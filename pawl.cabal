@@ -45,7 +45,10 @@ common executable
 library
   import: library
   -- cabal-gild: discover source/library
-  exposed-modules: Pawl
+  exposed-modules:
+    Pawl
+    Pawl.Type.Program
+
   hs-source-dirs: source/library
 
 test-suite pawl-test-suite
@@ -53,7 +56,7 @@ test-suite pawl-test-suite
   build-depends:
     tasty ^>=1.5.4,
     tasty-hunit ^>=0.10.2,
-    tasty-quickcheck ^>=0.11.1,
+    transformers ^>=0.6.1.2,
 
   hs-source-dirs: source/test-suite
   main-is: Main.hs
