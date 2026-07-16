@@ -40,9 +40,10 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 - **Current work is M1a** — casting a creature (mana, the stack, resolution).
   The design doc's M1 bundled two independent subsystems and is now split into
   **M1a** (casting) and **M1b** (combat); see `_scratch/design.md`. The
-  **committed spec** is `docs/superpowers/specs/2026-07-16-m1a-casting-design.md`.
-  Work through its plan task by task (TDD, one small complete commit per task on
-  `main`).
+  **committed spec** is `docs/superpowers/specs/2026-07-16-m1a-casting-design.md`
+  and the **implementation plan** to execute is
+  `docs/superpowers/plans/2026-07-16-m1a-casting.md`. Work through the plan task
+  by task (TDD, one small complete commit per task on `main`).
 - TODOs are tracked **ephemerally** with **git-bug** (installed in the Nix user
   profile, not the flake; data lives in `refs/bugs/*`). List with `git-bug bug`;
   create with `git-bug bug new -t "…" -m "…"`; close with
