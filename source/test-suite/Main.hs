@@ -1094,8 +1094,21 @@ replayTests =
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
 randomAnswer p = case p of
-  Prompt.DeclareAttackers {} -> pure []
-  Prompt.DeclareBlockers {} -> pure Map.empty
+  Prompt.DeclareAttackers _ _ ids -> do
+    g <- State.get
+    let (keep, g') = Random.uniformR (0, length ids) g
+    State.put g'
+    pure (take keep ids)
+  Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
+    [] -> pure Map.empty
+    a : _ -> do
+      g <- State.get
+      let (keep, g') = Random.uniformR (0, length mine) g
+      State.put g'
+      pure (Map.fromList (map (\b -> (b, a)) (take keep mine)))
+  -- The damage division stays canonical rather than random: a random division
+  -- would usually be illegal (it must total the attacker's power), and this
+  -- property suite is not the place to test the rejection path.
   Prompt.AssignCombatDamage _ _ _ ids n -> pure $ case Set.toList ids of
     b : _ -> Map.singleton b n
     [] -> Map.empty
@@ -1146,19 +1159,34 @@ propertyTests =
     "Properties"
     [ QC.testProperty "conservation: 120 objects at end" $ \s ->
         Game.objectCount (runRandomGame s) QC.=== 120,
+      -- The property that matters most now. Combat is the first thing that can
+      -- end a game before the library runs out.
       QC.testProperty "every game terminates with a result" $ \s ->
         QC.property (Maybe.isJust (GameState.result (runRandomGame s))),
       QC.testProperty "at least 120 ids were minted" $ \s ->
         QC.property (nextIdOf (runRandomGame s) >= 120),
-      -- Still true through all of M1a: damage does not exist until M1b. This
-      -- property FAILING is precisely how M1b announces itself.
-      QC.testProperty "no life changes before combat" $ \s ->
-        QC.property (all (\pl -> Player.life pl == Setup.startingLife) (Map.elems (GameState.players (runRandomGame s)))),
-      -- CR 500.4: pools empty at the end of every step, so a finished game can
-      -- never have mana floating.
       QC.testProperty "no mana floats at the end" $ \s ->
-        GameState.manaPool (runRandomGame s) QC.=== Map.empty
+        GameState.manaPool (runRandomGame s) QC.=== Map.empty,
+      -- Replaces M0's "no life changes". Nothing in M1b GAINS life, so any
+      -- increase is a bug. Dies at lifelink (M2), which is how M2 announces
+      -- itself -- exactly as this property's ancestor announced M1b.
+      QC.testProperty "life never increases" $ \s ->
+        QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players (runRandomGame s)))),
+      -- The M1b exit criterion, asserted rather than assumed: across 100 seeds,
+      -- at least one game must see damage actually change someone's life total.
+      -- Without this, every combat path could silently no-op and the suite would
+      -- still be green.
+      QC.testProperty "combat happens: some seed changes a life total" $
+        QC.once $
+          QC.property $
+            any someLifeChanged [1 .. 100 :: Int]
     ]
+
+-- Did anyone's life total move over the course of the game this seed produces?
+someLifeChanged :: Int -> Bool
+someLifeChanged s =
+  let moved pl = Player.life pl /= Setup.startingLife
+   in any moved (Map.elems (GameState.players (runRandomGame s)))
 
 -- Run setup, then a scripted tweak, then whatever steps the scenario needs.
 scenario :: Game.Type.Game () -> GameState.GameState
