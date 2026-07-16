@@ -54,6 +54,7 @@ library
     Pawl.Card
     Pawl.Decide
     Pawl.Game
+    Pawl.Sba
     Pawl.Setup
     Pawl.Turn
     Pawl.Type.Action

@@ -9,22 +9,27 @@ import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Game as Game
+import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TypeLine as TypeLine
@@ -40,7 +45,7 @@ testTree :: Tasty.TestTree
 testTree =
   Tasty.testGroup
     "pawl"
-    [programTests, cardTests, turnTests, gameTests, actionTests, setupTests]
+    [programTests, cardTests, turnTests, gameTests, actionTests, setupTests, sbaTests]
 
 alice, bob :: PlayerId.PlayerId
 alice = PlayerId.MkPlayerId 0
@@ -143,6 +148,27 @@ setupTests =
         HU.assertEqual "hand" 7 (length (Game.zoneMembers Zone.Hand bob setupState)),
       HU.testCase "active player is first in turn order" $
         HU.assertEqual "active" alice (GameState.activePlayer setupState)
+    ]
+
+sbaBase :: GameState.GameState
+sbaBase = Setup.emptyGame bothPlayers
+
+sbaTests :: Tasty.TestTree
+sbaTests =
+  Tasty.testGroup
+    "Sba"
+    [ HU.testCase "drew-from-empty loses" $
+        let after = Sba.checkStateBasedActions sbaBase {GameState.drewFromEmpty = Set.singleton alice}
+         in HU.assertEqual "alice lost" (Just (Status.Departed Departure.Lost)) (fmap Player.status (Map.lookup alice (GameState.players after))),
+      HU.testCase "one remaining player wins" $
+        let after = Sba.checkStateBasedActions sbaBase {GameState.drewFromEmpty = Set.singleton alice}
+         in HU.assertEqual "bob won" (Just (Result.Won bob)) (GameState.result after),
+      HU.testCase "life <= 0 loses" $
+        let gs = sbaBase {GameState.players = Map.insert alice (Player.MkPlayer {Player.life = 0, Player.status = Status.Playing}) (GameState.players sbaBase)}
+         in HU.assertEqual "bob won" (Just (Result.Won bob)) (GameState.result (Sba.checkStateBasedActions gs)),
+      HU.testCase "simultaneous last departures draw" $
+        let after = Sba.checkStateBasedActions sbaBase {GameState.drewFromEmpty = Set.fromList [alice, bob]}
+         in HU.assertEqual "draw" (Just Result.Drawn) (GameState.result after)
     ]
 
 -- A toy instruction set for exercising Program.
