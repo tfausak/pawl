@@ -86,7 +86,71 @@ testTree =
       stackTests,
       castEngineTests,
       sicknessTests,
-      damageTests
+      damageTests,
+      objectFactTests,
+      creatureSbaTests
+    ]
+
+objectFactTests :: Tasty.TestTree
+objectFactTests =
+  Tasty.testGroup
+    "ObjectFacts"
+    [ HU.testCase "a Piker's power and toughness are 2 and 1" $
+        let (oid, gs) = addPiker alice (Setup.emptyGame bothPlayers)
+         in do
+              HU.assertEqual "power" (Just 2) (Game.powerOf oid gs)
+              HU.assertEqual "toughness" (Just 1) (Game.toughnessOf oid gs),
+      HU.testCase "a Mountain has no power or toughness" $
+        let gs = mountainsInPlay 1
+         in case Game.zoneMembers Zone.Battlefield alice gs of
+              [] -> HU.assertFailure "fixture should have one Mountain"
+              oid : _ -> do
+                HU.assertEqual "power" Nothing (Game.powerOf oid gs)
+                HU.assertEqual "toughness" Nothing (Game.toughnessOf oid gs),
+      HU.testCase "controllerOf is the owner while nothing can change control" $
+        let (oid, gs) = addPiker bob (Setup.emptyGame bothPlayers)
+         in HU.assertEqual "controller" (Just bob) (Game.controllerOf oid gs),
+      HU.testCase "an unknown id has no facts" $
+        let gs = Setup.emptyGame bothPlayers
+            missing = ObjectId.MkObjectId 999
+         in do
+              HU.assertEqual "power" Nothing (Game.powerOf missing gs)
+              HU.assertEqual "controller" Nothing (Game.controllerOf missing gs)
+    ]
+
+creatureSbaTests :: Tasty.TestTree
+creatureSbaTests =
+  Tasty.testGroup
+    "CreatureSba"
+    [ HU.testCase "CR 704.5g a creature with lethal damage is destroyed" $
+        let (oid, gs) = addPiker alice (Setup.emptyGame bothPlayers)
+            after = Sba.checkStateBasedActions (markDamage oid 1 gs)
+         in do
+              HU.assertEqual "off the battlefield" [] (Game.zoneMembers Zone.Battlefield alice after)
+              HU.assertEqual "in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard alice after)),
+      HU.testCase "CR 704.5g damage below toughness is not lethal" $
+        let (oid, gs) = addPiker alice (Setup.emptyGame bothPlayers)
+            -- A Piker is 2/1, so 0 marked damage is survivable and 1 is not.
+            after = Sba.checkStateBasedActions (markDamage oid 0 gs)
+         in HU.assertEqual "still there" 1 (length (Game.zoneMembers Zone.Battlefield alice after)),
+      HU.testCase "CR 704.5g a Mountain with damage marked is not destroyed" $
+        -- Not a creature: 704.5f/g do not apply. This is the classification
+        -- doing its job -- the check never asks WHICH card it is.
+        let gs = mountainsInPlay 1
+         in case Game.zoneMembers Zone.Battlefield alice gs of
+              [] -> HU.assertFailure "fixture should have one Mountain"
+              oid : _ ->
+                HU.assertEqual
+                  "survives"
+                  1
+                  (length (Game.zoneMembers Zone.Battlefield alice (Sba.checkStateBasedActions (markDamage oid 5 gs)))),
+      HU.testCase "a destroyed creature conserves objects" $
+        let (oid, gs) = addPiker alice (Setup.emptyGame bothPlayers)
+            marked = markDamage oid 1 gs
+         in HU.assertEqual
+              "conserved"
+              (Game.objectCount marked)
+              (Game.objectCount (Sba.checkStateBasedActions marked))
     ]
 
 damageOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural.Natural

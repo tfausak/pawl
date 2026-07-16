@@ -3,6 +3,9 @@ module Pawl.Game where
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Quantity as Quantity
+import Pawl.Type.Card (Card)
+import qualified Pawl.Type.Card as Card
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Object (Object)
@@ -10,8 +13,12 @@ import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.ObjectId as ObjectId
 import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.Power as Power
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.Toughness as Toughness
 import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
 
@@ -74,3 +81,33 @@ changeZone oid dest gs = case lookupObject oid gs of
         gs2 = removeFromZones pid oid gs1
         gs3 = gs2 {GameState.objects = Map.insert newId newObj (Map.delete oid (GameState.objects gs2))}
      in insertIntoZone dest pid newId gs3
+
+-- The card an object is a copy of. Nothing when the id is unknown.
+cardOf :: ObjectId -> GameState -> Maybe Card
+cardOf oid gs = case lookupObject oid gs of
+  Nothing -> Nothing
+  Just obj -> case Object.source obj of
+    Source.OfCard printing -> Just (Printing.card printing)
+
+-- Nothing when the object has no power at all (a land), or when the value cannot
+-- be determined yet (a Star, once M3's layer system exists).
+powerOf :: ObjectId -> GameState -> Maybe Integer
+powerOf oid gs = case fmap Card.power (cardOf oid gs) of
+  Just (Just (Power.MkPower quantity)) -> Quantity.evaluate gs oid quantity
+  _ -> Nothing
+
+toughnessOf :: ObjectId -> GameState -> Maybe Integer
+toughnessOf oid gs = case fmap Card.toughness (cardOf oid gs) of
+  Just (Just (Toughness.MkToughness quantity)) -> Quantity.evaluate gs oid quantity
+  _ -> Nothing
+
+-- Who controls an object (CR 108.4). Nothing when the id is unknown.
+--
+-- Owner stands in for controller: nothing in M1b can change control, so the two
+-- are provably identical, and a real field would be dead state that every
+-- fixture must maintain and no card could observe drifting.
+--
+-- EXPIRES at M3 (Mindslaver). Everything that needs a controller calls this and
+-- never Object.owner, so that change is one function rather than every call site.
+controllerOf :: ObjectId -> GameState -> Maybe PlayerId
+controllerOf oid gs = fmap Object.owner (lookupObject oid gs)
