@@ -19,7 +19,9 @@ source-repository head
 
 common library
   build-depends:
-    base ^>=4.22.0
+    base ^>=4.22.0,
+    containers ^>=0.8,
+    text ^>=2.1.3,
 
   default-language: Haskell2010
   ghc-options:
@@ -47,7 +49,20 @@ library
   -- cabal-gild: discover source/library
   exposed-modules:
     Pawl
+    Pawl.Card
+    Pawl.Type.Card
+    Pawl.Type.CardType
+    Pawl.Type.Object
+    Pawl.Type.ObjectId
+    Pawl.Type.PlayerId
+    Pawl.Type.Printing
     Pawl.Type.Program
+    Pawl.Type.Source
+    Pawl.Type.Subtype
+    Pawl.Type.Supertype
+    Pawl.Type.TapState
+    Pawl.Type.TypeLine
+    Pawl.Type.Zone
 
   hs-source-dirs: source/library
 
