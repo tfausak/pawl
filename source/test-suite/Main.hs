@@ -8,6 +8,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
+import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
@@ -45,7 +46,15 @@ testTree :: Tasty.TestTree
 testTree =
   Tasty.testGroup
     "pawl"
-    [programTests, cardTests, turnTests, gameTests, actionTests, setupTests, sbaTests]
+    [ programTests,
+      cardTests,
+      turnTests,
+      gameTests,
+      actionTests,
+      setupTests,
+      sbaTests,
+      engineTests
+    ]
 
 alice, bob :: PlayerId.PlayerId
 alice = PlayerId.MkPlayerId 0
@@ -169,6 +178,53 @@ sbaTests =
       HU.testCase "simultaneous last departures draw" $
         let after = Sba.checkStateBasedActions sbaBase {GameState.drewFromEmpty = Set.fromList [alice, bob]}
          in HU.assertEqual "draw" (Just Result.Drawn) (GameState.result after)
+    ]
+
+goldfishResult :: (Result.Result, GameState.GameState)
+goldfishResult =
+  Engine.runGamePure identityAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom bothPlayers)
+
+-- Always plays a land when one is legal, otherwise passes.
+playLandAnswer :: Prompt.Prompt r -> r
+playLandAnswer p = case p of
+  Prompt.Shuffle ids -> ids
+  Prompt.ChooseAction _ _ actions ->
+    let isPlay :: A.Action -> Bool
+        isPlay a = case a of
+          A.Play _ -> True
+          A.Pass -> False
+     in case filter isPlay actions of
+          h : _ -> h
+          [] -> A.Pass
+
+landState :: GameState.GameState
+landState =
+  snd (Engine.runGamePure playLandAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom bothPlayers))
+
+-- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With one land play per
+-- turn (CR 305.2) a player can never have more lands out than turns taken.
+turnsTaken :: PlayerId.PlayerId -> GameState.GameState -> Int
+turnsTaken pid gs =
+  let total = fromIntegral (GameState.turnNumber gs)
+   in if pid == alice then (total + 1) `div` 2 else total `div` 2
+
+engineTests :: Tasty.TestTree
+engineTests =
+  Tasty.testGroup
+    "Engine"
+    [ HU.testCase "goldfish game ends with the starting player winning" $
+        HU.assertEqual "winner" (Result.Won alice) (fst goldfishResult),
+      HU.testCase "card conservation holds at end" $
+        HU.assertEqual "objects" 120 (Game.objectCount (snd goldfishResult)),
+      HU.testCase "playing lands fills the battlefield" $
+        HU.assertBool "non-empty" $
+          not (null (Game.zoneMembers Zone.Battlefield alice landState)),
+      HU.testCase "land play conserves cards" $
+        HU.assertEqual "objects" 120 (Game.objectCount landState),
+      HU.testCase "CR 305.2 at most one land per turn" $
+        HU.assertBool "no double land plays" $
+          length (Game.zoneMembers Zone.Battlefield alice landState) <= turnsTaken alice landState
+            && length (Game.zoneMembers Zone.Battlefield bob landState) <= turnsTaken bob landState
     ]
 
 -- A toy instruction set for exercising Program.
