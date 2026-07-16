@@ -1,0 +1,40 @@
+cabal-version: 3.14
+name: pawl
+version: 0.2026.7.15
+license: 0BSD
+license-file: LICENSE.txt
+extra-doc-files:
+  CHANGELOG.md
+  README.md
+
+category: TODO
+maintainer: TODO
+synopsis: TODO
+description: TODO TODO
+
+source-repository head
+  location: https://github.com/tfausak/pawl
+  type: git
+
+common library
+  build-depends:
+    base ^>=4.22.0
+
+  default-language: Haskell2010
+  ghc-options:
+    -Weverything
+    -Wno-implicit-prelude
+    -Wno-missing-deriving-strategies
+    -Wno-missing-export-lists
+    -Wno-missing-kind-signatures
+    -Wno-missing-role-annotations
+    -Wno-missing-safe-haskell-mode
+    -Wno-prepositive-qualified-module
+    -Wno-safe
+    -Wno-unsafe
+
+library
+  import: library
+  -- cabal-gild: discover source/library
+  exposed-modules: Pawl
+  hs-source-dirs: source/library

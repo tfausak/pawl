@@ -1,0 +1,43 @@
+hook cabal_check {
+    command cabal check {
+        pass_files none
+    }
+    files *.cabal
+}
+
+hook cabal_gild {
+    command cabal-gild {
+        check_args --mode check
+    }
+    files *.cabal cabal.project
+}
+
+hook hlint {
+    command hlint {
+    }
+    files *.hs
+}
+
+hook hooky {
+    command hooky lint {
+        fix_args --fix
+        pass_files file
+    }
+    files *
+}
+
+hook ormolu {
+    command ormolu {
+        check_args --mode check
+        fix_args --mode inplace
+    }
+    files *.hs
+}
+
+lint_rules {
+    - check_broken_symlinks
+    - check_case_conflict
+    - check_merge_conflict
+    - end_of_file_fixer
+    - trailing_whitespace
+}
