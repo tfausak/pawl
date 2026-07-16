@@ -75,14 +75,26 @@ untapAll pid = do
 
 -- CR 514.2. In M0 every card is a Mountain, so "which to discard" has no
 -- meaningful choice: trim from the front of hand without prompting.
+-- CR 514.2. Non-identical cards now share a hand (Mountains and Pikers), so
+-- trimming front-of-hand would be the engine choosing what to pitch -- policy in
+-- the rules core, not canonicalization. The choice is the player's.
+--
+-- The answer is filtered to cards actually in hand and capped at the excess, so
+-- a misbehaving interpreter cannot discard someone else's card or overshoot. An
+-- interpreter that returns too few simply discards too few; that is its bug, and
+-- inventing a fallback here would put the policy back.
 discardToHandSize :: PlayerId -> Game ()
 discardToHandSize pid = do
   gs <- State.get
   let held = Game.zoneMembers Zone.Hand pid gs
       excess = length held - Setup.openingHand
-      toGraveyard g oid = Game.changeZone oid Zone.Graveyard g
-  Monad.when (excess > 0) $
-    State.put (List.foldl' toGraveyard gs (take excess held))
+  Monad.when (excess > 0) $ do
+    let decider = Decide.deciderFor pid gs
+    chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (fromIntegral excess)))
+    let inHand oid = List.elem oid held
+        toDiscard = take excess (filter inHand chosen)
+        toGraveyard g oid = Game.changeZone oid Zone.Graveyard g
+    State.modify' (\g -> List.foldl' toGraveyard g toDiscard)
 
 -- CR 103.7a: the starting player skips their first draw step.
 skipsDraw :: GameState -> Bool

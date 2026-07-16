@@ -3,3 +3,8 @@
 # characteristic-defining ability), Plus Quantity Quantity, Half, Infinite,
 # Variable. See the module comment and the M1a design spec.
 - ignore: {name: "Use newtype instead of data", within: [Pawl.Type.Quantity]}
+
+# HLint wants prefix `elem x xs` rewritten to infix ``x `elem` xs``. The project
+# style rule is the opposite: prefer functions to operators, and no
+# backtick-infixed functions. See the style section of CONTRIBUTING.md.
+- ignore: {name: "Use infix"}

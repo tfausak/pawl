@@ -75,7 +75,49 @@ testTree =
       ruleTests,
       quantityTests,
       manaTests,
-      deckTests
+      deckTests,
+      discardTests
+    ]
+
+-- Discards from the BACK of hand. Deliberately unlike every fallback, so the
+-- CR 514.2 test proves the prompted choice is actually honored.
+discardLastAnswer :: Prompt.Prompt r -> r
+discardLastAnswer p = case p of
+  Prompt.Shuffle ids -> ids
+  Prompt.ChooseAction {} -> A.Pass
+  Prompt.ChooseDiscard _ _ ids n -> lastN (fromIntegral n) ids
+
+lastN :: Int -> [a] -> [a]
+lastN n xs = drop (length xs - n) xs
+
+-- Bob draws to eight, then discards at cleanup under discardLastAnswer.
+bobDiscardChoice :: (GameState.GameState, [ObjectId.ObjectId])
+bobDiscardChoice =
+  let start = Setup.emptyGame bothPlayers
+      steps = do
+        Setup.newGame bothPlayers
+        State.modify' $ \gs -> gs {GameState.activePlayer = bob, GameState.turnNumber = 2}
+        drawStep
+        beforeCleanup <- State.gets (Game.zoneMembers Zone.Hand bob)
+        Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)
+        pure beforeCleanup
+      (held, final) = Engine.runGamePure discardLastAnswer start steps
+   in (final, held)
+
+discardTests :: Tasty.TestTree
+discardTests =
+  Tasty.testGroup
+    "Discard"
+    [ HU.testCase "CR 514.2 discard trims to hand size" $
+        HU.assertEqual "hand" 7 (handSize bob (fst bobDiscardChoice)),
+      HU.testCase "CR 514.2 the prompted choice is honored" $
+        let (final, held) = bobDiscardChoice
+            kept = Game.zoneMembers Zone.Hand bob final
+            -- discardLastAnswer pitched the last card, so the first seven of the
+            -- pre-cleanup hand are exactly what survives. Ids are stable here:
+            -- the kept cards never changed zones.
+            expected = take 7 held
+         in HU.assertEqual "kept the front seven" expected kept
     ]
 
 countByName :: Text.Text -> PlayerId.PlayerId -> GameState.GameState -> Int
@@ -277,6 +319,7 @@ identityAnswer :: Prompt.Prompt r -> r
 identityAnswer p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> A.Pass
+  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
 
 setupState :: GameState.GameState
 setupState =
@@ -327,6 +370,7 @@ goldfishResult =
 playLandAnswer :: Prompt.Prompt r -> r
 playLandAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.ChooseAction _ _ actions ->
     let isPlay a = case a of
           A.Play _ -> True
@@ -393,6 +437,7 @@ randomAnswer p = case p of
     let (g1, g2) = Random.splitGen g
     State.put g2
     pure (shuffleWith g1 ids)
+  Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
   Prompt.ChooseAction _ _ actions -> do
     g <- State.get
     let n = length actions

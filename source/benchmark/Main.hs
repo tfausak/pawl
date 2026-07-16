@@ -15,6 +15,7 @@ alwaysPass :: Prompt.Prompt r -> r
 alwaysPass p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> Action.Pass
+  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
 
 -- Takes the first player's id so the whole game genuinely depends on the
 -- benchmark's argument; otherwise GHC floats the result out and times a cached
