@@ -7,6 +7,11 @@
 # backticked section rather than a bare application.
 - ignore: {name: "Avoid lambda using `infix`"}
 
+# HLint rewrites `if c then [] else [x]` into `[x | not c]`. The project style
+# rule bans list comprehensions outright, so this can never be applied. See the
+# style section of CONTRIBUTING.md.
+- ignore: {name: "Use list comprehension"}
+
 # HLint suggests `(, x)` for `\y -> (y, x)`. That needs TupleSections, and the
 # project is Haskell 2010 with only GADTs and RankNTypes permitted, so the
 # suggestion can never be applied. See the style section of CONTRIBUTING.md.

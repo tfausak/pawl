@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
@@ -97,7 +98,87 @@ testTree =
       creatureSbaTests,
       combatLegalityTests,
       combatReplayTests,
-      declareTests
+      declareTests,
+      combatDamageTests
+    ]
+
+lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
+lifeOf pid gs = fmap Player.life (Map.lookup pid (GameState.players gs))
+
+-- Attack with everything, block per the given plan, then deal damage.
+fightWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+fightWith answer gs =
+  snd $ Engine.runGamePure answer gs $ do
+    Combat.declareAttackers alice
+    Combat.declareBlockers
+    Damage.dealCombatDamage
+
+combatDamageTests :: Tasty.TestTree
+combatDamageTests =
+  Tasty.testGroup
+    "CombatDamage"
+    [ HU.testCase "CR 510.1b an unblocked attacker damages the defending player" $
+        let (gs, _, _) = combatBoard 1 0
+            after = fightWith aggressiveAnswer gs
+         in -- A Piker is a 2/1, and bob starts at 20.
+            HU.assertEqual "bob took 2" (Just 18) (lifeOf bob after),
+      HU.testCase "CR 509 a blocked attacker does not damage the player" $
+        let (gs, _, _) = combatBoard 1 1
+            after = fightWith aggressiveAnswer gs
+         in HU.assertEqual "bob untouched" (Just 20) (lifeOf bob after),
+      HU.testCase "CR 510.1c a single blocker takes all the damage, unprompted" $
+        -- If the engine wrongly prompts here, this interpreter answers with an
+        -- empty division, which is illegal (it does not total the attacker's
+        -- power), so it is rejected and the blocker takes 0 -- and the assertion
+        -- below fails. That is why this proves "unprompted" without an `error`,
+        -- which the no-partial-functions rule forbids anyway.
+        let (gs, _, theirs) = combatBoard 1 1
+            noAssign :: Prompt.Prompt r -> r
+            noAssign p = case p of
+              Prompt.AssignCombatDamage {} -> Map.empty
+              _ -> aggressiveAnswer p
+            after = fightWith noAssign gs
+         in case theirs of
+              [] -> HU.assertFailure "fixture should have a blocker"
+              b : _ -> HU.assertEqual "took 2" (Just 2) (damageOf b after),
+      HU.testCase "CR 510.2 a 2/1 trade kills BOTH creatures" $
+        -- The simultaneity test. Sequential damage kills only one, because the
+        -- blocker would be in the graveyard before it dealt its damage.
+        let (gs, _, _) = combatBoard 1 1
+            after = Sba.checkStateBasedActions (fightWith aggressiveAnswer gs)
+         in do
+              HU.assertEqual "alice's is dead" 0 (creaturesInPlay alice after)
+              HU.assertEqual "bob's is dead" 0 (creaturesInPlay bob after),
+      HU.testCase "CR 510.1c a free division of 2 across two blockers kills both" $
+        let (gs, _, theirs) = combatBoard 1 2
+            split :: Prompt.Prompt r -> r
+            split p = case p of
+              Prompt.AssignCombatDamage _ _ _ ids _ -> Map.fromList (map (\b -> (b, 1)) (Set.toList ids))
+              _ -> aggressiveAnswer p
+            after = Sba.checkStateBasedActions (fightWith split gs)
+         in do
+              HU.assertEqual "both blockers dead" 0 (creaturesInPlay bob after)
+              HU.assertEqual "expected two blockers" 2 (length theirs),
+      HU.testCase "CR 510.1c the same 2 damage on one blocker kills only it" $
+        let (gs, _, _) = combatBoard 1 2
+            dump :: Prompt.Prompt r -> r
+            dump p = case p of
+              Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
+                b : _ -> Map.singleton b n
+                [] -> Map.empty
+              _ -> aggressiveAnswer p
+            after = Sba.checkStateBasedActions (fightWith dump gs)
+         in HU.assertEqual "one blocker survives" 1 (creaturesInPlay bob after),
+      HU.testCase "CR 510.1e an illegal division is rejected and deals nothing" $
+        -- Not a reachable game state: this is the engine's defense against a
+        -- broken interpreter. See the spec, section 3.
+        let (gs, _, _) = combatBoard 1 2
+            cheat :: Prompt.Prompt r -> r
+            cheat p = case p of
+              Prompt.AssignCombatDamage _ _ _ ids _ -> Map.fromList (map (\b -> (b, 99)) (Set.toList ids))
+              _ -> aggressiveAnswer p
+            after = Sba.checkStateBasedActions (fightWith cheat gs)
+         in HU.assertEqual "both blockers survive" 2 (creaturesInPlay bob after)
     ]
 
 -- Attacks with everything and blocks the first attacker with everything.

@@ -135,6 +135,9 @@ runTurnBasedActions phase = do
       Monad.unless skip (drawFor active)
     Phase.Combat CombatStep.DeclareAttackers -> Combat.declareAttackers active
     Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers
+    Phase.Combat CombatStep.CombatDamage -> Damage.dealCombatDamage
+    -- CR 511.3: creatures stop being attacking and blocking.
+    Phase.Combat CombatStep.EndOfCombat -> State.modify' Combat.clearCombat
     Phase.Ending EndingStep.Cleanup -> do
       discardToHandSize active
       -- CR 514.2: damage wears off simultaneously with the discard.
