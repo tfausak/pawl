@@ -55,6 +55,7 @@ library
     Pawl.Action
     Pawl.Card
     Pawl.Cast
+    Pawl.Combat
     Pawl.Damage
     Pawl.Decide
     Pawl.Engine
@@ -67,10 +68,12 @@ library
     Pawl.Stack
     Pawl.Turn
     Pawl.Type.Action
+    Pawl.Type.AttackTarget
     Pawl.Type.BeginningStep
     Pawl.Type.Card
     Pawl.Type.CardType
     Pawl.Type.Color
+    Pawl.Type.Combat
     Pawl.Type.CombatStep
     Pawl.Type.Decider
     Pawl.Type.DecisionLog

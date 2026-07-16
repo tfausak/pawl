@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Data.Sequence (Seq)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
+import Pawl.Type.Combat (Combat)
 import Pawl.Type.Mana (Mana)
 import Pawl.Type.Object (Object)
 import Pawl.Type.ObjectId (ObjectId)
@@ -23,6 +24,8 @@ data GameState = MkGameState
     players :: Map PlayerId Player,
     -- CR 106.4. Absent from the map means an empty pool.
     manaPool :: Map PlayerId Mana,
+    -- CR 508/509. Lives for one combat phase; cleared at CR 511.
+    combat :: Combat,
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
     phase :: Phase,

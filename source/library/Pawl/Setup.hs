@@ -7,6 +7,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Pawl.Card as Card
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Game as Game
 import qualified Pawl.Turn as Turn
 import Pawl.Type.Game (Game)
@@ -61,6 +62,7 @@ emptyGame order =
           GameState.stack = [],
           GameState.players = Map.fromList (map newPlayer order_),
           GameState.manaPool = Map.empty,
+          GameState.combat = Combat.emptyCombat,
           GameState.turnOrder = order_,
           GameState.activePlayer = NonEmpty.head order,
           GameState.phase = Turn.firstPhase,

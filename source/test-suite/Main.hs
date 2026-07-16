@@ -12,6 +12,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
@@ -23,10 +24,13 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
+import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Combat as Combat.Type
+import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
@@ -88,7 +92,99 @@ testTree =
       sicknessTests,
       damageTests,
       objectFactTests,
-      creatureSbaTests
+      creatureSbaTests,
+      combatLegalityTests
+    ]
+
+-- alice is active with `a` Settled Pikers; bob defends with `b` Settled Pikers.
+-- Returns the attackers' ids and the blockers' ids alongside the state.
+combatBoard :: Int -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+combatBoard a b =
+  let addN pid n gs =
+        List.foldl'
+          (\(ids, g) _ -> let (oid, g1) = addPiker pid g in (ids ++ [oid], g1))
+          ([], gs)
+          [1 .. n]
+      (mine, gs1) = addN alice a (Setup.emptyGame bothPlayers)
+      (theirs, gs2) = addN bob b gs1
+   in ( gs2
+          { GameState.activePlayer = alice,
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers
+          },
+        mine,
+        theirs
+      )
+
+combatLegalityTests :: Tasty.TestTree
+combatLegalityTests =
+  Tasty.testGroup
+    "CombatLegality"
+    [ HU.testCase "a Settled untapped creature may attack" $
+        let (gs, mine, _) = combatBoard 1 0
+         in case mine of
+              [] -> HU.assertFailure "fixture should have an attacker"
+              oid : _ -> HU.assertBool "may attack" (Combat.canAttack alice oid gs),
+      HU.testCase "CR 302.6 a summoning sick creature may not attack" $
+        let (gs, mine, _) = combatBoard 1 0
+         in case mine of
+              [] -> HU.assertFailure "fixture should have an attacker"
+              oid : _ ->
+                let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+                 in HU.assertBool "may not attack" (not (Combat.canAttack alice oid sick)),
+      HU.testCase "CR 508.1a a tapped creature may not attack" $
+        let (gs, mine, _) = combatBoard 1 0
+         in case mine of
+              [] -> HU.assertFailure "fixture should have an attacker"
+              oid : _ ->
+                let tapped = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
+                 in HU.assertBool "may not attack" (not (Combat.canAttack alice oid tapped)),
+      HU.testCase "a land may not attack" $
+        let gs = (mountainsInPlay 1) {GameState.activePlayer = alice}
+         in case Game.zoneMembers Zone.Battlefield alice gs of
+              [] -> HU.assertFailure "fixture should have one Mountain"
+              oid : _ -> HU.assertBool "may not attack" (not (Combat.canAttack alice oid gs)),
+      HU.testCase "you may not attack with a creature you do not control" $
+        let (gs, _, theirs) = combatBoard 1 1
+         in case theirs of
+              [] -> HU.assertFailure "fixture should have a blocker"
+              oid : _ -> HU.assertBool "not alice's" (not (Combat.canAttack alice oid gs)),
+      -- CR 302.6 restricts attacking and tap abilities. It says NOTHING about
+      -- blocking, and getting this wrong is the classic beginner bug.
+      HU.testCase "CR 302.6 a summoning sick creature MAY block" $
+        let (gs, _, theirs) = combatBoard 1 1
+         in case theirs of
+              [] -> HU.assertFailure "fixture should have a blocker"
+              oid : _ ->
+                let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+                 in HU.assertBool "may block" (Combat.canBlock bob oid sick),
+      HU.testCase "CR 509.1a a tapped creature may not block" $
+        let (gs, _, theirs) = combatBoard 1 1
+         in case theirs of
+              [] -> HU.assertFailure "fixture should have a blocker"
+              oid : _ ->
+                let tapped = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
+                 in HU.assertBool "may not block" (not (Combat.canBlock bob oid tapped)),
+      HU.testCase "legalAttackers lists exactly the active player's creatures" $
+        let (gs, mine, _) = combatBoard 2 3
+         in HU.assertEqual "two" mine (Combat.legalAttackers alice gs),
+      HU.testCase "the defending player is the non-active player" $
+        let (gs, _, _) = combatBoard 1 1
+         in HU.assertEqual "bob defends" [bob] (Combat.defendingPlayers gs),
+      HU.testCase "combat starts empty and clears" $
+        let (gs, mine, _) = combatBoard 1 0
+            busy = case mine of
+              [] -> gs
+              oid : _ ->
+                gs
+                  { GameState.combat =
+                      Combat.Type.MkCombat
+                        { Combat.Type.attackers = Map.singleton oid (AttackTarget.OfPlayer bob),
+                          Combat.Type.blockers = Map.empty
+                        }
+                  }
+         in do
+              HU.assertEqual "starts empty" Map.empty (Combat.Type.attackers (GameState.combat gs))
+              HU.assertEqual "clears" Map.empty (Combat.Type.attackers (GameState.combat (Combat.clearCombat busy)))
     ]
 
 objectFactTests :: Tasty.TestTree
@@ -595,6 +691,7 @@ oneMountainState ph =
           GameState.stack = [],
           GameState.players = Map.empty,
           GameState.manaPool = Map.empty,
+          GameState.combat = Combat.emptyCombat,
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,
           GameState.phase = ph,
