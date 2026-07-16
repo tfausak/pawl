@@ -41,11 +41,23 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-16-m1a-casting-design.md` and
   `docs/superpowers/plans/2026-07-16-m1a-casting.md`.
-- **Current work is M1b** — combat. The design doc's M1 bundled two independent
-  subsystems and is split into **M1a** (casting) and **M1b** (combat); see
-  `_scratch/design.md`. Spec:
-  `docs/superpowers/specs/2026-07-16-m1b-combat-design.md`. Plan to execute:
+- **M1b is complete** (Pikers attack, block, deal damage simultaneously per CR
+  510.2, and die). The design doc's M1 bundled two independent subsystems and was
+  split into **M1a** (casting) and **M1b** (combat); see `_scratch/design.md`.
+  Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-16-m1b-combat-design.md` and
   `docs/superpowers/plans/2026-07-16-m1b-combat.md`.
+- **Current work is M2a** — the keyword seam plus flying, reach, defender,
+  vigilance and haste. The design doc's M2 is split into **M2a** (the seam +
+  blocking/attacking legality), **M2b** (first strike + the CR 506.1 conditional
+  turn structure) and **M2c** (deathtouch + trample); the split, the full 702
+  triage, and why protection and banding are punted are in `_scratch/design.md`.
+  Spec: `docs/superpowers/specs/2026-07-16-m2a-keywords-design.md`. Plan: not yet
+  written.
+- **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
+  the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
+  `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
+  not an effect. See §1 of the M2a spec before "fixing" this.
 - TODOs are tracked **ephemerally** with **git-bug** (installed in the Nix user
   profile, not the flake; data lives in `refs/bugs/*`). List with `git-bug bug`;
   create with `git-bug bug new -t "…" -m "…"`; close with
