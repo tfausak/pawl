@@ -3,6 +3,7 @@
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -20,6 +21,7 @@ import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -36,6 +38,7 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
+import qualified System.Random as Random
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 import qualified Test.Tasty.QuickCheck as QC
@@ -55,7 +58,9 @@ testTree =
       setupTests,
       sbaTests,
       engineTests,
-      replayTests
+      replayTests,
+      propertyTests,
+      ruleTests
     ]
 
 alice, bob :: PlayerId.PlayerId
@@ -248,6 +253,127 @@ replayTests =
             let ((_, gf), gfLog) = Replay.record identityAnswer start game
              in HU.assertEqual "goldfish" gf (snd (Replay.replay gfLog start game))
         ]
+
+-- A StdGen-driven interpreter: random shuffle and random legal action.
+randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
+randomAnswer p = case p of
+  Prompt.Shuffle ids -> do
+    g <- State.get
+    let (g1, g2) = Random.splitGen g
+    State.put g2
+    pure (shuffleWith g1 ids)
+  Prompt.ChooseAction _ _ actions -> do
+    g <- State.get
+    let n = length actions
+        (i, g') = Random.uniformR (0, max 0 (n - 1)) g
+    State.put g'
+    pure (pick actions (min (n - 1) (max 0 i)))
+
+-- Total index into a list; the engine always offers at least Pass, so the
+-- fallback is unreachable in practice but keeps this free of partial functions.
+pick :: [A.Action] -> Int -> A.Action
+pick actions i = case drop i actions of
+  h : _ -> h
+  [] -> A.Pass
+
+shuffleWith :: Random.StdGen -> [a] -> [a]
+shuffleWith g xs =
+  let unfoldInts :: Random.StdGen -> [Int]
+      unfoldInts gen = let (v, gen') = Random.uniform gen in v : unfoldInts gen'
+      insertByKey :: (Int, a) -> [(Int, a)] -> [(Int, a)]
+      insertByKey y ys = case ys of
+        [] -> [y]
+        z : zs -> if fst y <= fst z then y : z : zs else z : insertByKey y zs
+      keys = take (length xs) (unfoldInts g)
+   in map snd (foldr insertByKey [] (zip keys xs))
+
+runRandomGame :: Int -> GameState.GameState
+runRandomGame s =
+  let start = Setup.emptyGame bothPlayers
+      game = Engine.playFrom bothPlayers
+      (_, final) = State.evalState (Program.foldProgramM randomAnswer (State.runStateT game start)) (Random.mkStdGen s)
+   in final
+
+nextIdOf :: GameState.GameState -> Integer
+nextIdOf gs = case GameState.nextObjectId gs of
+  ObjectId.MkObjectId n -> toInteger n
+
+propertyTests :: Tasty.TestTree
+propertyTests =
+  Tasty.testGroup
+    "Properties"
+    [ QC.testProperty "conservation: 120 objects at end" $ \s ->
+        Game.objectCount (runRandomGame s) QC.=== 120,
+      QC.testProperty "every game terminates with a result" $ \s ->
+        QC.property (Maybe.isJust (GameState.result (runRandomGame s))),
+      QC.testProperty "at least 120 ids were minted" $ \s ->
+        QC.property (nextIdOf (runRandomGame s) >= 120),
+      QC.testProperty "no life changes in M0" $ \s ->
+        QC.property (all (\pl -> Player.life pl == Setup.startingLife) (Map.elems (GameState.players (runRandomGame s))))
+    ]
+
+-- Run setup, then a scripted tweak, then whatever steps the scenario needs.
+scenario :: Game.Type.Game () -> GameState.GameState
+scenario steps =
+  snd $ Engine.runGamePure identityAnswer (Setup.emptyGame bothPlayers) $ do
+    Setup.newGame bothPlayers
+    steps
+
+drawStep :: Game.Type.Game ()
+drawStep = Engine.runTurnBasedActions (Phase.Beginning BeginningStep.DrawStep)
+
+-- Alice starts, so her turn-1 draw is skipped.
+aliceFirstDraw :: GameState.GameState
+aliceFirstDraw = scenario drawStep
+
+-- Bob is not the starting player, so his draw happens normally.
+bobFirstDraw :: GameState.GameState
+bobFirstDraw = scenario $ do
+  State.modify' $ \gs -> gs {GameState.activePlayer = bob, GameState.turnNumber = 2}
+  drawStep
+
+bobAfterCleanup :: GameState.GameState
+bobAfterCleanup = scenario $ do
+  State.modify' $ \gs -> gs {GameState.activePlayer = bob, GameState.turnNumber = 2}
+  drawStep
+  Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)
+
+deckedOut :: GameState.GameState
+deckedOut = scenario $ do
+  State.modify' $ \gs ->
+    gs
+      { GameState.library = Map.insert alice Seq.empty (GameState.library gs),
+        GameState.turnNumber = 3
+      }
+  drawStep
+  Engine.checkSba
+
+handSize :: PlayerId.PlayerId -> GameState.GameState -> Int
+handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
+
+librarySize :: PlayerId.PlayerId -> GameState.GameState -> Int
+librarySize pid gs = length (Game.zoneMembers Zone.Library pid gs)
+
+ruleTests :: Tasty.TestTree
+ruleTests =
+  Tasty.testGroup
+    "Rules"
+    [ HU.testCase "CR 103.7a starting player skips first draw" $ do
+        HU.assertEqual "hand" 7 (handSize alice aliceFirstDraw)
+        HU.assertEqual "library" 53 (librarySize alice aliceFirstDraw),
+      HU.testCase "CR 103.7a only the starting player skips" $ do
+        HU.assertEqual "hand" 8 (handSize bob bobFirstDraw)
+        HU.assertEqual "library" 52 (librarySize bob bobFirstDraw),
+      HU.testCase "CR 514.2 discard to hand size" $
+        HU.assertEqual "hand" 7 (handSize bob bobAfterCleanup),
+      HU.testCase "CR 704.5b deck-out loses" $
+        HU.assertEqual
+          "alice departed"
+          (Just (Status.Departed Departure.Lost))
+          (fmap Player.status (Map.lookup alice (GameState.players deckedOut))),
+      HU.testCase "CR 704.5b the survivor wins" $
+        HU.assertEqual "bob won" (Just (Result.Won bob)) (GameState.result deckedOut)
+    ]
 
 -- A toy instruction set for exercising Program.
 data Toy r where
