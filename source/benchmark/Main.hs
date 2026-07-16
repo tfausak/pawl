@@ -17,17 +17,43 @@ alwaysPass p = case p of
   Prompt.ChooseAction {} -> Action.Pass
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
 
+-- Casts when legal, otherwise passes: the benchmark that actually exercises the
+-- stack, mana payment, and resolution.
+castAnswer :: Prompt.Prompt r -> r
+castAnswer p = case p of
+  Prompt.Shuffle ids -> ids
+  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseAction _ _ actions ->
+    let isCast a = case a of
+          Action.Cast _ -> True
+          _ -> False
+     in case filter isCast actions of
+          h : _ -> h
+          [] -> Action.Pass
+
+-- Two players, seeded from the benchmark's argument.
+playersFrom :: Natural -> NonEmpty.NonEmpty PlayerId
+playersFrom n = PlayerId.MkPlayerId n NonEmpty.:| [PlayerId.MkPlayerId (n + 1)]
+
 -- Takes the first player's id so the whole game genuinely depends on the
 -- benchmark's argument; otherwise GHC floats the result out and times a cached
 -- value rather than the game. NOINLINE keeps it from being folded back in.
 goldfish :: Natural -> Result
 goldfish n =
-  let players = PlayerId.MkPlayerId n NonEmpty.:| [PlayerId.MkPlayerId (n + 1)]
+  let players = playersFrom n
    in fst (Engine.runGamePure alwaysPass (Setup.emptyGame players) (Engine.playFrom players))
 {-# NOINLINE goldfish #-}
+
+-- Parameterized for the same reason as 'goldfish'.
+casting :: Natural -> Result
+casting n =
+  let players = playersFrom n
+   in fst (Engine.runGamePure castAnswer (Setup.emptyGame players) (Engine.playFrom players))
+{-# NOINLINE casting #-}
 
 main :: IO ()
 main =
   Bench.defaultMain
-    [ Bench.bench "goldfish 2p" $ Bench.whnf goldfish 0
+    [ Bench.bench "goldfish 2p" $ Bench.whnf goldfish 0,
+      Bench.bench "casting 2p" $ Bench.whnf casting 0
     ]

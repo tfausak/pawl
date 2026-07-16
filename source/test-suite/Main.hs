@@ -658,8 +658,14 @@ propertyTests =
         QC.property (Maybe.isJust (GameState.result (runRandomGame s))),
       QC.testProperty "at least 120 ids were minted" $ \s ->
         QC.property (nextIdOf (runRandomGame s) >= 120),
-      QC.testProperty "no life changes in M0" $ \s ->
-        QC.property (all (\pl -> Player.life pl == Setup.startingLife) (Map.elems (GameState.players (runRandomGame s))))
+      -- Still true through all of M1a: damage does not exist until M1b. This
+      -- property FAILING is precisely how M1b announces itself.
+      QC.testProperty "no life changes before combat" $ \s ->
+        QC.property (all (\pl -> Player.life pl == Setup.startingLife) (Map.elems (GameState.players (runRandomGame s)))),
+      -- CR 500.4: pools empty at the end of every step, so a finished game can
+      -- never have mana floating.
+      QC.testProperty "no mana floats at the end" $ \s ->
+        GameState.manaPool (runRandomGame s) QC.=== Map.empty
     ]
 
 -- Run setup, then a scripted tweak, then whatever steps the scenario needs.
