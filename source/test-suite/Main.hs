@@ -4,20 +4,25 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Card as Card
+import qualified Pawl.Turn as Turn
+import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
+import qualified Test.Tasty.QuickCheck as QC
 
 main :: IO ()
 main = Tasty.defaultMain testTree
 
 testTree :: Tasty.TestTree
-testTree = Tasty.testGroup "pawl" [programTests, cardTests]
+testTree = Tasty.testGroup "pawl" [programTests, cardTests, turnTests]
 
 -- A toy instruction set for exercising Program.
 data Toy r where
@@ -63,3 +68,31 @@ cardTests =
         HU.assertBool "cardtype" $
           Set.member CardType.Land (TypeLine.types (Card.Type.typeLine (Printing.card Card.mountainPrinting)))
     ]
+
+turnSequence :: [Phase.Phase]
+turnSequence = go Turn.firstPhase
+  where
+    go p = p : maybe [] go (Turn.next p)
+
+turnTests :: Tasty.TestTree
+turnTests =
+  Tasty.testGroup
+    "Turn"
+    [ HU.testCase "firstPhase is the untap step" $
+        HU.assertEqual "firstPhase" (Phase.Beginning BeginningStep.Untap) Turn.firstPhase,
+      HU.testCase "a turn has twelve steps in order" $
+        HU.assertEqual "sequence" Turn.allPhases turnSequence,
+      HU.testCase "next returns Nothing after cleanup" $
+        HU.assertEqual "end" Nothing (Turn.next (Phase.Ending EndingStep.Cleanup)),
+      HU.testCase "untap and cleanup grant no priority" $
+        HU.assertBool "no priority" $
+          not (Turn.grantsPriority (Phase.Beginning BeginningStep.Untap))
+            && not (Turn.grantsPriority (Phase.Ending EndingStep.Cleanup)),
+      QC.testProperty "next never revisits a phase in a turn" $
+        QC.property (length turnSequence == length (dedupe turnSequence))
+    ]
+
+dedupe :: (Eq a) => [a] -> [a]
+dedupe xs = case xs of
+  [] -> []
+  h : t -> h : dedupe (filter (/= h) t)

@@ -50,10 +50,15 @@ library
   exposed-modules:
     Pawl
     Pawl.Card
+    Pawl.Turn
+    Pawl.Type.BeginningStep
     Pawl.Type.Card
     Pawl.Type.CardType
+    Pawl.Type.CombatStep
+    Pawl.Type.EndingStep
     Pawl.Type.Object
     Pawl.Type.ObjectId
+    Pawl.Type.Phase
     Pawl.Type.PlayerId
     Pawl.Type.Printing
     Pawl.Type.Program
@@ -71,6 +76,7 @@ test-suite pawl-test-suite
   build-depends:
     tasty ^>=1.5.4,
     tasty-hunit ^>=0.10.2,
+    tasty-quickcheck ^>=0.11.1,
     transformers ^>=0.6.1.2,
 
   hs-source-dirs: source/test-suite
