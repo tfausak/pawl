@@ -65,6 +65,7 @@ library
     Pawl.Type.BeginningStep
     Pawl.Type.Card
     Pawl.Type.CardType
+    Pawl.Type.Color
     Pawl.Type.CombatStep
     Pawl.Type.Decider
     Pawl.Type.DecisionLog
@@ -72,6 +73,11 @@ library
     Pawl.Type.EndingStep
     Pawl.Type.Game
     Pawl.Type.GameState
+    Pawl.Type.Mana
+    Pawl.Type.ManaCost
+    Pawl.Type.ManaSymbol
+    Pawl.Type.ManaType
+    Pawl.Type.ManaUnit
     Pawl.Type.Object
     Pawl.Type.ObjectId
     Pawl.Type.Phase

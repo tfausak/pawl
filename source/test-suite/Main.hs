@@ -20,15 +20,20 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
@@ -38,6 +43,7 @@ import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 import qualified System.Random as Random
@@ -421,6 +427,9 @@ programTests =
          in HU.assertEqual "1 + 2" 3 (State.evalState (Program.foldProgramM answer toyProgram) [1, 2])
     ]
 
+pikerCard :: Card.Type.Card
+pikerCard = Printing.card Card.pikerPrinting
+
 cardTests :: Tasty.TestTree
 cardTests =
   Tasty.testGroup
@@ -434,7 +443,35 @@ cardTests =
           Set.member Subtype.Mountain (TypeLine.subtypes (Card.Type.typeLine (Printing.card Card.mountainPrinting))),
       HU.testCase "Mountain type line contains Land" $
         HU.assertBool "cardtype" $
-          Set.member CardType.Land (TypeLine.types (Card.Type.typeLine (Printing.card Card.mountainPrinting)))
+          Set.member CardType.Land (TypeLine.types (Card.Type.typeLine (Printing.card Card.mountainPrinting))),
+      -- CR 202.1: a land has no mana cost. Not a zero cost -- no cost at all.
+      HU.testCase "Mountain has no mana cost" $
+        HU.assertEqual "no cost" Nothing (Card.Type.manaCost (Printing.card Card.mountainPrinting)),
+      HU.testCase "Mountain has no power or toughness" $ do
+        HU.assertEqual "power" Nothing (Card.Type.power (Printing.card Card.mountainPrinting))
+        HU.assertEqual "toughness" Nothing (Card.Type.toughness (Printing.card Card.mountainPrinting)),
+      HU.testCase "Piker printing is named Goblin Piker" $
+        HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name pikerCard),
+      HU.testCase "Piker costs {1}{R}" $
+        HU.assertEqual
+          "cost"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]))
+          (Card.Type.manaCost pikerCard),
+      HU.testCase "Piker is a 2/1" $ do
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power pikerCard)
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness pikerCard),
+      HU.testCase "Piker is a Goblin Warrior" $
+        HU.assertEqual
+          "subtypes"
+          (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+          (TypeLine.subtypes (Card.Type.typeLine pikerCard)),
+      HU.testCase "Piker is a creature and not a land" $ do
+        HU.assertBool "creature" (Card.isCreature pikerCard)
+        HU.assertBool "not land" (not (Card.isLand pikerCard)),
+      -- CR 110.1: the classification resolution turns on. Never card identity.
+      HU.testCase "CR 110.1 both a Piker and a Mountain are permanents" $ do
+        HU.assertBool "piker" (Card.isPermanent pikerCard)
+        HU.assertBool "mountain" (Card.isPermanent (Printing.card Card.mountainPrinting))
     ]
 
 turnSequence :: [Phase.Phase]

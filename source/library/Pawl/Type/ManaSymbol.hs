@@ -1,0 +1,10 @@
+module Pawl.Type.ManaSymbol where
+
+import Numeric.Natural (Natural)
+import Pawl.Type.ManaType (ManaType)
+
+-- CR 107.4. Grows: hybrid, Phyrexian, snow, variable (X).
+data ManaSymbol
+  = Generic Natural
+  | OfType ManaType
+  deriving (Eq, Ord, Show)
