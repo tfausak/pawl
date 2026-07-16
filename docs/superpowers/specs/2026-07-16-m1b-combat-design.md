@@ -226,21 +226,54 @@ blocker must be theirs, untapped, and blocking a real attacker. Illegal entries
 are dropped, exactly as M1a's `discardToHandSize` filters to cards actually in
 hand.
 
-Damage division is the one answer that cannot be repaired by filtering, because
-CR 510.1e checks the assignment *as a whole*:
+### CR 510.1e is unreachable, and is not implemented
 
-> **CR 510.1e** Once a player has assigned combat damage from each attacking or
-> blocking creature they control, the total damage assignment … is checked to see
-> if it complies with the above rules. If it doesn't, the combat damage assignment
-> is illegal; the game returns to the moment before that player began to assign
-> combat damage.
+CR 510.1e says an illegal damage assignment is rewound — "the game returns to the
+moment before that player began to assign combat damage" — via CR 733. It is
+tempting to implement that rewind. **It would be a category error.**
 
-M1b implements that rewind as a **re-prompt**, bounded to one retry. If the second
-answer is also illegal, the attacker assigns no combat damage — which is what CR
-510.1b/c already prescribe for a creature with nothing legal to assign to, so it
-is the rules' own degenerate case rather than an invented punishment. Repairing an
-illegal division into a legal one would mean the engine choosing which creature
-dies, which is precisely the policy the rules core must not hold.
+Rule 733.1 opens: "If a **player** takes an illegal action or starts to take an
+action but can't legally complete it…". It is a rule for humans at a table, about
+physically doing something wrong; 733.2's "the player … may redo the reversed
+action in a legal way" only means anything to someone who can be told they erred.
+An enforcing engine gives a player no way to take the illegal action in the first
+place: the interpreter is offered a prompt, and a UI built on it presents only
+legal divisions.
+
+**M1a already settled this**, and the argument transfers verbatim:
+
+> CR 601.2 puts the card on the stack BEFORE costs are paid, rewinding the whole
+> cast if it turns out to be illegal. M1a pays first because `legalActions` only
+> ever offers an affordable cast, so there is nothing to rewind.
+
+733's rewind is unreachable for exactly the reason 601.2's rewind is.
+
+What *can* still arrive is an interpreter returning an illegal
+`Map ObjectId Natural`. That is not a game event and the rules have nothing to say
+about it — it is a **software contract violation**: a bug, or a hostile client.
+The two must not be conflated, because the rules' remedy (rewind and re-ask) is
+meaningless against the real cause.
+
+**Retrying is provably useless.** The seam is
+`runGamePure :: (forall r. Prompt r -> r) -> …` — a *pure function*. The same
+prompt yields the same answer by definition, so a re-prompt returns the identical
+illegal division. A retry is not caution; it is dead code, and it would write
+duplicate responses into the `DecisionLog` for `Replay` to faithfully reproduce.
+
+So the engine's only obligation is to stay total. An illegal division is rejected
+and the attacker assigns no combat damage. That is not a punishment invented by
+the engine: it is what CR 510.1b/c already prescribe for a creature with nothing
+legal to assign to, and it fails *loudly* — creatures conspicuously do not die —
+which is how an interpreter bug should present. Repairing an illegal division into
+a legal one would mean the engine choosing which creature dies. Per M1a's
+`discardToHandSize`: "that is its bug, and inventing a fallback here would put the
+policy back."
+
+Rejected: enumerating the legal divisions so an illegal one is unrepresentable.
+It matches `ChooseAction`'s shape and is trivial for M1b (2 damage among ≤4
+blockers is 10 options), but it does not scale — divisions of N damage among K
+blockers number `C(N+K-1, K-1)`, so a 20/20 trampler against 5 blockers is ~10,600.
+Enumerate when the space is small and finite; validate when it is not.
 
 ## 4. The combat sequence
 
@@ -308,8 +341,9 @@ actions.
 - *CR 510.1c* — a single blocker takes all the damage, with no prompt at all.
 - *CR 510.1c* — a free division: 2 damage across two blockers may be `1/1`
   (killing both) or `2/0` (killing one), and the prompted answer is honored.
-- *CR 510.1e* — a division that does not total the attacker's power is illegal
-  and re-prompted.
+- *CR 510.1e* — a division that does not total the attacker's power is rejected,
+  and the attacker deals no combat damage. This tests the engine's defense against
+  a broken interpreter, not a reachable game state (§3).
 - *CR 510.2* — simultaneity: a 2/1 attacker and a 2/1 blocker trade, and **both**
   die.
 - *CR 704.5g* — a creature with lethal damage marked is destroyed.
