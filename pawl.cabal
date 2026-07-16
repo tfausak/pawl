@@ -50,19 +50,25 @@ library
   exposed-modules:
     Pawl
     Pawl.Card
+    Pawl.Game
     Pawl.Turn
     Pawl.Type.BeginningStep
     Pawl.Type.Card
     Pawl.Type.CardType
     Pawl.Type.CombatStep
+    Pawl.Type.Departure
     Pawl.Type.EndingStep
+    Pawl.Type.GameState
     Pawl.Type.Object
     Pawl.Type.ObjectId
     Pawl.Type.Phase
+    Pawl.Type.Player
     Pawl.Type.PlayerId
     Pawl.Type.Printing
     Pawl.Type.Program
+    Pawl.Type.Result
     Pawl.Type.Source
+    Pawl.Type.Status
     Pawl.Type.Subtype
     Pawl.Type.Supertype
     Pawl.Type.TapState

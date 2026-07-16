@@ -1,0 +1,78 @@
+module Pawl.Game where
+
+import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
+import Pawl.Type.GameState (GameState)
+import qualified Pawl.Type.GameState as GameState
+import Pawl.Type.Object (Object)
+import qualified Pawl.Type.Object as Object
+import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.ObjectId as ObjectId
+import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.TapState as TapState
+import Pawl.Type.Zone (Zone)
+import qualified Pawl.Type.Zone as Zone
+
+lookupObject :: ObjectId -> GameState -> Maybe Object
+lookupObject oid gs = Map.lookup oid (GameState.objects gs)
+
+objectCount :: GameState -> Int
+objectCount gs = Map.size (GameState.objects gs)
+
+freshObjectId :: GameState -> (ObjectId, GameState)
+freshObjectId gs =
+  let ObjectId.MkObjectId n = GameState.nextObjectId gs
+   in (ObjectId.MkObjectId n, gs {GameState.nextObjectId = ObjectId.MkObjectId (n + 1)})
+
+zoneMembers :: Zone -> PlayerId -> GameState -> [ObjectId]
+zoneMembers zone pid gs =
+  let perPlayer :: Map.Map PlayerId (Seq.Seq ObjectId) -> [ObjectId]
+      perPlayer m = maybe [] (foldr (:) []) (Map.lookup pid m)
+      ownedBy :: ObjectId -> Bool
+      ownedBy oid = case lookupObject oid gs of
+        Just obj -> Object.owner obj == pid
+        Nothing -> False
+      ownedShared :: Set.Set ObjectId -> [ObjectId]
+      ownedShared s = filter ownedBy (Set.toList s)
+   in case zone of
+        Zone.Library -> perPlayer (GameState.library gs)
+        Zone.Hand -> perPlayer (GameState.hand gs)
+        Zone.Graveyard -> perPlayer (GameState.graveyard gs)
+        Zone.Battlefield -> ownedShared (GameState.battlefield gs)
+        Zone.Exile -> ownedShared (GameState.exile gs)
+        Zone.Stack -> filter ownedBy (GameState.stack gs)
+
+removeFromZones :: PlayerId -> ObjectId -> GameState -> GameState
+removeFromZones pid oid gs =
+  gs
+    { GameState.library = Map.adjust (Seq.filter (/= oid)) pid (GameState.library gs),
+      GameState.hand = Map.adjust (Seq.filter (/= oid)) pid (GameState.hand gs),
+      GameState.graveyard = Map.adjust (Seq.filter (/= oid)) pid (GameState.graveyard gs),
+      GameState.battlefield = Set.delete oid (GameState.battlefield gs),
+      GameState.exile = Set.delete oid (GameState.exile gs),
+      GameState.stack = filter (/= oid) (GameState.stack gs)
+    }
+
+insertIntoZone :: Zone -> PlayerId -> ObjectId -> GameState -> GameState
+insertIntoZone zone pid oid gs = case zone of
+  Zone.Library -> gs {GameState.library = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.library gs)}
+  Zone.Hand -> gs {GameState.hand = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.hand gs)}
+  Zone.Graveyard -> gs {GameState.graveyard = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.graveyard gs)}
+  Zone.Battlefield -> gs {GameState.battlefield = Set.insert oid (GameState.battlefield gs)}
+  Zone.Exile -> gs {GameState.exile = Set.insert oid (GameState.exile gs)}
+  Zone.Stack -> gs {GameState.stack = oid : GameState.stack gs}
+
+-- The single zone-change primitive (CR 400.7): the source object ceases; a NEW
+-- object with a fresh id is created in the destination, carrying owner and
+-- source forward and resetting per-incarnation state. No-op if the id is unknown.
+changeZone :: ObjectId -> Zone -> GameState -> GameState
+changeZone oid dest gs = case lookupObject oid gs of
+  Nothing -> gs
+  Just obj ->
+    let pid = Object.owner obj
+        (newId, gs1) = freshObjectId gs
+        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped}
+        gs2 = removeFromZones pid oid gs1
+        gs3 = gs2 {GameState.objects = Map.insert newId newObj (Map.delete oid (GameState.objects gs2))}
+     in insertIntoZone dest pid newId gs3
