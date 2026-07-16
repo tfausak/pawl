@@ -23,6 +23,7 @@ common library
   default-language: Haskell2010
   ghc-options:
     -Weverything
+    -Wno-all-missed-specialisations
     -Wno-implicit-prelude
     -Wno-missing-deriving-strategies
     -Wno-missing-export-lists
@@ -33,8 +34,25 @@ common library
     -Wno-safe
     -Wno-unsafe
 
+common executable
+  import: library
+  build-depends: pawl
+  ghc-options:
+    -rtsopts
+    -threaded
+
 library
   import: library
   -- cabal-gild: discover source/library
   exposed-modules: Pawl
   hs-source-dirs: source/library
+
+test-suite pawl-test-suite
+  import: executable
+  build-depends:
+    tasty ^>=1.5.4,
+    tasty-hunit ^>=0.10.2,
+    tasty-quickcheck ^>=0.11.1
+
+  hs-source-dirs: source/test-suite
+  main-is: Main.hs
