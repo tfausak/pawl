@@ -32,6 +32,7 @@ import qualified Pawl.Type.Program as Program
 import Pawl.Type.Prompt (Prompt)
 import qualified Pawl.Type.Prompt as Prompt
 import Pawl.Type.Result (Result)
+import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Zone as Zone
 
@@ -76,6 +77,18 @@ untapAll pid = do
       ids = Game.zoneMembers Zone.Battlefield pid gs
   State.put gs {GameState.objects = foldr (Map.adjust untap) (GameState.objects gs) ids}
 
+-- CR 302.6: permanents the active player has controlled since their turn began
+-- are no longer summoning sick. The untap step is where that becomes true.
+--
+-- EXPIRES at M3: control held CONTINUOUSLY is the actual rule, so a control
+-- change must reset this. Nothing in M1b can change control.
+settleAll :: PlayerId -> Game ()
+settleAll pid = do
+  gs <- State.get
+  let settle obj = obj {Object.sickness = Sickness.Settled}
+      ids = Game.zoneMembers Zone.Battlefield pid gs
+  State.put gs {GameState.objects = foldr (Map.adjust settle) (GameState.objects gs) ids}
+
 -- CR 514.2. Non-identical cards now share a hand (Mountains and Pikers), so
 -- trimming front-of-hand would be the engine choosing what to pitch -- policy in
 -- the rules core, not canonicalization. The choice is the player's.
@@ -111,6 +124,7 @@ runTurnBasedActions phase = do
   case phase of
     Phase.Beginning BeginningStep.Untap -> do
       untapAll active
+      settleAll active
       State.modify' $ \gs ->
         gs {GameState.landPlayed = Set.delete active (GameState.landPlayed gs)}
     Phase.Beginning BeginningStep.DrawStep -> do

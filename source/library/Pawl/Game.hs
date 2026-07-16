@@ -10,6 +10,7 @@ import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.ObjectId as ObjectId
 import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.TapState as TapState
 import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
@@ -69,7 +70,7 @@ changeZone oid dest gs = case lookupObject oid gs of
   Just obj ->
     let pid = Object.owner obj
         (newId, gs1) = freshObjectId gs
-        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped}
+        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.sickness = Sickness.Sick}
         gs2 = removeFromZones pid oid gs1
         gs3 = gs2 {GameState.objects = Map.insert newId newObj (Map.delete oid (GameState.objects gs2))}
      in insertIntoZone dest pid newId gs3

@@ -94,6 +94,7 @@ library
     Pawl.Type.Quantity
     Pawl.Type.Response
     Pawl.Type.Result
+    Pawl.Type.Sickness
     Pawl.Type.Source
     Pawl.Type.Status
     Pawl.Type.Subtype

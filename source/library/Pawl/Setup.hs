@@ -20,6 +20,7 @@ import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Printing (Printing)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.TapState as TapState
@@ -81,7 +82,8 @@ createCard pid printing = do
           { Object.owner = pid,
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Library,
-            Object.tapped = TapState.Untapped
+            Object.tapped = TapState.Untapped,
+            Object.sickness = Sickness.Sick
           }
       gs2 =
         gs1

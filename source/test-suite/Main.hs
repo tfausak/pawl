@@ -45,6 +45,7 @@ import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Result as Result
+import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Subtype as Subtype
@@ -81,7 +82,58 @@ testTree =
       discardTests,
       castTests,
       stackTests,
-      castEngineTests
+      castEngineTests,
+      sicknessTests
+    ]
+
+-- A Piker put onto the battlefield under pid's control, untapped and Settled.
+--
+-- Task 2 adds `Object.damage = 0` to this record when that field exists. It is
+-- absent here because it does not exist yet.
+addPiker :: PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addPiker pid gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      obj =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.source = Source.OfCard Card.pikerPrinting,
+            Object.zone = Zone.Battlefield,
+            Object.tapped = TapState.Untapped,
+            Object.sickness = Sickness.Settled
+          }
+   in ( oid,
+        gs1
+          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
+            GameState.battlefield = Set.insert oid (GameState.battlefield gs1)
+          }
+      )
+
+sicknessOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Sickness.Sickness
+sicknessOf oid gs = fmap Object.sickness (Game.lookupObject oid gs)
+
+sicknessTests :: Tasty.TestTree
+sicknessTests =
+  Tasty.testGroup
+    "Sickness"
+    [ HU.testCase "CR 302.6 a permanent entering the battlefield is summoning sick" $
+        -- changeZone mints a new object, so the id to inspect is the new one.
+        let (gs, oid) = pikerInHand 3 Phase.PrecombatMain
+            after = Game.changeZone oid Zone.Battlefield gs
+         in case Game.zoneMembers Zone.Battlefield alice after of
+              [] -> HU.assertFailure "expected a permanent"
+              ids -> case filter (\o -> sicknessOf o after == Just Sickness.Sick) ids of
+                [] -> HU.assertFailure "the new permanent should be Sick"
+                _ -> pure (),
+      HU.testCase "CR 302.6 the untap step settles the active player's permanents" $
+        let (oid, gs) = addPiker alice (Setup.emptyGame bothPlayers)
+            sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+            after = snd (Engine.runGamePure identityAnswer sick (Engine.settleAll alice))
+         in HU.assertEqual "settled" (Just Sickness.Settled) (sicknessOf oid after),
+      HU.testCase "CR 302.6 settling does not touch the other player's permanents" $
+        let (oid, gs) = addPiker bob (Setup.emptyGame bothPlayers)
+            sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+            after = snd (Engine.runGamePure identityAnswer sick (Engine.settleAll alice))
+         in HU.assertEqual "still sick" (Just Sickness.Sick) (sicknessOf oid after)
     ]
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
@@ -193,7 +245,8 @@ pikerInHand n ph =
           { Object.owner = alice,
             Object.source = Source.OfCard Card.pikerPrinting,
             Object.zone = Zone.Hand,
-            Object.tapped = TapState.Untapped
+            Object.tapped = TapState.Untapped,
+            Object.sickness = Sickness.Settled
           }
       gs2 =
         gs1
@@ -328,7 +381,8 @@ mountainsInPlay n =
                 { Object.owner = alice,
                   Object.source = Source.OfCard Card.mountainPrinting,
                   Object.zone = Zone.Battlefield,
-                  Object.tapped = TapState.Untapped
+                  Object.tapped = TapState.Untapped,
+                  Object.sickness = Sickness.Settled
                 }
          in gs1
               { GameState.objects = Map.insert oid obj (GameState.objects gs1),
@@ -426,7 +480,8 @@ oneMountainState ph =
           { Object.owner = alice,
             Object.source = Source.OfCard Card.mountainPrinting,
             Object.zone = Zone.Hand,
-            Object.tapped = TapState.Untapped
+            Object.tapped = TapState.Untapped,
+            Object.sickness = Sickness.Sick
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -467,7 +522,8 @@ gameTests =
                     { Object.owner = alice,
                       Object.source = Source.OfCard Card.mountainPrinting,
                       Object.zone = Zone.Battlefield,
-                      Object.tapped = TapState.Untapped
+                      Object.tapped = TapState.Untapped,
+                      Object.sickness = Sickness.Sick
                     }
               )
               (Game.lookupObject (ObjectId.MkObjectId 1) after)
