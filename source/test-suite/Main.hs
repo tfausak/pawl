@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -8,6 +9,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Game as Game
+import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
@@ -21,6 +23,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
@@ -34,10 +37,17 @@ main :: IO ()
 main = Tasty.defaultMain testTree
 
 testTree :: Tasty.TestTree
-testTree = Tasty.testGroup "pawl" [programTests, cardTests, turnTests, gameTests, actionTests]
+testTree =
+  Tasty.testGroup
+    "pawl"
+    [programTests, cardTests, turnTests, gameTests, actionTests, setupTests]
 
-alice :: PlayerId.PlayerId
+alice, bob :: PlayerId.PlayerId
 alice = PlayerId.MkPlayerId 0
+bob = PlayerId.MkPlayerId 1
+
+bothPlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
+bothPlayers = alice NonEmpty.:| [bob]
 
 -- A GameState with a single Mountain in alice's hand, in a chosen phase.
 oneMountainState :: Phase.Phase -> GameState.GameState
@@ -107,6 +117,32 @@ actionTests =
       HU.testCase "no second land after one is played" $
         let gs = (oneMountainState Phase.PrecombatMain) {GameState.landPlayed = Set.singleton alice}
          in HU.assertEqual "only pass" [A.Pass] (Action.legalActions alice gs)
+    ]
+
+-- Identity interpreter: shuffle returns ids unchanged; actions never occur here.
+identityAnswer :: Prompt.Prompt r -> r
+identityAnswer p = case p of
+  Prompt.Shuffle ids -> ids
+  Prompt.ChooseAction {} -> A.Pass
+
+setupState :: GameState.GameState
+setupState =
+  Program.foldProgram
+    identityAnswer
+    (State.execStateT (Setup.newGame bothPlayers) (Setup.emptyGame bothPlayers))
+
+setupTests :: Tasty.TestTree
+setupTests =
+  Tasty.testGroup
+    "Setup"
+    [ HU.testCase "120 objects after setup" $
+        HU.assertEqual "count" 120 (Game.objectCount setupState),
+      HU.testCase "each library has 53 after opening draws" $
+        HU.assertEqual "library" 53 (length (Game.zoneMembers Zone.Library alice setupState)),
+      HU.testCase "each hand has 7" $
+        HU.assertEqual "hand" 7 (length (Game.zoneMembers Zone.Hand bob setupState)),
+      HU.testCase "active player is first in turn order" $
+        HU.assertEqual "active" alice (GameState.activePlayer setupState)
     ]
 
 -- A toy instruction set for exercising Program.
