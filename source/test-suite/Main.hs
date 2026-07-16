@@ -14,6 +14,7 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
+import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
@@ -50,6 +51,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity.Type
+import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
@@ -93,8 +95,39 @@ testTree =
       damageTests,
       objectFactTests,
       creatureSbaTests,
-      combatLegalityTests
+      combatLegalityTests,
+      combatReplayTests
     ]
+
+combatReplayTests :: Tasty.TestTree
+combatReplayTests =
+  let decider = Decide.deciderFor alice (Setup.emptyGame bothPlayers)
+      oid = ObjectId.MkObjectId 7
+      attackPrompt = Prompt.DeclareAttackers decider alice [oid]
+      blockPrompt = Prompt.DeclareBlockers decider bob [oid] [oid]
+      damagePrompt = Prompt.AssignCombatDamage decider alice oid (Set.singleton oid) 2
+   in Tasty.testGroup
+        "CombatReplay"
+        [ HU.testCase "attackers round-trip through the transcript" $
+            HU.assertEqual "round trip" (Just [oid]) (Replay.decode attackPrompt (Replay.encode attackPrompt [oid])),
+          HU.testCase "blockers round-trip through the transcript" $
+            let answer = Map.singleton oid oid
+             in HU.assertEqual "round trip" (Just answer) (Replay.decode blockPrompt (Replay.encode blockPrompt answer)),
+          HU.testCase "a damage assignment round-trips through the transcript" $
+            let answer :: Map.Map ObjectId.ObjectId Natural.Natural
+                answer = Map.singleton oid 2
+             in HU.assertEqual "round trip" (Just answer) (Replay.decode damagePrompt (Replay.encode damagePrompt answer)),
+          HU.testCase "a mismatched response decodes to Nothing" $
+            HU.assertEqual "mismatch" Nothing (Replay.decode attackPrompt (Response.Shuffled [oid])),
+          HU.testCase "defaultAnswer attacks with nothing" $
+            HU.assertEqual "no attacks" [] (Replay.defaultAnswer attackPrompt),
+          HU.testCase "defaultAnswer blocks with nothing" $
+            HU.assertEqual "no blocks" Map.empty (Replay.defaultAnswer blockPrompt),
+          HU.testCase "defaultAnswer assigns a LEGAL division" $
+            -- Total must equal the attacker's power, or the fallback would be
+            -- rejected by Task 7's validation and deal no damage at all.
+            HU.assertEqual "all to one blocker" (Map.singleton oid 2) (Replay.defaultAnswer damagePrompt)
+        ]
 
 -- alice is active with `a` Settled Pikers; bob defends with `b` Settled Pikers.
 -- Returns the attackers' ids and the blockers' ids alongside the state.
@@ -335,6 +368,11 @@ sicknessTests =
 castAnswer :: Prompt.Prompt r -> r
 castAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
+    b : _ -> Map.singleton b n
+    [] -> Map.empty
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
@@ -506,6 +544,11 @@ castTests =
 -- CR 514.2 test proves the prompted choice is actually honored.
 discardLastAnswer :: Prompt.Prompt r -> r
 discardLastAnswer p = case p of
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
+    b : _ -> Map.singleton b n
+    [] -> Map.empty
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> A.Pass
   Prompt.ChooseDiscard _ _ ids n -> lastN (fromIntegral n) ids
@@ -747,6 +790,11 @@ actionTests =
 -- Identity interpreter: shuffle returns ids unchanged; actions never occur here.
 identityAnswer :: Prompt.Prompt r -> r
 identityAnswer p = case p of
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
+    b : _ -> Map.singleton b n
+    [] -> Map.empty
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> A.Pass
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
@@ -800,6 +848,11 @@ goldfishResult =
 playLandAnswer :: Prompt.Prompt r -> r
 playLandAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
+    b : _ -> Map.singleton b n
+    [] -> Map.empty
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.ChooseAction _ _ actions ->
     let isPlay a = case a of
@@ -863,6 +916,11 @@ replayTests =
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
 randomAnswer p = case p of
+  Prompt.DeclareAttackers {} -> pure []
+  Prompt.DeclareBlockers {} -> pure Map.empty
+  Prompt.AssignCombatDamage _ _ _ ids n -> pure $ case Set.toList ids of
+    b : _ -> Map.singleton b n
+    [] -> Map.empty
   Prompt.Shuffle ids -> do
     g <- State.get
     let (g1, g2) = Random.splitGen g
@@ -971,6 +1029,11 @@ librarySize pid gs = length (Game.zoneMembers Zone.Library pid gs)
 -- who gets asked next.
 recordingAnswer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
 recordingAnswer p = case p of
+  Prompt.DeclareAttackers {} -> pure []
+  Prompt.DeclareBlockers {} -> pure Map.empty
+  Prompt.AssignCombatDamage _ _ _ ids n -> pure $ case Set.toList ids of
+    b : _ -> Map.singleton b n
+    [] -> Map.empty
   Prompt.Shuffle ids -> pure ids
   Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
   Prompt.ChooseAction _ pid actions -> do

@@ -128,7 +128,8 @@ test-suite pawl-test-suite
 benchmark pawl-benchmark
   import: executable
   build-depends:
-    tasty-bench ^>=0.5.1
+    containers,
+    tasty-bench ^>=0.5.1,
 
   hs-source-dirs: source/benchmark
   main-is: Main.hs

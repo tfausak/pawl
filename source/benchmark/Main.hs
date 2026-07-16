@@ -1,6 +1,8 @@
 {-# LANGUAGE GADTs #-}
 
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Setup as Setup
@@ -16,6 +18,11 @@ alwaysPass p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> Action.Pass
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
+    b : _ -> Map.singleton b n
+    [] -> Map.empty
 
 -- Casts when legal, otherwise passes: the benchmark that actually exercises the
 -- stack, mana payment, and resolution.
@@ -23,6 +30,11 @@ castAnswer :: Prompt.Prompt r -> r
 castAnswer p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
+    b : _ -> Map.singleton b n
+    [] -> Map.empty
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
           Action.Cast _ -> True

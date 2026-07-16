@@ -4,6 +4,8 @@
 module Pawl.Replay where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Type.Action as Action
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
@@ -20,23 +22,37 @@ encode p answer = case p of
   Prompt.Shuffle _ -> Response.Shuffled answer
   Prompt.ChooseAction {} -> Response.ChoseAction answer
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
+  Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
+  Prompt.DeclareBlockers {} -> Response.DeclaredBlockers answer
+  Prompt.AssignCombatDamage {} -> Response.AssignedCombatDamage answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
+--
+-- The non-matching branches are a wildcard rather than written out. With six
+-- prompts and six responses the explicit form is thirty-six branches, and the
+-- exhaustiveness that protects us is on Prompt -- the GADT that refines r --
+-- which is still total. A new Response constructor correctly decodes to Nothing.
 decode :: Prompt r -> Response -> Maybe r
 decode p response = case p of
   Prompt.Shuffle _ -> case response of
     Response.Shuffled ids -> Just ids
-    Response.ChoseAction _ -> Nothing
-    Response.ChoseDiscard _ -> Nothing
+    _ -> Nothing
   Prompt.ChooseAction {} -> case response of
     Response.ChoseAction action -> Just action
-    Response.Shuffled _ -> Nothing
-    Response.ChoseDiscard _ -> Nothing
+    _ -> Nothing
   Prompt.ChooseDiscard {} -> case response of
     Response.ChoseDiscard ids -> Just ids
-    Response.ChoseAction _ -> Nothing
-    Response.Shuffled _ -> Nothing
+    _ -> Nothing
+  Prompt.DeclareAttackers {} -> case response of
+    Response.DeclaredAttackers ids -> Just ids
+    _ -> Nothing
+  Prompt.DeclareBlockers {} -> case response of
+    Response.DeclaredBlockers assignment -> Just assignment
+    _ -> Nothing
+  Prompt.AssignCombatDamage {} -> case response of
+    Response.AssignedCombatDamage assignment -> Just assignment
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -48,6 +64,15 @@ defaultAnswer p = case p of
     h : _ -> h
     [] -> Action.Pass
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  -- Declining to attack or block is always legal, and is the least eventful
+  -- thing a fallback can do.
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  -- Must be a LEGAL division, or Task 7's validation rejects it and the attacker
+  -- deals no damage. All of it to one blocker totals the attacker's power.
+  Prompt.AssignCombatDamage _ _ _ blockers n -> case Set.toList blockers of
+    b : _ -> Map.singleton b n
+    [] -> Map.empty
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])
