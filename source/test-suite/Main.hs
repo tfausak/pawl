@@ -5,9 +5,11 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Game as Game
 import qualified Pawl.Turn as Turn
+import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
@@ -32,7 +34,7 @@ main :: IO ()
 main = Tasty.defaultMain testTree
 
 testTree :: Tasty.TestTree
-testTree = Tasty.testGroup "pawl" [programTests, cardTests, turnTests, gameTests]
+testTree = Tasty.testGroup "pawl" [programTests, cardTests, turnTests, gameTests, actionTests]
 
 alice :: PlayerId.PlayerId
 alice = PlayerId.MkPlayerId 0
@@ -91,6 +93,21 @@ gameTests =
               )
               (Game.lookupObject (ObjectId.MkObjectId 1) after)
         ]
+
+actionTests :: Tasty.TestTree
+actionTests =
+  Tasty.testGroup
+    "Action"
+    [ HU.testCase "a land in hand is playable in a main phase" $
+        HU.assertBool "play" (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions alice (oneMountainState Phase.PrecombatMain)),
+      HU.testCase "passing is always legal" $
+        HU.assertBool "pass" (A.Pass `elem` Action.legalActions alice (oneMountainState Phase.PrecombatMain)),
+      HU.testCase "no land play outside a main phase" $
+        HU.assertEqual "only pass" [A.Pass] (Action.legalActions alice (oneMountainState (Phase.Beginning BeginningStep.Upkeep))),
+      HU.testCase "no second land after one is played" $
+        let gs = (oneMountainState Phase.PrecombatMain) {GameState.landPlayed = Set.singleton alice}
+         in HU.assertEqual "only pass" [A.Pass] (Action.legalActions alice gs)
+    ]
 
 -- A toy instruction set for exercising Program.
 data Toy r where
