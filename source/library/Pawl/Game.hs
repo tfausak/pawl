@@ -27,13 +27,10 @@ freshObjectId gs =
 
 zoneMembers :: Zone -> PlayerId -> GameState -> [ObjectId]
 zoneMembers zone pid gs =
-  let perPlayer :: Map.Map PlayerId (Seq.Seq ObjectId) -> [ObjectId]
-      perPlayer m = maybe [] (foldr (:) []) (Map.lookup pid m)
-      ownedBy :: ObjectId -> Bool
+  let perPlayer m = maybe [] (foldr (:) []) (Map.lookup pid m)
       ownedBy oid = case lookupObject oid gs of
         Just obj -> Object.owner obj == pid
         Nothing -> False
-      ownedShared :: Set.Set ObjectId -> [ObjectId]
       ownedShared s = filter ownedBy (Set.toList s)
    in case zone of
         Zone.Library -> perPlayer (GameState.library gs)

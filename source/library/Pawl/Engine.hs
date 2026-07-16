@@ -23,7 +23,6 @@ import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Phase as Phase
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
@@ -70,8 +69,7 @@ drawFor pid = do
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
   gs <- State.get
-  let untap :: Object.Object -> Object.Object
-      untap obj = obj {Object.tapped = TapState.Untapped}
+  let untap obj = obj {Object.tapped = TapState.Untapped}
       ids = Game.zoneMembers Zone.Battlefield pid gs
   State.put gs {GameState.objects = foldr (Map.adjust untap) (GameState.objects gs) ids}
 
@@ -82,7 +80,6 @@ discardToHandSize pid = do
   gs <- State.get
   let held = Game.zoneMembers Zone.Hand pid gs
       excess = length held - Setup.openingHand
-      toGraveyard :: GameState -> ObjectId -> GameState
       toGraveyard g oid = Game.changeZone oid Zone.Graveyard g
   Monad.when (excess > 0) $
     State.put (List.foldl' toGraveyard gs (take excess held))
@@ -116,8 +113,7 @@ priorityLoop :: Game ()
 priorityLoop = do
   active <- State.gets GameState.activePlayer
   State.modify' $ \gs -> gs {GameState.priority = Just active, GameState.passes = 0}
-  let loop :: Game ()
-      loop = do
+  let loop = do
         gs <- State.get
         case GameState.priority gs of
           Nothing -> pure ()
@@ -182,8 +178,7 @@ runStep = do
 -- drawing from an empty library is a loss (CR 704.5b).
 playGame :: Game Result
 playGame =
-  let loop :: Game Result
-      loop = do
+  let loop = do
         outcome <- State.gets GameState.result
         case outcome of
           Just r -> pure r

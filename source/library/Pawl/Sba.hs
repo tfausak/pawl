@@ -13,8 +13,7 @@ import qualified Pawl.Type.Status as Status
 
 stillPlaying :: GameState -> [PlayerId]
 stillPlaying gs =
-  let isPlaying :: (PlayerId, Player.Player) -> Bool
-      isPlaying entry = Player.status (snd entry) == Status.Playing
+  let isPlaying entry = Player.status (snd entry) == Status.Playing
    in map fst (filter isPlaying (Map.toList (GameState.players gs)))
 
 -- CR 704.5a (life <= 0) and CR 704.5b (drawing from an empty library).
@@ -27,8 +26,7 @@ losesNow gs pid = case Map.lookup pid (GameState.players gs) of
 
 depart :: PlayerId -> GameState -> GameState
 depart pid gs =
-  let lose :: Player.Player -> Player.Player
-      lose p = p {Player.status = Status.Departed Departure.Lost}
+  let lose p = p {Player.status = Status.Departed Departure.Lost}
    in gs {GameState.players = Map.adjust lose pid (GameState.players gs)}
 
 checkStateBasedActions :: GameState -> GameState

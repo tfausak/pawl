@@ -37,7 +37,6 @@ openingHand = 7
 emptyGame :: NonEmpty.NonEmpty PlayerId -> GameState
 emptyGame order =
   let order_ = NonEmpty.toList order
-      newPlayer :: PlayerId -> (PlayerId, Player.Player)
       newPlayer pid =
         ( pid,
           Player.MkPlayer

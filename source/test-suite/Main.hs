@@ -196,8 +196,7 @@ playLandAnswer :: Prompt.Prompt r -> r
 playLandAnswer p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction _ _ actions ->
-    let isPlay :: A.Action -> Bool
-        isPlay a = case a of
+    let isPlay a = case a of
           A.Play _ -> True
           A.Pass -> False
      in case filter isPlay actions of
@@ -280,7 +279,6 @@ shuffleWith :: Random.StdGen -> [a] -> [a]
 shuffleWith g xs =
   let unfoldInts :: Random.StdGen -> [Int]
       unfoldInts gen = let (v, gen') = Random.uniform gen in v : unfoldInts gen'
-      insertByKey :: (Int, a) -> [(Int, a)] -> [(Int, a)]
       insertByKey y ys = case ys of
         [] -> [y]
         z : zs -> if fst y <= fst z then y : z : zs else z : insertByKey y zs

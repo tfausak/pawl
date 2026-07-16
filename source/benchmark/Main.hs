@@ -21,8 +21,7 @@ alwaysPass p = case p of
 -- value rather than the game. NOINLINE keeps it from being folded back in.
 goldfish :: Natural -> Result
 goldfish n =
-  let players :: NonEmpty.NonEmpty PlayerId
-      players = PlayerId.MkPlayerId n NonEmpty.:| [PlayerId.MkPlayerId (n + 1)]
+  let players = PlayerId.MkPlayerId n NonEmpty.:| [PlayerId.MkPlayerId (n + 1)]
    in fst (Engine.runGamePure alwaysPass (Setup.emptyGame players) (Engine.playFrom players))
 {-# NOINLINE goldfish #-}
 

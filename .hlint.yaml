@@ -1,6 +1,0 @@
-# Pawl.Type.Source is a sum type that is still growing (OfToken, OfCopy,
-# OfEmblem, OfAbility, …). It is a `data` on purpose: it will gain constructors,
-# and a newtype would also change its strictness. Keeping it `data` avoids churn.
-- ignore:
-    name: Use newtype instead of data
-    within: Pawl.Type.Source

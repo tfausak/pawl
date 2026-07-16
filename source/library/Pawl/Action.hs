@@ -23,8 +23,7 @@ isMainPhase phase = case phase of
 
 playableLands :: PlayerId -> GameState -> [ObjectId]
 playableLands pid gs =
-  let isLandObject :: ObjectId -> Bool
-      isLandObject oid = case Game.lookupObject oid gs of
+  let isLandObject oid = case Game.lookupObject oid gs of
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Card.isLand (Printing.card printing)
         Nothing -> False
