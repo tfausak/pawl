@@ -1,16 +1,17 @@
 cabal-version: 3.14
 name: pawl
-version: 0.2026.7.15
+version: 0.2026.7.16
+synopsis: Magic: the Gathering rules engine
+description:
+  Pawl is a Magic: the Gathering rules engine.
+
+category: Game
 license: 0BSD
+maintainer: Taylor Fausak
 license-file: LICENSE.txt
 extra-doc-files:
   CHANGELOG.md
   README.md
-
-category: TODO
-maintainer: TODO
-synopsis: TODO
-description: TODO TODO
 
 source-repository head
   location: https://github.com/tfausak/pawl
