@@ -37,13 +37,15 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   deterministically). Its spec and plan are kept as reference:
   `docs/superpowers/specs/2026-07-15-m0-core-types-design.md` and
   `docs/superpowers/plans/2026-07-16-m0-engine.md`.
-- **Current work is M1a** — casting a creature (mana, the stack, resolution).
-  The design doc's M1 bundled two independent subsystems and is now split into
-  **M1a** (casting) and **M1b** (combat); see `_scratch/design.md`. The
-  **committed spec** is `docs/superpowers/specs/2026-07-16-m1a-casting-design.md`
-  and the **implementation plan** to execute is
-  `docs/superpowers/plans/2026-07-16-m1a-casting.md`. Work through the plan task
-  by task (TDD, one small complete commit per task on `main`).
+- **M1a is complete** (casting a Goblin Piker: mana, the stack, resolution).
+  Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-16-m1a-casting-design.md` and
+  `docs/superpowers/plans/2026-07-16-m1a-casting.md`.
+- **Current work is M1b** — combat. The design doc's M1 bundled two independent
+  subsystems and is split into **M1a** (casting) and **M1b** (combat); see
+  `_scratch/design.md`. Spec:
+  `docs/superpowers/specs/2026-07-16-m1b-combat-design.md`. Plan to execute:
+  `docs/superpowers/plans/2026-07-16-m1b-combat.md`.
 - TODOs are tracked **ephemerally** with **git-bug** (installed in the Nix user
   profile, not the flake; data lives in `refs/bugs/*`). List with `git-bug bug`;
   create with `git-bug bug new -t "…" -m "…"`; close with
@@ -55,21 +57,57 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 The toolchain comes from the Nix flake — GHC 9.14.1, already on `PATH` in the
 dev shell (`nix develop` or direnv).
 
-- `cabal build` — compile. Must be **warning-clean** (`-Weverything -Werror`,
-  minus the allow-list in `pawl.cabal`). A warning is a failure.
+- `cabal build` — compile. Must be **warning-clean** (`-Weverything` minus the
+  allow-list in `pawl.cabal`; `-Werror` is not set, so treat any warning as a
+  failure yourself). Incremental builds **hide** warnings: check with a clean one
+  — `rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build}`
+  then `cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"`
+  must print `0`. Suites break separately from the library, so always build `all`.
 - `cabal test` — the `tasty` suite, kept as a single file
   `source/test-suite/Main.hs` for now (`tasty-hunit` + `tasty-quickcheck`).
 - `cabal bench` — the `tasty-bench` benchmark, single file
   `source/benchmark/Main.hs`.
 - `cabal repl` — GHCi.
 - `hooky fix` then `hooky run` — format and lint (ormolu, hlint, cabal-gild,
-  cabal check, file hygiene).
+  cabal check, file hygiene). Acts on **staged** files only: `git add -A` first,
+  or it reports "hooks skipped" and checks nothing. `hooky fix` reformats, so
+  `git add -A` again before `hooky run`.
 
 ## Before you consider a change done
 
 1. `cabal build` is warning-free.
 2. `hooky fix` applied, `hooky run` passes.
 3. HLint suggestions applied, or the exception justified.
+4. Every rules claim was checked against `_scratch/rules.txt`. **Never trust
+   recalled Magic rules** — they go stale. Two M1b spec bugs came from exactly
+   this: damage assignment order was *removed from the game* (the glossary lists
+   it "Obsolete"), and CR 733 is about human error at a table, not engine
+   validation. Cite the rule number in the code comment so the next reader can
+   check your work.
+
+## Executing a plan
+
+Plans live in `docs/superpowers/plans/`. Work tasks **strictly in order**; each is
+one small complete commit on `main`.
+
+- **TDD is not optional:** write each failing test and actually run it to watch it
+  fail before implementing. Tick each `- [ ]` as you finish that step.
+- **Progress check:** `grep -c -- '- \[ \] \*\*Step' <plan>` must reach `0`. Use
+  *that* grep, not `grep -c -- '- \[ \]'` — the plan template's line 3 quotes the
+  checkbox syntax in prose, so the naive grep can never reach 0, and asking it to
+  is unsatisfiable without editing the plan.
+- **Never** edit the plan, weaken an assertion, or delete a test to make a check
+  pass. If the plan looks wrong, **stop and say so** — it has been wrong before.
+  A test failing against correct code is a plan bug: fix the plan's test, not the
+  engine.
+- A milestone's **exit criterion** may legitimately retire a property (M1b kills
+  M0's "no life changes"). That is the milestone landing, not a regression — the
+  plan says so explicitly where it applies.
+- The two invariants outrank the plan: the engine never cases on a card's
+  identity (only classifications), and never makes a player's choice. Eliding a
+  prompt is legitimate only for indistinguishable options, and every elision
+  carries a documented expiry naming the milestone that kills it. Where the rules
+  leave nothing to ask, don't prompt.
 
 ## Code conventions
 
