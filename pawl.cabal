@@ -53,6 +53,7 @@ library
     Pawl
     Pawl.Action
     Pawl.Card
+    Pawl.Cast
     Pawl.Decide
     Pawl.Engine
     Pawl.Game

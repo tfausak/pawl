@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
+import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
@@ -76,7 +77,78 @@ testTree =
       quantityTests,
       manaTests,
       deckTests,
-      discardTests
+      discardTests,
+      castTests
+    ]
+
+-- alice has n untapped Mountains in play and one Piker in hand, in a chosen phase.
+pikerInHand :: Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
+pikerInHand n ph =
+  let base = mountainsInPlay n
+      (oid, gs1) = Game.freshObjectId base
+      obj =
+        Object.MkObject
+          { Object.owner = alice,
+            Object.source = Source.OfCard Card.pikerPrinting,
+            Object.zone = Zone.Hand,
+            Object.tapped = TapState.Untapped
+          }
+      gs2 =
+        gs1
+          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
+            GameState.hand = Map.insert alice (Seq.singleton oid) (GameState.hand gs1),
+            GameState.phase = ph,
+            GameState.activePlayer = alice,
+            GameState.priority = Just alice
+          }
+   in (gs2, oid)
+
+castTests :: Tasty.TestTree
+castTests =
+  Tasty.testGroup
+    "Cast"
+    [ HU.testCase "a Piker is castable with two Mountains in a main phase" $
+        let (gs, oid) = pikerInHand 2 Phase.PrecombatMain
+         in HU.assertBool "castable" (Cast.castable alice oid gs),
+      HU.testCase "a Piker is not castable with one Mountain" $
+        let (gs, oid) = pikerInHand 1 Phase.PrecombatMain
+         in HU.assertBool "unaffordable" (not (Cast.castable alice oid gs)),
+      HU.testCase "CR 601.3a no creature spell in the upkeep" $
+        let (gs, oid) = pikerInHand 2 (Phase.Beginning BeginningStep.Upkeep)
+         in HU.assertBool "wrong timing" (not (Cast.castable alice oid gs)),
+      HU.testCase "CR 601.3a no creature spell with a non-empty stack" $
+        let (gs, oid) = pikerInHand 2 Phase.PrecombatMain
+            busy = gs {GameState.stack = [ObjectId.MkObjectId 999]}
+         in HU.assertBool "stack not empty" (not (Cast.castable alice oid busy)),
+      HU.testCase "CR 601.3a a non-active player cannot cast at sorcery speed" $
+        let (gs, oid) = pikerInHand 2 Phase.PrecombatMain
+            bobsTurn = gs {GameState.activePlayer = bob}
+         in HU.assertBool "not active" (not (Cast.castable alice oid bobsTurn)),
+      HU.testCase "a Mountain in hand is not castable: lands have no mana cost" $
+        HU.assertBool "no cost" $
+          not (Cast.castable alice (ObjectId.MkObjectId 0) (oneMountainState Phase.PrecombatMain)),
+      HU.testCase "CR 601 casting puts a NEW object on the stack and taps two lands" $
+        let (gs, oid) = pikerInHand 3 Phase.PrecombatMain
+            after = snd (Engine.runGamePure identityAnswer gs (Cast.castSpell alice oid))
+         in do
+              HU.assertEqual "stack depth" 1 (length (GameState.stack after))
+              HU.assertEqual "hand empty" 0 (handSize alice after)
+              HU.assertEqual "lands tapped" 2 (tappedCount alice after)
+              HU.assertEqual "conserved" (Game.objectCount gs) (Game.objectCount after)
+              -- CR 400.7: the card on the stack is a new object, not the old id.
+              HU.assertEqual "old id gone" Nothing (Game.lookupObject oid after),
+      HU.testCase "the stack object is still a Piker on the stack" $
+        let (gs, oid) = pikerInHand 3 Phase.PrecombatMain
+            after = snd (Engine.runGamePure identityAnswer gs (Cast.castSpell alice oid))
+         in case GameState.stack after of
+              [] -> HU.assertFailure "expected one object on the stack"
+              top : _ -> case Game.lookupObject top after of
+                Nothing -> HU.assertFailure "stack id should resolve"
+                Just obj -> do
+                  HU.assertEqual "zone" Zone.Stack (Object.zone obj)
+                  case Object.source obj of
+                    Source.OfCard printing ->
+                      HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name (Printing.card printing))
     ]
 
 -- Discards from the BACK of hand. Deliberately unlike every fallback, so the

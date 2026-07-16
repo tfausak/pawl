@@ -37,3 +37,9 @@ grantsPriority phase = case phase of
   Phase.Beginning BeginningStep.Untap -> False
   Phase.Ending EndingStep.Cleanup -> False
   _ -> True
+
+isMainPhase :: Phase -> Bool
+isMainPhase phase = case phase of
+  Phase.PrecombatMain -> True
+  Phase.PostcombatMain -> True
+  _ -> False

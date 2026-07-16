@@ -16,6 +16,9 @@ module Pawl.Type.Quantity where
 -- (signum Star? negate Infinite?), which collides with the no-partial-functions
 -- rule, and fromInteger would silently erase the very distinction this type
 -- exists to draw. Combining is explicit named functions.
-data Quantity
+--
+-- A newtype only because Literal is the only constructor today; it becomes a
+-- `data` the moment the second one lands.
+newtype Quantity
   = Literal Integer
   deriving (Eq, Ord, Show)
