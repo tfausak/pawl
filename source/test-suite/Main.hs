@@ -96,7 +96,104 @@ testTree =
       objectFactTests,
       creatureSbaTests,
       combatLegalityTests,
-      combatReplayTests
+      combatReplayTests,
+      declareTests
+    ]
+
+-- Attacks with everything and blocks the first attacker with everything.
+-- Deliberately maximal: it makes combat happen without the test having to
+-- hand-build a Combat record.
+aggressiveAnswer :: Prompt.Prompt r -> r
+aggressiveAnswer p = case p of
+  Prompt.Shuffle ids -> ids
+  Prompt.ChooseAction {} -> A.Pass
+  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.DeclareAttackers _ _ ids -> ids
+  Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
+    [] -> Map.empty
+    a : _ -> Map.fromList (map (\b -> (b, a)) mine)
+  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
+    b : _ -> Map.singleton b n
+    [] -> Map.empty
+
+declaredAttackers :: GameState.GameState -> [ObjectId.ObjectId]
+declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
+
+declareTests :: Tasty.TestTree
+declareTests =
+  Tasty.testGroup
+    "Declare"
+    [ HU.testCase "CR 508.1f declaring an attacker taps it" $
+        let (gs, mine, _) = combatBoard 1 1
+            after = snd (Engine.runGamePure aggressiveAnswer gs (Combat.declareAttackers alice))
+         in do
+              HU.assertEqual "one attacker" mine (declaredAttackers after)
+              HU.assertEqual "tapped" 1 (tappedCount alice after),
+      HU.testCase "CR 508.1 attackers attack the defending player" $
+        let (gs, mine, _) = combatBoard 1 1
+            after = snd (Engine.runGamePure aggressiveAnswer gs (Combat.declareAttackers alice))
+         in case mine of
+              [] -> HU.assertFailure "fixture should have an attacker"
+              oid : _ ->
+                HU.assertEqual
+                  "attacking bob"
+                  (Just (AttackTarget.OfPlayer bob))
+                  (Map.lookup oid (Combat.Type.attackers (GameState.combat after))),
+      HU.testCase "an illegal attacker in the answer is dropped" $
+        -- The interpreter names bob's creature. It is not alice's to attack with.
+        let (gs, _, theirs) = combatBoard 1 1
+            liar :: Prompt.Prompt r -> r
+            liar p = case p of
+              Prompt.DeclareAttackers {} -> theirs
+              _ -> aggressiveAnswer p
+            after = snd (Engine.runGamePure liar gs (Combat.declareAttackers alice))
+         in HU.assertEqual "nothing attacks" [] (declaredAttackers after),
+      HU.testCase "CR 509.1 a blocker is recorded against the attacker it blocks" $
+        let (gs, mine, theirs) = combatBoard 1 1
+            steps = do
+              Combat.declareAttackers alice
+              Combat.declareBlockers
+            after = snd (Engine.runGamePure aggressiveAnswer gs steps)
+         in case mine of
+              [] -> HU.assertFailure "fixture should have an attacker"
+              attacker : _ ->
+                HU.assertEqual "blocked by bob's creature" (Set.fromList theirs) (Combat.blockersOf attacker after),
+      HU.testCase "an unblocked attacker has no blockers" $
+        let (gs, mine, _) = combatBoard 1 0
+            steps = do
+              Combat.declareAttackers alice
+              Combat.declareBlockers
+            after = snd (Engine.runGamePure aggressiveAnswer gs steps)
+         in case mine of
+              [] -> HU.assertFailure "fixture should have an attacker"
+              attacker : _ -> HU.assertBool "unblocked" (not (Combat.isBlocked attacker after)),
+      HU.testCase "no legal attackers means no prompt and no attacks" $
+        -- combatBoard 0 1 gives alice nothing. A prompt here would be the engine
+        -- asking a question with exactly one answer.
+        let (gs, _, _) = combatBoard 0 1
+            after = snd (Engine.runGamePure aggressiveAnswer gs (Combat.declareAttackers alice))
+         in HU.assertEqual "nothing attacks" [] (declaredAttackers after),
+      -- The end-to-end summoning sickness scenario the spec names: a creature
+      -- that just arrived cannot attack, and the SAME creature can once its
+      -- controller's untap step has settled it. The halves are tested in Tasks 1
+      -- and 4; this proves they compose.
+      HU.testCase "CR 302.6 a creature cannot attack the turn it arrives, and can after untapping" $
+        let (gs, _, _) = combatBoard 1 1
+            -- Re-sicken alice's creature, as though it had just resolved.
+            justArrived =
+              gs
+                { GameState.objects =
+                    Map.map (\o -> if Object.owner o == alice then o {Object.sickness = Sickness.Sick} else o) (GameState.objects gs)
+                }
+            sameTurn = snd (Engine.runGamePure aggressiveAnswer justArrived (Combat.declareAttackers alice))
+            nextTurn =
+              snd $
+                Engine.runGamePure aggressiveAnswer justArrived $ do
+                  Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap)
+                  Combat.declareAttackers alice
+         in do
+              HU.assertEqual "cannot attack the turn it arrives" [] (declaredAttackers sameTurn)
+              HU.assertEqual "can attack after untapping" 1 (length (declaredAttackers nextTurn))
     ]
 
 combatReplayTests :: Tasty.TestTree

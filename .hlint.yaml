@@ -2,3 +2,12 @@
 # style rule is the opposite: prefer functions to operators, and no
 # backtick-infixed functions. See the style section of CONTRIBUTING.md.
 - ignore: {name: "Use infix"}
+
+# Same rule, different hint name: this one rewrites `\x -> elem x xs` into a
+# backticked section rather than a bare application.
+- ignore: {name: "Avoid lambda using `infix`"}
+
+# HLint suggests `(, x)` for `\y -> (y, x)`. That needs TupleSections, and the
+# project is Haskell 2010 with only GADTs and RankNTypes permitted, so the
+# suggestion can never be applied. See the style section of CONTRIBUTING.md.
+- ignore: {name: "Use tuple-section"}
