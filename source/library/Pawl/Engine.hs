@@ -11,10 +11,13 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Action as Action
+import qualified Pawl.Cast as Cast
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
+import qualified Pawl.Mana as Mana
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
+import qualified Pawl.Stack as Stack
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.BeginningStep as BeginningStep
@@ -73,8 +76,6 @@ untapAll pid = do
       ids = Game.zoneMembers Zone.Battlefield pid gs
   State.put gs {GameState.objects = foldr (Map.adjust untap) (GameState.objects gs) ids}
 
--- CR 514.2. In M0 every card is a Mountain, so "which to discard" has no
--- meaningful choice: trim from the front of hand without prompting.
 -- CR 514.2. Non-identical cards now share a hand (Mountains and Pikers), so
 -- trimming front-of-hand would be the engine choosing what to pitch -- policy in
 -- the rules core, not canonicalization. The choice is the player's.
@@ -119,8 +120,10 @@ runTurnBasedActions phase = do
     _ -> pure ()
 
 -- Ask the priority holder for an action until every still-playing player has
--- passed in succession. The stack is always empty in M0, so a full round of
--- passes simply ends the step.
+-- passed in succession (CR 117.4). A full round of passes resolves the top of
+-- the stack and hands priority back to the active player; only an EMPTY stack
+-- ends the step. M0 could skip that distinction because its stack was always
+-- empty.
 priorityLoop :: Game ()
 priorityLoop = do
   active <- State.gets GameState.activePlayer
@@ -138,7 +141,16 @@ priorityLoop = do
                 let passes = GameState.passes gs + 1
                     playing = length (Sba.stillPlaying gs)
                 if passes >= fromIntegral playing
-                  then State.put gs {GameState.priority = Nothing, GameState.passes = passes}
+                  then case GameState.stack gs of
+                    [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
+                    _ -> do
+                      let resolved = Stack.resolveTop gs
+                      State.put
+                        resolved
+                          { GameState.passes = 0,
+                            GameState.priority = Just (GameState.activePlayer resolved)
+                          }
+                      loop
                   else do
                     State.put
                       gs
@@ -148,14 +160,22 @@ priorityLoop = do
                     loop
               Action.Type.Play oid -> do
                 -- CR 305.1: playing a land is a special action; it resolves
-                -- immediately and the active player regains priority.
+                -- immediately and does not use the stack.
                 let played = Game.changeZone oid Zone.Battlefield gs
                 State.put
                   played
                     { GameState.landPlayed = Set.insert p (GameState.landPlayed played),
                       GameState.passes = 0,
-                      GameState.priority = Just (GameState.activePlayer played)
+                      -- CR 117.3c: the player who took the action keeps
+                      -- priority. M0 said activePlayer here, which was only
+                      -- accidentally right because lands are active-player-only.
+                      GameState.priority = Just p
                     }
+                loop
+              Action.Type.Cast oid -> do
+                Cast.castSpell p oid
+                -- CR 117.3c again: casting does not hand priority away.
+                State.modify' $ \g -> g {GameState.passes = 0, GameState.priority = Just p}
                 loop
   loop
 
@@ -182,6 +202,10 @@ runStep = do
   finished <- State.gets (Maybe.isJust . GameState.result)
   Monad.unless finished $ do
     Monad.when (Turn.grantsPriority phase) priorityLoop
+    -- CR 500.4: each player's mana pool empties at the end of every step and
+    -- phase. Nothing floats mana in M1a, so this is unobservable today; it is
+    -- the rule, and it is a one-liner.
+    State.modify' Mana.emptyManaPools
     checkSba
     stillFinished <- State.gets (Maybe.isJust . GameState.result)
     Monad.unless stillFinished (advance phase)

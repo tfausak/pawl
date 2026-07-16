@@ -80,7 +80,50 @@ testTree =
       deckTests,
       discardTests,
       castTests,
-      stackTests
+      stackTests,
+      castEngineTests
+    ]
+
+-- Casts when legal, otherwise plays a land, otherwise passes.
+castAnswer :: Prompt.Prompt r -> r
+castAnswer p = case p of
+  Prompt.Shuffle ids -> ids
+  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseAction _ _ actions ->
+    let isCast a = case a of
+          A.Cast _ -> True
+          _ -> False
+        isPlay a = case a of
+          A.Play _ -> True
+          _ -> False
+     in case filter isCast actions of
+          h : _ -> h
+          [] -> case filter isPlay actions of
+            h : _ -> h
+            [] -> A.Pass
+
+castGameState :: GameState.GameState
+castGameState =
+  snd (Engine.runGamePure castAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom bothPlayers))
+
+castEngineTests :: Tasty.TestTree
+castEngineTests =
+  Tasty.testGroup
+    "CastEngine"
+    [ HU.testCase "a castable Piker is offered as a legal action" $
+        let (gs, oid) = pikerInHand 2 Phase.PrecombatMain
+         in HU.assertBool "offered" (elem (A.Cast oid) (Action.legalActions alice gs)),
+      HU.testCase "an unaffordable Piker is not offered" $
+        let (gs, oid) = pikerInHand 1 Phase.PrecombatMain
+         in HU.assertBool "not offered" (notElem (A.Cast oid) (Action.legalActions alice gs)),
+      HU.testCase "casting actually happens in a full game" $
+        HU.assertBool "creatures resolved" (creaturesInPlay alice castGameState > 0),
+      HU.testCase "a casting game still terminates" $
+        HU.assertBool "has result" (Maybe.isJust (GameState.result castGameState)),
+      HU.testCase "a casting game conserves objects" $
+        HU.assertEqual "objects" 120 (Game.objectCount castGameState),
+      HU.testCase "CR 500.4 no mana floats at the end of a game" $
+        HU.assertEqual "pools empty" Map.empty (GameState.manaPool castGameState)
     ]
 
 creaturesInPlay :: PlayerId.PlayerId -> GameState.GameState -> Int
@@ -506,6 +549,7 @@ playLandAnswer p = case p of
     let isPlay a = case a of
           A.Play _ -> True
           A.Pass -> False
+          A.Cast _ -> False
      in case filter isPlay actions of
           h : _ -> h
           [] -> A.Pass
@@ -660,11 +704,53 @@ handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 librarySize :: PlayerId.PlayerId -> GameState.GameState -> Int
 librarySize pid gs = length (Game.zoneMembers Zone.Library pid gs)
 
+-- Records every player asked for an action, in order, and casts when it can.
+-- Recording is the point: whether the caster RETAINS priority is only visible in
+-- who gets asked next.
+recordingAnswer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+recordingAnswer p = case p of
+  Prompt.Shuffle ids -> pure ids
+  Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
+  Prompt.ChooseAction _ pid actions -> do
+    State.modify' (\asked -> asked ++ [pid])
+    let isCast a = case a of
+          A.Cast _ -> True
+          _ -> False
+    pure $ case filter isCast actions of
+      h : _ -> h
+      [] -> A.Pass
+
+-- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
+-- [alice, bob] and both players are in the players map.
+askedPlayers :: [PlayerId.PlayerId]
+askedPlayers =
+  let (gs, _) = pikerInHand 3 Phase.PrecombatMain
+   in State.execState
+        (Program.foldProgramM recordingAnswer (State.runStateT Engine.priorityLoop gs))
+        []
+
 ruleTests :: Tasty.TestTree
 ruleTests =
   Tasty.testGroup
     "Rules"
-    [ HU.testCase "CR 103.7a starting player skips first draw" $ do
+    [ HU.testCase "CR 117.4 a full round of passes resolves the stack, not the step" $
+        -- With a spell on the stack, everyone passing must RESOLVE it and keep
+        -- the step alive. Under M0's rule the step would simply end with the
+        -- spell still sitting on the stack.
+        let (gs, oid) = pikerInHand 3 Phase.PrecombatMain
+            steps = do
+              Cast.castSpell alice oid
+              Engine.priorityLoop
+            after = snd (Engine.runGamePure identityAnswer gs steps)
+         in do
+              HU.assertEqual "stack emptied" 0 (length (GameState.stack after))
+              HU.assertEqual "piker resolved onto the battlefield" 1 (creaturesInPlay alice after),
+      HU.testCase "CR 117.3c the caster is asked again, rather than passing priority on" $
+        -- alice is asked, casts, and must be asked AGAIN before bob gets a turn.
+        -- If priority wrongly advanced to the next player, this would be
+        -- [alice, bob, ...] instead.
+        HU.assertEqual "alice twice, then bob" [alice, alice, bob] (take 3 askedPlayers),
+      HU.testCase "CR 103.7a starting player skips first draw" $ do
         HU.assertEqual "hand" 7 (handSize alice aliceFirstDraw)
         HU.assertEqual "library" 53 (librarySize alice aliceFirstDraw),
       HU.testCase "CR 103.7a only the starting player skips" $ do

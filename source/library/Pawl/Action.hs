@@ -2,6 +2,7 @@ module Pawl.Action where
 
 import qualified Data.Set as Set
 import qualified Pawl.Card as Card
+import qualified Pawl.Cast as Cast
 import qualified Pawl.Game as Game
 import qualified Pawl.Turn as Turn
 import Pawl.Type.Action (Action)
@@ -30,4 +31,5 @@ legalActions pid gs =
           && GameState.activePlayer gs == pid
           && not (Set.member pid (GameState.landPlayed gs))
       lands = if canPlayLand then map Action.Play (playableLands pid gs) else []
-   in Action.Pass : lands
+      spells = map Action.Cast (Cast.castableSpells pid gs)
+   in Action.Pass : lands ++ spells
