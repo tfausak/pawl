@@ -83,6 +83,7 @@ createCard pid printing = do
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Library,
             Object.tapped = TapState.Untapped,
+            Object.damage = 0,
             Object.sickness = Sickness.Sick
           }
       gs2 =

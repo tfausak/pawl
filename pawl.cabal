@@ -55,6 +55,7 @@ library
     Pawl.Action
     Pawl.Card
     Pawl.Cast
+    Pawl.Damage
     Pawl.Decide
     Pawl.Engine
     Pawl.Game

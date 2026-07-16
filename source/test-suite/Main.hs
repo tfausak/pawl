@@ -8,9 +8,11 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
@@ -83,7 +85,39 @@ testTree =
       castTests,
       stackTests,
       castEngineTests,
-      sicknessTests
+      sicknessTests,
+      damageTests
+    ]
+
+damageOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural.Natural
+damageOf oid gs = fmap Object.damage (Game.lookupObject oid gs)
+
+markDamage :: ObjectId.ObjectId -> Natural.Natural -> GameState.GameState -> GameState.GameState
+markDamage oid n gs =
+  gs {GameState.objects = Map.adjust (\o -> o {Object.damage = n}) oid (GameState.objects gs)}
+
+damageTests :: Tasty.TestTree
+damageTests =
+  Tasty.testGroup
+    "Damage"
+    [ HU.testCase "a permanent starts with no damage marked" $
+        let (oid, gs) = addPiker alice (Setup.emptyGame bothPlayers)
+         in HU.assertEqual "none" (Just 0) (damageOf oid gs),
+      HU.testCase "CR 514.2 marked damage is removed" $
+        let (oid, gs) = addPiker alice (Setup.emptyGame bothPlayers)
+         in HU.assertEqual "removed" (Just 0) (damageOf oid (Damage.removeAllDamage (markDamage oid 1 gs))),
+      HU.testCase "CR 514.2 damage wears off at the cleanup step" $
+        let (oid, gs) = addPiker alice (Setup.emptyGame bothPlayers)
+            marked = markDamage oid 1 gs
+            after = snd (Engine.runGamePure identityAnswer marked (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
+         in HU.assertEqual "worn off" (Just 0) (damageOf oid after),
+      HU.testCase "CR 400.7 a new object carries no damage forward" $
+        let (oid, gs) = addPiker alice (Setup.emptyGame bothPlayers)
+            marked = markDamage oid 1 gs
+            after = Game.changeZone oid Zone.Graveyard marked
+         in case Game.zoneMembers Zone.Graveyard alice after of
+              [] -> HU.assertFailure "expected a card in the graveyard"
+              new : _ -> HU.assertEqual "fresh object, no damage" (Just 0) (damageOf new after)
     ]
 
 -- A Piker put onto the battlefield under pid's control, untapped and Settled.
@@ -99,6 +133,7 @@ addPiker pid gs =
             Object.source = Source.OfCard Card.pikerPrinting,
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
+            Object.damage = 0,
             Object.sickness = Sickness.Settled
           }
    in ( oid,
@@ -246,6 +281,7 @@ pikerInHand n ph =
             Object.source = Source.OfCard Card.pikerPrinting,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
+            Object.damage = 0,
             Object.sickness = Sickness.Settled
           }
       gs2 =
@@ -382,6 +418,7 @@ mountainsInPlay n =
                   Object.source = Source.OfCard Card.mountainPrinting,
                   Object.zone = Zone.Battlefield,
                   Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
                   Object.sickness = Sickness.Settled
                 }
          in gs1
@@ -481,6 +518,7 @@ oneMountainState ph =
             Object.source = Source.OfCard Card.mountainPrinting,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
+            Object.damage = 0,
             Object.sickness = Sickness.Sick
           }
    in GameState.MkGameState
@@ -523,6 +561,7 @@ gameTests =
                       Object.source = Source.OfCard Card.mountainPrinting,
                       Object.zone = Zone.Battlefield,
                       Object.tapped = TapState.Untapped,
+                      Object.damage = 0,
                       Object.sickness = Sickness.Sick
                     }
               )

@@ -12,6 +12,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Action as Action
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
@@ -130,7 +131,10 @@ runTurnBasedActions phase = do
     Phase.Beginning BeginningStep.DrawStep -> do
       skip <- State.gets skipsDraw
       Monad.unless skip (drawFor active)
-    Phase.Ending EndingStep.Cleanup -> discardToHandSize active
+    Phase.Ending EndingStep.Cleanup -> do
+      discardToHandSize active
+      -- CR 514.2: damage wears off simultaneously with the discard.
+      State.modify' Damage.removeAllDamage
     _ -> pure ()
 
 -- Ask the priority holder for an action until every still-playing player has
