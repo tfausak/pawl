@@ -18,6 +18,7 @@ import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
+import qualified Pawl.Stack as Stack
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
@@ -78,7 +79,65 @@ testTree =
       manaTests,
       deckTests,
       discardTests,
-      castTests
+      castTests,
+      stackTests
+    ]
+
+creaturesInPlay :: PlayerId.PlayerId -> GameState.GameState -> Int
+creaturesInPlay pid gs =
+  let isCreatureObject oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> case Object.source obj of
+          Source.OfCard printing -> Card.isCreature (Printing.card printing)
+   in length (filter isCreatureObject (Game.zoneMembers Zone.Battlefield pid gs))
+
+-- A Piker cast and left on the stack, ready to resolve.
+pikerOnStack :: GameState.GameState
+pikerOnStack =
+  let (gs, oid) = pikerInHand 3 Phase.PrecombatMain
+   in snd (Engine.runGamePure identityAnswer gs (Cast.castSpell alice oid))
+
+stackTests :: Tasty.TestTree
+stackTests =
+  Tasty.testGroup
+    "Stack"
+    [ HU.testCase "CR 608.3 a resolving creature spell becomes a permanent" $
+        let after = Stack.resolveTop pikerOnStack
+         in do
+              HU.assertEqual "stack empty" 0 (length (GameState.stack after))
+              -- Four, not one: pikerInHand 3 leaves three Mountains in play.
+              HU.assertEqual "four permanents" 4 (length (Game.zoneMembers Zone.Battlefield alice after))
+              HU.assertEqual "one of them a creature" 1 (creaturesInPlay alice after),
+      HU.testCase "CR 400.7 the permanent is a new object" $
+        let after = Stack.resolveTop pikerOnStack
+         in case GameState.stack pikerOnStack of
+              [] -> HU.assertFailure "fixture should have a spell on the stack"
+              top : _ -> HU.assertEqual "old id gone" Nothing (Game.lookupObject top after),
+      HU.testCase "the permanent is a Piker on the battlefield" $
+        -- The object the spell resolved INTO, not just any permanent: the
+        -- fixture already has three Mountains in play, and zoneMembers is
+        -- ordered by id, so the front of that list is Mountain id 0.
+        let before = Game.zoneMembers Zone.Battlefield alice pikerOnStack
+            after = Stack.resolveTop pikerOnStack
+            isNew o = notElem o before
+            fresh = filter isNew (Game.zoneMembers Zone.Battlefield alice after)
+         in case fresh of
+              [] -> HU.assertFailure "expected a new permanent"
+              oid : _ -> case Game.lookupObject oid after of
+                Nothing -> HU.assertFailure "battlefield id should resolve"
+                Just obj -> do
+                  HU.assertEqual "zone" Zone.Battlefield (Object.zone obj)
+                  case Object.source obj of
+                    Source.OfCard printing ->
+                      HU.assertBool "creature" (Card.isCreature (Printing.card printing)),
+      HU.testCase "resolving conserves objects" $
+        HU.assertEqual
+          "conserved"
+          (Game.objectCount pikerOnStack)
+          (Game.objectCount (Stack.resolveTop pikerOnStack)),
+      HU.testCase "resolving an empty stack is a no-op" $
+        let gs = Setup.emptyGame bothPlayers
+         in HU.assertEqual "unchanged" gs (Stack.resolveTop gs)
     ]
 
 -- alice has n untapped Mountains in play and one Piker in hand, in a chosen phase.

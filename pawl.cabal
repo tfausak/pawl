@@ -62,6 +62,7 @@ library
     Pawl.Replay
     Pawl.Sba
     Pawl.Setup
+    Pawl.Stack
     Pawl.Turn
     Pawl.Type.Action
     Pawl.Type.BeginningStep
