@@ -74,7 +74,32 @@ testTree =
       propertyTests,
       ruleTests,
       quantityTests,
-      manaTests
+      manaTests,
+      deckTests
+    ]
+
+countByName :: Text.Text -> PlayerId.PlayerId -> GameState.GameState -> Int
+countByName wanted pid gs =
+  let named oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> case Object.source obj of
+          Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
+      inLibrary = filter named (Game.zoneMembers Zone.Library pid gs)
+      inHand = filter named (Game.zoneMembers Zone.Hand pid gs)
+   in length inLibrary + length inHand
+
+deckTests :: Tasty.TestTree
+deckTests =
+  Tasty.testGroup
+    "Deck"
+    [ HU.testCase "the deck is 60 cards" $
+        HU.assertEqual "size" 60 (length Setup.deckList),
+      HU.testCase "deckSize agrees with deckList" $
+        HU.assertEqual "agrees" (length Setup.deckList) Setup.deckSize,
+      HU.testCase "36 Mountains per player" $
+        HU.assertEqual "mountains" 36 (countByName (Text.pack "Mountain") alice setupState),
+      HU.testCase "24 Pikers per player" $
+        HU.assertEqual "pikers" 24 (countByName (Text.pack "Goblin Piker") bob setupState)
     ]
 
 -- alice controls n untapped Mountains on the battlefield, nothing else.

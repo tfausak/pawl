@@ -17,6 +17,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
+import Pawl.Type.Printing (Printing)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Source as Source
@@ -27,8 +28,13 @@ import qualified Pawl.Type.Zone as Zone
 startingLife :: Integer
 startingLife = 20
 
+-- 36 Mountain / 24 Goblin Piker: enough lands to cast reliably, enough Pikers
+-- that a random game actually exercises casting.
+deckList :: [Printing]
+deckList = replicate 36 Card.mountainPrinting ++ replicate 24 Card.pikerPrinting
+
 deckSize :: Int
-deckSize = 60
+deckSize = length deckList
 
 openingHand :: Int
 openingHand = 7
@@ -66,14 +72,14 @@ emptyGame order =
           GameState.landPlayed = mempty
         }
 
-createMountain :: PlayerId -> Game ObjectId
-createMountain pid = do
+createCard :: PlayerId -> Printing -> Game ObjectId
+createCard pid printing = do
   gs <- State.get
   let (oid, gs1) = Game.freshObjectId gs
       obj =
         Object.MkObject
           { Object.owner = pid,
-            Object.source = Source.OfCard Card.mountainPrinting,
+            Object.source = Source.OfCard printing,
             Object.zone = Zone.Library,
             Object.tapped = TapState.Untapped
           }
@@ -101,6 +107,6 @@ drawCard pid = do
 
 newGame :: NonEmpty.NonEmpty PlayerId -> Game ()
 newGame order = Monad.forM_ (NonEmpty.toList order) $ \pid -> do
-  Monad.replicateM_ deckSize (createMountain pid)
+  Monad.forM_ deckList (createCard pid)
   shuffleLibrary pid
   Monad.replicateM_ openingHand (drawCard pid)
