@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -11,6 +12,7 @@ import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
+import qualified Pawl.Mana as Mana
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Sba as Sba
@@ -25,9 +27,11 @@ import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Mana as Mana.Type
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.ManaUnit as ManaUnit
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -69,7 +73,84 @@ testTree =
       replayTests,
       propertyTests,
       ruleTests,
-      quantityTests
+      quantityTests,
+      manaTests
+    ]
+
+-- alice controls n untapped Mountains on the battlefield, nothing else.
+mountainsInPlay :: Int -> GameState.GameState
+mountainsInPlay n =
+  let add gs _ =
+        let (oid, gs1) = Game.freshObjectId gs
+            obj =
+              Object.MkObject
+                { Object.owner = alice,
+                  Object.source = Source.OfCard Card.mountainPrinting,
+                  Object.zone = Zone.Battlefield,
+                  Object.tapped = TapState.Untapped
+                }
+         in gs1
+              { GameState.objects = Map.insert oid obj (GameState.objects gs1),
+                GameState.battlefield = Set.insert oid (GameState.battlefield gs1)
+              }
+   in List.foldl' add (Setup.emptyGame bothPlayers) [1 .. n]
+
+pikerCost :: ManaCost.ManaCost
+pikerCost = ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
+
+poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
+poolSize pid gs = case Mana.poolOf pid gs of
+  Mana.Type.MkMana units -> length units
+
+tappedCount :: PlayerId.PlayerId -> GameState.GameState -> Int
+tappedCount pid gs =
+  let isTapped oid = case Game.lookupObject oid gs of
+        Just obj -> Object.tapped obj == TapState.Tapped
+        Nothing -> False
+   in length (filter isTapped (Game.zoneMembers Zone.Battlefield pid gs))
+
+manaTests :: Tasty.TestTree
+manaTests =
+  Tasty.testGroup
+    "Mana"
+    [ HU.testCase "CR 305.6 a Mountain's red mana ability comes from its subtype" $
+        HU.assertEqual
+          "red"
+          (Just (ManaType.Colored Color.Red))
+          (Mana.subtypeMana Subtype.Mountain),
+      HU.testCase "a Goblin grants no mana ability" $
+        HU.assertEqual "none" Nothing (Mana.subtypeMana Subtype.Goblin),
+      HU.testCase "an empty pool starts empty" $
+        HU.assertEqual "empty" 0 (poolSize alice (mountainsInPlay 2)),
+      HU.testCase "tapping a Mountain taps it and adds one red unit" $
+        let gs = mountainsInPlay 1
+         in case Game.zoneMembers Zone.Battlefield alice gs of
+              [] -> HU.assertFailure "fixture should have one Mountain"
+              oid : _ -> do
+                let after = Mana.tapForMana oid gs
+                HU.assertEqual "tapped" 1 (tappedCount alice after)
+                HU.assertEqual
+                  "pool"
+                  (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red}])
+                  (Mana.poolOf alice after),
+      HU.testCase "two Mountains can pay {1}{R}" $
+        HU.assertBool "affordable" (Mana.canPay alice pikerCost (mountainsInPlay 2)),
+      HU.testCase "one Mountain cannot pay {1}{R}" $
+        HU.assertBool "unaffordable" (not (Mana.canPay alice pikerCost (mountainsInPlay 1))),
+      HU.testCase "no Mountains cannot pay {1}{R}" $
+        HU.assertBool "unaffordable" (not (Mana.canPay alice pikerCost (mountainsInPlay 0))),
+      HU.testCase "paying {1}{R} taps exactly two of three Mountains and leaves no float" $
+        case Mana.payCost alice pikerCost (mountainsInPlay 3) of
+          Nothing -> HU.assertFailure "three Mountains should pay {1}{R}"
+          Just after -> do
+            HU.assertEqual "tapped" 2 (tappedCount alice after)
+            HU.assertEqual "no float" 0 (poolSize alice after),
+      HU.testCase "CR 500.4 mana pools empty" $
+        let gs = mountainsInPlay 1
+         in case Game.zoneMembers Zone.Battlefield alice gs of
+              [] -> HU.assertFailure "fixture should have one Mountain"
+              oid : _ ->
+                HU.assertEqual "emptied" 0 (poolSize alice (Mana.emptyManaPools (Mana.tapForMana oid gs)))
     ]
 
 quantityTests :: Tasty.TestTree
@@ -115,6 +196,7 @@ oneMountainState ph =
           GameState.exile = mempty,
           GameState.stack = [],
           GameState.players = Map.empty,
+          GameState.manaPool = Map.empty,
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,
           GameState.phase = ph,

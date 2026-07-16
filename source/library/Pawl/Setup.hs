@@ -53,6 +53,7 @@ emptyGame order =
           GameState.exile = mempty,
           GameState.stack = [],
           GameState.players = Map.fromList (map newPlayer order_),
+          GameState.manaPool = Map.empty,
           GameState.turnOrder = order_,
           GameState.activePlayer = NonEmpty.head order,
           GameState.phase = Turn.firstPhase,

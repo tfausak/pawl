@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Data.Sequence (Seq)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
+import Pawl.Type.Mana (Mana)
 import Pawl.Type.Object (Object)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Phase (Phase)
@@ -20,6 +21,8 @@ data GameState = MkGameState
     exile :: Set ObjectId,
     stack :: [ObjectId],
     players :: Map PlayerId Player,
+    -- CR 106.4. Absent from the map means an empty pool.
+    manaPool :: Map PlayerId Mana,
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
     phase :: Phase,
