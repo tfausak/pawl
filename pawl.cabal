@@ -55,6 +55,7 @@ library
     Pawl.Decide
     Pawl.Engine
     Pawl.Game
+    Pawl.Replay
     Pawl.Sba
     Pawl.Setup
     Pawl.Turn

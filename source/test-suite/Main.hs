@@ -10,6 +10,7 @@ import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
+import qualified Pawl.Replay as Replay
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
@@ -53,7 +54,8 @@ testTree =
       actionTests,
       setupTests,
       sbaTests,
-      engineTests
+      engineTests,
+      replayTests
     ]
 
 alice, bob :: PlayerId.PlayerId
@@ -226,6 +228,26 @@ engineTests =
           length (Game.zoneMembers Zone.Battlefield alice landState) <= turnsTaken alice landState
             && length (Game.zoneMembers Zone.Battlefield bob landState) <= turnsTaken bob landState
     ]
+
+replayTests :: Tasty.TestTree
+replayTests =
+  let start = Setup.emptyGame bothPlayers
+      game = Engine.playFrom bothPlayers
+      -- Recorded with playLandAnswer, whose choices differ from Replay's
+      -- exhausted-transcript fallback. That keeps these assertions honest: the
+      -- transcript has to actually carry the decisions.
+      ((_, recorded), transcript) = Replay.record playLandAnswer start game
+   in Tasty.testGroup
+        "Replay"
+        [ HU.testCase "replaying a recorded game reproduces the final state" $
+            HU.assertEqual "final states equal" recorded (snd (Replay.replay transcript start game)),
+          HU.testCase "the transcript is what carries the decisions" $
+            HU.assertBool "empty log diverges" $
+              recorded /= snd (Replay.replay [] start game),
+          HU.testCase "a recorded goldfish also replays" $
+            let ((_, gf), gfLog) = Replay.record identityAnswer start game
+             in HU.assertEqual "goldfish" gf (snd (Replay.replay gfLog start game))
+        ]
 
 -- A toy instruction set for exercising Program.
 data Toy r where
