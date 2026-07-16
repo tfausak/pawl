@@ -1,0 +1,5 @@
+# Quantity has exactly one constructor today (Literal) and HLint therefore wants
+# a newtype. It must stay a `data`: it is a sum that grows -- Star (a
+# characteristic-defining ability), Plus Quantity Quantity, Half, Infinite,
+# Variable. See the module comment and the M1a design spec.
+- ignore: {name: "Use newtype instead of data", within: [Pawl.Type.Quantity]}

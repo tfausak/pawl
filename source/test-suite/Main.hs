@@ -11,6 +11,7 @@ import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
+import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
@@ -31,6 +32,7 @@ import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
@@ -60,7 +62,24 @@ testTree =
       engineTests,
       replayTests,
       propertyTests,
-      ruleTests
+      ruleTests,
+      quantityTests
+    ]
+
+quantityTests :: Tasty.TestTree
+quantityTests =
+  Tasty.testGroup
+    "Quantity"
+    [ HU.testCase "a literal evaluates to itself" $
+        HU.assertEqual
+          "literal"
+          (Just 2)
+          (Quantity.evaluate (Setup.emptyGame bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal 2)),
+      HU.testCase "a literal may be negative" $
+        HU.assertEqual
+          "negative"
+          (Just (-1))
+          (Quantity.evaluate (Setup.emptyGame bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal (-1)))
     ]
 
 alice, bob :: PlayerId.PlayerId

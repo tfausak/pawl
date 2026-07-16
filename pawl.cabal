@@ -56,6 +56,7 @@ library
     Pawl.Decide
     Pawl.Engine
     Pawl.Game
+    Pawl.Quantity
     Pawl.Replay
     Pawl.Sba
     Pawl.Setup
@@ -76,9 +77,11 @@ library
     Pawl.Type.Phase
     Pawl.Type.Player
     Pawl.Type.PlayerId
+    Pawl.Type.Power
     Pawl.Type.Printing
     Pawl.Type.Program
     Pawl.Type.Prompt
+    Pawl.Type.Quantity
     Pawl.Type.Response
     Pawl.Type.Result
     Pawl.Type.Source
@@ -86,6 +89,7 @@ library
     Pawl.Type.Subtype
     Pawl.Type.Supertype
     Pawl.Type.TapState
+    Pawl.Type.Toughness
     Pawl.Type.TypeLine
     Pawl.Type.Zone
 
