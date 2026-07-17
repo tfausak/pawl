@@ -61,13 +61,21 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   as reference:
   `docs/superpowers/specs/2026-07-17-m2b-first-strike-design.md` and
   `docs/superpowers/plans/2026-07-17-m2b-first-strike.md`.
-- **Current work is M2c** — deathtouch + trample. The design doc's M2 is split
-  into **M2a** / **M2b** / **M2c**; the brief is `docs/design.md` §M2c, and the
-  M2c pointers M2b left behind are in the M2b spec's §7 expiries (the damage-event
-  bit deathtouch first reads, and the damage-assignment-chooser inversion trample
-  and banding force). The split, the full 702 triage, and why protection and
-  banding are punted are in `docs/design.md`. The M2c spec and plan are not yet
-  written; write the spec from the brief first.
+- **M2c is complete** (deathtouch + trample. Deathtouch is the first damage-event
+  reader: `Damage.applyCombatDamage` is now a change-and-emit funnel recording
+  `GameState.damageEvents`, and the CR 704.5h SBA (`Sba.woundedByDeathtouch`)
+  destroys a wounded creature the SBA check then drains. Trample restructures
+  assignment: `AssignCombatDamage` carries a keyword-agnostic `Map Recipient
+  Natural` of lethal thresholds, `Damage.legalAssignment` is the CR 702.19b
+  defender-gating implication, and CR 702.2c collapses a deathtouch source's
+  threshold to 1 in one line of `Damage.blockerThreshold`. Zero opcodes). Spec and
+  plan kept as reference:
+  `docs/superpowers/specs/2026-07-17-m2c-deathtouch-trample-design.md` and
+  `docs/superpowers/plans/2026-07-17-m2c-deathtouch-trample.md`.
+- **Current work is M3** — the layer system and the first real ABI test (Magical
+  Hack, Humility/Opalescence, Mindslaver), where a granted/removed keyword makes
+  the M2c live-projection reads (deathtouch at SBA time, the trample threshold)
+  and CR 702.2e's last-known-information load-bearing. See `docs/design.md`.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is

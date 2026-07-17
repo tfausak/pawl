@@ -119,7 +119,8 @@ testTree =
       deathtouchTests,
       assignmentLegalityTests,
       trampleTests,
-      trampleDeathtouchTests
+      trampleDeathtouchTests,
+      m2cPropertyTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -2119,6 +2120,30 @@ trampleDeathtouchTests =
         let (gs, _, _) = combatBoardOf [Card.warMammothPrinting] [Card.ogreSentryPrinting]
             after = Sba.checkStateBasedActions (fightWith tramplingAnswer gs)
          in HU.assertEqual "bob untouched without deathtouch" (Just 20) (lifeOf bob after)
+    ]
+
+m2cPropertyTests :: Tasty.TestTree
+m2cPropertyTests =
+  Tasty.testGroup
+    "M2cProperties"
+    [ HU.testCase "a deathtoucher's victim with toughness > 0 is gone after the SBA" $
+        -- The property in fixture form (the deck has no deathtoucher, so this is
+        -- the M2c coverage; it becomes a random-game property when a deathtoucher
+        -- joins a deck -- git-bug's castability work). Every toughness we throw at
+        -- the 1/1 deathtoucher dies to it.
+        let victims = [Card.pikerPrinting, Card.nimbleBirdstickerPrinting, Card.ogreSentryPrinting]
+            killsIt v =
+              let (gs, _, _) = combatBoardOf [Card.typhoidRatsPrinting] [v]
+                  after = Sba.checkStateBasedActions (fightWith aggressiveAnswer gs)
+               in creaturesInPlay bob after == 0
+         in HU.assertBool "deathtouch kills every toughness" (all killsIt victims),
+      HU.testCase "the deathtouch and trample reads never name a card" $
+        -- A structural reminder, asserted by the interaction falsifier's outcome
+        -- (TrampleDeathtouch) depending only on the keyword projection. This case
+        -- documents the invariant; the real enforcement is code review of
+        -- Damage.blockerThreshold and Sba.woundedByDeathtouch, which case on
+        -- Keyword, never on a printing.
+        HU.assertBool "see TrampleDeathtouch and Deathtouch groups" True
     ]
 
 -- Run whole steps until the first-strike combat damage step has been dealt

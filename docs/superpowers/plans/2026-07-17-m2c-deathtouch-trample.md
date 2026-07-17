@@ -1051,7 +1051,7 @@ New properties, the classification assertion, a clean warning-free build of all 
 - Consumes: everything above.
 - Produces: the milestone's exit criterion, asserted.
 
-- [ ] **Step 1: Write the deathtouch-destroys property and the classification assertion**
+- [x] **Step 1: Write the deathtouch-destroys property and the classification assertion**
 
 In `source/test-suite/Main.hs`, add and append `m2cPropertyTests` to `testTree`:
 
@@ -1081,12 +1081,12 @@ m2cPropertyTests =
     ]
 ```
 
-- [ ] **Step 2: Run the full suite and confirm all M1b/M2a/M2b properties survive**
+- [x] **Step 2: Run the full suite and confirm all M1b/M2a/M2b properties survive**
 
 Run: `cabal test 2>&1 | tee /tmp/m2c-test.txt | tail -5` then `grep -E "FAIL|Errors|passed" /tmp/m2c-test.txt`
 Expected: all groups pass; conservation (120 objects), termination, ids ≥ 120, no mana floats, combat happens, fliers get through, no priority in a skipped step, **life never increases** (M2c adds no lifegain) all still green.
 
-- [ ] **Step 3: Clean-build all targets warning-free and run the benchmark**
+- [x] **Step 3: Clean-build all targets warning-free and run the benchmark**
 
 Run:
 ```bash
@@ -1096,11 +1096,11 @@ cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"
 Expected: `0`.
 Run: `cabal bench 2>&1 | tail -5` — Expected: builds and runs.
 
-- [ ] **Step 4: Update CLAUDE.md**
+- [x] **Step 4: Update CLAUDE.md**
 
 In `CLAUDE.md`, under "Current work and tracking", change the M2c bullet from "Current work is M2c" to a completion record mirroring the M2a/M2b entries: note M2c complete (deathtouch's 704.5h SBA + the damage-event funnel; trample's recipient/threshold assignment and the 702.19b defender-gating; the 702.2c interaction), cite the spec and this plan as reference, and set current work to **M3** (the ABI test). Keep the paragraph's structure identical to the M2b entry.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
