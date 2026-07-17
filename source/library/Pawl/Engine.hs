@@ -25,6 +25,7 @@ import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.EndingStep as EndingStep
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
@@ -265,7 +266,7 @@ playGame =
             loop
    in loop
 
-playFrom :: NonEmpty.NonEmpty PlayerId -> Game Result
-playFrom order = do
-  Setup.newGame order
+playFrom :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game Result
+playFrom matchup = do
+  Setup.newGame matchup
   playGame

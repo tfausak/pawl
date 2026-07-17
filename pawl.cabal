@@ -83,6 +83,7 @@ library
     Pawl.Type.DamageEvent
     Pawl.Type.Decider
     Pawl.Type.DecisionLog
+    Pawl.Type.Deck
     Pawl.Type.Departure
     Pawl.Type.EndingStep
     Pawl.Type.Game

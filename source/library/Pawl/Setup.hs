@@ -6,10 +6,12 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import Numeric.Natural (Natural)
 import qualified Pawl.Card as Card
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Game as Game
 import qualified Pawl.Turn as Turn
+import qualified Pawl.Type.Deck as Deck
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -30,22 +32,41 @@ import qualified Pawl.Type.Zone as Zone
 startingLife :: Integer
 startingLife = 20
 
--- 36 Mountain / 16 Goblin Piker / 8 Bird Maiden: enough lands to cast reliably,
--- enough creatures that a random game exercises casting and combat.
---
--- Bird Maiden REPLACES Pikers rather than joining them, so the list stays at 60
--- and conservation stays at 120 objects. It is the only M2a printing in the deck:
--- flying is the one keyword whose effect is visible across a whole random game,
--- and a printing is not a deck-list entry -- the other four are exercised by
--- fixtures, which is cheaper and gives a deck-composition bug nowhere to hide.
-deckList :: [Printing]
-deckList =
-  replicate 36 Card.mountainPrinting
-    ++ replicate 16 Card.pikerPrinting
-    ++ replicate 8 Card.birdMaidenPrinting
+-- Every deck is 36 land + 24 creature = 60, so two players conserve 120 objects
+-- in any matchup. redDeck is M0's deck; greenDeck and blackDeck make M2c's
+-- trampler and deathtoucher castable (git-bug 14138aa). Each deck is mono-color,
+-- which is what keeps Mana.payCost's source elision legitimate.
+redDeck :: Deck.Deck
+redDeck =
+  Deck.MkDeck $
+    Map.fromList
+      [ (Card.mountainPrinting, 36),
+        (Card.pikerPrinting, 16),
+        (Card.birdMaidenPrinting, 8)
+      ]
 
-deckSize :: Int
-deckSize = length deckList
+greenDeck :: Deck.Deck
+greenDeck =
+  Deck.MkDeck $
+    Map.fromList
+      [ (Card.forestPrinting, 36),
+        (Card.warMammothPrinting, 24)
+      ]
+
+blackDeck :: Deck.Deck
+blackDeck =
+  Deck.MkDeck $
+    Map.fromList
+      [ (Card.swampPrinting, 36),
+        (Card.typhoidRatsPrinting, 24)
+      ]
+
+deckSize :: Deck.Deck -> Natural
+deckSize (Deck.MkDeck m) = sum (Map.elems m)
+
+-- Pair every player with one deck, for a symmetric (mirror) matchup.
+mirror :: Deck.Deck -> NonEmpty.NonEmpty PlayerId -> NonEmpty.NonEmpty (PlayerId, Deck.Deck)
+mirror deck = NonEmpty.map (\pid -> (pid, deck))
 
 openingHand :: Int
 openingHand = 7
@@ -121,8 +142,14 @@ drawCard pid = do
     [] -> pure ()
     top : _ -> State.put (Game.changeZone top Zone.Hand gs)
 
-newGame :: NonEmpty.NonEmpty PlayerId -> Game ()
-newGame order = Monad.forM_ (NonEmpty.toList order) $ \pid -> do
-  Monad.forM_ deckList (createCard pid)
+-- Build each player's library from their deck's multiset, shuffle, draw.
+createDeck :: PlayerId -> Deck.Deck -> Game ()
+createDeck pid (Deck.MkDeck m) =
+  Monad.forM_ (Map.toList m) $ \(printing, n) ->
+    Monad.replicateM_ (fromIntegral n) (createCard pid printing)
+
+newGame :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
+newGame matchup = Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
+  createDeck pid deck
   shuffleLibrary pid
   Monad.replicateM_ openingHand (drawCard pid)

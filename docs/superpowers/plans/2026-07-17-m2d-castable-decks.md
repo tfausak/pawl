@@ -211,7 +211,7 @@ Introduces `Deck`, the three named decks, `deckSize`/`mirror`, and rewrites `new
 - Consumes: Task 1's `Card.swampPrinting`, `Card.forestPrinting`.
 - Test-local: `redRed`, `greenBlack :: NonEmpty (PlayerId, Deck.Deck)` (defined in the test suite).
 
-- [ ] **Step 1: Write the failing test (new `deckTests`)**
+- [x] **Step 1: Write the failing test (new `deckTests`)**
 
 Replace the existing `deckTests` group in `source/test-suite/Main.hs` (currently at ~line 1102-1116, the one asserting `length Setup.deckList`) with this. Add `import qualified Pawl.Type.Deck as Deck` to the import block:
 
@@ -251,12 +251,12 @@ deckTests =
     ]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | grep -iE "not in scope|deckSize|redDeck|Deck"`
 Expected: compile failure — `Deck`, `Setup.redDeck`, `Setup.deckSize`-as-function, etc. not in scope.
 
-- [ ] **Step 3: Create the `Deck` type**
+- [x] **Step 3: Create the `Deck` type**
 
 Create `source/library/Pawl/Type/Deck.hs`:
 
@@ -276,7 +276,7 @@ newtype Deck = MkDeck (Map Printing Natural)
 
 Run `hooky fix` (or `cabal-gild`) so the `-- cabal-gild: discover` directive picks up the new module — do not hand-edit `exposed-modules`.
 
-- [ ] **Step 4: Add decks, `deckSize`, `mirror`, and a deck-expander to `Setup`**
+- [x] **Step 4: Add decks, `deckSize`, `mirror`, and a deck-expander to `Setup`**
 
 In `source/library/Pawl/Setup.hs`: add imports `import qualified Pawl.Type.Deck as Deck` and (if not already present) `import qualified Numeric.Natural as Natural` — actually use `Numeric.Natural (Natural)` for the signature. Replace the `deckList`/`deckSize` block (lines ~33-48) with:
 
@@ -320,7 +320,7 @@ mirror deck order = NonEmpty.map (\pid -> (pid, deck)) order
 
 Add `import Numeric.Natural (Natural)` to the import list. `Card.warMammothPrinting`/`typhoidRatsPrinting` already exist from M2c; `Card` is already imported.
 
-- [ ] **Step 5: Rewrite `newGame` to take a matchup**
+- [x] **Step 5: Rewrite `newGame` to take a matchup**
 
 In `source/library/Pawl/Setup.hs`, replace `newGame` (lines ~124-128) with:
 
@@ -340,7 +340,7 @@ newGame matchup = Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
 
 `createCard`, `shuffleLibrary`, `drawCard`, `emptyGame` are unchanged. `fromIntegral :: Natural -> Int` for `replicateM_`.
 
-- [ ] **Step 6: Change `Engine.playFrom`**
+- [x] **Step 6: Change `Engine.playFrom`**
 
 In `source/library/Pawl/Engine.hs`, add `import qualified Pawl.Type.Deck as Deck`, and change `playFrom` (lines ~268-270):
 
@@ -353,7 +353,7 @@ playFrom matchup = do
 
 (`emptyGame` is still called by callers with `NonEmpty PlayerId`; `playFrom`'s body no longer needs the raw order.)
 
-- [ ] **Step 7: Update the benchmark call sites**
+- [x] **Step 7: Update the benchmark call sites**
 
 In `source/benchmark/Main.hs`, change the three runners (lines 84, 91, 97) to pass a red mirror. Each currently ends `… (Engine.playFrom players))`; make it:
 
@@ -363,7 +363,7 @@ In `source/benchmark/Main.hs`, change the three runners (lines 84, 91, 97) to pa
 
 Apply the same `Setup.mirror Setup.redDeck players` wrap in `casting` (line 91) and `fighting` (line 97). `Setup` is already imported.
 
-- [ ] **Step 8: Add matchup bindings and update every red-red call site in the tests**
+- [x] **Step 8: Add matchup bindings and update every red-red call site in the tests**
 
 In `source/test-suite/Main.hs`, define (near `bothPlayers`, ~line 1217):
 
@@ -384,17 +384,17 @@ Then update each call site so the suite compiles (behavior unchanged — still r
 
 `Setup.emptyGame bothPlayers` calls stay unchanged everywhere (they still take `NonEmpty PlayerId`).
 
-- [ ] **Step 9: Run tests to verify green**
+- [x] **Step 9: Run tests to verify green**
 
 Run: `cabal test 2>&1 | grep -iE "Deck|FAIL|error|passed"`
 Expected: the new `Deck` cases pass; all previously-passing groups still pass.
 
-- [ ] **Step 10: Clean-build warning check**
+- [x] **Step 10: Clean-build warning check**
 
 Run: `rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build} && cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"`
 Expected: `0`
 
-- [ ] **Step 11: Format, lint, commit**
+- [x] **Step 11: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

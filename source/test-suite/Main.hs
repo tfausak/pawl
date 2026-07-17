@@ -34,6 +34,7 @@ import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
@@ -890,7 +891,7 @@ castAnswer p = case p of
 
 castGameState :: GameState.GameState
 castGameState =
-  snd (Engine.runGamePure castAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom bothPlayers))
+  snd (Engine.runGamePure castAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom redRed))
 
 castEngineTests :: Tasty.TestTree
 castEngineTests =
@@ -1063,7 +1064,7 @@ bobDiscardChoice :: (GameState.GameState, [ObjectId.ObjectId])
 bobDiscardChoice =
   let start = Setup.emptyGame bothPlayers
       steps = do
-        Setup.newGame bothPlayers
+        Setup.newGame redRed
         State.modify' $ \gs -> gs {GameState.activePlayer = bob, GameState.turnNumber = 2}
         drawStep
         beforeCleanup <- State.gets (Game.zoneMembers Zone.Hand bob)
@@ -1102,17 +1103,33 @@ deckTests :: Tasty.TestTree
 deckTests =
   Tasty.testGroup
     "Deck"
-    [ HU.testCase "the deck is 60 cards" $
-        HU.assertEqual "size" 60 (length Setup.deckList),
-      HU.testCase "deckSize agrees with deckList" $
-        HU.assertEqual "agrees" (length Setup.deckList) Setup.deckSize,
-      HU.testCase "36 Mountains per player" $
+    [ HU.testCase "the red deck is 60 cards" $
+        HU.assertEqual "size" 60 (Setup.deckSize Setup.redDeck),
+      HU.testCase "the green deck is 60 cards" $
+        HU.assertEqual "size" 60 (Setup.deckSize Setup.greenDeck),
+      HU.testCase "the black deck is 60 cards" $
+        HU.assertEqual "size" 60 (Setup.deckSize Setup.blackDeck),
+      HU.testCase "red deck composition" $
+        let Deck.MkDeck m = Setup.redDeck
+         in do
+              HU.assertEqual "mountains" (Just 36) (Map.lookup Card.mountainPrinting m)
+              HU.assertEqual "pikers" (Just 16) (Map.lookup Card.pikerPrinting m)
+              HU.assertEqual "maidens" (Just 8) (Map.lookup Card.birdMaidenPrinting m),
+      HU.testCase "green deck composition" $
+        let Deck.MkDeck m = Setup.greenDeck
+         in do
+              HU.assertEqual "forests" (Just 36) (Map.lookup Card.forestPrinting m)
+              HU.assertEqual "mammoths" (Just 24) (Map.lookup Card.warMammothPrinting m),
+      HU.testCase "black deck composition" $
+        let Deck.MkDeck m = Setup.blackDeck
+         in do
+              HU.assertEqual "swamps" (Just 36) (Map.lookup Card.swampPrinting m)
+              HU.assertEqual "rats" (Just 24) (Map.lookup Card.typhoidRatsPrinting m),
+      HU.testCase "36 Mountains per player after a red-red setup" $
         HU.assertEqual "mountains" 36 (countByName (Text.pack "Mountain") alice setupState),
-      HU.testCase "8 Bird Maidens per player" $
+      HU.testCase "8 Bird Maidens per player after a red-red setup" $
         HU.assertEqual "maidens" 8 (countByName (Text.pack "Bird Maiden") alice setupState),
-      HU.testCase "16 Pikers per player" $
-        -- Bird Maiden REPLACES Pikers rather than joining them: the list stays at
-        -- 60, so conservation stays at 120 and M1b's property is untouched.
+      HU.testCase "16 Pikers per player after a red-red setup" $
         HU.assertEqual "pikers" 16 (countByName (Text.pack "Goblin Piker") bob setupState)
     ]
 
@@ -1217,6 +1234,9 @@ bob = PlayerId.MkPlayerId 1
 bothPlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
 bothPlayers = alice NonEmpty.:| [bob]
 
+redRed :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
+redRed = Setup.mirror Setup.redDeck bothPlayers
+
 -- A GameState with a single Mountain in alice's hand, in a chosen phase.
 oneMountainState :: Phase.Phase -> GameState.GameState
 oneMountainState ph =
@@ -1312,7 +1332,7 @@ setupState :: GameState.GameState
 setupState =
   Program.foldProgram
     identityAnswer
-    (State.execStateT (Setup.newGame bothPlayers) (Setup.emptyGame bothPlayers))
+    (State.execStateT (Setup.newGame redRed) (Setup.emptyGame bothPlayers))
 
 setupTests :: Tasty.TestTree
 setupTests =
@@ -1351,7 +1371,7 @@ sbaTests =
 
 goldfishResult :: (Result.Result, GameState.GameState)
 goldfishResult =
-  Engine.runGamePure identityAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom bothPlayers)
+  Engine.runGamePure identityAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom redRed)
 
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
@@ -1375,7 +1395,7 @@ playLandAnswer p = case p of
 
 landState :: GameState.GameState
 landState =
-  snd (Engine.runGamePure playLandAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom bothPlayers))
+  snd (Engine.runGamePure playLandAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom redRed))
 
 -- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With one land play per
 -- turn (CR 305.2) a player can never have more lands out than turns taken.
@@ -1406,7 +1426,7 @@ engineTests =
 replayTests :: Tasty.TestTree
 replayTests =
   let start = Setup.emptyGame bothPlayers
-      game = Engine.playFrom bothPlayers
+      game = Engine.playFrom redRed
       -- Recorded with playLandAnswer, whose choices differ from Replay's
       -- exhausted-transcript fallback. That keeps these assertions honest: the
       -- transcript has to actually carry the decisions.
@@ -1478,7 +1498,7 @@ shuffleWith g xs =
 runRandomGame :: Int -> GameState.GameState
 runRandomGame s =
   let start = Setup.emptyGame bothPlayers
-      game = Engine.playFrom bothPlayers
+      game = Engine.playFrom redRed
       (_, final) = State.evalState (Program.foldProgramM randomAnswer (State.runStateT game start)) (Random.mkStdGen s)
    in final
 
@@ -1525,7 +1545,7 @@ someLifeChanged s =
 scenario :: Game.Type.Game () -> GameState.GameState
 scenario steps =
   snd $ Engine.runGamePure identityAnswer (Setup.emptyGame bothPlayers) $ do
-    Setup.newGame bothPlayers
+    Setup.newGame redRed
     steps
 
 drawStep :: Game.Type.Game ()
