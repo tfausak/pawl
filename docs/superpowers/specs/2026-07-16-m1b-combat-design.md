@@ -1,7 +1,7 @@
 # M1b combat — design
 
 Design for milestone **M1b**: fighting with a creature. This is the second half
-of `_scratch/design.md`'s **M1** ("vanilla creatures"), split from **M1a**
+of `docs/design.md`'s **M1** ("vanilla creatures"), split from **M1a**
 (casting) so that a failure in the mana model surfaces on its own rather than
 tangled with combat bugs.
 

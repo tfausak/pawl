@@ -1,7 +1,7 @@
 # M0 core types — design
 
 Design for the foundational types of milestone **M0** ("a complete game with zero
-cards", per `_scratch/design.md`). Scope is deliberately the three interlocking
+cards", per `docs/design.md`). Scope is deliberately the three interlocking
 type families that are expensive to change later: the **entity-identity model**,
 the **`GameState`**, and the **suspension monad** (`Program Prompt`).
 
@@ -165,7 +165,7 @@ per-turn-resized zones):
 | id-keyed maps (`objects`, per-player zones, `players`) | `Data.Map.Strict`, keyed by the `newtype` id | type-safe keys — can't index by the wrong id kind; ids can be `Natural`. `IntMap`+`Int` is a proven-perf fallback |
 
 Caveat: at M0's scale (`n` ≈ 60) `Seq`'s constant factor may lose to a plain
-list. `_scratch/design.md`'s risk register already mandates profiling the
+list. `docs/design.md`'s risk register already mandates profiling the
 goldfish loop at M0; `Seq` is the principled default and the profile decides.
 It's a one-line change behind the zone accessors either way.
 

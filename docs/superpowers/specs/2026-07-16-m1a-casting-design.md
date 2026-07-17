@@ -1,7 +1,7 @@
 # M1a casting — design
 
 Design for milestone **M1a**: casting a creature spell. This is the first half of
-`_scratch/design.md`'s **M1** ("vanilla creatures"), which bundles two
+`docs/design.md`'s **M1** ("vanilla creatures"), which bundles two
 independent subsystems. They are split here:
 
 - **M1a (this spec)** — mana, the stack, casting, and resolution. Creatures reach

@@ -1,10 +1,10 @@
 # M2a keywords — design
 
 Design for milestone **M2a**: the keyword seam, and the five keywords that prove
-it. This is the first slice of `_scratch/design.md`'s **M2** ("French vanilla"),
+it. This is the first slice of `docs/design.md`'s **M2** ("French vanilla"),
 which is split into **M2a** (the seam + blocking/attacking legality), **M2b**
 (first strike + the conditional turn structure) and **M2c** (deathtouch +
-trample). See `_scratch/design.md` for the split and the full 702 triage.
+trample). See `docs/design.md` for the split and the full 702 triage.
 
 M1b made creatures fight. M2a is where they start being *different from each
 other* — without a single opcode.
@@ -411,7 +411,7 @@ recording now so the shape is not mistaken for a corner:
   entries — which is one more reason the M1b decision to key blockers per attacker
   and store a `Set` was right.
 - CR 702.22j/k **invert the chooser**. That is the `Decider` problem (§7 of
-  `_scratch/design.md`), and it is why banding cannot land before M3.
+  `docs/design.md`), and it is why banding cannot land before M3.
 
 Banding adds no entry to 509.1b. It is not a blocking restriction, and no part of
 M2a needs to anticipate it beyond leaving the `Combat` record extensible, which it

@@ -20,7 +20,7 @@ machine:
 `case effect of DealDamage{} -> …`. Fusing the two halves is the single failure
 mode that sinks this project — audit for it.
 
-Design notes live in `_scratch/` (local, not tracked in git):
+Design notes live in `docs/` (local, not tracked in git):
 
 - `design.md` — architecture decisions and the M0–M7 implementation path.
 - `prior-art-lessons.md` — what to copy/avoid from Argentum (MIT), Forge
@@ -43,7 +43,7 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   `docs/superpowers/plans/2026-07-16-m1a-casting.md`.
 - **M1b is complete** (Pikers attack, block, deal damage simultaneously per CR
   510.2, and die). The design doc's M1 bundled two independent subsystems and was
-  split into **M1a** (casting) and **M1b** (combat); see `_scratch/design.md`.
+  split into **M1a** (casting) and **M1b** (combat); see `docs/design.md`.
   Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-16-m1b-combat-design.md` and
   `docs/superpowers/plans/2026-07-16-m1b-combat.md`.
@@ -51,7 +51,7 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   vigilance and haste. The design doc's M2 is split into **M2a** (the seam +
   blocking/attacking legality), **M2b** (first strike + the CR 506.1 conditional
   turn structure) and **M2c** (deathtouch + trample); the split, the full 702
-  triage, and why protection and banding are punted are in `_scratch/design.md`.
+  triage, and why protection and banding are punted are in `docs/design.md`.
   Spec: `docs/superpowers/specs/2026-07-16-m2a-keywords-design.md`. Plan to
   execute: `docs/superpowers/plans/2026-07-16-m2a-keywords.md`.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
@@ -90,7 +90,7 @@ dev shell (`nix develop` or direnv).
 1. `cabal build` is warning-free.
 2. `hooky fix` applied, `hooky run` passes.
 3. HLint suggestions applied, or the exception justified.
-4. Every rules claim was checked against `_scratch/rules.txt`. **Never trust
+4. Every rules claim was checked against `docs/rules.txt`. **Never trust
    recalled Magic rules** — they go stale. Two M1b spec bugs came from exactly
    this: damage assignment order was *removed from the game* (the glossary lists
    it "Obsolete"), and CR 733 is about human error at a table, not engine
