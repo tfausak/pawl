@@ -72,7 +72,16 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   plan kept as reference:
   `docs/superpowers/specs/2026-07-17-m2c-deathtouch-trample-design.md` and
   `docs/superpowers/plans/2026-07-17-m2c-deathtouch-trample.md`.
-- **Current work is M3** — the layer system and the first real ABI test (Magical
+- **M2d is complete** (M2c's black/green creatures are castable: `Swamp`/`Forest`
+  basic lands, a `Deck` multiset (`Map Printing Natural`), and setup taking an
+  explicit `NonEmpty (PlayerId, Deck)` matchup. The property suite runs over two
+  matchups — red-red (unchanged) and green-black (alice green, bob black) — giving
+  the 704.5h deathtouch SBA, trample assignment, and their CR 702.2c interaction
+  random-game coverage; a deterministic test casts each card through the stack.
+  No new rules, zero opcodes. `git-bug 14138aa` is closed). Spec and plan kept as
+  reference: `docs/superpowers/specs/2026-07-17-m2d-castable-decks-design.md` and
+  `docs/superpowers/plans/2026-07-17-m2d-castable-decks.md`.
+- **Current work is M3** — (M2d landed first: castable black/green decks.) the layer system and the first real ABI test (Magical
   Hack, Humility/Opalescence, Mindslaver), where a granted/removed keyword makes
   the M2c live-projection reads (deathtouch at SBA time, the trample threshold)
   and CR 702.2e's last-known-information load-bearing. See `docs/design.md`.

@@ -715,7 +715,7 @@ Update the milestone tracking and close the git-bug. No code.
 **Files:**
 - Modify: `CLAUDE.md` (milestone list)
 
-- [ ] **Step 1: Add the M2d tracking bullet**
+- [x] **Step 1: Add the M2d tracking bullet**
 
 In `CLAUDE.md`, under "Current work and tracking", add a bullet after the M2c one and adjust the "Current work is M3" bullet to note M2d landed first:
 
@@ -731,12 +731,12 @@ In `CLAUDE.md`, under "Current work and tracking", add a bullet after the M2c on
   `docs/superpowers/plans/2026-07-17-m2d-castable-decks.md`.
 ```
 
-- [ ] **Step 2: Close the git-bug**
+- [x] **Step 2: Close the git-bug**
 
 Run: `git-bug bug status close 14138aa`
 Expected: the bug's status becomes `closed` (`git-bug bug` no longer lists it as open).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add CLAUDE.md
