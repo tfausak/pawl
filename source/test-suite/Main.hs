@@ -86,6 +86,7 @@ testTree =
       gameTests,
       actionTests,
       setupTests,
+      greenBlackSetupTests,
       sbaTests,
       engineTests,
       replayTests,
@@ -1237,6 +1238,12 @@ bothPlayers = alice NonEmpty.:| [bob]
 redRed :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
 redRed = Setup.mirror Setup.redDeck bothPlayers
 
+greenBlack :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
+greenBlack = (alice, Setup.greenDeck) NonEmpty.:| [(bob, Setup.blackDeck)]
+
+matchups :: [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
+matchups = [redRed, greenBlack]
+
 -- A GameState with a single Mountain in alice's hand, in a chosen phase.
 oneMountainState :: Phase.Phase -> GameState.GameState
 oneMountainState ph =
@@ -1346,6 +1353,24 @@ setupTests =
         HU.assertEqual "hand" 7 (length (Game.zoneMembers Zone.Hand bob setupState)),
       HU.testCase "active player is first in turn order" $
         HU.assertEqual "active" alice (GameState.activePlayer setupState)
+    ]
+
+greenBlackSetup :: GameState.GameState
+greenBlackSetup =
+  Program.foldProgram
+    identityAnswer
+    (State.execStateT (Setup.newGame greenBlack) (Setup.emptyGame bothPlayers))
+
+greenBlackSetupTests :: Tasty.TestTree
+greenBlackSetupTests =
+  Tasty.testGroup
+    "GreenBlackSetup"
+    [ HU.testCase "alice's green deck deals 36 Forests" $
+        HU.assertEqual "forests" 36 (countByName (Text.pack "Forest") alice greenBlackSetup),
+      HU.testCase "bob's black deck deals 36 Swamps" $
+        HU.assertEqual "swamps" 36 (countByName (Text.pack "Swamp") bob greenBlackSetup),
+      HU.testCase "green-black setup conserves 120 objects" $
+        HU.assertEqual "count" 120 (Game.objectCount greenBlackSetup)
     ]
 
 sbaBase :: GameState.GameState
@@ -1495,10 +1520,10 @@ shuffleWith g xs =
       keys = take (length xs) (unfoldInts g)
    in map snd (foldr insertByKey [] (zip keys xs))
 
-runRandomGame :: Int -> GameState.GameState
-runRandomGame s =
-  let start = Setup.emptyGame bothPlayers
-      game = Engine.playFrom redRed
+runRandomGame :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> Int -> GameState.GameState
+runRandomGame matchup s =
+  let start = Setup.emptyGame (NonEmpty.map fst matchup)
+      game = Engine.playFrom matchup
       (_, final) = State.evalState (Program.foldProgramM randomAnswer (State.runStateT game start)) (Random.mkStdGen s)
    in final
 
@@ -1511,24 +1536,19 @@ propertyTests =
   Tasty.testGroup
     "Properties"
     [ QC.testProperty "conservation: 120 objects at end" $ \s ->
-        Game.objectCount (runRandomGame s) QC.=== 120,
-      -- The property that matters most now. Combat is the first thing that can
-      -- end a game before the library runs out.
+        QC.conjoin (map (\m -> Game.objectCount (runRandomGame m s) QC.=== 120) matchups),
       QC.testProperty "every game terminates with a result" $ \s ->
-        QC.property (Maybe.isJust (GameState.result (runRandomGame s))),
+        QC.conjoin (map (\m -> QC.property (Maybe.isJust (GameState.result (runRandomGame m s)))) matchups),
       QC.testProperty "at least 120 ids were minted" $ \s ->
-        QC.property (nextIdOf (runRandomGame s) >= 120),
+        QC.conjoin (map (\m -> QC.property (nextIdOf (runRandomGame m s) >= 120)) matchups),
       QC.testProperty "no mana floats at the end" $ \s ->
-        GameState.manaPool (runRandomGame s) QC.=== Map.empty,
-      -- Replaces M0's "no life changes". Nothing in M1b GAINS life, so any
-      -- increase is a bug. Dies at lifelink (M2), which is how M2 announces
-      -- itself -- exactly as this property's ancestor announced M1b.
+        QC.conjoin (map (\m -> GameState.manaPool (runRandomGame m s) QC.=== Map.empty) matchups),
       QC.testProperty "life never increases" $ \s ->
-        QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players (runRandomGame s)))),
-      -- The M1b exit criterion, asserted rather than assumed: across 100 seeds,
-      -- at least one game must see damage actually change someone's life total.
-      -- Without this, every combat path could silently no-op and the suite would
-      -- still be green.
+        QC.conjoin
+          ( map
+              (\m -> QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players (runRandomGame m s)))))
+              matchups
+          ),
       QC.testProperty "combat happens: some seed changes a life total" $
         QC.once $
           QC.property $
@@ -1539,7 +1559,7 @@ propertyTests =
 someLifeChanged :: Int -> Bool
 someLifeChanged s =
   let moved pl = Player.life pl /= Setup.startingLife
-   in any moved (Map.elems (GameState.players (runRandomGame s)))
+   in any moved (Map.elems (GameState.players (runRandomGame redRed s)))
 
 -- Run setup, then a scripted tweak, then whatever steps the scenario needs.
 scenario :: Game.Type.Game () -> GameState.GameState

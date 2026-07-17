@@ -417,7 +417,7 @@ Parameterizes `runRandomGame` by matchup and asserts every property across `{ re
 - Consumes: Task 2's `redRed`, `Setup.greenDeck`, `Setup.blackDeck`, `Engine.playFrom :: NonEmpty (PlayerId, Deck) -> Game Result`.
 - Produces (test-local): `greenBlack`, `matchups :: [NonEmpty (PlayerId, Deck.Deck)]`, `runRandomGame :: NonEmpty (PlayerId, Deck.Deck) -> Int -> GameState`.
 
-- [ ] **Step 1: Write the failing test (green-black setup) and generalize the properties**
+- [x] **Step 1: Write the failing test (green-black setup) and generalize the properties**
 
 In `source/test-suite/Main.hs`, add near `redRed`:
 
@@ -451,13 +451,13 @@ greenBlackSetupTests =
     ]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | grep -iE "not in scope|greenBlack"`
 Expected: compile failure — `greenBlack` / `matchups` not yet used by `runRandomGame`, and the new group not registered.
 (After adding the group to the top-level list, the failure narrows to the property changes below.)
 
-- [ ] **Step 3: Parameterize `runRandomGame`**
+- [x] **Step 3: Parameterize `runRandomGame`**
 
 Replace `runRandomGame` (lines ~1478-1483) with a matchup-taking version:
 
@@ -470,7 +470,7 @@ runRandomGame matchup s =
    in final
 ```
 
-- [ ] **Step 4: Run each property over both matchups**
+- [x] **Step 4: Run each property over both matchups**
 
 Replace `propertyTests` (lines ~1490-1516) so each property is conjoined across `matchups` (no list comprehension — use `map`):
 
@@ -500,7 +500,7 @@ propertyTests =
     ]
 ```
 
-- [ ] **Step 5: Fix `someLifeChanged` for the new `runRandomGame` arity**
+- [x] **Step 5: Fix `someLifeChanged` for the new `runRandomGame` arity**
 
 Update `someLifeChanged` (lines ~1519-1522) to pass a matchup (red-red keeps its existing meaning):
 
@@ -511,12 +511,12 @@ someLifeChanged s =
    in any moved (Map.elems (GameState.players (runRandomGame redRed s)))
 ```
 
-- [ ] **Step 6: Run tests to verify green**
+- [x] **Step 6: Run tests to verify green**
 
 Run: `cabal test 2>&1 | grep -iE "Properties|GreenBlackSetup|FAIL|error"`
 Expected: all properties pass across both matchups; `GreenBlackSetup` passes.
 
-- [ ] **Step 7: Clean-build warning check**
+- [x] **Step 7: Clean-build warning check**
 
 Run: `rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build} && cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"`
 Expected: `0`
