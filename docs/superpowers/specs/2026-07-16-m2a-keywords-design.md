@@ -154,29 +154,86 @@ constructor is written in M2a, because none has a consumer; the *shape* is a
 
 ## 3. What each keyword touches
 
-Every one of these is a change to a function `Pawl.Combat` already has. Nothing
-new is created.
+Four of the five are a clause inside a function `Pawl.Combat` already has.
+Flying and reach are the exception, and they are the reason this section is long:
+they land on CR 509.1's structure, and getting that structure wrong is how M2a
+would paint the engine into a corner for menace.
 
-**Flying and reach — CR 702.9b, 702.17b.** `canBlock` gains an
-attacker-relative check. Note the asymmetry the rules state explicitly and that
-is easy to get backwards: 702.9b's second sentence says "a creature with flying
-can block a creature with or without flying." Flying restricts *being blocked*,
-never *blocking*.
+No prompt changes. `Pawl.Type.Prompt`, `Pawl.Type.Response`, `Pawl.Replay` and
+all eight interpreters are untouched — M2a is additive across the decision seam,
+unlike M1b's Task 5.
 
-The check is a relation, so it does not belong in `canBlock`'s existing
-signature, which asks only about the blocker:
+**Flying and reach — CR 702.9b, 702.17b.** Evasion is **not** a filter on who may
+block. CR 509.1b is explicit about what it is:
+
+> The defending player checks each creature they control to see whether it's
+> affected by any **restrictions** (effects that say a creature can't block, or
+> that it can't block unless some condition is met). If any restrictions are being
+> disobeyed, **the declaration of blockers is illegal**.
+>
+> A restriction may be created by an **evasion ability** (a static ability an
+> attacking creature has that restricts what can block it). … Different evasion
+> abilities are **cumulative**.
+
+So the rules validate the **whole declaration**, and the unit of legality is the
+declaration, not the pair. This distinction decides whether the milestone paints
+the engine into a corner, because the very next keyword on the punchlist does not
+fit the pair-shaped version: **menace** (702.111) says a creature "can't be
+blocked except by two or more creatures" — a constraint on the *set* blocking one
+attacker, which no per-pair predicate can express. CR 509.1c's own example is
+menace. Landwalk reads the defending player's lands; protection reads a quality.
+Only flying and reach are pairwise, and designing to them would be designing to
+the one case that misleads.
+
+Therefore the split follows the rules' own seam:
 
 ```hs
--- CR 509.1a's restrictions are about the blocker alone; evasion is about the
--- pair. Kept separate so the two do not get tangled.
-canBlockAttacker :: PlayerId -> ObjectId -> ObjectId -> GameState -> Bool
+-- Pawl.Combat
+
+-- CR 509.1a: about the blocker ALONE -- untapped, controlled by the defending
+-- player, a creature. Unchanged from M1b. These creatures can block SOMETHING;
+-- whether a given declaration is legal is a different question.
+canBlock :: PlayerId -> ObjectId -> GameState -> Bool
+
+-- CR 509.1b: restrictions, checked over the declaration AS A WHOLE. Evasion
+-- lives here. A conjunction of independent restriction checks, because 509.1b
+-- says different evasion abilities are cumulative -- flying and shadow together
+-- admit only blockers that have both.
+legalBlockDeclaration :: PlayerId -> Map ObjectId ObjectId -> GameState -> Bool
 ```
 
-`legalBlockers` becomes attacker-relative, and `Prompt.DeclareBlockers` — which
-currently offers one flat `[ObjectId]` of legal blockers alongside the attackers
-— must now offer a *per-attacker* legality, because "which creatures may block"
-is no longer a question with one answer. This is the one prompt change in M2a
-and the one place where an interface, not an implementation, moves.
+**`Prompt.DeclareBlockers` does not change.** It already offers the 509.1a
+candidates and the attackers, and already returns a whole
+`Map ObjectId ObjectId` — which is exactly the rules' unit of legality. The flat
+candidate list stays honest: those creatures really can block *something*. An
+interpreter that wants per-attacker legality can call `legalBlockDeclaration`
+itself; the library has no export lists, and the engine must validate the answer
+regardless of what the interpreter believed.
+
+**An illegal declaration is rejected whole, and no creature blocks.** M1b already
+settled this exact question for CR 510.1e and the argument transfers without
+modification:
+
+> CR 510.1e checks the assignment AS A WHOLE, so this cannot be repaired by
+> filtering the way a discard can.
+
+Filtering is not merely inelegant here, it is *unsound*: drop one blocker from a
+menace pair and the survivor is an illegal single block, so the filter would
+manufacture the illegality it was meant to remove. M1b's `declareBlockers`
+filters per-pair today (`Map.filterWithKey legal chosen`), which is correct only
+because pairwise legality is currently the whole of 509.1b. **M2a replaces that
+filter with whole-declaration validation** — the one behavioral change to
+existing code, and the reason it is worth making now rather than at menace.
+
+As with 510.1e, this is not CR 733's rewind: an enforcing engine never offers the
+illegal declaration, so only a broken interpreter arrives here, and re-prompting a
+pure `Prompt r -> r` returns the identical wrong answer. Declining to block is
+always legal today, so "no blocks" is a legal state to fall back to — see §6 for
+the milestone that stops making that true.
+
+Note the asymmetry the rules state explicitly and that is easy to get backwards:
+702.9b's second sentence says "a creature with flying can block a creature with or
+without flying." Flying restricts *being blocked*, never *blocking*.
 
 **Defender — CR 702.3b.** One clause in `canAttack`. It is the only keyword here
 that needs nothing but a `hasKeyword` call, which is why it is worth having: it
@@ -251,12 +308,24 @@ actions.
 
 **Rule-numbered scenarios**, matching the `ruleTests` convention:
 
-- *CR 702.9b* — a ground creature may not block a flier.
+- *CR 702.9b* — a declaration in which a ground creature blocks a flier is
+  illegal.
 - *CR 702.9b* — a flier may block a ground creature. (The asymmetry. This is the
   test that fails if flying is implemented as a symmetric predicate.)
 - *CR 702.17b* — a reach creature may block a flier. **The falsifier.** It fails
   against any implementation that asks "does the blocker have flying?"
 - *CR 702.9b* — a flier may block a flier.
+- *CR 509.1a* — a ground creature is still offered as a legal blocker while a
+  flier attacks. It can block *something*; 509.1a is about the blocker alone.
+  This is the test that fails if evasion is wrongly implemented as a filter on
+  the candidate list.
+- *CR 509.1b* — **an illegal declaration is rejected whole, not repaired.** The
+  interpreter answers with one legal block (a reach creature on the flier) *and*
+  one illegal one (a Piker on the flier); **neither** creature ends up blocking.
+  This is the test that pins reject-versus-filter, and it is worth having now
+  rather than at menace: it is the only M2a test that fails against M1b's
+  surviving `Map.filterWithKey`, which would drop the Piker and let the reach
+  block stand.
 - *CR 702.3b* — a creature with defender is not offered as a legal attacker.
 - *CR 702.3b* — a creature with defender may still block.
 - *CR 702.20b* — a creature with vigilance is declared as an attacker and is
@@ -300,6 +369,51 @@ which is unchanged and still owed.
 | `Keyword` has only nullary constructors | None of M2a's five take a parameter | **Punchlist** — `Landwalk Subtype` |
 | `Set Keyword` assumes redundancy | True of every keyword through M2c | Ward, Rampage (**tail**) |
 | CR 702.10c (haste and tap abilities) not implemented | No activated abilities exist | **M4** |
+| CR 509.1c **requirements** not implemented | Nothing says a creature must block | **Punchlist/M4** — see below |
+| CR 509.1b's "gains or loses evasion after a legal block has been declared" | Nothing can change abilities mid-combat | **M3** — layer 6 |
+
+### The two that matter for not painting ourselves in
+
+**CR 509.1c requirements are the harder half of 509.1, and M2a implements none of
+it.** Restrictions ("can't block") are a predicate over a declaration.
+Requirements ("must block if able") are not:
+
+> If the number of requirements that are being obeyed is fewer than the **maximum
+> possible number** of requirements that could be obeyed without disobeying any
+> restrictions, the declaration of blockers is illegal.
+
+That is a combinatorial optimization over the space of legal declarations, not a
+check — the engine must know the maximum achievable before it can judge the
+answer it was given. Nothing in M2a or its punchlist creates a requirement, so
+there is nothing to obey and the maximum is trivially zero. `legalBlockDeclaration`
+is named for restrictions deliberately, so that requirements arrive as a *second*
+function rather than as a surprise inside this one.
+
+**Requirements also invalidate M2a's fallback**, which is why it is flagged here
+rather than discovered later. Rejecting an illegal declaration yields "no blocks",
+which is legal *only* while nothing says a creature must block. Once a requirement
+exists, "no blocks" can itself be illegal, and the engine will not be able to fall
+back to it. That is a real design problem and it belongs to the milestone that
+introduces the first requirement, not to this one.
+
+**Banding needs no restriction machinery, and needs three other things.** Worth
+recording now so the shape is not mistaken for a corner:
+
+- CR 702.22c declares **bands** at declare-attackers — a *grouping* of attackers
+  that `Combat.attackers :: Map ObjectId AttackTarget` has no room for. A new
+  field on the `Combat` record, which is what that record exists to absorb.
+- CR 702.22h **propagates** blocks: "if an attacking creature becomes blocked by a
+  creature, each other creature in the same band … becomes blocked by that same
+  blocking creature." So the stored blockers are not the declared blockers.
+  `Map ObjectId (Set ObjectId)` already accommodates that — propagation only adds
+  entries — which is one more reason the M1b decision to key blockers per attacker
+  and store a `Set` was right.
+- CR 702.22j/k **invert the chooser**. That is the `Decider` problem (§7 of
+  `_scratch/design.md`), and it is why banding cannot land before M3.
+
+Banding adds no entry to 509.1b. It is not a blocking restriction, and no part of
+M2a needs to anticipate it beyond leaving the `Combat` record extensible, which it
+is.
 
 ## 7. Known deviation this milestone does not fix
 
