@@ -20,11 +20,13 @@ machine:
 `case effect of DealDamage{} -> …`. Fusing the two halves is the single failure
 mode that sinks this project — audit for it.
 
-Design notes live in `docs/` (local, not tracked in git):
+Design notes live in `docs/` (tracked in git):
 
 - `design.md` — architecture decisions and the M0–M7 implementation path.
 - `prior-art-lessons.md` — what to copy/avoid from Argentum (MIT), Forge
-  (GPLv3, reference only), and XMage.
+  (GPLv3, reference only), XMage, the two Haskell engines (mtg-pure and
+  MedeaMelana's Magic, both BSD-3 — §10), and the wider field (Magarena,
+  ygopro, Arena/MTGO/Duels).
 - `rules.txt` — the comprehensive rules.
 
 Follow the design doc's sequencing: retire architectural risk before adding

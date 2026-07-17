@@ -329,3 +329,48 @@ Recorded because §9's meta-lesson applies to *research about* engines as much a
 ## 9. Meta-lesson
 
 The most valuable thing in Argentum is not a mechanism — it's the **gap between its docs and its code.** Its `docs/` describe trial-application dependency resolution and lambda escape hatches that *were never built*, and its `CLAUDE.md` still asserts them. A reader trusting the docs would confidently mis-model the engine. Two consequences for pawl: (1) **mark your own design docs aspirational-vs-shipped**, and never cite a doc as evidence of behavior; (2) the hardest bet in this whole design — trial-application 613.8 — is exactly where the strongest prior art's ambition quietly outran its implementation. Assume that gravity applies to you too, and instrument against it (D2).
+
+---
+
+## 10. Third wave — the Haskell engines at code level
+
+*(2026-07-17. Same method as the first wave: one agent per repo interrogating the actual source. All claims trace to `path:line` in the study transcripts. Corpora: `_scratch/mtg-pure`, `_scratch/Magic`, plus deeper reads of `_scratch/magarena` and `_scratch/ygopro-core`.)*
+
+### 10.1 mtg-pure — the opposite fork, run to its conclusion
+
+**What it is.** [thomaseding/mtg-pure](https://github.com/thomaseding/mtg-pure), ~40k LOC / 179 files / 217 commits, BSD-3. Stated goals mirror pawl's: "cards type-check if and only if they are valid cards," deep embedding, "expressive enough to replicate its source code through introspection" (README.md:15-18).
+
+**The two opposite choices, and what each cost:**
+
+1. **Cards as a typed EDSL compiled in modules** (not runtime data). The card *syntax* is genuinely elegant (`counterspell :: Card OTNInstant`, Cards.hs:862) — but the guarantee is paid for in `src/MtgPure/Model/Object/`: **24 files / 5,199 LOC** of type-level object-union plumbing (`OT1..OT7`, `VisitObjectN.hs` 559 LOC, `SmartConstructors.hs` 841 LOC), **plus a code generator** (`ToObjectN/CodeGen.hs`, 428 LOC) that must be run before building — the price of refusing `UndecidableInstances`/overlap. Reflection needs hand-written `ConsIndex`/`Show`/`Ord` instances per type. pawl gets serialization, inspection, and rewriting for free by making cards data. **Copy the readability of the card syntax; reject the machinery.**
+2. **Choices as an IO callback record**, not suspensions: `Prompt'` (Engine/Prompt.hs:239-259) is a record of `m`-actions (`promptPick`, `promptChooseOption`, `promptChooseAttackers`, …) over an mtl-style `ExceptT`/`StateT` stack (Monad.hs:91-111). Consequently the engine **cannot snapshot, fork, or resume** a game in flight. Subgames: absent. Mindslaver: `qorController = oPlayer -- TODO mindslaver` (Engine/Core.hs:634). Randomness: `Random{} -> undefined` (PerformElections.hs:143). Decider≠player: not modeled at all.
+
+**Where it stalled — the map of the minefield.** All real development ran Sep 2022–Feb 2023, then the repo went quiet (one cleanup burst Aug 2024). The *mechanical* layer is substantial — turn structure, priority, stack, casting, combat, mana payment (`PayMana.hs`, 22k, is the largest engine file). Then, at the boundary pawl's M3 gate probes, everything stops: the CR 704.5 SBA list is enumerated but **~24 entries are `pure () -- TODO`** (legend rule, world rule, aura/equipment attachment); the `Effect 'Continuous` constructors (`StatDelta`, `GainAbility`, `LoseAbility`, `ChangeTo`, Recursive.hs:618-643) **exist in the AST and are never applied by the engine** — no layer pass exists; replacement effects are a comment sketch (Enact.hs:110-114); no text-changing; ~90 cards. Health markers: 198 TODO/XXX/FIXME, 57 `undefined`-as-implementation. Note the never-applied continuous constructors are §9's doc-code gap in *type* form: modeling a feature in the AST is not implementing it. Instrument pawl's coverage accordingly (a constructor with no interpreter case should fail a build-time hygiene test, per §5).
+
+**Take two things:** the `ElectStage` staging tag (§5), and the **cost-continuation warning** (Recursive.hs:578-584) that motivates D4 — their partial answer is `PlayerPays … (Variable FinPayment -> Elect …)` (Recursive.hs:710), a payment introducing a bound variable.
+
+### 10.2 MedeaMelana's Magic — pawl minus one decision
+
+**What it is.** [MedeaMelana/Magic](https://github.com/MedeaMelana/Magic), "Magic: The Gathering in Haskell" by Martijn van Steenbergen, 2012–2019, BSD-3, M13 core set only. Missed by the first two waves; it is the closest structural cousin pawl has.
+
+**What it already built that pawl plans:**
+- **Free-monad interaction**: `data Interact a` with `AskQuestion :: PlayerRef -> World -> Question a -> Interact a` (Types.hs:688) and a `Question` vocabulary (`AskKeepHand`, `AskPriorityAction`, `AskManaAbility`, `AskTarget`, `AskAttackers`, `AskSearch`, `AskChoice`) under a layered operational monad: `newtype Magic a = Magic (ViewT (ProgramT ExecuteEffects (Program Interact)) a)` (Types.hs:734).
+- **Full CR-613 layers as data**: `data Layer = Layer1 .. Layer7a..Layer7e` (Types.hs:504), `TemporaryLayeredEffect` with timestamps and durations, replacement effects as a first-class `_replacementEffects` field (Types.hs:239).
+
+**The one divergence — and it is exactly pawl's §2.7 bet:** card effects are `Contextual (Magic ())` — arbitrary monadic closures (`searingSpearEffect`, M13.hs:728). The invariant "never case on card identity" holds, but effects cannot be serialized, diffed, hashed, statically analyzed, or *rewritten* — layer 3 on a closure is impossible for the same reason it's impossible on compiled Java. **When defending §2.7, cite this engine, not hypotheticals: same language, same interaction model, same layer model — the closure leaves are the only difference, and they foreclose Magical Hack.**
+
+**The steal — effect ≡ event.** `data SimpleOneShotEffect` (Types.hs:566) is a closed ADT deliberately shaped so the same value flows through the whole pipeline: *"A one-shot effect is simple if its fields contain enough information to serve as an Event unchanged, using the `Did` constructor."* `ExecuteEffects :: [OneShotEffect] -> ExecuteEffects [Event]` (Types.hs:738) is the batch operation: propose → replacement-rewrite (614) → apply → emit as `Event` for triggers (603). One vocabulary wires replacements and triggered abilities together, and D3's copy-at-entry is the same seam. This is the design the M3 event substrate should start from.
+
+### 10.3 Deeper reads — Magarena and ygopro-core internals
+
+**Magarena's layer enum confirms sublayer granularity is mandatory.** `MagicLayer.java` enumerates every sublayer *including the CDA splits*: `Copy, Control, Text, CDASubtype, Type, CDAColor, Color, Ability, AbilityCond, CDAPT, SetPT, ModPT, CountersPT, SwitchPT, Player, Game, CostIncrease, CostReduction`. With MedeaMelana's `Layer7a..7e`, that is two independent confirmations (three counting Argentum) that 4a/5a/7a-e cannot be collapsed into "seven layers."
+
+**Magarena's AI quantifies the copy-cost pawl avoids, and its determinization is the technique to steal.** MCTS (`MCTSAI.java`) deep-clones the entire game per playout (`MagicCopyMap`/`MagicCopyable`, copy constructor `MagicGame.java:162`); hidden information is handled by **determinization** — `showRandomizedHiddenCards()` (`MagicGame.java:540`) deals a random consistent version of hidden zones into the clone — with an `artificial` flag so playouts skip UI. Steal the determinization pattern for M7 ("sample a hidden state consistent with observations" — §2.2's framing); the per-playout deep clone is the measured baseline that resume-the-continuation beats.
+
+**Magarena's DSL is regex-over-oracle-English — the argument for an AST over surface text.** `MagicRuleEventAction.java` (3,786 lines) is an enum of regex→factory pairs (`Destroy` at :390 matches `"destroy " + ARG.PERMANENTS`), plus a PEG grammar (`grammar/mtg.peg`). Coverage-efficient (§8.8: 84.3%), but unanalyzable — you can't know what an effect does without running the parser, and near-duplicate phrasings need near-duplicate regexes. pawl's round-trip (§design 4) deliberately points the text-shaped thing *outward* (pretty-print for diffing) and keeps the AST as truth; Magarena is the mirror image, and the brittleness lives exactly where you'd predict.
+
+**ygopro-core's decision protocol is pawl's `DecisionLog`, independently reinvented at 13k cards.** The host loop (`OCG_DuelProcess`, ocgapi.cpp:111) runs until the engine emits a message buffer, the host answers via `OCG_DuelSetResponse` (ocgapi.cpp:130), and a resumable step-machine (`struct processor`, field.h:197) plus Lua coroutines (`resume_coroutine`, interpreter.cpp:565) carries execution across the suspension. Replay = (Xoshiro256 seed + response log). So even though ygopro's open half is 94% code (§8.8), its *choice protocol* is the serialize-every-decision suspension model — the strongest scale evidence that the suspension seam, at least, is settled engineering.
+
+**ygopro's effect decomposition: Condition / Cost / Target / Operation as four separate slots** — with the target callback doing triple duty (`chk==0` pure legality probe / candidate validation / actual selection, e.g. c5318639.lua). The discipline of a *legality probe separate from resolution* is directly relevant to pawl's action-enumeration risk (design §7: enumeration is a peer of the resolver, and it needs exactly these can-this-happen predicates without side effects).
+
+**Caution:** ygopro has **no layer system** — continuous effects are `UPDATE/SET/FINAL` value modifiers sorted by application id (effect.cpp:14, field.cpp:1484), because Yu-Gi-Oh has no CR 613. Layer machinery is MTG-specific; there is no generic card-game substrate to borrow it from.
