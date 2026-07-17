@@ -38,6 +38,48 @@ mountainPrinting =
           }
     }
 
+-- The Swamp's black mana ability is granted from its subtype by CR 305.6, so it
+-- is derived by the engine, not stored on the card.
+swampPrinting :: Printing.Printing
+swampPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Swamp",
+            Card.manaCost = Nothing,
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.singleton Supertype.Basic,
+                  TypeLine.types = Set.singleton CardType.Land,
+                  TypeLine.subtypes = Set.singleton Subtype.Swamp
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty
+          }
+    }
+
+-- The Forest's green mana ability is granted from its subtype by CR 305.6, so it
+-- is derived by the engine, not stored on the card.
+forestPrinting :: Printing.Printing
+forestPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Forest",
+            Card.manaCost = Nothing,
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.singleton Supertype.Basic,
+                  TypeLine.types = Set.singleton CardType.Land,
+                  TypeLine.subtypes = Set.singleton Subtype.Forest
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty
+          }
+    }
+
 -- Goblin Piker: {1}{R}, Creature - Goblin Warrior, 2/1, no rules text.
 -- Genuinely vanilla -- its entire behavior is its type line, cost, and P/T, so
 -- it needs zero opcodes. Chosen over Grizzly Bears ({1}{G}) to reuse M0's

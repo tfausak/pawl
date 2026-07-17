@@ -38,6 +38,8 @@ import qualified Pawl.Type.Zone as Zone
 subtypeMana :: Subtype -> Maybe ManaType
 subtypeMana subtype = case subtype of
   Subtype.Mountain -> Just (ManaType.Colored Color.Red)
+  Subtype.Swamp -> Just (ManaType.Colored Color.Black)
+  Subtype.Forest -> Just (ManaType.Colored Color.Green)
   Subtype.Goblin -> Nothing
   Subtype.Warrior -> Nothing
   Subtype.Human -> Nothing

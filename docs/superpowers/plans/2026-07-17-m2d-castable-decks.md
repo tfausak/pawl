@@ -39,7 +39,7 @@ Adds the two land types and their printings. Self-contained: no setup signatures
 **Interfaces:**
 - Produces: `Subtype.Swamp`, `Subtype.Forest`; `Card.swampPrinting :: Printing.Printing`, `Card.forestPrinting :: Printing.Printing`; `Mana.subtypeMana Subtype.Swamp == Just (ManaType.Colored Color.Black)`, `Mana.subtypeMana Subtype.Forest == Just (ManaType.Colored Color.Green)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this test group to `source/test-suite/Main.hs` (place the function near `deckTests`), and register `basicLandTests` in the top-level test list (the list at lines ~100-124, e.g. right after `m2cCardTests`):
 
@@ -75,12 +75,12 @@ basicLandTests =
     ]
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | grep -iE "not in scope|Swamp|Forest"`
 Expected: compile failure — `Subtype.Swamp`, `Card.swampPrinting`, etc. not in scope.
 
-- [ ] **Step 3: Add the subtypes**
+- [x] **Step 3: Add the subtypes**
 
 In `source/library/Pawl/Type/Subtype.hs`, add `Swamp` and `Forest` to the `data Subtype` enumeration (keep the existing `deriving (Eq, Ord, Show)`):
 
@@ -103,7 +103,7 @@ data Subtype
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the mana mappings**
+- [x] **Step 4: Add the mana mappings**
 
 In `source/library/Pawl/Mana.hs`, add two arms to `subtypeMana` (it is the only exhaustive `case` over `Subtype` in the library, so this is the only match to extend):
 
@@ -125,7 +125,7 @@ subtypeMana subtype = case subtype of
   Subtype.Elephant -> Nothing
 ```
 
-- [ ] **Step 5: Add the basic-land printings**
+- [x] **Step 5: Add the basic-land printings**
 
 In `source/library/Pawl/Card.hs`, add `swampPrinting` and `forestPrinting`, each shaped exactly like `mountainPrinting` (mana ability granted from the subtype by CR 305.6, so not stored on the card):
 
@@ -173,17 +173,17 @@ forestPrinting =
     }
 ```
 
-- [ ] **Step 6: Run the test to verify it passes**
+- [x] **Step 6: Run the test to verify it passes**
 
 Run: `cabal test 2>&1 | grep -iE "BasicLand|FAIL|PASS|error"`
 Expected: the four `BasicLand` cases pass; whole suite green.
 
-- [ ] **Step 7: Clean-build warning check**
+- [x] **Step 7: Clean-build warning check**
 
 Run: `rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build} && cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"`
 Expected: `0`
 
-- [ ] **Step 8: Format, lint, commit**
+- [x] **Step 8: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

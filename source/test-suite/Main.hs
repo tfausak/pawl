@@ -115,6 +115,7 @@ testTree =
       hasteTests,
       evasionTests,
       m2cCardTests,
+      basicLandTests,
       damageEventTests,
       deathtouchTests,
       assignmentLegalityTests,
@@ -1869,6 +1870,36 @@ m2cCardTests =
         HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 3))) (Card.Type.power c)
         HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness c)
         HU.assertEqual "keywords" (Set.singleton Keyword.Trample) (Card.Type.keywords c)
+    ]
+
+basicLandTests :: Tasty.TestTree
+basicLandTests =
+  Tasty.testGroup
+    "BasicLand"
+    [ HU.testCase "CR 305.6 a Swamp's intrinsic ability is black mana" $
+        HU.assertEqual
+          "black"
+          (Just (ManaType.Colored Color.Black))
+          (Mana.subtypeMana Subtype.Swamp),
+      HU.testCase "CR 305.6 a Forest's intrinsic ability is green mana" $
+        HU.assertEqual
+          "green"
+          (Just (ManaType.Colored Color.Green))
+          (Mana.subtypeMana Subtype.Forest),
+      HU.testCase "swampPrinting is a basic Swamp land" $
+        let c = Printing.card Card.swampPrinting
+         in do
+              HU.assertBool "land" (Card.isLand c)
+              HU.assertBool
+                "swamp subtype"
+                (Set.member Subtype.Swamp (TypeLine.subtypes (Card.Type.typeLine c))),
+      HU.testCase "forestPrinting is a basic Forest land" $
+        let c = Printing.card Card.forestPrinting
+         in do
+              HU.assertBool "land" (Card.isLand c)
+              HU.assertBool
+                "forest subtype"
+                (Set.member Subtype.Forest (TypeLine.subtypes (Card.Type.typeLine c)))
     ]
 
 damageEventTests :: Tasty.TestTree
