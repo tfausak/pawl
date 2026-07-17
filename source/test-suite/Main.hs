@@ -78,6 +78,7 @@ testTree =
     [ programTests,
       cardTests,
       turnTests,
+      turnDataTests,
       gameTests,
       actionTests,
       setupTests,
@@ -323,7 +324,18 @@ combatBoardOf mine theirs =
       (yours, gs2) = addAll bob theirs gs1
    in ( gs2
           { GameState.activePlayer = alice,
-            GameState.phase = Phase.Combat CombatStep.DeclareAttackers
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            -- The steps after declare attackers, so a runStep-driven test (Tasks
+            -- 2 and 4) can advance through combat. Direct-call tests ignore it.
+            GameState.remaining =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain,
+                  Phase.Ending EndingStep.EndStep,
+                  Phase.Ending EndingStep.Cleanup
+                ]
           },
         ours,
         yours
@@ -1213,6 +1225,7 @@ oneMountainState ph =
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,
           GameState.phase = ph,
+          GameState.remaining = Turn.laterPhases,
           GameState.priority = Just alice,
           GameState.passes = 0,
           GameState.turnNumber = 1,
@@ -1671,27 +1684,59 @@ cardTests =
         HU.assertBool "mountain" (Card.isPermanent (Printing.card Card.mountainPrinting))
     ]
 
-turnSequence :: [Phase.Phase]
-turnSequence = go Turn.firstPhase
-  where
-    go p = p : maybe [] go (Turn.next p)
-
 turnTests :: Tasty.TestTree
 turnTests =
   Tasty.testGroup
     "Turn"
     [ HU.testCase "firstPhase is the untap step" $
         HU.assertEqual "firstPhase" (Phase.Beginning BeginningStep.Untap) Turn.firstPhase,
-      HU.testCase "a turn has twelve steps in order" $
-        HU.assertEqual "sequence" Turn.allPhases turnSequence,
-      HU.testCase "next returns Nothing after cleanup" $
-        HU.assertEqual "end" Nothing (Turn.next (Phase.Ending EndingStep.Cleanup)),
+      HU.testCase "a turn has twelve steps" $
+        HU.assertEqual "twelve" 12 (length Turn.allPhases),
+      HU.testCase "firstPhase and laterPhases reconstruct the turn template" $
+        HU.assertEqual "reconstruct" (Seq.fromList (drop 1 Turn.allPhases)) Turn.laterPhases,
       HU.testCase "untap and cleanup grant no priority" $
         HU.assertBool "no priority" $
           not (Turn.grantsPriority (Phase.Beginning BeginningStep.Untap))
             && not (Turn.grantsPriority (Phase.Ending EndingStep.Cleanup)),
-      QC.testProperty "next never revisits a phase in a turn" $
-        QC.property (length turnSequence == length (dedupe turnSequence))
+      QC.testProperty "a turn never revisits a phase" $
+        QC.property (length Turn.allPhases == length (dedupe Turn.allPhases))
+    ]
+
+turnDataTests :: Tasty.TestTree
+turnDataTests =
+  Tasty.testGroup
+    "TurnData"
+    [ HU.testCase "advance pops the schedule head into the current phase" $
+        let gs0 = Setup.emptyGame bothPlayers
+            gs =
+              gs0
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.remaining = Seq.fromList [Phase.Combat CombatStep.BeginningOfCombat, Phase.PostcombatMain]
+                }
+            after = snd (Engine.runGamePure aggressiveAnswer gs Engine.advance)
+         in do
+              HU.assertEqual "phase" (Phase.Combat CombatStep.BeginningOfCombat) (GameState.phase after)
+              HU.assertEqual "remaining" (Seq.fromList [Phase.PostcombatMain]) (GameState.remaining after),
+      HU.testCase "advance on an empty schedule hands off the turn" $
+        let gs0 = Setup.emptyGame bothPlayers
+            gs =
+              gs0
+                { GameState.phase = Phase.Ending EndingStep.Cleanup,
+                  GameState.remaining = Seq.empty,
+                  GameState.activePlayer = alice,
+                  GameState.turnNumber = 1
+                }
+            after = snd (Engine.runGamePure aggressiveAnswer gs Engine.advance)
+         in do
+              HU.assertEqual "new active player" bob (GameState.activePlayer after)
+              HU.assertEqual "phase reset" Turn.firstPhase (GameState.phase after)
+              HU.assertEqual "schedule refilled" Turn.laterPhases (GameState.remaining after)
+              HU.assertEqual "turn incremented" 2 (GameState.turnNumber after),
+      HU.testCase "a fresh game starts at untap with the rest of the turn scheduled" $
+        let gs = Setup.emptyGame bothPlayers
+         in do
+              HU.assertEqual "phase" Turn.firstPhase (GameState.phase gs)
+              HU.assertEqual "remaining" Turn.laterPhases (GameState.remaining gs)
     ]
 
 dedupe :: (Eq a) => [a] -> [a]

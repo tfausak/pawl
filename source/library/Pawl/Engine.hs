@@ -9,6 +9,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Action as Action
 import qualified Pawl.Cast as Cast
@@ -209,13 +210,19 @@ handoffTurn = State.modify' $ \gs ->
   gs
     { GameState.activePlayer = nextInOrder (GameState.turnOrder gs) (GameState.activePlayer gs),
       GameState.turnNumber = GameState.turnNumber gs + 1,
-      GameState.phase = Turn.firstPhase
+      GameState.phase = Turn.firstPhase,
+      GameState.remaining = Turn.laterPhases
     }
 
-advance :: Phase.Phase -> Game ()
-advance phase = case Turn.next phase of
-  Just p -> State.modify' (\gs -> gs {GameState.phase = p})
-  Nothing -> handoffTurn
+-- Consume the schedule: the next step becomes current. An empty schedule means
+-- the turn is over, so hand off. Replaces the old `Turn.next` walk -- the turn is
+-- data now, and this is the only thing that reads its order.
+advance :: Game ()
+advance = do
+  gs <- State.get
+  case Seq.viewl (GameState.remaining gs) of
+    p Seq.:< rest -> State.put gs {GameState.phase = p, GameState.remaining = rest}
+    Seq.EmptyL -> handoffTurn
 
 -- One step: turn-based actions, then priority (if the step grants it), then
 -- state-based actions, then move on. Bails out as soon as the game has a result.
@@ -233,7 +240,7 @@ runStep = do
     State.modify' Mana.emptyManaPools
     checkSba
     stillFinished <- State.gets (Maybe.isJust . GameState.result)
-    Monad.unless stillFinished (advance phase)
+    Monad.unless stillFinished advance
 
 -- Terminates because libraries are finite, each turn draws at most one card, and
 -- drawing from an empty library is a loss (CR 704.5b).

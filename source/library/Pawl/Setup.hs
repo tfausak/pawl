@@ -75,6 +75,7 @@ emptyGame order =
           GameState.turnOrder = order_,
           GameState.activePlayer = NonEmpty.head order,
           GameState.phase = Turn.firstPhase,
+          GameState.remaining = Turn.laterPhases,
           GameState.priority = Nothing,
           GameState.passes = 0,
           GameState.turnNumber = 1,

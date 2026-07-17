@@ -29,6 +29,11 @@ data GameState = MkGameState
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
     phase :: Phase,
+    -- CR 500. The steps still scheduled this turn, in order; `phase` is the one
+    -- in progress. The turn is DATA: CR 508.8 drops steps from this, CR 510.4 and
+    -- 500.8/500.9 splice steps and phases into it. `Turn.allPhases` is the
+    -- template a new turn refills from (see Engine.handoffTurn).
+    remaining :: Seq Phase,
     priority :: Maybe PlayerId,
     passes :: Natural,
     turnNumber :: Natural,

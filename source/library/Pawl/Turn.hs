@@ -1,5 +1,7 @@
 module Pawl.Turn where
 
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -25,12 +27,12 @@ allPhases =
 firstPhase :: Phase
 firstPhase = Phase.Beginning BeginningStep.Untap
 
-next :: Phase -> Maybe Phase
-next phase =
-  let follow ps = case ps of
-        x : y : rest -> if x == phase then Just y else follow (y : rest)
-        _ -> Nothing
-   in follow allPhases
+-- The steps of a fresh turn AFTER its first (the untap step). A new turn's
+-- schedule refills to this; `firstPhase` is its current step. Demoted from the
+-- old `next` walk: nothing computes a successor any more -- Engine.advance pops
+-- this sequence instead.
+laterPhases :: Seq Phase
+laterPhases = Seq.fromList (drop 1 allPhases)
 
 grantsPriority :: Phase -> Bool
 grantsPriority phase = case phase of
