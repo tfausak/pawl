@@ -1077,8 +1077,12 @@ deckTests =
         HU.assertEqual "agrees" (length Setup.deckList) Setup.deckSize,
       HU.testCase "36 Mountains per player" $
         HU.assertEqual "mountains" 36 (countByName (Text.pack "Mountain") alice setupState),
-      HU.testCase "24 Pikers per player" $
-        HU.assertEqual "pikers" 24 (countByName (Text.pack "Goblin Piker") bob setupState)
+      HU.testCase "8 Bird Maidens per player" $
+        HU.assertEqual "maidens" 8 (countByName (Text.pack "Bird Maiden") alice setupState),
+      HU.testCase "16 Pikers per player" $
+        -- Bird Maiden REPLACES Pikers rather than joining them: the list stays at
+        -- 60, so conservation stays at 120 and M1b's property is untouched.
+        HU.assertEqual "pikers" 16 (countByName (Text.pack "Goblin Piker") bob setupState)
     ]
 
 -- alice controls n untapped Mountains on the battlefield, nothing else.

@@ -1075,7 +1075,7 @@ The keyword that is visible across a whole random game.
 - Consumes: everything above.
 - Produces: no new library interfaces.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add these cases to the existing `deckTests` group:
 
@@ -1090,12 +1090,12 @@ Add these cases to the existing `deckTests` group:
 
 The existing "24 Pikers per player" case is replaced by the 16-Piker case above. That is the deck change landing, not a regression.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "/Deck/"' 2>&1 > /tmp/t.txt; grep -m3 -E "FAIL|expected" /tmp/t.txt`
 Expected: FAIL — 0 Bird Maidens, 24 Pikers.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `source/library/Pawl/Setup.hs`, replace `deckList`:
 
@@ -1115,12 +1115,12 @@ deckList =
     ++ replicate 8 Card.birdMaidenPrinting
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `cabal test --test-options='-p "/Deck/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (5 cases).
 
-- [ ] **Step 5: Run the properties**
+- [x] **Step 5: Run the properties**
 
 Run: `cabal test --test-options='-p "/Properties/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (6 properties). **M2a retires no property** — it is the first milestone since M0 that does not.
@@ -1129,7 +1129,7 @@ If "conservation: 120 objects at end" fails, the deck list is not 60 cards. Fix 
 
 Then `cabal test` and `cabal bench`. Expected: all pass; the benchmark reports `goldfish 2p`, `casting 2p` and `fighting 2p`.
 
-- [ ] **Step 6: Full verification**
+- [x] **Step 6: Full verification**
 
 ```bash
 rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build}
@@ -1147,7 +1147,7 @@ cabal test --test-options='-p "/CombatReplay/"'
 
 Expected: PASS. `Prompt` did not change in M2a, so this should be untouched; if it is not, something added a prompt.
 
-- [ ] **Step 7: Commit and close the milestone**
+- [x] **Step 7: Commit and close the milestone**
 
 ```bash
 git add -A

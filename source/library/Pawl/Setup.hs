@@ -30,10 +30,19 @@ import qualified Pawl.Type.Zone as Zone
 startingLife :: Integer
 startingLife = 20
 
--- 36 Mountain / 24 Goblin Piker: enough lands to cast reliably, enough Pikers
--- that a random game actually exercises casting.
+-- 36 Mountain / 16 Goblin Piker / 8 Bird Maiden: enough lands to cast reliably,
+-- enough creatures that a random game exercises casting and combat.
+--
+-- Bird Maiden REPLACES Pikers rather than joining them, so the list stays at 60
+-- and conservation stays at 120 objects. It is the only M2a printing in the deck:
+-- flying is the one keyword whose effect is visible across a whole random game,
+-- and a printing is not a deck-list entry -- the other four are exercised by
+-- fixtures, which is cheaper and gives a deck-composition bug nowhere to hide.
 deckList :: [Printing]
-deckList = replicate 36 Card.mountainPrinting ++ replicate 24 Card.pikerPrinting
+deckList =
+  replicate 36 Card.mountainPrinting
+    ++ replicate 16 Card.pikerPrinting
+    ++ replicate 8 Card.birdMaidenPrinting
 
 deckSize :: Int
 deckSize = length deckList
