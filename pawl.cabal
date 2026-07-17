@@ -81,6 +81,7 @@ library
     Pawl.Type.EndingStep
     Pawl.Type.Game
     Pawl.Type.GameState
+    Pawl.Type.Keyword
     Pawl.Type.Mana
     Pawl.Type.ManaCost
     Pawl.Type.ManaSymbol

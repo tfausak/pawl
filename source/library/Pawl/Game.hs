@@ -2,12 +2,14 @@ module Pawl.Game where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Quantity as Quantity
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.Card as Card
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.Object (Object)
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
@@ -111,3 +113,21 @@ toughnessOf oid gs = case fmap Card.toughness (cardOf oid gs) of
 -- never Object.owner, so that change is one function rather than every call site.
 controllerOf :: ObjectId -> GameState -> Maybe PlayerId
 controllerOf oid gs = fmap Object.owner (lookupObject oid gs)
+
+-- The keywords an object currently has (CR 702). Empty when the id is unknown.
+--
+-- A function, not a field read, and that is the whole point. Today this is
+-- provably Card.keywords of the object's printing -- nothing in M2a grants or
+-- removes an ability -- so reading the field directly from Pawl.Combat would
+-- compile and pass every test. It would also be wrong in a dozen call sites at
+-- once the moment Magical Hack and Humility arrive.
+--
+-- EXPIRES at M3: layer 6 grants and removes abilities, at which point this
+-- consults the layer system. Everything that needs a keyword calls this and never
+-- Card.keywords, so that change is one function rather than every call site. Same
+-- move as controllerOf, and as M1a's Mana.manaSources.
+keywordsOf :: ObjectId -> GameState -> Set Keyword
+keywordsOf oid gs = maybe Set.empty Card.keywords (cardOf oid gs)
+
+hasKeyword :: Keyword -> ObjectId -> GameState -> Bool
+hasKeyword keyword oid gs = Set.member keyword (keywordsOf oid gs)

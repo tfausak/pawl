@@ -37,6 +37,7 @@ import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Mana as Mana.Type
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
@@ -99,7 +100,9 @@ testTree =
       combatLegalityTests,
       combatReplayTests,
       declareTests,
-      combatDamageTests
+      combatDamageTests,
+      keywordTests,
+      m2aCardTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -493,15 +496,14 @@ damageTests =
 
 -- A Piker put onto the battlefield under pid's control, untapped and Settled.
 --
--- Task 2 adds `Object.damage = 0` to this record when that field exists. It is
--- absent here because it does not exist yet.
-addPiker :: PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
-addPiker pid gs =
+-- Any printing, on the battlefield under pid's control, untapped and Settled.
+addCreature :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addCreature printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
       obj =
         Object.MkObject
           { Object.owner = pid,
-            Object.source = Source.OfCard Card.pikerPrinting,
+            Object.source = Source.OfCard printing,
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
@@ -513,6 +515,98 @@ addPiker pid gs =
             GameState.battlefield = Set.insert oid (GameState.battlefield gs1)
           }
       )
+
+addPiker :: PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addPiker = addCreature Card.pikerPrinting
+
+-- The printings M2a adds, paired with the single keyword each must carry.
+m2aPrintings :: [(Printing.Printing, Keyword.Keyword)]
+m2aPrintings =
+  [ (Card.birdMaidenPrinting, Keyword.Flying),
+    (Card.nimbleBirdstickerPrinting, Keyword.Reach),
+    (Card.ogreSentryPrinting, Keyword.Defender),
+    (Card.windseekerCentaurPrinting, Keyword.Vigilance),
+    (Card.goblinChariotPrinting, Keyword.Haste)
+  ]
+
+keywordTests :: Tasty.TestTree
+keywordTests =
+  let gs0 = Setup.emptyGame bothPlayers
+      -- Each M2a printing carries exactly its one keyword and no other.
+      carriesOnly (printing, keyword) =
+        let (oid, gs) = addCreature printing alice gs0
+            name = Text.unpack (Card.Type.name (Printing.card printing))
+         in HU.testCase (name ++ " carries exactly " ++ show keyword) $ do
+              HU.assertEqual "keywords" (Set.singleton keyword) (Game.keywordsOf oid gs)
+              HU.assertBool "hasKeyword" (Game.hasKeyword keyword oid gs)
+   in Tasty.testGroup
+        "Keyword"
+        ( map carriesOnly m2aPrintings
+            ++ [ HU.testCase "a Piker has no keywords" $
+                   let (oid, gs) = addPiker alice gs0
+                    in do
+                         HU.assertEqual "none" Set.empty (Game.keywordsOf oid gs)
+                         HU.assertBool "no flying" (not (Game.hasKeyword Keyword.Flying oid gs)),
+                 HU.testCase "a Mountain has no keywords" $
+                   let gs = mountainsInPlay 1
+                    in case Game.zoneMembers Zone.Battlefield alice gs of
+                         [] -> HU.assertFailure "fixture should have one Mountain"
+                         oid : _ -> HU.assertEqual "none" Set.empty (Game.keywordsOf oid gs),
+                 HU.testCase "an unknown id has no keywords" $
+                   HU.assertEqual "none" Set.empty (Game.keywordsOf (ObjectId.MkObjectId 999) gs0),
+                 -- Flying is on Bird Maiden and NOT on Nimble Birdsticker. If this
+                 -- passes while the reach case above also passes, the two keywords
+                 -- are genuinely distinct rather than one flag.
+                 HU.testCase "reach is not flying" $
+                   let (oid, gs) = addCreature Card.nimbleBirdstickerPrinting alice gs0
+                    in HU.assertBool "no flying" (not (Game.hasKeyword Keyword.Flying oid gs))
+               ]
+        )
+
+redCost :: [ManaSymbol.ManaSymbol] -> Maybe ManaCost.ManaCost
+redCost symbols = Just (ManaCost.MkManaCost symbols)
+
+m2aCardTests :: Tasty.TestTree
+m2aCardTests =
+  let card = Printing.card
+      red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+   in Tasty.testGroup
+        "M2aCards"
+        [ HU.testCase "Bird Maiden is a {2}{R} 1/2 Human Bird with flying" $ do
+            HU.assertEqual "name" (Text.pack "Bird Maiden") (Card.Type.name (card Card.birdMaidenPrinting))
+            HU.assertEqual "cost" (redCost [ManaSymbol.Generic 2, red]) (Card.Type.manaCost (card Card.birdMaidenPrinting))
+            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power (card Card.birdMaidenPrinting))
+            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness (card Card.birdMaidenPrinting))
+            HU.assertEqual
+              "subtypes"
+              (Set.fromList [Subtype.Human, Subtype.Bird])
+              (TypeLine.subtypes (Card.Type.typeLine (card Card.birdMaidenPrinting))),
+          HU.testCase "Nimble Birdsticker is a {2}{R} 2/3 Goblin with reach" $ do
+            HU.assertEqual "name" (Text.pack "Nimble Birdsticker") (Card.Type.name (card Card.nimbleBirdstickerPrinting))
+            HU.assertEqual "cost" (redCost [ManaSymbol.Generic 2, red]) (Card.Type.manaCost (card Card.nimbleBirdstickerPrinting))
+            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (card Card.nimbleBirdstickerPrinting))
+            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness (card Card.nimbleBirdstickerPrinting)),
+          HU.testCase "Ogre Sentry is a {1}{R} 3/3 Ogre Warrior with defender" $ do
+            HU.assertEqual "name" (Text.pack "Ogre Sentry") (Card.Type.name (card Card.ogreSentryPrinting))
+            HU.assertEqual "cost" (redCost [ManaSymbol.Generic 1, red]) (Card.Type.manaCost (card Card.ogreSentryPrinting))
+            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 3))) (Card.Type.power (card Card.ogreSentryPrinting))
+            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness (card Card.ogreSentryPrinting)),
+          HU.testCase "Windseeker Centaur is a {1}{R}{R} 2/2 Centaur with vigilance" $ do
+            HU.assertEqual "name" (Text.pack "Windseeker Centaur") (Card.Type.name (card Card.windseekerCentaurPrinting))
+            HU.assertEqual "cost" (redCost [ManaSymbol.Generic 1, red, red]) (Card.Type.manaCost (card Card.windseekerCentaurPrinting))
+            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (card Card.windseekerCentaurPrinting))
+            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness (card Card.windseekerCentaurPrinting)),
+          HU.testCase "Goblin Chariot is a {2}{R} 2/2 Goblin Warrior with haste" $ do
+            HU.assertEqual "name" (Text.pack "Goblin Chariot") (Card.Type.name (card Card.goblinChariotPrinting))
+            HU.assertEqual "cost" (redCost [ManaSymbol.Generic 2, red]) (Card.Type.manaCost (card Card.goblinChariotPrinting))
+            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (card Card.goblinChariotPrinting))
+            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness (card Card.goblinChariotPrinting)),
+          HU.testCase "all five are creatures and none is a land" $
+            HU.assertBool "creatures" $
+              all
+                (\(p, _) -> Card.isCreature (card p) && not (Card.isLand (card p)))
+                m2aPrintings
+        ]
 
 sicknessOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Sickness.Sickness
 sicknessOf oid gs = fmap Object.sickness (Game.lookupObject oid gs)
