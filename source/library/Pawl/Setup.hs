@@ -72,6 +72,7 @@ emptyGame order =
           GameState.players = Map.fromList (map newPlayer order_),
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
+          GameState.damageEvents = [],
           GameState.turnOrder = order_,
           GameState.activePlayer = NonEmpty.head order,
           GameState.phase = Turn.firstPhase,

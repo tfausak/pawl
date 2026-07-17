@@ -33,6 +33,7 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
@@ -53,6 +54,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity.Type
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Sickness as Sickness
@@ -112,7 +114,8 @@ testTree =
       vigilanceTests,
       hasteTests,
       evasionTests,
-      m2cCardTests
+      m2cCardTests,
+      damageEventTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -1228,6 +1231,7 @@ oneMountainState ph =
           GameState.players = Map.empty,
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
+          GameState.damageEvents = [],
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,
           GameState.phase = ph,
@@ -1852,6 +1856,34 @@ m2cCardTests =
         HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 3))) (Card.Type.power c)
         HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness c)
         HU.assertEqual "keywords" (Set.singleton Keyword.Trample) (Card.Type.keywords c)
+    ]
+
+damageEventTests :: Tasty.TestTree
+damageEventTests =
+  Tasty.testGroup
+    "DamageEvent"
+    [ HU.testCase "a blocked 2/1 trade emits both damage events" $
+        let (gs, mine, theirs) = combatBoard 1 1
+            after = fightWith aggressiveAnswer gs
+            events = GameState.damageEvents after
+         in case (mine, theirs) of
+              (a : _, b : _) -> do
+                HU.assertEqual "two events" 2 (length events)
+                HU.assertBool "attacker hit blocker for 2" $
+                  elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2) events
+                HU.assertBool "blocker hit attacker for 2" $
+                  elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2) events
+              _ -> HU.assertFailure "fixture should have one creature per side",
+      HU.testCase "an unblocked 2/1 emits a ToDefender event" $
+        let (gs, mine, _) = combatBoard 1 0
+            after = fightWith aggressiveAnswer gs
+         in case mine of
+              a : _ ->
+                HU.assertEqual
+                  "one player event"
+                  [DamageEvent.MkDamageEvent a (Recipient.ToDefender bob) 2]
+                  (GameState.damageEvents after)
+              _ -> HU.assertFailure "fixture should have an attacker"
     ]
 
 -- Run whole steps until the first-strike combat damage step has been dealt

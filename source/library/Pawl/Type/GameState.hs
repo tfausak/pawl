@@ -5,6 +5,7 @@ import Data.Sequence (Seq)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Combat (Combat)
+import Pawl.Type.DamageEvent (DamageEvent)
 import Pawl.Type.Mana (Mana)
 import Pawl.Type.Object (Object)
 import Pawl.Type.ObjectId (ObjectId)
@@ -26,6 +27,9 @@ data GameState = MkGameState
     manaPool :: Map PlayerId Mana,
     -- CR 508/509. Lives for one combat phase; cleared at CR 511.
     combat :: Combat,
+    -- CR 510: combat damage dealt this step, as events, for the SBA to read.
+    -- The change-and-emit funnel's log; drained at each SBA check (Sba). See spec §2.
+    damageEvents :: [DamageEvent],
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
     phase :: Phase,

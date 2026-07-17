@@ -80,6 +80,7 @@ library
     Pawl.Type.Color
     Pawl.Type.Combat
     Pawl.Type.CombatStep
+    Pawl.Type.DamageEvent
     Pawl.Type.Decider
     Pawl.Type.DecisionLog
     Pawl.Type.Departure
@@ -102,6 +103,7 @@ library
     Pawl.Type.Program
     Pawl.Type.Prompt
     Pawl.Type.Quantity
+    Pawl.Type.Recipient
     Pawl.Type.Response
     Pawl.Type.Result
     Pawl.Type.Sickness

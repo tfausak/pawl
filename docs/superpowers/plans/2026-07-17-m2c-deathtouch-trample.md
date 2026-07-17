@@ -91,7 +91,7 @@ Every task's requirements implicitly include all of these:
 - Consumes: `Card.MkCard`, `Printing.MkPrinting`, `ManaCost.MkManaCost`, `ManaSymbol.Generic`/`OfType`, `ManaType.Colored`, `Color.Black`/`Green`, `Power.MkPower`, `Toughness.MkToughness`, `Quantity.Literal` (all exist).
 - Produces: `Keyword.Deathtouch`, `Keyword.Trample`, `Subtype.Rat`, `Subtype.Elephant`, `Card.typhoidRatsPrinting`, `Card.warMammothPrinting`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Main.hs`, add this group and append `m2cCardTests` to the `testTree` list:
 
@@ -117,12 +117,12 @@ m2cCardTests =
 (In the test suite, `Pawl.Type.Quantity` is aliased `Quantity.Type` — note the qualifier differs from `Pawl/Card.hs`, which uses `Quantity`.)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test 2>&1 | tail -30`
 Expected: FAIL — `typhoidRatsPrinting`/`warMammothPrinting` not in scope, `Deathtouch`/`Trample` not in scope.
 
-- [ ] **Step 3: Add the keywords and subtypes**
+- [x] **Step 3: Add the keywords and subtypes**
 
 In `source/library/Pawl/Type/Keyword.hs`, add the two constructors in CR-number order (Deathtouch before `Defender`; Trample between `Reach` and `Vigilance`) and update the count comment:
 
@@ -142,7 +142,7 @@ data Keyword
 
 In `source/library/Pawl/Type/Subtype.hs`, add `Rat` and `Elephant` to the list.
 
-- [ ] **Step 4: Add the two printings**
+- [x] **Step 4: Add the two printings**
 
 In `source/library/Pawl/Card.hs`, add (verified against Scryfall `api.scryfall.com/cards/named?exact=…`, 2026-07-17 — both carry zero Gatherer rulings, french-vanilla oracle is the CR):
 
@@ -201,21 +201,18 @@ warMammothPrinting =
     }
 ```
 
-- [ ] **Step 5: Run tests and clean-build to verify pass + warning-free**
+- [x] **Step 5: Run tests and clean-build to verify pass + warning-free**
 
 Run: `cabal test 2>&1 | tail -20` — Expected: PASS (M2cCards green, all others green).
 Run the clean-build warning check from Global Constraints — Expected: `0`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
 git commit -m "Add deathtouch and trample keywords with Typhoid Rats and War Mammoth"
 ```
-
----
-
-### Task 2: The damage-event funnel
+ The damage-event funnel
 
 `Recipient` and `DamageEvent` types; `GameState.damageEvents`; `Damage.applyCombatDamage` becomes change-and-emit; `gatherCombatDamage`/`attackerAssignment`/`blockerAssignment` produce `[DamageEvent]`. **No behavior change** to marked damage or life — only events are additionally recorded. The `AssignCombatDamage` prompt is untouched (Task 4).
 
