@@ -950,7 +950,7 @@ Deathtouch lowers each blocker's threshold to 1 (any nonzero assignment is letha
 - Consumes: `Game.hasKeyword`, `Keyword.Deathtouch` (Task 1); `blockerThreshold` (Task 5).
 - Produces: deathtouch-aware `blockerThreshold`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Main.hs`, add and append `trampleDeathtouchTests` to `testTree`. Define the synthetic fixture inline, clearly labeled:
 
@@ -1001,12 +1001,12 @@ trampleDeathtouchTests =
     ]
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "/TrampleDeathtouch/"' 2>&1 | tail -20`
 Expected: FAIL — the deathtouch case gets `bob = 20` (threshold is still full toughness 3, so `tramplingAnswer` assigns all 3 to the Ogre and spills nothing).
 
-- [ ] **Step 3: Add the 702.2c collapse**
+- [x] **Step 3: Add the 702.2c collapse**
 
 In `source/library/Pawl/Damage.hs`, use the `attacker` argument (drop the `_` prefix) and add the deathtouch branch:
 
@@ -1026,12 +1026,12 @@ blockerThreshold gs attacker blocker =
         else lethal
 ```
 
-- [ ] **Step 4: Run tests and clean-build**
+- [x] **Step 4: Run tests and clean-build**
 
 Run: `cabal test 2>&1 | tail -20` — Expected: PASS. `TrampleDeathtouch` green; `Trample` and `Deathtouch` still green (the collapse only fires when the attacker has deathtouch AND the blocker is not already lethal).
 Run the clean-build warning check — Expected: `0`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

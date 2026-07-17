@@ -56,16 +56,20 @@ legalAssignment thresholds power answer =
       defenderGated = defenderAmount == 0 || everyBlockerLethal
    in totalsPower && onlyLegal && defenderGated
 
--- CR 702.19b: a blocker's lethal threshold is its toughness minus damage already
--- marked, never negative. (Damage already marked matters against M2b: a first-
--- strike step can leave marked damage that lowers this in the regular step.) The
--- 702.2c deathtouch collapse to 1 arrives in Task 6.
+-- CR 702.19b / 702.2c: a blocker's lethal threshold is toughness minus marked
+-- damage -- but 702.2c makes any nonzero assignment by a deathtouch source lethal,
+-- so a deathtouch attacker needs only 1 (0 if the blocker is already lethal). Read
+-- through the projection (Game.hasKeyword), the same way the 704.5h SBA reads it.
 blockerThreshold :: GameState -> ObjectId -> ObjectId -> Natural
-blockerThreshold gs _attacker blocker =
+blockerThreshold gs attacker blocker =
   let marked = maybe 0 Object.damage (Game.lookupObject blocker gs)
-   in case Game.toughnessOf blocker gs of
+      lethal :: Natural
+      lethal = case Game.toughnessOf blocker gs of
         Nothing -> 0
         Just t -> fromInteger (max 0 (t - toInteger marked))
+   in if lethal > 0 && Game.hasKeyword Keyword.Deathtouch attacker gs
+        then 1
+        else lethal
 
 -- What one attacking creature assigns, as damage events carrying the source.
 -- CR 510.1a: a creature that would assign 0 or less assigns none, so events all

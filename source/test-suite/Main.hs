@@ -118,7 +118,8 @@ testTree =
       damageEventTests,
       deathtouchTests,
       assignmentLegalityTests,
-      trampleTests
+      trampleTests,
+      trampleDeathtouchTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -2073,6 +2074,51 @@ trampleTests =
          in do
               HU.assertEqual "bob untouched (no overflow)" (Just 20) (lifeOf bob after)
               HU.assertEqual "one Ogre took all 3 and died, the other lived" 1 (creaturesInPlay bob after)
+    ]
+
+-- SYNTHETIC, NOT A REAL CARD. No printed Magic creature has both deathtouch and
+-- trample (Scryfall keyword:deathtouch keyword:trample is empty), and M2c has no
+-- granting effect (that is M3, e.g. Basilisk Collar) to combine them on a real
+-- card. This fixture is the only way to exercise CR 702.2c in M2c. EXPIRES at M3:
+-- grant deathtouch to a real trampler (War Mammoth) and delete this. See the M2c
+-- spec, section 6, and git-bug's M3 work.
+syntheticDeathtramplerPrinting :: Printing.Printing
+syntheticDeathtramplerPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.Type.MkCard
+          { Card.Type.name = Text.pack "Synthetic Deathtrampler (test fixture)",
+            Card.Type.manaCost = Nothing,
+            Card.Type.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Creature,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.Type.power = Just (Power.MkPower (Quantity.Type.Literal 3)),
+            Card.Type.toughness = Just (Toughness.MkToughness (Quantity.Type.Literal 3)),
+            Card.Type.keywords = Set.fromList [Keyword.Deathtouch, Keyword.Trample]
+          }
+    }
+
+trampleDeathtouchTests :: Tasty.TestTree
+trampleDeathtouchTests =
+  Tasty.testGroup
+    "TrampleDeathtouch"
+    [ HU.testCase "CR 702.2c a deathtouch trampler needs only 1 on the blocker, spilling the rest" $
+        -- Synthetic 3/3 deathtouch+trample into Ogre Sentry (3/3): lethal is 1, so
+        -- 1 to the Ogre and 2 tramples to bob. The Ogre still dies (704.5h).
+        let (gs, _, _) = combatBoardOf [syntheticDeathtramplerPrinting] [Card.ogreSentryPrinting]
+            after = Sba.checkStateBasedActions (fightWith tramplingAnswer gs)
+         in do
+              HU.assertEqual "bob took 2 overflow" (Just 18) (lifeOf bob after)
+              HU.assertEqual "the Ogre is dead" 0 (creaturesInPlay bob after),
+      HU.testCase "CR 702.19b the control: plain trample into the same 3/3 spills nothing" $
+        -- War Mammoth (3/3 trample, no deathtouch) into Ogre Sentry (3/3): lethal
+        -- is 3, all 3 go to the Ogre, 0 tramples. Only deathtouch changes the spill.
+        let (gs, _, _) = combatBoardOf [Card.warMammothPrinting] [Card.ogreSentryPrinting]
+            after = Sba.checkStateBasedActions (fightWith tramplingAnswer gs)
+         in HU.assertEqual "bob untouched without deathtouch" (Just 20) (lifeOf bob after)
     ]
 
 -- Run whole steps until the first-strike combat damage step has been dealt
