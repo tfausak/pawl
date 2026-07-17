@@ -667,7 +667,7 @@ CR 702.20b, in `declareAttackers`. The action-modifier shape.
 - Consumes: Task 1's `Game.hasKeyword`, `Card.windseekerCentaurPrinting`; Task 2's `combatBoardOf`.
 - Produces: test helper `tapStateOf :: ObjectId -> GameState -> Maybe TapState`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this helper and group, and add `vigilanceTests` to `testTree`:
 
@@ -709,12 +709,12 @@ vigilanceTests =
     ]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "/Vigilance/"' 2>&1 > /tmp/t.txt; grep -m3 -E "FAIL|expected" /tmp/t.txt`
 Expected: FAIL — the centaur is tapped.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `source/library/Pawl/Combat.hs`, replace `declareAttackers`' `tapIt` binding:
 
@@ -728,14 +728,14 @@ In `source/library/Pawl/Combat.hs`, replace `declareAttackers`' `tapIt` binding:
                 else g {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects g)}
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `cabal test --test-options='-p "/Vigilance/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (3 cases).
 
 Then `cabal test`. Expected: all pass — M1b's "CR 508.1f declaring an attacker taps it" uses Pikers and is unaffected.
 
-- [ ] **Step 5: Lint and commit**
+- [x] **Step 5: Lint and commit**
 
 ```bash
 git add -A

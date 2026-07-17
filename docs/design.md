@@ -256,8 +256,17 @@ With a vocabulary of roughly a dozen opcodes, make these work:
 | **Humility + Opalescence** | Layer dependency resolution via trial application. |
 | **Panglacial Wurm** | Library search is not atomic — it's a nested game context. |
 | **Mindslaver** | `Decider` ≠ `PlayerId`. |
+| **Rest in Peace** | CR 614. An event is a value a replacement effect rewrites before it happens — and `changeZone`, today fire-and-forget, is interceptable. ("If a card or token would be put into a graveyard from anywhere, exile it instead." — Scryfall.) |
 
 If these work with twelve opcodes, the ABI is right and the rest is volume. If they don't, you found out now instead of at card #8,000.
+
+#### Three ABI decisions M3 owes beyond the gate cards
+
+A 2026-07-17 audit of the specs against the code found these committed nowhere, and each is cheaper to decide before the M3 spec than during it. Detail and evidence: `prior-art-lessons.md` §3 (D3, D4) and §10.
+
+1. **The event substrate.** Triggered abilities have reserved names (`OrderTriggers`, the commented-out `OfAbility`) but no designed mechanism, and three docs have independently wanted an event log (M1b's deathtouch note, M2b's Moraug note, the single-pass SBA loop's admitted debt). Adopt the "atom" pattern before M3: every observable mutation goes through one helper that performs the change *and* emits its event *and* owns the no-op→no-event guard (603.2f).
+2. **Effect ≡ event.** MedeaMelana's Magic shapes each primitive effect so the effect value *is* the event value, flowing through one pipeline: propose → replacement-rewrite (614) → apply → emit for triggers (603). One vocabulary wires replacements and triggers together, and D3 (copy resolved at entry) is the same seam. Rest in Peace is the gate card that proves it.
+3. **Binding.** How does a first-order effect reference prior choices and payments — "if {B} was spent to cast this," "for each," a mode chosen earlier, X? mtg-pure hit this wall and punted (§10.1's cost-continuation warning). The answer for a first-order DSL is named binding slots, not lambdas; M1a's mana-unit provenance is already the closed-half half of it. This shapes every opcode's fields — decide it with the first dozen, not at opcode #150.
 
 ### M4 — The vocabulary
 
@@ -280,6 +289,8 @@ These are **not** exotic opcodes. They're numbered sections of the closed half:
 - **732** Handling Illegal Actions
 
 XMage lists Shahrazad as unimplementable not because 728 is unclear but because their architecture can't nest a game inside a game. Yours nests a `Program Prompt` inside a `Program Prompt` — which is a function call.
+
+mtg-pure corroborates this from inside Haskell: its prompts are IO callbacks (`promptPick :: … -> m a`), so a game in flight cannot be snapshotted or resumed — subgames are absent and Mindslaver is a `-- TODO` comment. The suspension model is what makes 728 a function call; the language is not.
 
 Keep this claim scoped to true subgames (728). Restarting (726) is *not* the same problem: XMage does implement Karn Liberated by mutating the single `Game` instance in place (`KarnLiberated.java:95`, code comment: "dirty hack… can cause bugs"). Restart-in-place is tractable even in a mutable engine; nesting a subgame to completion and *resuming the parent* is the part that isn't.
 
@@ -410,6 +421,7 @@ Note rule **404.3**: when multiple cards hit a graveyard simultaneously, the own
 | **Fusing the halves** | The §1 invariant. Audit for `case effect of` in the rules core. Watch the axis Argentum fused on: the mana subsystem grew 26 + 11 `is AddMana*Effect ->` branches because `Effect` carried no `manaProduced()` classification. **For every question the core must answer about an effect *before* executing it (produces mana? redirects a zone change?), add an explicit ABI classification — or the core will grow the switch.** |
 | **Trial application unproven in all prior art** | This is the M3 go/no-go and the single hardest bet in the design. **No studied engine actually does it.** Argentum *documented* full 613.8 trial application and shipped a hardcoded whitelist (`EffectSorter.dependsOn`, ~2 `Modification` subtypes; else → timestamp) — it couldn't even represent "Blood Moon removes Urborg's ability." Do not trust any doc, blog post, or `CLAUDE.md` claiming otherwise. **Mitigation: build the dependency test set — Blood Moon + Urborg, Humility + Opalescence, Magical Hack (layer 3) — *before* the resolver, and make the incompleteness a failing test, never a doc footnote.** The edge is real: immutable + memoized state makes the re-projection step of trial application cheaper for pawl than for any copy-on-write engine — this is the unclaimed territory the substrate is built for. |
 | **DSL churn** | Expected. Version the AST from commit one. |
+| **Effects that reference prior choices and payments** | "If {B} was spent to cast this," "for each," modal back-references, X. mtg-pure hit this wall in a first-order model and punted (its cost-continuation warning, `prior-art-lessons.md` §10.1). Mitigation: named binding slots in the DSL, decided at M3 alongside the first opcodes (D4 in `prior-art-lessons.md` §3); M1a's mana-unit provenance is the closed-half half of the answer. |
 | **Thunk leaks** | Strict fields, `Data.IntMap.Strict` keyed by entity ID. A 100-turn game must not build a thunk chain the size of the match. Exception: the projected state should be a lazy field, shared per state — that's a genuine laziness win. Profile the goldfish loop at M0. |
 | **Action enumeration underestimated** | Generating the legal action set (priority, targeting legality, X values, modal choices, trigger ordering, alternate cost payments) is roughly as much work as resolution. Budget for it as a peer of the resolver, not a helper. |
 | **Simulation throughput** | Target thousands of games/sec. For reference, MageZero aspires to ~1,000 games/**hour** on XMage. The bar is low. |
@@ -423,7 +435,9 @@ Note rule **404.3**: when multiple cards hit a graveyard simultaneously, the own
 - **XMage, "List of cards that will not be implemented"** — `github.com/magefree/mage/wiki` — the best taxonomy of engine failure modes in existence
 - **Forge, "Missing Cards in Forge"** + `res/cardsfolder` — reference semantics; check the license
 - **MTGJSON** — `AtomicCards` for the static shell and the round-trip oracle. Note: `power` is a *string* (`1+*`). Nothing in MTGJSON is executable.
-- **Argentum** (`github.com/wingedsheep/argentum-engine`) — the Kotlin prior art; the project that spurred this one. Base/projected split: **confirmed in code.** Trial-application dependency resolution: **documented, never built** — the real resolver (`EffectSorter.dependsOn`) is a hardcoded whitelist of ~2 `Modification` subtypes; everything else falls to timestamp, while the docs and `CLAUDE.md` still describe the trial application it doesn't do. A *cautionary* datapoint on 613.8, not a positive one. No AI, small pool. MIT — portable with attribution. Full study: `_scratch/prior-art-lessons.md`.
+- **Argentum** (`github.com/wingedsheep/argentum-engine`) — the Kotlin prior art; the project that spurred this one. Base/projected split: **confirmed in code.** Trial-application dependency resolution: **documented, never built** — the real resolver (`EffectSorter.dependsOn`) is a hardcoded whitelist of ~2 `Modification` subtypes; everything else falls to timestamp, while the docs and `CLAUDE.md` still describe the trial application it doesn't do. A *cautionary* datapoint on 613.8, not a positive one. No AI, small pool. MIT — portable with attribution. Full study: `docs/prior-art-lessons.md`.
+- **mtg-pure** (`github.com/thomaseding/mtg-pure`, BSD-3) — the other Haskell engine, and the opposite fork on both central bets: cards as a type-indexed EDSL compiled as modules (~5,200 LOC of type-level object plumbing plus a mandatory codegen step), choices as IO callbacks (no snapshot/resume — Mindslaver is a `-- TODO`). Stalled after six months of real work, at exactly the layers/replacement/subgames boundary M3 probes. Study: `prior-art-lessons.md` §10.1.
+- **MedeaMelana's Magic** (`github.com/MedeaMelana/Magic`, BSD-3) — the design point one step short of pawl: free-monad `Interact` prompts and `Layer1..7e` as data, but card effects are `Contextual (Magic ())` closures. Source of the effect≡event pipeline M3 should adopt. Study: `prior-art-lessons.md` §10.2.
 - **Churchill, Biderman & Herrick**, *Magic: The Gathering is Turing Complete*
 
 ---

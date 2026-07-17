@@ -104,7 +104,8 @@ testTree =
       keywordTests,
       m2aCardTests,
       defenderTests,
-      vigilanceTests
+      vigilanceTests,
+      hasteTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -265,16 +266,11 @@ declareTests =
       -- and 4; this proves they compose.
       HU.testCase "CR 302.6 a creature cannot attack the turn it arrives, and can after untapping" $
         let (gs, _, _) = combatBoard 1 1
-            -- Re-sicken alice's creature, as though it had just resolved.
-            justArrived =
-              gs
-                { GameState.objects =
-                    Map.map (\o -> if Object.owner o == alice then o {Object.sickness = Sickness.Sick} else o) (GameState.objects gs)
-                }
-            sameTurn = snd (Engine.runGamePure aggressiveAnswer justArrived (Combat.declareAttackers alice))
+            arrived = justArrived gs
+            sameTurn = snd (Engine.runGamePure aggressiveAnswer arrived (Combat.declareAttackers alice))
             nextTurn =
               snd $
-                Engine.runGamePure aggressiveAnswer justArrived $ do
+                Engine.runGamePure aggressiveAnswer arrived $ do
                   Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap)
                   Combat.declareAttackers alice
          in do
@@ -370,6 +366,40 @@ defenderTests =
 
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
+
+-- Re-sicken alice's creatures, as though they had just resolved this turn.
+justArrived :: GameState.GameState -> GameState.GameState
+justArrived gs =
+  let sicken o = if Object.owner o == alice then o {Object.sickness = Sickness.Sick} else o
+   in gs {GameState.objects = Map.map sicken (GameState.objects gs)}
+
+hasteTests :: Tasty.TestTree
+hasteTests =
+  Tasty.testGroup
+    "Haste"
+    [ HU.testCase "CR 702.10b a creature with haste attacks the turn it arrives" $
+        let (gs, _, _) = combatBoardOf [Card.goblinChariotPrinting] [Card.pikerPrinting]
+            after = snd (Engine.runGamePure aggressiveAnswer (justArrived gs) (Combat.declareAttackers alice))
+         in HU.assertEqual "attacks" 1 (length (declaredAttackers after)),
+      HU.testCase "CR 302.6 the same creature without haste cannot" $
+        -- The control. Goblin Chariot and Goblin Piker are both 2/2-ish Goblin
+        -- Warriors; the ONLY difference the engine can see is the keyword.
+        let (gs, _, _) = combatBoardOf [Card.pikerPrinting] [Card.pikerPrinting]
+            after = snd (Engine.runGamePure aggressiveAnswer (justArrived gs) (Combat.declareAttackers alice))
+         in HU.assertEqual "cannot attack" [] (declaredAttackers after),
+      HU.testCase "CR 702.10b haste is not needed once the creature has settled" $
+        let (gs, mine, _) = combatBoardOf [Card.pikerPrinting] [Card.pikerPrinting]
+            after = snd (Engine.runGamePure aggressiveAnswer gs (Combat.declareAttackers alice))
+         in HU.assertEqual "attacks" mine (declaredAttackers after),
+      HU.testCase "CR 702.10b a hasty creature and a sick one, in the same declaration" $
+        -- Both sick; only the Chariot may attack. A blanket "sickness ignored"
+        -- bug would let both through.
+        let (gs, mine, _) = combatBoardOf [Card.goblinChariotPrinting, Card.pikerPrinting] [Card.pikerPrinting]
+            after = snd (Engine.runGamePure aggressiveAnswer (justArrived gs) (Combat.declareAttackers alice))
+         in case mine of
+              [chariot, _] -> HU.assertEqual "only the chariot" [chariot] (declaredAttackers after)
+              _ -> HU.assertFailure "fixture should have two creatures"
+    ]
 
 vigilanceTests :: Tasty.TestTree
 vigilanceTests =

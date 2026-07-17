@@ -59,7 +59,10 @@ canAttack pid oid gs = case Game.lookupObject oid gs of
       && GameState.activePlayer gs == pid
       && Object.zone obj == Zone.Battlefield
       && Object.tapped obj == TapState.Untapped
-      && Object.sickness obj == Sickness.Settled
+      -- CR 302.6, relaxed by CR 702.10b: a creature with haste can attack even if
+      -- it hasn't been controlled continuously since its controller's most recent
+      -- turn began.
+      && (Object.sickness obj == Sickness.Settled || Game.hasKeyword Keyword.Haste oid gs)
       && isCreatureObject oid gs
       -- CR 702.3b: a creature with defender can't attack. It may still block --
       -- 702.3b says nothing about blocking.

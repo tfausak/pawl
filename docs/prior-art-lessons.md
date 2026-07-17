@@ -6,11 +6,13 @@
 
 *§8 adds a **second wave**: a survey of the closed-source engines (Arena, MTGO, Duels, Manalink) and the wider open-source field. Method there is weaker — public writeups plus, where possible, source verification. Sourcing is graded inline: **[source]** = verified against code/text read directly, **[public]** = a dev statement on the page, **[weak]** = forum/wiki only.*
 
+*§10 adds a **third wave** (2026-07-17): code-level studies of the two Haskell engines — **mtg-pure** and **MedeaMelana's Magic**, both BSD-3 — plus deeper reads of Magarena's layer/AI internals and ygopro-core's suspension protocol. Method matches the first wave: agents interrogating source, claims traced to `path:line`.*
+
 ---
 
-## 0. The six findings that change what you do
+## 0. The seven findings that change what you do
 
-*(1–5 from the first wave — Argentum/Forge/XMage at code level. 6 from the second wave — §8.)*
+*(1–5 from the first wave — Argentum/Forge/XMage at code level. 6 from the second wave — §8. 7 from the third wave — the Haskell engines, §10.)*
 
 1. **Trial-application layer resolution is the bet the best prior art gave up on.** Argentum *documented* trial application (`docs/continuous-effect-dependency-system.md`) in loving detail and then shipped a hardcoded whitelist (`EffectSorter.dependsOn` pattern-matches ~2 `Modification` subtypes; else → timestamp). It couldn't even *represent* "Blood Moon removes Urborg's ability." Its `CLAUDE.md` still claims trial application it doesn't do. **This is your M3 go/no-go.** Budget real engineering, or scope it down deliberately — do not assume "we'll just do trial application." (§Decisions, §M3)
 
@@ -23,6 +25,8 @@
 5. **The opcode build order is now empirical, not guessed.** Forge's 33k cards yield **190 distinct opcodes; the top ~20 cover 77%, top ~50 cover 92%** — *steeper* Zipfian than your "150–200 for 80%." `ChangeZone, Pump, Draw, Token, PutCounter, DealDamage, Mana, GainLife, Destroy, Tap` are the first ten. This is your M4 sequencing, derived from data. (§M4)
 
 6. **~80% is proven; the last 20% is the whole bet — and nobody has held it but Argentum.** Measured across corpora (§8.8): Magarena is **84.3%** declarative (2,057/13,071 need `requires_groovy_code`, *plus* 5,293 cards never attempted at all), Arena's parser gets **~80%** automatically, Forge ~95%. Three unrelated systems converged on ~80/20 — so "a first-order DSL expresses most cards" is **settled, not a risk**. The risk is elsewhere, and it's sharper than "everyone leaks": the leak ranges **0% → 94%**, and that range *is* the architecture. ygopro looks like your design (15 `EFFECT_TYPE_*`, 75 `EVENT_*`) but **94.4% of its 13,415 cards call `SetOperation`** — an arbitrary Lua closure, even for "take control of 1 monster." Its open half is not data. **Only Argentum is 100% declarative, and only at ~1/10th Forge's corpus.** State the bet honestly: *can pawl hold the last 20% with no hatch, at a scale where the sole precedent is untested?* Decide the answer **now**, before card #400 forces it — every other project answered under duress, and answered the same way. (§8.8)
+
+7. **The two Haskell engines bracket pawl's design, and each stalled one decision short of it.** mtg-pure took the opposite fork on *both* central bets — cards as a type-indexed EDSL in modules (5,199 LOC of object-union plumbing plus a mandatory codegen), choices as IO callbacks (so no snapshot/resume: subgames absent, Mindslaver a literal `-- TODO`) — and died in six months at exactly the layers/replacement/subgames boundary. MedeaMelana's Magic has pawl's free-monad interaction and full `Layer1..7e` as data, but its card effects are monadic closures — unserializable, unanalyzable. Together they isolate pawl's delta to precisely two choices: **suspensions, not callbacks; data leaves, not closures.** Both are BSD-3 — portable. (§10)
 
 ---
 
@@ -64,6 +68,9 @@ The strongest sibling punted. Two honest options: (a) **Full 613.8**: solve what
 
 **D3 — Is copy a projector layer, or an entry-time replacement?** (refines §2.6)
 Argentum resolves copy (Layer 1) at object-entry time as a replacement effect: the copied component *becomes base state*, so the projector **skips Layer 1 and starts at Layer 2**. This is simpler *and* more correct for 707.2 copiable-values than running copy inside the 613 loop. **Recommendation: carve copy out of the layer loop; resolve it into base state at entry.**
+
+**D4 — How does a first-order effect reference prior choices and payments?** (mtg-pure's wall; shapes every opcode)
+"If {B} was spent to cast this…", "for each…", a mode chosen earlier, X. mtg-pure's author agonized over exactly this (`Recursive.hs:578-584`) — a first-order model can't close over a payment — and punted; their partial answer is `PlayerPays … (Variable FinPayment -> Elect …)`: a payment introduces a *bound variable* later steps read. Argentum's `EffectContext` named collections (§4-M4) are the same move. **Recommendation: named binding slots in the DSL — payments, chosen modes, selected sets, and X introduce names; later fields reference them; a static linter checks every read has a writer (Argentum's AST-dataflow lint, §5).** M1a's mana-unit provenance is the closed-half half of the answer; D4 is the open-half half. Decide at M3 with the first dozen opcodes — it changes their field shapes.
 
 ---
 
@@ -114,6 +121,13 @@ All from Argentum (MIT — attribute; port freely):
 - **Two-phase durations** (reversible gate + latch SBA).
 - **`GameLimits`** saturating arithmetic + token/depth caps.
 
+From **MedeaMelana's Magic** (BSD-3 — attribute; port freely):
+- **Effect ≡ event**: `SimpleOneShotEffect` is shaped so the effect value *is* the event value ("simple if its fields contain enough information to serve as an Event unchanged, using the `Did` constructor"), and `ExecuteEffects :: [OneShotEffect] -> ExecuteEffects [Event]` is the batch propose → replacement-rewrite → apply → emit-for-triggers pipeline. One vocabulary wires 614 and 603. (§10.2)
+- The `Interact`/`Question` vocabulary (`AskKeepHand`, `AskPriorityAction`, `AskManaAbility`, `AskTarget`, `AskAttackers`, `AskSearch`, `AskChoice`) — a field-tested checklist for pawl's eventual `Prompt` constructors.
+
+From **mtg-pure** (BSD-3 — attribute; port freely):
+- **The `ElectStage` tag** (`IntrinsicStage / TargetStage / ResolveStage`): *when* a choice locks in — printed characteristic vs. cast-time target vs. resolution-time choice. Port as a runtime validation tag on DSL choice nodes (drop the singletons); it rejects a whole class of ill-formed cards, e.g. a target chosen at resolution. (§10.1)
+
 Property to preserve from Argentum's continuation stack even though you use a free monad: **the suspension must serialize** (persist/resume across hosts).
 
 Structural warning from XMage: keep the *AI-search-needs-deep-copy* observation (`GameImpl.copy()` clones ~24 sub-structures per ply) as motivation for your continuation approach.
@@ -159,6 +173,7 @@ Tail (rank 61→190) = 130 opcodes sharing <8% of usage — the long cheap tail 
 | **Forge** | **GPLv3** (repo + cardsfolder) | Study the DSL and use the frequency table (facts, not derivative). **Do not** bundle/transpile-and-ship cardsfolder data or copy `*Effect.java` unless pawl goes GPLv3. Keep it a **read-only dev-time oracle**; generate pawl's cards independently (e.g. from Scryfall/MTGJSON oracle text). |
 | **XMage** | (per-repo; verify before reuse) | Studied here for architecture lessons only — nothing to port. |
 | **mtg-pure** | **BSD-3** | Permissive. Study and port freely with the notice. **The other permissive MTG-specific source besides Argentum.** |
+| **MedeaMelana's Magic** | **BSD-3** | Permissive — the third portable source (© 2012–2016 Martijn van Steenbergen). Free-monad `Interact` + layers-as-data are directly relevant; effects are closures (§10.2). |
 | **jinteki.net** | **MIT** | Permissive — safe to read freely, unlike Forge. Not MTG, so lessons are structural only. |
 | **ygopro-core** | **AGPL-3** | **Reference only** — same posture as Forge, and AGPL is stricter (network use triggers it). Read for the core/data seam; do not copy structure. |
 | **Magarena** | **GPL-3** | **Reference only.** The `requires_groovy_code` ratio (§8.8) is a fact, not a derivative work — safe to cite. |
@@ -167,7 +182,7 @@ Tail (rank 61→190) = 130 opcodes sharing <8% of usage — the long cheap tail 
 
 *(Card names/text are Wizards IP regardless of engine license — orthogonal, relevant before redistributing any card data.)*
 
-**Posture:** Argentum (MIT) and mtg-pure (BSD-3) are the only sources pawl may *derive from*. Everything else in §8 is a read-only oracle.
+**Posture:** Argentum (MIT), mtg-pure (BSD-3), and MedeaMelana's Magic (BSD-3) are the only sources pawl may *derive from*. Everything else in §8 is a read-only oracle.
 
 ---
 
@@ -254,7 +269,8 @@ Surveyed; nothing here displaces Argentum as the primary reference, but three ar
 
 | Project | Lang / License | Why it matters |
 |---|---|---|
-| [**mtg-pure**](https://github.com/thomaseding/mtg-pure) | Haskell / BSD-3 | **The other Haskell attempt, and the one that took the opposite fork.** Stated goals mirror pawl's ("cards type-check iff they are valid cards", no special-casing, resilience to rules changes) — but its DSL is **recursive and compiled-in**: cards are Haskell values in a module, not runtime data. `MtgPure/Model/Recursive.hs` is the single highest-value file in this survey. **Read it to learn which cards forced that choice.** |
+| [**mtg-pure**](https://github.com/thomaseding/mtg-pure) | Haskell / BSD-3 | **The other Haskell attempt, and the one that took the opposite fork.** Stated goals mirror pawl's ("cards type-check iff they are valid cards", no special-casing, resilience to rules changes) — but its DSL is **recursive and compiled-in**: cards are Haskell values in a module, not runtime data. `MtgPure/Model/Recursive.hs` is the single highest-value file in this survey. **Now studied at code level (§10.1) — the reading is done, and the verdict is cautionary.** |
+| [**Magic** (MedeaMelana)](https://github.com/MedeaMelana/Magic) | Haskell / BSD-3 | Free-monad `Interact` + full `Layer1..7e` as data — pawl's interaction model, already built in Haskell (2012–2019, M13 core set only); card effects are `Contextual (Magic ())` closures. Missed by the first two waves; studied at code level in §10.2. |
 | [**ygopro-core / EDOPro**](https://github.com/edo9300/ygopro-core) | C++17 / AGPL-3 | Cleanest **core/data seam** in the field: the core takes three host callbacks (script reader, card reader, message handler) and nothing else. Scripts don't *do* things, they **register effects** classified by `EFFECT_TYPE_*` / `CATEGORY_*` / event codes — pawl's invariant, proven at ~13k cards. Then leaks: `SetOperation` takes an arbitrary Lua closure. |
 | [**jinteki.net**](https://github.com/mtgred/netrunner) | Clojure / **MIT** | Netrunner, ~1,650 cards. `defcard` bodies are **plain data maps**; the engine dispatches on keys (`:cost`, `:choices`, `:events`). MIT, so unlike Forge it is safe to read freely. Then leaks: `:effect` bottoms out in arbitrary state-mutating Clojure. |
 | [**Magarena**](https://github.com/magarena/magarena) | Java / GPL-3 | Dormant since 2023-04. Key-value card scripts with an **explicit `requires_groovy_code` flag** — the escape hatch, made countable. See §8.8. |
