@@ -317,11 +317,32 @@ Bot (MCTS over suspended continuations — resuming twice with different decisio
 |---|---|---|
 | Closed half | The comprehensive rules. Numbered, finite, citable. Name tests after rule numbers → free coverage map. | Yes |
 | Cards | **Round-trip against MTGJSON.** Pretty-print AST → oracle text, diff against MTGJSON's `text` field for all 28k. | Yes, automatically |
-| **Open half** | **Nothing. No external oracle exists.** | **No** |
+| **Open half** | **Nothing complete. The one partial oracle is official rulings — below.** | **No** |
 
 **The trap:** if `DealDamage` is implemented wrong, every card using it round-trips *perfectly* and every card is *wrong*. The round-trip validates that a card **says** the right thing. It says nothing about whether the interpreter **does** the right thing.
 
 So the open half needs hand-written scenario tests per opcode. That work doesn't scale and doesn't parallelize with an LLM. It's the real cost center — not the cards.
+
+### Errata and rulings — the partial oracle for the open half
+
+*(Added 2026-07-17. Counts measured against MTGJSON AllPrintings 5.3.0+20260717, English printings.)*
+
+The "no oracle" cell above is slightly too strong, and the exception is worth engineering around. **Gatherer rulings are dated, official WotC statements of expected behavior** — many are literally "in this situation, X happens": scenario tests someone at Wizards already wrote. They ride along in the data source already chosen for the round-trip: **19,801 of 34,652 card names (57%) carry at least one ruling.** Rulings don't validate the interpreter automatically — someone still transcribes each into a scenario — but they answer *which scenarios matter*, which is the expensive half of hand-written tests. **M4 discipline: when an opcode lands, pull the rulings for the cards that use it and transcribe the Q&A-shaped ones.**
+
+Where the errata trail lives, in decreasing order of authority:
+
+- **Oracle (Gatherer)** — the authoritative current text; errata's end state, no history. Already the round-trip target via MTGJSON `text`.
+- **Update Bulletins** (magic.wizards.com announcements) — official per-set articles documenting Oracle and CR changes *with rationale*, labeling each change functional vs. non-functional. Published regularly until fall 2023, sporadically since; judges' unofficial bulletins (The Name of the Rule, blogs.magicjudges.org) fill the gap at judge-grade quality but without WotC authority.
+- **Per-set Release Notes** (magic.wizards.com/en/rules) — still published for every set; the card-specific notes are pre-written tricky-interaction tests for each new mechanic.
+
+**The computable corpus is already in hand, and it is mostly noise by construction:** `originalText ≠ text` on **47,831 printings — 22,585 distinct names, 65% of all cards**. That 65% is not "two-thirds of Magic has errata"; it is templating churn (the 2024 "enters the battlefield" → "enters" sweep alone touches most of the game). The functional subset is small, and the Update Bulletins are its labels. Don't diff-mine first; read the bulletins, then use the diff to locate printings.
+
+Two operational consequences:
+
+- **Oracle text moves.** Pin the MTGJSON snapshot the round-trip runs against and re-baseline deliberately, the same way the AST is versioned. A round-trip failure after a data refresh may be an errata event, not a regression.
+- **Rulings move too.** WotC prunes and rewrites them — Humility, the poster child for layer confusion, carries only **3** rulings today; its infamous longer list was retired as the layer rules matured. A transcribed scenario test outlives the ruling that inspired it, so record the ruling's date in the test name.
+
+`tests/nightmares/` gains a category: **the functional-errata sagas** — cards whose printed text Oracle itself couldn't honor without patching. Candidates: Time Vault (erratad repeatedly across two decades), the Grand Creature Type Update (2007), Lotus Vale and its kin. Each is a documented case of WotC debugging a card against the rules, usually with a bulletin explaining the intended semantics — verify each specific history against the bulletins before transcribing, per §9 of `prior-art-lessons.md`: never cite a doc (including this one) as evidence of behavior.
 
 **Coverage metric:** % of cards that transpile and round-trip. Let it tell you where the tail actually hurts.
 
