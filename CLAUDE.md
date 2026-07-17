@@ -49,13 +49,18 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-16-m1b-combat-design.md` and
   `docs/superpowers/plans/2026-07-16-m1b-combat.md`.
-- **Current work is M2a** — the keyword seam plus flying, reach, defender,
-  vigilance and haste. The design doc's M2 is split into **M2a** (the seam +
-  blocking/attacking legality), **M2b** (first strike + the CR 506.1 conditional
-  turn structure) and **M2c** (deathtouch + trample); the split, the full 702
+- **M2a is complete** (the keyword seam plus flying, reach, defender, vigilance
+  and haste — blocking/attacking legality through the `keywordsOf` projection).
+  Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-16-m2a-keywords-design.md` and
+  `docs/superpowers/plans/2026-07-16-m2a-keywords.md`.
+- **Current work is M2b** — first strike + double strike and the CR 506.1
+  conditional turn structure (the 508.8 skip, `git-bug 5f50eec`, and the 510.4
+  second damage step) via turn-as-data. The design doc's M2 is split into
+  **M2a** / **M2b** / **M2c** (deathtouch + trample); the split, the full 702
   triage, and why protection and banding are punted are in `docs/design.md`.
-  Spec: `docs/superpowers/specs/2026-07-16-m2a-keywords-design.md`. Plan to
-  execute: `docs/superpowers/plans/2026-07-16-m2a-keywords.md`.
+  **The M2b spec is not yet written** — the brief is `docs/design.md` §M2b,
+  including its "Pre-spec notes for M2b" (dated 2026-07-17).
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
