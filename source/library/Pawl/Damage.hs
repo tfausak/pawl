@@ -16,12 +16,14 @@ import qualified Pawl.Type.Combat as Combat.Type
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Zone as Zone
 
 -- CR 514.2: during the cleanup step, all damage marked on permanents is removed.
 --
@@ -83,17 +85,21 @@ blockerAssignment gs (attacker, blockers) =
         Nothing -> []
    in concatMap assign (Set.toList blockers)
 
--- CR 510.2: all combat damage is dealt SIMULTANEOUSLY.
+-- CR 510.2: gather all combat damage from the participants that `assigns` admits,
+-- before applying any of it (simultaneity). The filter is how a wave restricts
+-- who deals: attackers by their id, blockers by pruning each attacker's set.
 --
 -- Everything is gathered before anything is applied. Applying attacker-by-
 -- attacker with state-based actions in between would let a creature die before
 -- it deals its damage, and a 2/1 trading with a 2/1 would kill only one of them.
-gatherCombatDamage :: Game ([(ObjectId, Natural)], [(PlayerId, Natural)])
-gatherCombatDamage = do
+gatherCombatDamage :: (ObjectId -> Bool) -> Game ([(ObjectId, Natural)], [(PlayerId, Natural)])
+gatherCombatDamage assigns = do
   gs <- State.get
   let combat = GameState.combat gs
-  parts <- Monad.mapM (attackerAssignment gs) (Map.toList (Combat.Type.attackers combat))
-  let fromBlockers = concatMap (blockerAssignment gs) (Map.toList (Combat.Type.blockers combat))
+      attackers = filter (assigns . fst) (Map.toList (Combat.Type.attackers combat))
+      blockers = Map.toList (Map.map (Set.filter assigns) (Combat.Type.blockers combat))
+  parts <- Monad.mapM (attackerAssignment gs) attackers
+  let fromBlockers = concatMap (blockerAssignment gs) blockers
   pure (concatMap fst parts ++ fromBlockers, concatMap snd parts)
 
 applyCombatDamage :: ([(ObjectId, Natural)], [(PlayerId, Natural)]) -> GameState -> GameState
@@ -106,7 +112,48 @@ applyCombatDamage (toCreatures, toPlayers) gs =
       bleed g (pid, n) = g {GameState.players = Map.adjust (drain n) pid (GameState.players g)}
    in List.foldl' bleed (List.foldl' hurt gs toCreatures) toPlayers
 
-dealCombatDamage :: Game ()
+-- Deal one combat damage step, returning True iff this was the FIRST of two --
+-- i.e. a second combat damage step must be spliced (CR 510.4).
+--
+-- Which creatures assign is read LIVE off the projection at this boundary (spec
+-- §3), never precomputed. `struckFirst` both routes the wave and records CR
+-- 510.4's "had first strike or double strike as the first step began" snapshot.
+-- Only creatures still on the battlefield assign ("the REMAINING attackers and
+-- blockers") -- a striker killed in the first step is gone for the second.
+dealCombatDamage :: Game Bool
 dealCombatDamage = do
-  assignment <- gatherCombatDamage
+  gs <- State.get
+  let combat = GameState.combat gs
+      participants =
+        Set.union
+          (Map.keysSet (Combat.Type.attackers combat))
+          (Set.unions (Map.elems (Combat.Type.blockers combat)))
+      striking oid = Game.hasKeyword Keyword.FirstStrike oid gs || Game.hasKeyword Keyword.DoubleStrike oid gs
+      strikers = Set.filter striking participants
+      onBattlefield oid = case Game.lookupObject oid gs of
+        Just obj -> Object.zone obj == Zone.Battlefield
+        Nothing -> False
+  case Combat.Type.struckFirst combat of
+    Nothing
+      -- CR 510.4 does not apply: no striker, so one step and everyone deals.
+      | Set.null strikers -> do
+          dealWave onBattlefield
+          pure False
+      -- CR 510.4: a striker is present. This is the first of two steps; only
+      -- first strikers and double strikers deal, and a second step follows.
+      | otherwise -> do
+          State.modify' (\g -> g {GameState.combat = (GameState.combat g) {Combat.Type.struckFirst = Just strikers}})
+          dealWave (\oid -> onBattlefield oid && Set.member oid strikers)
+          pure True
+    -- CR 510.4 second step: those that had neither first strike nor double strike
+    -- as the first step began (not in the snapshot), plus those that currently
+    -- have double strike -- and are still on the battlefield.
+    Just snapshot -> do
+      dealWave (\oid -> onBattlefield oid && (Set.notMember oid snapshot || Game.hasKeyword Keyword.DoubleStrike oid gs))
+      pure False
+
+-- Gather this wave's damage under `assigns` and apply it.
+dealWave :: (ObjectId -> Bool) -> Game ()
+dealWave assigns = do
+  assignment <- gatherCombatDamage assigns
   State.modify' (applyCombatDamage assignment)

@@ -58,3 +58,9 @@ dropSkippedCombatSteps =
         p /= Phase.Combat CombatStep.DeclareBlockers
           && p /= Phase.Combat CombatStep.CombatDamage
    in Seq.filter kept
+
+-- CR 510.4 / 500.9: a second combat damage step, spliced directly after the
+-- current one -- i.e. at the head of the remaining schedule, so it runs next.
+-- CR 500.9's "most recently created step occurs first" is exactly cons-at-head.
+spliceSecondDamage :: Seq Phase -> Seq Phase
+spliceSecondDamage remaining = Phase.Combat CombatStep.CombatDamage Seq.<| remaining

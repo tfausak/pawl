@@ -140,7 +140,13 @@ runTurnBasedActions phase = do
       -- have nothing to do if nobody attacked.
       State.modify' Combat.skipEmptyCombat
     Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers
-    Phase.Combat CombatStep.CombatDamage -> Damage.dealCombatDamage
+    Phase.Combat CombatStep.CombatDamage -> do
+      -- CR 510.4: deal this step's damage; if it was the first-strike step,
+      -- splice a second combat damage step in after it. The between-steps
+      -- priority (CR 510.3) and SBA check come free from the step machinery.
+      needSecond <- Damage.dealCombatDamage
+      Monad.when needSecond $
+        State.modify' (\gs -> gs {GameState.remaining = Turn.spliceSecondDamage (GameState.remaining gs)})
     -- CR 511.3: creatures stop being attacking and blocking.
     Phase.Combat CombatStep.EndOfCombat -> State.modify' Combat.clearCombat
     Phase.Ending EndingStep.Cleanup -> do

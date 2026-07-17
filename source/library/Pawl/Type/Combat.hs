@@ -24,6 +24,16 @@ data Combat = MkCombat
     -- exist and invite code enforcing a constraint the game does not have.
     -- Lethal-in-order survives only inside trample (CR 702.19b), where it
     -- belongs to that keyword, and arrives with M2.
-    blockers :: Map ObjectId (Set ObjectId)
+    blockers :: Map ObjectId (Set ObjectId),
+    -- CR 510.4: which attackers and blockers had first strike or double strike as
+    -- the FIRST combat damage step began. Nothing while that step has not
+    -- happened; Just once it has, so the second combat damage step knows who is
+    -- excluded ("had neither...") and the step router knows a second step already
+    -- ran. Reset at CR 511 (end of combat).
+    --
+    -- EXPIRES at M3: this is captured live off the projection because nothing
+    -- changes keywords mid-combat; at M3 (layer 6) "had it then" and "has it now"
+    -- come apart, and the CR 510.3 window between the two steps can change it.
+    struckFirst :: Maybe (Set ObjectId)
   }
   deriving (Eq, Ord, Show)

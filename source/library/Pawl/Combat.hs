@@ -33,7 +33,8 @@ emptyCombat :: Combat
 emptyCombat =
   Combat.MkCombat
     { Combat.attackers = Map.empty,
-      Combat.blockers = Map.empty
+      Combat.blockers = Map.empty,
+      Combat.struckFirst = Nothing
     }
 
 -- CR 511.3: creatures stop being attacking and blocking at end of combat.

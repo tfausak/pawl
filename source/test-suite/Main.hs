@@ -106,6 +106,7 @@ testTree =
       keywordTests,
       m2aCardTests,
       m2bCardTests,
+      firstStrikeTests,
       defenderTests,
       vigilanceTests,
       hasteTests,
@@ -606,7 +607,8 @@ combatLegalityTests =
                   { GameState.combat =
                       Combat.Type.MkCombat
                         { Combat.Type.attackers = Map.singleton oid (AttackTarget.OfPlayer bob),
-                          Combat.Type.blockers = Map.empty
+                          Combat.Type.blockers = Map.empty,
+                          Combat.Type.struckFirst = Nothing
                         }
                   }
          in do
@@ -1831,6 +1833,90 @@ m2bCardTests =
                   HU.assertEqual "tiger body" (bodyOf Card.pikerPrinting) (bodyOf Card.sabretoothTigerPrinting)
                   HU.assertEqual "raptor body" (bodyOf Card.pikerPrinting) (bodyOf Card.ridgetopRaptorPrinting)
         ]
+
+-- Run whole steps until the first-strike combat damage step has been dealt
+-- (struckFirst is set) or combat ends, so a test can observe the board BETWEEN
+-- the two combat damage steps.
+runToFirstStrikeDone :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runToFirstStrikeDone answer gs0 =
+  let go n g =
+        if n <= (0 :: Int)
+          || Maybe.isJust (Combat.Type.struckFirst (GameState.combat g))
+          || not (inCombatPhase (GameState.phase g))
+          then g
+          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+   in go 24 gs0
+
+firstStrikeTests :: Tasty.TestTree
+firstStrikeTests =
+  Tasty.testGroup
+    "FirstStrike"
+    [ HU.testCase "CR 702.7b a first striker kills a vanilla blocker and lives" $
+        -- The tiger (2/1 first strike) kills the Piker (2/1) in the first-strike
+        -- step; the SBA between steps buries it before it can deal, so the tiger
+        -- survives at zero damage.
+        let (gs, _, _) = combatBoardOf [Card.sabretoothTigerPrinting] [Card.pikerPrinting]
+            after = runCombat aggressiveAnswer gs
+         in do
+              HU.assertEqual "the blocker is dead" 0 (creaturesInPlay bob after)
+              HU.assertEqual "the first striker lives" 1 (creaturesInPlay alice after),
+      HU.testCase "CR 510.2 the control: two vanilla 2/1s trade" $
+        -- With a Piker in the tiger's place there is one combat damage step and
+        -- both die. So first strike is the sole cause above.
+        let (gs, _, _) = combatBoardOf [Card.pikerPrinting] [Card.pikerPrinting]
+            after = runCombat aggressiveAnswer gs
+         in do
+              HU.assertEqual "alice's is dead" 0 (creaturesInPlay alice after)
+              HU.assertEqual "bob's is dead" 0 (creaturesInPlay bob after),
+      HU.testCase "CR 702.4b a double striker deals twice to an unblocked player" $
+        -- The raptor (2/1 double strike) deals 2 in each step: bob loses 4.
+        let (gs, _, _) = combatBoardOf [Card.ridgetopRaptorPrinting] []
+            after = runCombat aggressiveAnswer gs
+         in HU.assertEqual "bob took 4" (Just 16) (lifeOf bob after),
+      HU.testCase "CR 702.7b the control: a first striker deals once to a player" $
+        let (gs, _, _) = combatBoardOf [Card.sabretoothTigerPrinting] []
+            after = runCombat aggressiveAnswer gs
+         in HU.assertEqual "bob took 2" (Just 18) (lifeOf bob after),
+      HU.testCase "CR 510.1b the control: a vanilla creature deals once to a player" $
+        let (gs, _, _) = combatBoardOf [Card.pikerPrinting] []
+            after = runCombat aggressiveAnswer gs
+         in HU.assertEqual "bob took 2" (Just 18) (lifeOf bob after),
+      HU.testCase "CR 510.4 double strike kills a 3/3 across two steps; first strike does not" $
+        -- The raptor deals 2 + 2 = 4 to the Ogre (3/3), killing it. A first
+        -- striker deals 2 once, and the Ogre lives.
+        let raptorVs = combatBoardOf [Card.ridgetopRaptorPrinting] [Card.ogreSentryPrinting]
+            tigerVs = combatBoardOf [Card.sabretoothTigerPrinting] [Card.ogreSentryPrinting]
+            afterRaptor = runCombat aggressiveAnswer (frst raptorVs)
+            afterTiger = runCombat aggressiveAnswer (frst tigerVs)
+         in do
+              HU.assertEqual "double strike kills the Ogre" 0 (creaturesInPlay bob afterRaptor)
+              HU.assertEqual "first strike leaves the Ogre" 1 (creaturesInPlay bob afterTiger),
+      HU.testCase "CR 510.4 a striker killed in the first step does not deal in the second" $
+        -- Raptor (double strike) and tiger (first strike) each block-kill the
+        -- other in the first step. Neither is "remaining" for the second step, so
+        -- no second-wave damage; both are simply dead.
+        let (gs, _, _) = combatBoardOf [Card.ridgetopRaptorPrinting] [Card.sabretoothTigerPrinting]
+            after = runCombat aggressiveAnswer gs
+         in do
+              HU.assertEqual "attacker dead" 0 (creaturesInPlay alice after)
+              HU.assertEqual "blocker dead" 0 (creaturesInPlay bob after),
+      HU.testCase "CR 510.4 the mixed board: first strike once, vanilla once, double strike twice" $
+        -- Tiger (first strike), raptor (double strike) and Piker (vanilla) all
+        -- attack unblocked. First-strike step: tiger 2 + raptor 2 = 4. Second
+        -- step: raptor 2 + Piker 2 = 4. bob: 20 - 8 = 12. The naive "strikers in
+        -- step one, everyone else in step two" drops the raptor's second hit and
+        -- lands bob at 14.
+        let (gs, _, _) = combatBoardOf [Card.sabretoothTigerPrinting, Card.ridgetopRaptorPrinting, Card.pikerPrinting] []
+            mid = runToFirstStrikeDone aggressiveAnswer gs
+            after = runCombat aggressiveAnswer gs
+         in do
+              HU.assertEqual "after the first-strike step, bob took 4" (Just 16) (lifeOf bob mid)
+              HU.assertEqual "after both steps, bob took 8" (Just 12) (lifeOf bob after)
+    ]
+
+-- The state out of a combatBoardOf triple.
+frst :: (a, b, c) -> a
+frst (a, _, _) = a
 
 dedupe :: (Eq a) => [a] -> [a]
 dedupe xs = case xs of
