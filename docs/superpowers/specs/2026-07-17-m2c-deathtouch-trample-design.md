@@ -39,7 +39,7 @@ dealt." That is *precisely* trample's calculation. A trampler that also has
 deathtouch needs to assign only **1** to each blocker before the rest tramples
 over, where a plain trampler must assign full toughness. The two keywords are not
 wired together by special-case code — they meet in one place, the lethal-damage
-minimum, and getting that meeting right is what M2c exists to prove.
+threshold, and getting that meeting right is what M2c exists to prove.
 
 **Exit criterion.** A 1/1 deathtoucher destroys a 3/3 it deals one damage to
 (where a 2/1 without deathtouch leaves the 3/3 alive); a 3/3 trampler blocked by a
@@ -186,7 +186,10 @@ M1b:
 
 Rather than bolt a trample special case onto the prompt, M2c **generalizes the
 prompt to be keyword-agnostic**, parameterized on the two things the *rules*
-compute: the legal recipients and a per-recipient **lethal minimum**.
+compute: the legal recipients and a per-recipient **lethal threshold** (the
+damage that counts as lethal for that blocker). The threshold is *not* a hard
+floor — 702.19b lets the controller under-assign a blocker, forgoing overflow —
+so it gates the defender rather than every recipient; see Validation below.
 
 ### The recipient type
 
@@ -208,34 +211,39 @@ single-opponent, planeswalker-free board can produce.
 AssignCombatDamage
   :: Decider -> PlayerId
   -> ObjectId                  -- the attacker assigning
-  -> Map Recipient Natural     -- legal recipients -> minimum each must receive
+  -> Map Recipient Natural     -- legal recipients -> lethal threshold (0 = none)
   -> Natural                   -- power to distribute
   -> Prompt (Map Recipient Natural)
 ```
 
 The prompt **never mentions trample**. The rules compute its `Map Recipient
-Natural` of minimums, and the two cases fall out of that one argument:
+Natural` of thresholds, and the two cases fall out of that one argument:
 
 - **Non-trample blocked attacker (CR 510.1c):** recipients are the blockers, every
-  minimum `0` — free division, exactly M1b. A single blocker is still forced (one
-  recipient, minimum 0, total must equal power) and so, as in M1b, **not asked**;
-  2+ blockers are asked, as in M1b.
-- **Trample (CR 702.19b):** recipients are the blockers, each with minimum =
-  **lethal**, *plus* `ToDefender` with minimum `0`. A single blocker with excess
+  threshold `0` — free division, exactly M1b. A single blocker is still forced (one
+  recipient, total must equal power) and so, as in M1b, **not asked**; 2+ blockers
+  are asked, as in M1b.
+- **Trample (CR 702.19b):** recipients are the blockers, each with threshold =
+  **lethal**, *plus* `ToDefender` with threshold `0`. A single blocker with excess
   power now has a non-forced distribution and **is** asked — the falsified
   shortcut, corrected by the same generic "ask only when the answer is not forced"
   test that M1b and the engine-makes-no-choices rule already use.
 
-**Lethal-first needs no ordering rule.** 702.19b's "once all those blocking
-creatures are assigned lethal damage, any excess …" is captured entirely by "each
-blocker receives ≥ its minimum." The rule that damage may reach the defender only
-after every blocker has lethal is exactly "every blocker's minimum is met"; an
-answer that feeds the defender while a blocker is short leaves that blocker below
-its minimum and is rejected. There is no separate ordering constraint and no
-damage-assignment *order* (M1b established that order was removed from the game);
-lethal-in-order lives only here, inside the keyword, as a per-recipient floor.
+**Lethal-first is a condition on the defender, not a floor on the blockers.**
+702.19b: the controller "need not assign lethal damage to all those blocking
+creatures but in that case can't assign any damage to the player." So the
+threshold does **not** force each blocker to lethal — a trampler may pour
+everything onto one blocker, or fail to reach lethal at all, provided it then
+assigns **nothing** to the defender. The rule is one implication: *if the defender
+is assigned any damage, then every blocker must have received at least its lethal
+threshold.* This also means a trampler whose power is below its blocker's lethal
+(a 2/2 into a 3/3) assigns all of it to the blocker and tramples nothing — legal,
+and a case a naive "every blocker ≥ lethal" floor would wrongly reject as
+impossible. There is no damage-assignment *order* (M1b established order was
+removed from the game); lethal-in-order lives only here, inside the keyword, as
+this one implication.
 
-**Lethal accounts for damage already marked (702.19b).** A blocker's minimum is
+**Lethal accounts for damage already marked (702.19b).** A blocker's threshold is
 `max(0, toughness − alreadyMarked)`, not bare toughness. This is load-bearing
 against M2b: a blocker damaged in the first-strike step carries that marked damage
 into the regular step, lowering the trampler's obligation to it. "Damage from
@@ -245,9 +253,16 @@ multi-block-of-one-blocker case has a home.
 
 ### Validation
 
-`Damage.attackerAssignment` generalizes M1b's `onlyBlockers && totalsPower` to
-**`everyRecipientMeetsMinimum && onlyLegalRecipients && totalsPower`**, checked
-against the assignment as a whole (CR 510.1e). M1b's **reject-not-repair**
+`Damage.attackerAssignment` generalizes M1b's `onlyBlockers && totalsPower`.
+Checked against the assignment as a whole (CR 510.1e), an answer is legal iff
+**`totalsPower && onlyLegalRecipients && defenderGatedByLethal`**, where
+`defenderGatedByLethal` is the 702.19b implication: the defender's amount is `0`,
+**or** every blocker received at least its lethal threshold. (For a non-trample
+attacker there is no defender recipient, so the third clause holds vacuously and
+this reduces to M1b's `onlyBlockers && totalsPower`.) The predicate is a pure
+function so it can be property-tested across the whole space — power below, equal
+to, and above lethal; under-assignment with no overflow; defender-short rejection
+— independently of which cards happen to exist (§7). M1b's **reject-not-repair**
 discipline carries over verbatim: an illegal answer yields no assignment (the
 rules' own degenerate case), and this is explicitly not the CR 733 human-error
 rewind — the comment M1b wrote stays.
@@ -272,19 +287,19 @@ not fix it; it is a `Decider` problem for **M3**, not a combat problem.
 
 ## 5. The interaction (CR 702.2c) — the falsifier
 
-Deathtouch changes trample's lethal minimum. 702.2c makes any nonzero assignment to
-a creature by a deathtouch source count as lethal "for the purposes of determining
-if excess damage is being dealt" — which is the exact calculation §4's minimum
-performs. So when the trampler's source has deathtouch, each blocker's minimum
-collapses from `max(0, toughness − alreadyMarked)` to **1** (or 0 if the blocker
-already has lethal marked).
+Deathtouch changes trample's lethal threshold. 702.2c makes any nonzero assignment
+to a creature by a deathtouch source count as lethal "for the purposes of
+determining if excess damage is being dealt" — which is the exact quantity §4's
+threshold names. So when the trampler's source has deathtouch, each blocker's
+threshold collapses from `max(0, toughness − alreadyMarked)` to **1** (or 0 if the
+blocker already has lethal marked, i.e. `toughness − alreadyMarked ≤ 0`).
 
-This must **not** be special-case code joining two keywords. The minimum is
+This must **not** be special-case code joining two keywords. The threshold is
 computed in one function, and it consults `Game.hasKeyword Deathtouch (the
-attacker)` when it computes the floor — the same projection §3's SBA reads. A
+attacker)` when it computes the value — the same projection §3's SBA reads. A
 trample+deathtouch 3/3 into a 3/3 blocker assigns 1 and tramples 2; a plain
 trample 3/3 into the same blocker must assign all 3 and tramples nothing. One data
-point on the lethal floor, read through the keyword projection, produces the whole
+point on the lethal threshold, read through the keyword projection, produces the whole
 difference. If the two keywords were implemented as independent branches, this case
 is where they would disagree — which is why the milestone pairs them.
 
@@ -372,24 +387,29 @@ implementation gets wrong:
 - *CR 702.19b — single blocker is now asked.* The same board asserts the assignment
   is **prompted** (a distribution exists other than all-to-blocker), where M1b's
   single-blocker path issues no prompt. The falsified shortcut.
-- *CR 510.1e — lethal-first is enforced.* A decider that assigns 0 to the Piker and
-  3 to `bob` is **rejected** (the blocker is below its lethal minimum); the
-  attacker then assigns nothing (reject-not-repair). A property over legal
-  assignments: the blocker always receives ≥ its minimum before the defender
-  receives anything.
+- *CR 510.1e / 702.19b — the defender is gated by lethal.* A decider that assigns 0
+  to the Piker and 3 to `bob` is **rejected** (the defender got damage while the
+  blocker is below lethal); the attacker then assigns nothing (reject-not-repair).
+- *CR 702.19b — under-assignment with no overflow is legal.* The precise-rule
+  scenario the cards do not naturally reach: a trampler with power **below** its
+  blocker's lethal (or one that simply chooses to pour everything onto one blocker
+  and nothing on the defender) assigns all to blockers, `bob` loses 0, and this is
+  **accepted** — the case a naive "every blocker ≥ lethal" floor wrongly rejects.
+  Driven by a fixture whose blocker toughness exceeds the trampler's power, and
+  covered exhaustively by the validation property below.
 - *CR 702.2c — the interaction falsifier.* The synthetic trample+deathtouch 3/3
   attacks; Ogre Sentry (3/3) blocks. Lethal to the Ogre is **1** (deathtouch), so
   1 is assigned and **2 tramples** to `bob`; the Ogre still dies. Against the plain
   War Mammoth (3/3 trample, no deathtouch) into the same Ogre, lethal is 3, all 3
   are assigned, and **0 tramples**. The with-vs-without pair isolates 702.2c: only
   deathtouch on the source changes what spills.
-- *CR 702.19b × 510.4 — already-marked damage lowers the floor.* A trampler that
+- *CR 702.19b × 510.4 — already-marked damage lowers the threshold.* A trampler that
   survives a first-strike step (or a board where the blocker entered the regular
   step with marked damage) needs less to reach the blocker's lethal, so more
   tramples over. Exercises the `alreadyMarked` term and the M2b×M2c seam.
 
 **The classification test, the point of the milestone.** The 704.5h predicate, the
-lethal minimum, and the 702.2c floor all read `keywordsOf` / `hasKeyword` and the
+lethal threshold, and the 702.2c threshold all read `keywordsOf` / `hasKeyword` and the
 damage events, and **no call site in `Pawl.Sba` or `Pawl.Damage` names a card**.
 Asserted the M2a/M2b way — by boards the identity-based implementation gets wrong:
 the interaction falsifier above, whose outcome depends only on which citations the
@@ -411,9 +431,13 @@ fixtures outside the deck, so no landed property is disturbed.
   contains a deathtoucher, so this rides the fixture scenarios in M2c and becomes a
   random-game property when a deathtoucher joins a deck — its own future deck
   change, noted.)
-- *no trample assignment leaves a blocker short* — over any trample assignment the
-  engine accepts, every blocker received ≥ its lethal minimum. The property form of
-  CR 702.19b's floor.
+- *the validation predicate is exactly CR 702.19b* — a QuickCheck property over the
+  pure legality function across generated `(power, blockers-with-lethal, defender?)`
+  configurations: an accepted assignment always totals power and uses only legal
+  recipients, and whenever the defender received any damage every blocker was at its
+  lethal threshold — while under-assignment with the defender at 0 is accepted. This
+  is where "all scenarios" is proven (power below / equal to / above lethal), not
+  the card fixtures, which reach only representative points.
 
 ## 8. Expiries
 
