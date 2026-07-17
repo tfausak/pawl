@@ -52,8 +52,8 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   blocking/attacking legality), **M2b** (first strike + the CR 506.1 conditional
   turn structure) and **M2c** (deathtouch + trample); the split, the full 702
   triage, and why protection and banding are punted are in `_scratch/design.md`.
-  Spec: `docs/superpowers/specs/2026-07-16-m2a-keywords-design.md`. Plan: not yet
-  written.
+  Spec: `docs/superpowers/specs/2026-07-16-m2a-keywords-design.md`. Plan to
+  execute: `docs/superpowers/plans/2026-07-16-m2a-keywords.md`.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
