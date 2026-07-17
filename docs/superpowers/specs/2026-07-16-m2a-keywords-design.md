@@ -264,8 +264,10 @@ nothing; only **one** joins the deck list, because that is what changes the shap
 of a random game and gives a deck-composition bug somewhere to hide.
 
 Every card below is mono-red, castable from the existing 36 Mountains with no
-mana changes, and genuinely vanilla-plus-one-keyword — verified against the card
-data in `_scratch/mage/Utils/mtg-cards-data.txt`, not recalled:
+mana changes, and genuinely vanilla-plus-one-keyword — each **verified against
+Scryfall** (`api.scryfall.com/cards/named?exact=…`), not recalled. The dumps in
+`_scratch/` are other projects' working data and are fine for *finding*
+candidates, but never for confirming one:
 
 | Card | Cost | P/T | Type | Rules text |
 |---|---|---|---|---|
