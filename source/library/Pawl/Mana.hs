@@ -44,6 +44,9 @@ subtypeMana subtype = case subtype of
   Subtype.Bird -> Nothing
   Subtype.Ogre -> Nothing
   Subtype.Centaur -> Nothing
+  Subtype.Cat -> Nothing
+  Subtype.Dinosaur -> Nothing
+  Subtype.Beast -> Nothing
 
 -- Every mana type an object could produce, derived from its subtypes.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]

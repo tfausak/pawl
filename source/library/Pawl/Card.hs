@@ -217,6 +217,63 @@ goblinChariotPrinting =
           }
     }
 
+-- The M2b keyword cards. Each is mono-red, a 2/1 (the same body as a Goblin
+-- Piker, so the only thing the engine can see is the keyword), and genuinely
+-- vanilla-plus-one-keyword. Verified against Scryfall
+-- (api.scryfall.com/cards/named?exact=...), zero Gatherer rulings.
+
+-- Sabretooth Tiger: {2}{R}, Creature - Cat, 2/1, First strike.
+sabretoothTigerPrinting :: Printing.Printing
+sabretoothTigerPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Sabretooth Tiger",
+            Card.manaCost =
+              Just
+                ( ManaCost.MkManaCost
+                    [ ManaSymbol.Generic 2,
+                      ManaSymbol.OfType (ManaType.Colored Color.Red)
+                    ]
+                ),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Creature,
+                  TypeLine.subtypes = Set.singleton Subtype.Cat
+                },
+            Card.power = Just (Power.MkPower (Quantity.Literal 2)),
+            Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
+            Card.keywords = Set.singleton Keyword.FirstStrike
+          }
+    }
+
+-- Ridgetop Raptor: {3}{R}, Creature - Dinosaur Beast, 2/1, Double strike.
+ridgetopRaptorPrinting :: Printing.Printing
+ridgetopRaptorPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Ridgetop Raptor",
+            Card.manaCost =
+              Just
+                ( ManaCost.MkManaCost
+                    [ ManaSymbol.Generic 3,
+                      ManaSymbol.OfType (ManaType.Colored Color.Red)
+                    ]
+                ),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Creature,
+                  TypeLine.subtypes = Set.fromList [Subtype.Dinosaur, Subtype.Beast]
+                },
+            Card.power = Just (Power.MkPower (Quantity.Literal 2)),
+            Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
+            Card.keywords = Set.singleton Keyword.DoubleStrike
+          }
+    }
+
 isLand :: Card.Card -> Bool
 isLand c = Set.member CardType.Land (TypeLine.types (Card.typeLine c))
 

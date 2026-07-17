@@ -105,6 +105,7 @@ testTree =
       combatDamageTests,
       keywordTests,
       m2aCardTests,
+      m2bCardTests,
       defenderTests,
       vigilanceTests,
       hasteTests,
@@ -1792,6 +1793,44 @@ inCombatPhase :: Phase.Phase -> Bool
 inCombatPhase p = case p of
   Phase.Combat _ -> True
   _ -> False
+
+m2bCardTests :: Tasty.TestTree
+m2bCardTests =
+  let card = Printing.card
+      red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+      gs0 = Setup.emptyGame bothPlayers
+   in Tasty.testGroup
+        "M2bCards"
+        [ HU.testCase "Sabretooth Tiger is a {2}{R} 2/1 Cat with first strike" $ do
+            HU.assertEqual "name" (Text.pack "Sabretooth Tiger") (Card.Type.name (card Card.sabretoothTigerPrinting))
+            HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, red])) (Card.Type.manaCost (card Card.sabretoothTigerPrinting))
+            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (card Card.sabretoothTigerPrinting))
+            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness (card Card.sabretoothTigerPrinting))
+            HU.assertEqual "subtypes" (Set.singleton Subtype.Cat) (TypeLine.subtypes (Card.Type.typeLine (card Card.sabretoothTigerPrinting)))
+            HU.assertEqual "keyword" (Set.singleton Keyword.FirstStrike) (Card.Type.keywords (card Card.sabretoothTigerPrinting)),
+          HU.testCase "Ridgetop Raptor is a {3}{R} 2/1 Dinosaur Beast with double strike" $ do
+            HU.assertEqual "name" (Text.pack "Ridgetop Raptor") (Card.Type.name (card Card.ridgetopRaptorPrinting))
+            HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, red])) (Card.Type.manaCost (card Card.ridgetopRaptorPrinting))
+            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (card Card.ridgetopRaptorPrinting))
+            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness (card Card.ridgetopRaptorPrinting))
+            HU.assertEqual "subtypes" (Set.fromList [Subtype.Dinosaur, Subtype.Beast]) (TypeLine.subtypes (Card.Type.typeLine (card Card.ridgetopRaptorPrinting)))
+            HU.assertEqual "keyword" (Set.singleton Keyword.DoubleStrike) (Card.Type.keywords (card Card.ridgetopRaptorPrinting)),
+          HU.testCase "the tiger has first strike through the projection" $
+            let (oid, gs) = addCreature Card.sabretoothTigerPrinting alice gs0
+             in do
+                  HU.assertBool "first strike" (Game.hasKeyword Keyword.FirstStrike oid gs)
+                  HU.assertBool "not double strike" (not (Game.hasKeyword Keyword.DoubleStrike oid gs)),
+          HU.testCase "the raptor has double strike through the projection" $
+            let (oid, gs) = addCreature Card.ridgetopRaptorPrinting alice gs0
+             in do
+                  HU.assertBool "double strike" (Game.hasKeyword Keyword.DoubleStrike oid gs)
+                  HU.assertBool "not first strike" (not (Game.hasKeyword Keyword.FirstStrike oid gs)),
+          HU.testCase "both are 2/1s, the same body as a Piker" $
+            let bodyOf p = (Card.Type.power (card p), Card.Type.toughness (card p))
+             in do
+                  HU.assertEqual "tiger body" (bodyOf Card.pikerPrinting) (bodyOf Card.sabretoothTigerPrinting)
+                  HU.assertEqual "raptor body" (bodyOf Card.pikerPrinting) (bodyOf Card.ridgetopRaptorPrinting)
+        ]
 
 dedupe :: (Eq a) => [a] -> [a]
 dedupe xs = case xs of

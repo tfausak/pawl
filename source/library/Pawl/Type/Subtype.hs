@@ -9,4 +9,7 @@ data Subtype
   | Bird
   | Ogre
   | Centaur
+  | Cat
+  | Dinosaur
+  | Beast
   deriving (Eq, Ord, Show)
