@@ -212,7 +212,10 @@ Run the clean-build warning check from Global Constraints — Expected: `0`.
 git add -A && hooky fix && git add -A && hooky run
 git commit -m "Add deathtouch and trample keywords with Typhoid Rats and War Mammoth"
 ```
- The damage-event funnel
+
+---
+
+### Task 2: The damage-event funnel
 
 `Recipient` and `DamageEvent` types; `GameState.damageEvents`; `Damage.applyCombatDamage` becomes change-and-emit; `gatherCombatDamage`/`attackerAssignment`/`blockerAssignment` produce `[DamageEvent]`. **No behavior change** to marked damage or life — only events are additionally recorded. The `AssignCombatDamage` prompt is untouched (Task 4).
 
@@ -231,7 +234,7 @@ git commit -m "Add deathtouch and trample keywords with Typhoid Rats and War Mam
   - `Damage.attackerAssignment :: GameState -> (ObjectId, AttackTarget) -> Game [DamageEvent]`
   - `Damage.blockerAssignment :: GameState -> (ObjectId, Set ObjectId) -> [DamageEvent]`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Main.hs`, add and append `damageEventTests` to `testTree`. It asserts a Piker-vs-Piker exchange emits the two events (each Piker deals 2 to the other), with existing damage/life behavior unchanged:
 
@@ -267,12 +270,12 @@ damageEventTests =
 
 Add to the test suite's import block: `import qualified Pawl.Type.DamageEvent as DamageEvent` and `import qualified Pawl.Type.Recipient as Recipient` (they sort between `Combat.Type`/`CombatStep` and `GameState`/`Keyword` respectively; `cabal-gild`/`hooky fix` will order them).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test 2>&1 | tail -30`
 Expected: FAIL — `DamageEvent`, `Recipient`, `GameState.damageEvents` not in scope (they are created in Step 3).
 
-- [ ] **Step 3: Create the two types**
+- [x] **Step 3: Create the two types**
 
 `source/library/Pawl/Type/Recipient.hs`:
 
@@ -314,7 +317,7 @@ data DamageEvent = MkDamageEvent
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the GameState field and initialize it**
+- [x] **Step 4: Add the GameState field and initialize it**
 
 In `source/library/Pawl/Type/GameState.hs`, import `DamageEvent` and add the field after `combat` (or anywhere in the record), with a comment:
 
@@ -326,7 +329,7 @@ In `source/library/Pawl/Type/GameState.hs`, import `DamageEvent` and add the fie
 
 In `source/library/Pawl/Setup.hs`, in `emptyGame`'s record, add `GameState.damageEvents = [],`.
 
-- [ ] **Step 5: Rewrite the Damage assignment path to emit events**
+- [x] **Step 5: Rewrite the Damage assignment path to emit events**
 
 Replace `attackerAssignment`, `blockerAssignment`, `gatherCombatDamage`, and `applyCombatDamage` in `source/library/Pawl/Damage.hs`. Add imports `qualified Pawl.Type.DamageEvent as DamageEvent` and `qualified Pawl.Type.Recipient as Recipient`. Keep the CR 510.1e reject-not-repair comment.
 
@@ -412,12 +415,12 @@ applyCombatDamage events gs =
 
 `dealCombatDamage` and `dealWave` are unchanged in structure (`dealWave` still does `assignment <- gatherCombatDamage assigns; State.modify' (applyCombatDamage assignment)` — the types line up). Remove the now-unused `AttackTarget` import only if the compiler flags it (it is still used).
 
-- [ ] **Step 6: Run tests and clean-build**
+- [x] **Step 6: Run tests and clean-build**
 
 Run: `cabal test 2>&1 | tail -20` — Expected: PASS. The existing `CombatDamage` tests still pass (marked damage and life unchanged); `DamageEvent` is green.
 Run the clean-build warning check — Expected: `0`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
