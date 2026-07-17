@@ -1603,7 +1603,11 @@ propertyTests =
       QC.testProperty "combat happens: some seed changes a life total" $
         QC.once $
           QC.property $
-            any someLifeChanged [1 .. 100 :: Int]
+            any someLifeChanged [1 .. 100 :: Int],
+      QC.testProperty "green-black: some seed sends a creature to the graveyard" $
+        QC.once $
+          QC.property $
+            any creatureDied [1 .. 100 :: Int]
     ]
 
 -- Did anyone's life total move over the course of the game this seed produces?
@@ -1611,6 +1615,19 @@ someLifeChanged :: Int -> Bool
 someLifeChanged s =
   let moved pl = Player.life pl /= Setup.startingLife
    in any moved (Map.elems (GameState.players (runRandomGame redRed s)))
+
+-- Did some green-black seed put a creature into a graveyard? In green-black the
+-- only way a creature dies is combat (trade, deathtouch SBA, or trample), so
+-- this fails only if combat never engages across all these seeds.
+creatureDied :: Int -> Bool
+creatureDied s =
+  let gs = runRandomGame greenBlack s
+      isDeadCreature oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> case Object.source obj of
+          Source.OfCard printing -> Card.isCreature (Printing.card printing)
+      inGrave pid = any isDeadCreature (Game.zoneMembers Zone.Graveyard pid gs)
+   in any inGrave [alice, bob]
 
 -- Run setup, then a scripted tweak, then whatever steps the scenario needs.
 scenario :: Game.Type.Game () -> GameState.GameState

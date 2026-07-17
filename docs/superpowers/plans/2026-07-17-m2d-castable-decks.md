@@ -635,7 +635,7 @@ Expected: both `Castability` cases pass; the pre-existing `Cast`/`Stack` groups 
 Run: `rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build} && cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"`
 Expected: `0`
 
-- [ ] **Step 5: Format, lint, commit**
+- [x] **Step 5: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -657,7 +657,7 @@ A `QC.once` property that at least one green-black seed sends a creature to a gr
 **Interfaces:**
 - Consumes: Task 3's `runRandomGame`, `greenBlack`; existing `Game.zoneMembers`, `Zone.Graveyard`, `Card.isCreature`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Main.hs`:
 
@@ -685,18 +685,18 @@ And add this case to the `propertyTests` list (after "combat happens"):
             any creatureDied [1 .. 100 :: Int]
 ```
 
-- [ ] **Step 2: Run to verify it passes**
+- [x] **Step 2: Run to verify it passes**
 
 Run: `cabal test 2>&1 | grep -iE "graveyard|Properties|FAIL"`
 Expected: the new property passes (some seed in 1..100 has a creature death).
 Note: if it unexpectedly fails, that is a real signal combat is not engaging in green-black — investigate rather than widening the seed range blindly. Do not weaken the assertion.
 
-- [ ] **Step 3: Clean-build warning check**
+- [x] **Step 3: Clean-build warning check**
 
 Run: `rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build} && cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"`
 Expected: `0`
 
-- [ ] **Step 4: Format, lint, commit**
+- [x] **Step 4: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
