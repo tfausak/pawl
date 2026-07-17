@@ -758,7 +758,7 @@ CR 702.10b, in `canAttack`. The state-override shape.
 - Consumes: Task 1's `Game.hasKeyword`, `Card.goblinChariotPrinting`; Task 2's `combatBoardOf`.
 - Produces: test fixture `justArrived :: GameState -> GameState`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this fixture and group, and add `hasteTests` to `testTree`:
 
@@ -798,12 +798,12 @@ hasteTests =
     ]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "/Haste/"' 2>&1 > /tmp/t.txt; grep -m3 -E "FAIL|expected" /tmp/t.txt`
 Expected: FAIL — the Goblin Chariot does not attack.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `source/library/Pawl/Combat.hs`, replace `canAttack`'s sickness clause:
 
@@ -816,14 +816,14 @@ In `source/library/Pawl/Combat.hs`, replace `canAttack`'s sickness clause:
 
 Note CR 702.10c — haste also frees activated abilities with the tap symbol from CR 302.6 — is **not** implemented. There are no activated abilities, so it has no consumer; unlike M1b's CR 704.5f, omitting it makes nothing partial. EXPIRES at M4.
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `cabal test --test-options='-p "/Haste/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (4 cases).
 
 Then `cabal test`. Expected: all pass — M1b's summoning-sickness tests use Pikers, which have no haste.
 
-- [ ] **Step 5: Lint and commit**
+- [x] **Step 5: Lint and commit**
 
 ```bash
 git add -A
@@ -850,7 +850,7 @@ git commit -m "Add haste"
 
 `canBlock` and `legalBlockers` are **unchanged** — they are CR 509.1a, which is about the blocker alone. `Prompt.DeclareBlockers` is **unchanged**.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this helper and group, and add `evasionTests` to `testTree`:
 
@@ -949,12 +949,12 @@ evasionTests =
     ]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "/Evasion/"' 2>&1 > /tmp/t.txt; grep -m3 -E "FAIL|error" /tmp/t.txt`
 Expected: FAIL — `Combat.legalBlockDeclaration` not in scope.
 
-- [ ] **Step 3: Implement the restriction check**
+- [x] **Step 3: Implement the restriction check**
 
 In `source/library/Pawl/Combat.hs`, add the import:
 
@@ -1010,7 +1010,7 @@ legalBlockDeclaration pid declaration gs =
    in all ok (Map.toList declaration)
 ```
 
-- [ ] **Step 4: Replace the filter with whole-declaration validation**
+- [x] **Step 4: Replace the filter with whole-declaration validation**
 
 In `source/library/Pawl/Combat.hs`, replace the body of `declareBlockers`' inner `Monad.unless`:
 
@@ -1043,7 +1043,7 @@ In `source/library/Pawl/Combat.hs`, replace the body of `declareBlockers`' inner
 
 The `legal`/`accepted` bindings are deleted. `legalBlockDeclaration` subsumes them: its `wellFormed` clause is exactly M1b's `legal`, now applied to the declaration rather than used to filter it.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `cabal test --test-options='-p "/Evasion/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (9 cases).
@@ -1052,7 +1052,7 @@ If "an illegal declaration is rejected WHOLE" fails while the others pass, the f
 
 Then `cabal test`. Expected: all pass. M1b's `Declare` and `CombatDamage` groups use Pikers only, so every declaration in them is legal and unaffected.
 
-- [ ] **Step 6: Lint and commit**
+- [x] **Step 6: Lint and commit**
 
 ```bash
 git add -A

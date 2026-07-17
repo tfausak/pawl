@@ -105,7 +105,8 @@ testTree =
       m2aCardTests,
       defenderTests,
       vigilanceTests,
-      hasteTests
+      hasteTests,
+      evasionTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -399,6 +400,99 @@ hasteTests =
          in case mine of
               [chariot, _] -> HU.assertEqual "only the chariot" [chariot] (declaredAttackers after)
               _ -> HU.assertFailure "fixture should have two creatures"
+    ]
+
+-- Declare attackers with everything, then hand back the state and the ids.
+attacking :: [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+attacking mine theirs =
+  let (gs, ours, yours) = combatBoardOf mine theirs
+      after = snd (Engine.runGamePure aggressiveAnswer gs (Combat.declareAttackers alice))
+   in (after, ours, yours)
+
+evasionTests :: Tasty.TestTree
+evasionTests =
+  Tasty.testGroup
+    "Evasion"
+    [ HU.testCase "CR 702.9b a declaration in which a ground creature blocks a flier is illegal" $
+        let (gs, mine, theirs) = attacking [Card.birdMaidenPrinting] [Card.pikerPrinting]
+         in case (mine, theirs) of
+              (a : _, b : _) ->
+                HU.assertBool "illegal" (not (Combat.legalBlockDeclaration bob (Map.singleton b a) gs))
+              _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.17b a reach creature may block a flier" $
+        -- THE FALSIFIER. Fails against any implementation that asks "does the
+        -- blocker have flying?"
+        let (gs, mine, theirs) = attacking [Card.birdMaidenPrinting] [Card.nimbleBirdstickerPrinting]
+         in case (mine, theirs) of
+              (a : _, b : _) ->
+                HU.assertBool "legal" (Combat.legalBlockDeclaration bob (Map.singleton b a) gs)
+              _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.9b a flier may block a ground creature" $
+        -- The asymmetry: 702.9b's second sentence. Fails if flying is implemented
+        -- as a symmetric predicate.
+        let (gs, mine, theirs) = attacking [Card.pikerPrinting] [Card.birdMaidenPrinting]
+         in case (mine, theirs) of
+              (a : _, b : _) ->
+                HU.assertBool "legal" (Combat.legalBlockDeclaration bob (Map.singleton b a) gs)
+              _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.9b a flier may block a flier" $
+        let (gs, mine, theirs) = attacking [Card.birdMaidenPrinting] [Card.birdMaidenPrinting]
+         in case (mine, theirs) of
+              (a : _, b : _) ->
+                HU.assertBool "legal" (Combat.legalBlockDeclaration bob (Map.singleton b a) gs)
+              _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 509.1a a ground creature is still a legal blocker while a flier attacks" $
+        -- 509.1a is about the blocker ALONE: it can block SOMETHING. This test
+        -- fails if evasion is wrongly implemented as a filter on the candidates.
+        let (gs, _, theirs) = attacking [Card.birdMaidenPrinting] [Card.pikerPrinting]
+         in HU.assertEqual "still offered" theirs (Combat.legalBlockers bob gs),
+      HU.testCase "CR 509.1b an illegal declaration is rejected WHOLE, not repaired" $
+        -- aggressiveAnswer blocks the first attacker with EVERYTHING, so bob
+        -- declares the reach creature (legal) AND the Piker (illegal) on the
+        -- flier. Neither may block. A per-pair filter would drop the Piker and
+        -- let the Birdsticker's block stand -- which is what M1b does today, and
+        -- is unsound: under menace, dropping one blocker from a pair manufactures
+        -- an illegal single block.
+        let (gs, _, _) = combatBoardOf [Card.birdMaidenPrinting] [Card.nimbleBirdstickerPrinting, Card.pikerPrinting]
+            steps = do
+              Combat.declareAttackers alice
+              Combat.declareBlockers
+            after = snd (Engine.runGamePure aggressiveAnswer gs steps)
+         in case Map.keys (Combat.Type.attackers (GameState.combat after)) of
+              [] -> HU.assertFailure "fixture should have an attacker"
+              a : _ -> HU.assertEqual "nobody blocks" Set.empty (Combat.blockersOf a after),
+      HU.testCase "CR 509.1b a wholly legal declaration is accepted" $
+        -- The control for the test above: with only the reach creature, the same
+        -- interpreter produces a legal declaration and the block stands.
+        let (gs, _, theirs) = combatBoardOf [Card.birdMaidenPrinting] [Card.nimbleBirdstickerPrinting]
+            steps = do
+              Combat.declareAttackers alice
+              Combat.declareBlockers
+            after = snd (Engine.runGamePure aggressiveAnswer gs steps)
+         in case Map.keys (Combat.Type.attackers (GameState.combat after)) of
+              [] -> HU.assertFailure "fixture should have an attacker"
+              a : _ -> HU.assertEqual "the reach creature blocks" (Set.fromList theirs) (Combat.blockersOf a after),
+      HU.testCase "CR 509.1a a Mountain is not a legal blocker, flier or no flier" $
+        -- The classification, from the other side: `canBlock` asks
+        -- is-it-a-creature, never which card it is. M1b tests "a land may not
+        -- attack" but never that a land may not BLOCK, so this closes a real gap
+        -- rather than restating one.
+        let (gs, mine, _) = attacking [Card.birdMaidenPrinting] []
+            withLand = snd (addCreature Card.mountainPrinting bob gs)
+         in case mine of
+              [] -> HU.assertFailure "fixture should have an attacker"
+              _ : _ -> HU.assertEqual "no legal blockers" [] (Combat.legalBlockers bob withLand),
+      HU.testCase "CR 702.9b a flier connects past an untapped ground creature, in a real combat" $
+        -- The integration case, and it is precise rather than vacuous. WITH
+        -- flying: nothing may block, bob takes 1, and both creatures live.
+        -- WITHOUT flying: the Piker blocks, bob takes 0, and the two TRADE (Bird
+        -- Maiden is 1/2, Piker is 2/1). All three assertions distinguish them.
+        let (gs, _, _) = combatBoardOf [Card.birdMaidenPrinting] [Card.pikerPrinting]
+            after = Sba.checkStateBasedActions (fightWith aggressiveAnswer gs)
+         in do
+              HU.assertEqual "bob took 1" (Just 19) (lifeOf bob after)
+              HU.assertEqual "the flier lives" 1 (creaturesInPlay alice after)
+              HU.assertEqual "the would-be blocker lives" 1 (creaturesInPlay bob after)
     ]
 
 vigilanceTests :: Tasty.TestTree

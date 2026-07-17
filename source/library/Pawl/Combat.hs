@@ -4,6 +4,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -88,6 +89,50 @@ canBlock pid oid gs = case Game.lookupObject oid gs of
 legalBlockers :: PlayerId -> GameState -> [ObjectId]
 legalBlockers pid gs = filter (\oid -> canBlock pid oid gs) (Game.zoneMembers Zone.Battlefield pid gs)
 
+-- CR 702.9b: a creature with flying can't be blocked except by creatures with
+-- flying and/or reach (CR 702.17b).
+--
+-- Note the asymmetry, which is easy to get backwards: 702.9b's second sentence
+-- says a creature with flying CAN block a creature with or without flying.
+-- Flying restricts being blocked, never blocking. The question is asked of the
+-- ATTACKER first, and only then of the blocker.
+evasionAllows :: ObjectId -> ObjectId -> GameState -> Bool
+evasionAllows blocker attacker gs =
+  not (Game.hasKeyword Keyword.Flying attacker gs)
+    || Game.hasKeyword Keyword.Flying blocker gs
+    || Game.hasKeyword Keyword.Reach blocker gs
+
+-- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
+-- any are disobeyed the DECLARATION is illegal.
+--
+-- The unit of legality is the whole declaration, not the pair, and that is not a
+-- stylistic choice. Menace (CR 702.111, one punchlist entry away) says a creature
+-- can't be blocked except by TWO OR MORE creatures -- a constraint on the SET
+-- blocking an attacker, which no per-pair predicate can express. Only flying and
+-- reach are pairwise; designing to them would be designing to the case that
+-- misleads. See the M2a spec, section 3.
+--
+-- A conjunction of independent restriction checks, because CR 509.1b says
+-- different evasion abilities are cumulative: an attacker with flying AND shadow
+-- admits only blockers that answer both.
+--
+-- CR 509.1c REQUIREMENTS ("must block if able") are NOT implemented, and are not
+-- a check but a maximization: 509.1c demands the declaration obey the maximum
+-- possible number of requirements achievable without disobeying any restriction.
+-- Nothing in M2a creates a requirement, so that maximum is trivially zero. This
+-- function is named for restrictions so requirements arrive as a SECOND function
+-- rather than as a surprise inside this one. EXPIRES with the first requirement,
+-- which also invalidates declareBlockers' fallback -- see there.
+legalBlockDeclaration :: PlayerId -> Map ObjectId ObjectId -> GameState -> Bool
+legalBlockDeclaration pid declaration gs =
+  let attackers = Map.keys (Combat.attackers (GameState.combat gs))
+      candidates = legalBlockers pid gs
+      -- CR 509.1a: the blocker must be one this player could block with at all,
+      -- and the attacker must actually be attacking.
+      wellFormed blocker attacker = List.elem blocker candidates && List.elem attacker attackers
+      ok (blocker, attacker) = wellFormed blocker attacker && evasionAllows blocker attacker gs
+   in all ok (Map.toList declaration)
+
 blockersOf :: ObjectId -> GameState -> Set ObjectId
 blockersOf oid gs = Map.findWithDefault Set.empty oid (Combat.blockers (GameState.combat gs))
 
@@ -144,10 +189,24 @@ declareBlockers = do
       Monad.unless (null candidates) $ do
         let decider = Decide.deciderFor pid gs
         chosen <- Trans.lift (Program.prompt (Prompt.DeclareBlockers decider pid candidates attacking))
-        -- Filtered, not trusted: the blocker must be theirs and legal, and the
-        -- attacker must actually be attacking.
-        let legal b a = List.elem b candidates && List.elem a attacking
-            accepted = Map.filterWithKey legal chosen
-            add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m
-            merged = List.foldl' add (Combat.blockers (GameState.combat gs)) (Map.toList accepted)
-        State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged}}
+        -- CR 509.1b: an illegal declaration is illegal AS A WHOLE. It is NOT
+        -- filtered down to its legal entries -- that is unsound, not merely
+        -- inelegant: under menace, dropping one blocker from a pair leaves an
+        -- illegal single block, so the filter would manufacture the illegality it
+        -- was meant to remove. M1b settled the identical question for CR 510.1e:
+        -- "checks the assignment AS A WHOLE, so this cannot be repaired by
+        -- filtering the way a discard can."
+        --
+        -- This is NOT CR 733's rewind. An enforcing engine never offers an
+        -- illegal declaration, so only a broken interpreter arrives here, and
+        -- re-prompting a pure `Prompt r -> r` returns the identical wrong answer.
+        --
+        -- Declining to block is always legal today, so "no blocks" is a legal
+        -- state to fall back to. EXPIRES with CR 509.1c requirements: once
+        -- something must block, "no blocks" can itself be illegal and this
+        -- fallback stops being available.
+        gs1 <- State.get
+        Monad.when (legalBlockDeclaration pid chosen gs1) $ do
+          let add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m
+              merged = List.foldl' add (Combat.blockers (GameState.combat gs1)) (Map.toList chosen)
+          State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged}}
