@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.Recipient (Recipient)
 
 data Response
   = ChoseAction Action
@@ -11,5 +12,5 @@ data Response
   | ChoseDiscard [ObjectId]
   | DeclaredAttackers [ObjectId]
   | DeclaredBlockers (Map ObjectId ObjectId)
-  | AssignedCombatDamage (Map ObjectId Natural)
+  | AssignedCombatDamage (Map Recipient Natural)
   deriving (Eq, Show)

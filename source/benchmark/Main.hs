@@ -2,7 +2,6 @@
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Setup as Setup
@@ -10,8 +9,14 @@ import qualified Pawl.Type.Action as Action
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.Result (Result)
 import qualified Test.Tasty.Bench as Bench
+
+isCreatureRecipient :: Recipient.Recipient -> Bool
+isCreatureRecipient r = case r of
+  Recipient.ToCreature _ -> True
+  Recipient.ToDefender _ -> False
 
 alwaysPass :: Prompt.Prompt r -> r
 alwaysPass p = case p of
@@ -20,9 +25,10 @@ alwaysPass p = case p of
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
 
 -- Casts when legal, otherwise passes: the benchmark that actually exercises the
 -- stack, mana payment, and resolution.
@@ -32,9 +38,10 @@ castAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
           Action.Cast _ -> True
@@ -52,9 +59,10 @@ fightAnswer p = case p of
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
     a : _ -> Map.fromList (map (\b -> (b, a)) mine)
-  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
           Action.Cast _ -> True

@@ -546,7 +546,7 @@ git commit -m "Destroy creatures wounded by a deathtouch source as CR 704.5h"
   - `Response.AssignedCombatDamage (Map Recipient Natural)`
   - `Damage.legalAssignment :: Map Recipient Natural -> Natural -> Map Recipient Natural -> Bool`
 
-- [ ] **Step 1: Write the failing test — the exhaustive validation property**
+- [x] **Step 1: Write the failing test — the exhaustive validation property**
 
 In `source/test-suite/Main.hs`, add and append `assignmentLegalityTests` to `testTree`. This is where "all scenarios" is proven — the pure predicate, independent of any card:
 
@@ -631,12 +631,12 @@ genLegalityCase = do
 
 (`ObjectId.MkObjectId :: Natural -> ObjectId` is used directly, as the suite already does at `Main.hs:290`. No new helper.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "/AssignmentLegality/"' 2>&1 | tail -20`
 Expected: FAIL — `Damage.legalAssignment` not in scope.
 
-- [ ] **Step 3: Change the prompt and response types**
+- [x] **Step 3: Change the prompt and response types**
 
 In `source/library/Pawl/Type/Prompt.hs`, import `Recipient` and change the constructor and its comment:
 
@@ -655,7 +655,7 @@ In `source/library/Pawl/Type/Response.hs`, import `Recipient` and change:
   | AssignedCombatDamage (Map Recipient Natural)
 ```
 
-- [ ] **Step 4: Add `legalAssignment` and issue the new prompt (non-trample behavior preserved)**
+- [x] **Step 4: Add `legalAssignment` and issue the new prompt (non-trample behavior preserved)**
 
 In `source/library/Pawl/Damage.hs`, add the pure predicate and rewrite `attackerAssignment`'s multi-blocker branch to build the thresholds map (all `0` for now — non-trample), issue the new prompt, and validate with `legalAssignment`:
 
@@ -708,7 +708,7 @@ Replace the multi-blocker branch of `attackerAssignment` (the `blockers -> …` 
 
 Note the answer's keys are now `Recipient`, so `toEvent` builds the event directly from the recipient (no `ToCreature` wrapping here — the map already carries recipients).
 
-- [ ] **Step 5: Migrate `Replay.defaultAnswer`**
+- [x] **Step 5: Migrate `Replay.defaultAnswer`**
 
 In `source/library/Pawl/Replay.hs`, the `AssignCombatDamage` branch of `defaultAnswer` (currently destructures `_ _ _ blockers n` over a `Set` and returns `Map.singleton b n`). Replace with a legal default that dumps all power on the first non-defender recipient (defender gets nothing, so the gate is vacuous):
 
@@ -727,7 +727,7 @@ In `source/library/Pawl/Replay.hs`, the `AssignCombatDamage` branch of `defaultA
 
 Add `qualified Pawl.Type.Recipient as Recipient` to `Replay.hs`'s imports. `encode`/`decode` use `{}` and `AssignedCombatDamage answer`, which are unchanged.
 
-- [ ] **Step 6: Migrate the interpreters in the test suite and benchmark**
+- [x] **Step 6: Migrate the interpreters in the test suite and benchmark**
 
 Every responder that matched `Prompt.AssignCombatDamage _ _ _ ids n` where `ids :: Set ObjectId` now matches `_ _ _ thresholds n` where `thresholds :: Map Recipient Natural`, and returns `Map Recipient Natural`. The mechanical transform for the common "dump all on the first blocker" responders (`aggressiveAnswer` line ~208, and the identical clauses at test lines ~861, ~1037, ~1288, ~1346, ~1427, ~1555, and benchmark `source/benchmark/Main.hs` lines ~23, ~35, ~55):
 
@@ -749,13 +749,13 @@ The three structurally-different responders in `combatDamageTests` migrate as:
 
 And the prompt **construction** at test line ~293 (`damagePrompt = Prompt.AssignCombatDamage decider alice oid (Set.singleton oid) 2`) becomes `Prompt.AssignCombatDamage decider alice oid (Map.singleton (Recipient.ToCreature oid) 0) 2`. Add `qualified Pawl.Type.Recipient as Recipient` to the test suite and benchmark imports.
 
-- [ ] **Step 7: Run tests and clean-build**
+- [x] **Step 7: Run tests and clean-build**
 
 Run: `cabal test 2>&1 | tail -30` — Expected: PASS. `AssignmentLegality` green; every migrated `CombatDamage` test still green (behavior preserved); replay/determinism tests green.
 Run: `cabal bench 2>&1 | tail -5` — Expected: builds and runs.
 Run the clean-build warning check — Expected: `0`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

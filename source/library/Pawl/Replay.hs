@@ -5,13 +5,13 @@ module Pawl.Replay where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 import qualified Pawl.Type.Action as Action
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.Program as Program
 import Pawl.Type.Prompt (Prompt)
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.Response (Response)
 import qualified Pawl.Type.Response as Response
 
@@ -68,11 +68,16 @@ defaultAnswer p = case p of
   -- thing a fallback can do.
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
-  -- Must be a LEGAL division, or Task 7's validation rejects it and the attacker
-  -- deals no damage. All of it to one blocker totals the attacker's power.
-  Prompt.AssignCombatDamage _ _ _ blockers n -> case Set.toList blockers of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  -- Must be a LEGAL division (Damage.legalAssignment), or the attacker deals
+  -- nothing. All power onto the first blocker totals power with the defender at 0.
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    let blockers = filter isCreatureRecipient (Map.keys thresholds)
+        isCreatureRecipient r = case r of
+          Recipient.ToCreature _ -> True
+          Recipient.ToDefender _ -> False
+     in case blockers of
+          r : _ -> Map.singleton r n
+          [] -> Map.empty
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

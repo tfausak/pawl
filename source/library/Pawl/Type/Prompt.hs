@@ -3,12 +3,12 @@
 module Pawl.Type.Prompt where
 
 import Data.Map.Strict (Map)
-import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
 import Pawl.Type.Decider (Decider)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
+import Pawl.Type.Recipient (Recipient)
 
 data Prompt r where
   ChooseAction :: Decider -> PlayerId -> [Action] -> Prompt Action
@@ -22,8 +22,9 @@ data Prompt r where
   -- CR 509.1. The legal blockers, then the attackers they may block. The answer
   -- maps each blocking creature to the attacker it blocks.
   DeclareBlockers :: Decider -> PlayerId -> [ObjectId] -> [ObjectId] -> Prompt (Map ObjectId ObjectId)
-  -- CR 510.1c: a creature blocked by TWO OR MORE creatures divides its damage
-  -- among them freely. Never asked for a single blocker -- CR 510.1c forces all
-  -- the damage onto it, and asking would invent a decision the rules do not
-  -- offer. The ObjectId is the attacker; the Natural is its power.
-  AssignCombatDamage :: Decider -> PlayerId -> ObjectId -> Set ObjectId -> Natural -> Prompt (Map ObjectId Natural)
+  -- CR 510.1 / 702.19b: the attacker divides its power among the legal recipients.
+  -- The Map is recipient -> lethal threshold (blockers -> lethal, the defender ->
+  -- 0); trample-ness is entirely in whether the defender is a key and what the
+  -- thresholds are. Not asked when the division is forced (single blocker, no
+  -- excess). Validation is Damage.legalAssignment. See the M2c spec, section 4.
+  AssignCombatDamage :: Decider -> PlayerId -> ObjectId -> Map Recipient Natural -> Natural -> Prompt (Map Recipient Natural)

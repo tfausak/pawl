@@ -116,7 +116,8 @@ testTree =
       evasionTests,
       m2cCardTests,
       damageEventTests,
-      deathtouchTests
+      deathtouchTests,
+      assignmentLegalityTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -170,7 +171,7 @@ combatDamageTests =
         let (gs, _, theirs) = combatBoard 1 2
             split :: Prompt.Prompt r -> r
             split p = case p of
-              Prompt.AssignCombatDamage _ _ _ ids _ -> Map.fromList (map (\b -> (b, 1)) (Set.toList ids))
+              Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (map (\r -> (r, 1)) (filter isCreatureRecipient (Map.keys thresholds)))
               _ -> aggressiveAnswer p
             after = Sba.checkStateBasedActions (fightWith split gs)
          in do
@@ -180,9 +181,10 @@ combatDamageTests =
         let (gs, _, _) = combatBoard 1 2
             dump :: Prompt.Prompt r -> r
             dump p = case p of
-              Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
-                b : _ -> Map.singleton b n
-                [] -> Map.empty
+              Prompt.AssignCombatDamage _ _ _ thresholds n ->
+                case filter isCreatureRecipient (Map.keys thresholds) of
+                  r : _ -> Map.singleton r n
+                  [] -> Map.empty
               _ -> aggressiveAnswer p
             after = Sba.checkStateBasedActions (fightWith dump gs)
          in HU.assertEqual "one blocker survives" 1 (creaturesInPlay bob after),
@@ -192,7 +194,7 @@ combatDamageTests =
         let (gs, _, _) = combatBoard 1 2
             cheat :: Prompt.Prompt r -> r
             cheat p = case p of
-              Prompt.AssignCombatDamage _ _ _ ids _ -> Map.fromList (map (\b -> (b, 99)) (Set.toList ids))
+              Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (map (\r -> (r, 99)) (filter isCreatureRecipient (Map.keys thresholds)))
               _ -> aggressiveAnswer p
             after = Sba.checkStateBasedActions (fightWith cheat gs)
          in HU.assertEqual "both blockers survive" 2 (creaturesInPlay bob after)
@@ -210,9 +212,10 @@ aggressiveAnswer p = case p of
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
     a : _ -> Map.fromList (map (\b -> (b, a)) mine)
-  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
 
 declaredAttackers :: GameState.GameState -> [ObjectId.ObjectId]
 declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
@@ -295,7 +298,7 @@ combatReplayTests =
       oid = ObjectId.MkObjectId 7
       attackPrompt = Prompt.DeclareAttackers decider alice [oid]
       blockPrompt = Prompt.DeclareBlockers decider bob [oid] [oid]
-      damagePrompt = Prompt.AssignCombatDamage decider alice oid (Set.singleton oid) 2
+      damagePrompt = Prompt.AssignCombatDamage decider alice oid (Map.singleton (Recipient.ToCreature oid) 0) 2
    in Tasty.testGroup
         "CombatReplay"
         [ HU.testCase "attackers round-trip through the transcript" $
@@ -304,8 +307,8 @@ combatReplayTests =
             let answer = Map.singleton oid oid
              in HU.assertEqual "round trip" (Just answer) (Replay.decode blockPrompt (Replay.encode blockPrompt answer)),
           HU.testCase "a damage assignment round-trips through the transcript" $
-            let answer :: Map.Map ObjectId.ObjectId Natural.Natural
-                answer = Map.singleton oid 2
+            let answer :: Map.Map Recipient.Recipient Natural.Natural
+                answer = Map.singleton (Recipient.ToCreature oid) 2
              in HU.assertEqual "round trip" (Just answer) (Replay.decode damagePrompt (Replay.encode damagePrompt answer)),
           HU.testCase "a mismatched response decodes to Nothing" $
             HU.assertEqual "mismatch" Nothing (Replay.decode attackPrompt (Response.Shuffled [oid])),
@@ -315,8 +318,8 @@ combatReplayTests =
             HU.assertEqual "no blocks" Map.empty (Replay.defaultAnswer blockPrompt),
           HU.testCase "defaultAnswer assigns a LEGAL division" $
             -- Total must equal the attacker's power, or the fallback would be
-            -- rejected by Task 7's validation and deal no damage at all.
-            HU.assertEqual "all to one blocker" (Map.singleton oid 2) (Replay.defaultAnswer damagePrompt)
+            -- rejected by validation and deal no damage at all.
+            HU.assertEqual "all to one blocker" (Map.singleton (Recipient.ToCreature oid) 2) (Replay.defaultAnswer damagePrompt)
         ]
 
 -- alice is active with one Settled creature per printing in `mine`; bob defends
@@ -863,9 +866,10 @@ castAnswer p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
@@ -1039,9 +1043,10 @@ discardLastAnswer :: Prompt.Prompt r -> r
 discardLastAnswer p = case p of
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> A.Pass
   Prompt.ChooseDiscard _ _ ids n -> lastN (fromIntegral n) ids
@@ -1291,9 +1296,10 @@ identityAnswer :: Prompt.Prompt r -> r
 identityAnswer p = case p of
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> A.Pass
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
@@ -1349,9 +1355,10 @@ playLandAnswer p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ ids n -> case Set.toList ids of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.ChooseAction _ _ actions ->
     let isPlay a = case a of
@@ -1430,9 +1437,10 @@ randomAnswer p = case p of
   -- The damage division stays canonical rather than random: a random division
   -- would usually be illegal (it must total the attacker's power), and this
   -- property suite is not the place to test the rejection path.
-  Prompt.AssignCombatDamage _ _ _ ids n -> pure $ case Set.toList ids of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    pure $ case filter isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
   Prompt.Shuffle ids -> do
     g <- State.get
     let (g1, g2) = Random.splitGen g
@@ -1558,9 +1566,10 @@ recordingAnswer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
 recordingAnswer p = case p of
   Prompt.DeclareAttackers {} -> pure []
   Prompt.DeclareBlockers {} -> pure Map.empty
-  Prompt.AssignCombatDamage _ _ _ ids n -> pure $ case Set.toList ids of
-    b : _ -> Map.singleton b n
-    [] -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    pure $ case filter isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
   Prompt.Shuffle ids -> pure ids
   Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
   Prompt.ChooseAction _ pid actions -> do
@@ -1908,6 +1917,95 @@ deathtouchTests =
             after = Sba.checkStateBasedActions (fightWith aggressiveAnswer gs)
          in HU.assertEqual "events drained" [] (GameState.damageEvents after)
     ]
+
+assignmentLegalityTests :: Tasty.TestTree
+assignmentLegalityTests =
+  Tasty.testGroup
+    "AssignmentLegality"
+    [ HU.testCase "under-assignment with no overflow is legal (power below lethal)" $
+        -- One blocker, lethal 3, power 2, defender present with threshold 0.
+        let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+            thresholds =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 3),
+                  (Recipient.ToDefender bob, 0)
+                ]
+            answer :: Map.Map Recipient.Recipient Natural.Natural
+            answer = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 1), 2)]
+         in HU.assertBool "accepted" (Damage.legalAssignment thresholds 2 answer),
+      HU.testCase "defender damage while a blocker is short is illegal" $
+        let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+            thresholds =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 3),
+                  (Recipient.ToDefender bob, 0)
+                ]
+            answer :: Map.Map Recipient.Recipient Natural.Natural
+            answer =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 0),
+                  (Recipient.ToDefender bob, 3)
+                ]
+         in HU.assertBool "rejected" (not (Damage.legalAssignment thresholds 3 answer)),
+      HU.testCase "defender damage once the blocker has lethal is legal" $
+        let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+            thresholds =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 1),
+                  (Recipient.ToDefender bob, 0)
+                ]
+            answer :: Map.Map Recipient.Recipient Natural.Natural
+            answer =
+              Map.fromList
+                [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 1),
+                  (Recipient.ToDefender bob, 2)
+                ]
+         in HU.assertBool "accepted" (Damage.legalAssignment thresholds 3 answer),
+      HU.testCase "an answer that does not total power is illegal" $
+        let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+            thresholds = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 1), 0)]
+            answer :: Map.Map Recipient.Recipient Natural.Natural
+            answer = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 1), 1)]
+         in HU.assertBool "rejected" (not (Damage.legalAssignment thresholds 2 answer)),
+      HU.testCase "an illegal recipient is rejected" $
+        let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+            thresholds = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 1), 0)]
+            answer :: Map.Map Recipient.Recipient Natural.Natural
+            answer = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 2), 2)]
+         in HU.assertBool "rejected" (not (Damage.legalAssignment thresholds 2 answer)),
+      QC.testProperty "an accepted assignment always totals power and gates the defender" $
+        QC.forAll genLegalityCase $ \(thresholds, power, answer) ->
+          not (Damage.legalAssignment thresholds power answer)
+            || ( sum (Map.elems answer) == power
+                   && all (\r -> Map.member r thresholds) (Map.keys answer)
+                   && ( Map.findWithDefault 0 (Recipient.ToDefender bob) answer == 0
+                          || all
+                            (\(r, t) -> Map.findWithDefault 0 r answer >= t)
+                            (Map.toList (Map.filterWithKey (\r _ -> isCreatureRecipient r) thresholds))
+                      )
+               )
+    ]
+
+isCreatureRecipient :: Recipient.Recipient -> Bool
+isCreatureRecipient r = case r of
+  Recipient.ToCreature _ -> True
+  Recipient.ToDefender _ -> False
+
+-- A blocker (lethal 0..4), a defender (threshold 0), power 0..6, and an arbitrary
+-- assignment over those two recipients. Covers power below / equal to / above
+-- lethal and every over/under split.
+genLegalityCase :: QC.Gen (Map.Map Recipient.Recipient Natural.Natural, Natural.Natural, Map.Map Recipient.Recipient Natural.Natural)
+genLegalityCase = do
+  lethal <- QC.choose (0, 4) :: QC.Gen Integer
+  power <- QC.choose (0, 6) :: QC.Gen Integer
+  toBlocker <- QC.choose (0, 6) :: QC.Gen Integer
+  toDefender <- QC.choose (0, 6) :: QC.Gen Integer
+  let blocker = Recipient.ToCreature (ObjectId.MkObjectId 1)
+      thresholds :: Map.Map Recipient.Recipient Natural.Natural
+      thresholds = Map.fromList [(blocker, fromInteger lethal), (Recipient.ToDefender bob, 0)]
+      answer :: Map.Map Recipient.Recipient Natural.Natural
+      answer = Map.fromList [(blocker, fromInteger toBlocker), (Recipient.ToDefender bob, fromInteger toDefender)]
+  pure (thresholds, fromInteger power, answer)
 
 -- Run whole steps until the first-strike combat damage step has been dealt
 -- (struckFirst is set) or combat ends, so a test can observe the board BETWEEN

@@ -37,6 +37,25 @@ removeAllDamage gs =
   let clear obj = obj {Object.damage = 0}
    in gs {GameState.objects = Map.map clear (GameState.objects gs)}
 
+-- CR 510.1e / 702.19b, as a pure predicate over the whole assignment. Legal iff it
+-- totals power, uses only legal recipients, and -- the trample implication -- the
+-- defender got damage ONLY if every blocker is at its lethal threshold. The
+-- threshold is NOT a per-blocker floor: a blocker may be under-assigned as long as
+-- the defender then gets nothing. See the M2c spec, section 4.
+legalAssignment :: Map.Map Recipient.Recipient Natural -> Natural -> Map.Map Recipient.Recipient Natural -> Bool
+legalAssignment thresholds power answer =
+  let assigned r = Map.findWithDefault 0 r answer
+      totalsPower = sum (Map.elems answer) == power
+      onlyLegal = all (\r -> Map.member r thresholds) (Map.keys answer)
+      isDefender r = case r of
+        Recipient.ToDefender _ -> True
+        Recipient.ToCreature _ -> False
+      defenderAmount = sum (Map.elems (Map.filterWithKey (\r _ -> isDefender r) answer))
+      blockerThresholds = Map.filterWithKey (\r _ -> not (isDefender r)) thresholds
+      everyBlockerLethal = all (\(r, t) -> assigned r >= t) (Map.toList blockerThresholds)
+      defenderGated = defenderAmount == 0 || everyBlockerLethal
+   in totalsPower && onlyLegal && defenderGated
+
 -- What one attacking creature assigns, as damage events carrying the source.
 -- CR 510.1a: a creature that would assign 0 or less assigns none, so events all
 -- carry amount > 0.
@@ -61,19 +80,21 @@ attackerAssignment gs (attacker, target) = case Game.powerOf attacker gs of
             Nothing -> pure []
             Just pid -> do
               let decider = Decide.deciderFor pid gs
+                  -- Non-trample: recipients are the blockers, every threshold 0.
+                  -- Trample thresholds and the defender recipient arrive in Task 5.
+                  thresholds :: Map.Map Recipient.Recipient Natural
+                  thresholds =
+                    Map.fromList (map (\b -> (Recipient.ToCreature b, 0)) blockers)
               chosen <-
                 Trans.lift
-                  (Program.prompt (Prompt.AssignCombatDamage decider pid attacker (Set.fromList blockers) power))
+                  (Program.prompt (Prompt.AssignCombatDamage decider pid attacker thresholds power))
               -- CR 510.1e checks the assignment AS A WHOLE. An illegal answer is
-              -- rejected and the attacker assigns nothing (CR 510.1b/c degenerate
-              -- case), NOT the CR 733 rewind. See the spec, section 4.
-              let isBlocker o = List.elem o blockers
-                  onlyBlockers = all isBlocker (Map.keys chosen)
-                  totalsPower = sum (Map.elems chosen) == power
-                  toEvent (blocker, n) = DamageEvent.MkDamageEvent attacker (Recipient.ToCreature blocker) n
+              -- rejected and the attacker assigns nothing -- the rules' degenerate
+              -- case (CR 510.1b/c), NOT the CR 733 human-error rewind. See spec §4.
+              let toEvent (recipient, n) = DamageEvent.MkDamageEvent attacker recipient n
                   positive (_, n) = n > 0
               pure
-                ( if onlyBlockers && totalsPower
+                ( if legalAssignment thresholds power chosen
                     then map toEvent (filter positive (Map.toList chosen))
                     else []
                 )
