@@ -117,7 +117,8 @@ testTree =
       m2cCardTests,
       damageEventTests,
       deathtouchTests,
-      assignmentLegalityTests
+      assignmentLegalityTests,
+      trampleTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -2006,6 +2007,73 @@ genLegalityCase = do
       answer :: Map.Map Recipient.Recipient Natural.Natural
       answer = Map.fromList [(blocker, fromInteger toBlocker), (Recipient.ToDefender bob, fromInteger toDefender)]
   pure (thresholds, fromInteger power, answer)
+
+-- Assigns each blocker exactly its threshold, and every leftover point to the
+-- defender. A legal trample division for these boards.
+tramplingAnswer :: Prompt.Prompt r -> r
+tramplingAnswer p = case p of
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    let blockers = Map.toList (Map.filterWithKey (\r _ -> isCreatureRecipient r) thresholds)
+        toBlockers = Map.fromList (map (\(r, t) -> (r, t)) blockers)
+        spent = sum (map snd blockers)
+        leftover = if n >= spent then n - spent else 0
+        defenders = filter (not . isCreatureRecipient) (Map.keys thresholds)
+     in case defenders of
+          d : _ -> Map.insert d leftover toBlockers
+          [] -> toBlockers
+  _ -> aggressiveAnswer p
+
+trampleTests :: Tasty.TestTree
+trampleTests =
+  Tasty.testGroup
+    "Trample"
+    [ HU.testCase "CR 702.19b a 3/3 trampler spills excess onto the defending player" $
+        -- War Mammoth (3/3 trample) blocked by a Piker (2/1): 1 lethal to the
+        -- Piker, 2 to bob. Mammoth survives (2 marked < 3).
+        let (gs, _, _) = combatBoardOf [Card.warMammothPrinting] [Card.pikerPrinting]
+            after = Sba.checkStateBasedActions (fightWith tramplingAnswer gs)
+         in do
+              HU.assertEqual "bob took the 2 overflow" (Just 18) (lifeOf bob after)
+              HU.assertEqual "the Piker is dead" 0 (creaturesInPlay bob after)
+              HU.assertEqual "the Mammoth survives" 1 (creaturesInPlay alice after),
+      HU.testCase "CR 702.19b a non-trample control spills nothing" $
+        -- Ogre Sentry is a 3/3 that cannot attack (defender), so use the Piker's
+        -- existing behavior as the control: a blocked non-trample attacker deals
+        -- nothing to the player. (combatDamageTests already asserts bob = 20.)
+        let (gs, _, _) = combatBoardOf [Card.pikerPrinting] [Card.pikerPrinting]
+            after = fightWith tramplingAnswer gs
+         in HU.assertEqual "bob untouched by a non-trampler" (Just 20) (lifeOf bob after),
+      HU.testCase "CR 702.19b defender-short assignment is rejected" $
+        -- A cheat responder gives bob 3 while the Piker gets 0. Illegal: the
+        -- attacker deals nothing, bob untouched, Piker survives.
+        let (gs, _, _) = combatBoardOf [Card.warMammothPrinting] [Card.pikerPrinting]
+            cheat p = case p of
+              Prompt.AssignCombatDamage _ _ _ thresholds n ->
+                case filter (not . isCreatureRecipient) (Map.keys thresholds) of
+                  d : _ -> Map.singleton d n
+                  [] -> Map.empty
+              _ -> aggressiveAnswer p
+            after = Sba.checkStateBasedActions (fightWith cheat gs)
+         in do
+              HU.assertEqual "bob untouched" (Just 20) (lifeOf bob after)
+              HU.assertEqual "the Piker survives the rejected assignment" 1 (creaturesInPlay bob after),
+      HU.testCase "CR 702.19b under-assignment across two blockers spills nothing (power below total lethal)" $
+        -- War Mammoth (3/3 trample) blocked by TWO Ogre Sentries (3/3 each): it
+        -- cannot reach lethal on both (needs 6, has 3), so no overflow -- bob is
+        -- untouched -- and the division among the Ogres is free. Real cards, the
+        -- power-below-lethal case the property covers exhaustively.
+        let (gs, _, _) = combatBoardOf [Card.warMammothPrinting] [Card.ogreSentryPrinting, Card.ogreSentryPrinting]
+            dumpOne p = case p of
+              Prompt.AssignCombatDamage _ _ _ thresholds n ->
+                case filter isCreatureRecipient (Map.keys thresholds) of
+                  r : _ -> Map.singleton r n
+                  [] -> Map.empty
+              _ -> aggressiveAnswer p
+            after = Sba.checkStateBasedActions (fightWith dumpOne gs)
+         in do
+              HU.assertEqual "bob untouched (no overflow)" (Just 20) (lifeOf bob after)
+              HU.assertEqual "one Ogre took all 3 and died, the other lived" 1 (creaturesInPlay bob after)
+    ]
 
 -- Run whole steps until the first-strike combat damage step has been dealt
 -- (struckFirst is set) or combat ends, so a test can observe the board BETWEEN

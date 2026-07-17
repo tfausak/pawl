@@ -56,6 +56,17 @@ legalAssignment thresholds power answer =
       defenderGated = defenderAmount == 0 || everyBlockerLethal
    in totalsPower && onlyLegal && defenderGated
 
+-- CR 702.19b: a blocker's lethal threshold is its toughness minus damage already
+-- marked, never negative. (Damage already marked matters against M2b: a first-
+-- strike step can leave marked damage that lowers this in the regular step.) The
+-- 702.2c deathtouch collapse to 1 arrives in Task 6.
+blockerThreshold :: GameState -> ObjectId -> ObjectId -> Natural
+blockerThreshold gs _attacker blocker =
+  let marked = maybe 0 Object.damage (Game.lookupObject blocker gs)
+   in case Game.toughnessOf blocker gs of
+        Nothing -> 0
+        Just t -> fromInteger (max 0 (t - toInteger marked))
+
 -- What one attacking creature assigns, as damage events carrying the source.
 -- CR 510.1a: a creature that would assign 0 or less assigns none, so events all
 -- carry amount > 0.
@@ -68,29 +79,38 @@ attackerAssignment gs (attacker, target) = case Game.powerOf attacker gs of
       else do
         let power :: Natural
             power = fromInteger p
+            trample = Game.hasKeyword Keyword.Trample attacker gs
         case Set.toList (Combat.blockersOf attacker gs) of
           -- CR 510.1b: unblocked, so it hits what it is attacking.
           [] -> case target of
-            AttackTarget.OfPlayer pid ->
-              pure [DamageEvent.MkDamageEvent attacker (Recipient.ToDefender pid) power]
-          -- CR 510.1c: exactly one blocker takes ALL of it. Forced, so not asked.
-          [blocker] ->
-            pure [DamageEvent.MkDamageEvent attacker (Recipient.ToCreature blocker) power]
+            AttackTarget.OfPlayer defender ->
+              pure [DamageEvent.MkDamageEvent attacker (Recipient.ToDefender defender) power]
+          -- CR 510.1c / 702.19b: a single blocker with no trample -- or trample but
+          -- no power past its threshold -- is forced: all onto the blocker. A single
+          -- trample blocker WITH excess fails this guard and falls to the prompt arm.
+          [blocker]
+            | not trample || power <= blockerThreshold gs attacker blocker ->
+                pure [DamageEvent.MkDamageEvent attacker (Recipient.ToCreature blocker) power]
           blockers -> case Game.controllerOf attacker gs of
             Nothing -> pure []
+            -- CR 702.19b: the excess is assigned "as its controller chooses," so the
+            -- chooser is the attacker's controller. EXPIRES at M3: banding (702.22j,
+            -- the DEFENDING player chooses) and Mindslaver (a Decider, not this
+            -- PlayerId) both invert it -- a Decider problem, not a combat one. See
+            -- the M2c spec, sections 4 and 8.
             Just pid -> do
               let decider = Decide.deciderFor pid gs
-                  -- Non-trample: recipients are the blockers, every threshold 0.
-                  -- Trample thresholds and the defender recipient arrive in Task 5.
-                  thresholds :: Map.Map Recipient.Recipient Natural
-                  thresholds =
-                    Map.fromList (map (\b -> (Recipient.ToCreature b, 0)) blockers)
+                  thresholdOf b = if trample then blockerThreshold gs attacker b else 0
+                  blockerEntries = map (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
+                  defenderEntry = case target of
+                    AttackTarget.OfPlayer defender ->
+                      if trample then [(Recipient.ToDefender defender, 0 :: Natural)] else []
+                  thresholds = Map.fromList (blockerEntries ++ defenderEntry)
               chosen <-
                 Trans.lift
                   (Program.prompt (Prompt.AssignCombatDamage decider pid attacker thresholds power))
-              -- CR 510.1e checks the assignment AS A WHOLE. An illegal answer is
-              -- rejected and the attacker assigns nothing -- the rules' degenerate
-              -- case (CR 510.1b/c), NOT the CR 733 human-error rewind. See spec §4.
+              -- CR 510.1e / 702.19b: reject-not-repair (NOT the CR 733 human-error
+              -- rewind). An illegal answer assigns nothing. See the M2c spec, §4.
               let toEvent (recipient, n) = DamageEvent.MkDamageEvent attacker recipient n
                   positive (_, n) = n > 0
               pure

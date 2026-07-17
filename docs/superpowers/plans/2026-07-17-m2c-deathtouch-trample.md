@@ -775,7 +775,7 @@ git commit -m "Generalize AssignCombatDamage to recipients and lethal thresholds
 - Consumes: `Game.hasKeyword`, `Keyword.Trample`, `Game.toughnessOf`, `Game.lookupObject`, `Object.damage`, `legalAssignment` (Task 4).
 - Produces: `Damage.blockerThreshold :: GameState -> ObjectId -> ObjectId -> Natural`; trample-aware `attackerAssignment`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Main.hs`, add and append `trampleTests` to `testTree`. A trample-aware responder that assigns lethal to blockers and pours the rest on the defender:
 
@@ -848,12 +848,12 @@ trampleTests =
     ]
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "/Trample/"' 2>&1 | tail -30`
 Expected: FAIL — the trample spill test gets `bob = 20` (trample not implemented; the Mammoth's blocked damage all lands on the Piker).
 
-- [ ] **Step 3: Compute trample thresholds and recipients**
+- [x] **Step 3: Compute trample thresholds and recipients**
 
 In `source/library/Pawl/Damage.hs`, add `blockerThreshold` (deathtouch consultation is Task 6, so the attacker is unused now — prefix `_attacker`):
 
@@ -925,12 +925,12 @@ attackerAssignment gs (attacker, target) = case Game.powerOf attacker gs of
 
 `Keyword` and `Object` are already imported in `Damage.hs`. Note the fallthrough: a single blocker whose guard fails is matched by the variable pattern `blockers` (a one-element list), so it is prompted — this is the M1b "single blocker not asked" shortcut being correctly falsified for trample only.
 
-- [ ] **Step 4: Run tests and clean-build**
+- [x] **Step 4: Run tests and clean-build**
 
 Run: `cabal test 2>&1 | tail -30` — Expected: PASS. `Trample` green; `CombatDamage` (non-trample) still green (the `trample` flag is `False` for Pikers, so behavior is unchanged); `AssignmentLegality` green.
 Run the clean-build warning check — Expected: `0`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
