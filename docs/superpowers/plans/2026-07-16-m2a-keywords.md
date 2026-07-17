@@ -90,7 +90,7 @@ All five cards are verified against Scryfall (`api.scryfall.com/cards/named?exac
 | Windseeker Centaur | `{1}{R}{R}` | 2/2 | Creature — Centaur | Vigilance |
 | Goblin Chariot | `{2}{R}` | 2/2 | Creature — Goblin Warrior | Haste |
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add the import to `source/test-suite/Main.hs` (keep the block alphabetically sorted — `hooky fix` enforces it):
 
@@ -224,12 +224,12 @@ m2aCardTests =
         ]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 > /tmp/t.txt; grep -m3 error /tmp/t.txt`
 Expected: FAIL — `Pawl.Type.Keyword` not found.
 
-- [ ] **Step 3: Create `Pawl.Type.Keyword`**
+- [x] **Step 3: Create `Pawl.Type.Keyword`**
 
 `source/library/Pawl/Type/Keyword.hs`:
 
@@ -263,7 +263,7 @@ data Keyword
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the field to `Card`, and the subtypes**
+- [x] **Step 4: Add the field to `Card`, and the subtypes**
 
 `source/library/Pawl/Type/Card.hs` — replace the whole file:
 
@@ -314,11 +314,11 @@ data Subtype
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 5: Add `keywords` to the existing printings**
+- [x] **Step 5: Add `keywords` to the existing printings**
 
 In `source/library/Pawl/Card.hs`, add `Card.keywords = Set.empty,` to **both** `Card.MkCard` records — `mountainPrinting`'s and `pikerPrinting`'s — after their `Card.toughness` line. These are the only two `Card.MkCard` sites in the repo; `-Werror` will confirm.
 
-- [ ] **Step 6: Add the five printings**
+- [x] **Step 6: Add the five printings**
 
 Append to `source/library/Pawl/Card.hs`. Add the import first:
 
@@ -478,7 +478,7 @@ goblinChariotPrinting =
     }
 ```
 
-- [ ] **Step 7: Add the query to `Pawl.Game`**
+- [x] **Step 7: Add the query to `Pawl.Game`**
 
 In `source/library/Pawl/Game.hs`, add the import:
 
@@ -510,14 +510,14 @@ hasKeyword :: Keyword -> ObjectId -> GameState -> Bool
 hasKeyword keyword oid gs = Set.member keyword (keywordsOf oid gs)
 ```
 
-- [ ] **Step 8: Sync, build, test**
+- [x] **Step 8: Sync, build, test**
 
 Run: `cabal-gild --mode format --input pawl.cabal --output pawl.cabal`, then `cabal build all --enable-tests --enable-benchmarks`, then `cabal test --test-options='-p "/Keyword/"'` and `cabal test --test-options='-p "/M2aCards/"'`.
 Expected: PASS (9 cases, then 6 cases).
 
 Then `cabal test`. Expected: all pass — nothing consumes keywords yet, so M1b's 137 are untouched.
 
-- [ ] **Step 9: Lint and commit**
+- [x] **Step 9: Lint and commit**
 
 ```bash
 git add -A

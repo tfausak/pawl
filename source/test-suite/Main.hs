@@ -102,7 +102,8 @@ testTree =
       declareTests,
       combatDamageTests,
       keywordTests,
-      m2aCardTests
+      m2aCardTests,
+      defenderTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -310,24 +311,61 @@ combatReplayTests =
             HU.assertEqual "all to one blocker" (Map.singleton oid 2) (Replay.defaultAnswer damagePrompt)
         ]
 
--- alice is active with `a` Settled Pikers; bob defends with `b` Settled Pikers.
--- Returns the attackers' ids and the blockers' ids alongside the state.
-combatBoard :: Int -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
-combatBoard a b =
-  let addN pid n gs =
+-- alice is active with one Settled creature per printing in `mine`; bob defends
+-- with one per printing in `theirs`. Returns their ids alongside the state, in
+-- the order the printings were given.
+combatBoardOf :: [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+combatBoardOf mine theirs =
+  let addAll pid ps gs =
         List.foldl'
-          (\(ids, g) _ -> let (oid, g1) = addPiker pid g in (ids ++ [oid], g1))
+          (\(ids, g) p -> let (oid, g1) = addCreature p pid g in (ids ++ [oid], g1))
           ([], gs)
-          [1 .. n]
-      (mine, gs1) = addN alice a (Setup.emptyGame bothPlayers)
-      (theirs, gs2) = addN bob b gs1
+          ps
+      (ours, gs1) = addAll alice mine (Setup.emptyGame bothPlayers)
+      (yours, gs2) = addAll bob theirs gs1
    in ( gs2
           { GameState.activePlayer = alice,
             GameState.phase = Phase.Combat CombatStep.DeclareAttackers
           },
-        mine,
-        theirs
+        ours,
+        yours
       )
+
+-- alice is active with `a` Settled Pikers; bob defends with `b` Settled Pikers.
+-- Returns the attackers' ids and the blockers' ids alongside the state.
+combatBoard :: Int -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+combatBoard a b = combatBoardOf (replicate a Card.pikerPrinting) (replicate b Card.pikerPrinting)
+
+defenderTests :: Tasty.TestTree
+defenderTests =
+  Tasty.testGroup
+    "Defender"
+    [ HU.testCase "CR 702.3b a creature with defender can't attack" $
+        let (gs, mine, _) = combatBoardOf [Card.ogreSentryPrinting] [Card.pikerPrinting]
+         in case mine of
+              [] -> HU.assertFailure "fixture should have one creature"
+              oid : _ -> HU.assertBool "can't attack" (not (Combat.canAttack alice oid gs)),
+      HU.testCase "CR 702.3b a creature with defender is not offered as a legal attacker" $
+        let (gs, _, _) = combatBoardOf [Card.ogreSentryPrinting] [Card.pikerPrinting]
+         in HU.assertEqual "none" [] (Combat.legalAttackers alice gs),
+      HU.testCase "CR 702.3b defender does not stop it blocking" $
+        -- 702.3b says "can't attack" and nothing else. A defender that could not
+        -- block would be a Wall in the pre-2004 sense, and that is not the rule.
+        let (gs, _, theirs) = combatBoardOf [Card.pikerPrinting] [Card.ogreSentryPrinting]
+         in case theirs of
+              [] -> HU.assertFailure "fixture should have one blocker"
+              oid : _ -> HU.assertBool "may block" (Combat.canBlock bob oid gs),
+      HU.testCase "a creature without defender is still offered" $
+        -- The control. If defender were implemented as "nothing may attack", the
+        -- test above would pass and this one would fail.
+        let (gs, mine, _) = combatBoardOf [Card.pikerPrinting] [Card.pikerPrinting]
+         in HU.assertEqual "one" mine (Combat.legalAttackers alice gs),
+      HU.testCase "CR 702.3b a defender is skipped but its neighbor still attacks" $
+        let (gs, mine, _) = combatBoardOf [Card.ogreSentryPrinting, Card.pikerPrinting] [Card.pikerPrinting]
+         in case mine of
+              [_, piker] -> HU.assertEqual "only the piker" [piker] (Combat.legalAttackers alice gs)
+              _ -> HU.assertFailure "fixture should have two creatures"
+    ]
 
 combatLegalityTests :: Tasty.TestTree
 combatLegalityTests =

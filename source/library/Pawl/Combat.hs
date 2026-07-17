@@ -17,6 +17,7 @@ import qualified Pawl.Type.Combat as Combat
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
@@ -60,6 +61,9 @@ canAttack pid oid gs = case Game.lookupObject oid gs of
       && Object.tapped obj == TapState.Untapped
       && Object.sickness obj == Sickness.Settled
       && isCreatureObject oid gs
+      -- CR 702.3b: a creature with defender can't attack. It may still block --
+      -- 702.3b says nothing about blocking.
+      && not (Game.hasKeyword Keyword.Defender oid gs)
 
 legalAttackers :: PlayerId -> GameState -> [ObjectId]
 legalAttackers pid gs = filter (\oid -> canAttack pid oid gs) (Game.zoneMembers Zone.Battlefield pid gs)
