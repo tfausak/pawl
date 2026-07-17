@@ -59,8 +59,11 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   second damage step) via turn-as-data. The design doc's M2 is split into
   **M2a** / **M2b** / **M2c** (deathtouch + trample); the split, the full 702
   triage, and why protection and banding are punted are in `docs/design.md`.
-  **The M2b spec is not yet written** — the brief is `docs/design.md` §M2b,
-  including its "Pre-spec notes for M2b" (dated 2026-07-17).
+  **The M2b spec and plan are written** —
+  `docs/superpowers/specs/2026-07-17-m2b-first-strike-design.md` and
+  `docs/superpowers/plans/2026-07-17-m2b-first-strike.md` (the spec's brief was
+  `docs/design.md` §M2b and the "Pre-spec notes for M2b", dated 2026-07-17).
+  Execute the plan's five tasks strictly in order.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
