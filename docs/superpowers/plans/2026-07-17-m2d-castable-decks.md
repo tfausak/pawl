@@ -521,7 +521,7 @@ Expected: all properties pass across both matchups; `GreenBlackSetup` passes.
 Run: `rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build} && cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"`
 Expected: `0`
 
-- [ ] **Step 8: Format, lint, commit**
+- [x] **Step 8: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -543,7 +543,7 @@ A deterministic test that actually casts War Mammoth off Forests and Typhoid Rat
 **Interfaces:**
 - Consumes: Task 1's `Card.forestPrinting`, `Card.swampPrinting`; existing `Card.warMammothPrinting`, `Card.typhoidRatsPrinting`, `Cast.castSpell`, `Stack.resolveTop`, `creaturesInPlay`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Main.hs`, add (and register `castabilityTests` in the top-level test list):
 
@@ -615,7 +615,7 @@ castabilityTests =
     ]
 ```
 
-- [ ] **Step 2: DRY — redefine `mountainsInPlay` in terms of `landsInPlay`**
+- [x] **Step 2: DRY — redefine `mountainsInPlay` in terms of `landsInPlay`**
 
 Replace the body of the existing `mountainsInPlay` (lines ~1119-1135) with a one-liner so there is a single land-placement helper:
 
@@ -625,12 +625,12 @@ mountainsInPlay :: Int -> GameState.GameState
 mountainsInPlay = landsInPlay Card.mountainPrinting
 ```
 
-- [ ] **Step 3: Run to verify the new tests pass**
+- [x] **Step 3: Run to verify the new tests pass**
 
 Run: `cabal test 2>&1 | grep -iE "Castability|Cast\b|Stack|FAIL|error"`
 Expected: both `Castability` cases pass; the pre-existing `Cast`/`Stack` groups (which use `mountainsInPlay`) still pass.
 
-- [ ] **Step 4: Clean-build warning check**
+- [x] **Step 4: Clean-build warning check**
 
 Run: `rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build} && cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"`
 Expected: `0`

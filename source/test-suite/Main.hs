@@ -98,6 +98,7 @@ testTree =
       discardTests,
       castTests,
       stackTests,
+      castabilityTests,
       castEngineTests,
       sicknessTests,
       damageTests,
@@ -1134,15 +1135,15 @@ deckTests =
         HU.assertEqual "pikers" 16 (countByName (Text.pack "Goblin Piker") bob setupState)
     ]
 
--- alice controls n untapped Mountains on the battlefield, nothing else.
-mountainsInPlay :: Int -> GameState.GameState
-mountainsInPlay n =
+-- alice controls n untapped basic lands of one printing, nothing else.
+landsInPlay :: Printing.Printing -> Int -> GameState.GameState
+landsInPlay land n =
   let add gs _ =
         let (oid, gs1) = Game.freshObjectId gs
             obj =
               Object.MkObject
                 { Object.owner = alice,
-                  Object.source = Source.OfCard Card.mountainPrinting,
+                  Object.source = Source.OfCard land,
                   Object.zone = Zone.Battlefield,
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
@@ -1153,6 +1154,56 @@ mountainsInPlay n =
                 GameState.battlefield = Set.insert oid (GameState.battlefield gs1)
               }
    in List.foldl' add (Setup.emptyGame bothPlayers) [1 .. n]
+
+-- alice controls n untapped Mountains on the battlefield, nothing else.
+mountainsInPlay :: Int -> GameState.GameState
+mountainsInPlay = landsInPlay Card.mountainPrinting
+
+-- Put one card of a printing into alice's hand in a main phase with priority.
+handOne :: Printing.Printing -> GameState.GameState -> (GameState.GameState, ObjectId.ObjectId)
+handOne printing base =
+  let (oid, gs1) = Game.freshObjectId base
+      obj =
+        Object.MkObject
+          { Object.owner = alice,
+            Object.source = Source.OfCard printing,
+            Object.zone = Zone.Hand,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled
+          }
+   in ( gs1
+          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
+            GameState.hand = Map.insert alice (Seq.singleton oid) (GameState.hand gs1),
+            GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = alice,
+            GameState.priority = Just alice
+          },
+        oid
+      )
+
+-- Cast `creature` off `nLands` copies of `land`, then resolve it.
+resolvedCreature :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+resolvedCreature land creature nLands =
+  let (base, oid) = handOne creature (landsInPlay land nLands)
+      afterCast = snd (Engine.runGamePure identityAnswer base (Cast.castSpell alice oid))
+   in Stack.resolveTop afterCast
+
+castabilityTests :: Tasty.TestTree
+castabilityTests =
+  Tasty.testGroup
+    "Castability"
+    [ HU.testCase "War Mammoth is cast off four Forests and resolves onto the battlefield" $
+        let gs = resolvedCreature Card.forestPrinting Card.warMammothPrinting 4
+         in do
+              HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
+              HU.assertEqual "one creature in play" 1 (creaturesInPlay alice gs),
+      HU.testCase "Typhoid Rats is cast off one Swamp and resolves onto the battlefield" $
+        let gs = resolvedCreature Card.swampPrinting Card.typhoidRatsPrinting 1
+         in do
+              HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
+              HU.assertEqual "one creature in play" 1 (creaturesInPlay alice gs)
+    ]
 
 pikerCost :: ManaCost.ManaCost
 pikerCost = ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
