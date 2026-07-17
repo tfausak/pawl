@@ -103,7 +103,8 @@ testTree =
       combatDamageTests,
       keywordTests,
       m2aCardTests,
-      defenderTests
+      defenderTests,
+      vigilanceTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -365,6 +366,42 @@ defenderTests =
          in case mine of
               [_, piker] -> HU.assertEqual "only the piker" [piker] (Combat.legalAttackers alice gs)
               _ -> HU.assertFailure "fixture should have two creatures"
+    ]
+
+tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
+tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
+
+vigilanceTests :: Tasty.TestTree
+vigilanceTests =
+  Tasty.testGroup
+    "Vigilance"
+    [ HU.testCase "CR 702.20b attacking doesn't tap a creature with vigilance, but does tap its neighbor" $
+        -- Both creatures in ONE declaration, so a blanket "nothing taps" bug
+        -- cannot pass: the Piker must still tap.
+        let (gs, mine, _) = combatBoardOf [Card.windseekerCentaurPrinting, Card.pikerPrinting] [Card.pikerPrinting]
+            after = snd (Engine.runGamePure aggressiveAnswer gs (Combat.declareAttackers alice))
+         in case mine of
+              [centaur, piker] -> do
+                HU.assertEqual "both attacking" 2 (length (declaredAttackers after))
+                HU.assertEqual "the centaur is untapped" (Just TapState.Untapped) (tapStateOf centaur after)
+                HU.assertEqual "the piker is tapped" (Just TapState.Tapped) (tapStateOf piker after)
+              _ -> HU.assertFailure "fixture should have two attackers",
+      HU.testCase "CR 702.20b vigilance still attacks" $
+        -- Vigilance is not a legality question: the creature is declared as an
+        -- attacker exactly as normal. It simply skips CR 508.1f's tap.
+        let (gs, mine, _) = combatBoardOf [Card.windseekerCentaurPrinting] [Card.pikerPrinting]
+            after = snd (Engine.runGamePure aggressiveAnswer gs (Combat.declareAttackers alice))
+         in HU.assertEqual "attacking" mine (declaredAttackers after),
+      HU.testCase "CR 702.20b an untapped vigilant attacker can still be blocked" $
+        -- It is attacking, so it is in the Combat record, tapped or not.
+        let (gs, mine, theirs) = combatBoardOf [Card.windseekerCentaurPrinting] [Card.pikerPrinting]
+            steps = do
+              Combat.declareAttackers alice
+              Combat.declareBlockers
+            after = snd (Engine.runGamePure aggressiveAnswer gs steps)
+         in case mine of
+              [] -> HU.assertFailure "fixture should have an attacker"
+              attacker : _ -> HU.assertEqual "blocked" (Set.fromList theirs) (Combat.blockersOf attacker after)
     ]
 
 combatLegalityTests :: Tasty.TestTree

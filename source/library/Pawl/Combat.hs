@@ -117,7 +117,13 @@ declareAttackers pid = do
         -- that is not legally an attacker.
         let isCandidate oid = List.elem oid candidates
             attacking = filter isCandidate chosen
-            tapIt g oid = g {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects g)}
+            -- CR 508.1f: declaring an attacker taps it -- unless it has vigilance
+            -- (CR 702.20b), which does not change WHETHER it attacks, only what
+            -- attacking does to it.
+            tapIt g oid =
+              if Game.hasKeyword Keyword.Vigilance oid g
+                then g
+                else g {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects g)}
             recorded = Map.fromList (map (\oid -> (oid, AttackTarget.OfPlayer defender)) attacking)
             attach g = g {GameState.combat = (GameState.combat g) {Combat.attackers = recorded}}
         State.modify' (\g -> attach (List.foldl' tapIt g attacking))

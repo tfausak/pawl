@@ -540,7 +540,7 @@ CR 702.3b, in `canAttack`. The unary shape.
 - Consumes: Task 1's `Game.hasKeyword`, `Card.ogreSentryPrinting`, `addCreature`.
 - Produces: test fixture `combatBoardOf :: [Printing] -> [Printing] -> (GameState, [ObjectId], [ObjectId])`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this fixture, and **redefine `combatBoard` in terms of it** so M1b's existing call sites keep working unchanged:
 
@@ -606,12 +606,12 @@ defenderTests =
     ]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "/Defender/"' 2>&1 > /tmp/t.txt; grep -m3 -E "FAIL|error" /tmp/t.txt`
 Expected: FAIL — the Ogre Sentry is offered as a legal attacker.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `source/library/Pawl/Combat.hs`, add the import:
 
@@ -637,14 +637,14 @@ canAttack pid oid gs = case Game.lookupObject oid gs of
       && not (Game.hasKeyword Keyword.Defender oid gs)
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `cabal test --test-options='-p "/Defender/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (5 cases).
 
 Then `cabal test`. Expected: all pass.
 
-- [ ] **Step 5: Lint and commit**
+- [x] **Step 5: Lint and commit**
 
 ```bash
 git add -A
