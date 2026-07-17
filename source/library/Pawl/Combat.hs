@@ -12,6 +12,7 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Sba as Sba
+import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import Pawl.Type.Combat (Combat)
 import qualified Pawl.Type.Combat as Combat
@@ -38,6 +39,16 @@ emptyCombat =
 -- CR 511.3: creatures stop being attacking and blocking at end of combat.
 clearCombat :: GameState -> GameState
 clearCombat gs = gs {GameState.combat = emptyCombat}
+
+-- CR 508.8: if no creatures were declared as attackers, skip the declare
+-- blockers and combat damage steps. Called right after declareAttackers, when
+-- the attacker set is final. "Put onto the battlefield attacking" (508.8) has no
+-- source at M2b; EXPIRES at M4+ with the effects that create attacking creatures.
+skipEmptyCombat :: GameState -> GameState
+skipEmptyCombat gs =
+  if Map.null (Combat.attackers (GameState.combat gs))
+    then gs {GameState.remaining = Turn.dropSkippedCombatSteps (GameState.remaining gs)}
+    else gs
 
 -- CR 506.2. M1b is two-player, so this is "the other one" and choosing whom to
 -- attack is not a choice at all.

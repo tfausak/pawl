@@ -79,6 +79,7 @@ testTree =
       cardTests,
       turnTests,
       turnDataTests,
+      skipTests,
       gameTests,
       actionTests,
       setupTests,
@@ -1738,6 +1739,59 @@ turnDataTests =
               HU.assertEqual "phase" Turn.firstPhase (GameState.phase gs)
               HU.assertEqual "remaining" Turn.laterPhases (GameState.remaining gs)
     ]
+
+skipTests :: Tasty.TestTree
+skipTests =
+  Tasty.testGroup
+    "Skip"
+    [ HU.testCase "CR 508.8 dropSkippedCombatSteps removes declare blockers and combat damage" $
+        let full =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain
+                ]
+            expected = Seq.fromList [Phase.Combat CombatStep.EndOfCombat, Phase.PostcombatMain]
+         in HU.assertEqual "dropped" expected (Turn.dropSkippedCombatSteps full),
+      HU.testCase "CR 508.8 no attacker declared skips to end of combat" $
+        -- Nobody has a creature, so no attackers are declared: the declare
+        -- blockers and combat damage steps must not run at all.
+        let (gs, _, _) = combatBoardOf [] []
+            after = snd (Engine.runGamePure aggressiveAnswer gs Engine.runStep)
+         in HU.assertEqual "jumped past the two dead steps" (Phase.Combat CombatStep.EndOfCombat) (GameState.phase after),
+      HU.testCase "CR 508.8 an attacker keeps the declare blockers step" $
+        -- The control: with an attacker, the step after declare attackers is
+        -- declare blockers, exactly as before. So the skip is not "always skip".
+        let (gs, _, _) = combatBoardOf [Card.pikerPrinting] []
+            after = snd (Engine.runGamePure aggressiveAnswer gs Engine.runStep)
+         in HU.assertEqual "declare blockers still next" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase after),
+      HU.testCase "CR 508.8 an attacker-less combat changes no life total" $
+        -- End to end: run the whole combat region. No attackers means no damage,
+        -- and the turn still leaves combat cleanly.
+        let (gs, _, _) = combatBoardOf [] []
+            after = runCombat aggressiveAnswer gs
+         in do
+              HU.assertEqual "bob untouched" (Just 20) (lifeOf bob after)
+              HU.assertEqual "alice untouched" (Just 20) (lifeOf alice after)
+              HU.assertBool "left combat" (not (inCombatPhase (GameState.phase after)))
+    ]
+
+-- Run whole steps through the engine while the current phase is in the combat
+-- phase, stopping once combat is left or the game ends. Bounded so a bug cannot
+-- loop forever.
+runCombat :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runCombat answer gs0 =
+  let go n g =
+        if n <= (0 :: Int) || Maybe.isJust (GameState.result g) || not (inCombatPhase (GameState.phase g))
+          then g
+          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+   in go 24 gs0
+
+inCombatPhase :: Phase.Phase -> Bool
+inCombatPhase p = case p of
+  Phase.Combat _ -> True
+  _ -> False
 
 dedupe :: (Eq a) => [a] -> [a]
 dedupe xs = case xs of

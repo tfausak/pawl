@@ -134,7 +134,11 @@ runTurnBasedActions phase = do
     Phase.Beginning BeginningStep.DrawStep -> do
       skip <- State.gets skipsDraw
       Monad.unless skip (drawFor active)
-    Phase.Combat CombatStep.DeclareAttackers -> Combat.declareAttackers active
+    Phase.Combat CombatStep.DeclareAttackers -> do
+      Combat.declareAttackers active
+      -- CR 508.8: with the attacker set now final, drop the two combat steps that
+      -- have nothing to do if nobody attacked.
+      State.modify' Combat.skipEmptyCombat
     Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers
     Phase.Combat CombatStep.CombatDamage -> Damage.dealCombatDamage
     -- CR 511.3: creatures stop being attacking and blocking.
