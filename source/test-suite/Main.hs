@@ -115,7 +115,8 @@ testTree =
       hasteTests,
       evasionTests,
       m2cCardTests,
-      damageEventTests
+      damageEventTests,
+      deathtouchTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -1884,6 +1885,28 @@ damageEventTests =
                   [DamageEvent.MkDamageEvent a (Recipient.ToDefender bob) 2]
                   (GameState.damageEvents after)
               _ -> HU.assertFailure "fixture should have an attacker"
+    ]
+
+deathtouchTests :: Tasty.TestTree
+deathtouchTests =
+  Tasty.testGroup
+    "Deathtouch"
+    [ HU.testCase "CR 704.5h a 1/1 deathtoucher destroys a 3/3 it deals 1 to" $
+        -- Typhoid Rats attacks, Ogre Sentry blocks. Rat deals 1 -> Ogre dies by
+        -- 704.5h (toughness 3, not lethal by the numbers); Ogre's 3 kills the Rat.
+        let (gs, _, _) = combatBoardOf [Card.typhoidRatsPrinting] [Card.ogreSentryPrinting]
+            after = Sba.checkStateBasedActions (fightWith aggressiveAnswer gs)
+         in do
+              HU.assertEqual "the Ogre is dead" 0 (creaturesInPlay bob after)
+              HU.assertEqual "the Rat is dead" 0 (creaturesInPlay alice after),
+      HU.testCase "CR 704.5g the control: a 2/1 without deathtouch leaves the 3/3 alive" $
+        let (gs, _, _) = combatBoardOf [Card.pikerPrinting] [Card.ogreSentryPrinting]
+            after = Sba.checkStateBasedActions (fightWith aggressiveAnswer gs)
+         in HU.assertEqual "the Ogre survives" 1 (creaturesInPlay bob after),
+      HU.testCase "the SBA check drains the damage events" $
+        let (gs, _, _) = combatBoardOf [Card.typhoidRatsPrinting] [Card.ogreSentryPrinting]
+            after = Sba.checkStateBasedActions (fightWith aggressiveAnswer gs)
+         in HU.assertEqual "events drained" [] (GameState.damageEvents after)
     ]
 
 -- Run whole steps until the first-strike combat damage step has been dealt

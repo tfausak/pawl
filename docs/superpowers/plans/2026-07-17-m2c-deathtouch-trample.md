@@ -440,7 +440,7 @@ git commit -m "Route combat damage through a change-and-emit helper that records
 - Consumes: `GameState.damageEvents`, `DamageEvent` fields, `Recipient.ToCreature`, `Game.hasKeyword`, `Keyword.Deathtouch`, `Game.toughnessOf` (all exist / from Tasks 1–2).
 - Produces: `Sba.creatureDies` now also destroys 704.5h victims; `Sba.checkStateBasedActions` clears `damageEvents`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Main.hs`, add and append `deathtouchTests` to `testTree`. Uses `combatBoardOf` with the new printings; drives through `fightWith`, then the SBA:
 
@@ -468,12 +468,12 @@ deathtouchTests =
     ]
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "/Deathtouch/"' 2>&1 | tail -20`
 Expected: FAIL — "the Ogre is dead" gets 1 (no 704.5h yet), and "events drained" gets a non-empty list.
 
-- [ ] **Step 3: Add the 704.5h clause and the drain**
+- [x] **Step 3: Add the 704.5h clause and the drain**
 
 In `source/library/Pawl/Sba.hs`, add imports `qualified Pawl.Type.DamageEvent as DamageEvent`, `qualified Pawl.Type.Recipient as Recipient`, `qualified Pawl.Type.Keyword as Keyword`. Add a helper and extend `creatureDies`:
 
@@ -518,12 +518,12 @@ In `checkStateBasedActions`, drain the events in the returned state. Change the 
 
 (Rename the existing final `departed {GameState.result = …}` to thread through `drained` as shown; `dying`/`buried` still read the pre-drain `gs`, so victims are computed before the drain.)
 
-- [ ] **Step 4: Run tests and clean-build**
+- [x] **Step 4: Run tests and clean-build**
 
 Run: `cabal test 2>&1 | tail -20` — Expected: PASS. `Deathtouch` green; the existing 704.5f/g `markDamage` tests still pass (they emit no events, so the drain is a no-op and 704.5h never fires).
 Run the clean-build warning check — Expected: `0`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
