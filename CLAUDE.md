@@ -81,10 +81,11 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   No new rules, zero opcodes. `git-bug 14138aa` is closed). Spec and plan kept as
   reference: `docs/superpowers/specs/2026-07-17-m2d-castable-decks-design.md` and
   `docs/superpowers/plans/2026-07-17-m2d-castable-decks.md`.
-- **Current work is M3** — (M2d landed first: castable black/green decks.) the layer system and the first real ABI test (Magical
+- **Current work is M3** — the layer system and the first real ABI test (Magical
   Hack, Humility/Opalescence, Mindslaver), where a granted/removed keyword makes
   the M2c live-projection reads (deathtouch at SBA time, the trample threshold)
-  and CR 702.2e's last-known-information load-bearing. See `docs/design.md`.
+  and CR 702.2e's last-known-information load-bearing; M2d (castable black/green
+  decks) landed first. See `docs/design.md`.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is

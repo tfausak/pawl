@@ -1197,12 +1197,14 @@ castabilityTests =
         let gs = resolvedCreature Card.forestPrinting Card.warMammothPrinting 4
          in do
               HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
-              HU.assertEqual "one creature in play" 1 (creaturesInPlay alice gs),
+              HU.assertEqual "one creature in play" 1 (creaturesInPlay alice gs)
+              HU.assertEqual "lands tapped" 4 (tappedCount alice gs),
       HU.testCase "Typhoid Rats is cast off one Swamp and resolves onto the battlefield" $
         let gs = resolvedCreature Card.swampPrinting Card.typhoidRatsPrinting 1
          in do
               HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
               HU.assertEqual "one creature in play" 1 (creaturesInPlay alice gs)
+              HU.assertEqual "lands tapped" 1 (tappedCount alice gs)
     ]
 
 pikerCost :: ManaCost.ManaCost
@@ -1588,18 +1590,28 @@ propertyTests =
     "Properties"
     [ QC.testProperty "conservation: 120 objects at end" $ \s ->
         QC.conjoin (map (\m -> Game.objectCount (runRandomGame m s) QC.=== 120) matchups),
+      -- The property that matters most now. Combat is the first thing that can
+      -- end a game before the library runs out.
       QC.testProperty "every game terminates with a result" $ \s ->
         QC.conjoin (map (\m -> QC.property (Maybe.isJust (GameState.result (runRandomGame m s)))) matchups),
       QC.testProperty "at least 120 ids were minted" $ \s ->
         QC.conjoin (map (\m -> QC.property (nextIdOf (runRandomGame m s) >= 120)) matchups),
       QC.testProperty "no mana floats at the end" $ \s ->
         QC.conjoin (map (\m -> GameState.manaPool (runRandomGame m s) QC.=== Map.empty) matchups),
+      -- Replaces M0's "no life changes". Nothing here GAINS life, so any
+      -- increase is a bug. Dies at lifelink (still unscheduled -- see the
+      -- design doc's punchlist), the same way this property's ancestor
+      -- announced M1b.
       QC.testProperty "life never increases" $ \s ->
         QC.conjoin
           ( map
               (\m -> QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players (runRandomGame m s)))))
               matchups
           ),
+      -- The M1b exit criterion, asserted rather than assumed: across 100 seeds,
+      -- at least one red-red game must see damage actually change someone's
+      -- life total. Without this, every combat path could silently no-op and
+      -- the suite would still be green.
       QC.testProperty "combat happens: some seed changes a life total" $
         QC.once $
           QC.property $
