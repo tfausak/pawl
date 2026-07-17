@@ -107,6 +107,7 @@ testTree =
       m2aCardTests,
       m2bCardTests,
       firstStrikeTests,
+      m2bExitTests,
       defenderTests,
       vigilanceTests,
       hasteTests,
@@ -1917,6 +1918,21 @@ firstStrikeTests =
 -- The state out of a combatBoardOf triple.
 frst :: (a, b, c) -> a
 frst (a, _, _) = a
+
+m2bExitTests :: Tasty.TestTree
+m2bExitTests =
+  Tasty.testGroup
+    "M2bExit"
+    [ HU.testCase "the milestone: first strike breaks the trade, double strike doubles the hit, no attacker no damage" $
+        let trade = runCombat aggressiveAnswer (frst (combatBoardOf [Card.sabretoothTigerPrinting] [Card.pikerPrinting]))
+            doubled = runCombat aggressiveAnswer (frst (combatBoardOf [Card.ridgetopRaptorPrinting] []))
+            quiet = runCombat aggressiveAnswer (frst (combatBoardOf [] []))
+         in do
+              HU.assertEqual "first striker lives" 1 (creaturesInPlay alice trade)
+              HU.assertEqual "its would-be killer is dead" 0 (creaturesInPlay bob trade)
+              HU.assertEqual "double striker deals 4" (Just 16) (lifeOf bob doubled)
+              HU.assertEqual "an attacker-less turn deals nothing" (Just 20) (lifeOf bob quiet)
+    ]
 
 dedupe :: (Eq a) => [a] -> [a]
 dedupe xs = case xs of

@@ -86,7 +86,7 @@ Every task's requirements implicitly include all of these:
   - `Engine.advance :: Game ()` (was `Phase -> Game ()`)
   - `Turn.next` is **deleted**
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Main.hs`, **replace** the `turnTests` group and **delete** the `turnSequence` helper (the two `where`-bound lines under it); keep `dedupe`:
 
@@ -151,12 +151,12 @@ turnDataTests =
     ]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 > /tmp/t.txt; grep -m3 -E "error|not in scope" /tmp/t.txt`
 Expected: FAIL — `GameState.remaining` and `Turn.laterPhases` not in scope.
 
-- [ ] **Step 3: Add the field to `GameState`**
+- [x] **Step 3: Add the field to `GameState`**
 
 In `source/library/Pawl/Type/GameState.hs`, add the field immediately after `phase :: Phase,`:
 
@@ -171,7 +171,7 @@ In `source/library/Pawl/Type/GameState.hs`, add the field immediately after `pha
 
 `Seq` and `Phase` are already imported by this module.
 
-- [ ] **Step 4: Rework `Pawl.Turn`**
+- [x] **Step 4: Rework `Pawl.Turn`**
 
 `source/library/Pawl/Turn.hs` — add the two imports, delete `next`, add `laterPhases`:
 
@@ -193,7 +193,7 @@ laterPhases = Seq.fromList (drop 1 allPhases)
 
 Leave `allPhases`, `firstPhase`, `grantsPriority` and `isMainPhase` as they are.
 
-- [ ] **Step 5: Rework `advance` and `handoffTurn`**
+- [x] **Step 5: Rework `advance` and `handoffTurn`**
 
 In `source/library/Pawl/Engine.hs`, add the import (keep the block sorted):
 
@@ -230,7 +230,7 @@ In `runStep`, change the final `advance phase` to `advance` (it no longer takes 
     Monad.unless stillFinished advance
 ```
 
-- [ ] **Step 6: Set `remaining` in `Setup.emptyGame`**
+- [x] **Step 6: Set `remaining` in `Setup.emptyGame`**
 
 In `source/library/Pawl/Setup.hs`, add the field immediately after `GameState.phase = Turn.firstPhase,`:
 
@@ -239,7 +239,7 @@ In `source/library/Pawl/Setup.hs`, add the field immediately after `GameState.ph
           GameState.remaining = Turn.laterPhases,
 ```
 
-- [ ] **Step 7: Set `remaining` on the combat fixture**
+- [x] **Step 7: Set `remaining` on the combat fixture**
 
 In `source/test-suite/Main.hs`, in `combatBoardOf`, add `remaining` to the record update that already sets `activePlayer` and `phase`:
 
@@ -264,14 +264,14 @@ In `source/test-suite/Main.hs`, in `combatBoardOf`, add `remaining` to the recor
       )
 ```
 
-- [ ] **Step 8: Build and test**
+- [x] **Step 8: Build and test**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`, then `cabal test --test-options='-p "/TurnData/"'` and `cabal test --test-options='-p "/Turn/"'`.
 Expected: PASS (3 cases, then 5 cases).
 
 Then `cabal test`. Expected: **all pass** — this is a pure refactor. Phases run in the same order, so the property games, the replay, and every combat test are untouched. If any existing test other than `turnTests` needs editing, the refactor is wrong — stop and reread Step 5.
 
-- [ ] **Step 9: Lint and commit**
+- [x] **Step 9: Lint and commit**
 
 ```bash
 git add -A
@@ -296,7 +296,7 @@ git commit -m "Make the turn data: a schedule the engine pops"
   - `Turn.dropSkippedCombatSteps :: Seq Phase -> Seq Phase`
   - `Combat.skipEmptyCombat :: GameState -> GameState`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this group, and add `skipTests` to `testTree`:
 
@@ -355,12 +355,12 @@ inCombatPhase p = case p of
   _ -> False
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "/Skip/"' 2>&1 > /tmp/t.txt; grep -m3 -E "error|not in scope" /tmp/t.txt`
 Expected: FAIL — `Turn.dropSkippedCombatSteps` not in scope.
 
-- [ ] **Step 3: Add the drop to `Pawl.Turn`**
+- [x] **Step 3: Add the drop to `Pawl.Turn`**
 
 In `source/library/Pawl/Turn.hs`, append:
 
@@ -379,7 +379,7 @@ dropSkippedCombatSteps =
    in Seq.filter (\p -> not (skipped p))
 ```
 
-- [ ] **Step 4: Add `skipEmptyCombat` to `Pawl.Combat`**
+- [x] **Step 4: Add `skipEmptyCombat` to `Pawl.Combat`**
 
 In `source/library/Pawl/Combat.hs`, add the import (keep the block sorted):
 
@@ -401,7 +401,7 @@ skipEmptyCombat gs =
     else gs
 ```
 
-- [ ] **Step 5: Wire it into the declare attackers step**
+- [x] **Step 5: Wire it into the declare attackers step**
 
 In `source/library/Pawl/Engine.hs`, in `runTurnBasedActions`, replace the declare attackers case:
 
@@ -413,14 +413,14 @@ In `source/library/Pawl/Engine.hs`, in `runTurnBasedActions`, replace the declar
       State.modify' Combat.skipEmptyCombat
 ```
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `cabal test --test-options='-p "/Skip/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (4 cases).
 
 Then `cabal test`. Expected: all pass — nothing else declares an attacker-less combat and then inspects the schedule.
 
-- [ ] **Step 7: Lint, commit, close the bug**
+- [x] **Step 7: Lint, commit, close the bug**
 
 ```bash
 git add -A
@@ -451,7 +451,7 @@ Both cards are **verified against Scryfall** (`api.scryfall.com/cards/named?exac
 | Sabretooth Tiger | `{2}{R}` | 2/1 | Creature — Cat | First strike |
 | Ridgetop Raptor | `{3}{R}` | 2/1 | Creature — Dinosaur Beast | Double strike |
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this group, and add `m2bCardTests` to `testTree`:
 
@@ -495,12 +495,12 @@ m2bCardTests =
         ]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 > /tmp/t.txt; grep -m3 -E "error|not in scope" /tmp/t.txt`
 Expected: FAIL — `Card.sabretoothTigerPrinting` not in scope.
 
-- [ ] **Step 3: Add the keywords**
+- [x] **Step 3: Add the keywords**
 
 `source/library/Pawl/Type/Keyword.hs` — insert `DoubleStrike` and `FirstStrike` in CR-number order and update the header comment's count line:
 
@@ -518,7 +518,7 @@ data Keyword
 
 In the block comment above the type, change the "Five, because five have consumers -- M2b inserts FirstStrike (702.7) and DoubleStrike (702.4); …" sentence to read: "Seven, because seven have consumers -- M2b added FirstStrike (702.7) and DoubleStrike (702.4); M2c inserts Deathtouch (702.2) and Trample (702.19)."
 
-- [ ] **Step 4: Add the subtypes**
+- [x] **Step 4: Add the subtypes**
 
 `source/library/Pawl/Type/Subtype.hs` — append `Cat`, `Dinosaur`, `Beast`:
 
@@ -537,7 +537,7 @@ data Subtype
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 5: Add the printings**
+- [x] **Step 5: Add the printings**
 
 Append to `source/library/Pawl/Card.hs`:
 
@@ -600,14 +600,14 @@ ridgetopRaptorPrinting =
     }
 ```
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `cabal test --test-options='-p "/M2bCards/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (5 cases).
 
 Then `cabal test`. Expected: all pass — nothing consumes the keywords yet.
 
-- [ ] **Step 7: Lint and commit**
+- [x] **Step 7: Lint and commit**
 
 ```bash
 git add -A
@@ -633,7 +633,7 @@ CR 510.4. `Combat.struckFirst` snapshot, the wave predicates, the splice, the "s
   - `Damage.dealCombatDamage :: Game Bool` (was `Game ()`)
   - `Turn.spliceSecondDamage :: Seq Phase -> Seq Phase`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this group and the `runToFirstStrikeDone` helper, and add `firstStrikeTests` to `testTree`:
 
@@ -723,12 +723,12 @@ frst :: (a, b, c) -> a
 frst (a, _, _) = a
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "/FirstStrike/"' 2>&1 > /tmp/t.txt; grep -m3 -E "error|not in scope|FAIL" /tmp/t.txt`
 Expected: FAIL — `Combat.Type.struckFirst` not in scope.
 
-- [ ] **Step 3: Add `struckFirst` to the `Combat` type**
+- [x] **Step 3: Add `struckFirst` to the `Combat` type**
 
 In `source/library/Pawl/Type/Combat.hs`, add the field after `blockers`:
 
@@ -750,7 +750,7 @@ In `source/library/Pawl/Type/Combat.hs`, add the field after `blockers`:
 
 `Maybe` and `Set` are already available to this module (`Set` is imported; `Maybe` is in the Prelude).
 
-- [ ] **Step 4: Reset `struckFirst` in `emptyCombat`**
+- [x] **Step 4: Reset `struckFirst` in `emptyCombat`**
 
 In `source/library/Pawl/Combat.hs`, add the field to `emptyCombat`:
 
@@ -764,7 +764,7 @@ emptyCombat =
     }
 ```
 
-- [ ] **Step 5: Add the splice to `Pawl.Turn`**
+- [x] **Step 5: Add the splice to `Pawl.Turn`**
 
 In `source/library/Pawl/Turn.hs`, append:
 
@@ -776,7 +776,7 @@ spliceSecondDamage :: Seq Phase -> Seq Phase
 spliceSecondDamage remaining = Phase.Combat CombatStep.CombatDamage Seq.<| remaining
 ```
 
-- [ ] **Step 6: Rewrite the combat damage step in `Pawl.Damage`**
+- [x] **Step 6: Rewrite the combat damage step in `Pawl.Damage`**
 
 In `source/library/Pawl/Damage.hs`, add the import (keep the block sorted):
 
@@ -852,7 +852,7 @@ dealWave assigns = do
   State.modify' (applyCombatDamage assignment)
 ```
 
-- [ ] **Step 7: Splice the second step in the engine**
+- [x] **Step 7: Splice the second step in the engine**
 
 In `source/library/Pawl/Engine.hs`, in `runTurnBasedActions`, replace the combat damage case:
 
@@ -866,7 +866,7 @@ In `source/library/Pawl/Engine.hs`, in `runTurnBasedActions`, replace the combat
         State.modify' (\gs -> gs {GameState.remaining = Turn.spliceSecondDamage (GameState.remaining gs)})
 ```
 
-- [ ] **Step 8: Run to verify it passes**
+- [x] **Step 8: Run to verify it passes**
 
 Run: `cabal test --test-options='-p "/FirstStrike/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (8 cases).
@@ -875,7 +875,7 @@ If "the mixed board" fails at `Just 14` rather than `Just 12`, the second wave i
 
 Then `cabal test`. Expected: all pass — M1b/M2a combat tests use Pikers and keyword cards with no strikers, so `dealCombatDamage` takes the single-wave `Nothing`/`null strikers` branch and behaves exactly as before. The `Game ()` → `Game Bool` change is absorbed by `fightWith`, which discards the block's result.
 
-- [ ] **Step 9: Lint and commit**
+- [x] **Step 9: Lint and commit**
 
 ```bash
 git add -A
@@ -898,14 +898,14 @@ No new library code. Confirm the milestone: every property survives, the suite i
 - Consumes: everything above.
 - Produces: no new library interfaces.
 
-- [ ] **Step 1: Run the properties**
+- [x] **Step 1: Run the properties**
 
 Run: `cabal test --test-options='-p "/Properties/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (6 properties). **M2b retires no property.** The deck is unchanged, so conservation still asserts 120; the turn-structure change is additive.
 
 If "conservation: 120 objects at end" fails, something touched the deck — M2b must not. If "every game terminates" hangs, suspect an unbounded splice: the splice must fire only in the `Nothing`/striker branch of `dealCombatDamage`, and the `Just snapshot` branch must never return `True`.
 
-- [ ] **Step 2: Add the exit-criterion assertion**
+- [x] **Step 2: Add the exit-criterion assertion**
 
 Add this group, and add `m2bExitTests` to `testTree`. It states the milestone's headline in one deterministic case: a first striker that would trade as a vanilla instead lives, and a turn with no attacker changes nothing.
 
@@ -926,14 +926,14 @@ m2bExitTests =
     ]
 ```
 
-- [ ] **Step 3: Run the exit test and the full suite**
+- [x] **Step 3: Run the exit test and the full suite**
 
 Run: `cabal test --test-options='-p "/M2bExit/"' 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`
 Expected: PASS (1 case).
 
 Then `cabal test 2>&1 > /tmp/t.txt; grep -E "^All|FAIL" /tmp/t.txt`. Expected: all pass.
 
-- [ ] **Step 4: Confirm replay is untouched**
+- [x] **Step 4: Confirm replay is untouched**
 
 The `Prompt` type did not change in M2b, so the transcript and replay are unaffected — confirm it:
 
@@ -944,7 +944,7 @@ cabal test --test-options='-p "/CombatReplay/"'
 
 Expected: PASS. If either fails, something added or changed a prompt — M2b must not.
 
-- [ ] **Step 5: Full warning-clean build and benchmark**
+- [x] **Step 5: Full warning-clean build and benchmark**
 
 ```bash
 rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build}
@@ -955,7 +955,7 @@ Expected: `0`.
 
 Then `cabal bench`. Expected: PASS — the benchmark reports `goldfish 2p`, `casting 2p` and `fighting 2p`; nothing in M2b changes its shape.
 
-- [ ] **Step 6: Commit and close the milestone**
+- [x] **Step 6: Commit and close the milestone**
 
 ```bash
 git add -A
