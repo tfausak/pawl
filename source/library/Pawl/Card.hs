@@ -274,6 +274,59 @@ ridgetopRaptorPrinting =
           }
     }
 
+-- Typhoid Rats: {B}, Creature - Rat, 1/1, Deathtouch (CR 702.2).
+-- Black, not red: mono-red deathtouch does not exist (Scryfall keyword:deathtouch
+-- c=r is empty). Never cast, only placed in combat fixtures, so color is cosmetic.
+-- A 1/1 on purpose: one power isolates deathtouch, since 1 damage is lethal to a
+-- 3/3 ONLY because of 702.2. See the M2c spec, section 6.
+typhoidRatsPrinting :: Printing.Printing
+typhoidRatsPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Typhoid Rats",
+            Card.manaCost =
+              Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Black)]),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Creature,
+                  TypeLine.subtypes = Set.singleton Subtype.Rat
+                },
+            Card.power = Just (Power.MkPower (Quantity.Literal 1)),
+            Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
+            Card.keywords = Set.singleton Keyword.Deathtouch
+          }
+    }
+
+-- War Mammoth: {3}{G}, Creature - Elephant, 3/3, Trample (CR 702.19).
+-- Green: clean vanilla-plus-trample lives in green. A 3/3 tramples cleanly over a
+-- 2/1 (assign 1, spill 2) and survives a 2/1 blocker, so the overflow is visible.
+warMammothPrinting :: Printing.Printing
+warMammothPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "War Mammoth",
+            Card.manaCost =
+              Just
+                ( ManaCost.MkManaCost
+                    [ ManaSymbol.Generic 3,
+                      ManaSymbol.OfType (ManaType.Colored Color.Green)
+                    ]
+                ),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Creature,
+                  TypeLine.subtypes = Set.singleton Subtype.Elephant
+                },
+            Card.power = Just (Power.MkPower (Quantity.Literal 3)),
+            Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 3)),
+            Card.keywords = Set.singleton Keyword.Trample
+          }
+    }
+
 isLand :: Card.Card -> Bool
 isLand c = Set.member CardType.Land (TypeLine.types (Card.typeLine c))
 

@@ -11,7 +11,7 @@ module Pawl.Type.Keyword where
 -- "fixing" this into a classification.
 --
 -- Constructors are ordered by RULE NUMBER, not by arrival, so this type stays
--- diffable against rule 702 itself. Seven, because seven have consumers -- M2b
+-- diffable against rule 702 itself. Nine, because nine have consumers -- M2b
 -- added FirstStrike (702.7) and DoubleStrike (702.4); M2c inserts Deathtouch
 -- (702.2) and Trample (702.19).
 --
@@ -19,11 +19,13 @@ module Pawl.Type.Keyword where
 -- and later Protection Quality (702.16) and Ward Cost (702.21). A `data`, not an
 -- enum, so that is an addition rather than a reshape.
 data Keyword
-  = Defender -- 702.3
+  = Deathtouch -- 702.2
+  | Defender -- 702.3
   | DoubleStrike -- 702.4
   | FirstStrike -- 702.7
   | Flying -- 702.9
   | Haste -- 702.10
   | Reach -- 702.17
+  | Trample -- 702.19
   | Vigilance -- 702.20
   deriving (Eq, Ord, Show)

@@ -111,7 +111,8 @@ testTree =
       defenderTests,
       vigilanceTests,
       hasteTests,
-      evasionTests
+      evasionTests,
+      m2cCardTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -1834,6 +1835,24 @@ m2bCardTests =
                   HU.assertEqual "tiger body" (bodyOf Card.pikerPrinting) (bodyOf Card.sabretoothTigerPrinting)
                   HU.assertEqual "raptor body" (bodyOf Card.pikerPrinting) (bodyOf Card.ridgetopRaptorPrinting)
         ]
+
+m2cCardTests :: Tasty.TestTree
+m2cCardTests =
+  Tasty.testGroup
+    "M2cCards"
+    [ HU.testCase "Typhoid Rats is a {B} 1/1 Rat with deathtouch" $ do
+        let c = Printing.card Card.typhoidRatsPrinting
+        HU.assertEqual "name" (Text.pack "Typhoid Rats") (Card.Type.name c)
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power c)
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
+        HU.assertEqual "keywords" (Set.singleton Keyword.Deathtouch) (Card.Type.keywords c),
+      HU.testCase "War Mammoth is a {3}{G} 3/3 Elephant with trample" $ do
+        let c = Printing.card Card.warMammothPrinting
+        HU.assertEqual "name" (Text.pack "War Mammoth") (Card.Type.name c)
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 3))) (Card.Type.power c)
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness c)
+        HU.assertEqual "keywords" (Set.singleton Keyword.Trample) (Card.Type.keywords c)
+    ]
 
 -- Run whole steps until the first-strike combat damage step has been dealt
 -- (struckFirst is set) or combat ends, so a test can observe the board BETWEEN

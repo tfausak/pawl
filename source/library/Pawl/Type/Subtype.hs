@@ -12,4 +12,6 @@ data Subtype
   | Cat
   | Dinosaur
   | Beast
+  | Rat
+  | Elephant
   deriving (Eq, Ord, Show)
