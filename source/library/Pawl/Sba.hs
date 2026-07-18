@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Departure as Departure
 import Pawl.Type.GameState (GameState)
@@ -14,6 +15,7 @@ import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Status as Status
@@ -57,10 +59,13 @@ woundedByDeathtouch gs oid =
 -- today, so toughnessOf already implies it -- but a Vehicle (CR 301.7) has P/T
 -- while not being a creature, and 704.5f/g must not touch it. Ask the
 -- classification, never the identity.
-creatureDies :: GameState -> ObjectId -> Bool
-creatureDies gs oid =
-  let isCreature = Projection.isCreatureOf oid gs
-   in isCreature && case Projection.toughnessOf oid gs of
+-- Takes the object's already-projected characteristics (checkStateBasedActions
+-- projects the whole board once, per CR 704.4 simultaneity, rather than
+-- re-projecting per object).
+creatureDies :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool
+creatureDies gs pc oid =
+  let isCreature = Set.member CardType.Creature (PC.cardTypes pc)
+   in isCreature && case PC.toughness pc of
         -- An unevaluable toughness means NO state-based action, not a crash.
         -- Unreachable in M1b (every toughness is a Literal); reachable at M3.
         Nothing -> False
@@ -82,8 +87,13 @@ creatureDies gs oid =
 checkStateBasedActions :: GameState -> GameState
 checkStateBasedActions gs =
   let -- CR 704.5f/g are checked against the state BEFORE any of them apply: SBAs
-      -- are simultaneous.
-      dying = filter (creatureDies gs) (Set.toList (GameState.battlefield gs))
+      -- are simultaneous. Project the whole board once (one gather) and judge each
+      -- object against it, rather than re-projecting per object.
+      pcs = Projection.projectAll gs
+      dies oid = case Map.lookup oid pcs of
+        Nothing -> False
+        Just pc -> creatureDies gs pc oid
+      dying = filter dies (Set.toList (GameState.battlefield gs))
       bury g oid = Game.changeZone oid Zone.Graveyard g
       buried = List.foldl' bury gs dying
       leaving = filter (losesNow buried) (stillPlaying buried)

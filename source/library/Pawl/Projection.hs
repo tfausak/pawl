@@ -1,6 +1,8 @@
 module Pawl.Projection where
 
 import qualified Data.List as List
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
@@ -248,9 +250,14 @@ gather gs =
 -- within-layer reorder; the topological CR 613.8b applies-to reorder is deferred
 -- (spec §6, git-bug). design.md §2.5.
 project :: ObjectId -> GameState -> ProjectedCharacteristics
-project oid gs =
-  let cands = gather gs
-      layers = Set.toAscList (Set.fromList (map gLayer cands))
+project oid gs = projectFrom (gather gs) oid gs
+
+-- Project one object against a PRECOMPUTED candidate list. gather is
+-- oid-independent, so a whole-board sweep gathers once and folds each object
+-- (projectAll) instead of re-gathering per object.
+projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
+projectFrom cands oid gs =
+  let layers = Set.toAscList (Set.fromList (map gLayer cands))
       applyLayer partial lyr =
         let here = filter (\c -> gLayer c == lyr && affects (gSource c) oid (gAffected c) partial gs) cands
             -- CR 613.7 timestamp order within a layer. EXPIRES: CR 613.8b dependency
@@ -261,6 +268,14 @@ project oid gs =
             step pc c = applyModification gs oid (gModification c) pc
          in List.foldl' step partial ordered
    in List.foldl' applyLayer (baseCharacteristics oid gs) layers
+
+-- Project every battlefield object against ONE gather: O(gather + P*fold) instead
+-- of the O(P*(gather+fold)) of calling project per object. The hot path for SBA
+-- sweeps and combat, which query many objects against the same state.
+projectAll :: GameState -> Map ObjectId ProjectedCharacteristics
+projectAll gs =
+  let cands = gather gs
+   in Map.fromSet (\oid -> projectFrom cands oid gs) (GameState.battlefield gs)
 
 powerOf :: ObjectId -> GameState -> Maybe Integer
 powerOf oid gs = PC.power (project oid gs)
