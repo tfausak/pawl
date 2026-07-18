@@ -6,4 +6,8 @@ module Pawl.Type.TargetSpec where
 -- and battles grow this).
 data TargetSpec
   = AnyTarget
+  | -- CR 115.4: "target creature" -- a creature on the battlefield, no players.
+    -- The first spec whose legal set can be EMPTY, which falsifies M3a's
+    -- CR 601.2c targeting gate (Giant Growth with no creature is uncastable).
+    CreatureTarget
   deriving (Eq, Ord, Show)

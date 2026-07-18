@@ -21,13 +21,17 @@ import qualified Pawl.Type.Zone as Zone
 -- hexproof, shroud) exists in the pool -- this function is where they will
 -- all land.
 legalRecipients :: TargetSpec -> GameState -> Set Recipient
-legalRecipients spec gs = case spec of
-  TargetSpec.AnyTarget ->
-    let isCreatureId oid = fmap Card.isCreature (Game.cardOf oid gs) == Just True
-        creaturesOf pid = filter isCreatureId (Game.zoneMembers Zone.Battlefield pid gs)
-        creatures = map Recipient.ToCreature (concatMap creaturesOf (Sba.stillPlaying gs))
-        players = map Recipient.ToPlayer (Sba.stillPlaying gs)
-     in Set.fromList (creatures ++ players)
+legalRecipients spec gs =
+  let isCreatureId oid = fmap Card.isCreature (Game.cardOf oid gs) == Just True
+      creatures =
+        map Recipient.ToCreature $
+          concatMap
+            (filter isCreatureId . (\pid -> Game.zoneMembers Zone.Battlefield pid gs))
+            (Sba.stillPlaying gs)
+      players = map Recipient.ToPlayer (Sba.stillPlaying gs)
+   in case spec of
+        TargetSpec.AnyTarget -> Set.fromList (creatures ++ players)
+        TargetSpec.CreatureTarget -> Set.fromList creatures
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is

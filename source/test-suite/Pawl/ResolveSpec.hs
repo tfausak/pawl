@@ -63,7 +63,23 @@ targetTests =
          in HU.assertEqual
               "one slot, two players"
               (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]))
-              (Target.legalSets specs gs)
+              (Target.legalSets specs gs),
+      HU.testCase "CR 115.4 CreatureTarget offers creatures but no players" $
+        let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
+         in HU.assertEqual
+              "just the creature"
+              (Set.singleton (Recipient.ToCreature oid))
+              (Target.legalRecipients TargetSpec.CreatureTarget gs),
+      HU.testCase "CR 601.2c CreatureTarget has an empty legal set with no creatures" $
+        HU.assertBool
+          "nothing to target"
+          (Set.null (Target.legalRecipients TargetSpec.CreatureTarget (Setup.emptyGame S.bothPlayers))),
+      HU.testCase "CR 608.2b a creature that left is no longer a legal CreatureTarget" $
+        let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
+            gone = Game.changeZone oid Zone.Graveyard gs
+         in do
+              HU.assertBool "legal while fielded" (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gs)
+              HU.assertBool "illegal once moved" (not (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gone))
     ]
 
 resolveTests :: Tasty.TestTree
