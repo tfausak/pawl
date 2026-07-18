@@ -111,7 +111,7 @@ gameTests =
                 moved = Game.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
                 landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
              in HU.assertEqual "reset" [Map.empty] (map Object.targets landed),
-          HU.testCase "CR 613.7b changeZone stamps the new incarnation with a fresh timestamp" $
+          HU.testCase "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $
             let (oid, gs) = S.addPiker S.bob (S.mountainsInPlay 1)
                 before = GameState.nextTimestamp gs
                 movedState = Game.changeZone oid Zone.Graveyard gs

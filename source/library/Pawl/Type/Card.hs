@@ -28,9 +28,9 @@ data Card = MkCard
     -- The closed half must read this through Pawl.Game.keywordsOf, never
     -- directly: layer 6 grants and removes abilities at M3.
     keywords :: Set Keyword,
-    -- CR 604.3: this card's static continuous abilities (Humility). Empty for
-    -- everything but the few printings that generate a continuous effect just by
-    -- being on the battlefield. The projection gathers these live.
+    -- CR 604.1/604.2: this card's static continuous abilities (Humility). Empty
+    -- for everything but the few printings that generate a continuous effect just
+    -- by being on the battlefield. The projection gathers these live.
     staticAbilities :: [StaticAbility],
     -- The card's rules text as data. Ordered: CR 608.2c resolves instructions
     -- in the order written.

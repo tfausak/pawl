@@ -29,9 +29,10 @@ data Object = MkObject
     -- everything but a spell on the stack. Per-incarnation state: reset by
     -- changeZone, so CR 400.7 forgets them when the spell moves.
     targets :: Map SlotName Recipient,
-    -- CR 613.7b: when this object was created (its "entered" time). A static
-    -- ability's timestamp is this; stamped fresh on every zone change (CR 400.7
-    -- makes each a new object). Read by the projection when ordering layer 6/7.
+    -- CR 613.7d: when this object entered its current zone. A static ability's
+    -- continuous effect shares this timestamp (CR 613.7a); stamped fresh on every
+    -- zone change (CR 400.7 makes each a new object). Read by the projection when
+    -- ordering layer 6/7.
     timestamp :: Timestamp
   }
   deriving (Eq, Ord, Show)
