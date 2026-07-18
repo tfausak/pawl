@@ -718,7 +718,7 @@ git commit -m "Add Blood Moon, Urborg, and Opalescence printings (Scryfall-verif
 - Consumes: `gather`/`project`/`affects` (Task 4), the cards (Task 5).
 - Produces: `staticAbilitiesLive :: ObjectId -> GameState -> Bool`; `gather` drops a permanent's static abilities when it is not `staticAbilitiesLive`. Blood Moon + Urborg then resolves order-independently.
 
-- [ ] **Step 1: Write the failing tests (the Phase-2 existence test set)**
+- [x] **Step 1: Write the failing tests (the Phase-2 existence test set)**
 
 Add helpers and the dependency tests to `source/test-suite/Pawl/ProjectionSpec.hs` (new imports `qualified Pawl.Mana as Mana` for the mana observable in Task 7; here assert via `subtypesOf`). A fixture placing Blood Moon, Urborg, and a Forest in a controllable order:
 
@@ -756,12 +756,12 @@ bloodMoonUrborg urborgFirst =
          in HU.assertEqual "Forest stays a Forest, order-independent" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs),
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "613.8"'`
 Expected: FAIL — without source-liveness, `gather` still includes Urborg's `AddLandSubtype Swamp`, so the Forest projects `{Forest, Swamp}` and Urborg projects `{Mountain, Swamp}` (or timestamp-dependent), not the correct `{Forest}` / `{Mountain}`.
 
-- [ ] **Step 3: Implement source-liveness**
+- [x] **Step 3: Implement source-liveness**
 
 In `source/library/Pawl/Projection.hs`, add `affectsBase`, `setLandSubtypeEffects`, and `staticAbilitiesLive`, and gate `gather`'s static branch:
 
@@ -826,12 +826,12 @@ Gate the static branch of `gather` (replace `fromPermanent`):
               else []
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — all four CR 613.8 tests green, both orders, and every prior test still green. **This is the go/no-go: a genuine YES on the existence dependency Argentum could not represent.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

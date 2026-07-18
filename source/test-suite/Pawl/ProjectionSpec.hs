@@ -12,6 +12,7 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
+import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
@@ -85,6 +86,26 @@ humilityTimestamp gs =
    in case Maybe.mapMaybe stampOf hums of
         t : _ -> t
         [] -> Timestamp.MkTimestamp 0
+
+-- Blood Moon, Urborg, and a Forest on the battlefield. `urborgFirst` controls
+-- the timestamp order (fresh timestamps ascend with placement), to prove the
+-- outcome is order-INDEPENDENT (CR 613.8 dependency overrides CR 613.7).
+bloodMoonUrborg :: Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+bloodMoonUrborg urborgFirst =
+  let base = Setup.emptyGame S.bothPlayers
+      (forestId, g1) = S.addCreature Card.forestPrinting S.alice base
+      place g =
+        if urborgFirst
+          then
+            let (u, g') = S.addCreature Card.urborgPrinting S.alice g
+                (_, g'') = S.addCreature Card.bloodMoonPrinting S.alice g'
+             in (u, g'')
+          else
+            let (_, g') = S.addCreature Card.bloodMoonPrinting S.alice g
+                (u, g'') = S.addCreature Card.urborgPrinting S.alice g'
+             in (u, g'')
+      (urborgId, gs) = place g1
+   in (forestId, urborgId, gs)
 
 tests :: Tasty.TestTree
 tests =
@@ -267,5 +288,17 @@ tests =
             -- is evaluated after layer 4.
             gs1 = withEffect landId (Timestamp.MkTimestamp 100) (Modification.AddCardType CardType.Creature) gs0
             gs = withDynamicEffect Affected.AllCreatures (Timestamp.MkTimestamp 200) (Modification.GainKeyword Keyword.Flying) gs1
-         in HU.assertBool "land gained flying because it became a creature" (Projection.hasKeyword Keyword.Flying landId gs)
+         in HU.assertBool "land gained flying because it became a creature" (Projection.hasKeyword Keyword.Flying landId gs),
+      HU.testCase "CR 305.7/613.8 Blood Moon strips Urborg: Urborg is only a Mountain (Blood Moon older)" $
+        let (_, urborgId, gs) = bloodMoonUrborg False
+         in HU.assertEqual "Urborg subtypes" (Set.singleton Subtype.Mountain) (Projection.subtypesOf urborgId gs),
+      HU.testCase "CR 305.7/613.8 Blood Moon strips Urborg: Urborg is only a Mountain (Urborg older)" $
+        let (_, urborgId, gs) = bloodMoonUrborg True
+         in HU.assertEqual "Urborg subtypes, order-independent" (Set.singleton Subtype.Mountain) (Projection.subtypesOf urborgId gs),
+      HU.testCase "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Blood Moon older)" $
+        let (forestId, _, gs) = bloodMoonUrborg False
+         in HU.assertEqual "Forest stays a Forest" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs),
+      HU.testCase "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Urborg older)" $
+        let (forestId, _, gs) = bloodMoonUrborg True
+         in HU.assertEqual "Forest stays a Forest, order-independent" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs)
     ]

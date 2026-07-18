@@ -152,10 +152,55 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.rulesTextActive = True
       }
 
+-- affects evaluated against an object's BASE characteristics (used by
+-- source-liveness, which must not recurse into the projection it feeds).
+affectsBase :: ObjectId -> ObjectId -> Affected.Affected -> GameState -> Bool
+affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) gs
+
+-- Every SetLandSubtype effect in the game, each with its source and affected set
+-- (from stored effects and battlefield permanents' static abilities). This is a
+-- legitimate case-on-Modification -- Projection is its sole home.
+setLandSubtypeEffects :: GameState -> [(ObjectId, Affected.Affected)]
+setLandSubtypeEffects gs =
+  let isSet m = case m of
+        Modification.SetLandSubtype _ -> True
+        _ -> False
+      fromStored eff =
+        if isSet (ContinuousEffect.modification eff)
+          then [(ContinuousEffect.source eff, ContinuousEffect.affected eff)]
+          else []
+      fromPerm permId = case Game.cardOf permId gs of
+        Nothing -> []
+        Just card ->
+          map (\sa -> (permId, StaticAbility.affected sa)) $
+            filter (isSet . StaticAbility.modification) (Card.Type.staticAbilities card)
+   in concatMap fromStored (GameState.continuousEffects gs)
+        ++ concatMap fromPerm (Set.toList (GameState.battlefield gs))
+
+-- CR 305.7: a land whose subtype is SET to a basic type loses its rules-text
+-- abilities. So an object's static abilities are live unless a live SetLandSubtype
+-- applies to it. "Live" recurses on the stripper's own source; "applies to" reads
+-- BASE characteristics (nonbasic is a printed supertype; card-type Land is
+-- unchanged by any M3c effect), so nothing recurses into the projection and the
+-- result is order-INDEPENDENT. A cycle trips the visited set (both treated as
+-- live -- the CR 613.8b loop-escape analog; expiry in the spec).
+staticAbilitiesLive :: ObjectId -> GameState -> Bool
+staticAbilitiesLive = staticAbilitiesLiveVisited Set.empty
+
+staticAbilitiesLiveVisited :: Set ObjectId -> ObjectId -> GameState -> Bool
+staticAbilitiesLiveVisited visited oid gs =
+  Set.member oid visited
+    || let visited' = Set.insert oid visited
+           strips (src, aff) =
+             staticAbilitiesLiveVisited visited' src gs
+               && affectsBase src oid aff gs
+        in not (any strips (setLandSubtypeEffects gs))
+
 -- Every continuous effect in the game: stored resolution effects, plus the
 -- static abilities of every battlefield permanent (CR 613.7a: with the
--- permanent's own timestamp). NOT filtered by object here -- project filters
--- per layer against the partial. (Task 6 adds the CR 305.7 source-liveness gate.)
+-- permanent's own timestamp), dropping a permanent whose static abilities are
+-- not live (CR 305.7 stripped). NOT filtered by object here -- project filters
+-- per layer against the partial.
 gather :: GameState -> [Gathered]
 gather gs =
   let fromStored eff =
@@ -179,7 +224,10 @@ gather gs =
         Nothing -> []
         Just permObj -> case Game.cardOf permId gs of
           Nothing -> []
-          Just card -> map (fromStatic permId permObj) (Card.Type.staticAbilities card)
+          Just card ->
+            if staticAbilitiesLive permId gs
+              then map (fromStatic permId permObj) (Card.Type.staticAbilities card)
+              else []
       static_ = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
    in stored ++ static_
 
