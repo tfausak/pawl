@@ -146,6 +146,7 @@ test-suite pawl-test-suite
   other-modules:
     Pawl.CardSpec
     Pawl.CastSpec
+    Pawl.CombatSpec
     Pawl.CoreSpec
     Pawl.GameSpec
     Pawl.ManaSpec
