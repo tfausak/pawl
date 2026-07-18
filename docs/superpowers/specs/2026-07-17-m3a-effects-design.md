@@ -44,7 +44,7 @@ any field, per design.md §1:
 
 ```haskell
 data Effect
-  = DealDamage TargetSlot Quantity
+  = DealDamage SlotName Quantity
   deriving (Eq, Ord, Show)
 ```
 
@@ -52,11 +52,18 @@ One constructor, on purpose: the milestone proves the seam, M3b–M4 add volume.
 `Quantity` is M1a's numeric shape, exercised beyond P/T for the first time
 (`Literal 3`).
 
-**`Pawl.Type.TargetSlot`** — `newtype TargetSlot = MkTargetSlot Natural`, an
-index into the card's target-spec list. This is D4's **named binding slots** in
-minimal concrete form: an effect leaf never contains a target, it *references a
-slot* that casting filled in. Payments, modes, and X reuse the same move in
-later milestones; deciding that now is the D4 decision, building it is not.
+**`Pawl.Type.SlotName`** — `newtype SlotName = MkSlotName Text`, the name of a
+binding slot. This is D4's **named binding slots**, both halves: an effect leaf
+never contains a target, it *references a slot by name* that casting filled in
+— and a hygiene test (§8) statically checks every reference resolves, the
+Argentum AST-dataflow lint from `prior-art-lessons.md` §5 ("every read has a
+writer"). Nothing anywhere aligns by position: the alternative — slot indices
+into a parallel spec list — puts three structures (specs, references, choices)
+in silent positional agreement, and a misauthored card no-ops instead of
+failing. Names make the agreement checkable; the lint checks it. Payments,
+modes, and X introduce names into the same namespace in later milestones.
+The type is deliberately `SlotName`, not `TargetSlot`: targets are the first
+binding slots, not the last.
 
 **`Pawl.Type.TargetSpec`** — what a slot may legally hold. Classification data,
 never a predicate function:
@@ -70,15 +77,19 @@ data TargetSpec
 `AnyTarget` is Bolt's "any target": a creature or a player (planeswalkers and
 battles grow it when those card types exist).
 
-**`Card`** grows `effects :: [Effect]` and `targetSpecs :: [TargetSpec]` — a
-*list* of slots from day one (design.md §2.11: fixed arity is the recurring
-root cause), even though nothing at M3a has two. Every existing printing gets
-two empty lists. CR 601.2c settles a question this shape raises: the same
+**`Card`** grows `effects :: [Effect]` and
+`targetSpecs :: Map SlotName TargetSpec`. The effect list is *ordered* because
+execution order is real (CR 608.2c: follow the instructions in the order
+written); the spec collection is a `Map` because slots have no order, only
+names — the two structures share nothing positionally, and arity is unfixed
+from day one (design.md §2.11) without a parallel list to misalign. Every
+existing printing gets an empty list and an empty map. CR 601.2c settles a
+question this shape raises: the same
 object or player **may** be chosen once for *each* instance of the word
 "target," and may **not** be chosen twice for *one* instance — so per-slot
-choices are independent at M3a (each slot is one instance choosing one target),
-and a within-one-instance distinctness check first bites when a slot can hold
-multiple targets, not when a card has multiple slots.
+choices are independent at M3a (each named slot is one instance choosing one
+target), and a within-one-instance distinctness check first bites when a slot
+can hold multiple targets, not when a card has multiple slots.
 
 **`CardType`** grows `Instant`. `Card.isPermanentType` answers `False` for it
 (CR 110.1 lists the permanent types; Instant is not among them) and
@@ -106,8 +117,10 @@ the executor-coverage hygiene test, at compile time: a constructor without a
 
 `Resolve.resolveEffects` executes a resolving spell's effect list in order.
 `DealDamage slot qty`: evaluate `qty` (`Quantity.evaluate`; an unevaluable
-quantity is a no-op, the `powerOf` posture), read the recipient the slot was
-filled with, skip it if that target is now illegal (CR 608.2b's partial
+quantity is a no-op, the `powerOf` posture), read the recipient the named slot
+was filled with (a `Map.lookup`, kept total: an unfilled slot is a skip,
+though the §8 lint makes one unrepresentable in a well-formed printing), skip
+it if that target is now illegal (CR 608.2b's partial
 resolution: illegal targets are unaffected, other parts still happen), and
 apply through the damage funnel (§4).
 
@@ -139,19 +152,19 @@ only creatures. Recorded here so M3b asserts it rather than rediscovers it.
 **The prompt**:
 
 ```haskell
-ChooseTargets :: Decider -> PlayerId -> ObjectId -> [Set Recipient] -> Prompt [Recipient]
+ChooseTargets :: Decider -> PlayerId -> ObjectId -> Map SlotName (Set Recipient) -> Prompt (Map SlotName Recipient)
 ```
 
 The `ObjectId` is the spell being cast (for interpreter display); the outer
-list is the slots, **positional** — slot *i* is `targetSpecs !! i` and is what
-effect leaves reference by index, so neither the outer collection nor the
-answer may be a set (two slots may carry identical legal sets and must not
-collapse). The inner collection is honestly a `Set`: legal recipients are
-unordered and duplicate-free (the `Deck`-as-multiset argument, M2d §2).
-`Response` grows `ChoseTargets [Recipient]`.
+`Map` is keyed by slot name — slots have no order, and the question and answer
+agree by *name*, never by position. The inner collection is honestly a `Set`:
+legal recipients are unordered and duplicate-free (the `Deck`-as-multiset
+argument, M2d §2). `Response` grows `ChoseTargets (Map SlotName Recipient)`;
+interpreters iterate the map in its `Ord` order, which is deterministic.
 
-**Order within `castSpell`**: compute legal sets, prompt, validate — each
-choice a member of its slot's set, one choice per slot — then pay, then move to
+**Order within `castSpell`**: compute legal sets, prompt, validate — the
+answer's keys are exactly the spec's keys and each choice is a member of its
+slot's set — then pay, then move to
 the stack, then stamp the choices on the **new** stack incarnation. An illegal
 answer makes the whole cast a no-op (reject-not-repair, the
 `AssignCombatDamage` posture; nothing moved, nothing paid). Note this order is
@@ -161,8 +174,9 @@ costs are paid (601.2c before 601.2f–h). What remains elided is the rewind:
 answer cannot fail after the prompt. That elision expires when casting can fail
 mid-announcement (kicker-style choices, or M3g's cast-during-search).
 
-**Chosen targets are object state.** `Object` grows `targets :: [Recipient]`
-(empty for everything but spells on the stack), **per-incarnation** state reset
+**Chosen targets are object state.** `Object` grows
+`targets :: Map SlotName Recipient` (empty for everything but spells on the
+stack), **per-incarnation** state reset
 by `changeZone` exactly like `damage` and `sickness` — CR 400.7 forgets a
 spell's targets for free when it leaves the stack.
 
@@ -230,8 +244,13 @@ and closes `15de615`.
 ## 6. The card and the deck
 
 **`Card.lightningBoltPrinting`**: `{R}` Instant, no P/T, no keywords,
-`effects = [DealDamage (MkTargetSlot 0) (Literal 3)]`,
-`targetSpecs = [AnyTarget]`. Scryfall-verified; per design.md §4's rulings
+`effects = [DealDamage (MkSlotName "target") (Literal 3)]`,
+`targetSpecs = Map.singleton (MkSlotName "target") AnyTarget`. The slot name is
+the card author's to choose; the lint only checks agreement. `Card` also gains
+**`allPrintings :: [Printing]`**, the registry the lint (§8) and any future
+golden-snapshot test iterate — a printing not in the registry escapes the
+hygiene net, so the registry's completeness is itself asserted by the existing
+deck-composition tests referencing printings through it. Scryfall-verified; per design.md §4's rulings
 discipline, the plan's card step pulls Bolt's Gatherer rulings and transcribes
 any Q&A-shaped ones (expected: few to none — redirection rulings died with the
 planeswalker redirection rule).
@@ -272,6 +291,13 @@ Deterministic, each named by rule number, cards by real name:
   the beginning-of-combat and end-of-combat steps still offer it.
 - **Cast legality**: a Bolt is not offered without `{R}` available; not offered
   from the graveyard; `Play` never offers it (it is not a land).
+- **The slot dataflow lint** (D4's "every read has a writer,"
+  `prior-art-lessons.md` §3/§5): for every printing in `Card.allPrintings`,
+  the set of slot names referenced by its effects **equals** the key set of its
+  `targetSpecs` — no dangling reference, no unused slot. A misauthored card is
+  a failing test, not a silent no-op. (Equality, not subset: a spec no effect
+  reads is a card announcing a target it ignores — representable in Magic but
+  not in this pool; loosen to ⊇ if such a card ever lands.)
 
 Properties (`runMatch`, both matchups): all M2d properties as they stand —
 conservation at 120, termination, ids, no floating mana, life never increases
