@@ -303,7 +303,7 @@ git commit -m "Add layer-4 type-changing modifications and Legendary (CR 305.7)"
 **Interfaces:**
 - Produces: `Quantity.ManaValue :: Quantity`; `Quantity.evaluate gs oid ManaValue` returns the affected object's mana value (CR 202.3) as `Just`, `Just 0` for a card with no mana cost, `Nothing` if the object has no card.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Test `ManaValue` through the projection path (this both exercises `evaluate` and avoids the `Pawl.Quantity` / `Pawl.Type.Quantity` last-component alias collision — `ProjectionSpec` already imports the *type* module as `Quantity`). Add to `source/test-suite/Pawl/ProjectionSpec.hs`:
 
@@ -316,12 +316,12 @@ Test `ManaValue` through the projection path (this both exercises `evaluate` and
               HU.assertEqual "toughness = mana value" (Just 2) (Projection.toughnessOf oid gs),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "mana value"'`
 Expected: FAIL to compile — `Quantity.ManaValue` not in scope.
 
-- [ ] **Step 3: Add the constructor**
+- [x] **Step 3: Add the constructor**
 
 In `source/library/Pawl/Type/Quantity.hs`, promote the `newtype` to `data` (its header comment already anticipates this — "it becomes a `data` the moment the second one lands"):
 
@@ -335,7 +335,7 @@ data Quantity
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Evaluate it**
+- [x] **Step 4: Evaluate it**
 
 In `source/library/Pawl/Quantity.hs`, add imports `qualified Pawl.Game as Game`, `qualified Pawl.Type.Card as Card`, `qualified Pawl.Type.ManaCost as ManaCost`, `qualified Pawl.Type.ManaSymbol as ManaSymbol`. Replace `evaluate`:
 
@@ -362,12 +362,12 @@ symbolValue symbol = case symbol of
 
 **Cycle check:** `Pawl.Quantity` now imports `Pawl.Game`. `Pawl.Game` imports only `Pawl.Type.*` (verified), never `Pawl.Quantity`, so no cycle. If `cabal build` reports a non-exhaustive `case` on `Quantity` in any *other* module, add a `ManaValue` arm there — but `Pawl.Quantity.evaluate` is the expected sole matcher.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

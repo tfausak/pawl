@@ -17,8 +17,10 @@ module Pawl.Type.Quantity where
 -- rule, and fromInteger would silently erase the very distinction this type
 -- exists to draw. Combining is explicit named functions.
 --
--- A newtype only because Literal is the only constructor today; it becomes a
--- `data` the moment the second one lands.
-newtype Quantity
+data Quantity
   = Literal Integer
+  | -- CR 202.3: an object's mana value, computed from its mana cost. A
+    -- computed quantity (Opalescence's "base P/T equal to its mana value"),
+    -- evaluated against the affected object.
+    ManaValue
   deriving (Eq, Ord, Show)

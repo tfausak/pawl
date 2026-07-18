@@ -237,5 +237,11 @@ tests =
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
             gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.AddCardType CardType.Creature) gs0
-         in HU.assertBool "now a creature" (Projection.isCreatureOf landId gs)
+         in HU.assertBool "now a creature" (Projection.isCreatureOf landId gs),
+      HU.testCase "CR 202.3 SetBasePowerToughness ManaValue sets a Piker to its mana value ({1}{R} = 2)" $
+        let (oid, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
+            gs = withEffect oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness Quantity.ManaValue Quantity.ManaValue) gs0
+         in do
+              HU.assertEqual "power = mana value" (Just 2) (Projection.powerOf oid gs)
+              HU.assertEqual "toughness = mana value" (Just 2) (Projection.toughnessOf oid gs)
     ]
