@@ -248,6 +248,11 @@ addCreature printing pid gs =
 addPiker :: PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addPiker = addCreature Card.pikerPrinting
 
+-- Humility on the battlefield under bob's control (it is not a creature, so
+-- AllCreatures does not touch it). Returns the updated state.
+withHumility :: GameState.GameState -> GameState.GameState
+withHumility gs = snd (addCreature Card.humilityPrinting bob gs)
+
 -- alice controls n untapped basic lands of one printing, nothing else.
 landsInPlay :: Printing.Printing -> Int -> GameState.GameState
 landsInPlay land n =

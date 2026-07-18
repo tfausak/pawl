@@ -3,6 +3,7 @@ module Pawl.Card where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
@@ -17,6 +18,7 @@ import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
@@ -467,6 +469,47 @@ giantGrowthPrinting =
           }
     }
 
+-- Humility: {2}{W}{W}, Enchantment, "All creatures lose all abilities and have
+-- base power and toughness 1/1." Scryfall-verified. Two static abilities: layer 6
+-- (lose all abilities, CR 604.1/604.2) and layer 7b (set base 1/1), each over
+-- AllCreatures. No targets, no effects -- the projection gathers it live while it
+-- is on the battlefield (CR 613.7a: each takes Humility's own timestamp). White,
+-- so it is a deterministic fixture only (no white matchup). Checked Gatherer's 3
+-- rulings (design.md section 4): all are Humility+Opalescence layer/timestamp
+-- interactions or animated-land mana-ability notes -- Opalescence is M3c and
+-- nothing here animates a land, so none is expressible in the M3b pool.
+humilityPrinting :: Printing.Printing
+humilityPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Humility",
+            Card.manaCost =
+              Just
+                ( ManaCost.MkManaCost
+                    [ ManaSymbol.Generic 2,
+                      ManaSymbol.OfType (ManaType.Colored Color.White),
+                      ManaSymbol.OfType (ManaType.Colored Color.White)
+                    ]
+                ),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Enchantment,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities =
+              [ StaticAbility.MkStaticAbility Affected.AllCreatures Modification.LoseAllAbilities,
+                StaticAbility.MkStaticAbility Affected.AllCreatures (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+              ],
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
+          }
+    }
+
 -- The registry the dataflow lint and future golden tests iterate. A printing
 -- not listed here escapes the hygiene net -- add every new printing.
 allPrintings :: [Printing.Printing]
@@ -485,7 +528,8 @@ allPrintings =
     typhoidRatsPrinting,
     warMammothPrinting,
     lightningBoltPrinting,
-    giantGrowthPrinting
+    giantGrowthPrinting,
+    humilityPrinting
   ]
 
 isLand :: Card.Card -> Bool
@@ -505,6 +549,7 @@ isPermanentType cardType = case cardType of
   CardType.Land -> True
   CardType.Creature -> True
   CardType.Instant -> False
+  CardType.Enchantment -> True
 
 -- The classification resolution dispatches on (CR 608.3). This is the whole
 -- reason the engine never needs to know WHICH card is resolving.

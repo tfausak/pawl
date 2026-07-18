@@ -10,6 +10,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Sba as Sba
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
@@ -126,5 +127,31 @@ tests =
          in do
               HU.assertEqual "effect dropped" [] (GameState.continuousEffects afterCleanup)
               HU.assertEqual "Piker back to base power" (Just 2) (Projection.powerOf pikerId afterCleanup)
-              HU.assertEqual "Piker back to base toughness" (Just 1) (Projection.toughnessOf pikerId afterCleanup)
+              HU.assertEqual "Piker back to base toughness" (Just 1) (Projection.toughnessOf pikerId afterCleanup),
+      HU.testCase "CR 613 Humility makes every creature 1/1 with no abilities" $
+        let (flyerId, gs0) = S.addCreature Card.birdMaidenPrinting S.bob (S.mountainsInPlay 1)
+            gs = S.withHumility gs0
+         in do
+              HU.assertEqual "power 1" (Just 1) (Projection.powerOf flyerId gs)
+              HU.assertEqual "toughness 1" (Just 1) (Projection.toughnessOf flyerId gs)
+              HU.assertBool "no flying" (not (Projection.hasKeyword Keyword.Flying flyerId gs)),
+      HU.testCase "CR 704.5g Humility's toughness drop makes an already-damaged creature die" $
+        let (mammothId, gs0) = S.addCreature Card.warMammothPrinting S.bob (S.mountainsInPlay 1)
+            damaged = S.markDamage mammothId 2 gs0
+            underHumility = S.withHumility damaged
+            afterSba = Sba.checkStateBasedActions underHumility
+         in do
+              HU.assertEqual "survives at 3/3 with 2 marked" (Just 3) (Projection.toughnessOf mammothId damaged)
+              HU.assertEqual "no creature survives once toughness is 1" 0 (S.creaturesInPlay S.bob afterSba),
+      HU.testCase "CR 613 layer order: Giant Growth on a Humility'd Piker is 4/4" $
+        let base = S.landsInPlay Card.forestPrinting 1
+            (pikerId, withPiker) = S.addPiker S.alice base
+            withHum = S.withHumility withPiker
+            (gs, ggId) = S.handOne Card.giantGrowthPrinting withHum
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice ggId))
+            resolved = Stack.resolveTop cast
+         in do
+              -- Layer 7b (set 1/1) before 7c (+3/+3): 1 then +3 = 4.
+              HU.assertEqual "power" (Just 4) (Projection.powerOf pikerId resolved)
+              HU.assertEqual "toughness" (Just 4) (Projection.toughnessOf pikerId resolved)
     ]
