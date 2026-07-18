@@ -64,6 +64,12 @@ greenBlack = (alice, Setup.greenDeck) NonEmpty.:| [(bob, Setup.blackDeck)]
 matchups :: [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
 matchups = [redRed, greenBlack]
 
+-- A 60-basic-land mirror: no spell can be cast and no creature can attack, so the
+-- only loss condition reachable is CR 704.5b deck-out. Used by the durable
+-- lands-only-decks property.
+landsOnly :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
+landsOnly = Setup.mirror (Deck.MkDeck (Map.singleton Card.mountainPrinting 60)) bothPlayers
+
 isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True

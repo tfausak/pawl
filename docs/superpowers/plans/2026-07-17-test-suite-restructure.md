@@ -768,7 +768,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Produces: three named deterministic successor tests; the `landsOnly` matchup;
   the `landsOnlyDecks` property. Final suite count **262**.
 
-- [ ] **Step 1: Add the deterministic combat successor to `Pawl.CombatSpec`**
+- [x] **Step 1: Add the deterministic combat successor to `Pawl.CombatSpec`**
 
 In `combatDamageTests` (or a small new group `exitCriterionTests` added to
 `CombatSpec.tests`), add:
@@ -782,7 +782,7 @@ In `combatDamageTests` (or a small new group `exitCriterionTests` added to
          in HU.assertEqual "defender took two" (Just 18) (S.lifeOf S.bob after)
 ```
 
-- [ ] **Step 2: Add the deterministic death successor to `Pawl.DamageSpec`**
+- [x] **Step 2: Add the deterministic death successor to `Pawl.DamageSpec`**
 
 Add to an appropriate group (e.g. `creatureSbaTests`):
 
@@ -798,7 +798,7 @@ Add to an appropriate group (e.g. `creatureSbaTests`):
               HU.assertEqual "blocker died" 0 (S.creaturesInPlay S.bob after)
 ```
 
-- [ ] **Step 3: Add the deterministic instant successor to `Pawl.ResolveSpec`**
+- [x] **Step 3: Add the deterministic instant successor to `Pawl.ResolveSpec`**
 
 Add to `resolveTests`:
 
@@ -811,7 +811,7 @@ Add to `resolveTests`:
          in HU.assertEqual "one card in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
 ```
 
-- [ ] **Step 4: Add the `landsOnly` matchup to `Pawl.Support`**
+- [x] **Step 4: Add the `landsOnly` matchup to `Pawl.Support`**
 
 In `Pawl.Support`, next to `redRed`/`greenBlack`:
 
@@ -826,7 +826,7 @@ landsOnly = Setup.mirror (Deck.MkDeck (Map.singleton Card.mountainPrinting 60)) 
 (Add `Data.Map.Strict`, `Pawl.Type.Deck`, `Pawl.Card`, `Pawl.Setup`,
 `Pawl.Type.PlayerId`, `Data.List.NonEmpty` imports if not already present.)
 
-- [ ] **Step 5: Remove the three existence properties, add the durable one**
+- [x] **Step 5: Remove the three existence properties, add the durable one**
 
 In `Pawl.PropertySpec`, delete the three `QC.testProperty` entries
 `combat happens: some seed changes a life total`,
@@ -850,14 +850,14 @@ In `Pawl.PropertySpec`, delete the three `QC.testProperty` entries
 (Ensure `Data.Maybe`, `Data.Set`, and `Pawl.Type.GameState` are imported in
 `PropertySpec`.)
 
-- [ ] **Step 6: Build and run the full suite**
+- [x] **Step 6: Build and run the full suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -3` → clean.
 Run: `cabal test 2>&1 | grep -E "tests? passed|out of"`
 Expected: `All 262 tests passed` (261 − 3 existence properties + 3 deterministic
 tests + 1 lands-only property).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/test-suite/Pawl/CombatSpec.hs source/test-suite/Pawl/DamageSpec.hs source/test-suite/Pawl/ResolveSpec.hs source/test-suite/Pawl/PropertySpec.hs source/test-suite/Pawl/Support.hs

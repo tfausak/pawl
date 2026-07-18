@@ -72,7 +72,16 @@ creatureSbaTests =
          in HU.assertEqual
               "conserved"
               (Game.objectCount marked)
-              (Game.objectCount (Sba.checkStateBasedActions marked))
+              (Game.objectCount (Sba.checkStateBasedActions marked)),
+      -- The deterministic successor to the retired green-black "some seed sends a
+      -- creature to the graveyard" property: two 2/1 Pikers trade in combat and
+      -- both die to the CR 704.5g state-based action.
+      HU.testCase "a creature dies in a played-out combat" $
+        let (gs, _, _) = S.combatBoard 1 1
+            after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
+         in do
+              HU.assertEqual "attacker died" 0 (S.creaturesInPlay S.alice after)
+              HU.assertEqual "blocker died" 0 (S.creaturesInPlay S.bob after)
     ]
 
 damageTests :: Tasty.TestTree

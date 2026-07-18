@@ -108,7 +108,13 @@ resolveTests =
         let (base, cast, _) = S.boltAtBobsPiker
             dead = Sba.checkStateBasedActions (S.markDamage (S.pikerOf base) 3 cast)
             after = Stack.resolveTop dead
-         in HU.assertEqual "life totals unchanged" (Just 20) (S.lifeOf S.alice after)
+         in HU.assertEqual "life totals unchanged" (Just 20) (S.lifeOf S.alice after),
+      -- The deterministic successor to the retired "instants happen" property: a
+      -- Bolt cast in a game and resolved ends in its owner's graveyard.
+      HU.testCase "a cast Bolt reaches its owner's graveyard" $
+        let (_, cast, _) = S.boltAtBobsPiker
+            after = Stack.resolveTop cast
+         in HU.assertEqual "one card in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
     ]
 
 -- Casts every castable spell (targets via lookupMin: creatures first),

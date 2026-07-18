@@ -99,7 +99,13 @@ combatDamageTests =
               Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (map (\r -> (r, 99)) (filter S.isCreatureRecipient (Map.keys thresholds)))
               _ -> S.aggressiveAnswer p
             after = Sba.checkStateBasedActions (S.fightWith cheat gs)
-         in HU.assertEqual "both blockers survive" 2 (S.creaturesInPlay S.bob after)
+         in HU.assertEqual "both blockers survive" 2 (S.creaturesInPlay S.bob after),
+      -- The deterministic successor to the retired "combat happens" property: an
+      -- unblocked 2/1 attacker reduces the defender's life by its power.
+      HU.testCase "combat deals damage to the defending player" $
+        let (gs, _, _) = S.combatBoardOf [Card.pikerPrinting] []
+            after = S.runCombat S.aggressiveAnswer gs
+         in HU.assertEqual "defender took two" (Just 18) (S.lifeOf S.bob after)
     ]
 
 declaredAttackers :: GameState.GameState -> [ObjectId.ObjectId]

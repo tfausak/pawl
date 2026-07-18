@@ -5,17 +5,13 @@ module Pawl.PropertySpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Pawl.Card as Card
+import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Player as Player
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.QuickCheck as QC
 
@@ -47,57 +43,17 @@ propertyTests =
               (\m -> QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players (S.runRandomGame m s)))))
               S.matchups
           ),
-      -- The M1b exit criterion, asserted rather than assumed: across 100 seeds,
-      -- at least one red-red game must see damage actually change someone's
-      -- life total. Without this, every combat path could silently no-op and
-      -- the suite would still be green.
-      QC.testProperty "combat happens: some seed changes a life total" $
-        QC.once $
-          QC.property $
-            any someLifeChanged [1 .. 100 :: Int],
-      QC.testProperty "green-black: some seed sends a creature to the graveyard" $
-        QC.once $
-          QC.property $
-            any creatureDied [1 .. 100 :: Int],
-      -- The M3a exit criterion, asserted the same way combat's was: across 100
-      -- seeds some red-red game must actually cast a Bolt, or instant speed
-      -- could silently never fire while the suite stays green.
-      QC.testProperty "instants happen: some seed casts a Bolt" $
-        QC.once $
-          QC.property $
-            any boltCast_ [1 .. 100 :: Int]
+      -- Durable structural property: with a deck that can only ever deck out (60
+      -- basic lands, no spells, no attackers), every seed's game ends AND ends by
+      -- a player drawing from an empty library (CR 704.5b) -- never by any other
+      -- loss condition. Stays true no matter what cards later exist.
+      QC.testProperty "a lands-only mirror always ends by deck-out" $ \s ->
+        let final = S.runRandomGame S.landsOnly s
+         in QC.property
+              ( Maybe.isJust (GameState.result final)
+                  && not (Set.null (GameState.drewFromEmpty final))
+              )
     ]
-
--- Did this seed's red-red game put a Bolt into a graveyard? A cast Bolt always
--- ends there (resolved or fizzled), and nothing else moves one out of a library.
-boltCast_ :: Int -> Bool
-boltCast_ s =
-  let gs = S.runRandomGame S.redRed s
-      isBolt oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> case Object.source obj of
-          Source.OfCard printing -> Printing.card printing == Printing.card Card.lightningBoltPrinting
-      inGrave pid = any isBolt (Game.zoneMembers Zone.Graveyard pid gs)
-   in any inGrave [S.alice, S.bob]
-
--- Did anyone's life total move over the course of the game this seed produces?
-someLifeChanged :: Int -> Bool
-someLifeChanged s =
-  let moved pl = Player.life pl /= Setup.startingLife
-   in any moved (Map.elems (GameState.players (S.runRandomGame S.redRed s)))
-
--- Did some green-black seed put a creature into a graveyard? In green-black the
--- only way a creature dies is combat (trade, deathtouch SBA, or trample), so
--- this fails only if combat never engages across all these seeds.
-creatureDied :: Int -> Bool
-creatureDied s =
-  let gs = S.runRandomGame S.greenBlack s
-      isDeadCreature oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.isCreature (Printing.card printing)
-      inGrave pid = any isDeadCreature (Game.zoneMembers Zone.Graveyard pid gs)
-   in any inGrave [S.alice, S.bob]
 
 tests :: Tasty.TestTree
 tests = Tasty.testGroup "Properties" [propertyTests]
