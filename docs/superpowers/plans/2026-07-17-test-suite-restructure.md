@@ -225,7 +225,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Produces: `CardSpec.tests` grouping `cardTests`, `lintTests`, `m2aCardTests`,
   `m2bCardTests`, `m2cCardTests`, `basicLandTests`.
 
-- [ ] **Step 1: Create the spec module**
+- [x] **Step 1: Create the spec module**
 
 Create `source/test-suite/Pawl/CardSpec.hs`:
 
@@ -247,18 +247,18 @@ tests =
     [cardTests, lintTests, m2aCardTests, m2bCardTests, m2cCardTests, basicLandTests]
 ```
 
-- [ ] **Step 2: Wire into `Main.hs`**
+- [x] **Step 2: Wire into `Main.hs`**
 
 Delete the six groups from `Main.hs`; add `import qualified Pawl.CardSpec`;
 replace their `testTree` entries with `CardSpec.tests`. Prune any now-unused
 `Pawl.Support` import names.
 
-- [ ] **Step 3: Register and build**
+- [x] **Step 3: Register and build**
 
 Add `Pawl.CardSpec` to `other-modules` if hand-listed. Then build clean and
 `cabal test` → `All 261 tests passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/test-suite/Pawl/CardSpec.hs source/test-suite/Main.hs pawl.cabal

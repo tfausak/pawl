@@ -144,6 +144,7 @@ test-suite pawl-test-suite
   hs-source-dirs: source/test-suite
   main-is: Main.hs
   other-modules:
+    Pawl.CardSpec
     Pawl.CoreSpec
     Pawl.Support
 
