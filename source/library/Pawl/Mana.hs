@@ -7,7 +7,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Game as Game
-import qualified Pawl.Type.Card as Card
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.Color as Color
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -24,12 +24,9 @@ import qualified Pawl.Type.ManaUnit as ManaUnit
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Source as Source
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 
 -- CR 305.6: a basic land's mana ability is granted intrinsically by its subtype,
@@ -52,14 +49,12 @@ subtypeMana subtype = case subtype of
   Subtype.Rat -> Nothing
   Subtype.Elephant -> Nothing
 
--- Every mana type an object could produce, derived from its subtypes.
+-- Every mana type an object could produce, derived from its PROJECTED subtypes
+-- (CR 305.6, through the layer system: Blood Moon and Urborg change what a land
+-- taps for). CR 305.7's "gains the appropriate mana ability" needs no explicit
+-- grant -- the projected subtype IS the ability.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
-manaTypesOf oid gs = case Game.lookupObject oid gs of
-  Nothing -> []
-  Just obj -> case Object.source obj of
-    Source.OfCard printing ->
-      Maybe.mapMaybe subtypeMana $
-        Set.toList (TypeLine.subtypes (Card.typeLine (Printing.card printing)))
+manaTypesOf oid gs = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesOf oid gs))
 
 -- CR 106.4. Absent from the map means an empty pool.
 poolOf :: PlayerId -> GameState -> Mana

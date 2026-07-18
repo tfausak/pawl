@@ -850,7 +850,7 @@ git commit -m "Resolve CR 613.8 existence via source-liveness (Blood Moon strips
 - Consumes: `Projection.subtypesOf` (Task 1), source-liveness (Task 6).
 - Produces: `Mana.manaTypesOf` reads the *projected* subtypes, so a Blood Moon'd land taps `{R}`, an Urborg'd land taps `{B}`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ManaSpec.hs` (mirror its style; import `qualified Pawl.Card as Card`, `qualified Pawl.Mana as Mana`, `qualified Pawl.Setup as Setup`, `qualified Pawl.Support as S`, `qualified Pawl.Type.Color as Color`, `qualified Pawl.Type.ManaType as ManaType` as needed):
 
@@ -872,12 +872,12 @@ Add to `source/test-suite/Pawl/ManaSpec.hs` (mirror its style; import `qualified
               HU.assertBool "black not available (stripped)" (ManaType.Colored Color.Black `notElem` Mana.manaTypesOf urborgId gs),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "taps for"'`
 Expected: FAIL — `manaTypesOf` reads the *printed* subtypes, so Urborg (printed no subtypes) taps for nothing and the Blood Moon'd Urborg is unchanged.
 
-- [ ] **Step 3: Read projected subtypes in `manaTypesOf`**
+- [x] **Step 3: Read projected subtypes in `manaTypesOf`**
 
 In `source/library/Pawl/Mana.hs`, add `import qualified Pawl.Projection as Projection`, and replace `manaTypesOf` (the `Source`/`Printing`/`TypeLine` imports may become unused — remove any that do to stay warning-clean):
 
@@ -892,12 +892,12 @@ manaTypesOf oid gs = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypes
 
 **Cycle check:** `Pawl.Mana` now imports `Pawl.Projection`; `Pawl.Projection` does not import `Pawl.Mana` (verified), so no cycle.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. If the build warns about unused imports in `Mana.hs` (`Source`, `Printing`, `TypeLine`, `Card`), delete them.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

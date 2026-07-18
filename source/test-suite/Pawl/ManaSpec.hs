@@ -6,6 +6,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Color as Color
@@ -95,7 +96,22 @@ manaTests =
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
               [] -> HU.assertFailure "fixture should have one Mountain"
               oid : _ ->
-                HU.assertEqual "emptied" 0 (poolSize S.alice (Mana.emptyManaPools (Mana.tapForMana oid gs)))
+                HU.assertEqual "emptied" 0 (poolSize S.alice (Mana.emptyManaPools (Mana.tapForMana oid gs))),
+      HU.testCase "CR 305.6/305.7 an Urborg'd Mountain taps for black too" $
+        let base = Setup.emptyGame S.bothPlayers
+            (mountainId, g1) = S.addCreature Card.mountainPrinting S.alice base
+            (_, gs) = S.addCreature Card.urborgPrinting S.alice g1
+         in -- Urborg adds Swamp to all lands, so the Mountain taps for black too.
+            do
+              HU.assertBool "black available" (ManaType.Colored Color.Black `elem` Mana.manaTypesOf mountainId gs)
+              HU.assertBool "red still available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf mountainId gs),
+      HU.testCase "CR 305.6/305.7 a Blood Moon'd Urborg taps for red only" $
+        let base = Setup.emptyGame S.bothPlayers
+            (urborgId, g1) = S.addCreature Card.urborgPrinting S.alice base
+            (_, gs) = S.addCreature Card.bloodMoonPrinting S.alice g1
+         in do
+              HU.assertBool "red available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf urborgId gs)
+              HU.assertBool "black not available (stripped)" (ManaType.Colored Color.Black `notElem` Mana.manaTypesOf urborgId gs)
     ]
 
 tests :: Tasty.TestTree
