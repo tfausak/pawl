@@ -86,7 +86,7 @@ to serve the dependency test), and the letters are cross-referenced throughout
   `CreatureTarget` spell and destroyable by an SBA.
 
 The `DecisionLog` replays deterministically with the new projected type line and
-the resolver's ordering in the projection path.
+source-liveness in the projection path.
 
 **Non-goals.**
 
@@ -204,10 +204,11 @@ values are filled in as the cards require. Humility's M3b printing is unchanged.
 ## 2. The generalized projection
 
 `Pawl.Projection` keeps its `gather → order-within-layer → fold` shape and stays
-**the sole `case`-on-`Modification` home** — the resolver included, because
-detecting dependencies means trial-applying modifications through
-`applyModification`/`affects`, and confining that to `Projection` preserves the
-invariant (`Resolve : Effect :: Projection : Modification`). Three changes:
+**the sole `case`-on-`Modification` home** — source-liveness included, because
+deciding whether a source's rules text is stripped reads a `Modification`
+(`SetLandSubtype`) through `applyModification`/`affects`, and confining that to
+`Projection` preserves the invariant (`Resolve : Effect :: Projection :
+Modification`). Three changes:
 
 **(1) The applier gains the three layer-4 modifications** (the only new
 `case`-on-`Modification` arms):
@@ -220,66 +221,71 @@ invariant (`Resolve : Effect :: Projection : Modification`). Three changes:
   enforced in `gather` (below), because it governs what this object contributes
   to *other* objects, not its own P/T fold.
 
-**(2) `gather` becomes projection-aware, and its element grows a source id.**
-The M3b tuple `(Layer, Timestamp, Modification)` cannot express the existence
-dependency the resolver detects (does applying B strip A's *source* ability?),
-so the gathered element grows the **source `ObjectId`** — a `GatheredEffect`
-carrying `(source, layer, timestamp, modification)`. The source is already in
-hand at both gather sites (the static branch's `permId`; a stored effect's
-`ContinuousEffect.source`). A battlefield permanent's static abilities are
-collected only if that permanent's rules text is still active — i.e. no
-`SetLandSubtype` applies to it (CR 305.7). Deciding that means **projecting the
-source permanent** — the cross-object coupling: to know whether Urborg still
-generates "each land is a Swamp," project Urborg under Blood Moon. Projection
-stops being per-object-independent.
+**(2) `gather` becomes projection-aware.** A battlefield permanent's static
+abilities are collected only if that permanent's rules text is still active —
+i.e. `staticAbilitiesLive` holds, no live `SetLandSubtype` applies to it (CR
+305.7, §2.1). Deciding that means **projecting the source permanent** — the
+cross-object coupling: to know whether Urborg still generates "each land is a
+Swamp," project Urborg under Blood Moon. Projection stops being
+per-object-independent. (The gathered element does not need a source id for the
+fold itself; `staticAbilitiesLive` is consulted at the moment a permanent's
+abilities are gathered, keyed by that permanent's id.)
 
-- **Termination and cost:** `project` carries an **intra-call memo** keyed by
-  `ObjectId`; a source-projection cycle trips a visited-set and the cycle's
-  effects fall to the **CR 613.8b loop rule** (timestamp order). This is a
-  *within-`project`-call* memo only; across queries M3c still recomputes (the
-  cross-query cached field stays deferred, §6, its pressure now noted).
+- **Termination and cost:** `project` memoizes per object; a source-projection
+  cycle trips a visited-set and both sources are treated as live (the CR 613.8b
+  loop-escape analog). This is a *per-query* memo; across queries M3c still
+  recomputes (the cross-query cached field stays deferred, §6, its pressure now
+  noted).
 
-**(3) The within-layer ordering becomes the dependency resolver** (§2.1),
-replacing the M3b `List.sortOn timestamp`.
+**(3) Within-layer ordering stays CR 613.7 timestamp; CR 613.8 *existence*
+dependency is resolved by source-liveness** (§2.1), not a topological reorder.
 
 New projected reads join `keywordsOf`/`powerOf`/`toughnessOf`: `subtypesOf`,
 `cardTypesOf`, and `isCreatureOf = Set.member Creature . cardTypesOf`.
 
-### 2.1 The resolver — trial application
+### 2.1 CR 613.8 via source-liveness (a refinement found in planning)
 
-Within one layer's gathered effects, order them per CR 613.8:
+**The refinement.** Tracing the two gates against the code shows both are
+resolved *without* a topological trial-application reorder:
 
-```haskell
--- The application order of one layer's effects, given the partial projection
--- built by lower layers. Detection IS trial re-application: an effect A depends
--- on B iff hypothetically applying B on top of the partial changes A's affected
--- set over the candidate objects OR A's source-ability existence (CR 613.8a).
-orderLayer :: GameState -> ProjectedCharacteristics -> [GatheredEffect] -> [GatheredEffect]
-```
+- **Blood Moon + Urborg is an *existence* dependency** (CR 613.8a clause b, "the
+  existence of the first effect"). pawl resolves it with the substrate's own
+  edge: a static ability from source *Y* is gathered by `project` only if
+  *projecting Y* shows its rules text is not stripped by a live `SetLandSubtype`
+  (CR 305.7). This is a **memoized recursive-projection fixpoint**, and it is
+  **order-independent by construction** — Urborg is stripped whether older or
+  newer — so both timestamp orders yield the correct outcome automatically. No
+  "apply tentatively, detect, reorder" step is needed; the immutable+memoized
+  projection *is* the trial application — the "unclaimed territory the substrate
+  is built for" (risk register).
+- **Humility + Opalescence is cross-layer** (4 → 6 → 7b), so CR 613.8 (same
+  layer) does not apply; it is pure CR 613.7 timestamp within layer 7b.
 
-The algorithm (all four CR 613.8 clauses):
+The classic CR 613.8b **topological reorder** — apply B tentatively, observe it
+changes *which objects A applies to* (both effects surviving), reorder — bites
+only for a same-layer *applies-to* dependency. **No M3c card constructs one**
+(the vocabulary — layer-4 type-changing plus layer-6/7 P·T/keywords — cannot
+build a same-layer pair where one changes the other's affected set with both
+surviving; finding cards that do is a post-M3c task). Building that resolver now
+would be speculative machinery with no card to falsify it, against the project's
+"one axis per letter / no premature machinery" discipline.
 
-- **613.8a — dependency.** A depends on B iff (a) same layer [true — one layer
-  at a time]; (b) applying B would change **A's affected set** over the
-  candidate objects, **or the existence** of A's effect (its source ability
-  being stripped), **or what A does**; (c) neither is a CDA [true — no CDAs at
-  M3c, so clause (c) holds trivially]. Detection is a **single hypothetical
-  step**: compute A's parameters against the partial-so-far, then against
-  partial-so-far + B, and diff. No full recursive re-projection — the partial is
-  the context, which is what bounds the work.
-- **613.8b — ordering and loops.** Apply the effects whose dependencies are all
-  already applied, **earliest timestamp first**. If every remaining effect
-  depends on another remaining one (a dependency loop), ignore 613.8 for the
-  loop and apply its members in timestamp order.
-- **613.8c — re-evaluation.** After each application, re-evaluate dependencies
-  among the remaining effects; they may change.
+**So M3c implements source-liveness** as the CR 613.8 *existence* mechanism, and
+**tracks the topological applies-to resolver as a pending test + expiry** (§6) —
+incompleteness as a failing/pending test, never a doc footnote (risk register).
+The go/no-go verdict is a genuine **YES** on the hardest documented case
+(existence dependency, both orders), the pair Argentum could not represent.
 
-**Why this is cheap for pawl and was not for Argentum:** the substrate is
-immutable and the partial characteristics are memoized, so trial re-application
-is a value comparison, not a copy-on-write of mutable game state. This is the
-"unclaimed territory the substrate is built for" (risk register). **Completeness
-is a tracked metric, not a claim:** the §5 test set is the tripwire, and any
-dependency shape the trial step fails to detect must land as a *failing* test.
+**`staticAbilitiesLive :: ObjectId -> GameState -> Bool`** — `True` unless a live
+`SetLandSubtype` effect applies to the object. "A live `SetLandSubtype`" is one
+whose own source is `staticAbilitiesLive`; "applies to" is evaluated against
+**base** (printed) characteristics — "nonbasic" is a printed supertype fact and
+card-type `Land` is unchanged by any gate, so the recursion reads no projected
+value and terminates. A cycle (two lands stripping each other) trips a
+visited-set and both are treated as live — the CR 613.8b loop-escape analog, an
+expiry until a card needs more. `project` memoizes per object so the
+cross-object recursion (project a Forest → project its Urborg source → project
+Blood Moon) does the work once.
 
 ### 2.2 Worked outcomes
 
@@ -357,37 +363,46 @@ only the source of the type answer moves from the printed card to `Projection`.
 
 ## 5. Setup, decks, and testing
 
-**Testing follows the phased spine (§0), test set before resolver:**
+**Testing follows the phased spine (§0), test set before source-liveness:**
 
-**Phase 1 — Axis A, timestamp-only (passing):**
+**Phase 1 — Axis A, timestamp-only + appliers (passing, no source-liveness):**
 
-- **Blood Moon alone** (CR 305.7 set, 305.6): a nonbasic land projects to
-  subtypes {Mountain} and taps {R}; its printed keywords/abilities are stripped.
+- **The layer-4 appliers, unit-tested via directly-built effects** (`withEffect`,
+  `TheseObjects`): `SetLandSubtype Mountain` on a Forest → subtypes {Mountain},
+  keywords emptied; `AddLandSubtype Swamp` → subtypes gain Swamp; `AddCardType
+  Creature` → cardTypes gain Creature.
 - **Urborg alone** (CR 305.7 add, 305.6): every land projects Swamp in addition
-  and taps {B}; Urborg itself taps {B}.
+  and taps {B}; Urborg itself taps {B}. (No stripper present, so correct under
+  timestamp-only.)
 - **Opalescence alone** (CR 613 layers 4 + 7b, `Quantity.ManaValue`): a non-Aura
   enchantment projects as a Creature with base P/T = its mana value; it is a
   legal `CreatureTarget` and dies to a lethal-damage SBA.
 - **Humility + Opalescence, both 7b timestamp orders** (CR 613.7): real creature
   1/1 no abilities; Humility 1/1 or 4/4 by order; Opalescence a non-creature
   enchantment. Order controlled by placement sequence reading `nextTimestamp`
-  monotonicity (M3b's technique).
+  monotonicity (M3b's technique). (Cross-layer, no source-liveness needed.)
 
-**Phase 2 — the dependency test set (written here, failing against Phase 1):**
+**Phase 2 — the existence test set (written here, failing before source-liveness).**
+"Blood Moon alone" belongs here, not Phase 1: its only nonbasic target in the
+pool is Urborg, whose own "each land is a Swamp" is what CR 305.7 strips, so a
+correct outcome *requires* source-liveness.
 
-- **Blood Moon + Urborg + a Forest, Blood-Moon-older**, asserting the correct
-  outcome: Forest taps {G} only, the nonbasic land taps {R} only.
-- **Blood Moon + Urborg + a Forest, Urborg-older**, asserting the *same* correct
-  outcome. Fails under the timestamp-only fold (Forest wrongly taps {B}).
+- **Blood Moon on Urborg** (single): Urborg projects subtypes {Mountain} and taps
+  {R} only. Fails before source-liveness (Urborg's own Swamp survives → taps
+  {B} too).
+- **Blood Moon + Urborg + a Forest, Blood-Moon-older**: Forest taps {G} only, the
+  nonbasic land taps {R} only.
+- **Blood Moon + Urborg + a Forest, Urborg-older**: the *same* correct outcome.
+  Fails before source-liveness (Forest wrongly taps {B}).
 
   Ported from Argentum's `ClassicLayerScenariosTest.kt` / `LayerSystemTest.kt` as
   the target list, but asserting corrected outcomes — its Blood Moon test asserts
   a documented-wrong one (`prior-art-lessons.md`). Test names cite CR 613.8 +
   305.7.
 
-**Phase 3 — the resolver (makes Phase 2 pass): the go/no-go verdict.** If trial
-application cannot be made to pass Phase 2, Phases 1–2 are still sound and
-committed; the failure is isolated.
+**Phase 3 — source-liveness (makes Phase 2 pass): the go/no-go verdict.** If the
+memoized recursive-projection fixpoint cannot be made to pass Phase 2, Phases 1–2
+are still sound and committed; the failure is isolated.
 
 **Setup.** `emptyGame` is unchanged for the new counters (M3b already added
 `nextTimestamp`/`continuousEffects`); the fixtures place the enchantments and
@@ -407,7 +422,7 @@ is explicitly deferred past M3.
 **Properties** (`runMatch`, both matchups): every M2d/M3a/M3b invariant as it
 stands — conservation, termination, ids, no floating mana, life never increases,
 combat happens, green-black engagement. Replay determinism now covers the
-projected type line and the resolver's ordering in the serialized path. The
+projected type line and source-liveness in the serialized path. The
 benchmark stays on `redDeck`; throughput is watched for the deepened per-query
 projection cost (the coupling), not asserted.
 
@@ -415,21 +430,29 @@ projection cost (the coupling), not asserted.
 
 **Preserves:**
 
-- **The two invariants.** `Projection` is the sole `Modification` executor — the
-  resolver included; `Resolve` the sole `Effect` executor; no rules-core module
-  (`Combat`, `Damage`, `Sba`, `Engine`, `Cast`, `Target`, `Mana`) cases on
+- **The two invariants.** `Projection` is the sole `Modification` executor —
+  source-liveness included; `Resolve` the sole `Effect` executor; no rules-core
+  module (`Combat`, `Damage`, `Sba`, `Engine`, `Cast`, `Target`, `Mana`) cases on
   `Modification` or `Effect`. They ask `Projection.layer` / the projected reads.
 - **No forced prompt elided.** Target choice for `CreatureTarget` spells stays
-  prompted; the resolver makes no player choice.
+  prompted; source-liveness makes no player choice.
 - **Combat / SBA / Damage / Target logic:** unchanged; only printed→projected
   type reads move.
 - **`NamedFieldPuns`** per the M3b amendment; no new convention change.
 
 **Expiries this milestone opens:**
 
-- **Resolver completeness is the tracked metric.** The Phase-2 pairs are the
-  tripwire; any dependency shape the trial step fails to detect lands as a
-  failing test, never a doc claim (risk register D2 — the Argentum trap).
+- **The topological CR 613.8b resolver is deferred, tracked by a pending test.**
+  M3c resolves *existence* dependencies via source-liveness; the same-layer
+  *applies-to* reorder (apply B tentatively, observe A's affected set change,
+  reorder) has no M3c card to falsify it. A pending test with hand-built
+  same-layer effects records the gap so incompleteness is a failing/pending test,
+  never a doc claim (risk register D2 — the Argentum trap). Finding real cards
+  that exercise a same-layer applies-to dependency is a post-M3c task.
+- **Source-liveness completeness is the tracked metric.** The Phase-2 existence
+  pairs are the tripwire; a future ability-stripper other than `SetLandSubtype`
+  (e.g. `LoseAllAbilities` suppressing a static-ability source) extends
+  `staticAbilitiesLive` and lands with its own test.
 - **Layers still without producers**: 1 (copy), 2 (control), 5 (color), 7a
   (CDA), 7d (P/T switch) grow appliers with their first card. **Layer 3
   text-changing (Magical Hack) is M3d**, its own go/no-go.
