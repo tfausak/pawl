@@ -25,6 +25,7 @@ import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
+import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.AttackTarget as AttackTarget
@@ -129,7 +130,8 @@ testTree =
       trampleTests,
       trampleDeathtouchTests,
       m2cPropertyTests,
-      lintTests
+      lintTests,
+      targetTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -1885,6 +1887,36 @@ lintTests =
          in do
               HU.assertBool "an instant" (Card.isInstant card)
               HU.assertEqual "one slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget) (Card.Type.targetSpecs card)
+    ]
+
+targetTests :: Tasty.TestTree
+targetTests =
+  Tasty.testGroup
+    "Target"
+    [ HU.testCase "CR 115.4 AnyTarget offers every creature and every playing player" $
+        let (oid, gs) = addPiker bob (Setup.emptyGame bothPlayers)
+         in HU.assertEqual
+              "creature and both players"
+              (Set.fromList [Recipient.ToCreature oid, Recipient.ToPlayer alice, Recipient.ToPlayer bob])
+              (Target.legalRecipients TargetSpec.AnyTarget gs),
+      HU.testCase "a departed player is not a legal target" $
+        let gs = Sba.depart bob (Setup.emptyGame bothPlayers)
+         in HU.assertBool
+              "bob gone"
+              (not (Set.member (Recipient.ToPlayer bob) (Target.legalRecipients TargetSpec.AnyTarget gs))),
+      HU.testCase "CR 608.2b a creature that left its zone is no longer legal" $
+        let (oid, gs) = addPiker bob (Setup.emptyGame bothPlayers)
+            gone = Game.changeZone oid Zone.Graveyard gs
+         in do
+              HU.assertBool "legal while fielded" (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.AnyTarget gs)
+              HU.assertBool "illegal once moved" (not (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.AnyTarget gone)),
+      HU.testCase "legalSets maps each slot to its legal recipients" $
+        let specs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget
+            gs = Setup.emptyGame bothPlayers
+         in HU.assertEqual
+              "one slot, two players"
+              (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer alice, Recipient.ToPlayer bob]))
+              (Target.legalSets specs gs)
     ]
 
 turnTests :: Tasty.TestTree
