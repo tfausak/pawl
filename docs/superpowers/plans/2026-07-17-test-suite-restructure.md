@@ -80,7 +80,7 @@ Group-local helpers (`tramplingAnswer`, `discardLastAnswer`, `recordingAnswer`,
 `resolvedCreature`, and the various `*Answer`/scenario helpers used by exactly one
 group) STAY in `Main.hs` for now; they travel with their group in later tasks.
 
-- [ ] **Step 1: Create `Pawl.Support` with the module header and the moved definitions**
+- [x] **Step 1: Create `Pawl.Support` with the module header and the moved definitions**
 
 Create `source/test-suite/Pawl/Support.hs` beginning with:
 
@@ -99,7 +99,7 @@ already uses — copy the relevant import lines). Build errors from `Pawl.Suppor
 referencing a name still in `Main.hs` mean that name's definition must also move
 here; follow the closure until `Pawl.Support` compiles.
 
-- [ ] **Step 2: Register the module in `pawl.cabal` and wire `Main.hs`**
+- [x] **Step 2: Register the module in `pawl.cabal` and wire `Main.hs`**
 
 In the `test-suite pawl-test-suite` stanza, directly under `main-is: Main.hs`, add:
 
@@ -138,14 +138,14 @@ import Pawl.Support
 (Adjust the list to exactly the names you moved — the build will flag any
 mismatch.) `Main.hs`'s test bodies are otherwise untouched.
 
-- [ ] **Step 3: Build and run the full suite**
+- [x] **Step 3: Build and run the full suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -3`
 Expected: clean (warning-free).
 Run: `cabal test 2>&1 | grep -E "tests? passed|out of"`
 Expected: `All 261 tests passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/test-suite/Pawl/Support.hs source/test-suite/Main.hs pawl.cabal

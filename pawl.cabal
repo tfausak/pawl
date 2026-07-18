@@ -143,6 +143,7 @@ test-suite pawl-test-suite
 
   hs-source-dirs: source/test-suite
   main-is: Main.hs
+  other-modules: Pawl.Support
   type: exitcode-stdio-1.0
 
 benchmark pawl-benchmark
