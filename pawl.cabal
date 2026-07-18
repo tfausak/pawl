@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: pawl
-version: 0.2026.7.17
+version: 0.2026.7.18
 synopsis: Magic: the Gathering rules engine
 description:
   Pawl is a Magic: the Gathering rules engine.
@@ -143,6 +143,7 @@ test-suite pawl-test-suite
 
   hs-source-dirs: source/test-suite
   main-is: Main.hs
+  -- cabal-gild: discover source/test-suite --exclude source/test-suite/Main.hs
   other-modules:
     Pawl.CardSpec
     Pawl.CastSpec
