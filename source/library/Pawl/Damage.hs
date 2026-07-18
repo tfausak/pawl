@@ -146,10 +146,12 @@ gatherCombatDamage assigns = do
   pure (concat parts ++ fromBlockers)
 
 -- CR 120.3e / 120.3a: mark damage on creatures, drain life from players -- AND
--- emit each event into GameState.damageEvents. This is the change-and-emit funnel:
--- the sole place combat damage is applied and the sole place an event is recorded.
-applyCombatDamage :: [DamageEvent.DamageEvent] -> GameState -> GameState
-applyCombatDamage events gs =
+-- emit each event into GameState.damageEvents. This is the change-and-emit funnel
+-- for combat's two waves and resolving effects alike: the sole place damage is
+-- applied and the sole place an event is recorded, and (M3f) the one seam CR
+-- 614's replacement step will hook.
+applyDamage :: [DamageEvent.DamageEvent] -> GameState -> GameState
+applyDamage events gs =
   let markOne g ev = case DamageEvent.target ev of
         Recipient.ToCreature oid ->
           let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
@@ -204,4 +206,4 @@ dealCombatDamage = do
 dealWave :: (ObjectId -> Bool) -> Game ()
 dealWave assigns = do
   assignment <- gatherCombatDamage assigns
-  State.modify' (applyCombatDamage assignment)
+  State.modify' (applyDamage assignment)
