@@ -189,16 +189,21 @@ setLandSubtypeEffects gs =
 -- result is order-INDEPENDENT. A cycle trips the visited set (both treated as
 -- live -- the CR 613.8b loop-escape analog; expiry in the spec).
 staticAbilitiesLive :: ObjectId -> GameState -> Bool
-staticAbilitiesLive = staticAbilitiesLiveVisited Set.empty
+staticAbilitiesLive oid gs = liveGiven (setLandSubtypeEffects gs) Set.empty oid gs
 
-staticAbilitiesLiveVisited :: Set ObjectId -> ObjectId -> GameState -> Bool
-staticAbilitiesLiveVisited visited oid gs =
+-- The liveness fixpoint given the game's SetLandSubtype effects PRECOMPUTED. The
+-- list is hoisted here (rather than recomputed inside) so gather can compute it
+-- once per projection instead of once per permanent -- recomputing it per
+-- permanent made project O(permanents^3) per state-based-action sweep. An empty
+-- list means no stripper exists, so any strips [] is False and oid is live.
+liveGiven :: [(ObjectId, Affected.Affected)] -> Set ObjectId -> ObjectId -> GameState -> Bool
+liveGiven setEffs visited oid gs =
   Set.member oid visited
     || let visited' = Set.insert oid visited
            strips (src, aff) =
-             staticAbilitiesLiveVisited visited' src gs
+             liveGiven setEffs visited' src gs
                && affectsBase src oid aff gs
-        in not (any strips (setLandSubtypeEffects gs))
+        in not (any strips setEffs)
 
 -- Every continuous effect in the game: stored resolution effects, plus the
 -- static abilities of every battlefield permanent (CR 613.7a: with the
@@ -207,7 +212,8 @@ staticAbilitiesLiveVisited visited oid gs =
 -- per layer against the partial.
 gather :: GameState -> [Gathered]
 gather gs =
-  let fromStored eff =
+  let setEffs = setLandSubtypeEffects gs
+      fromStored eff =
         MkGathered
           { gSource = ContinuousEffect.source eff,
             gAffected = ContinuousEffect.affected eff,
@@ -229,7 +235,7 @@ gather gs =
         Just permObj -> case Game.cardOf permId gs of
           Nothing -> []
           Just card ->
-            if staticAbilitiesLive permId gs
+            if null setEffs || liveGiven setEffs Set.empty permId gs
               then map (fromStatic permId permObj) (Card.Type.staticAbilities card)
               else []
       static_ = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
