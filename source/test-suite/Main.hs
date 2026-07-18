@@ -133,7 +133,8 @@ testTree =
       m2cPropertyTests,
       lintTests,
       targetTests,
-      resolveTests
+      resolveTests,
+      fizzleTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -2064,6 +2065,75 @@ resolveTests =
             dead = Sba.checkStateBasedActions (markDamage (pikerOf base) 3 cast)
             after = Stack.resolveTop dead
          in HU.assertEqual "life totals unchanged" (Just 20) (lifeOf alice after)
+    ]
+
+-- Casts every castable spell (targets via lookupMin: creatures first),
+-- otherwise passes. Drives the Bolt-vs-Bolt integration falsifier.
+boltAnswer :: Prompt.Prompt r -> r
+boltAnswer p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    let isCast a = case a of
+          A.Cast _ -> True
+          _ -> False
+     in case filter isCast actions of
+          h : _ -> h
+          [] -> A.Pass
+  _ -> identityAnswer p
+
+-- bob's Piker on the battlefield; alice holds TWO Bolts and two Mountains, in
+-- her main phase. boltAnswer casts both (CR 117.3c keeps priority), both
+-- target the Piker (the only creature), and the priority loop resolves them
+-- LIFO: B kills the Piker, the mid-loop SBA buries it, A fizzles.
+twoBoltState :: GameState.GameState
+twoBoltState =
+  let (_, withPiker) = addPiker bob (mountainsInPlay 2)
+      (gs1, _oid1) = handOne Card.lightningBoltPrinting withPiker
+      (oid2, gs2) = Game.freshObjectId gs1
+      obj =
+        Object.MkObject
+          { Object.owner = alice,
+            Object.source = Source.OfCard Card.lightningBoltPrinting,
+            Object.zone = Zone.Hand,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled,
+            Object.targets = Map.empty
+          }
+   in gs2
+        { GameState.objects = Map.insert oid2 obj (GameState.objects gs2),
+          -- handOne already put oid1 in hand; ADD the second Bolt, oid2.
+          GameState.hand = Map.adjust (oid2 Seq.<|) alice (GameState.hand gs2)
+        }
+
+fizzleTests :: Tasty.TestTree
+fizzleTests =
+  Tasty.testGroup
+    "Fizzle"
+    [ HU.testCase "CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles" $
+        let after = snd (Engine.runGamePure boltAnswer twoBoltState Engine.priorityLoop)
+         in do
+              HU.assertEqual "stack cleared" 0 (length (GameState.stack after))
+              HU.assertEqual "Piker dead" 0 (creaturesInPlay bob after)
+              HU.assertEqual "both Bolts in alice's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard alice after))
+              HU.assertEqual "the Piker in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard bob after))
+              HU.assertEqual "bob's life untouched: the fizzled Bolt hit nothing" (Just 20) (lifeOf bob after),
+      HU.testCase "CR 704.5a a Bolt can end the game mid-step" $
+        let (gs, oid) = boltInHand 1 Phase.PrecombatMain
+            lowBob =
+              gs {GameState.players = Map.adjust (\pl -> pl {Player.life = 3}) bob (GameState.players gs)}
+            atBob :: Prompt.Prompt r -> r
+            atBob p = case p of
+              Prompt.ChooseTargets _ _ _ sets ->
+                Map.map (const (Recipient.ToPlayer bob)) sets
+              Prompt.ChooseAction _ _ actions ->
+                case filter (\a -> a == A.Cast oid) actions of
+                  h : _ -> h
+                  [] -> A.Pass
+              _ -> identityAnswer p
+            after = snd (Engine.runGamePure atBob lowBob Engine.priorityLoop)
+         in do
+              HU.assertEqual "alice wins" (Just (Result.Won alice)) (GameState.result after)
+              HU.assertEqual "the loop released priority" Nothing (GameState.priority after)
     ]
 
 turnTests :: Tasty.TestTree

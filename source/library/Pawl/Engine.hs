@@ -193,13 +193,22 @@ priorityLoop = do
                   then case GameState.stack gs of
                     [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
                     _ -> do
-                      let resolved = Stack.resolveTop gs
-                      State.put
-                        resolved
-                          { GameState.passes = 0,
-                            GameState.priority = Just (GameState.activePlayer resolved)
-                          }
-                      loop
+                      -- CR 117.5 / 704.3: state-based actions are performed
+                      -- before any player would receive priority -- which is
+                      -- exactly now, after a resolution. A creature the spell
+                      -- killed must be buried before the next player acts, and
+                      -- a game the spell ended must actually end.
+                      let resolved = Sba.checkStateBasedActions (Stack.resolveTop gs)
+                      case GameState.result resolved of
+                        Just _ ->
+                          State.put resolved {GameState.priority = Nothing, GameState.passes = 0}
+                        Nothing -> do
+                          State.put
+                            resolved
+                              { GameState.passes = 0,
+                                GameState.priority = Just (GameState.activePlayer resolved)
+                              }
+                          loop
                   else do
                     State.put
                       gs
