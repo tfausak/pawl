@@ -85,6 +85,7 @@ library
     Pawl.Type.DecisionLog
     Pawl.Type.Deck
     Pawl.Type.Departure
+    Pawl.Type.Effect
     Pawl.Type.EndingStep
     Pawl.Type.Game
     Pawl.Type.GameState
@@ -108,11 +109,13 @@ library
     Pawl.Type.Response
     Pawl.Type.Result
     Pawl.Type.Sickness
+    Pawl.Type.SlotName
     Pawl.Type.Source
     Pawl.Type.Status
     Pawl.Type.Subtype
     Pawl.Type.Supertype
     Pawl.Type.TapState
+    Pawl.Type.TargetSpec
     Pawl.Type.Toughness
     Pawl.Type.TypeLine
     Pawl.Type.Zone

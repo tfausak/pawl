@@ -1,5 +1,6 @@
 module Pawl.Card where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Type.Card as Card
@@ -34,7 +35,9 @@ mountainPrinting =
                 },
             Card.power = Nothing,
             Card.toughness = Nothing,
-            Card.keywords = Set.empty
+            Card.keywords = Set.empty,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -55,7 +58,9 @@ swampPrinting =
                 },
             Card.power = Nothing,
             Card.toughness = Nothing,
-            Card.keywords = Set.empty
+            Card.keywords = Set.empty,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -76,7 +81,9 @@ forestPrinting =
                 },
             Card.power = Nothing,
             Card.toughness = Nothing,
-            Card.keywords = Set.empty
+            Card.keywords = Set.empty,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -105,7 +112,9 @@ pikerPrinting =
                 },
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
-            Card.keywords = Set.empty
+            Card.keywords = Set.empty,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -142,7 +151,9 @@ birdMaidenPrinting =
                 },
             Card.power = Just (Power.MkPower (Quantity.Literal 1)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 2)),
-            Card.keywords = Set.singleton Keyword.Flying
+            Card.keywords = Set.singleton Keyword.Flying,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -171,7 +182,9 @@ nimbleBirdstickerPrinting =
                 },
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 3)),
-            Card.keywords = Set.singleton Keyword.Reach
+            Card.keywords = Set.singleton Keyword.Reach,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -199,7 +212,9 @@ ogreSentryPrinting =
                 },
             Card.power = Just (Power.MkPower (Quantity.Literal 3)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 3)),
-            Card.keywords = Set.singleton Keyword.Defender
+            Card.keywords = Set.singleton Keyword.Defender,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -229,7 +244,9 @@ windseekerCentaurPrinting =
                 },
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 2)),
-            Card.keywords = Set.singleton Keyword.Vigilance
+            Card.keywords = Set.singleton Keyword.Vigilance,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -255,7 +272,9 @@ goblinChariotPrinting =
                 },
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 2)),
-            Card.keywords = Set.singleton Keyword.Haste
+            Card.keywords = Set.singleton Keyword.Haste,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -286,7 +305,9 @@ sabretoothTigerPrinting =
                 },
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
-            Card.keywords = Set.singleton Keyword.FirstStrike
+            Card.keywords = Set.singleton Keyword.FirstStrike,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -312,7 +333,9 @@ ridgetopRaptorPrinting =
                 },
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
-            Card.keywords = Set.singleton Keyword.DoubleStrike
+            Card.keywords = Set.singleton Keyword.DoubleStrike,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -337,7 +360,9 @@ typhoidRatsPrinting =
                 },
             Card.power = Just (Power.MkPower (Quantity.Literal 1)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
-            Card.keywords = Set.singleton Keyword.Deathtouch
+            Card.keywords = Set.singleton Keyword.Deathtouch,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -365,7 +390,9 @@ warMammothPrinting =
                 },
             Card.power = Just (Power.MkPower (Quantity.Literal 3)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 3)),
-            Card.keywords = Set.singleton Keyword.Trample
+            Card.keywords = Set.singleton Keyword.Trample,
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -375,11 +402,17 @@ isLand c = Set.member CardType.Land (TypeLine.types (Card.typeLine c))
 isCreature :: Card.Card -> Bool
 isCreature c = Set.member CardType.Creature (TypeLine.types (Card.typeLine c))
 
+-- CR 304.1: an instant is castable whenever its controller has priority. The
+-- timing classification, shaped like isPermanent.
+isInstant :: Card.Card -> Bool
+isInstant c = Set.member CardType.Instant (TypeLine.types (Card.typeLine c))
+
 -- CR 110.1: the permanent card types. An enumeration -- closed half, finite.
 isPermanentType :: CardType.CardType -> Bool
 isPermanentType cardType = case cardType of
   CardType.Land -> True
   CardType.Creature -> True
+  CardType.Instant -> False
 
 -- The classification resolution dispatches on (CR 608.3). This is the whole
 -- reason the engine never needs to know WHICH card is resolving.

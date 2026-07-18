@@ -1828,7 +1828,30 @@ cardTests =
       -- CR 110.1: the classification resolution turns on. Never card identity.
       HU.testCase "CR 110.1 both a Piker and a Mountain are permanents" $ do
         HU.assertBool "piker" (Card.isPermanent pikerCard)
-        HU.assertBool "mountain" (Card.isPermanent (Printing.card Card.mountainPrinting))
+        HU.assertBool "mountain" (Card.isPermanent (Printing.card Card.mountainPrinting)),
+      HU.testCase "CR 110.1 an instant is not a permanent type" $
+        let instantLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Instant,
+                  TypeLine.subtypes = Set.empty
+                }
+            card =
+              Card.Type.MkCard
+                { Card.Type.name = Text.pack "Some Instant",
+                  Card.Type.manaCost = Nothing,
+                  Card.Type.typeLine = instantLine,
+                  Card.Type.power = Nothing,
+                  Card.Type.toughness = Nothing,
+                  Card.Type.keywords = Set.empty,
+                  Card.Type.effects = [],
+                  Card.Type.targetSpecs = Map.empty
+                }
+         in do
+              HU.assertBool "not a permanent" (not (Card.isPermanent card))
+              HU.assertBool "an instant" (Card.isInstant card),
+      HU.testCase "a Piker is not an instant" $
+        HU.assertBool "creature" (not (Card.isInstant pikerCard))
     ]
 
 turnTests :: Tasty.TestTree
@@ -2252,7 +2275,9 @@ syntheticDeathtramplerPrinting =
                 },
             Card.Type.power = Just (Power.MkPower (Quantity.Type.Literal 3)),
             Card.Type.toughness = Just (Toughness.MkToughness (Quantity.Type.Literal 3)),
-            Card.Type.keywords = Set.fromList [Keyword.Deathtouch, Keyword.Trample]
+            Card.Type.keywords = Set.fromList [Keyword.Deathtouch, Keyword.Trample],
+            Card.Type.effects = [],
+            Card.Type.targetSpecs = Map.empty
           }
     }
 

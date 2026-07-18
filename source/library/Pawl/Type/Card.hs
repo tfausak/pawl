@@ -1,10 +1,14 @@
 module Pawl.Type.Card where
 
+import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Data.Text (Text)
+import Pawl.Type.Effect (Effect)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
 import Pawl.Type.Power (Power)
+import Pawl.Type.SlotName (SlotName)
+import Pawl.Type.TargetSpec (TargetSpec)
 import Pawl.Type.Toughness (Toughness)
 import Pawl.Type.TypeLine (TypeLine)
 
@@ -22,6 +26,12 @@ data Card = MkCard
     --
     -- The closed half must read this through Pawl.Game.keywordsOf, never
     -- directly: layer 6 grants and removes abilities at M3.
-    keywords :: Set Keyword
+    keywords :: Set Keyword,
+    -- The card's rules text as data. Ordered: CR 608.2c resolves instructions
+    -- in the order written.
+    effects :: [Effect],
+    -- The target slots effects reference by name. A Map, not a parallel list:
+    -- slots have no order, only names, and nothing aligns by position.
+    targetSpecs :: Map SlotName TargetSpec
   }
   deriving (Eq, Ord, Show)
