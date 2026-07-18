@@ -36,6 +36,7 @@ import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.Effect as Effect
@@ -220,6 +221,7 @@ combatDamageTests =
 aggressiveAnswer :: Prompt.Prompt r -> r
 aggressiveAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction {} -> A.Pass
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.DeclareAttackers _ _ ids -> ids
@@ -745,7 +747,8 @@ addCreature printing pid gs =
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled
+            Object.sickness = Sickness.Settled,
+            Object.targets = Map.empty
           }
    in ( oid,
         gs1
@@ -878,6 +881,7 @@ sicknessTests =
 castAnswer :: Prompt.Prompt r -> r
 castAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -991,7 +995,8 @@ pikerInHand n ph =
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled
+            Object.sickness = Sickness.Settled,
+            Object.targets = Map.empty
           }
       gs2 =
         gs1
@@ -1063,6 +1068,7 @@ discardLastAnswer p = case p of
       [] -> Map.empty
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> A.Pass
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> lastN (fromIntegral n) ids
 
 lastN :: Int -> [a] -> [a]
@@ -1154,7 +1160,8 @@ landsInPlay land n =
                   Object.zone = Zone.Battlefield,
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
-                  Object.sickness = Sickness.Settled
+                  Object.sickness = Sickness.Settled,
+                  Object.targets = Map.empty
                 }
          in gs1
               { GameState.objects = Map.insert oid obj (GameState.objects gs1),
@@ -1177,7 +1184,8 @@ handOne printing base =
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled
+            Object.sickness = Sickness.Settled,
+            Object.targets = Map.empty
           }
    in ( gs1
           { GameState.objects = Map.insert oid obj (GameState.objects gs1),
@@ -1315,7 +1323,8 @@ oneMountainState ph =
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Sick
+            Object.sickness = Sickness.Sick,
+            Object.targets = Map.empty
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -1361,10 +1370,24 @@ gameTests =
                       Object.zone = Zone.Battlefield,
                       Object.tapped = TapState.Untapped,
                       Object.damage = 0,
-                      Object.sickness = Sickness.Sick
+                      Object.sickness = Sickness.Sick,
+                      Object.targets = Map.empty
                     }
               )
-              (Game.lookupObject (ObjectId.MkObjectId 1) after)
+              (Game.lookupObject (ObjectId.MkObjectId 1) after),
+          HU.testCase "CR 400.7 changeZone forgets a spell's targets" $
+            let base = oneMountainState Phase.PrecombatMain
+                stamped =
+                  base
+                    { GameState.objects =
+                        Map.adjust
+                          (\o -> o {Object.targets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToPlayer alice)})
+                          (ObjectId.MkObjectId 0)
+                          (GameState.objects base)
+                    }
+                moved = Game.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
+                landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
+             in HU.assertEqual "reset" [Map.empty] (map Object.targets landed)
         ]
 
 actionTests :: Tasty.TestTree
@@ -1393,6 +1416,7 @@ identityAnswer p = case p of
       [] -> Map.empty
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> A.Pass
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
 
 setupState :: GameState.GameState
@@ -1468,6 +1492,7 @@ goldfishResult =
 playLandAnswer :: Prompt.Prompt r -> r
 playLandAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -1531,7 +1556,12 @@ replayTests =
               recorded /= snd (Replay.replay [] start game),
           HU.testCase "a recorded goldfish also replays" $
             let ((_, gf), gfLog) = Replay.record identityAnswer start game
-             in HU.assertEqual "goldfish" gf (snd (Replay.replay gfLog start game))
+             in HU.assertEqual "goldfish" gf (snd (Replay.replay gfLog start game)),
+          HU.testCase "a ChooseTargets answer round-trips through the transcript" $
+            let sets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.singleton (Recipient.ToPlayer bob))
+                p = Prompt.ChooseTargets (Decider.MkDecider alice) alice (ObjectId.MkObjectId 0) sets
+                answer = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToPlayer bob)
+             in HU.assertEqual "decode . encode = Just" (Just answer) (Replay.decode p (Replay.encode p answer))
         ]
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
@@ -1568,6 +1598,16 @@ randomAnswer p = case p of
         (i, g') = Random.uniformR (0, max 0 (n - 1)) g
     State.put g'
     pure (pick actions (min (n - 1) (max 0 i)))
+  Prompt.ChooseTargets _ _ _ sets ->
+    let pickFrom s = do
+          g <- State.get
+          let xs = Set.toList s
+              (i, g') = Random.uniformR (0, max 0 (length xs - 1)) g
+          State.put g'
+          pure $ case drop (min (max 0 i) (max 0 (length xs - 1))) xs of
+            h : _ -> Just h
+            [] -> Nothing
+     in fmap (Map.mapMaybe id) (traverse pickFrom sets)
 
 -- Total index into a list; the engine always offers at least Pass, so the
 -- fallback is unreachable in practice but keeps this free of partial functions.
@@ -1705,6 +1745,7 @@ recordingAnswer p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.Shuffle ids -> pure ids
+  Prompt.ChooseTargets _ _ _ sets -> pure (Map.mapMaybe Set.lookupMin sets)
   Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
   Prompt.ChooseAction _ pid actions -> do
     State.modify' (\asked -> asked ++ [pid])

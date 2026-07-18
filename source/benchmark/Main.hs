@@ -2,6 +2,7 @@
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Setup as Setup
@@ -29,6 +30,7 @@ alwaysPass p = case p of
     case filter isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
 
 -- Casts when legal, otherwise passes: the benchmark that actually exercises the
 -- stack, mana payment, and resolution.
@@ -42,6 +44,7 @@ castAnswer p = case p of
     case filter isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
           Action.Cast _ -> True
@@ -63,6 +66,7 @@ fightAnswer p = case p of
     case filter isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
           Action.Cast _ -> True

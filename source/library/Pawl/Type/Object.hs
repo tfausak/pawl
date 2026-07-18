@@ -1,8 +1,11 @@
 module Pawl.Type.Object where
 
+import Data.Map.Strict (Map)
 import Numeric.Natural (Natural)
 import Pawl.Type.PlayerId (PlayerId)
+import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.Sickness (Sickness)
+import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Source (Source)
 import Pawl.Type.TapState (TapState)
 import Pawl.Type.Zone (Zone)
@@ -20,6 +23,10 @@ data Object = MkObject
     -- Removed at cleanup (CR 514.2). Per-incarnation state: reset by changeZone.
     damage :: Natural,
     -- CR 302.6. Per-incarnation state: reset by changeZone.
-    sickness :: Sickness
+    sickness :: Sickness,
+    -- CR 601.2c: the targets chosen while casting, by slot name. Empty for
+    -- everything but a spell on the stack. Per-incarnation state: reset by
+    -- changeZone, so CR 400.7 forgets them when the spell moves.
+    targets :: Map SlotName Recipient
   }
   deriving (Eq, Ord, Show)

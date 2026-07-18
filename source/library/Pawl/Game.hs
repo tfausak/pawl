@@ -79,7 +79,7 @@ changeZone oid dest gs = case lookupObject oid gs of
   Just obj ->
     let pid = Object.owner obj
         (newId, gs1) = freshObjectId gs
-        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick}
+        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.targets = Map.empty}
         gs2 = removeFromZones pid oid gs1
         gs3 = gs2 {GameState.objects = Map.insert newId newObj (Map.delete oid (GameState.objects gs2))}
      in insertIntoZone dest pid newId gs3

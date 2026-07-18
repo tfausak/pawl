@@ -3,12 +3,14 @@
 module Pawl.Type.Prompt where
 
 import Data.Map.Strict (Map)
+import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
 import Pawl.Type.Decider (Decider)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
+import Pawl.Type.SlotName (SlotName)
 
 data Prompt r where
   ChooseAction :: Decider -> PlayerId -> [Action] -> Prompt Action
@@ -28,3 +30,8 @@ data Prompt r where
   -- thresholds are. Not asked when the division is forced (single blocker, no
   -- excess). Validation is Damage.legalAssignment. See the M2c spec, section 4.
   AssignCombatDamage :: Decider -> PlayerId -> ObjectId -> Map Recipient Natural -> Natural -> Prompt (Map Recipient Natural)
+  -- CR 601.2c. One legal-recipient set per named slot of the spell being cast
+  -- (the ObjectId); the answer fills every slot. Slots agree by NAME, never by
+  -- position. Not asked when the spell has no slots: zero slots is no choice
+  -- at all, and where the rules leave nothing to ask, don't prompt.
+  ChooseTargets :: Decider -> PlayerId -> ObjectId -> Map SlotName (Set Recipient) -> Prompt (Map SlotName Recipient)

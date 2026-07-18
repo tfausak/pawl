@@ -5,6 +5,7 @@ module Pawl.Replay where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Type.Action as Action
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
@@ -25,6 +26,7 @@ encode p answer = case p of
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
   Prompt.DeclareBlockers {} -> Response.DeclaredBlockers answer
   Prompt.AssignCombatDamage {} -> Response.AssignedCombatDamage answer
+  Prompt.ChooseTargets {} -> Response.ChoseTargets answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -53,6 +55,9 @@ decode p response = case p of
   Prompt.AssignCombatDamage {} -> case response of
     Response.AssignedCombatDamage assignment -> Just assignment
     _ -> Nothing
+  Prompt.ChooseTargets {} -> case response of
+    Response.ChoseTargets chosen -> Just chosen
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -78,6 +83,9 @@ defaultAnswer p = case p of
      in case blockers of
           r : _ -> Map.singleton r n
           [] -> Map.empty
+  -- One legal recipient per slot, chosen deterministically (the minimum). A
+  -- slot with no legal recipient stays unfilled -- casting rejects that answer.
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])
