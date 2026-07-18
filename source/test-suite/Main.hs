@@ -132,7 +132,8 @@ testTree =
       trampleDeathtouchTests,
       m2cPropertyTests,
       lintTests,
-      targetTests
+      targetTests,
+      resolveTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -2017,6 +2018,37 @@ targetTests =
               "one slot, two players"
               (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer alice, Recipient.ToPlayer bob]))
               (Target.legalSets specs gs)
+    ]
+
+resolveTests :: Tasty.TestTree
+resolveTests =
+  Tasty.testGroup
+    "Resolve"
+    [ HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $
+        let (_, cast, _) = boltAtBobsPiker
+            after = Sba.checkStateBasedActions (Stack.resolveTop cast)
+         in do
+              HU.assertEqual "stack empty" 0 (length (GameState.stack after))
+              HU.assertEqual "no creature survives" 0 (creaturesInPlay bob after)
+              HU.assertEqual "Piker in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard bob after)),
+      HU.testCase "CR 608.2n the resolved Bolt is in its owner's graveyard" $
+        let (_, cast, _) = boltAtBobsPiker
+            after = Stack.resolveTop cast
+         in HU.assertEqual "one card" 1 (length (Game.zoneMembers Zone.Graveyard alice after)),
+      HU.testCase "CR 120.3a a Bolt at a player drains life without marking" $
+        -- No creature on the battlefield, so identityAnswer's lookupMin picks
+        -- ToPlayer alice: a self-Bolt, which is legal Magic.
+        let (gs, oid) = boltInHand 1 Phase.PrecombatMain
+            cast = snd (Engine.runGamePure identityAnswer gs (Cast.castSpell alice oid))
+            after = Stack.resolveTop cast
+         in HU.assertEqual "seventeen" (Just 17) (lifeOf alice after),
+      HU.testCase "the resolved damage flows through the event funnel" $
+        let (_, cast, _) = boltAtBobsPiker
+            after = Stack.resolveTop cast
+         in HU.assertEqual "one event of amount 3" [3] (map DamageEvent.amount (GameState.damageEvents after)),
+      HU.testCase "resolving a Bolt conserves objects" $
+        let (_, cast, _) = boltAtBobsPiker
+         in HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (Stack.resolveTop cast))
     ]
 
 turnTests :: Tasty.TestTree
