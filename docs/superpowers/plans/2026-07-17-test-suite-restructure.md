@@ -468,7 +468,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Produces: `CastSpec.tests` grouping `castTests`, `castEngineTests`,
   `stackTests`, `discardTests`, `sicknessTests`.
 
-- [ ] **Step 1: Create the spec module**
+- [x] **Step 1: Create the spec module**
 
 ```haskell
 -- Covers Pawl.Cast and Pawl.Stack: cast timing, the stack, discard, and
@@ -489,13 +489,13 @@ tests =
     [castTests, castEngineTests, stackTests, discardTests, sicknessTests]
 ```
 
-- [ ] **Step 2: Wire into `Main.hs`** — delete the five groups, `import qualified
+- [x] **Step 2: Wire into `Main.hs`** — delete the five groups, `import qualified
   Pawl.CastSpec`, replace entries with `CastSpec.tests`, prune unused imports.
 
-- [ ] **Step 3: Register and build** — add to `other-modules` if hand-listed;
+- [x] **Step 3: Register and build** — add to `other-modules` if hand-listed;
   build clean; `cabal test` → `All 261 tests passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/test-suite/Pawl/CastSpec.hs source/test-suite/Main.hs pawl.cabal

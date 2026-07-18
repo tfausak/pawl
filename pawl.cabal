@@ -145,6 +145,7 @@ test-suite pawl-test-suite
   main-is: Main.hs
   other-modules:
     Pawl.CardSpec
+    Pawl.CastSpec
     Pawl.CoreSpec
     Pawl.GameSpec
     Pawl.ManaSpec
