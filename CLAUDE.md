@@ -206,7 +206,8 @@ follow them without being asked. Full rationale in the style section of
 - **One type per module** under `Pawl.Type.<TypeName>` (type + instances only);
   cross-type logic lives in other `Pawl.*` modules. A module never imports its
   parents; a sibling `Pawl.Type.*` import is fine. Only `GADTs` and `RankNTypes`
-  are permitted (the suspension core); nothing else.
+  are permitted (the suspension core), plus `NamedFieldPuns` per the extensions
+  note above; nothing else.
 - **Qualified imports**, aliased to the last component (`Data.List` → `List`);
   import operators unqualified. One import group, no first/third-party split.
   `A.B.C` must not import `A.B` or `A`.
