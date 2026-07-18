@@ -68,6 +68,7 @@ library
     Pawl.Mana
     Pawl.Quantity
     Pawl.Replay
+    Pawl.Resolve
     Pawl.Sba
     Pawl.Setup
     Pawl.Stack

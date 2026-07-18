@@ -21,6 +21,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Replay as Replay
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -36,6 +37,7 @@ import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.Departure as Departure
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
@@ -59,10 +61,12 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
@@ -124,7 +128,8 @@ testTree =
       assignmentLegalityTests,
       trampleTests,
       trampleDeathtouchTests,
-      m2cPropertyTests
+      m2cPropertyTests,
+      lintTests
     ]
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
@@ -1852,6 +1857,34 @@ cardTests =
               HU.assertBool "an instant" (Card.isInstant card),
       HU.testCase "a Piker is not an instant" $
         HU.assertBool "creature" (not (Card.isInstant pikerCard))
+    ]
+
+-- The D4 dataflow lint: every slot an effect reads is declared, and every
+-- declared slot is read. Equality, not subset: a spec no effect reads is a
+-- card announcing a target it ignores -- representable in Magic, not in this
+-- pool. Loosen to superset if such a card ever lands.
+lintTests :: Tasty.TestTree
+lintTests =
+  Tasty.testGroup
+    "Lint"
+    [ HU.testCase "every printing's slot reads equal its declared slots" $
+        let reads_ card = Set.unions (map Resolve.slotsOf (Card.Type.effects card))
+            writes card = Map.keysSet (Card.Type.targetSpecs card)
+            offenders =
+              filter
+                (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
+                Card.allPrintings
+         in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
+      HU.testCase "the registry holds every printing (14 at M3a)" $
+        HU.assertEqual "count" 14 (length Card.allPrintings),
+      HU.testCase "the lint itself catches a dangling reference" $
+        let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
+         in HU.assertBool "misauthored card detected" (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)),
+      HU.testCase "Lightning Bolt is in the red pool with one AnyTarget slot" $
+        let card = Printing.card Card.lightningBoltPrinting
+         in do
+              HU.assertBool "an instant" (Card.isInstant card)
+              HU.assertEqual "one slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget) (Card.Type.targetSpecs card)
     ]
 
 turnTests :: Tasty.TestTree

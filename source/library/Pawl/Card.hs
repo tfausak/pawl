@@ -6,6 +6,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
@@ -13,8 +14,10 @@ import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
+import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TypeLine as TypeLine
 
@@ -395,6 +398,53 @@ warMammothPrinting =
             Card.targetSpecs = Map.empty
           }
     }
+
+-- Lightning Bolt: {R}, Instant, "Lightning Bolt deals 3 damage to any target."
+-- The first card whose rules text is DATA. Verified against Scryfall
+-- (api.scryfall.com/cards/named?exact=Lightning+Bolt); it has no Gatherer
+-- rulings at all, so there is no Q&A-shaped edge case for this pool to miss
+-- (design.md section 4; the M3a spec, section 6).
+lightningBoltPrinting :: Printing.Printing
+lightningBoltPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Lightning Bolt",
+            Card.manaCost =
+              Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)]),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Instant,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3)],
+            Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget
+          }
+    }
+
+-- The registry the dataflow lint and future golden tests iterate. A printing
+-- not listed here escapes the hygiene net -- add every new printing.
+allPrintings :: [Printing.Printing]
+allPrintings =
+  [ mountainPrinting,
+    swampPrinting,
+    forestPrinting,
+    pikerPrinting,
+    birdMaidenPrinting,
+    nimbleBirdstickerPrinting,
+    ogreSentryPrinting,
+    windseekerCentaurPrinting,
+    goblinChariotPrinting,
+    sabretoothTigerPrinting,
+    ridgetopRaptorPrinting,
+    typhoidRatsPrinting,
+    warMammothPrinting,
+    lightningBoltPrinting
+  ]
 
 isLand :: Card.Card -> Bool
 isLand c = Set.member CardType.Land (TypeLine.types (Card.typeLine c))
