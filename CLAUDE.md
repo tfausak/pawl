@@ -81,14 +81,29 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   No new rules, zero opcodes. `git-bug 14138aa` is closed). Spec and plan kept as
   reference: `docs/superpowers/specs/2026-07-17-m2d-castable-decks-design.md` and
   `docs/superpowers/plans/2026-07-17-m2d-castable-decks.md`.
-- **Current work is M3** — the layer system and the first real ABI test (Magical
-  Hack, Humility/Opalescence, Mindslaver), where a granted/removed keyword makes
+- **M3a is complete** (the first opcode — Lightning Bolt as data. A first-order,
+  non-recursive `Effect` AST (`DealDamage SlotName Quantity`) referenced by named
+  slots (`SlotName`), with `Pawl.Resolve` the *sole* module that may `case` on an
+  `Effect` — executor plus `slotsOf`, the read half of the D4 dataflow lint that
+  equates every printing's slot reads to its declared `targetSpecs`. `Pawl.Target`
+  owns targeting legality (CR 115.4 `AnyTarget`), shared by casting and the CR
+  608.2b re-validation. Casting prompts `ChooseTargets`, reject-not-repair, and
+  stamps `Object.targets` on the new stack incarnation (reset by `changeZone`, CR
+  400.7); `Cast` honors CR 117.1a instant speed. `Resolve.resolveSpell` runs the
+  executor through the generalized `Damage.applyDamage` funnel, buries to the
+  graveyard (CR 608.2n), and fizzles when every target is illegal (CR 608.2b). The
+  priority loop checks state-based actions after each resolution (CR 117.5) and
+  bails on a result. `Engine.runMatch`/`runMatchPure` derive the player list from
+  the matchup — `git-bug 15de615` is closed — and four Lightning Bolts in
+  `redDeck` give instant speed random-game coverage. Spec and plan kept as
+  reference: `docs/superpowers/specs/2026-07-17-m3a-effects-design.md` and
+  `docs/superpowers/plans/2026-07-17-m3a-effects.md`.
+- **Current work is M3b** — continuous effects: the single-effect layer system
+  and durations (Giant Growth, a keyword granter, Humility solo — per the M3a–M3g
+  split table in `docs/design.md`). This is where a granted/removed keyword makes
   the M2c live-projection reads (deathtouch at SBA time, the trample threshold)
-  and CR 702.2e's last-known-information load-bearing; M2d (castable black/green
-  decks) landed first. M3 is split into **M3a–M3g** — one structural axis per
-  letter, gates and falsifiers in the split table in `docs/design.md`; the
-  go/no-go verdict arrives at the end of M3d. `git-bug 15de615` lands at the
-  front of M3a.
+  and CR 702.2e's last-known-information load-bearing. The go/no-go verdict on the
+  whole approach arrives at the end of M3d.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
