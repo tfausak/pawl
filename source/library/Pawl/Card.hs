@@ -39,6 +39,7 @@ mountainPrinting =
             Card.power = Nothing,
             Card.toughness = Nothing,
             Card.keywords = Set.empty,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -62,6 +63,7 @@ swampPrinting =
             Card.power = Nothing,
             Card.toughness = Nothing,
             Card.keywords = Set.empty,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -85,6 +87,7 @@ forestPrinting =
             Card.power = Nothing,
             Card.toughness = Nothing,
             Card.keywords = Set.empty,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -116,6 +119,7 @@ pikerPrinting =
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
             Card.keywords = Set.empty,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -155,6 +159,7 @@ birdMaidenPrinting =
             Card.power = Just (Power.MkPower (Quantity.Literal 1)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 2)),
             Card.keywords = Set.singleton Keyword.Flying,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -186,6 +191,7 @@ nimbleBirdstickerPrinting =
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 3)),
             Card.keywords = Set.singleton Keyword.Reach,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -216,6 +222,7 @@ ogreSentryPrinting =
             Card.power = Just (Power.MkPower (Quantity.Literal 3)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 3)),
             Card.keywords = Set.singleton Keyword.Defender,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -248,6 +255,7 @@ windseekerCentaurPrinting =
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 2)),
             Card.keywords = Set.singleton Keyword.Vigilance,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -276,6 +284,7 @@ goblinChariotPrinting =
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 2)),
             Card.keywords = Set.singleton Keyword.Haste,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -309,6 +318,7 @@ sabretoothTigerPrinting =
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
             Card.keywords = Set.singleton Keyword.FirstStrike,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -337,6 +347,7 @@ ridgetopRaptorPrinting =
             Card.power = Just (Power.MkPower (Quantity.Literal 2)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
             Card.keywords = Set.singleton Keyword.DoubleStrike,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -364,6 +375,7 @@ typhoidRatsPrinting =
             Card.power = Just (Power.MkPower (Quantity.Literal 1)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
             Card.keywords = Set.singleton Keyword.Deathtouch,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -394,6 +406,7 @@ warMammothPrinting =
             Card.power = Just (Power.MkPower (Quantity.Literal 3)),
             Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 3)),
             Card.keywords = Set.singleton Keyword.Trample,
+            Card.staticAbilities = [],
             Card.effects = [],
             Card.targetSpecs = Map.empty
           }
@@ -421,6 +434,7 @@ lightningBoltPrinting =
             Card.power = Nothing,
             Card.toughness = Nothing,
             Card.keywords = Set.empty,
+            Card.staticAbilities = [],
             Card.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3)],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget
           }

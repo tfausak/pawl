@@ -472,6 +472,7 @@ oneMountainState ph =
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.damageEvents = [],
+          GameState.continuousEffects = [],
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,
           GameState.phase = ph,

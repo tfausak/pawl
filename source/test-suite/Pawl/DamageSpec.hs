@@ -352,6 +352,7 @@ syntheticDeathtramplerPrinting =
             Card.Type.power = Just (Power.MkPower (Quantity.Type.Literal 3)),
             Card.Type.toughness = Just (Toughness.MkToughness (Quantity.Type.Literal 3)),
             Card.Type.keywords = Set.fromList [Keyword.Deathtouch, Keyword.Trample],
+            Card.Type.staticAbilities = [],
             Card.Type.effects = [],
             Card.Type.targetSpecs = Map.empty
           }

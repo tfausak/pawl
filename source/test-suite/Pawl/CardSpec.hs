@@ -132,6 +132,7 @@ cardTests =
                   Card.Type.power = Nothing,
                   Card.Type.toughness = Nothing,
                   Card.Type.keywords = Set.empty,
+                  Card.Type.staticAbilities = [],
                   Card.Type.effects = [],
                   Card.Type.targetSpecs = Map.empty
                 }

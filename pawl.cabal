@@ -75,6 +75,7 @@ library
     Pawl.Target
     Pawl.Turn
     Pawl.Type.Action
+    Pawl.Type.Affected
     Pawl.Type.AttackTarget
     Pawl.Type.BeginningStep
     Pawl.Type.Card
@@ -82,21 +83,25 @@ library
     Pawl.Type.Color
     Pawl.Type.Combat
     Pawl.Type.CombatStep
+    Pawl.Type.ContinuousEffect
     Pawl.Type.DamageEvent
     Pawl.Type.Decider
     Pawl.Type.DecisionLog
     Pawl.Type.Deck
     Pawl.Type.Departure
+    Pawl.Type.Duration
     Pawl.Type.Effect
     Pawl.Type.EndingStep
     Pawl.Type.Game
     Pawl.Type.GameState
     Pawl.Type.Keyword
+    Pawl.Type.Layer
     Pawl.Type.Mana
     Pawl.Type.ManaCost
     Pawl.Type.ManaSymbol
     Pawl.Type.ManaType
     Pawl.Type.ManaUnit
+    Pawl.Type.Modification
     Pawl.Type.Object
     Pawl.Type.ObjectId
     Pawl.Type.Phase
@@ -105,6 +110,7 @@ library
     Pawl.Type.Power
     Pawl.Type.Printing
     Pawl.Type.Program
+    Pawl.Type.ProjectedCharacteristics
     Pawl.Type.Prompt
     Pawl.Type.Quantity
     Pawl.Type.Recipient
@@ -113,6 +119,7 @@ library
     Pawl.Type.Sickness
     Pawl.Type.SlotName
     Pawl.Type.Source
+    Pawl.Type.StaticAbility
     Pawl.Type.Status
     Pawl.Type.Subtype
     Pawl.Type.Supertype

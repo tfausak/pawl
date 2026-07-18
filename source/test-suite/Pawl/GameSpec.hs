@@ -20,6 +20,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
+import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
@@ -122,7 +123,11 @@ gameTests =
                   HU.assertEqual "the incarnation carries the pre-move next timestamp" (Just before) stamp
                   HU.assertBool "the counter advanced" (GameState.nextTimestamp movedState > before),
           HU.testCase "emptyGame starts the timestamp counter at zero" $
-            HU.assertEqual "zero" (Timestamp.MkTimestamp 0) (GameState.nextTimestamp (Setup.emptyGame S.bothPlayers))
+            HU.assertEqual "zero" (Timestamp.MkTimestamp 0) (GameState.nextTimestamp (Setup.emptyGame S.bothPlayers)),
+          HU.testCase "a fresh game has no continuous effects" $
+            HU.assertEqual "empty" [] (GameState.continuousEffects (Setup.emptyGame S.bothPlayers)),
+          HU.testCase "a vanilla printing declares no static abilities" $
+            HU.assertEqual "empty" [] (Card.Type.staticAbilities S.pikerCard)
         ]
 
 actionTests :: Tasty.TestTree

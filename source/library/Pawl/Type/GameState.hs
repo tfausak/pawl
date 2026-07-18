@@ -5,6 +5,7 @@ import Data.Sequence (Seq)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Combat (Combat)
+import Pawl.Type.ContinuousEffect (ContinuousEffect)
 import Pawl.Type.DamageEvent (DamageEvent)
 import Pawl.Type.Mana (Mana)
 import Pawl.Type.Object (Object)
@@ -31,6 +32,10 @@ data GameState = MkGameState
     -- CR 510: combat damage dealt this step, as events, for the SBA to read.
     -- The change-and-emit funnel's log; drained at each SBA check (Sba). See spec §2.
     damageEvents :: [DamageEvent],
+    -- CR 611.2: stored continuous effects from resolutions (Giant Growth,
+    -- Serpent's Gift), each with a duration cleanup consults. Static-ability
+    -- effects are NOT here -- the projection re-derives those live.
+    continuousEffects :: [ContinuousEffect],
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
     phase :: Phase,
