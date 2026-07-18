@@ -77,7 +77,7 @@ Bake a shuffled library into `GameState` on day one and you will fight this fore
 
 ### 2.3 Decider ≠ player
 
-Note the `Decider` field, separate from `PlayerId`. Rule **722 (Controlling Another Player)** is a rules section, not a card hack. Mindslaver, Word of Command, and Sen Triplets all fall out of getting this type right on day one and are a rewrite if you don't.
+Note the `Decider` field, separate from `PlayerId`. Rule **723 (Controlling Another Player)** is a rules section, not a card hack. Mindslaver, Word of Command, and Sen Triplets all fall out of getting this type right on day one and are a rewrite if you don't.
 
 ### 2.4 Multiplayer from the start
 
@@ -277,6 +277,33 @@ A 2026-07-17 audit of the specs against the code found these committed nowhere, 
 2. **Effect ≡ event.** MedeaMelana's Magic shapes each primitive effect so the effect value *is* the event value, flowing through one pipeline: propose → replacement-rewrite (614) → apply → emit for triggers (603). One vocabulary wires replacements and triggers together, and D3 (copy resolved at entry) is the same seam. Rest in Peace is the gate card that proves it.
 3. **Binding.** How does a first-order effect reference prior choices and payments — "if {B} was spent to cast this," "for each," a mode chosen earlier, X? mtg-pure hit this wall and punted (§10.1's cost-continuation warning). The answer for a first-order DSL is named binding slots, not lambdas; M1a's mana-unit provenance is already the closed-half half of it. This shapes every opcode's fields — decide it with the first dozen, not at opcode #150.
 
+#### The split: M3a–M3g *(planning pass 2026-07-17, at M2d's completion — pre-spec)*
+
+The five gate cards are the right five — each attacks a different load-bearing wall, and nothing in them is premature (no Attach, no protection, no copy; D3 stays deferred). But each drags in an entire subsystem that does not exist at M2d: nothing targets, nothing casts at instant speed, there is no activated ability beyond the intrinsic CR 305.6 tap, no triggered ability, no continuous effect, no replacement, no search. M3 as one milestone is seven independent axes wearing one number. Same discipline as M2: **one structural axis per letter, each carrying the card that falsifies its own naive implementation.**
+
+| | Axis | Gates | Falsifier |
+|---|---|---|---|
+| **M3a** | Effects as data: the DSL core, targeting, instant speed | Lightning Bolt | Bolt-vs-Bolt: CR 608.2b re-checks target legality at resolution, so stored-resolved-targets is wrong — forces symbolic late-binding targets |
+| **M3b** | The projection generalized: continuous effects, single-effect layers, durations | Giant Growth; a real keyword granter/remover; Humility solo | Grant/remove deathtouch between damage-deal and SBA check: `Sba.woundedByDeathtouch`'s live read (its comment names this expiry) becomes wrong; `DamageEvent` grows a deal-time deathtouch bit (CR 702.2c/702.2e) |
+| **M3c** | CR 613.8 dependency: trial application — **the go/no-go** | Humility + Opalescence, both timestamp orders; Blood Moon + Urborg, both orders | Blood Moon/Urborg is the pair Argentum couldn't represent; port its layer tests but assert *correct* outcomes — its Blood Moon test asserts a documented wrong one |
+| **M3d** | Layer 3: the rewritable AST | Magical Hack — on a permanent *and* on a spell on the stack | A hacked basic Mountain taps for the new color with zero special cases, purely because CR 305.6 reads the projected type line (CR 612.1: text-changing covers type-line text) |
+| **M3e** | Abilities on the stack: activation (CR 602), non-mana costs, the CR 605 classification | Prodigal Sorcerer (reuses DealDamage); Evolving Wilds (sacrifice cost, Search) | Mana abilities must *not* go on the stack — CR 605.1a is literally an ABI predicate, the classification bit Shandalar, Duels, and Arena all independently grew (§8.2) |
+| **M3f** | The event pipeline: triggers (603) + replacements (614) | Rest in Peace, whole card | RiP must catch a *token* dying and a *spell* going to the graveyard from the stack (a resolved Bolt gets exiled) — replacement at the `changeZone` funnel, not a battlefield-only hook; plus the three-pass trigger scan (§4-M0) |
+| **M3g** | The payoff pair: Decider (CR 723) + re-entrancy | Mindslaver; Panglacial Wurm | Mindslaver: prompts aimed at the controlled player route to the controller while resource ownership stays put (Argentum's `actorFor`). Panglacial: cast mid-search *while Evolving Wilds' ability is still resolving*, then the search continues (CR 605.3a permits mana activation mid-resolution) |
+
+Notes the letters' specs must not lose:
+
+- **Ordering.** a→b→c→d front-loads the two bets no prior art has ever landed — trial application and the rewritable AST. **The go/no-go verdict arrives at the end of M3d, not M3g**: e–g validate seams prior art already proves work (ygopro's suspension protocol at 13k cards, Argentum's `actorFor`). If the architecture is going to die, it dies by M3d. M3e must precede M3g (Mindslaver and Evolving Wilds both need activation); e/f are otherwise independent of b/c/d.
+- **The vocabulary is three leaf families, not twelve opcodes.** Tallied against the gates' oracle texts, ~12 leaves holds — but they split into one-shot effects, continuous-effect specifications (classified by layer), and replacement specifications (classified by the event pattern they intercept), each with its own ABI classification record. Designing those three records *is* the ABI test; the leaf count is almost incidental.
+- **Rest in Peace's hidden dependency.** The gate table quotes only the replacement clause, but the card's first line is an ETB trigger ("When this enchantment enters, exile all graveyards" — Scryfall). The RiP gate therefore implies minimal CR 603 machinery; M3f owns it deliberately rather than discovering it mid-spec.
+- **Giant Growth is added as a gate** because no original gate exercised until-end-of-turn durations — Humility, Opalescence, and RiP are permanent statics, and Magical Hack "lasts indefinitely." §2.5's founding story ("when Giant Growth wears off you remove the effect and recalculate") was in no milestone. M3b owns durations: CR 611.2b's two-phase latch, 611.2c's fixed-set semantics, wear-off as delete-and-recompute.
+- **M3b discharges M2c's debts.** The synthetic both-keywords fixture's expiry waits on a layer-6 grant; the grant is also what makes the M2c live-projection reads and CR 702.2e's last-known information load-bearing, per the current-work note in `CLAUDE.md`.
+- **613.8 precision.** Humility+Opalescence's famous behavior is cross-layer (4 vs 6) plus 7b timestamp ordering; the pair that genuinely exercises 613.8 dependency — applying one changes the *existence* of the other's effect — is Blood Moon+Urborg. The M3c spec must derive which pair witnesses what from `rules.txt`, not folklore, and the test set must exist **before** the resolver (risk register).
+- **`abilitiesOf` is a projection from day one** (M3e), the same move as `keywordsOf` — so a Humility'd Prodigal Sorcerer can't tap.
+- **Mindslaver details.** It's *Legendary*: tests keep it singleton or note the CR 704.5j elision. CR 723.1: control applies to the next turn the player *actually takes*; 723.1a: multiple player-controlling effects overwrite — the duration model is turn-scheduled, not time-scheduled.
+- **`git-bug 15de615`** (Setup: `emptyGame`/matchup player agreement by construction) lands at the **front of M3a** — the first letter to touch the setup seam (new printings and matchups for instant coverage; Magical Hack's `{U}` and the white gates need Island/Plains printings, cheap under M2d's per-player mono-color decks). The bug's own "revisit at Mindslaver" note predates this split; under it, every letter after M3a inherits whatever Setup does, so the unenforced invariant must not survive six letters of new fixtures.
+- **Random-game coverage will trail again.** Like M2c→M2d, most gates land as deterministic fixtures; an M2d-style coverage tail (a white or blue matchup for random games) should follow M3 rather than be discovered later.
+
 ### M4 — The vocabulary
 
 **Rule 701 (Keyword Actions) is your opcode list, written by Wizards.** ~55 entries, numbered, individually specified: Activate, Attach, Cast, Counter, Create, Destroy, Discard, Exchange, Exile, Fight, Mill, Play, Reveal, Sacrifice, Scry, Search, Shuffle, Tap/Untap, Explore, Surveil, Amass, Connive, Venture, Manifest, Meld, Discover, Time Travel, Convert…
@@ -291,19 +318,21 @@ Add the obvious English verbs (draw, damage, life, counters, +N/+N) alongside. V
 
 These are **not** exotic opcodes. They're numbered sections of the closed half:
 
-- **722** Controlling Another Player → Mindslaver, Word of Command
-- **726** Restarting the Game → Karn Liberated
-- **728** Subgames → Shahrazad, Enter the Dungeon
-- **731** Taking Shortcuts
-- **732** Handling Illegal Actions
+- **723** Controlling Another Player → Mindslaver, Word of Command
+- **727** Restarting the Game → Karn Liberated
+- **729** Subgames → Shahrazad, Enter the Dungeon
+- **732** Taking Shortcuts
+- **733** Handling Illegal Actions
 
-XMage lists Shahrazad as unimplementable not because 728 is unclear but because their architecture can't nest a game inside a game. Yours nests a `Program Prompt` inside a `Program Prompt` — which is a function call.
+*(Numbers per the vendored `rules.txt`; the CR renumbers this block as sections are inserted, so cite it, not memory — the 2026-07-17 audit found the previous numbering here had already drifted by one.)*
 
-mtg-pure corroborates this from inside Haskell: its prompts are IO callbacks (`promptPick :: … -> m a`), so a game in flight cannot be snapshotted or resumed — subgames are absent and Mindslaver is a `-- TODO` comment. The suspension model is what makes 728 a function call; the language is not.
+XMage lists Shahrazad as unimplementable not because 729 is unclear but because their architecture can't nest a game inside a game. Yours nests a `Program Prompt` inside a `Program Prompt` — which is a function call.
 
-Keep this claim scoped to true subgames (728). Restarting (726) is *not* the same problem: XMage does implement Karn Liberated by mutating the single `Game` instance in place (`KarnLiberated.java:95`, code comment: "dirty hack… can cause bugs"). Restart-in-place is tractable even in a mutable engine; nesting a subgame to completion and *resuming the parent* is the part that isn't.
+mtg-pure corroborates this from inside Haskell: its prompts are IO callbacks (`promptPick :: … -> m a`), so a game in flight cannot be snapshotted or resumed — subgames are absent and Mindslaver is a `-- TODO` comment. The suspension model is what makes 729 a function call; the language is not.
 
-Do 731 and 732 eventually. Nobody plans for them; everybody needs them.
+Keep this claim scoped to true subgames (729). Restarting (727) is *not* the same problem: XMage does implement Karn Liberated by mutating the single `Game` instance in place (`KarnLiberated.java:95`, code comment: "dirty hack… can cause bugs"). Restart-in-place is tractable even in a mutable engine; nesting a subgame to completion and *resuming the parent* is the part that isn't.
+
+Do 732 and 733 eventually. Nobody plans for them; everybody needs them.
 
 ### M6 — The transpiler
 
@@ -425,7 +454,7 @@ Sorting rule: **do the un-cards whose difficulty is shared with black border.**
 |---|---|---|
 | Little Girl (`½`), Mox Lotus (`{∞}`) | Tarmogoyf (`*/1+*`), X | §2.12 numeric tower |
 | Magical Hacker | Magical Hack | Layer 3 (§5) |
-| Enter the Dungeon, The Countdown Is at One | Shahrazad | 728 subgames |
+| Enter the Dungeon, The Countdown Is at One | Shahrazad | 729 subgames |
 | Who // What // When // Where // Why | Every modal / split / DFC card | §2.11 layout arity |
 
 These aren't flexes — they're canaries wearing funny hats, and they're *sharper* than their black-border twins because un-sets are deliberately designed to attack the rules. A free adversarial test suite written by the people who wrote the rules.

@@ -85,7 +85,10 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   Hack, Humility/Opalescence, Mindslaver), where a granted/removed keyword makes
   the M2c live-projection reads (deathtouch at SBA time, the trample threshold)
   and CR 702.2e's last-known-information load-bearing; M2d (castable black/green
-  decks) landed first. See `docs/design.md`.
+  decks) landed first. M3 is split into **M3a–M3g** — one structural axis per
+  letter, gates and falsifiers in the split table in `docs/design.md`; the
+  go/no-go verdict arrives at the end of M3d. `git-bug 15de615` lands at the
+  front of M3a.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
