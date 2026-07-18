@@ -1100,22 +1100,22 @@ git commit -m "Track the deferred CR 613.8b applies-to resolver with a documenti
 
 ## Final verification
 
-- [ ] **Step 1: Clean build, all suites**
+- [x] **Step 1: Clean build, all suites**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks`
 Expected: warning-free (a clean build surfaces warnings incremental builds hide).
 
-- [ ] **Step 2: Full test suite (including the property suite over both matchups)**
+- [x] **Step 2: Full test suite (including the property suite over both matchups)**
 
 Run: `cabal test`
 Expected: PASS — every M2d/M3a/M3b property still holds; replay determinism covers the projected type line and source-liveness. (No card enters a random game — the three M3c cards are deterministic fixtures, per the spec's white/red-fixture posture — so `PropertySpec` needs no change.)
 
-- [ ] **Step 3: Lint and format**
+- [x] **Step 3: Lint and format**
 
 Run: `git add -A && hooky fix && git add -A && hooky run`
 Expected: all hooks pass; apply any HLint suggestions or justify the exception.
 
-- [ ] **Step 4: Progress check**
+- [x] **Step 4: Progress check**
 
 Run: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-18-m3c-dependency.md`
 Expected: `0` — every step ticked.
