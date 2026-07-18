@@ -280,7 +280,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Produces: `SetupSpec.tests` grouping `setupTests`, `greenBlackSetupTests`,
   `deckTests`.
 
-- [ ] **Step 1: Create the spec module**
+- [x] **Step 1: Create the spec module**
 
 Create `source/test-suite/Pawl/SetupSpec.hs`:
 
@@ -297,14 +297,14 @@ tests :: Tasty.TestTree
 tests = Tasty.testGroup "Setup" [setupTests, greenBlackSetupTests, deckTests]
 ```
 
-- [ ] **Step 2: Wire into `Main.hs`** — delete the three groups, `import qualified
+- [x] **Step 2: Wire into `Main.hs`** — delete the three groups, `import qualified
   Pawl.SetupSpec`, replace their `testTree` entries with `SetupSpec.tests`, prune
   unused `Pawl.Support` imports.
 
-- [ ] **Step 3: Register and build** — add to `other-modules` if hand-listed;
+- [x] **Step 3: Register and build** — add to `other-modules` if hand-listed;
   build clean; `cabal test` → `All 261 tests passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/test-suite/Pawl/SetupSpec.hs source/test-suite/Main.hs pawl.cabal

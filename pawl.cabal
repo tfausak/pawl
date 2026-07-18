@@ -146,6 +146,7 @@ test-suite pawl-test-suite
   other-modules:
     Pawl.CardSpec
     Pawl.CoreSpec
+    Pawl.SetupSpec
     Pawl.Support
 
   type: exitcode-stdio-1.0
