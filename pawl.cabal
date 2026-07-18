@@ -151,6 +151,7 @@ test-suite pawl-test-suite
     Pawl.DamageSpec
     Pawl.GameSpec
     Pawl.ManaSpec
+    Pawl.ReplaySpec
     Pawl.ResolveSpec
     Pawl.SetupSpec
     Pawl.Support
