@@ -918,8 +918,16 @@ castEngineTests =
       HU.testCase "an unaffordable Piker is not offered" $
         let (gs, oid) = pikerInHand 1 Phase.PrecombatMain
          in HU.assertBool "not offered" (notElem (A.Cast oid) (Action.legalActions alice gs)),
+      -- M3a: the red deck now carries Lightning Bolt, so castAnswer casts removal
+      -- that clears the board -- creaturesInPlay at end is no longer a valid proxy
+      -- for "a spell resolved". castAnswer never attacks, so the ONLY source of
+      -- life loss is a resolved Bolt: a player below 20 proves an instant was cast
+      -- AND resolved (not merely discarded). Deck-robust where creature-presence
+      -- was not.
       HU.testCase "casting actually happens in a full game" $
-        HU.assertBool "creatures resolved" (creaturesInPlay alice castGameState > 0),
+        HU.assertBool
+          "a spell resolved and dealt damage"
+          (any (\pl -> Player.life pl < Setup.startingLife) (Map.elems (GameState.players castGameState))),
       HU.testCase "a casting game still terminates" $
         HU.assertBool "has result" (Maybe.isJust (GameState.result castGameState)),
       HU.testCase "a casting game conserves objects" $
@@ -1168,8 +1176,9 @@ deckTests =
         let Deck.MkDeck m = Setup.redDeck
          in do
               HU.assertEqual "mountains" (Just 36) (Map.lookup Card.mountainPrinting m)
-              HU.assertEqual "pikers" (Just 16) (Map.lookup Card.pikerPrinting m)
-              HU.assertEqual "maidens" (Just 8) (Map.lookup Card.birdMaidenPrinting m),
+              HU.assertEqual "pikers" (Just 12) (Map.lookup Card.pikerPrinting m)
+              HU.assertEqual "maidens" (Just 8) (Map.lookup Card.birdMaidenPrinting m)
+              HU.assertEqual "bolts" (Just 4) (Map.lookup Card.lightningBoltPrinting m),
       HU.testCase "green deck composition" $
         let Deck.MkDeck m = Setup.greenDeck
          in do
@@ -1184,8 +1193,10 @@ deckTests =
         HU.assertEqual "mountains" 36 (countByName (Text.pack "Mountain") alice setupState),
       HU.testCase "8 Bird Maidens per player after a red-red setup" $
         HU.assertEqual "maidens" 8 (countByName (Text.pack "Bird Maiden") alice setupState),
-      HU.testCase "16 Pikers per player after a red-red setup" $
-        HU.assertEqual "pikers" 16 (countByName (Text.pack "Goblin Piker") bob setupState)
+      HU.testCase "12 Pikers per player after a red-red setup" $
+        HU.assertEqual "pikers" 12 (countByName (Text.pack "Goblin Piker") bob setupState),
+      HU.testCase "4 Lightning Bolts per player after a red-red setup" $
+        HU.assertEqual "bolts" 4 (countByName (Text.pack "Lightning Bolt") alice setupState)
     ]
 
 -- alice controls n untapped basic lands of one printing, nothing else.
@@ -1730,8 +1741,27 @@ propertyTests =
       QC.testProperty "green-black: some seed sends a creature to the graveyard" $
         QC.once $
           QC.property $
-            any creatureDied [1 .. 100 :: Int]
+            any creatureDied [1 .. 100 :: Int],
+      -- The M3a exit criterion, asserted the same way combat's was: across 100
+      -- seeds some red-red game must actually cast a Bolt, or instant speed
+      -- could silently never fire while the suite stays green.
+      QC.testProperty "instants happen: some seed casts a Bolt" $
+        QC.once $
+          QC.property $
+            any boltCast_ [1 .. 100 :: Int]
     ]
+
+-- Did this seed's red-red game put a Bolt into a graveyard? A cast Bolt always
+-- ends there (resolved or fizzled), and nothing else moves one out of a library.
+boltCast_ :: Int -> Bool
+boltCast_ s =
+  let gs = runRandomGame redRed s
+      isBolt oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> case Object.source obj of
+          Source.OfCard printing -> Printing.card printing == Printing.card Card.lightningBoltPrinting
+      inGrave pid = any isBolt (Game.zoneMembers Zone.Graveyard pid gs)
+   in any inGrave [alice, bob]
 
 -- Did anyone's life total move over the course of the game this seed produces?
 someLifeChanged :: Int -> Bool
@@ -2225,7 +2255,18 @@ skipTests =
          in do
               HU.assertEqual "bob untouched" (Just 20) (lifeOf bob after)
               HU.assertEqual "alice untouched" (Just 20) (lifeOf alice after)
-              HU.assertBool "left combat" (not (inCombatPhase (GameState.phase after)))
+              HU.assertBool "left combat" (not (inCombatPhase (GameState.phase after))),
+      HU.testCase "CR 508.8 the skip stands even when an instant could have been cast" $
+        -- bob holds a castable Bolt; nobody attacks. The blockers and damage
+        -- steps are still dropped -- the priority windows an instant would use
+        -- in them do not exist (CR 500.11: proceed as though they don't).
+        let (base, _) = boltInHand 1 (Phase.Combat CombatStep.DeclareAttackers)
+            armed = base {GameState.activePlayer = bob}
+            after = snd (Engine.runGamePure identityAnswer armed (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers)))
+            remaining = foldr (:) [] (GameState.remaining after)
+         in do
+              HU.assertBool "no blockers step" (notElem (Phase.Combat CombatStep.DeclareBlockers) remaining)
+              HU.assertBool "no damage step" (notElem (Phase.Combat CombatStep.CombatDamage) remaining)
     ]
 
 -- Run whole steps through the engine while the current phase is in the combat

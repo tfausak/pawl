@@ -36,13 +36,18 @@ startingLife = 20
 -- in any matchup. redDeck is M0's deck; greenDeck and blackDeck make M2c's
 -- trampler and deathtoucher castable (git-bug 14138aa). Each deck is mono-color,
 -- which is what keeps Mana.payCost's source elision legitimate.
+-- 36 land + 24 spells = 60. Maiden stays at 8 so flying still gets random-game
+-- coverage, and four Bolts keep combat fed (enough Pikers for the engagement
+-- guards) while making instant speed fire in some seed (git-bug 15de615's sibling
+-- exit criterion).
 redDeck :: Deck.Deck
 redDeck =
   Deck.MkDeck $
     Map.fromList
       [ (Card.mountainPrinting, 36),
-        (Card.pikerPrinting, 16),
-        (Card.birdMaidenPrinting, 8)
+        (Card.pikerPrinting, 12),
+        (Card.birdMaidenPrinting, 8),
+        (Card.lightningBoltPrinting, 4)
       ]
 
 greenDeck :: Deck.Deck
