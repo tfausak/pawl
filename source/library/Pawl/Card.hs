@@ -6,11 +6,13 @@ import qualified Data.Text as Text
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
@@ -440,6 +442,31 @@ lightningBoltPrinting =
           }
     }
 
+-- Giant Growth: {G}, Instant, "Target creature gets +3/+3 until end of turn."
+-- Scryfall-verified. Layer 7c, until end of turn -- the first duration effect and
+-- the first creature-only target.
+giantGrowthPrinting :: Printing.Printing
+giantGrowthPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Giant Growth",
+            Card.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Instant,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities = [],
+            Card.effects = [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) (SlotName.MkSlotName (Text.pack "target"))],
+            Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget
+          }
+    }
+
 -- The registry the dataflow lint and future golden tests iterate. A printing
 -- not listed here escapes the hygiene net -- add every new printing.
 allPrintings :: [Printing.Printing]
@@ -457,7 +484,8 @@ allPrintings =
     ridgetopRaptorPrinting,
     typhoidRatsPrinting,
     warMammothPrinting,
-    lightningBoltPrinting
+    lightningBoltPrinting,
+    giantGrowthPrinting
   ]
 
 isLand :: Card.Card -> Bool

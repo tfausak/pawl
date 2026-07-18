@@ -1,5 +1,7 @@
 module Pawl.Type.Effect where
 
+import Pawl.Type.Duration (Duration)
+import Pawl.Type.Modification (Modification)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.SlotName (SlotName)
 
@@ -8,4 +10,9 @@ import Pawl.Type.SlotName (SlotName)
 -- the rules core asks classifications, never identities.
 data Effect
   = DealDamage SlotName Quantity
+  | -- CR 611: create a continuous effect on the slot's target for a duration.
+    -- Giant Growth and Serpent's Gift are this one opcode, differing only in the
+    -- Modification (layer 7c vs 6). Resolve stores it; it never cases on the
+    -- Modification.
+    ModifyTarget Duration Modification SlotName
   deriving (Eq, Ord, Show)

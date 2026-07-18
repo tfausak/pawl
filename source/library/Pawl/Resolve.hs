@@ -8,14 +8,18 @@ import qualified Pawl.Damage as Damage
 import qualified Pawl.Game as Game
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Target as Target
+import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Effect as Effect
 import Pawl.Type.GameState (GameState)
+import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Recipient (Recipient)
+import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.SlotName (SlotName)
 import qualified Pawl.Type.Zone as Zone
 
@@ -26,6 +30,7 @@ import qualified Pawl.Type.Zone as Zone
 slotsOf :: Effect -> Set SlotName
 slotsOf effect = case effect of
   Effect.DealDamage slot _ -> Set.singleton slot
+  Effect.ModifyTarget _ _ slot -> Set.singleton slot
 
 -- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if
 -- the spell has slots and ALL are now illegal, it does not resolve -- it moves
@@ -67,4 +72,24 @@ applyEffect source legality chosen gs effect = case effect of
             -- constructing this DamageEvent and funneling it is the whole
             -- application. CR 120.3e / 120.3a live in applyDamage.
             else Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n)] gs
+      _ -> gs
+  Effect.ModifyTarget duration modification slot ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just (Recipient.ToCreature target), True) ->
+        -- CR 611.2c: the affected set is locked to this one object now. The
+        -- Modification's quantities are stored as-is (Literals); CR 611.2b's
+        -- freeze is a no-op until X exists, at which point evaluate-and-freeze
+        -- here. See the M3b spec, section 3.
+        let (ts, gs1) = Game.freshTimestamp gs
+            eff =
+              ContinuousEffect.MkContinuousEffect
+                { ContinuousEffect.source = source,
+                  ContinuousEffect.timestamp = ts,
+                  ContinuousEffect.duration = duration,
+                  ContinuousEffect.modification = modification,
+                  ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+                }
+         in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+      -- A creature-only modification cannot land on a player (CreatureTarget) or
+      -- an illegal slot (CR 608.2b): no-op.
       _ -> gs

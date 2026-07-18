@@ -5,8 +5,12 @@
 module Pawl.ProjectionSpec where
 
 import qualified Data.Set as Set
+import qualified Pawl.Card as Card
+import qualified Pawl.Cast as Cast
+import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
@@ -21,6 +25,18 @@ import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
+
+-- alice has a Forest for mana, a Piker on the battlefield, and Giant Growth in
+-- hand, in her main phase. Cast Giant Growth (identityAnswer targets the only
+-- creature), then resolve it.
+giantGrowthOnPiker :: (ObjectId.ObjectId, GameState.GameState)
+giantGrowthOnPiker =
+  let base = S.landsInPlay Card.forestPrinting 1
+      (pikerId, withPiker) = S.addPiker S.alice base
+      (gs, ggId) = S.handOne Card.giantGrowthPrinting withPiker
+      cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice ggId))
+      resolved = Stack.resolveTop cast
+   in (pikerId, resolved)
 
 -- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`.
 withEffect :: ObjectId.ObjectId -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
@@ -91,5 +107,14 @@ tests =
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
             gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs0
-         in HU.assertEqual "still no power" Nothing (Projection.powerOf landId gs)
+         in HU.assertEqual "still no power" Nothing (Projection.powerOf landId gs),
+      HU.testCase "CR 611 Giant Growth stores a +3/+3 effect; the Piker is 5/4" $
+        let (pikerId, gs) = giantGrowthOnPiker
+         in do
+              HU.assertEqual "one stored effect" 1 (length (GameState.continuousEffects gs))
+              HU.assertEqual "power" (Just 5) (Projection.powerOf pikerId gs)
+              HU.assertEqual "toughness" (Just 4) (Projection.toughnessOf pikerId gs),
+      HU.testCase "CR 601.2c Giant Growth is uncastable with no creature to target" $
+        let (gs, ggId) = S.handOne Card.giantGrowthPrinting (S.landsInPlay Card.forestPrinting 1)
+         in HU.assertBool "no legal target, not castable" (not (Cast.castable S.alice ggId gs))
     ]
