@@ -712,7 +712,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
   unchanged — universal invariants AND the three existence properties; Task 14
   splits them).
 
-- [ ] **Step 1: Create the spec module**
+- [x] **Step 1: Create the spec module**
 
 ```haskell
 -- Covers cross-cutting universal QuickCheck invariants (true for every seed).
@@ -730,14 +730,14 @@ tests :: Tasty.TestTree
 tests = Tasty.testGroup "Properties" [propertyTests]
 ```
 
-- [ ] **Step 2: Wire into `Main.hs`** — delete `propertyTests` and its helpers,
+- [x] **Step 2: Wire into `Main.hs`** — delete `propertyTests` and its helpers,
   `import qualified Pawl.PropertySpec`, replace the `testTree` entry with
   `PropertySpec.tests`, prune unused imports.
 
-- [ ] **Step 3: Register and build** — add to `other-modules` if hand-listed;
+- [x] **Step 3: Register and build** — add to `other-modules` if hand-listed;
   build clean; `cabal test` → `All 261 tests passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/test-suite/Pawl/PropertySpec.hs source/test-suite/Main.hs pawl.cabal
