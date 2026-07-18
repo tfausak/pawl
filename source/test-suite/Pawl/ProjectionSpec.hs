@@ -15,6 +15,7 @@ import qualified Pawl.Sba as Sba
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -28,6 +29,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
@@ -196,5 +198,19 @@ tests =
             newerGrant = withEffect mammothId (Timestamp.MkTimestamp (h + 1)) (Modification.GainKeyword Keyword.Deathtouch) withHum
          in do
               HU.assertBool "grant before Humility: erased" (not (Projection.hasKeyword Keyword.Deathtouch mammothId olderGrant))
-              HU.assertBool "grant after Humility: survives" (Projection.hasKeyword Keyword.Deathtouch mammothId newerGrant)
+              HU.assertBool "grant after Humility: survives" (Projection.hasKeyword Keyword.Deathtouch mammothId newerGrant),
+      HU.testCase "projected type line: a Piker is a Creature - Goblin Warrior" $
+        let (oid, gs) = S.addPiker S.bob (S.mountainsInPlay 1)
+         in do
+              HU.assertBool "is a creature" (Projection.isCreatureOf oid gs)
+              HU.assertEqual "card types" (Set.singleton CardType.Creature) (Projection.cardTypesOf oid gs)
+              HU.assertEqual "subtypes" (Set.fromList [Subtype.Goblin, Subtype.Warrior]) (Projection.subtypesOf oid gs),
+      HU.testCase "projected type line: a Mountain is a Land - Mountain, not a creature" $
+        let gs = S.mountainsInPlay 1
+            landId = case Game.zoneMembers Zone.Battlefield S.alice gs of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+         in do
+              HU.assertBool "not a creature" (not (Projection.isCreatureOf landId gs))
+              HU.assertEqual "subtypes" (Set.singleton Subtype.Mountain) (Projection.subtypesOf landId gs)
     ]

@@ -8,6 +8,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.GameState (GameState)
@@ -23,8 +24,10 @@ import qualified Pawl.Type.Power as Power
 import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.StaticAbility as StaticAbility
+import qualified Pawl.Type.Subtype as Subtype
 import Pawl.Type.Timestamp (Timestamp)
 import qualified Pawl.Type.Toughness as Toughness
+import qualified Pawl.Type.TypeLine as TypeLine
 
 -- CR 613.1: the layer a modification applies in. THE ABI classification the
 -- rules core would ask -- never the modification's identity. One of two case-on-
@@ -85,7 +88,15 @@ affects oid a gs = case a of
 -- Printed characteristics before any effect (CR 613.2/613.4 starting point).
 baseCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 baseCharacteristics oid gs = case Game.cardOf oid gs of
-  Nothing -> PC.MkProjectedCharacteristics {PC.keywords = Set.empty, PC.power = Nothing, PC.toughness = Nothing}
+  Nothing ->
+    PC.MkProjectedCharacteristics
+      { PC.keywords = Set.empty,
+        PC.power = Nothing,
+        PC.toughness = Nothing,
+        PC.cardTypes = Set.empty,
+        PC.subtypes = Set.empty,
+        PC.rulesTextActive = True
+      }
   Just card ->
     PC.MkProjectedCharacteristics
       { PC.keywords = Card.Type.keywords card,
@@ -94,7 +105,10 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
           Just (Power.MkPower q) -> Quantity.evaluate gs oid q,
         PC.toughness = case Card.Type.toughness card of
           Nothing -> Nothing
-          Just (Toughness.MkToughness q) -> Quantity.evaluate gs oid q
+          Just (Toughness.MkToughness q) -> Quantity.evaluate gs oid q,
+        PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
+        PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
+        PC.rulesTextActive = True
       }
 
 -- Every continuous effect touching this object, from BOTH sources, tagged with
@@ -138,6 +152,17 @@ toughnessOf oid gs = PC.toughness (project oid gs)
 
 keywordsOf :: ObjectId -> GameState -> Set Keyword
 keywordsOf oid gs = PC.keywords (project oid gs)
+
+subtypesOf :: ObjectId -> GameState -> Set Subtype.Subtype
+subtypesOf oid gs = PC.subtypes (project oid gs)
+
+cardTypesOf :: ObjectId -> GameState -> Set CardType.CardType
+cardTypesOf oid gs = PC.cardTypes (project oid gs)
+
+-- CR 305.2 / 613.1d: creature-ness is the projected card-type question, the same
+-- projection posture as keywordsOf. An Opalescence'd enchantment is a creature.
+isCreatureOf :: ObjectId -> GameState -> Bool
+isCreatureOf oid gs = Set.member CardType.Creature (cardTypesOf oid gs)
 
 hasKeyword :: Keyword -> ObjectId -> GameState -> Bool
 hasKeyword keyword oid gs = Set.member keyword (keywordsOf oid gs)
