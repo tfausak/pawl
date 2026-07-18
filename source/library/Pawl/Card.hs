@@ -510,6 +510,38 @@ humilityPrinting =
           }
     }
 
+-- Serpent's Gift: {2}{G}, Instant, "Target creature gains deathtouch until end of
+-- turn." Scryfall-verified. Layer 6, until end of turn -- the same ModifyTarget
+-- opcode as Giant Growth with a GainKeyword modification. Granting deathtouch to
+-- War Mammoth rebuilds M2c's synthetic deathtouch+trample fixture from real cards.
+serpentsGiftPrinting :: Printing.Printing
+serpentsGiftPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Serpent's Gift",
+            Card.manaCost =
+              Just
+                ( ManaCost.MkManaCost
+                    [ ManaSymbol.Generic 2,
+                      ManaSymbol.OfType (ManaType.Colored Color.Green)
+                    ]
+                ),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Instant,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities = [],
+            Card.effects = [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Deathtouch) (SlotName.MkSlotName (Text.pack "target"))],
+            Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget
+          }
+    }
+
 -- The registry the dataflow lint and future golden tests iterate. A printing
 -- not listed here escapes the hygiene net -- add every new printing.
 allPrintings :: [Printing.Printing]
@@ -529,7 +561,8 @@ allPrintings =
     warMammothPrinting,
     lightningBoltPrinting,
     giantGrowthPrinting,
-    humilityPrinting
+    humilityPrinting,
+    serpentsGiftPrinting
   ]
 
 isLand :: Card.Card -> Bool

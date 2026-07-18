@@ -4,6 +4,7 @@
 -- wiring; real-card behavior lands in later tasks and DamageSpec.
 module Pawl.ProjectionSpec where
 
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
@@ -21,9 +22,12 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Layer as Layer
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
@@ -53,6 +57,19 @@ withEffect oid ts m gs =
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
+
+-- The object timestamp of the (single) Humility on the battlefield.
+humilityTimestamp :: GameState.GameState -> Timestamp.Timestamp
+humilityTimestamp gs =
+  let isHum oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> case Object.source obj of
+          Source.OfCard p -> Printing.card p == Printing.card Card.humilityPrinting
+      hums = filter isHum (Set.toList (GameState.battlefield gs))
+      stampOf oid = fmap Object.timestamp (Game.lookupObject oid gs)
+   in case Maybe.mapMaybe stampOf hums of
+        t : _ -> t
+        [] -> Timestamp.MkTimestamp 0
 
 tests :: Tasty.TestTree
 tests =
@@ -153,5 +170,31 @@ tests =
          in do
               -- Layer 7b (set 1/1) before 7c (+3/+3): 1 then +3 = 4.
               HU.assertEqual "power" (Just 4) (Projection.powerOf pikerId resolved)
-              HU.assertEqual "toughness" (Just 4) (Projection.toughnessOf pikerId resolved)
+              HU.assertEqual "toughness" (Just 4) (Projection.toughnessOf pikerId resolved),
+      HU.testCase "CR 611 Serpent's Gift grants deathtouch to its target" $
+        -- {2}{G} needs 3 total mana; 3 Forests, not 2 (a brief fixture bug --
+        -- 2 Forests only pay {1}{G}, leaving the spell uncast and the assertion
+        -- vacuously true off the base card's native trample).
+        let base = S.landsInPlay Card.forestPrinting 3
+            (mammothId, withMammoth) = S.addCreature Card.warMammothPrinting S.alice base
+            (gs, sgId) = S.handOne Card.serpentsGiftPrinting withMammoth
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice sgId))
+            resolved = Stack.resolveTop cast
+         in do
+              HU.assertBool "keeps trample" (Projection.hasKeyword Keyword.Trample mammothId resolved)
+              HU.assertBool "gains deathtouch" (Projection.hasKeyword Keyword.Deathtouch mammothId resolved),
+      HU.testCase "CR 613.7 layer 6: a grant older than Humility is erased; newer survives" $
+        -- War Mammoth and Humility on the battlefield; a directly-built
+        -- Serpent's-Gift effect (GainKeyword Deathtouch, the same value the card
+        -- creates) whose timestamp straddles Humility's object timestamp, to
+        -- witness BOTH orders of CR 613.7 in layer 6. h-1 and h+1 make the
+        -- relative order exact, not a guess.
+        let (mammothId, gs0) = S.addCreature Card.warMammothPrinting S.bob (S.mountainsInPlay 1)
+            withHum = S.withHumility gs0
+            Timestamp.MkTimestamp h = humilityTimestamp withHum
+            olderGrant = withEffect mammothId (Timestamp.MkTimestamp (h - 1)) (Modification.GainKeyword Keyword.Deathtouch) withHum
+            newerGrant = withEffect mammothId (Timestamp.MkTimestamp (h + 1)) (Modification.GainKeyword Keyword.Deathtouch) withHum
+         in do
+              HU.assertBool "grant before Humility: erased" (not (Projection.hasKeyword Keyword.Deathtouch mammothId olderGrant))
+              HU.assertBool "grant after Humility: survives" (Projection.hasKeyword Keyword.Deathtouch mammothId newerGrant)
     ]
