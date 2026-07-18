@@ -1,7 +1,9 @@
 module Pawl.Type.Modification where
 
+import Pawl.Type.CardType (CardType)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.Quantity (Quantity)
+import Pawl.Type.Subtype (Subtype)
 
 -- The open-half continuous-effect vocabulary -- its own leaf family (design.md's
 -- M3g note: "continuous-effect specifications, classified by layer"), distinct
@@ -13,6 +15,9 @@ import Pawl.Type.Quantity (Quantity)
 data Modification
   = GainKeyword Keyword -- layer 6 (Serpent's Gift)
   | LoseAllAbilities -- layer 6 (Humility)
-  | SetBasePowerToughness Quantity Quantity -- layer 7b (Humility 1/1)
+  | SetBasePowerToughness Quantity Quantity -- layer 7b (Humility 1/1; Opalescence mana value)
   | ModifyPowerToughness Quantity Quantity -- layer 7c (Giant Growth +3/+3)
+  | SetLandSubtype Subtype -- layer 4, CR 305.7 set (Blood Moon -> Mountain)
+  | AddLandSubtype Subtype -- layer 4, CR 305.7 add (Urborg -> Swamp)
+  | AddCardType CardType -- layer 4 (Opalescence -> Creature)
   deriving (Eq, Ord, Show)

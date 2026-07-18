@@ -180,7 +180,7 @@ git commit -m "Project the type line: cardTypes, subtypes, rulesTextActive (CR 6
 - Consumes: `ProjectedCharacteristics` fields from Task 1.
 - Produces: `Modification.SetLandSubtype :: Subtype -> Modification`, `Modification.AddLandSubtype :: Subtype -> Modification`, `Modification.AddCardType :: CardType -> Modification`; `Supertype.Legendary`. All three modifications classify to `Layer.Type`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ProjectionSpec.hs`:
 
@@ -212,12 +212,12 @@ Add to `source/test-suite/Pawl/ProjectionSpec.hs`:
          in HU.assertBool "now a creature" (Projection.isCreatureOf landId gs),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "613.1d"'`
 Expected: FAIL to compile — the new `Modification` constructors are not in scope.
 
-- [ ] **Step 3: Add `Supertype.Legendary`**
+- [x] **Step 3: Add `Supertype.Legendary`**
 
 In `source/library/Pawl/Type/Supertype.hs`:
 
@@ -228,7 +228,7 @@ data Supertype
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the `Modification` constructors**
+- [x] **Step 4: Add the `Modification` constructors**
 
 In `source/library/Pawl/Type/Modification.hs`, add the import `import Pawl.Type.CardType (CardType)` and `import Pawl.Type.Subtype (Subtype)`, and extend the type (keep the existing header comment, extend it):
 
@@ -244,7 +244,7 @@ data Modification
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 5: Classify and apply them in `Projection`**
+- [x] **Step 5: Classify and apply them in `Projection`**
 
 Add `qualified Data.Set as Set` is already present. In `source/library/Pawl/Projection.hs`, extend `layer`:
 
@@ -279,12 +279,12 @@ Extend `applyModification` with the three arms (append inside the `case m of`):
       }
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. (`withEffect` uses `TheseObjects`, which the existing gather-sort-fold applies in layer order; layer 4 sorts before 6/7, so these land correctly with no restructure yet.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

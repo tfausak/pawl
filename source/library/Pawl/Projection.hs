@@ -38,6 +38,9 @@ layer m = case m of
   Modification.LoseAllAbilities -> Layer.Ability
   Modification.SetBasePowerToughness _ _ -> Layer.SetPT
   Modification.ModifyPowerToughness _ _ -> Layer.ModifyPT
+  Modification.SetLandSubtype _ -> Layer.Type
+  Modification.AddLandSubtype _ -> Layer.Type
+  Modification.AddCardType _ -> Layer.Type
 
 -- Apply one modification to characteristics-in-progress. THE ONE applier
 -- (Resolve : Effect :: Projection : Modification). P/T quantities are evaluated
@@ -59,6 +62,20 @@ applyModification gs oid m pc = case m of
     pc
       { PC.power = addPT (PC.power pc) (Quantity.evaluate gs oid p),
         PC.toughness = addPT (PC.toughness pc) (Quantity.evaluate gs oid t)
+      }
+  Modification.AddLandSubtype s ->
+    pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
+  Modification.AddCardType t ->
+    pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
+  -- CR 305.7: setting a land's subtype to a basic type removes its old land
+  -- types AND strips its rules-text abilities (here: keywords and, via
+  -- rulesTextActive, its static abilities -- see gather). It gains the new mana
+  -- ability from the subtype (CR 305.6, read at the mana call site).
+  Modification.SetLandSubtype s ->
+    pc
+      { PC.subtypes = Set.singleton s,
+        PC.keywords = Set.empty,
+        PC.rulesTextActive = False
       }
 
 -- Layer 7b sets P/T only on an object that HAS P/T; a land stays without.

@@ -212,5 +212,30 @@ tests =
               [] -> ObjectId.MkObjectId 999
          in do
               HU.assertBool "not a creature" (not (Projection.isCreatureOf landId gs))
-              HU.assertEqual "subtypes" (Set.singleton Subtype.Mountain) (Projection.subtypesOf landId gs)
+              HU.assertEqual "subtypes" (Set.singleton Subtype.Mountain) (Projection.subtypesOf landId gs),
+      HU.testCase "CR 613.1d layer 4: the three type-changing modifications are Type" $ do
+        HU.assertEqual "set land subtype" Layer.Type (Projection.layer (Modification.SetLandSubtype Subtype.Mountain))
+        HU.assertEqual "add land subtype" Layer.Type (Projection.layer (Modification.AddLandSubtype Subtype.Swamp))
+        HU.assertEqual "add card type" Layer.Type (Projection.layer (Modification.AddCardType CardType.Creature)),
+      HU.testCase "CR 613.1d AddLandSubtype gives a Forest the Swamp subtype" $
+        let gs0 = S.landsInPlay Card.forestPrinting 1
+            landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+            gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.AddLandSubtype Subtype.Swamp) gs0
+         in HU.assertEqual "Forest and Swamp" (Set.fromList [Subtype.Forest, Subtype.Swamp]) (Projection.subtypesOf landId gs),
+      HU.testCase "CR 305.7 SetLandSubtype sets a Forest to only Mountain" $
+        let gs0 = S.landsInPlay Card.forestPrinting 1
+            landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+            gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.SetLandSubtype Subtype.Mountain) gs0
+         in HU.assertEqual "only Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf landId gs),
+      HU.testCase "CR 613.1d AddCardType makes a land a creature" $
+        let gs0 = S.landsInPlay Card.forestPrinting 1
+            landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+            gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.AddCardType CardType.Creature) gs0
+         in HU.assertBool "now a creature" (Projection.isCreatureOf landId gs)
     ]
