@@ -40,7 +40,7 @@
 **Interfaces:**
 - Produces: `Timestamp.MkTimestamp Natural`; `Object.timestamp :: Timestamp`; `GameState.nextTimestamp :: Timestamp`; `Game.freshTimestamp :: GameState -> (Timestamp, GameState)`. `Game.changeZone` now stamps the new incarnation with a fresh timestamp. Later tasks read `Object.timestamp` (static-ability ordering) and call `freshTimestamp` (stored-effect creation).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/GameSpec.hs`, add to the `changeZone` group (find the group testing `Game.changeZone`; if none, add these to the module's top-level `tests` list):
 
@@ -62,12 +62,12 @@ In `source/test-suite/Pawl/GameSpec.hs`, add to the `changeZone` group (find the
 
 Add imports to `GameSpec.hs` if missing: `import qualified Pawl.Type.Timestamp as Timestamp`, and ensure `Setup`, `Object`, `Zone`, `ObjectId`, `GameState`, `Game` are imported (they are, in the existing spec).
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: compile error — `Pawl.Type.Timestamp`, `GameState.nextTimestamp`, `Object.timestamp` not in scope.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `source/library/Pawl/Type/Timestamp.hs`:
 
@@ -182,12 +182,12 @@ addCreature printing pid gs =
 
 Then `grep -rn "MkObject\|MkGameState" source/test-suite/Pawl/GameSpec.hs source/test-suite/Pawl/DamageSpec.hs source/test-suite/Pawl/ResolveSpec.hs` and add `Object.timestamp = Timestamp.MkTimestamp 0` (and `GameState.nextTimestamp = Timestamp.MkTimestamp 0` on any full `MkGameState`) to each, importing `Timestamp` where needed.
 
-- [ ] **Step 4: Build and run the full suite**
+- [x] **Step 4: Build and run the full suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -3` → clean (this proves every `MkObject`/`MkGameState` was updated).
 Run: `cabal test 2>&1 | tail -5` → PASS (all existing + the two new).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Type/Timestamp.hs source/library/Pawl/Type/Object.hs source/library/Pawl/Type/GameState.hs source/library/Pawl/Game.hs source/library/Pawl/Setup.hs source/test-suite/Pawl/Support.hs source/test-suite/Pawl/GameSpec.hs source/test-suite/Pawl/DamageSpec.hs source/test-suite/Pawl/ResolveSpec.hs pawl.cabal
@@ -210,7 +210,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 **Interfaces:**
 - Produces: `Layer.{Copy,Control,Text,Type,Color,Ability,CharacteristicPT,SetPT,ModifyPT,SwitchPT}`; `Duration.UntilEndOfTurn`; `Affected.{TheseObjects (Set ObjectId), AllCreatures}`; `Modification.{GainKeyword Keyword, LoseAllAbilities, SetBasePowerToughness Quantity Quantity, ModifyPowerToughness Quantity Quantity}`; `ContinuousEffect.MkContinuousEffect {source, timestamp, duration, modification, affected}`; `StaticAbility.MkStaticAbility {affected, modification}`; `ProjectedCharacteristics.MkProjectedCharacteristics {keywords, power, toughness}`; `GameState.continuousEffects :: [ContinuousEffect]`; `Card.staticAbilities :: [StaticAbility]`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `GameSpec.hs`:
 
@@ -223,11 +223,11 @@ In `GameSpec.hs`:
 
 (Import `qualified Pawl.Type.Card as Card.Type` if not present; `S.pikerCard` exists.)
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `cabal test 2>&1 | tail -20` → compile error, `GameState.continuousEffects` / `Card.Type.staticAbilities` not in scope.
 
-- [ ] **Step 3: Implement the types**
+- [x] **Step 3: Implement the types**
 
 `source/library/Pawl/Type/Layer.hs`:
 
@@ -393,12 +393,12 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
 
 `Setup.emptyGame`'s `MkGameState` gains `GameState.continuousEffects = []`. Every `Card.MkCard` in `Pawl.Card` (all 14 printings) gains `Card.staticAbilities = []` — `grep -n "MkCard" source/library/Pawl/Card.hs` and visit each. `Support.oneMountainState`'s `MkGameState` gains `GameState.continuousEffects = []`; any `MkCard` fixture in the test suite (`grep -rn "MkCard" source/test-suite/`) gains `Card.Type.staticAbilities = []`.
 
-- [ ] **Step 4: Build and run the full suite**
+- [x] **Step 4: Build and run the full suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -3` → clean.
 Run: `cabal test 2>&1 | tail -5` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Type/Layer.hs source/library/Pawl/Type/Duration.hs source/library/Pawl/Type/Affected.hs source/library/Pawl/Type/Modification.hs source/library/Pawl/Type/ContinuousEffect.hs source/library/Pawl/Type/StaticAbility.hs source/library/Pawl/Type/ProjectedCharacteristics.hs source/library/Pawl/Type/GameState.hs source/library/Pawl/Type/Card.hs source/library/Pawl/Card.hs source/library/Pawl/Setup.hs source/test-suite/Pawl/Support.hs source/test-suite/Pawl/GameSpec.hs pawl.cabal
@@ -420,7 +420,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 **Interfaces:**
 - Produces: `Projection.keywordsOf :: ObjectId -> GameState -> Set Keyword`; `Projection.powerOf :: ObjectId -> GameState -> Maybe Integer`; `Projection.toughnessOf :: ObjectId -> GameState -> Maybe Integer`; `Projection.hasKeyword :: Keyword -> ObjectId -> GameState -> Bool`. Same signatures as the old `Game.*`; Task 4 rewrites the bodies. This task is a **behavior-preserving move** — the existing suite is its test.
 
-- [ ] **Step 1: Create the module (verbatim bodies)**
+- [x] **Step 1: Create the module (verbatim bodies)**
 
 `source/library/Pawl/Projection.hs` — the four functions, moved unchanged from `Game.hs` (still reading the base printing; Task 4 makes them layer-aware):
 
@@ -461,7 +461,7 @@ hasKeyword keyword oid gs = Set.member keyword (keywordsOf oid gs)
 
 (The `Card.Type` alias is `Pawl.Type.Card`; `Game.cardOf` is the raw state read, which stays in `Game`.)
 
-- [ ] **Step 2: Delete the four functions from `Game` and migrate callers**
+- [x] **Step 2: Delete the four functions from `Game` and migrate callers**
 
 In `Pawl.Game`, delete `powerOf`, `toughnessOf`, `keywordsOf`, `hasKeyword` and remove imports they alone used (`Power`, `Toughness`, `Quantity`, and `Keyword` if now unused — check with the build). Keep `cardOf`, `controllerOf`, `lookupObject`, `zoneMembers`, `changeZone`, `freshObjectId`, `freshTimestamp`, etc.
 
@@ -473,12 +473,12 @@ grep -rn "Game\.\(powerOf\|toughnessOf\|keywordsOf\|hasKeyword\)" source/library
 
 Visit each hit — `Combat.hs` (lines ~78, 82, 113–115, 184: `hasKeyword`), `Damage.hs` (`toughnessOf` in `blockerThreshold`, `hasKeyword` in `blockerThreshold`/`attackerAssignment`/`dealCombatDamage`, `powerOf` in `attackerAssignment`/`blockerAssignment`), `Sba.hs` (`toughnessOf` in `creatureDies`, `hasKeyword` in `woundedByDeathtouch`) — and change the qualifier to `Projection.`. Update the comments in `Sba.woundedByDeathtouch` and `Damage.blockerThreshold` that say "Game.hasKeyword" to "Projection.hasKeyword".
 
-- [ ] **Step 3: Build and run the full suite (this is the whole test)**
+- [x] **Step 3: Build and run the full suite (this is the whole test)**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -3` → clean (a missed call site is a scope error).
 Run: `cabal test 2>&1 | tail -5` → PASS, **unchanged test count** — a pure move changes no behavior. If any test changes outcome, you changed behavior; revert and redo the move faithfully.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/library/Pawl/Projection.hs source/library/Pawl/Game.hs source/library/Pawl/Combat.hs source/library/Pawl/Damage.hs source/library/Pawl/Sba.hs pawl.cabal
@@ -502,7 +502,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 - Consumes: `Card.staticAbilities`, `ContinuousEffect.*`, `StaticAbility.*`, `Affected.*`, `Modification.*`, `Layer`, `Object.timestamp`, `GameState.continuousEffects`, `Game.cardOf`/`lookupObject`, `Card.isCreature`, `Quantity.evaluate`.
 - Produces: `Projection.project :: ObjectId -> GameState -> ProjectedCharacteristics`; `Projection.layer :: Modification -> Layer`. The four wrappers now derive from `project`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `source/test-suite/Pawl/ProjectionSpec.hs`:
 
@@ -608,12 +608,12 @@ tests =
 
 For the land test, add `import qualified Pawl.Type.Zone as Zone` and use `Zone.Battlefield` (rename `Pawl.Type.Zone.Battlefield` above to `Zone.Battlefield`). Add `ProjectionSpec.tests` to `testTree` in `source/test-suite/Main.hs` (and `import qualified Pawl.ProjectionSpec as ProjectionSpec`).
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cabal test 2>&1 | tail -30`
 Expected: compile error — `Projection.layer`/`project` not defined; the +3/+3 and layer tests fail (the Task 3 bodies ignore continuous effects).
 
-- [ ] **Step 3: Implement the fold**
+- [x] **Step 3: Implement the fold**
 
 Rewrite `Pawl.Projection` (add imports: `qualified Data.List as List`, `qualified Data.Maybe as Maybe`, `qualified Pawl.Card as Card`, `qualified Pawl.Type.Affected as Affected`, `qualified Pawl.Type.ContinuousEffect as ContinuousEffect`, `qualified Pawl.Type.GameState as GameState`, `qualified Pawl.Type.Layer as Layer`, `Pawl.Type.Layer (Layer)`, `qualified Pawl.Type.Modification as Modification`, `Pawl.Type.Modification (Modification)`, `qualified Pawl.Type.Object as Object`, `qualified Pawl.Type.ProjectedCharacteristics as PC`, `Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)`, `qualified Pawl.Type.StaticAbility as StaticAbility`, `Pawl.Type.Timestamp (Timestamp)`, `qualified Data.Set as Set`):
 
@@ -736,11 +736,11 @@ hasKeyword keyword oid gs = Set.member keyword (keywordsOf oid gs)
 
 Delete the Task-3 verbatim bodies of the four wrappers (they are replaced above). Keep the `Power`/`Toughness` imports (now used by `baseCharacteristics`).
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 Run: `cabal test 2>&1 | tail -5` → PASS (existing suite unchanged: with no continuous effects, `project` equals the base printing; the new `ProjectionSpec` group passes).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Projection.hs source/test-suite/Pawl/ProjectionSpec.hs source/test-suite/Main.hs pawl.cabal
@@ -761,7 +761,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 **Interfaces:**
 - Produces: `TargetSpec.CreatureTarget`; `Target.legalRecipients`/`stillLegal` handle it (creatures on the battlefield, no players).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `ResolveSpec.hs`'s `Target` group:
 
@@ -784,11 +784,11 @@ In `ResolveSpec.hs`'s `Target` group:
               HU.assertBool "illegal once moved" (not (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gone))
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cabal test 2>&1 | tail -20` → `TargetSpec.CreatureTarget` not in scope.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Pawl.Type.TargetSpec` gains a constructor (comment updated):
 
@@ -820,11 +820,11 @@ legalRecipients spec gs =
 
 (`stillLegal` is already `Set.member recipient (legalRecipients spec gs)` — it handles the new spec with no change.)
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 Run: `cabal test 2>&1 | tail -5` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Type/TargetSpec.hs source/library/Pawl/Target.hs source/test-suite/Pawl/ResolveSpec.hs
@@ -846,7 +846,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 - Consumes: `Game.freshTimestamp`, `Target.stillLegal`, `Affected.TheseObjects`, `ContinuousEffect.MkContinuousEffect`, `Object.targets`.
 - Produces: `Effect.ModifyTarget Duration Modification SlotName`; `Card.giantGrowthPrinting :: Printing`. `Resolve.resolveSpell` now appends a stored `ContinuousEffect` for a `ModifyTarget` effect.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `ProjectionSpec.hs` (add imports `qualified Pawl.Cast as Cast`, `qualified Pawl.Engine as Engine`, `qualified Pawl.Stack as Stack`, `qualified Pawl.Type.Phase as Phase`):
 
@@ -876,11 +876,11 @@ giantGrowthOnPiker =
          in HU.assertBool "no legal target, not castable" (not (Cast.castable S.alice ggId gs))
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cabal test 2>&1 | tail -30` → `Card.giantGrowthPrinting` / `Effect.ModifyTarget` not in scope.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Pawl.Type.Effect` gains the constructor (import `Pawl.Type.Duration (Duration)`, `Pawl.Type.Modification (Modification)`):
 
@@ -961,11 +961,11 @@ giantGrowthPrinting =
 
 Add `giantGrowthPrinting` to `allPrintings`. Before finalizing the comment, check Giant Growth's Gatherer rulings per design.md §4: `curl -s -H "User-Agent: pawl/1.0" "https://api.scryfall.com/cards/named?exact=Giant+Growth" | python3 -c "import json,sys; print(json.load(sys.stdin)['rulings_uri'])"` and fetch that URI; if any ruling is Q&A-shaped *and* expressible in this pool, STOP and tell the user. In `CardSpec.hs`, bump the `allPrintings` count assertion (14 → 15) if such a test exists.
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 Run: `cabal test 2>&1 | tail -5` → PASS. The slot lint (over `allPrintings`) now covers Giant Growth: its one effect reads slot `"target"`, its `targetSpecs` declares `"target"` — equal, so the lint is green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Type/Effect.hs source/library/Pawl/Resolve.hs source/library/Pawl/Card.hs source/test-suite/Pawl/ProjectionSpec.hs source/test-suite/Pawl/CardSpec.hs pawl.cabal
@@ -986,7 +986,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 **Interfaces:**
 - Produces: a pure `dropEndOfTurnEffects :: GameState -> GameState` dropping every `UntilEndOfTurn` continuous effect. `Engine`'s cleanup step calls it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `ProjectionSpec.hs` (imports `qualified Pawl.Type.BeginningStep as BeginningStep`, `qualified Pawl.Type.EndingStep as EndingStep` as needed):
 
@@ -1003,11 +1003,11 @@ In `ProjectionSpec.hs` (imports `qualified Pawl.Type.BeginningStep as BeginningS
 
 (`giantGrowthOnPiker` from Task 6 leaves the Piker on the battlefield with the stored effect; note the Piker id survives cleanup because a battlefield permanent is not re-created — only the *effect* is dropped.)
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `cabal test 2>&1 | tail -20` → the effect is still present after cleanup (power 5).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `Pawl.Projection` (imports `qualified Pawl.Type.ContinuousEffect as ContinuousEffect`, `qualified Pawl.Type.Duration as Duration` — already present):
 
@@ -1032,11 +1032,11 @@ In `Pawl.Engine`, the cleanup arm (currently `discardToHandSize active` then `St
       State.modify' Projection.dropEndOfTurnEffects
 ```
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 Run: `cabal test 2>&1 | tail -5` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Projection.hs source/library/Pawl/Engine.hs source/test-suite/Pawl/ProjectionSpec.hs
@@ -1058,7 +1058,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 - Consumes: `Card.staticAbilities`, `StaticAbility.MkStaticAbility`, `Affected.AllCreatures`, `Modification.{LoseAllAbilities, SetBasePowerToughness}`.
 - Produces: `Card.humilityPrinting :: Printing`; `S.withHumility :: GameState -> GameState` (places a Humility on the battlefield under bob's control).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `S.withHumility` in `Support.hs` (reuses `addCreature`, which places any printing on the battlefield):
 
@@ -1102,11 +1102,11 @@ In `ProjectionSpec.hs`:
 
 (Add `import qualified Pawl.Sba as Sba` to `ProjectionSpec.hs`.)
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cabal test 2>&1 | tail -30` → `Card.humilityPrinting` not in scope.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Check `Pawl.Type.CardType` for an `Enchantment` constructor; if absent, add it (comment ordered like the others) and give `Card.isPermanentType` the `CardType.Enchantment -> True` case (CR 110.1 lists enchantment among permanent types). Then in `Pawl.Card`:
 
@@ -1151,11 +1151,11 @@ humilityPrinting =
 
 (Check `ManaType.Generic`/`ManaSymbol.OfType` spelling against how existing multi-symbol costs are written in `Pawl.Card` — the Piker's `{1}{R}` is the template; match it exactly. Import `StaticAbility`, `Affected`, `Modification`.) Add `humilityPrinting` to `allPrintings`; bump the `CardSpec` count (15 → 16). Pull Humility's Gatherer rulings per design.md §4 before finalizing the comment (it has only 3 today; check whether any is Q&A-shaped and expressible — layer interactions mostly are not, but verify).
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 Run: `cabal test 2>&1 | tail -5` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Card.hs source/library/Pawl/Type/CardType.hs source/test-suite/Pawl/Support.hs source/test-suite/Pawl/ProjectionSpec.hs source/test-suite/Pawl/CardSpec.hs pawl.cabal
@@ -1177,7 +1177,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 - Consumes: `Effect.ModifyTarget` with `Modification.GainKeyword` (Task 6's opcode, no new engine code).
 - Produces: `Card.serpentsGiftPrinting :: Printing`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `ProjectionSpec.hs`:
 
@@ -1226,11 +1226,11 @@ humilityTimestamp gs =
 
 (Add imports `qualified Pawl.Type.Source as Source`, `qualified Pawl.Type.Printing as Printing`, `qualified Data.Maybe as Maybe` to `ProjectionSpec.hs`. `withEffect` is Task 4's helper.)
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cabal test 2>&1 | tail -30` → `Card.serpentsGiftPrinting` not in scope.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `Pawl.Card` (mirror Giant Growth, but `{2}{G}` and `GainKeyword Deathtouch`):
 
@@ -1270,11 +1270,11 @@ serpentsGiftPrinting =
 
 (Match the `{2}{G}` template to how the code writes generic + colored symbols; `Keyword` is imported in `Pawl.Card` already.) Add `serpentsGiftPrinting` to `allPrintings`; bump the `CardSpec` count (16 → 17). Pull Serpent's Gift's rulings per design.md §4.
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 Run: `cabal test 2>&1 | tail -5` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Card.hs source/test-suite/Pawl/ProjectionSpec.hs source/test-suite/Pawl/CardSpec.hs pawl.cabal
@@ -1295,7 +1295,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 **Interfaces:**
 - Produces: `DamageEvent.dealtByDeathtouch :: Bool`, set from the projected deathtouch of the source at deal time; `Sba.woundedByDeathtouch` reads it.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `DamageSpec.hs`, replace the `syntheticDeathtramplerPrinting`-based `trampleDeathtouchTests` with real cards. The synthetic 3/3 deathtoucher+trampler becomes War Mammoth (3/3 trample) granted deathtouch by a directly-appended Serpent's-Gift effect (no mana plumbing in a combat fixture). Add a local helper to `DamageSpec.hs`:
 
@@ -1374,11 +1374,11 @@ Add two bit assertions to the `Deathtouch` group. These pin the deal-time bit **
          in HU.assertBool "no deathtouch at deal time under Humility" (not ratBit)
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cabal test 2>&1 | tail -30` → `DamageEvent.dealtByDeathtouch` not in scope.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Pawl.Type.DamageEvent` gains the field (comment updated):
 
@@ -1438,12 +1438,12 @@ woundedByDeathtouch gs oid =
 
 (If `Sba` no longer uses `Projection`/`Keyword` after this, remove those imports to stay warning-clean — but `creatureDies` still uses `Projection.toughnessOf`, so `Projection` stays; `Keyword` may become unused.) Finally, `grep -rn "MkDamageEvent" source/test-suite/` and add the `dealtByDeathtouch` field (usually `False`) to any test that builds a `DamageEvent` literal.
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -3` → clean.
 Run: `cabal test 2>&1 | tail -5` → PASS. The M2c deathtouch/trample behavior is preserved (a printed deathtoucher's bit is `True` through the projection), now proven with real cards, and the synthetic fixture is gone.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Type/DamageEvent.hs source/library/Pawl/Damage.hs source/library/Pawl/Resolve.hs source/library/Pawl/Sba.hs source/test-suite/Pawl/DamageSpec.hs
@@ -1464,7 +1464,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 **Interfaces:**
 - Consumes: everything prior. Produces the M3b random-game coverage.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `SetupSpec.hs`, update `greenDeck`'s composition assertion to 36 Forest / 16 War Mammoth / 4 Giant Growth / 4 Serpent's Gift (still 36 land + 24 spells = 60), and any post-setup count that referenced 24 Mammoths. In `PropertySpec.hs`, add engagement guards mirroring M3a's "instants happen":
 
@@ -1494,11 +1494,11 @@ castsNamed name s =
 
 (Import `Text`, `Card.Type`, `Printing`, `Source`, `Zone`, `Object`, `Game` in `PropertySpec.hs` if not present.)
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cabal test 2>&1 | tail -30` → composition asserts the new counts; `greenDeck` still says 24 Mammoths.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Setup.greenDeck` becomes (comment notes the split keeps 36 land + 24 spells, and that Giant Growth/Serpent's Gift give continuous effects random-game coverage; War Mammoth stays plentiful so combat still happens and Serpent's Gift has a trampler to grant):
 
@@ -1514,11 +1514,11 @@ greenDeck =
       ]
 ```
 
-- [ ] **Step 4: Run the full suite twice**
+- [x] **Step 4: Run the full suite twice**
 
 Run: `cabal test 2>&1 | tail -5` → PASS. The property suite now fuzzes continuous effects in every green-black seed; a failure in *any* existing property here (conservation at 120, termination, life-never-increases, green-black engagement) is a real M3b bug — investigate, don't reseed. Run once more to confirm determinism.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Setup.hs source/test-suite/Pawl/SetupSpec.hs source/test-suite/Pawl/PropertySpec.hs
@@ -1536,7 +1536,7 @@ Claude-Session: https://claude.ai/code/session_01Sni8JpsTfduJC15gLtLc3e"
 **Files:**
 - Modify: `CLAUDE.md` (M3b complete bullet; current-work → M3c), `CONTRIBUTING.md` (NamedFieldPuns amendment), `docs/superpowers/plans/2026-07-18-m3b-continuous-effects.md` (this file — all steps ticked)
 
-- [ ] **Step 1: Full verification**
+- [x] **Step 1: Full verification**
 
 ```bash
 cabal clean && cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"
@@ -1551,15 +1551,15 @@ Expected: tests PASS; the grep prints `0` (every step ticked).
 
 Run `cabal bench 2>&1 | tail -8` and eyeball: the per-query projection fold adds cost to every `powerOf`/`toughnessOf`/`keywordsOf` read (combat is read-heavy). Note the numbers in the commit message; a collapse (10x) is a bug — stop and say so. (This is the memoized-projected-state expiry becoming visible; it is watched, not asserted.)
 
-- [ ] **Step 2: Record the convention amendment**
+- [x] **Step 2: Record the convention amendment**
 
 In `CONTRIBUTING.md` (the style section) and `CLAUDE.md` (§Code conventions, the "Haskell 2010, no language extensions" bullet), record that `NamedFieldPuns` is permitted where it improves clarity, and that it does not relax the non-punning rule for *constructor* names. Keep it one sentence each, matching the surrounding prose.
 
-- [ ] **Step 3: Record M3b complete**
+- [x] **Step 3: Record M3b complete**
 
 In `CLAUDE.md`, add an "M3b is complete" bullet after M3a's (pattern-match the existing bullets: what landed — the `Pawl.Projection` layer fold and its `Modification`/`Layer`/`Duration`/`Affected`/`ContinuousEffect`/`StaticAbility`/`ProjectedCharacteristics`/`Timestamp` types; `ModifyTarget` as one opcode for Giant Growth and Serpent's Gift; Humility's static abilities; CR 514.2 wear-off; the deal-time deathtouch bit retiring M2c's synthetic fixture; `CreatureTarget`; the green deck; and the spec/plan paths), and update the "Current work" bullet to **M3c** (CR 613.8 dependency via trial application — the go/no-go — Humility+Opalescence and Blood Moon+Urborg, both orders; the test set must exist *before* the resolver, per the risk register).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add CLAUDE.md CONTRIBUTING.md docs/superpowers/plans/2026-07-18-m3b-continuous-effects.md

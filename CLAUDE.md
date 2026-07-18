@@ -98,12 +98,25 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   `redDeck` give instant speed random-game coverage. Spec and plan kept as
   reference: `docs/superpowers/specs/2026-07-17-m3a-effects-design.md` and
   `docs/superpowers/plans/2026-07-17-m3a-effects.md`.
-- **Current work is M3b** — continuous effects: the single-effect layer system
-  and durations (Giant Growth, a keyword granter, Humility solo — per the M3a–M3g
-  split table in `docs/design.md`). This is where a granted/removed keyword makes
-  the M2c live-projection reads (deathtouch at SBA time, the trample threshold)
-  and CR 702.2e's last-known-information load-bearing. The go/no-go verdict on the
-  whole approach arrives at the end of M3d.
+- **M3b is complete** (continuous effects: `Pawl.Projection` runs the CR 613
+  single-effect layer fold over a type family — `Timestamp`, `Layer`,
+  `Duration`, `Affected`, `Modification`, `ContinuousEffect`, `StaticAbility`,
+  `ProjectedCharacteristics` — and `Effect.ModifyTarget` is ONE opcode driving
+  both Giant Growth (layer 7c, +3/+3) and Serpent's Gift (layer 6, a deathtouch
+  grant); no per-card opcode was added. Humility contributes two static
+  abilities (layer 6 strips keywords, layer 7b sets base power/toughness to
+  1/1), and CR 514.2 wears until-end-of-turn effects off at cleanup. The
+  `DamageEvent.dealtByDeathtouch` deal-time bit (CR 702.2e) retires M2c's
+  synthetic deathtrampler fixture in favor of real cards; `CreatureTarget` gives
+  Serpent's Gift and Giant Growth a targeting spec; the green deck carries both
+  for random-game coverage. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-18-m3b-continuous-effects-design.md` and
+  `docs/superpowers/plans/2026-07-18-m3b-continuous-effects.md`.
+- **Current work is M3c** — CR 613.8 dependency via trial application, the
+  go/no-go verdict for the whole continuous-effects approach. Humility+Opalescence
+  and Blood Moon+Urborg, both application orders, are the canonical dependency
+  fixtures; per the risk register, the test set for both must exist *before* the
+  dependency resolver is written.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
@@ -186,6 +199,8 @@ follow them without being asked. Full rationale in the style section of
 
 - **Haskell 2010, no language extensions** unless there's genuinely no
   alternative. No `LambdaCase`, `OverloadedStrings`, etc. by default.
+  `NamedFieldPuns` is permitted where it improves clarity on record-heavy code;
+  it does not relax the non-punning rule for *constructor* names below.
 - **No explicit export lists** (`module Pawl.Foo where`). The cabal file already
   silences `-Wmissing-export-lists`.
 - **One type per module** under `Pawl.Type.<TypeName>` (type + instances only);
