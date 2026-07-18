@@ -15,11 +15,13 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.Duration as Duration
+import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Layer as Layer
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
@@ -116,5 +118,13 @@ tests =
               HU.assertEqual "toughness" (Just 4) (Projection.toughnessOf pikerId gs),
       HU.testCase "CR 601.2c Giant Growth is uncastable with no creature to target" $
         let (gs, ggId) = S.handOne Card.giantGrowthPrinting (S.landsInPlay Card.forestPrinting 1)
-         in HU.assertBool "no legal target, not castable" (not (Cast.castable S.alice ggId gs))
+         in HU.assertBool "no legal target, not castable" (not (Cast.castable S.alice ggId gs)),
+      HU.testCase "CR 514.2 an until-end-of-turn effect wears off at cleanup" $
+        let (pikerId, cast) = giantGrowthOnPiker
+            -- Run the cleanup step's turn-based actions; the +3/+3 must be gone.
+            afterCleanup = snd (Engine.runGamePure S.identityAnswer cast (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
+         in do
+              HU.assertEqual "effect dropped" [] (GameState.continuousEffects afterCleanup)
+              HU.assertEqual "Piker back to base power" (Just 2) (Projection.powerOf pikerId afterCleanup)
+              HU.assertEqual "Piker back to base toughness" (Just 1) (Projection.toughnessOf pikerId afterCleanup)
     ]

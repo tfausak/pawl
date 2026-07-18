@@ -9,6 +9,7 @@ import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Keyword (Keyword)
@@ -139,3 +140,11 @@ keywordsOf oid gs = PC.keywords (project oid gs)
 
 hasKeyword :: Keyword -> ObjectId -> GameState -> Bool
 hasKeyword keyword oid gs = Set.member keyword (keywordsOf oid gs)
+
+-- CR 514.2: during cleanup, "all 'until end of turn' and 'this turn' effects
+-- end". Delete-and-recompute (design.md §2.5): dropping the stored effect makes
+-- the next projection revert -- nothing is explicitly undone.
+dropEndOfTurnEffects :: GameState -> GameState
+dropEndOfTurnEffects gs =
+  let keep eff = ContinuousEffect.duration eff /= Duration.UntilEndOfTurn
+   in gs {GameState.continuousEffects = filter keep (GameState.continuousEffects gs)}

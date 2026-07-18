@@ -18,6 +18,7 @@ import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -164,8 +165,10 @@ runTurnBasedActions phase = do
     Phase.Combat CombatStep.EndOfCombat -> State.modify' Combat.clearCombat
     Phase.Ending EndingStep.Cleanup -> do
       discardToHandSize active
-      -- CR 514.2: damage wears off simultaneously with the discard.
+      -- CR 514.2: damage wears off AND until-end-of-turn effects end,
+      -- simultaneously.
       State.modify' Damage.removeAllDamage
+      State.modify' Projection.dropEndOfTurnEffects
     _ -> pure ()
 
 -- Ask the priority holder for an action until every still-playing player has
