@@ -79,8 +79,8 @@ replays deterministically with the new stored continuous-effect state.
 
 **`Pawl.Type.Timestamp`** — `newtype Timestamp = MkTimestamp Natural`, drawn from
 a monotonic **`GameState.nextTimestamp`** counter (shaped like `nextObjectId`).
-CR 613.7b: a static ability's timestamp is the timestamp of the object it is on,
-i.e. when that object entered the battlefield. So **`Object` grows
+CR 613.7a: a static ability's timestamp is the timestamp of the object it is on,
+which per CR 613.7d is when that object entered the battlefield. So **`Object` grows
 `timestamp :: Timestamp`**, assigned when the object is created — in
 `Game.changeZone` (a fresh permanent's entry, CR 400.7) and in `Setup`'s initial
 placement. Stored continuous effects draw from the **same** counter at creation.
@@ -233,7 +233,7 @@ project :: ObjectId -> GameState -> ProjectedCharacteristics
      object, tagged with its stored `timestamp`;
    - for every permanent on the battlefield, each of its card's
      `staticAbilities` whose `affected` includes the object, tagged with that
-     **permanent's `Object.timestamp`** (CR 613.7b).
+     **permanent's `Object.timestamp`** (CR 613.7a).
 
    An `affected` membership test: `TheseObjects s` → `Set.member oid s`;
    `AllCreatures` → `oid` is a creature on the battlefield (read through the
