@@ -5,6 +5,7 @@ import qualified Pawl.CoreSpec as CoreSpec
 import qualified Pawl.DamageSpec as DamageSpec
 import qualified Pawl.GameSpec as GameSpec
 import qualified Pawl.ManaSpec as ManaSpec
+import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
 import qualified Pawl.ReplaySpec as ReplaySpec
 import qualified Pawl.ResolveSpec as ResolveSpec
@@ -30,5 +31,6 @@ testTree =
       ManaSpec.tests,
       CastSpec.tests,
       CombatSpec.tests,
-      ResolveSpec.tests
+      ResolveSpec.tests,
+      ProjectionSpec.tests
     ]

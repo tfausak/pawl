@@ -25,7 +25,7 @@ data Card = MkCard
     -- redundant -- a per-keyword fact, true of everything through M2c, and NOT
     -- true out in the tail (two Wards both trigger; Rampage stacks).
     --
-    -- The closed half must read this through Pawl.Game.keywordsOf, never
+    -- The closed half must read this through Pawl.Projection.keywordsOf, never
     -- directly: layer 6 grants and removes abilities at M3.
     keywords :: Set Keyword,
     -- CR 604.1/604.2: this card's static continuous abilities (Humility). Empty
