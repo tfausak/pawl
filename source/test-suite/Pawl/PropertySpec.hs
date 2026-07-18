@@ -6,18 +6,37 @@ module Pawl.PropertySpec where
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Game as Game
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.QuickCheck as QC
 
 nextIdOf :: GameState.GameState -> Integer
 nextIdOf gs = case GameState.nextObjectId gs of
   ObjectId.MkObjectId n -> toInteger n
+
+-- Did this seed's green-black game put a card of this name into a graveyard? A
+-- cast instant always ends there (resolved or fizzled); nothing else moves a
+-- Giant Growth or Serpent's Gift out of a library.
+castsNamed :: Text.Text -> Int -> Bool
+castsNamed name s =
+  let gs = S.runRandomGame S.greenBlack s
+      named oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> case Object.source obj of
+          Source.OfCard printing -> Card.Type.name (Printing.card printing) == name
+      inGrave pid = any named (Game.zoneMembers Zone.Graveyard pid gs)
+   in any inGrave [S.alice, S.bob]
 
 propertyTests :: Tasty.TestTree
 propertyTests =
@@ -52,7 +71,11 @@ propertyTests =
          in QC.property
               ( Maybe.isJust (GameState.result final)
                   && not (Set.null (GameState.drewFromEmpty final))
-              )
+              ),
+      QC.testProperty "continuous effects happen: some green-black seed casts Giant Growth" $
+        QC.once (QC.property (any (castsNamed (Text.pack "Giant Growth")) [1 .. 100 :: Int])),
+      QC.testProperty "grants happen: some green-black seed casts Serpent's Gift" $
+        QC.once (QC.property (any (castsNamed (Text.pack "Serpent's Gift")) [1 .. 100 :: Int]))
     ]
 
 tests :: Tasty.TestTree

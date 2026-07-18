@@ -51,12 +51,18 @@ redDeck =
         (Card.lightningBoltPrinting, 4)
       ]
 
+-- Still 36 land + 24 spells = 60. Giant Growth and Serpent's Gift give
+-- continuous effects random-game coverage (M3b); War Mammoth stays plentiful
+-- (16, down from 24) so combat still happens and Serpent's Gift has a
+-- trampler to grant deathtouch to.
 greenDeck :: Deck.Deck
 greenDeck =
   Deck.MkDeck $
     Map.fromList
       [ (Card.forestPrinting, 36),
-        (Card.warMammothPrinting, 24)
+        (Card.warMammothPrinting, 16),
+        (Card.giantGrowthPrinting, 4),
+        (Card.serpentsGiftPrinting, 4)
       ]
 
 blackDeck :: Deck.Deck

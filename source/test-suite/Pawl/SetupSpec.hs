@@ -38,7 +38,9 @@ deckTests =
         let Deck.MkDeck m = Setup.greenDeck
          in do
               HU.assertEqual "forests" (Just 36) (Map.lookup Card.forestPrinting m)
-              HU.assertEqual "mammoths" (Just 24) (Map.lookup Card.warMammothPrinting m),
+              HU.assertEqual "mammoths" (Just 16) (Map.lookup Card.warMammothPrinting m)
+              HU.assertEqual "giant growths" (Just 4) (Map.lookup Card.giantGrowthPrinting m)
+              HU.assertEqual "serpent's gifts" (Just 4) (Map.lookup Card.serpentsGiftPrinting m),
       HU.testCase "black deck composition" $
         let Deck.MkDeck m = Setup.blackDeck
          in do
