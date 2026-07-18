@@ -4,7 +4,6 @@ import Control.Applicative ((<|>))
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Pawl.Card as Card
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.DamageEvent as DamageEvent
@@ -60,7 +59,7 @@ woundedByDeathtouch gs oid =
 -- classification, never the identity.
 creatureDies :: GameState -> ObjectId -> Bool
 creatureDies gs oid =
-  let isCreature = fmap Card.isCreature (Game.cardOf oid gs) == Just True
+  let isCreature = Projection.isCreatureOf oid gs
    in isCreature && case Projection.toughnessOf oid gs of
         -- An unevaluable toughness means NO state-based action, not a crash.
         -- Unreachable in M1b (every toughness is a Literal); reachable at M3.

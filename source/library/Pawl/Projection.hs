@@ -78,12 +78,16 @@ applyModification gs oid m pc = case m of
         PC.rulesTextActive = False
       }
 
--- Layer 7b sets P/T only on an object that HAS P/T; a land stays without.
+-- CR 613.4b: layer 7b SETS base P/T to a specific value -- it ESTABLISHES P/T, so
+-- an object with no printed P/T that is set (an Opalescence-animated enchantment)
+-- gains it. When the effect sets only one axis (Nothing on the other), a base
+-- without P/T stays without on that axis (nothing sets it). Contrast addPT (7c),
+-- which only MODIFIES and so never gives P/T to something that has none.
 setPT :: Maybe Integer -> Maybe Integer -> Maybe Integer
 setPT base new = case (base, new) of
-  (Just _, Just n) -> Just n
+  (_, Just n) -> Just n
   (Just b, Nothing) -> Just b
-  (Nothing, _) -> Nothing
+  (Nothing, Nothing) -> Nothing
 
 -- Layer 7c adds; an unevaluable delta leaves the value, a land stays without.
 addPT :: Maybe Integer -> Maybe Integer -> Maybe Integer

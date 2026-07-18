@@ -918,7 +918,7 @@ git commit -m "Tap lands off their projected subtypes (CR 305.6/305.7)"
 - Consumes: `Projection.isCreatureOf` (Task 1), the cards (Task 5).
 - Produces: `Sba`, `Target`, `Combat` treat an Opalescence'd enchantment as a creature.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ProjectionSpec.hs` (import `qualified Pawl.Target as Target`, `qualified Pawl.Type.Recipient as Recipient` if needed). Opalescence + Humility: Humility becomes a creature and is a legal `CreatureTarget`; and, marked lethal, an SBA destroys it:
 
@@ -939,12 +939,12 @@ Add to `source/test-suite/Pawl/ProjectionSpec.hs` (import `qualified Pawl.Target
 
 (If `Sba.checkStateBasedActions` has a different name, use the one `ProjectionSpec` already imports — the M3b Humility test uses `Sba.checkStateBasedActions`.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "Opalescence makes Humility"'`
 Expected: FAIL — `Sba` reads the *printed* type via `Card.isCreature`, so Humility is not seen as a creature and the SBA never destroys it.
 
-- [ ] **Step 3: Rewire the three consumers**
+- [x] **Step 3: Rewire the three consumers**
 
 `source/library/Pawl/Sba.hs` — replace the printed read (line ~63). It already imports `Projection`:
 
@@ -967,12 +967,12 @@ isCreatureObject oid gs = Projection.isCreatureOf oid gs
 
 Remove any now-unused `Card`/`Card.isCreature` imports from `Target.hs`/`Combat.hs`/`Sba.hs` to stay warning-clean. **Cycle check:** `Projection` imports none of `Sba`/`Target`/`Combat`, so these edges are safe.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — Opalescence'd Humility is a targetable, SBA-killable creature; all combat/targeting/SBA tests for ordinary creatures still green (printed and projected agree when no type-changer is present).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

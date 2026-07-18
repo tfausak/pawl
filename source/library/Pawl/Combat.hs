@@ -8,7 +8,6 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Pawl.Card as Card
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
@@ -61,7 +60,7 @@ defendingPlayers :: GameState -> [PlayerId]
 defendingPlayers gs = filter (/= GameState.activePlayer gs) (Sba.stillPlaying gs)
 
 isCreatureObject :: ObjectId -> GameState -> Bool
-isCreatureObject oid gs = fmap Card.isCreature (Game.cardOf oid gs) == Just True
+isCreatureObject = Projection.isCreatureOf
 
 -- CR 508.1a: an attacking creature must be untapped, controlled by the active
 -- player, and not summoning sick (CR 302.6).

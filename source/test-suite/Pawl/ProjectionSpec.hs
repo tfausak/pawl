@@ -300,5 +300,17 @@ tests =
          in HU.assertEqual "Forest stays a Forest" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs),
       HU.testCase "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Urborg older)" $
         let (forestId, _, gs) = bloodMoonUrborg True
-         in HU.assertEqual "Forest stays a Forest, order-independent" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs)
+         in HU.assertEqual "Forest stays a Forest, order-independent" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs),
+      HU.testCase "CR 305.2 Opalescence makes Humility a creature: legal creature target and SBA-killable" $
+        let base = Setup.emptyGame S.bothPlayers
+            (humilityId, g1) = S.addCreature Card.humilityPrinting S.alice base
+            -- Opalescence AFTER Humility, so Opalescence's 7b (mana value 4) wins
+            -- the timestamp race: Humility is a 4/4 creature.
+            (_, g2) = S.addCreature Card.opalescencePrinting S.alice g1
+         in do
+              HU.assertBool "Humility is a creature" (Projection.isCreatureOf humilityId g2)
+              HU.assertEqual "base P/T = its mana value" (Just 4) (Projection.toughnessOf humilityId g2)
+              let damaged = S.markDamage humilityId 4 g2
+                  afterSba = Sba.checkStateBasedActions damaged
+              HU.assertBool "lethal damage destroys the animated enchantment" (not (Set.member humilityId (GameState.battlefield afterSba)))
     ]

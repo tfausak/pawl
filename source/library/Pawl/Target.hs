@@ -4,8 +4,8 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Pawl.Card as Card
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import Pawl.Type.GameState (GameState)
 import Pawl.Type.Recipient (Recipient)
@@ -22,7 +22,7 @@ import qualified Pawl.Type.Zone as Zone
 -- all land.
 legalRecipients :: TargetSpec -> GameState -> Set Recipient
 legalRecipients spec gs =
-  let isCreatureId oid = fmap Card.isCreature (Game.cardOf oid gs) == Just True
+  let isCreatureId oid = Projection.isCreatureOf oid gs
       creatures =
         map Recipient.ToCreature $
           concatMap
