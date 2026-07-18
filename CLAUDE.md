@@ -112,11 +112,29 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   for random-game coverage. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-18-m3b-continuous-effects-design.md` and
   `docs/superpowers/plans/2026-07-18-m3b-continuous-effects.md`.
-- **Current work is M3c** — CR 613.8 dependency via trial application, the
-  go/no-go verdict for the whole continuous-effects approach. Humility+Opalescence
-  and Blood Moon+Urborg, both application orders, are the canonical dependency
-  fixtures; per the risk register, the test set for both must exist *before* the
-  dependency resolver is written.
+- **M3c is complete** (the CR 613.8 *existence* dependency — the go/no-go for the
+  whole continuous-effects approach, a genuine YES. `Pawl.Projection` folds a full
+  projected **type line** (`cardTypes`, `subtypes`, `rulesTextActive` on
+  `ProjectedCharacteristics`) layer by layer, evaluating each effect's affected-set
+  against the *partial* projection, so a layer-4 type change is visible to a
+  layer-6 grant. Three layer-4 `Modification`s (`SetLandSubtype`, `AddLandSubtype`,
+  `AddCardType`), `Quantity.ManaValue` (CR 202.3), and `Supertype.Legendary` land
+  with no new opcode. **The dependency is resolved by source-liveness, not trial
+  application** (a plan refinement): `Projection.staticAbilitiesLive` gathers a
+  permanent's static abilities only if no *live* `SetLandSubtype` applies to it,
+  reading base characteristics so nothing recurses into the projection — Blood Moon
+  strips Urborg order-**independently**, verified in both timestamp orders (the
+  falsifier: a naive timestamp fold gives a Forest Swamp). Opalescence animates
+  every *other* non-Aura enchantment; `setPT` now *establishes* P/T on a set (CR
+  613.4b), so Humility becomes a 4/4 creature under it, resolved in both 7b orders.
+  Mana taps off projected subtypes (CR 305.6/305.7); `Sba`/`Target`/`Combat` read
+  projected creature-ness. Blood Moon, Urborg, and Opalescence are deterministic
+  fixtures (no random-game entry, per the white/red-fixture posture). The
+  topological CR 613.8b *applies-to* reorder is deferred behind a documenting test
+  (`git-bug f90e0c4`). Performance: `Projection.projectAll` projects the whole
+  board from one `gather` per state-based-action sweep. Spec and plan kept as
+  reference: `docs/superpowers/specs/2026-07-18-m3c-dependency-design.md` and
+  `docs/superpowers/plans/2026-07-18-m3c-dependency.md`.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
