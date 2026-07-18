@@ -6,6 +6,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Affected as Affected
@@ -16,6 +17,7 @@ import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Effect as Effect
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Recipient (Recipient)
@@ -71,7 +73,7 @@ applyEffect source legality chosen gs effect = case effect of
             -- The applied effect IS the event (the M3a spec, section 4):
             -- constructing this DamageEvent and funneling it is the whole
             -- application. CR 120.3e / 120.3a live in applyDamage.
-            else Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n)] gs
+            else Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n) (Projection.hasKeyword Keyword.Deathtouch source gs)] gs
       _ -> gs
   Effect.ModifyTarget duration modification slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

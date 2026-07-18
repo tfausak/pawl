@@ -11,7 +11,6 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Departure as Departure
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
@@ -40,17 +39,16 @@ depart pid gs =
    in gs {GameState.players = Map.adjust lose pid (GameState.players gs)}
 
 -- CR 704.5h: a creature with toughness > 0 dealt damage by a deathtouch source
--- since the last SBA check is destroyed. "Since the last check" is exactly the
--- span of GameState.damageEvents, which checkStateBasedActions drains below. The
--- source's deathtouch is read through the projection (Projection.hasKeyword), at
--- check time -- CR 702.2e's last-known-information never differs while keywords
--- are printed (M3 expiry).
+-- since the last SBA check is destroyed. "Deathtouch source" is read from the
+-- event's deal-time bit (CR 702.2e last-known information), NOT re-derived now --
+-- so a source that lost deathtouch (Humility) or left after dealing damage is
+-- still judged by what it was. See the M3b spec, section 4.
 woundedByDeathtouch :: GameState -> ObjectId -> Bool
 woundedByDeathtouch gs oid =
   let hits ev =
         DamageEvent.target ev == Recipient.ToCreature oid
           && DamageEvent.amount ev > 0
-          && Projection.hasKeyword Keyword.Deathtouch (DamageEvent.source ev) gs
+          && DamageEvent.dealtByDeathtouch ev
    in any hits (GameState.damageEvents gs)
 
 -- CR 704.5f (toughness 0 or less), CR 704.5g (damage marked >= toughness), and

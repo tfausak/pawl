@@ -5,13 +5,18 @@ import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Recipient (Recipient)
 
 -- One instance of combat damage: a source dealt `amount` to `target`. The first
--- reader is deathtouch's CR 704.5h SBA, which asks whether `source` has deathtouch
--- (via the projection, at check time). Minimal by design (CR 702.2 needs only
--- source + creature target + nonzero amount); lifelink and M4 combat-damage
--- triggers grow the payload rather than reshape it. See the M2c spec, section 2.
+-- reader is deathtouch's CR 704.5h SBA, which asks `dealtByDeathtouch`. Minimal
+-- by design (CR 702.2 needs only source + creature target + nonzero amount);
+-- lifelink and M4 combat-damage triggers grow the payload rather than reshape
+-- it. See the M2c spec, section 2.
 data DamageEvent = MkDamageEvent
   { source :: ObjectId,
     target :: Recipient,
-    amount :: Natural
+    amount :: Natural,
+    -- CR 702.2e: whether the source had deathtouch WHEN THIS DAMAGE WAS DEALT.
+    -- Captured from the projection at deal time (Projection.hasKeyword), not
+    -- re-derived at SBA-check time -- last-known information. Read by the CR
+    -- 704.5h SBA. See the M3b spec, section 4.
+    dealtByDeathtouch :: Bool
   }
   deriving (Eq, Ord, Show)

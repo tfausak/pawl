@@ -89,13 +89,13 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
           -- CR 510.1b: unblocked, so it hits what it is attacking.
           [] -> case target of
             AttackTarget.OfPlayer defender ->
-              pure [DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer defender) power]
+              pure [DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer defender) power (Projection.hasKeyword Keyword.Deathtouch attacker gs)]
           -- CR 510.1c / 702.19b: a single blocker with no trample -- or trample but
           -- no power past its threshold -- is forced: all onto the blocker. A single
           -- trample blocker WITH excess fails this guard and falls to the prompt arm.
           [blocker]
             | not trample || power <= blockerThreshold gs attacker blocker ->
-                pure [DamageEvent.MkDamageEvent attacker (Recipient.ToCreature blocker) power]
+                pure [DamageEvent.MkDamageEvent attacker (Recipient.ToCreature blocker) power (Projection.hasKeyword Keyword.Deathtouch attacker gs)]
           blockers -> case Game.controllerOf attacker gs of
             Nothing -> pure []
             -- CR 702.19b: the excess is assigned "as its controller chooses," so the
@@ -116,7 +116,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                   (Program.prompt (Prompt.AssignCombatDamage decider pid attacker thresholds power))
               -- CR 510.1e / 702.19b: reject-not-repair (NOT the CR 733 human-error
               -- rewind). An illegal answer assigns nothing. See the M2c spec, §4.
-              let toEvent (recipient, n) = DamageEvent.MkDamageEvent attacker recipient n
+              let toEvent (recipient, n) = DamageEvent.MkDamageEvent attacker recipient n (Projection.hasKeyword Keyword.Deathtouch attacker gs)
                   positive (_, n) = n > 0
               pure
                 ( if legalAssignment thresholds power chosen
@@ -131,7 +131,7 @@ blockerAssignment gs (attacker, blockers) =
         Just p ->
           if p <= 0
             then []
-            else [DamageEvent.MkDamageEvent blocker (Recipient.ToCreature attacker) (fromInteger p)]
+            else [DamageEvent.MkDamageEvent blocker (Recipient.ToCreature attacker) (fromInteger p) (Projection.hasKeyword Keyword.Deathtouch blocker gs)]
         Nothing -> []
    in concatMap assign (Set.toList blockers)
 

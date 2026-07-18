@@ -7,7 +7,6 @@ module Pawl.DamageSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Card as Card
 import qualified Pawl.Damage as Damage
@@ -16,25 +15,23 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Departure as Departure
+import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
-import qualified Pawl.Type.Power as Power
-import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Status as Status
-import qualified Pawl.Type.Toughness as Toughness
-import qualified Pawl.Type.TypeLine as TypeLine
+import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -141,9 +138,9 @@ damageEventTests =
               (a : _, b : _) -> do
                 HU.assertEqual "two events" 2 (length events)
                 HU.assertBool "attacker hit blocker for 2" $
-                  elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2) events
+                  elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2 False) events
                 HU.assertBool "blocker hit attacker for 2" $
-                  elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2) events
+                  elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False) events
               _ -> HU.assertFailure "fixture should have one creature per side",
       HU.testCase "an unblocked 2/1 emits a ToPlayer event" $
         let (gs, mine, _) = S.combatBoard 1 0
@@ -152,7 +149,7 @@ damageEventTests =
               a : _ ->
                 HU.assertEqual
                   "one player event"
-                  [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2]
+                  [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False]
                   (GameState.damageEvents after)
               _ -> HU.assertFailure "fixture should have an attacker"
     ]
@@ -176,7 +173,28 @@ deathtouchTests =
       HU.testCase "the SBA check drains the damage events" $
         let (gs, _, _) = S.combatBoardOf [Card.typhoidRatsPrinting] [Card.ogreSentryPrinting]
             after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
-         in HU.assertEqual "events drained" [] (GameState.damageEvents after)
+         in HU.assertEqual "events drained" [] (GameState.damageEvents after),
+      HU.testCase "CR 702.2e the deal-time bit is true for a real deathtoucher, false for a plain source" $
+        -- Typhoid Rats (deathtouch) and Ogre Sentry trade combat damage under
+        -- aggressiveAnswer (which DOES declare attackers). fightWith runs no SBAs,
+        -- so the wave is still in damageEvents.
+        let (gs, rats, ogres) = S.combatBoardOf [Card.typhoidRatsPrinting] [Card.ogreSentryPrinting]
+            fought = S.fightWith S.aggressiveAnswer gs
+            ratId = case rats of r : _ -> r; [] -> ObjectId.MkObjectId 999
+            ogreId = case ogres of o : _ -> o; [] -> ObjectId.MkObjectId 999
+            bitFor src = any (\ev -> DamageEvent.source ev == src && DamageEvent.dealtByDeathtouch ev) (GameState.damageEvents fought)
+         in do
+              HU.assertBool "Rat's damage is flagged deathtouch" (bitFor ratId)
+              HU.assertBool "Ogre's damage is not" (not (bitFor ogreId)),
+      HU.testCase "CR 702.2e Humility removes deathtouch, so the deal-time bit is false" $
+        -- Under Humility the Rat loses deathtouch (layer 6); its combat-damage
+        -- event's bit is false -- asserted directly on the event, not via a kill.
+        let (gs0, rats, _) = S.combatBoardOf [Card.typhoidRatsPrinting] [Card.ogreSentryPrinting]
+            gs = S.withHumility gs0
+            fought = S.fightWith S.aggressiveAnswer gs
+            ratId = case rats of r : _ -> r; [] -> ObjectId.MkObjectId 999
+            ratBit = any (\ev -> DamageEvent.source ev == ratId && DamageEvent.dealtByDeathtouch ev) (GameState.damageEvents fought)
+         in HU.assertBool "no deathtouch at deal time under Humility" (not ratBit)
     ]
 
 assignmentLegalityTests :: Tasty.TestTree
@@ -330,48 +348,41 @@ trampleTests =
               HU.assertEqual "one Ogre took all 3 and died, the other lived" 1 (S.creaturesInPlay S.bob after)
     ]
 
--- SYNTHETIC, NOT A REAL CARD. No printed Magic creature has both deathtouch and
--- trample (Scryfall keyword:deathtouch keyword:trample is empty), and M2c has no
--- granting effect (that is M3, e.g. Basilisk Collar) to combine them on a real
--- card. This fixture is the only way to exercise CR 702.2c in M2c. EXPIRES at M3:
--- grant deathtouch to a real trampler (War Mammoth) and delete this. See the M2c
--- spec, section 6, and git-bug's M3 work.
-syntheticDeathtramplerPrinting :: Printing.Printing
-syntheticDeathtramplerPrinting =
-  Printing.MkPrinting
-    { Printing.card =
-        Card.Type.MkCard
-          { Card.Type.name = Text.pack "Synthetic Deathtrampler (test fixture)",
-            Card.Type.manaCost = Nothing,
-            Card.Type.typeLine =
-              TypeLine.MkTypeLine
-                { TypeLine.supertypes = Set.empty,
-                  TypeLine.types = Set.singleton CardType.Creature,
-                  TypeLine.subtypes = Set.empty
-                },
-            Card.Type.power = Just (Power.MkPower (Quantity.Type.Literal 3)),
-            Card.Type.toughness = Just (Toughness.MkToughness (Quantity.Type.Literal 3)),
-            Card.Type.keywords = Set.fromList [Keyword.Deathtouch, Keyword.Trample],
-            Card.Type.staticAbilities = [],
-            Card.Type.effects = [],
-            Card.Type.targetSpecs = Map.empty
+-- Grant deathtouch to `oid` the way Serpent's Gift does: a stored continuous
+-- effect over just that object. Timestamp is arbitrary (no competing layer-6
+-- effect in these fixtures).
+grantDeathtouch :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+grantDeathtouch oid gs =
+  let eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = ObjectId.MkObjectId 997,
+            ContinuousEffect.timestamp = Timestamp.MkTimestamp 500,
+            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.modification = Modification.GainKeyword Keyword.Deathtouch,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
-    }
+   in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
 trampleDeathtouchTests :: Tasty.TestTree
 trampleDeathtouchTests =
   Tasty.testGroup
     "TrampleDeathtouch"
-    [ HU.testCase "CR 702.2c a deathtouch trampler needs only 1 on the blocker, spilling the rest" $
-        -- Synthetic 3/3 deathtouch+trample into Ogre Sentry (3/3): lethal is 1, so
-        -- 1 to the Ogre and 2 tramples to bob. The Ogre still dies (704.5h).
-        let (gs, _, _) = S.combatBoardOf [syntheticDeathtramplerPrinting] [Card.ogreSentryPrinting]
+    [ HU.testCase "CR 702.2c a deathtouch-granted trampler needs only 1 on the blocker, spilling the rest" $
+        -- War Mammoth (3/3 trample) GRANTED deathtouch into Ogre Sentry (3/3):
+        -- lethal collapses to 1, so 1 to the Ogre and 2 tramples to bob; the Ogre
+        -- still dies (704.5h, via the deal-time bit). Real cards replace M2c's
+        -- synthetic deathtrampler.
+        let (gs0, mammoths, _) = S.combatBoardOf [Card.warMammothPrinting] [Card.ogreSentryPrinting]
+            mammothId = case mammoths of
+              m : _ -> m
+              [] -> ObjectId.MkObjectId 999
+            gs = grantDeathtouch mammothId gs0
             after = Sba.checkStateBasedActions (S.fightWith tramplingAnswer gs)
          in do
-              HU.assertEqual "bob took 2 overflow" (Just 18) (S.lifeOf S.bob after)
+              HU.assertEqual "bob took the 2 overflow" (Just 18) (S.lifeOf S.bob after)
               HU.assertEqual "the Ogre is dead" 0 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 702.19b the control: plain trample into the same 3/3 spills nothing" $
-        -- War Mammoth (3/3 trample, no deathtouch) into Ogre Sentry (3/3): lethal
+        -- War Mammoth (3/3 trample, NO deathtouch) into Ogre Sentry (3/3): lethal
         -- is 3, all 3 go to the Ogre, 0 tramples. Only deathtouch changes the spill.
         let (gs, _, _) = S.combatBoardOf [Card.warMammothPrinting] [Card.ogreSentryPrinting]
             after = Sba.checkStateBasedActions (S.fightWith tramplingAnswer gs)
