@@ -13,12 +13,12 @@ import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
+import qualified Pawl.CoreSpec as CoreSpec
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
-import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
@@ -121,7 +121,7 @@ testTree :: Tasty.TestTree
 testTree =
   Tasty.testGroup
     "pawl"
-    [ programTests,
+    [ CoreSpec.tests,
       cardTests,
       turnTests,
       turnDataTests,
@@ -135,7 +135,6 @@ testTree =
       replayTests,
       propertyTests,
       ruleTests,
-      quantityTests,
       manaTests,
       deckTests,
       discardTests,
@@ -1136,22 +1135,6 @@ manaTests =
                 HU.assertEqual "emptied" 0 (poolSize alice (Mana.emptyManaPools (Mana.tapForMana oid gs)))
     ]
 
-quantityTests :: Tasty.TestTree
-quantityTests =
-  Tasty.testGroup
-    "Quantity"
-    [ HU.testCase "a literal evaluates to itself" $
-        HU.assertEqual
-          "literal"
-          (Just 2)
-          (Quantity.evaluate (Setup.emptyGame bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal 2)),
-      HU.testCase "a literal may be negative" $
-        HU.assertEqual
-          "negative"
-          (Just (-1))
-          (Quantity.evaluate (Setup.emptyGame bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal (-1)))
-    ]
-
 gameTests :: Tasty.TestTree
 gameTests =
   let after = Game.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield (oneMountainState Phase.PrecombatMain)
@@ -1514,35 +1497,6 @@ ruleTests =
           (fmap Player.status (Map.lookup alice (GameState.players deckedOut))),
       HU.testCase "CR 704.5b the survivor wins" $
         HU.assertEqual "bob won" (Just (Result.Won bob)) (GameState.result deckedOut)
-    ]
-
--- A toy instruction set for exercising Program.
-data Toy r where
-  Ask :: Toy Int
-
-toyProgram :: Program.Program Toy Int
-toyProgram = do
-  x <- Program.prompt Ask
-  y <- Program.prompt Ask
-  pure (x + y)
-
-programTests :: Tasty.TestTree
-programTests =
-  Tasty.testGroup
-    "Program"
-    [ HU.testCase "pure interpreter threads answers" $
-        let answer :: Toy b -> b
-            answer i = case i of Ask -> 21
-         in HU.assertEqual "21 + 21" 42 (Program.foldProgram answer toyProgram),
-      HU.testCase "effectful interpreter runs in order" $
-        let answer :: Toy b -> State.State [Int] b
-            answer i = case i of
-              Ask -> do
-                xs <- State.get
-                case xs of
-                  h : t -> do State.put t; pure h
-                  [] -> pure 0
-         in HU.assertEqual "1 + 2" 3 (State.evalState (Program.foldProgramM answer toyProgram) [1, 2])
     ]
 
 cardTests :: Tasty.TestTree

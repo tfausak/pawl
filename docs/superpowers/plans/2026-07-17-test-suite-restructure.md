@@ -170,7 +170,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Produces: `CoreSpec.tests :: Tasty.TestTree` grouping `programTests` and
   `quantityTests`.
 
-- [ ] **Step 1: Create the spec module**
+- [x] **Step 1: Create the spec module**
 
 Create `source/test-suite/Pawl/CoreSpec.hs`:
 
@@ -190,20 +190,20 @@ tests :: Tasty.TestTree
 tests = Tasty.testGroup "Core" [programTests, quantityTests]
 ```
 
-- [ ] **Step 2: Wire into `Main.hs`**
+- [x] **Step 2: Wire into `Main.hs`**
 
 In `Main.hs`: delete `programTests` and `quantityTests`; add
 `import qualified Pawl.CoreSpec`; in `testTree`'s list replace the two entries
 with `CoreSpec.tests`. If any name in the transitional `Pawl.Support` explicit
 import is now unused in `Main.hs`, remove it from that list.
 
-- [ ] **Step 3: Register and build**
+- [x] **Step 3: Register and build**
 
 If `other-modules` is hand-listed, add `Pawl.CoreSpec`. Then:
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -3` → clean.
 Run: `cabal test 2>&1 | grep -E "tests? passed|out of"` → `All 261 tests passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/test-suite/Pawl/CoreSpec.hs source/test-suite/Main.hs pawl.cabal
