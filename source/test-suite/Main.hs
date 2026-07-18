@@ -20,7 +20,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.GameSpec as GameSpec
-import qualified Pawl.Mana as Mana
+import qualified Pawl.ManaSpec as ManaSpec
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
@@ -48,7 +48,6 @@ import Pawl.Support
     identityAnswer,
     inCombatPhase,
     isCreatureRecipient,
-    landsInPlay,
     lifeOf,
     m2aPrintings,
     markDamage,
@@ -70,7 +69,6 @@ import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Decider as Decider
@@ -78,16 +76,10 @@ import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Mana as Mana.Type
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.ManaType as ManaType
-import qualified Pawl.Type.ManaUnit as ManaUnit
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
-import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
@@ -99,7 +91,6 @@ import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
-import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
@@ -124,11 +115,10 @@ testTree =
       sbaTests,
       replayTests,
       propertyTests,
-      manaTests,
+      ManaSpec.tests,
       discardTests,
       castTests,
       stackTests,
-      castabilityTests,
       castEngineTests,
       sicknessTests,
       damageTests,
@@ -930,82 +920,6 @@ discardTests =
             -- the kept cards never changed zones.
             expected = take 7 held
          in HU.assertEqual "kept the front seven" expected kept
-    ]
-
--- Cast `creature` off `nLands` copies of `land`, then resolve it.
-resolvedCreature :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
-resolvedCreature land creature nLands =
-  let (base, oid) = handOne creature (landsInPlay land nLands)
-      afterCast = snd (Engine.runGamePure identityAnswer base (Cast.castSpell alice oid))
-   in Stack.resolveTop afterCast
-
-castabilityTests :: Tasty.TestTree
-castabilityTests =
-  Tasty.testGroup
-    "Castability"
-    [ HU.testCase "War Mammoth is cast off four Forests and resolves onto the battlefield" $
-        let gs = resolvedCreature Card.forestPrinting Card.warMammothPrinting 4
-         in do
-              HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
-              HU.assertEqual "one creature in play" 1 (creaturesInPlay alice gs)
-              HU.assertEqual "lands tapped" 4 (tappedCount alice gs),
-      HU.testCase "Typhoid Rats is cast off one Swamp and resolves onto the battlefield" $
-        let gs = resolvedCreature Card.swampPrinting Card.typhoidRatsPrinting 1
-         in do
-              HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
-              HU.assertEqual "one creature in play" 1 (creaturesInPlay alice gs)
-              HU.assertEqual "lands tapped" 1 (tappedCount alice gs)
-    ]
-
-pikerCost :: ManaCost.ManaCost
-pikerCost = ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
-
-poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
-poolSize pid gs = case Mana.poolOf pid gs of
-  Mana.Type.MkMana units -> length units
-
-manaTests :: Tasty.TestTree
-manaTests =
-  Tasty.testGroup
-    "Mana"
-    [ HU.testCase "CR 305.6 a Mountain's red mana ability comes from its subtype" $
-        HU.assertEqual
-          "red"
-          (Just (ManaType.Colored Color.Red))
-          (Mana.subtypeMana Subtype.Mountain),
-      HU.testCase "a Goblin grants no mana ability" $
-        HU.assertEqual "none" Nothing (Mana.subtypeMana Subtype.Goblin),
-      HU.testCase "an empty pool starts empty" $
-        HU.assertEqual "empty" 0 (poolSize alice (mountainsInPlay 2)),
-      HU.testCase "tapping a Mountain taps it and adds one red unit" $
-        let gs = mountainsInPlay 1
-         in case Game.zoneMembers Zone.Battlefield alice gs of
-              [] -> HU.assertFailure "fixture should have one Mountain"
-              oid : _ -> do
-                let after = Mana.tapForMana oid gs
-                HU.assertEqual "tapped" 1 (tappedCount alice after)
-                HU.assertEqual
-                  "pool"
-                  (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red}])
-                  (Mana.poolOf alice after),
-      HU.testCase "two Mountains can pay {1}{R}" $
-        HU.assertBool "affordable" (Mana.canPay alice pikerCost (mountainsInPlay 2)),
-      HU.testCase "one Mountain cannot pay {1}{R}" $
-        HU.assertBool "unaffordable" (not (Mana.canPay alice pikerCost (mountainsInPlay 1))),
-      HU.testCase "no Mountains cannot pay {1}{R}" $
-        HU.assertBool "unaffordable" (not (Mana.canPay alice pikerCost (mountainsInPlay 0))),
-      HU.testCase "paying {1}{R} taps exactly two of three Mountains and leaves no float" $
-        case Mana.payCost alice pikerCost (mountainsInPlay 3) of
-          Nothing -> HU.assertFailure "three Mountains should pay {1}{R}"
-          Just after -> do
-            HU.assertEqual "tapped" 2 (tappedCount alice after)
-            HU.assertEqual "no float" 0 (poolSize alice after),
-      HU.testCase "CR 500.4 mana pools empty" $
-        let gs = mountainsInPlay 1
-         in case Game.zoneMembers Zone.Battlefield alice gs of
-              [] -> HU.assertFailure "fixture should have one Mountain"
-              oid : _ ->
-                HU.assertEqual "emptied" 0 (poolSize alice (Mana.emptyManaPools (Mana.tapForMana oid gs)))
     ]
 
 sbaBase :: GameState.GameState

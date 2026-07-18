@@ -147,6 +147,7 @@ test-suite pawl-test-suite
     Pawl.CardSpec
     Pawl.CoreSpec
     Pawl.GameSpec
+    Pawl.ManaSpec
     Pawl.SetupSpec
     Pawl.Support
     Pawl.TurnSpec

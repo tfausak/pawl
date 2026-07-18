@@ -425,7 +425,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `ManaSpec.tests` grouping `manaTests`, `castabilityTests`.
 
-- [ ] **Step 1: Create the spec module**
+- [x] **Step 1: Create the spec module**
 
 ```haskell
 -- Covers Pawl.Mana: mana payment and castability.
@@ -440,13 +440,13 @@ tests :: Tasty.TestTree
 tests = Tasty.testGroup "Mana" [manaTests, castabilityTests]
 ```
 
-- [ ] **Step 2: Wire into `Main.hs`** — delete the two groups, `import qualified
+- [x] **Step 2: Wire into `Main.hs`** — delete the two groups, `import qualified
   Pawl.ManaSpec`, replace entries with `ManaSpec.tests`, prune unused imports.
 
-- [ ] **Step 3: Register and build** — add to `other-modules` if hand-listed;
+- [x] **Step 3: Register and build** — add to `other-modules` if hand-listed;
   build clean; `cabal test` → `All 261 tests passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/test-suite/Pawl/ManaSpec.hs source/test-suite/Main.hs pawl.cabal
