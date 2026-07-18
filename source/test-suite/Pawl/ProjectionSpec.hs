@@ -336,5 +336,16 @@ tests =
         let base = Setup.emptyGame S.bothPlayers
             (opalId, g1) = S.addCreature Card.opalescencePrinting S.alice base
             (_, gs) = S.addCreature Card.humilityPrinting S.alice g1
-         in HU.assertBool "Opalescence stays a non-creature enchantment" (not (Projection.isCreatureOf opalId gs))
+         in HU.assertBool "Opalescence stays a non-creature enchantment" (not (Projection.isCreatureOf opalId gs)),
+      HU.testCase "CR 613.7 within layer 4, timestamp order (EXPIRES at CR 613.8b, git-bug f90e0c4)" $
+        -- A Piker made a Land by B (layer 4, TheseObjects), and A = AddLandSubtype
+        -- Swamp over AllLands (layer 4). With A OLDER than B, timestamp order applies
+        -- A before B, so A does not yet see the Piker as a land and adds no Swamp.
+        -- The CR 613.8b-correct answer is that A depends on B (B changes what A
+        -- applies to), so B applies first and the Piker WOULD gain Swamp. When the
+        -- topological resolver lands, flip this assertion to assert the Swamp.
+        let (pikerId, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
+            gsA = withDynamicEffect Affected.AllLands (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Swamp) gs0
+            gs = withEffect pikerId (Timestamp.MkTimestamp 20) (Modification.AddCardType CardType.Land) gsA
+         in HU.assertBool "timestamp-only: no Swamp yet (known-incomplete, tracked)" (not (Set.member Subtype.Swamp (Projection.subtypesOf pikerId gs)))
     ]

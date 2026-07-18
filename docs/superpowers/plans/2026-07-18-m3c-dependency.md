@@ -1046,7 +1046,7 @@ git commit -m "Gate Humility + Opalescence in both 7b timestamp orders (CR 613.7
 **Interfaces:**
 - No production behavior change. This records the one CR 613.8 case M3c does not implement — the same-layer *applies-to* topological reorder — as a live, executable tracker rather than a doc footnote (risk register D2).
 
-- [ ] **Step 1: Open the git-bug**
+- [x] **Step 1: Open the git-bug**
 
 ```bash
 git-bug bug new -t "M3c: topological CR 613.8b (applies-to) dependency deferred" -m "Within-layer ordering is CR 613.7 timestamp only. The CR 613.8b topological reorder -- apply B tentatively, observe it changes which objects A applies to (both surviving), reorder -- is not implemented; no M3c card falsifies it (existence dependencies are handled by source-liveness). Post-M3c: find a real same-layer applies-to card pair, then implement the reorder and flip ProjectionSpec's documenting test to assert the dependency outcome."
@@ -1054,7 +1054,7 @@ git-bug bug new -t "M3c: topological CR 613.8b (applies-to) dependency deferred"
 
 Capture the printed bug id for the comment and test below.
 
-- [ ] **Step 2: Add the expiry comment**
+- [x] **Step 2: Add the expiry comment**
 
 In `source/library/Pawl/Projection.hs`, at the `ordered = List.sortOn gTimestamp here` line inside `project`, add:
 
@@ -1066,7 +1066,7 @@ In `source/library/Pawl/Projection.hs`, at the `ordered = List.sortOn gTimestamp
         ordered = List.sortOn gTimestamp here
 ```
 
-- [ ] **Step 3: Add the documenting test**
+- [x] **Step 3: Add the documenting test**
 
 Add to `source/test-suite/Pawl/ProjectionSpec.hs` a hand-built same-layer applies-to case, asserting the **current timestamp behavior** with a comment naming the expiry (so a future implementer consciously flips it):
 
@@ -1084,12 +1084,12 @@ Add to `source/test-suite/Pawl/ProjectionSpec.hs` a hand-built same-layer applie
          in HU.assertBool "timestamp-only: no Swamp yet (known-incomplete, tracked)" (not (Set.member Subtype.Swamp (Projection.subtypesOf pikerId gs))),
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS (the test asserts the current, deliberately-incomplete contract).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

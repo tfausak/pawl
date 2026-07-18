@@ -253,6 +253,10 @@ project oid gs =
       layers = Set.toAscList (Set.fromList (map gLayer cands))
       applyLayer partial lyr =
         let here = filter (\c -> gLayer c == lyr && affects (gSource c) oid (gAffected c) partial gs) cands
+            -- CR 613.7 timestamp order within a layer. EXPIRES: CR 613.8b dependency
+            -- (a same-layer effect that changes which objects another applies to)
+            -- would override this. Deferred -- no M3c card falsifies it; existence
+            -- dependencies are handled by staticAbilitiesLive. git-bug f90e0c4.
             ordered = List.sortOn gTimestamp here
             step pc c = applyModification gs oid (gModification c) pc
          in List.foldl' step partial ordered
