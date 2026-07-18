@@ -159,8 +159,8 @@ lintTests =
                 (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
                 Card.allPrintings
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (17 at M3b)" $
-        HU.assertEqual "count" 17 (length Card.allPrintings),
+      HU.testCase "the registry holds every printing (20 at M3c)" $
+        HU.assertEqual "count" 20 (length Card.allPrintings),
       HU.testCase "the lint itself catches a dangling reference" $
         let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
          in HU.assertBool "misauthored card detected" (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)),
@@ -257,8 +257,23 @@ basicLandTests =
                 (Set.member Subtype.Forest (TypeLine.subtypes (Card.Type.typeLine c)))
     ]
 
+m3cCardTests :: Tasty.TestTree
+m3cCardTests =
+  Tasty.testGroup
+    "M3cCards"
+    [ HU.testCase "M3c printings are registered in allPrintings" $ do
+        HU.assertBool "Blood Moon" (Card.bloodMoonPrinting `elem` Card.allPrintings)
+        HU.assertBool "Urborg" (Card.urborgPrinting `elem` Card.allPrintings)
+        HU.assertBool "Opalescence" (Card.opalescencePrinting `elem` Card.allPrintings),
+      HU.testCase "Blood Moon is a {2}{R} enchantment with one SetLandSubtype static ability" $
+        let card = Printing.card Card.bloodMoonPrinting
+         in do
+              HU.assertEqual "one static ability" 1 (length (Card.Type.staticAbilities card))
+              HU.assertBool "not a permanent target" (Map.null (Card.Type.targetSpecs card))
+    ]
+
 tests :: Tasty.TestTree
 tests =
   Tasty.testGroup
     "Card"
-    [cardTests, lintTests, m2aCardTests, m2bCardTests, m2cCardTests, basicLandTests]
+    [cardTests, lintTests, m2aCardTests, m2bCardTests, m2cCardTests, basicLandTests, m3cCardTests]

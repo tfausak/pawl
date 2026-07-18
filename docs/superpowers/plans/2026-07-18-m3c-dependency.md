@@ -554,7 +554,7 @@ git commit -m "Fold the projection layer by layer over the partial type line (CR
 **Interfaces:**
 - Produces: `Card.bloodMoonPrinting`, `Card.urborgPrinting`, `Card.opalescencePrinting`, each in `Card.allPrintings`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/CardSpec.hs` (match its existing style; it likely asserts printings are registered and shaped — mirror an existing case):
 
@@ -572,12 +572,12 @@ Add to `source/test-suite/Pawl/CardSpec.hs` (match its existing style; it likely
 
 (Add imports `qualified Pawl.Type.Card as Card.Type`, `qualified Pawl.Type.Printing as Printing`, `qualified Data.Map.Strict as Map` if not present.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "M3c printings"'`
 Expected: FAIL to compile — the three printings are not in scope.
 
-- [ ] **Step 3: Add the printings**
+- [x] **Step 3: Add the printings**
 
 In `source/library/Pawl/Card.hs` (imports `Affected`, `Modification`, `StaticAbility`, `CardType`, `Subtype`, `Supertype`, `TypeLine`, `ManaCost`, `ManaSymbol`, `ManaType`, `Color` are already present). Add before `allPrintings`:
 
@@ -692,12 +692,12 @@ Append the three to `allPrintings`:
   ]
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. (The D4 slot lint over `allPrintings` is satisfied: all three have empty `effects`/`targetSpecs`, so `slotsOf == targetSpecs keys == ∅`.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

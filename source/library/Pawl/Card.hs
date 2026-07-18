@@ -542,6 +542,104 @@ serpentsGiftPrinting =
           }
     }
 
+-- Blood Moon: {2}{R}, Enchantment, "Nonbasic lands are Mountains."
+-- Scryfall-verified. One layer-4 static ability that SETS every nonbasic land's
+-- subtype to Mountain (CR 305.7), stripping their rules-text abilities. Red, so
+-- it is a deterministic fixture only (no white/blue matchup churn here).
+bloodMoonPrinting :: Printing.Printing
+bloodMoonPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Blood Moon",
+            Card.manaCost =
+              Just
+                ( ManaCost.MkManaCost
+                    [ ManaSymbol.Generic 2,
+                      ManaSymbol.OfType (ManaType.Colored Color.Red)
+                    ]
+                ),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Enchantment,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities =
+              [StaticAbility.MkStaticAbility Affected.AllNonbasicLands (Modification.SetLandSubtype Subtype.Mountain)],
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
+          }
+    }
+
+-- Urborg, Tomb of Yawgmoth: Legendary Land, "Each land is a Swamp in addition to
+-- its other land types." Scryfall-verified. One layer-4 static ability that ADDS
+-- the Swamp subtype to every land (CR 305.7 add). Nonbasic (Legendary, no Basic),
+-- so Blood Moon strips it -- the existence dependency. No mana cost (CR 202.1).
+urborgPrinting :: Printing.Printing
+urborgPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Urborg, Tomb of Yawgmoth",
+            Card.manaCost = Nothing,
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.singleton Supertype.Legendary,
+                  TypeLine.types = Set.singleton CardType.Land,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities =
+              [StaticAbility.MkStaticAbility Affected.AllLands (Modification.AddLandSubtype Subtype.Swamp)],
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
+          }
+    }
+
+-- Opalescence: {2}{W}{W}, Enchantment, "Each other non-Aura enchantment is a
+-- creature in addition to its other types and has base power and base toughness
+-- each equal to its mana value." Scryfall-verified. Two static abilities over the
+-- same set (each OTHER non-Aura enchantment): layer 4 adds the Creature type,
+-- layer 7b sets base P/T to the mana value. White, so it is a deterministic
+-- fixture only (no white matchup).
+opalescencePrinting :: Printing.Printing
+opalescencePrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Opalescence",
+            Card.manaCost =
+              Just
+                ( ManaCost.MkManaCost
+                    [ ManaSymbol.Generic 2,
+                      ManaSymbol.OfType (ManaType.Colored Color.White),
+                      ManaSymbol.OfType (ManaType.Colored Color.White)
+                    ]
+                ),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Enchantment,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities =
+              [ StaticAbility.MkStaticAbility Affected.OtherNonAuraEnchantments (Modification.AddCardType CardType.Creature),
+                StaticAbility.MkStaticAbility Affected.OtherNonAuraEnchantments (Modification.SetBasePowerToughness Quantity.ManaValue Quantity.ManaValue)
+              ],
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
+          }
+    }
+
 -- The registry the dataflow lint and future golden tests iterate. A printing
 -- not listed here escapes the hygiene net -- add every new printing.
 allPrintings :: [Printing.Printing]
@@ -562,7 +660,10 @@ allPrintings =
     lightningBoltPrinting,
     giantGrowthPrinting,
     humilityPrinting,
-    serpentsGiftPrinting
+    serpentsGiftPrinting,
+    bloodMoonPrinting,
+    urborgPrinting,
+    opalescencePrinting
   ]
 
 isLand :: Card.Card -> Bool
