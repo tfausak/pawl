@@ -6,8 +6,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Card as Card
-import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -195,13 +195,13 @@ m2bCardTests =
           HU.testCase "the tiger has first strike through the projection" $
             let (oid, gs) = S.addCreature Card.sabretoothTigerPrinting S.alice gs0
              in do
-                  HU.assertBool "first strike" (Game.hasKeyword Keyword.FirstStrike oid gs)
-                  HU.assertBool "not double strike" (not (Game.hasKeyword Keyword.DoubleStrike oid gs)),
+                  HU.assertBool "first strike" (Projection.hasKeyword Keyword.FirstStrike oid gs)
+                  HU.assertBool "not double strike" (not (Projection.hasKeyword Keyword.DoubleStrike oid gs)),
           HU.testCase "the raptor has double strike through the projection" $
             let (oid, gs) = S.addCreature Card.ridgetopRaptorPrinting S.alice gs0
              in do
-                  HU.assertBool "double strike" (Game.hasKeyword Keyword.DoubleStrike oid gs)
-                  HU.assertBool "not first strike" (not (Game.hasKeyword Keyword.FirstStrike oid gs)),
+                  HU.assertBool "double strike" (Projection.hasKeyword Keyword.DoubleStrike oid gs)
+                  HU.assertBool "not first strike" (not (Projection.hasKeyword Keyword.FirstStrike oid gs)),
           HU.testCase "both are 2/1s, the same body as a Piker" $
             let bodyOf p = (Card.Type.power (card p), Card.Type.toughness (card p))
              in do

@@ -16,6 +16,7 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as A
@@ -51,15 +52,15 @@ objectFactTests =
     [ HU.testCase "a Piker's power and toughness are 2 and 1" $
         let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
          in do
-              HU.assertEqual "power" (Just 2) (Game.powerOf oid gs)
-              HU.assertEqual "toughness" (Just 1) (Game.toughnessOf oid gs),
+              HU.assertEqual "power" (Just 2) (Projection.powerOf oid gs)
+              HU.assertEqual "toughness" (Just 1) (Projection.toughnessOf oid gs),
       HU.testCase "a Mountain has no power or toughness" $
         let gs = S.mountainsInPlay 1
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
               [] -> HU.assertFailure "fixture should have one Mountain"
               oid : _ -> do
-                HU.assertEqual "power" Nothing (Game.powerOf oid gs)
-                HU.assertEqual "toughness" Nothing (Game.toughnessOf oid gs),
+                HU.assertEqual "power" Nothing (Projection.powerOf oid gs)
+                HU.assertEqual "toughness" Nothing (Projection.toughnessOf oid gs),
       HU.testCase "controllerOf is the owner while nothing can change control" $
         let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual "controller" (Just S.bob) (Game.controllerOf oid gs),
@@ -67,7 +68,7 @@ objectFactTests =
         let gs = Setup.emptyGame S.bothPlayers
             missing = ObjectId.MkObjectId 999
          in do
-              HU.assertEqual "power" Nothing (Game.powerOf missing gs)
+              HU.assertEqual "power" Nothing (Projection.powerOf missing gs)
               HU.assertEqual "controller" Nothing (Game.controllerOf missing gs)
     ]
 

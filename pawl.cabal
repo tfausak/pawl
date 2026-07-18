@@ -66,6 +66,7 @@ library
     Pawl.Engine
     Pawl.Game
     Pawl.Mana
+    Pawl.Projection
     Pawl.Quantity
     Pawl.Replay
     Pawl.Resolve

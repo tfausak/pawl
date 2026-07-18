@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Card as Card
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Departure as Departure
 import Pawl.Type.GameState (GameState)
@@ -41,15 +42,15 @@ depart pid gs =
 -- CR 704.5h: a creature with toughness > 0 dealt damage by a deathtouch source
 -- since the last SBA check is destroyed. "Since the last check" is exactly the
 -- span of GameState.damageEvents, which checkStateBasedActions drains below. The
--- source's deathtouch is read through the projection (Game.hasKeyword), at check
--- time -- CR 702.2e's last-known-information never differs while keywords are
--- printed (M3 expiry).
+-- source's deathtouch is read through the projection (Projection.hasKeyword), at
+-- check time -- CR 702.2e's last-known-information never differs while keywords
+-- are printed (M3 expiry).
 woundedByDeathtouch :: GameState -> ObjectId -> Bool
 woundedByDeathtouch gs oid =
   let hits ev =
         DamageEvent.target ev == Recipient.ToCreature oid
           && DamageEvent.amount ev > 0
-          && Game.hasKeyword Keyword.Deathtouch (DamageEvent.source ev) gs
+          && Projection.hasKeyword Keyword.Deathtouch (DamageEvent.source ev) gs
    in any hits (GameState.damageEvents gs)
 
 -- CR 704.5f (toughness 0 or less), CR 704.5g (damage marked >= toughness), and
@@ -62,7 +63,7 @@ woundedByDeathtouch gs oid =
 creatureDies :: GameState -> ObjectId -> Bool
 creatureDies gs oid =
   let isCreature = fmap Card.isCreature (Game.cardOf oid gs) == Just True
-   in isCreature && case Game.toughnessOf oid gs of
+   in isCreature && case Projection.toughnessOf oid gs of
         -- An unevaluable toughness means NO state-based action, not a crash.
         -- Unreachable in M1b (every toughness is a Literal); reachable at M3.
         Nothing -> False

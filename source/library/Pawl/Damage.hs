@@ -10,6 +10,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import Pawl.Type.AttackTarget (AttackTarget)
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.Combat as Combat.Type
@@ -59,15 +60,15 @@ legalAssignment thresholds power answer =
 -- CR 702.19b / 702.2c: a blocker's lethal threshold is toughness minus marked
 -- damage -- but 702.2c makes any nonzero assignment by a deathtouch source lethal,
 -- so a deathtouch attacker needs only 1 (0 if the blocker is already lethal). Read
--- through the projection (Game.hasKeyword), the same way the 704.5h SBA reads it.
+-- through the projection (Projection.hasKeyword), the same way the 704.5h SBA reads it.
 blockerThreshold :: GameState -> ObjectId -> ObjectId -> Natural
 blockerThreshold gs attacker blocker =
   let marked = maybe 0 Object.damage (Game.lookupObject blocker gs)
       lethal :: Natural
-      lethal = case Game.toughnessOf blocker gs of
+      lethal = case Projection.toughnessOf blocker gs of
         Nothing -> 0
         Just t -> fromInteger (max 0 (t - toInteger marked))
-   in if lethal > 0 && Game.hasKeyword Keyword.Deathtouch attacker gs
+   in if lethal > 0 && Projection.hasKeyword Keyword.Deathtouch attacker gs
         then 1
         else lethal
 
@@ -75,7 +76,7 @@ blockerThreshold gs attacker blocker =
 -- CR 510.1a: a creature that would assign 0 or less assigns none, so events all
 -- carry amount > 0.
 attackerAssignment :: GameState -> (ObjectId, AttackTarget) -> Game [DamageEvent.DamageEvent]
-attackerAssignment gs (attacker, target) = case Game.powerOf attacker gs of
+attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs of
   Nothing -> pure []
   Just p ->
     if p <= 0
@@ -83,7 +84,7 @@ attackerAssignment gs (attacker, target) = case Game.powerOf attacker gs of
       else do
         let power :: Natural
             power = fromInteger p
-            trample = Game.hasKeyword Keyword.Trample attacker gs
+            trample = Projection.hasKeyword Keyword.Trample attacker gs
         case Set.toList (Combat.blockersOf attacker gs) of
           -- CR 510.1b: unblocked, so it hits what it is attacking.
           [] -> case target of
@@ -126,7 +127,7 @@ attackerAssignment gs (attacker, target) = case Game.powerOf attacker gs of
 -- CR 510.1d: a blocking creature assigns its damage to the creature it blocks.
 blockerAssignment :: GameState -> (ObjectId, Set.Set ObjectId) -> [DamageEvent.DamageEvent]
 blockerAssignment gs (attacker, blockers) =
-  let assign blocker = case Game.powerOf blocker gs of
+  let assign blocker = case Projection.powerOf blocker gs of
         Just p ->
           if p <= 0
             then []
@@ -178,7 +179,7 @@ dealCombatDamage = do
         Set.union
           (Map.keysSet (Combat.Type.attackers combat))
           (Set.unions (Map.elems (Combat.Type.blockers combat)))
-      striking oid = Game.hasKeyword Keyword.FirstStrike oid gs || Game.hasKeyword Keyword.DoubleStrike oid gs
+      striking oid = Projection.hasKeyword Keyword.FirstStrike oid gs || Projection.hasKeyword Keyword.DoubleStrike oid gs
       strikers = Set.filter striking participants
       onBattlefield oid = case Game.lookupObject oid gs of
         Just obj -> Object.zone obj == Zone.Battlefield
@@ -199,7 +200,7 @@ dealCombatDamage = do
     -- as the first step began (not in the snapshot), plus those that currently
     -- have double strike -- and are still on the battlefield.
     Just snapshot -> do
-      dealWave (\oid -> onBattlefield oid && (Set.notMember oid snapshot || Game.hasKeyword Keyword.DoubleStrike oid gs))
+      dealWave (\oid -> onBattlefield oid && (Set.notMember oid snapshot || Projection.hasKeyword Keyword.DoubleStrike oid gs))
       pure False
 
 -- Gather this wave's damage under `assigns` and apply it.

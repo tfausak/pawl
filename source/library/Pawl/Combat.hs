@@ -11,6 +11,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Card as Card
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.AttackTarget as AttackTarget
@@ -75,11 +76,11 @@ canAttack pid oid gs = case Game.lookupObject oid gs of
       -- CR 302.6, relaxed by CR 702.10b: a creature with haste can attack even if
       -- it hasn't been controlled continuously since its controller's most recent
       -- turn began.
-      && (Object.sickness obj == Sickness.Settled || Game.hasKeyword Keyword.Haste oid gs)
+      && (Object.sickness obj == Sickness.Settled || Projection.hasKeyword Keyword.Haste oid gs)
       && isCreatureObject oid gs
       -- CR 702.3b: a creature with defender can't attack. It may still block --
       -- 702.3b says nothing about blocking.
-      && not (Game.hasKeyword Keyword.Defender oid gs)
+      && not (Projection.hasKeyword Keyword.Defender oid gs)
 
 legalAttackers :: PlayerId -> GameState -> [ObjectId]
 legalAttackers pid gs = filter (\oid -> canAttack pid oid gs) (Game.zoneMembers Zone.Battlefield pid gs)
@@ -110,9 +111,9 @@ legalBlockers pid gs = filter (\oid -> canBlock pid oid gs) (Game.zoneMembers Zo
 -- ATTACKER first, and only then of the blocker.
 evasionAllows :: ObjectId -> ObjectId -> GameState -> Bool
 evasionAllows blocker attacker gs =
-  not (Game.hasKeyword Keyword.Flying attacker gs)
-    || Game.hasKeyword Keyword.Flying blocker gs
-    || Game.hasKeyword Keyword.Reach blocker gs
+  not (Projection.hasKeyword Keyword.Flying attacker gs)
+    || Projection.hasKeyword Keyword.Flying blocker gs
+    || Projection.hasKeyword Keyword.Reach blocker gs
 
 -- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
 -- any are disobeyed the DECLARATION is illegal.
@@ -181,7 +182,7 @@ declareAttackers pid = do
             -- (CR 702.20b), which does not change WHETHER it attacks, only what
             -- attacking does to it.
             tapIt g oid =
-              if Game.hasKeyword Keyword.Vigilance oid g
+              if Projection.hasKeyword Keyword.Vigilance oid g
                 then g
                 else g {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects g)}
             recorded = Map.fromList (map (\oid -> (oid, AttackTarget.OfPlayer defender)) attacking)

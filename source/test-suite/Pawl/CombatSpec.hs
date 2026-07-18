@@ -13,6 +13,7 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -458,29 +459,29 @@ keywordTests =
         let (oid, gs) = S.addCreature printing S.alice gs0
             name = Text.unpack (Card.Type.name (Printing.card printing))
          in HU.testCase (name ++ " carries exactly " ++ show keyword) $ do
-              HU.assertEqual "keywords" (Set.singleton keyword) (Game.keywordsOf oid gs)
-              HU.assertBool "hasKeyword" (Game.hasKeyword keyword oid gs)
+              HU.assertEqual "keywords" (Set.singleton keyword) (Projection.keywordsOf oid gs)
+              HU.assertBool "hasKeyword" (Projection.hasKeyword keyword oid gs)
    in Tasty.testGroup
         "Keyword"
         ( map carriesOnly S.m2aPrintings
             ++ [ HU.testCase "a Piker has no keywords" $
                    let (oid, gs) = S.addPiker S.alice gs0
                     in do
-                         HU.assertEqual "none" Set.empty (Game.keywordsOf oid gs)
-                         HU.assertBool "no flying" (not (Game.hasKeyword Keyword.Flying oid gs)),
+                         HU.assertEqual "none" Set.empty (Projection.keywordsOf oid gs)
+                         HU.assertBool "no flying" (not (Projection.hasKeyword Keyword.Flying oid gs)),
                  HU.testCase "a Mountain has no keywords" $
                    let gs = S.mountainsInPlay 1
                     in case Game.zoneMembers Zone.Battlefield S.alice gs of
                          [] -> HU.assertFailure "fixture should have one Mountain"
-                         oid : _ -> HU.assertEqual "none" Set.empty (Game.keywordsOf oid gs),
+                         oid : _ -> HU.assertEqual "none" Set.empty (Projection.keywordsOf oid gs),
                  HU.testCase "an unknown id has no keywords" $
-                   HU.assertEqual "none" Set.empty (Game.keywordsOf (ObjectId.MkObjectId 999) gs0),
+                   HU.assertEqual "none" Set.empty (Projection.keywordsOf (ObjectId.MkObjectId 999) gs0),
                  -- Flying is on Bird Maiden and NOT on Nimble Birdsticker. If this
                  -- passes while the reach case above also passes, the two keywords
                  -- are genuinely distinct rather than one flag.
                  HU.testCase "reach is not flying" $
                    let (oid, gs) = S.addCreature Card.nimbleBirdstickerPrinting S.alice gs0
-                    in HU.assertBool "no flying" (not (Game.hasKeyword Keyword.Flying oid gs))
+                    in HU.assertBool "no flying" (not (Projection.hasKeyword Keyword.Flying oid gs))
                ]
         )
 
