@@ -51,7 +51,7 @@ Claude-Session: https://claude.ai/code/session_01NTJULXEgqPcgT5gbizas3U
 **Interfaces:**
 - Produces: `ProjectedCharacteristics` with new fields `cardTypes :: Set CardType`, `subtypes :: Set Subtype`, `rulesTextActive :: Bool`; `Projection.subtypesOf :: ObjectId -> GameState -> Set Subtype`, `Projection.cardTypesOf :: ObjectId -> GameState -> Set CardType`, `Projection.isCreatureOf :: ObjectId -> GameState -> Bool`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to the `tests` list in `source/test-suite/Pawl/ProjectionSpec.hs` (new imports `qualified Pawl.Type.CardType as CardType` and `qualified Pawl.Type.Subtype as Subtype`):
 
@@ -72,12 +72,12 @@ Add to the `tests` list in `source/test-suite/Pawl/ProjectionSpec.hs` (new impor
               HU.assertEqual "subtypes" (Set.singleton Subtype.Mountain) (Projection.subtypesOf landId gs),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "projected type line"'`
 Expected: FAIL to compile — `cardTypesOf`/`subtypesOf`/`isCreatureOf` not in scope.
 
-- [ ] **Step 3: Extend `ProjectedCharacteristics`**
+- [x] **Step 3: Extend `ProjectedCharacteristics`**
 
 Replace the record in `source/library/Pawl/Type/ProjectedCharacteristics.hs` (add imports `qualified Pawl.Type.CardType`… actually import the types unqualified via their modules):
 
@@ -105,7 +105,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
   deriving (Eq, Show)
 ```
 
-- [ ] **Step 4: Seed the new fields in `baseCharacteristics` and add the reads**
+- [x] **Step 4: Seed the new fields in `baseCharacteristics` and add the reads**
 
 In `source/library/Pawl/Projection.hs`, add imports `qualified Pawl.Type.CardType as CardType`, `qualified Pawl.Type.Subtype as Subtype`, `qualified Pawl.Type.TypeLine as TypeLine`. Replace `baseCharacteristics`:
 
@@ -154,12 +154,12 @@ isCreatureOf oid gs = Set.member CardType.Creature (cardTypesOf oid gs)
 
 (`Set` is the bare type from `import Data.Set (Set)`, already in `Projection.hs`; `Set.member` uses the `qualified Data.Set as Set` import, also present.)
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — new tests green, all M3b projection tests still green (the new fields pass through the existing fold untouched).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
