@@ -31,6 +31,7 @@ import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
+import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -147,7 +148,8 @@ twoBoltState =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty
+            Object.targets = Map.empty,
+            Object.timestamp = Timestamp.MkTimestamp 0
           }
    in gs2
         { GameState.objects = Map.insert oid2 obj (GameState.objects gs2),

@@ -45,6 +45,7 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified System.Random as Random
 
@@ -225,6 +226,7 @@ runRandomGame matchup s =
 addCreature :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addCreature printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = pid,
@@ -233,12 +235,13 @@ addCreature printing pid gs =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty
+            Object.targets = Map.empty,
+            Object.timestamp = ts
           }
    in ( oid,
-        gs1
-          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
-            GameState.battlefield = Set.insert oid (GameState.battlefield gs1)
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.battlefield = Set.insert oid (GameState.battlefield gs2)
           }
       )
 
@@ -250,6 +253,7 @@ landsInPlay :: Printing.Printing -> Int -> GameState.GameState
 landsInPlay land n =
   let add gs _ =
         let (oid, gs1) = Game.freshObjectId gs
+            (ts, gs2) = Game.freshTimestamp gs1
             obj =
               Object.MkObject
                 { Object.owner = alice,
@@ -258,11 +262,12 @@ landsInPlay land n =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.targets = Map.empty
+                  Object.targets = Map.empty,
+                  Object.timestamp = ts
                 }
-         in gs1
-              { GameState.objects = Map.insert oid obj (GameState.objects gs1),
-                GameState.battlefield = Set.insert oid (GameState.battlefield gs1)
+         in gs2
+              { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+                GameState.battlefield = Set.insert oid (GameState.battlefield gs2)
               }
    in List.foldl' add (Setup.emptyGame bothPlayers) [1 .. n]
 
@@ -274,6 +279,7 @@ mountainsInPlay = landsInPlay Card.mountainPrinting
 handOne :: Printing.Printing -> GameState.GameState -> (GameState.GameState, ObjectId.ObjectId)
 handOne printing base =
   let (oid, gs1) = Game.freshObjectId base
+      (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = alice,
@@ -282,11 +288,12 @@ handOne printing base =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty
+            Object.targets = Map.empty,
+            Object.timestamp = ts
           }
-   in ( gs1
-          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
-            GameState.hand = Map.insert alice (Seq.singleton oid) (GameState.hand gs1),
+   in ( gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.hand = Map.insert alice (Seq.singleton oid) (GameState.hand gs2),
             GameState.phase = Phase.PrecombatMain,
             GameState.activePlayer = alice,
             GameState.priority = Just alice
@@ -299,6 +306,7 @@ pikerInHand :: Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
 pikerInHand n ph =
   let base = mountainsInPlay n
       (oid, gs1) = Game.freshObjectId base
+      (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = alice,
@@ -307,17 +315,18 @@ pikerInHand n ph =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty
+            Object.targets = Map.empty,
+            Object.timestamp = ts
           }
-      gs2 =
-        gs1
-          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
-            GameState.hand = Map.insert alice (Seq.singleton oid) (GameState.hand gs1),
+      gs3 =
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.hand = Map.insert alice (Seq.singleton oid) (GameState.hand gs2),
             GameState.phase = ph,
             GameState.activePlayer = alice,
             GameState.priority = Just alice
           }
-   in (gs2, oid)
+   in (gs3, oid)
 
 -- alice has n untapped Mountains in play and one Lightning Bolt in hand.
 boltInHand :: Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
@@ -448,7 +457,8 @@ oneMountainState ph =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
-            Object.targets = Map.empty
+            Object.targets = Map.empty,
+            Object.timestamp = Timestamp.MkTimestamp 0
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -471,6 +481,7 @@ oneMountainState ph =
           GameState.turnNumber = 1,
           GameState.result = Nothing,
           GameState.nextObjectId = ObjectId.MkObjectId 1,
+          GameState.nextTimestamp = Timestamp.MkTimestamp 1,
           GameState.drewFromEmpty = mempty,
           GameState.landPlayed = mempty
         }

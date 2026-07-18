@@ -20,6 +20,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Toughness as Toughness
 import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
@@ -34,6 +35,11 @@ freshObjectId :: GameState -> (ObjectId, GameState)
 freshObjectId gs =
   let ObjectId.MkObjectId n = GameState.nextObjectId gs
    in (ObjectId.MkObjectId n, gs {GameState.nextObjectId = ObjectId.MkObjectId (n + 1)})
+
+freshTimestamp :: GameState -> (Timestamp.Timestamp, GameState)
+freshTimestamp gs =
+  let Timestamp.MkTimestamp n = GameState.nextTimestamp gs
+   in (Timestamp.MkTimestamp n, gs {GameState.nextTimestamp = Timestamp.MkTimestamp (n + 1)})
 
 zoneMembers :: Zone -> PlayerId -> GameState -> [ObjectId]
 zoneMembers zone pid gs =
@@ -79,8 +85,9 @@ changeZone oid dest gs = case lookupObject oid gs of
   Just obj ->
     let pid = Object.owner obj
         (newId, gs1) = freshObjectId gs
-        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.targets = Map.empty}
-        gs2 = removeFromZones pid oid gs1
+        (ts, gs1b) = freshTimestamp gs1
+        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.targets = Map.empty, Object.timestamp = ts}
+        gs2 = removeFromZones pid oid gs1b
         gs3 = gs2 {GameState.objects = Map.insert newId newObj (Map.delete oid (GameState.objects gs2))}
      in insertIntoZone dest pid newId gs3
 

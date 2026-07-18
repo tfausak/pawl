@@ -38,6 +38,7 @@ import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -89,7 +90,10 @@ gameTests =
                       Object.tapped = TapState.Untapped,
                       Object.damage = 0,
                       Object.sickness = Sickness.Sick,
-                      Object.targets = Map.empty
+                      Object.targets = Map.empty,
+                      -- changeZone draws a fresh timestamp; oneMountainState's
+                      -- nextTimestamp starts at 1 (object 0 already holds 0).
+                      Object.timestamp = Timestamp.MkTimestamp 1
                     }
               )
               (Game.lookupObject (ObjectId.MkObjectId 1) after),
@@ -105,7 +109,20 @@ gameTests =
                     }
                 moved = Game.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
                 landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
-             in HU.assertEqual "reset" [Map.empty] (map Object.targets landed)
+             in HU.assertEqual "reset" [Map.empty] (map Object.targets landed),
+          HU.testCase "CR 613.7b changeZone stamps the new incarnation with a fresh timestamp" $
+            let (oid, gs) = S.addPiker S.bob (S.mountainsInPlay 1)
+                before = GameState.nextTimestamp gs
+                movedState = Game.changeZone oid Zone.Graveyard gs
+                movedId = case Game.zoneMembers Zone.Graveyard S.bob movedState of
+                  i : _ -> i
+                  [] -> ObjectId.MkObjectId 999
+                stamp = fmap Object.timestamp (Game.lookupObject movedId movedState)
+             in do
+                  HU.assertEqual "the incarnation carries the pre-move next timestamp" (Just before) stamp
+                  HU.assertBool "the counter advanced" (GameState.nextTimestamp movedState > before),
+          HU.testCase "emptyGame starts the timestamp counter at zero" $
+            HU.assertEqual "zero" (Timestamp.MkTimestamp 0) (GameState.nextTimestamp (Setup.emptyGame S.bothPlayers))
         ]
 
 actionTests :: Tasty.TestTree

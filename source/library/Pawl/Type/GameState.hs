@@ -13,6 +13,7 @@ import Pawl.Type.Phase (Phase)
 import Pawl.Type.Player (Player)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Result (Result)
+import Pawl.Type.Timestamp (Timestamp)
 
 data GameState = MkGameState
   { objects :: Map ObjectId Object,
@@ -43,6 +44,9 @@ data GameState = MkGameState
     turnNumber :: Natural,
     result :: Maybe Result,
     nextObjectId :: ObjectId,
+    -- CR 613.7: the monotonic source of timestamps for objects (at creation) and
+    -- stored continuous effects (at CR 611 creation). See Timestamp.
+    nextTimestamp :: Timestamp,
     drewFromEmpty :: Set PlayerId,
     landPlayed :: Set PlayerId
   }

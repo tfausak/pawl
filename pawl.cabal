@@ -118,6 +118,7 @@ library
     Pawl.Type.Supertype
     Pawl.Type.TapState
     Pawl.Type.TargetSpec
+    Pawl.Type.Timestamp
     Pawl.Type.Toughness
     Pawl.Type.TypeLine
     Pawl.Type.Zone

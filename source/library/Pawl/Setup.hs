@@ -27,6 +27,7 @@ import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 
 startingLife :: Integer
@@ -108,6 +109,7 @@ emptyGame order =
           GameState.turnNumber = 1,
           GameState.result = Nothing,
           GameState.nextObjectId = ObjectId.MkObjectId 0,
+          GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
           GameState.landPlayed = mempty
         }
@@ -116,6 +118,7 @@ createCard :: PlayerId -> Printing -> Game ObjectId
 createCard pid printing = do
   gs <- State.get
   let (oid, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = pid,
@@ -124,14 +127,15 @@ createCard pid printing = do
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
-            Object.targets = Map.empty
+            Object.targets = Map.empty,
+            Object.timestamp = ts
           }
-      gs2 =
-        gs1
-          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
-            GameState.library = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.library gs1)
+      gs3 =
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.library = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.library gs2)
           }
-  State.put gs2
+  State.put gs3
   pure oid
 
 shuffleLibrary :: PlayerId -> Game ()

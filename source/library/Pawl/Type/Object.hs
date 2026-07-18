@@ -8,6 +8,7 @@ import Pawl.Type.Sickness (Sickness)
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Source (Source)
 import Pawl.Type.TapState (TapState)
+import Pawl.Type.Timestamp (Timestamp)
 import Pawl.Type.Zone (Zone)
 
 data Object = MkObject
@@ -27,6 +28,10 @@ data Object = MkObject
     -- CR 601.2c: the targets chosen while casting, by slot name. Empty for
     -- everything but a spell on the stack. Per-incarnation state: reset by
     -- changeZone, so CR 400.7 forgets them when the spell moves.
-    targets :: Map SlotName Recipient
+    targets :: Map SlotName Recipient,
+    -- CR 613.7b: when this object was created (its "entered" time). A static
+    -- ability's timestamp is this; stamped fresh on every zone change (CR 400.7
+    -- makes each a new object). Read by the projection when ordering layer 6/7.
+    timestamp :: Timestamp
   }
   deriving (Eq, Ord, Show)
