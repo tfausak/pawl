@@ -1053,7 +1053,45 @@ castTests =
                   HU.assertEqual "zone" Zone.Stack (Object.zone obj)
                   case Object.source obj of
                     Source.OfCard printing ->
-                      HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name (Printing.card printing))
+                      HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name (Printing.card printing)),
+      HU.testCase "CR 117.1a a Bolt is castable outside a main phase" $
+        let (gs, oid) = boltInHand 1 (Phase.Beginning BeginningStep.Upkeep)
+         in HU.assertBool "instant speed" (Cast.castable alice oid gs),
+      HU.testCase "CR 117.1a a Bolt is castable on the opponent's turn" $
+        let (gs, oid) = boltInHand 1 Phase.PrecombatMain
+            bobsTurn = gs {GameState.activePlayer = bob}
+         in HU.assertBool "not my turn, still castable" (Cast.castable alice oid bobsTurn),
+      HU.testCase "CR 117.1a a Bolt is castable with a non-empty stack" $
+        let (gs, oid) = boltInHand 1 Phase.PrecombatMain
+            busy = gs {GameState.stack = [ObjectId.MkObjectId 999]}
+         in HU.assertBool "in response" (Cast.castable alice oid busy),
+      HU.testCase "a Bolt in the graveyard is not castable" $
+        let (gs, oid) = boltInHand 1 Phase.PrecombatMain
+            buried = Game.changeZone oid Zone.Graveyard gs
+         in HU.assertEqual "nothing castable" [] (Cast.castableSpells alice buried),
+      HU.testCase "CR 601.2c casting a Bolt stamps the chosen target on the stack object" $
+        let (base, gs, _) = boltAtBobsPiker
+         in case GameState.stack gs of
+              [] -> HU.assertFailure "expected the Bolt on the stack"
+              top : _ -> case Game.lookupObject top gs of
+                Nothing -> HU.assertFailure "stack id should resolve"
+                Just obj -> do
+                  HU.assertEqual "one Mountain tapped" 1 (tappedCount alice gs)
+                  HU.assertEqual
+                    "the Piker is the target"
+                    (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToCreature (pikerOf base)))
+                    (Object.targets obj),
+      HU.testCase "an illegal target answer makes the cast a no-op" $
+        let (gs, oid) = boltInHand 1 Phase.PrecombatMain
+            liar :: Prompt.Prompt r -> r
+            liar p = case p of
+              Prompt.ChooseTargets _ _ _ sets ->
+                Map.map (const (Recipient.ToCreature (ObjectId.MkObjectId 999))) sets
+              _ -> identityAnswer p
+            after = snd (Engine.runGamePure liar gs (Cast.castSpell alice oid))
+         in do
+              HU.assertEqual "nothing on the stack" 0 (length (GameState.stack after))
+              HU.assertEqual "nothing paid" 0 (tappedCount alice after)
     ]
 
 -- Discards from the BACK of hand. Deliberately unlike every fallback, so the
@@ -1196,6 +1234,27 @@ handOne printing base =
           },
         oid
       )
+
+-- alice has n untapped Mountains in play and one Lightning Bolt in hand.
+boltInHand :: Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
+boltInHand n ph =
+  let (gs, oid) = handOne Card.lightningBoltPrinting (mountainsInPlay n)
+   in (gs {GameState.phase = ph}, oid)
+
+-- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer
+-- (lookupMin prefers ToCreature over ToPlayer, and the Piker is the only
+-- creature). Returns (pre-cast state, post-cast state, Bolt's hand id).
+boltAtBobsPiker :: (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
+boltAtBobsPiker =
+  let (_, withPiker) = addPiker bob (mountainsInPlay 1)
+      (gs, oid) = handOne Card.lightningBoltPrinting withPiker
+   in (gs, snd (Engine.runGamePure identityAnswer gs (Cast.castSpell alice oid)), oid)
+
+-- The single creature bob controls in a fixture built by addPiker.
+pikerOf :: GameState.GameState -> ObjectId.ObjectId
+pikerOf gs = case Game.zoneMembers Zone.Battlefield bob gs of
+  oid : _ -> oid
+  [] -> ObjectId.MkObjectId 999
 
 -- Cast `creature` off `nLands` copies of `land`, then resolve it.
 resolvedCreature :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState

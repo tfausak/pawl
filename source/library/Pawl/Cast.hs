@@ -1,10 +1,16 @@
 module Pawl.Cast where
 
+import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Pawl.Card as Card
+import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
-import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.Card as Card.Type
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -13,6 +19,8 @@ import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Zone as Zone
 
@@ -21,7 +29,7 @@ costOf :: ObjectId -> GameState -> Maybe ManaCost
 costOf oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
   Just obj -> case Object.source obj of
-    Source.OfCard printing -> Card.manaCost (Printing.card printing)
+    Source.OfCard printing -> Card.Type.manaCost (Printing.card printing)
 
 -- CR 601.3a / 302.1: a creature spell may be cast only when its controller could
 -- cast a sorcery -- a main phase of their own turn, with an empty stack. (The
@@ -36,34 +44,70 @@ sorcerySpeed pid gs =
     && GameState.activePlayer gs == pid
     && null (GameState.stack gs)
 
--- Affordable and correctly timed, and actually in this player's hand.
+-- CR 117.1a / 304.1: an instant is castable whenever its controller has
+-- priority; anything else needs sorcery speed (CR 601.3a). Priority is
+-- implicit: the engine only offers actions to the priority holder.
+timingOk :: PlayerId -> ObjectId -> GameState -> Bool
+timingOk pid oid gs = case Game.cardOf oid gs of
+  Nothing -> False
+  Just card -> Card.isInstant card || sorcerySpeed pid gs
+
+-- CR 601.2c: every target slot must have at least one legal recipient, or the
+-- spell cannot be cast. Unobservable for Bolt (AnyTarget always holds a living
+-- player); first falsified by Giant Growth at M3b.
+targetable :: ObjectId -> GameState -> Bool
+targetable oid gs = case Game.cardOf oid gs of
+  Nothing -> False
+  Just card -> not (any Set.null (Map.elems (Target.legalSets (Card.Type.targetSpecs card) gs)))
+
+-- Affordable and correctly timed, actually in this player's hand, and fillable.
 castable :: PlayerId -> ObjectId -> GameState -> Bool
 castable pid oid gs = case costOf oid gs of
   Nothing -> False
   Just cost ->
-    sorcerySpeed pid gs
+    timingOk pid oid gs
       && elem oid (Game.zoneMembers Zone.Hand pid gs)
       && Mana.canPay pid cost gs
+      && targetable oid gs
 
 castableSpells :: PlayerId -> GameState -> [ObjectId]
-castableSpells pid gs =
-  if sorcerySpeed pid gs
-    then filter (\oid -> castable pid oid gs) (Game.zoneMembers Zone.Hand pid gs)
-    else []
+castableSpells pid gs = filter (\oid -> castable pid oid gs) (Game.zoneMembers Zone.Hand pid gs)
 
--- CR 601: the card moves hand -> stack, becoming a NEW object (CR 400.7), and
--- its costs are paid. The caster keeps priority (CR 117.3c) -- that is the
--- caller's job, in the priority loop.
---
--- CR 601.2 puts the card on the stack BEFORE costs are paid, rewinding the whole
--- cast if it turns out to be illegal. M1a pays first because legalActions only
--- ever offers an affordable cast, so there is nothing to rewind and the
--- observable result is identical. A no-op on failure keeps this total.
+-- CR 601: choose targets (601.2c), pay (601.2f-h), move to the stack (601.2a),
+-- stamp the choices on the NEW stack incarnation (CR 400.7). Prompting before
+-- payment is 601.2's own order; what stays elided is the rewind -- legalActions
+-- only offers affordable, fully-fillable casts, so a legal answer cannot fail
+-- after the prompt (expiry: mid-announcement failure, e.g. cast-during-search).
+-- An illegal answer makes the whole cast a no-op: reject-not-repair, the
+-- AssignCombatDamage posture. A spell with no slots asks nothing.
 castSpell :: PlayerId -> ObjectId -> Game ()
 castSpell pid oid = do
   gs <- State.get
   case costOf oid gs of
     Nothing -> pure ()
-    Just cost -> case Mana.payCost pid cost gs of
+    Just cost -> case Game.cardOf oid gs of
       Nothing -> pure ()
-      Just paid -> State.put (Game.changeZone oid Zone.Stack paid)
+      Just card -> do
+        let sets = Target.legalSets (Card.Type.targetSpecs card) gs
+        chosen <-
+          if Map.null sets
+            then pure Map.empty
+            else do
+              let decider = Decide.deciderFor pid gs
+              Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid oid sets))
+        let keysAgree = Map.keysSet chosen == Map.keysSet sets
+            eachLegal = and (Map.intersectionWith Set.member chosen sets)
+        if not (keysAgree && eachLegal)
+          then pure ()
+          else case Mana.payCost pid cost gs of
+            Nothing -> pure ()
+            Just paid -> do
+              let moved = Game.changeZone oid Zone.Stack paid
+              case GameState.stack moved of
+                [] -> State.put moved
+                top : _ ->
+                  State.put
+                    moved
+                      { GameState.objects =
+                          Map.adjust (\o -> o {Object.targets = chosen}) top (GameState.objects moved)
+                      }
