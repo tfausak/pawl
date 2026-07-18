@@ -63,7 +63,7 @@ import Pawl.Support
     tappedCount,
   )
 import qualified Pawl.Target as Target
-import qualified Pawl.Turn as Turn
+import qualified Pawl.TurnSpec as TurnSpec
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.BeginningStep as BeginningStep
@@ -71,7 +71,6 @@ import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Combat as Combat.Type
-import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Departure as Departure
@@ -120,9 +119,7 @@ testTree =
     "pawl"
     [ CoreSpec.tests,
       CardSpec.tests,
-      turnTests,
-      turnDataTests,
-      skipTests,
+      TurnSpec.tests,
       gameTests,
       actionTests,
       SetupSpec.tests,
@@ -1508,109 +1505,6 @@ fizzleTests =
               HU.assertEqual "the loop released priority" Nothing (GameState.priority after)
     ]
 
-turnTests :: Tasty.TestTree
-turnTests =
-  Tasty.testGroup
-    "Turn"
-    [ HU.testCase "firstPhase is the untap step" $
-        HU.assertEqual "firstPhase" (Phase.Beginning BeginningStep.Untap) Turn.firstPhase,
-      HU.testCase "a turn has twelve steps" $
-        HU.assertEqual "twelve" 12 (length Turn.allPhases),
-      HU.testCase "firstPhase and laterPhases reconstruct the turn template" $
-        HU.assertEqual "reconstruct" (Seq.fromList (drop 1 Turn.allPhases)) Turn.laterPhases,
-      HU.testCase "untap and cleanup grant no priority" $
-        HU.assertBool "no priority" $
-          not (Turn.grantsPriority (Phase.Beginning BeginningStep.Untap))
-            && not (Turn.grantsPriority (Phase.Ending EndingStep.Cleanup)),
-      QC.testProperty "a turn never revisits a phase" $
-        QC.property (length Turn.allPhases == length (dedupe Turn.allPhases))
-    ]
-
-turnDataTests :: Tasty.TestTree
-turnDataTests =
-  Tasty.testGroup
-    "TurnData"
-    [ HU.testCase "advance pops the schedule head into the current phase" $
-        let gs0 = Setup.emptyGame bothPlayers
-            gs =
-              gs0
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.remaining = Seq.fromList [Phase.Combat CombatStep.BeginningOfCombat, Phase.PostcombatMain]
-                }
-            after = snd (Engine.runGamePure aggressiveAnswer gs Engine.advance)
-         in do
-              HU.assertEqual "phase" (Phase.Combat CombatStep.BeginningOfCombat) (GameState.phase after)
-              HU.assertEqual "remaining" (Seq.fromList [Phase.PostcombatMain]) (GameState.remaining after),
-      HU.testCase "advance on an empty schedule hands off the turn" $
-        let gs0 = Setup.emptyGame bothPlayers
-            gs =
-              gs0
-                { GameState.phase = Phase.Ending EndingStep.Cleanup,
-                  GameState.remaining = Seq.empty,
-                  GameState.activePlayer = alice,
-                  GameState.turnNumber = 1
-                }
-            after = snd (Engine.runGamePure aggressiveAnswer gs Engine.advance)
-         in do
-              HU.assertEqual "new active player" bob (GameState.activePlayer after)
-              HU.assertEqual "phase reset" Turn.firstPhase (GameState.phase after)
-              HU.assertEqual "schedule refilled" Turn.laterPhases (GameState.remaining after)
-              HU.assertEqual "turn incremented" 2 (GameState.turnNumber after),
-      HU.testCase "a fresh game starts at untap with the rest of the turn scheduled" $
-        let gs = Setup.emptyGame bothPlayers
-         in do
-              HU.assertEqual "phase" Turn.firstPhase (GameState.phase gs)
-              HU.assertEqual "remaining" Turn.laterPhases (GameState.remaining gs)
-    ]
-
-skipTests :: Tasty.TestTree
-skipTests =
-  Tasty.testGroup
-    "Skip"
-    [ HU.testCase "CR 508.8 dropSkippedCombatSteps removes declare blockers and combat damage" $
-        let full =
-              Seq.fromList
-                [ Phase.Combat CombatStep.DeclareBlockers,
-                  Phase.Combat CombatStep.CombatDamage,
-                  Phase.Combat CombatStep.EndOfCombat,
-                  Phase.PostcombatMain
-                ]
-            expected = Seq.fromList [Phase.Combat CombatStep.EndOfCombat, Phase.PostcombatMain]
-         in HU.assertEqual "dropped" expected (Turn.dropSkippedCombatSteps full),
-      HU.testCase "CR 508.8 no attacker declared skips to end of combat" $
-        -- Nobody has a creature, so no attackers are declared: the declare
-        -- blockers and combat damage steps must not run at all.
-        let (gs, _, _) = combatBoardOf [] []
-            after = snd (Engine.runGamePure aggressiveAnswer gs Engine.runStep)
-         in HU.assertEqual "jumped past the two dead steps" (Phase.Combat CombatStep.EndOfCombat) (GameState.phase after),
-      HU.testCase "CR 508.8 an attacker keeps the declare blockers step" $
-        -- The control: with an attacker, the step after declare attackers is
-        -- declare blockers, exactly as before. So the skip is not "always skip".
-        let (gs, _, _) = combatBoardOf [Card.pikerPrinting] []
-            after = snd (Engine.runGamePure aggressiveAnswer gs Engine.runStep)
-         in HU.assertEqual "declare blockers still next" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase after),
-      HU.testCase "CR 508.8 an attacker-less combat changes no life total" $
-        -- End to end: run the whole combat region. No attackers means no damage,
-        -- and the turn still leaves combat cleanly.
-        let (gs, _, _) = combatBoardOf [] []
-            after = runCombat aggressiveAnswer gs
-         in do
-              HU.assertEqual "bob untouched" (Just 20) (lifeOf bob after)
-              HU.assertEqual "alice untouched" (Just 20) (lifeOf alice after)
-              HU.assertBool "left combat" (not (inCombatPhase (GameState.phase after))),
-      HU.testCase "CR 508.8 the skip stands even when an instant could have been cast" $
-        -- bob holds a castable Bolt; nobody attacks. The blockers and damage
-        -- steps are still dropped -- the priority windows an instant would use
-        -- in them do not exist (CR 500.11: proceed as though they don't).
-        let (base, _) = boltInHand 1 (Phase.Combat CombatStep.DeclareAttackers)
-            armed = base {GameState.activePlayer = bob}
-            after = snd (Engine.runGamePure identityAnswer armed (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers)))
-            remaining = foldr (:) [] (GameState.remaining after)
-         in do
-              HU.assertBool "no blockers step" (notElem (Phase.Combat CombatStep.DeclareBlockers) remaining)
-              HU.assertBool "no damage step" (notElem (Phase.Combat CombatStep.CombatDamage) remaining)
-    ]
-
 damageEventTests :: Tasty.TestTree
 damageEventTests =
   Tasty.testGroup
@@ -1981,8 +1875,3 @@ m2bExitTests =
               HU.assertEqual "double striker deals 4" (Just 16) (lifeOf bob doubled)
               HU.assertEqual "an attacker-less turn deals nothing" (Just 20) (lifeOf bob quiet)
     ]
-
-dedupe :: (Eq a) => [a] -> [a]
-dedupe xs = case xs of
-  [] -> []
-  h : t -> h : dedupe (filter (/= h) t)

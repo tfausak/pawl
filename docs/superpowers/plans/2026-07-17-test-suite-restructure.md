@@ -325,7 +325,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `TurnSpec.tests` grouping `turnTests`, `turnDataTests`, `skipTests`.
 
-- [ ] **Step 1: Create the spec module**
+- [x] **Step 1: Create the spec module**
 
 Create `source/test-suite/Pawl/TurnSpec.hs`:
 
@@ -345,14 +345,14 @@ tests = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests]
 Note: `skipTests` uses the shared `S.combatBoardOf`, `S.runCombat`, and
 `S.inCombatPhase` (all in `Pawl.Support` from Task 1) — reference them qualified.
 
-- [ ] **Step 2: Wire into `Main.hs`** — delete the three groups, `import qualified
+- [x] **Step 2: Wire into `Main.hs`** — delete the three groups, `import qualified
   Pawl.TurnSpec`, replace `testTree` entries with `TurnSpec.tests`, prune unused
   imports.
 
-- [ ] **Step 3: Register and build** — add to `other-modules` if hand-listed;
+- [x] **Step 3: Register and build** — add to `other-modules` if hand-listed;
   build clean; `cabal test` → `All 261 tests passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/test-suite/Pawl/TurnSpec.hs source/test-suite/Main.hs pawl.cabal

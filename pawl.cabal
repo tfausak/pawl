@@ -148,6 +148,7 @@ test-suite pawl-test-suite
     Pawl.CoreSpec
     Pawl.SetupSpec
     Pawl.Support
+    Pawl.TurnSpec
 
   type: exitcode-stdio-1.0
 
