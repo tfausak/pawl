@@ -2048,7 +2048,22 @@ resolveTests =
          in HU.assertEqual "one event of amount 3" [3] (map DamageEvent.amount (GameState.damageEvents after)),
       HU.testCase "resolving a Bolt conserves objects" $
         let (_, cast, _) = boltAtBobsPiker
-         in HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (Stack.resolveTop cast))
+         in HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (Stack.resolveTop cast)),
+      HU.testCase "CR 608.2b a Bolt whose only target died fizzles" $
+        let (base, cast, _) = boltAtBobsPiker
+            -- Kill the Piker while the Bolt is on the stack, as Bolt B will in
+            -- the integration test, then check state-based actions.
+            dead = Sba.checkStateBasedActions (markDamage (pikerOf base) 3 cast)
+            after = Stack.resolveTop dead
+         in do
+              HU.assertEqual "Bolt in the graveyard, unresolved" 1 (length (Game.zoneMembers Zone.Graveyard alice after))
+              HU.assertEqual "no damage was dealt" [] (GameState.damageEvents after)
+              HU.assertEqual "bob untouched" (Just 20) (lifeOf bob after),
+      HU.testCase "CR 608.2b a fizzled spell applies none of its effects" $
+        let (base, cast, _) = boltAtBobsPiker
+            dead = Sba.checkStateBasedActions (markDamage (pikerOf base) 3 cast)
+            after = Stack.resolveTop dead
+         in HU.assertEqual "life totals unchanged" (Just 20) (lifeOf alice after)
     ]
 
 turnTests :: Tasty.TestTree
