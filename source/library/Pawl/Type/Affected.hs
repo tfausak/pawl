@@ -11,4 +11,7 @@ import Pawl.Type.ObjectId (ObjectId)
 data Affected
   = TheseObjects (Set ObjectId)
   | AllCreatures
+  | AllLands -- Urborg
+  | AllNonbasicLands -- Blood Moon
+  | OtherNonAuraEnchantments -- Opalescence ("each other"); self excluded by the effect's source at fold time
   deriving (Eq, Ord, Show)

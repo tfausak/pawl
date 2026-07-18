@@ -389,7 +389,7 @@ git commit -m "Add the ManaValue quantity and evaluate it (CR 202.3)"
 
 > **Note (self-exclusion):** Opalescence's "each **other**" needs the effect's *source* to exclude itself. A `Card` cannot carry its future object id, so the exclusion is applied at fold time using the source id gathered alongside each effect — `Affected.OtherNonAuraEnchantments` carries **no** id (a plan refinement of the spec's `AllOtherNonAuraEnchantments ObjectId`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ProjectionSpec.hs` a helper and a test proving affected-sets read the *partial* (a layer-4 creature-add is visible to a layer-6 `AllCreatures` grant):
 
@@ -422,12 +422,12 @@ withDynamicEffect aff ts m gs =
          in HU.assertBool "land gained flying because it became a creature" (Projection.hasKeyword Keyword.Flying landId gs),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "reads the partial"'`
 Expected: FAIL — the M3b `project` gathers with a `GameState`-only `affects`, so the land is not yet a creature when `AllCreatures` is evaluated, and it does not gain flying.
 
-- [ ] **Step 3: Add the `Affected` constructors**
+- [x] **Step 3: Add the `Affected` constructors**
 
 In `source/library/Pawl/Type/Affected.hs`:
 
@@ -441,7 +441,7 @@ data Affected
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Restructure `Projection` — `affects`, `gather`, `project`**
+- [x] **Step 4: Restructure `Projection` — `affects`, `gather`, `project`**
 
 In `source/library/Pawl/Projection.hs` add imports `qualified Pawl.Type.Supertype as Supertype`, `qualified Pawl.Type.StaticAbility as StaticAbility` (if not already present), and `qualified Pawl.Type.Object as Object` (present). Define the fold accumulator, the new `affects`, `isBasic`, `gather`, and `project`:
 
@@ -531,12 +531,12 @@ project oid gs =
 
 Delete the old M3b `gather` and `project` (the ones with the `(Layer, Timestamp, Modification)` tuple and `List.sortOn (\(l, ts, _) -> (l, ts))`). Remove the now-unused `Layer`/`Timestamp` tuple imports only if they become unused (they are still used by `Gathered`). Keep `affects`'s old two-argument form deleted — the new five-argument form replaces it.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the new "reads the partial" test is green, and every M3b projection test still passes (for a plain creature the partial at layer 6/7 equals its printed type, so `AllCreatures` resolves identically).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

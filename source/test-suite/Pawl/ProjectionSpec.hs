@@ -60,6 +60,19 @@ withEffect oid ts m gs =
           }
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
+-- Append a stored continuous effect over a dynamic set, at timestamp `ts`.
+withDynamicEffect :: Affected.Affected -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withDynamicEffect aff ts m gs =
+  let eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = ObjectId.MkObjectId 997,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.modification = m,
+            ContinuousEffect.affected = aff
+          }
+   in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
+
 -- The object timestamp of the (single) Humility on the battlefield.
 humilityTimestamp :: GameState.GameState -> Timestamp.Timestamp
 humilityTimestamp gs =
@@ -243,5 +256,16 @@ tests =
             gs = withEffect oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness Quantity.ManaValue Quantity.ManaValue) gs0
          in do
               HU.assertEqual "power = mana value" (Just 2) (Projection.powerOf oid gs)
-              HU.assertEqual "toughness = mana value" (Just 2) (Projection.toughnessOf oid gs)
+              HU.assertEqual "toughness = mana value" (Just 2) (Projection.toughnessOf oid gs),
+      HU.testCase "CR 613 affected-set reads the partial: a layer-4 creature-add is seen by a layer-6 AllCreatures grant" $
+        let gs0 = S.landsInPlay Card.forestPrinting 1
+            landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+            -- Layer 4 makes the land a creature; layer 6 grants flying to all
+            -- creatures. The grant reaches the land ONLY because the affected set
+            -- is evaluated after layer 4.
+            gs1 = withEffect landId (Timestamp.MkTimestamp 100) (Modification.AddCardType CardType.Creature) gs0
+            gs = withDynamicEffect Affected.AllCreatures (Timestamp.MkTimestamp 200) (Modification.GainKeyword Keyword.Flying) gs1
+         in HU.assertBool "land gained flying because it became a creature" (Projection.hasKeyword Keyword.Flying landId gs)
     ]

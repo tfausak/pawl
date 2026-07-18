@@ -3,7 +3,6 @@ module Pawl.Projection where
 import qualified Data.List as List
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Pawl.Card as Card
 import qualified Pawl.Game as Game
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Type.Affected as Affected
@@ -25,6 +24,7 @@ import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Supertype as Supertype
 import Pawl.Type.Timestamp (Timestamp)
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TypeLine as TypeLine
@@ -92,15 +92,39 @@ addPT base delta = case (base, delta) of
   (Just b, Nothing) -> Just b
   (Nothing, _) -> Nothing
 
--- CR 611.2c: does this effect's set include the object? A fixed set is a
--- membership test; AllCreatures is re-evaluated live (creatures on the
--- battlefield).
-affects :: ObjectId -> Affected.Affected -> GameState -> Bool
-affects oid a gs = case a of
-  Affected.TheseObjects s -> Set.member oid s
-  Affected.AllCreatures ->
-    Set.member oid (GameState.battlefield gs)
-      && fmap Card.isCreature (Game.cardOf oid gs) == Just True
+-- A continuous effect ready to fold: its source (for OtherNonAuraEnchantments
+-- self-exclusion), the set it affects, its layer, its timestamp, and the
+-- modification. Projection-internal; not a domain type.
+data Gathered = MkGathered
+  { gSource :: ObjectId,
+    gAffected :: Affected.Affected,
+    gLayer :: Layer,
+    gTimestamp :: Timestamp,
+    gModification :: Modification
+  }
+
+-- CR 611.2c / 613: does the effect from `source` apply to `oid`, given the
+-- partial projection built by the layers below this one? Fixed sets are a
+-- membership test; dynamic sets read the PARTIAL type line, so a layer-4 type
+-- change is visible to a later layer. Supertype (nonbasic) is read from the
+-- printed type line -- no effect changes a supertype at M3c.
+affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
+affects source oid a partial gs =
+  let onBattlefield = Set.member oid (GameState.battlefield gs)
+      hasType t = Set.member t (PC.cardTypes partial)
+   in case a of
+        Affected.TheseObjects s -> Set.member oid s
+        Affected.AllCreatures -> onBattlefield && hasType CardType.Creature
+        Affected.AllLands -> onBattlefield && hasType CardType.Land
+        Affected.AllNonbasicLands -> onBattlefield && hasType CardType.Land && not (isBasic oid gs)
+        Affected.OtherNonAuraEnchantments -> onBattlefield && oid /= source && hasType CardType.Enchantment
+
+-- CR 205.4a: a basic land is one with the Basic supertype. Read from the printed
+-- type line (supertypes are not projected at M3c).
+isBasic :: ObjectId -> GameState -> Bool
+isBasic oid gs = case Game.cardOf oid gs of
+  Nothing -> False
+  Just card -> Set.member Supertype.Basic (TypeLine.supertypes (Card.Type.typeLine card))
 
 -- Printed characteristics before any effect (CR 613.2/613.4 starting point).
 baseCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
@@ -128,38 +152,53 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.rulesTextActive = True
       }
 
--- Every continuous effect touching this object, from BOTH sources, tagged with
--- its layer and timestamp: stored resolution effects, plus the static abilities
--- of every battlefield permanent (CR 613.7a: a static ability's continuous
--- effect has the same timestamp as the object it is on).
-gather :: ObjectId -> GameState -> [(Layer, Timestamp, Modification)]
-gather oid gs =
+-- Every continuous effect in the game: stored resolution effects, plus the
+-- static abilities of every battlefield permanent (CR 613.7a: with the
+-- permanent's own timestamp). NOT filtered by object here -- project filters
+-- per layer against the partial. (Task 6 adds the CR 305.7 source-liveness gate.)
+gather :: GameState -> [Gathered]
+gather gs =
   let fromStored eff =
-        if affects oid (ContinuousEffect.affected eff) gs
-          then [(layer (ContinuousEffect.modification eff), ContinuousEffect.timestamp eff, ContinuousEffect.modification eff)]
-          else []
-      stored = concatMap fromStored (GameState.continuousEffects gs)
-      fromStatic permId = case Game.lookupObject permId gs of
+        MkGathered
+          { gSource = ContinuousEffect.source eff,
+            gAffected = ContinuousEffect.affected eff,
+            gLayer = layer (ContinuousEffect.modification eff),
+            gTimestamp = ContinuousEffect.timestamp eff,
+            gModification = ContinuousEffect.modification eff
+          }
+      stored = map fromStored (GameState.continuousEffects gs)
+      fromStatic permId permObj sa =
+        MkGathered
+          { gSource = permId,
+            gAffected = StaticAbility.affected sa,
+            gLayer = layer (StaticAbility.modification sa),
+            gTimestamp = Object.timestamp permObj,
+            gModification = StaticAbility.modification sa
+          }
+      fromPermanent permId = case Game.lookupObject permId gs of
         Nothing -> []
         Just permObj -> case Game.cardOf permId gs of
           Nothing -> []
-          Just card ->
-            let one sa =
-                  if affects oid (StaticAbility.affected sa) gs
-                    then [(layer (StaticAbility.modification sa), Object.timestamp permObj, StaticAbility.modification sa)]
-                    else []
-             in concatMap one (Card.Type.staticAbilities card)
-      static_ = concatMap fromStatic (Set.toList (GameState.battlefield gs))
+          Just card -> map (fromStatic permId permObj) (Card.Type.staticAbilities card)
+      static_ = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
    in stored ++ static_
 
--- CR 613: apply every continuous effect to the base characteristics in layer
--- order, ties broken by CR 613.7 timestamp. A linear fold -- no CR 613.8
--- dependency (that is M3c's trial application). design.md §2.5.
+-- CR 613: apply continuous effects layer by layer (only the layers with effects,
+-- ascending). Within a layer, CR 613.7 timestamp order. An effect's affected set
+-- is evaluated against the partial projection through the previous layers.
+-- CR 613.8 EXISTENCE dependency is handled by source-liveness in Task 6, not a
+-- within-layer reorder; the topological CR 613.8b applies-to reorder is deferred
+-- (spec §6, git-bug). design.md §2.5.
 project :: ObjectId -> GameState -> ProjectedCharacteristics
 project oid gs =
-  let sorted = List.sortOn (\(l, ts, _) -> (l, ts)) (gather oid gs)
-      step pc (_, _, m) = applyModification gs oid m pc
-   in List.foldl' step (baseCharacteristics oid gs) sorted
+  let cands = gather gs
+      layers = Set.toAscList (Set.fromList (map gLayer cands))
+      applyLayer partial lyr =
+        let here = filter (\c -> gLayer c == lyr && affects (gSource c) oid (gAffected c) partial gs) cands
+            ordered = List.sortOn gTimestamp here
+            step pc c = applyModification gs oid (gModification c) pc
+         in List.foldl' step partial ordered
+   in List.foldl' applyLayer (baseCharacteristics oid gs) layers
 
 powerOf :: ObjectId -> GameState -> Maybe Integer
 powerOf oid gs = PC.power (project oid gs)
