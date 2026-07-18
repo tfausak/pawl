@@ -99,7 +99,8 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 
 -- Every continuous effect touching this object, from BOTH sources, tagged with
 -- its layer and timestamp: stored resolution effects, plus the static abilities
--- of every battlefield permanent (CR 613.7b: the permanent's own timestamp).
+-- of every battlefield permanent (CR 613.7a: a static ability's continuous
+-- effect has the same timestamp as the object it is on).
 gather :: ObjectId -> GameState -> [(Layer, Timestamp, Modification)]
 gather oid gs =
   let fromStored eff =
