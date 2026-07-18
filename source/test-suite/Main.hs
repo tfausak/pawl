@@ -1,6 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE RankNTypes #-}
-
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.CombatSpec as CombatSpec

@@ -880,7 +880,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Produces: a `Main.hs` of only imports + `testTree` + `defaultMain`; updated
   project guidance.
 
-- [ ] **Step 1: Verify `Main.hs` is a pure aggregator**
+- [x] **Step 1: Verify `Main.hs` is a pure aggregator**
 
 Confirm `Main.hs` now contains only: the module header, `import qualified
 Pawl.<Area>Spec` lines (one per spec), a `Test.Tasty`/`Test.Tasty.Ingredients`
@@ -892,7 +892,7 @@ it was missed by an earlier task — move it to the spec that uses it and note w
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -3` → clean.
 Run: `cabal test 2>&1 | grep -E "tests? passed|out of"` → `All 262 tests passed`.
 
-- [ ] **Step 2: Update CLAUDE.md**
+- [x] **Step 2: Update CLAUDE.md**
 
 Replace the two single-file directives. The first is in the "Environment and
 commands" section (`cabal test` — the `tasty` suite, "kept as a single file
@@ -924,13 +924,13 @@ helpers stay with their group. New `Pawl.*Spec` files are picked up by cabal-gil
 (If Task 1 used a hand-listed `other-modules`, change the last sentence to "add
 the module to the test-suite `other-modules` list".)
 
-- [ ] **Step 3: Final clean-build verification**
+- [x] **Step 3: Final clean-build verification**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"`
 Expected: `0`.
 Run: `cabal test 2>&1 | grep -E "tests? passed|out of"` → `All 262 tests passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/test-suite/Main.hs CLAUDE.md
