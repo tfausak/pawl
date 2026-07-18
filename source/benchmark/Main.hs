@@ -81,20 +81,20 @@ playersFrom n = PlayerId.MkPlayerId n NonEmpty.:| [PlayerId.MkPlayerId (n + 1)]
 goldfish :: Natural -> Result
 goldfish n =
   let players = playersFrom n
-   in fst (Engine.runGamePure alwaysPass (Setup.emptyGame players) (Engine.playFrom (Setup.mirror Setup.redDeck players)))
+   in fst (Engine.runMatchPure alwaysPass (Setup.mirror Setup.redDeck players))
 {-# NOINLINE goldfish #-}
 
 -- Parameterized for the same reason as 'goldfish'.
 casting :: Natural -> Result
 casting n =
   let players = playersFrom n
-   in fst (Engine.runGamePure castAnswer (Setup.emptyGame players) (Engine.playFrom (Setup.mirror Setup.redDeck players)))
+   in fst (Engine.runMatchPure castAnswer (Setup.mirror Setup.redDeck players))
 {-# NOINLINE casting #-}
 
 fighting :: Natural -> Result
 fighting n =
   let players = playersFrom n
-   in fst (Engine.runGamePure fightAnswer (Setup.emptyGame players) (Engine.playFrom (Setup.mirror Setup.redDeck players)))
+   in fst (Engine.runMatchPure fightAnswer (Setup.mirror Setup.redDeck players))
 {-# NOINLINE fighting #-}
 
 main :: IO ()

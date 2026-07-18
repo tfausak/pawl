@@ -48,6 +48,18 @@ runGame answer gs game = Program.foldProgramM answer (State.runStateT game gs)
 runGamePure :: (forall r. Prompt r -> r) -> GameState -> Game a -> (a, GameState)
 runGamePure answer gs game = Program.foldProgram answer (State.runStateT game gs)
 
+-- One entry point from matchup to played game: the player list is DERIVED from
+-- the matchup, so a matchup player without a Player record is unrepresentable
+-- here (git-bug 15de615). Setup.emptyGame stays public as the deckless fixture
+-- door, where no deck agreement exists to violate.
+runMatch :: (Monad m) => (forall r. Prompt r -> m r) -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> m (Result, GameState)
+runMatch answer matchup =
+  runGame answer (Setup.emptyGame (NonEmpty.map fst matchup)) (playFrom matchup)
+
+runMatchPure :: (forall r. Prompt r -> r) -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> (Result, GameState)
+runMatchPure answer matchup =
+  runGamePure answer (Setup.emptyGame (NonEmpty.map fst matchup)) (playFrom matchup)
+
 -- The next entry of a cyclic order after 'pid'. Falls back to 'pid' when the
 -- order is empty or does not mention it, keeping the function total.
 nextInOrder :: [PlayerId] -> PlayerId -> PlayerId

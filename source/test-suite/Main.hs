@@ -893,7 +893,7 @@ castAnswer p = case p of
 
 castGameState :: GameState.GameState
 castGameState =
-  snd (Engine.runGamePure castAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom redRed))
+  snd (Engine.runMatchPure castAnswer redRed)
 
 castEngineTests :: Tasty.TestTree
 castEngineTests =
@@ -1405,7 +1405,13 @@ setupTests =
       HU.testCase "each hand has 7" $
         HU.assertEqual "hand" 7 (length (Game.zoneMembers Zone.Hand bob setupState)),
       HU.testCase "active player is first in turn order" $
-        HU.assertEqual "active" alice (GameState.activePlayer setupState)
+        HU.assertEqual "active" alice (GameState.activePlayer setupState),
+      HU.testCase "runMatch derives the players from the matchup (git-bug 15de615)" $
+        let (result, final) = Engine.runMatchPure identityAnswer redRed
+         in do
+              HU.assertBool "has a result" (Maybe.isJust (GameState.result final))
+              HU.assertEqual "both players have a life total" 2 (Map.size (GameState.players final))
+              HU.assertEqual "the result is the run's result" (Just result) (GameState.result final)
     ]
 
 greenBlackSetup :: GameState.GameState
@@ -1449,7 +1455,7 @@ sbaTests =
 
 goldfishResult :: (Result.Result, GameState.GameState)
 goldfishResult =
-  Engine.runGamePure identityAnswer (Setup.emptyGame bothPlayers) (Engine.playFrom redRed)
+  Engine.runMatchPure identityAnswer redRed
 
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
@@ -1503,7 +1509,7 @@ engineTests =
 
 replayTests :: Tasty.TestTree
 replayTests =
-  let start = Setup.emptyGame bothPlayers
+  let start = Setup.emptyGame (NonEmpty.map fst redRed)
       game = Engine.playFrom redRed
       -- Recorded with playLandAnswer, whose choices differ from Replay's
       -- exhausted-transcript fallback. That keeps these assertions honest: the
@@ -1575,10 +1581,7 @@ shuffleWith g xs =
 
 runRandomGame :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> Int -> GameState.GameState
 runRandomGame matchup s =
-  let start = Setup.emptyGame (NonEmpty.map fst matchup)
-      game = Engine.playFrom matchup
-      (_, final) = State.evalState (Program.foldProgramM randomAnswer (State.runStateT game start)) (Random.mkStdGen s)
-   in final
+  snd (State.evalState (Engine.runMatch randomAnswer matchup) (Random.mkStdGen s))
 
 nextIdOf :: GameState.GameState -> Integer
 nextIdOf gs = case GameState.nextObjectId gs of
@@ -1644,7 +1647,7 @@ creatureDied s =
 -- Run setup, then a scripted tweak, then whatever steps the scenario needs.
 scenario :: Game.Type.Game () -> GameState.GameState
 scenario steps =
-  snd $ Engine.runGamePure identityAnswer (Setup.emptyGame bothPlayers) $ do
+  snd $ Engine.runGamePure identityAnswer (Setup.emptyGame (NonEmpty.map fst redRed)) $ do
     Setup.newGame redRed
     steps
 
