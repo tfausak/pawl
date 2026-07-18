@@ -102,11 +102,13 @@ The toolchain comes from the Nix flake — GHC 9.14.1, already on `PATH` in the
 dev shell (`nix develop` or direnv).
 
 - `cabal build` — compile. Must be **warning-clean** (`-Weverything` minus the
-  allow-list in `pawl.cabal`; `-Werror` is not set, so treat any warning as a
-  failure yourself). Incremental builds **hide** warnings: check with a clean one
-  — `rm -rf dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.7.16/{b,t,build}`
-  then `cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -c "warning:"`
-  must print `0`. Suites break separately from the library, so always build `all`.
+  allow-list in `pawl.cabal`). The `pedantic` cabal flag adds `-Werror` and is
+  enabled in `cabal.project.local` (`flags: +pedantic`), so the build fails on
+  any warning; if the flag is somehow off, treat any warning as a failure
+  yourself. Incremental builds **hide** warnings from unchanged modules: when
+  you need a definitive check, `cabal clean` first — never poke at paths inside
+  `dist-newstyle`. Suites break separately from the library, so always build
+  `all` (`cabal build all --enable-tests --enable-benchmarks`).
 - `cabal test` — the `tasty` suite, kept as a single file
   `source/test-suite/Main.hs` for now (`tasty-hunit` + `tasty-quickcheck`).
 - `cabal bench` — the `tasty-bench` benchmark, single file
