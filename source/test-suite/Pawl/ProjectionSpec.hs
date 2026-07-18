@@ -312,5 +312,29 @@ tests =
               HU.assertEqual "base P/T = its mana value" (Just 4) (Projection.toughnessOf humilityId g2)
               let damaged = S.markDamage humilityId 4 g2
                   afterSba = Sba.checkStateBasedActions damaged
-              HU.assertBool "lethal damage destroys the animated enchantment" (not (Set.member humilityId (GameState.battlefield afterSba)))
+              HU.assertBool "lethal damage destroys the animated enchantment" (not (Set.member humilityId (GameState.battlefield afterSba))),
+      HU.testCase "CR 613 Humility + Opalescence: a real creature is 1/1 with no abilities" $
+        let base = Setup.emptyGame S.bothPlayers
+            (pikerId, g1) = S.addPiker S.alice base
+            (_, g2) = S.addCreature Card.humilityPrinting S.alice g1
+            (_, gs) = S.addCreature Card.opalescencePrinting S.alice g2
+         in do
+              HU.assertEqual "power 1" (Just 1) (Projection.powerOf pikerId gs)
+              HU.assertEqual "toughness 1" (Just 1) (Projection.toughnessOf pikerId gs)
+              HU.assertBool "no abilities" (Set.null (Projection.keywordsOf pikerId gs)),
+      HU.testCase "CR 613.7 Humility + Opalescence: Humility is 4/4 when Opalescence is newer" $
+        let base = Setup.emptyGame S.bothPlayers
+            (humilityId, g1) = S.addCreature Card.humilityPrinting S.alice base
+            (_, gs) = S.addCreature Card.opalescencePrinting S.alice g1
+         in HU.assertEqual "Opalescence's mana-value 7b wins" (Just 4) (Projection.powerOf humilityId gs),
+      HU.testCase "CR 613.7 Humility + Opalescence: Humility is 1/1 when Humility is newer" $
+        let base = Setup.emptyGame S.bothPlayers
+            (_, g1) = S.addCreature Card.opalescencePrinting S.alice base
+            (humilityId, gs) = S.addCreature Card.humilityPrinting S.alice g1
+         in HU.assertEqual "Humility's 1/1 7b wins" (Just 1) (Projection.powerOf humilityId gs),
+      HU.testCase "CR 305.2 Opalescence is not itself a creature (\"each other\")" $
+        let base = Setup.emptyGame S.bothPlayers
+            (opalId, g1) = S.addCreature Card.opalescencePrinting S.alice base
+            (_, gs) = S.addCreature Card.humilityPrinting S.alice g1
+         in HU.assertBool "Opalescence stays a non-creature enchantment" (not (Projection.isCreatureOf opalId gs))
     ]

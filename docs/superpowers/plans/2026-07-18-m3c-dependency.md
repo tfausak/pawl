@@ -991,7 +991,7 @@ git commit -m "Read creature-ness through the projection in Sba, Target, Combat"
 **Interfaces:**
 - Consumes: everything above. No production code — this is the famous cross-layer correctness gate (CR 613.7 within layer 7b), which the layer-by-layer fold already handles.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Add to `source/test-suite/Pawl/ProjectionSpec.hs`:
 
@@ -1022,12 +1022,12 @@ Add to `source/test-suite/Pawl/ProjectionSpec.hs`:
          in HU.assertBool "Opalescence stays a non-creature enchantment" (not (Projection.isCreatureOf opalId gs)),
 ```
 
-- [ ] **Step 2: Run tests to verify they pass**
+- [x] **Step 2: Run tests to verify they pass**
 
 Run: `cabal test --test-options='-p "Humility + Opalescence"'` then the full `cabal test`.
 Expected: PASS — no production change needed; the fold already applies layer 4 (creature-add) before layer 6 (lose-all) before layer 7b (two P/T sets, timestamp-ordered). If any fails, the fold or timestamp order is wrong — **stop and report**, do not weaken the assertion.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
