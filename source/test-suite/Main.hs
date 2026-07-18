@@ -2041,14 +2041,14 @@ damageEventTests =
                 HU.assertBool "blocker hit attacker for 2" $
                   elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2) events
               _ -> HU.assertFailure "fixture should have one creature per side",
-      HU.testCase "an unblocked 2/1 emits a ToDefender event" $
+      HU.testCase "an unblocked 2/1 emits a ToPlayer event" $
         let (gs, mine, _) = combatBoard 1 0
             after = fightWith aggressiveAnswer gs
          in case mine of
               a : _ ->
                 HU.assertEqual
                   "one player event"
-                  [DamageEvent.MkDamageEvent a (Recipient.ToDefender bob) 2]
+                  [DamageEvent.MkDamageEvent a (Recipient.ToPlayer bob) 2]
                   (GameState.damageEvents after)
               _ -> HU.assertFailure "fixture should have an attacker"
     ]
@@ -2085,7 +2085,7 @@ assignmentLegalityTests =
             thresholds =
               Map.fromList
                 [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 3),
-                  (Recipient.ToDefender bob, 0)
+                  (Recipient.ToPlayer bob, 0)
                 ]
             answer :: Map.Map Recipient.Recipient Natural.Natural
             answer = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 1), 2)]
@@ -2095,13 +2095,13 @@ assignmentLegalityTests =
             thresholds =
               Map.fromList
                 [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 3),
-                  (Recipient.ToDefender bob, 0)
+                  (Recipient.ToPlayer bob, 0)
                 ]
             answer :: Map.Map Recipient.Recipient Natural.Natural
             answer =
               Map.fromList
                 [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 0),
-                  (Recipient.ToDefender bob, 3)
+                  (Recipient.ToPlayer bob, 3)
                 ]
          in HU.assertBool "rejected" (not (Damage.legalAssignment thresholds 3 answer)),
       HU.testCase "defender damage once the blocker has lethal is legal" $
@@ -2109,13 +2109,13 @@ assignmentLegalityTests =
             thresholds =
               Map.fromList
                 [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 1),
-                  (Recipient.ToDefender bob, 0)
+                  (Recipient.ToPlayer bob, 0)
                 ]
             answer :: Map.Map Recipient.Recipient Natural.Natural
             answer =
               Map.fromList
                 [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 1),
-                  (Recipient.ToDefender bob, 2)
+                  (Recipient.ToPlayer bob, 2)
                 ]
          in HU.assertBool "accepted" (Damage.legalAssignment thresholds 3 answer),
       HU.testCase "an answer that does not total power is illegal" $
@@ -2135,7 +2135,7 @@ assignmentLegalityTests =
           not (Damage.legalAssignment thresholds power answer)
             || ( sum (Map.elems answer) == power
                    && all (\r -> Map.member r thresholds) (Map.keys answer)
-                   && ( Map.findWithDefault 0 (Recipient.ToDefender bob) answer == 0
+                   && ( Map.findWithDefault 0 (Recipient.ToPlayer bob) answer == 0
                           || all
                             (\(r, t) -> Map.findWithDefault 0 r answer >= t)
                             (Map.toList (Map.filterWithKey (\r _ -> isCreatureRecipient r) thresholds))
@@ -2146,7 +2146,7 @@ assignmentLegalityTests =
 isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True
-  Recipient.ToDefender _ -> False
+  Recipient.ToPlayer _ -> False
 
 -- A blocker (lethal 0..4), a defender (threshold 0), power 0..6, and an arbitrary
 -- assignment over those two recipients. Covers power below / equal to / above
@@ -2159,9 +2159,9 @@ genLegalityCase = do
   toDefender <- QC.choose (0, 6) :: QC.Gen Integer
   let blocker = Recipient.ToCreature (ObjectId.MkObjectId 1)
       thresholds :: Map.Map Recipient.Recipient Natural.Natural
-      thresholds = Map.fromList [(blocker, fromInteger lethal), (Recipient.ToDefender bob, 0)]
+      thresholds = Map.fromList [(blocker, fromInteger lethal), (Recipient.ToPlayer bob, 0)]
       answer :: Map.Map Recipient.Recipient Natural.Natural
-      answer = Map.fromList [(blocker, fromInteger toBlocker), (Recipient.ToDefender bob, fromInteger toDefender)]
+      answer = Map.fromList [(blocker, fromInteger toBlocker), (Recipient.ToPlayer bob, fromInteger toDefender)]
   pure (thresholds, fromInteger power, answer)
 
 -- Assigns each blocker exactly its threshold, and every leftover point to the

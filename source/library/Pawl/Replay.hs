@@ -74,7 +74,7 @@ defaultAnswer p = case p of
     let blockers = filter isCreatureRecipient (Map.keys thresholds)
         isCreatureRecipient r = case r of
           Recipient.ToCreature _ -> True
-          Recipient.ToDefender _ -> False
+          Recipient.ToPlayer _ -> False
      in case blockers of
           r : _ -> Map.singleton r n
           [] -> Map.empty

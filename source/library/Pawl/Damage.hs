@@ -48,7 +48,7 @@ legalAssignment thresholds power answer =
       totalsPower = sum (Map.elems answer) == power
       onlyLegal = all (\r -> Map.member r thresholds) (Map.keys answer)
       isDefender r = case r of
-        Recipient.ToDefender _ -> True
+        Recipient.ToPlayer _ -> True
         Recipient.ToCreature _ -> False
       defenderAmount = sum (Map.elems (Map.filterWithKey (\r _ -> isDefender r) answer))
       blockerThresholds = Map.filterWithKey (\r _ -> not (isDefender r)) thresholds
@@ -88,7 +88,7 @@ attackerAssignment gs (attacker, target) = case Game.powerOf attacker gs of
           -- CR 510.1b: unblocked, so it hits what it is attacking.
           [] -> case target of
             AttackTarget.OfPlayer defender ->
-              pure [DamageEvent.MkDamageEvent attacker (Recipient.ToDefender defender) power]
+              pure [DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer defender) power]
           -- CR 510.1c / 702.19b: a single blocker with no trample -- or trample but
           -- no power past its threshold -- is forced: all onto the blocker. A single
           -- trample blocker WITH excess fails this guard and falls to the prompt arm.
@@ -108,7 +108,7 @@ attackerAssignment gs (attacker, target) = case Game.powerOf attacker gs of
                   blockerEntries = map (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
                   defenderEntry = case target of
                     AttackTarget.OfPlayer defender ->
-                      if trample then [(Recipient.ToDefender defender, 0 :: Natural)] else []
+                      if trample then [(Recipient.ToPlayer defender, 0 :: Natural)] else []
                   thresholds = Map.fromList (blockerEntries ++ defenderEntry)
               chosen <-
                 Trans.lift
@@ -154,7 +154,7 @@ applyCombatDamage events gs =
         Recipient.ToCreature oid ->
           let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
            in g {GameState.objects = Map.adjust hurt oid (GameState.objects g)}
-        Recipient.ToDefender pid ->
+        Recipient.ToPlayer pid ->
           let drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
            in g {GameState.players = Map.adjust drain pid (GameState.players g)}
       marked = List.foldl' markOne gs events

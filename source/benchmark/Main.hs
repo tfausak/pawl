@@ -16,7 +16,7 @@ import qualified Test.Tasty.Bench as Bench
 isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True
-  Recipient.ToDefender _ -> False
+  Recipient.ToPlayer _ -> False
 
 alwaysPass :: Prompt.Prompt r -> r
 alwaysPass p = case p of
