@@ -46,7 +46,9 @@ deckTests cards =
         let Deck.MkDeck m = Cards.blackDeck cards
          in do
               HU.assertEqual "swamps" (Just 36) (Map.lookup (Cards.swampPrinting cards) m)
-              HU.assertEqual "rats" (Just 24) (Map.lookup (Cards.typhoidRatsPrinting cards) m),
+              HU.assertEqual "rats" (Just 16) (Map.lookup (Cards.typhoidRatsPrinting cards) m)
+              HU.assertEqual "murders" (Just 4) (Map.lookup (Cards.murderPrinting cards) m)
+              HU.assertEqual "mind rots" (Just 4) (Map.lookup (Cards.mindRotPrinting cards) m),
       HU.testCase "36 Mountains per player after a red-red setup" $
         HU.assertEqual "mountains" 36 (S.countByName (Text.pack "Mountain") S.alice (setupState cards)),
       HU.testCase "8 Bird Maidens per player after a red-red setup" $

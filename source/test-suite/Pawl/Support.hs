@@ -64,8 +64,11 @@ redRed cards = Setup.mirror (Cards.redDeck cards) bothPlayers
 greenBlack :: Cards.Cards -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
 greenBlack cards = (alice, Cards.greenDeck cards) NonEmpty.:| [(bob, Cards.blackDeck cards)]
 
+blueBlack :: Cards.Cards -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
+blueBlack cards = (alice, Cards.blueDeck cards) NonEmpty.:| [(bob, Cards.blackDeck cards)]
+
 matchups :: Cards.Cards -> [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
-matchups cards = [redRed cards, greenBlack cards]
+matchups cards = [redRed cards, greenBlack cards, blueBlack cards]
 
 -- A 60-basic-land mirror: no spell can be cast and no creature can attack, so the
 -- only loss condition reachable is CR 704.5b deck-out. Used by the durable

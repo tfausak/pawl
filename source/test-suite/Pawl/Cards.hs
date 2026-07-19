@@ -210,10 +210,26 @@ greenDeck cards =
         (serpentsGiftPrinting cards, 4)
       ]
 
+-- Blue, no creatures: Divination accelerates its own deck-out, Unsummon bounces
+-- the opponent's creatures, Tome Scour mills them. Gives bounce/draw/mill random
+-- coverage (M4b fast follow).
+blueDeck :: Cards -> Deck.Deck
+blueDeck cards =
+  Deck.MkDeck $
+    Map.fromList
+      [ (islandPrinting cards, 40),
+        (unsummonPrinting cards, 8),
+        (divinationPrinting cards, 8),
+        (tomeScourPrinting cards, 4)
+      ]
+
 blackDeck :: Cards -> Deck.Deck
 blackDeck cards =
   Deck.MkDeck $
     Map.fromList
       [ (swampPrinting cards, 36),
-        (typhoidRatsPrinting cards, 24)
+        (typhoidRatsPrinting cards, 16),
+        -- Murder and Mind Rot give Destroy and Discard random-play coverage.
+        (murderPrinting cards, 4),
+        (mindRotPrinting cards, 4)
       ]

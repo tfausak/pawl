@@ -1153,7 +1153,7 @@ Give the highest-value verbs random-play coverage before M4c: add Murder + Mind 
 - Consumes: the seven M4b card accessors, `Cards.islandPrinting`, `Cards.swampPrinting`, `Cards.typhoidRatsPrinting` (existing).
 - Produces: `Cards.blueDeck :: Cards -> Deck.Deck`; `Support.blueBlack`; `Support.matchups` now returns three matchups.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/Support.hs` the new matchup and extend `matchups` (this is the "test" — the property suite consumes `matchups`, so a not-yet-defined `blueBlack`/`blueDeck` is the red):
 
@@ -1165,12 +1165,12 @@ matchups :: Cards.Cards -> [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
 matchups cards = [redRed cards, greenBlack cards, blueBlack cards]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: compile failure — `Cards.blueDeck` not in scope (red).
 
-- [ ] **Step 3: Add the blue deck and extend the black deck**
+- [x] **Step 3: Add the blue deck and extend the black deck**
 
 In `source/test-suite/Pawl/Cards.hs`, add `blueDeck` and rewrite `blackDeck` (each totals 60):
 
@@ -1200,12 +1200,12 @@ blackDeck cards =
       ]
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -40`
 Expected: PASS — the property suite runs over three matchups; each still ends with 120 objects, terminates, mints ≥120 ids, and empties the mana pool. If a random game surfaces a real bug (non-termination, lost object), that is a genuine finding — stop and diagnose per systematic-debugging, do **not** weaken the property.
 
-- [ ] **Step 5: Format, lint, commit**
+- [x] **Step 5: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
