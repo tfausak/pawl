@@ -1,9 +1,11 @@
 -- Covers Pawl.Codec.
 module Pawl.CodecSpec where
 
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec as Codec
+import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Decimal as Decimal
 import qualified Pawl.Type.Json as Json
@@ -11,10 +13,12 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -63,5 +67,18 @@ tests =
               (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]),
           HU.testCase "Power round-trips" $
             roundTrip "pow" Codec.powerToJson Codec.jsonToPower (Power.MkPower (Quantity.Literal 2))
+        ],
+      Tasty.testGroup
+        "modification + affected"
+        [ HU.testCase "GainKeyword" $
+            roundTrip "m1" Codec.modificationToJson Codec.jsonToModification (Modification.GainKeyword Keyword.Deathtouch),
+          HU.testCase "SetBasePowerToughness" $
+            roundTrip "m2" Codec.modificationToJson Codec.jsonToModification (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)),
+          HU.testCase "ChangeSubtypeWord" $
+            roundTrip "m3" Codec.modificationToJson Codec.jsonToModification (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island),
+          HU.testCase "AllCreatures" $
+            roundTrip "a1" Codec.affectedToJson Codec.jsonToAffected Affected.AllCreatures,
+          HU.testCase "TheseObjects" $
+            roundTrip "a2" Codec.affectedToJson Codec.jsonToAffected (Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1]))
         ]
     ]

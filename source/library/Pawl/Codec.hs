@@ -12,6 +12,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Json as Json
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
+import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CastingPermission as CastingPermission
@@ -22,6 +23,7 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Quantity as Quantity
@@ -362,3 +364,57 @@ toughnessToJson (Toughness.MkToughness q) = quantityToJson q
 
 jsonToToughness :: Value -> Either Text Toughness.Toughness
 jsonToToughness value = Toughness.MkToughness <$> jsonToQuantity value
+
+-- Modification, affected -----------------------------------------------------
+
+modificationToJson :: Modification.Modification -> Value
+modificationToJson m = case m of
+  Modification.GainKeyword k -> Json.tagged (Text.pack "GainKeyword") (Just (keywordToJson k))
+  Modification.LoseAllAbilities -> nullary (Text.pack "LoseAllAbilities")
+  Modification.SetBasePowerToughness p t -> Json.tagged (Text.pack "SetBasePowerToughness") (Just (Array [quantityToJson p, quantityToJson t]))
+  Modification.ModifyPowerToughness p t -> Json.tagged (Text.pack "ModifyPowerToughness") (Just (Array [quantityToJson p, quantityToJson t]))
+  Modification.SetLandSubtype s -> Json.tagged (Text.pack "SetLandSubtype") (Just (subtypeToJson s))
+  Modification.AddLandSubtype s -> Json.tagged (Text.pack "AddLandSubtype") (Just (subtypeToJson s))
+  Modification.AddCardType c -> Json.tagged (Text.pack "AddCardType") (Just (cardTypeToJson c))
+  Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array [subtypeToJson a, subtypeToJson b]))
+
+jsonToModification :: Value -> Either Text Modification.Modification
+jsonToModification value = do
+  (t, mv) <- Json.tag value
+  let pair v = case v of
+        Just (Array [x, y]) -> Right (x, y)
+        _ -> Left (Text.pack "expected a two-element array")
+  case Text.unpack t of
+    "GainKeyword" -> withValue mv (fmap Modification.GainKeyword . jsonToKeyword)
+    "LoseAllAbilities" -> Right Modification.LoseAllAbilities
+    "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> jsonToQuantity x <*> jsonToQuantity y
+    "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> jsonToQuantity x <*> jsonToQuantity y
+    "SetLandSubtype" -> withValue mv (fmap Modification.SetLandSubtype . jsonToSubtype)
+    "AddLandSubtype" -> withValue mv (fmap Modification.AddLandSubtype . jsonToSubtype)
+    "AddCardType" -> withValue mv (fmap Modification.AddCardType . jsonToCardType)
+    "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> jsonToSubtype x <*> jsonToSubtype y
+    _ -> Left (Text.pack "unknown Modification: " <> t)
+
+withValue :: Maybe Value -> (Value -> Either Text a) -> Either Text a
+withValue mv f = case mv of
+  Just v -> f v
+  Nothing -> Left (Text.pack "missing tagged value")
+
+affectedToJson :: Affected.Affected -> Value
+affectedToJson a = case a of
+  Affected.TheseObjects ids -> Json.tagged (Text.pack "TheseObjects") (Just (setTo objectIdToJson ids))
+  Affected.AllCreatures -> nullary (Text.pack "AllCreatures")
+  Affected.AllLands -> nullary (Text.pack "AllLands")
+  Affected.AllNonbasicLands -> nullary (Text.pack "AllNonbasicLands")
+  Affected.OtherNonAuraEnchantments -> nullary (Text.pack "OtherNonAuraEnchantments")
+
+jsonToAffected :: Value -> Either Text Affected.Affected
+jsonToAffected value = do
+  (t, mv) <- Json.tag value
+  case Text.unpack t of
+    "TheseObjects" -> withValue mv (fmap Affected.TheseObjects . setFrom jsonToObjectId)
+    "AllCreatures" -> Right Affected.AllCreatures
+    "AllLands" -> Right Affected.AllLands
+    "AllNonbasicLands" -> Right Affected.AllNonbasicLands
+    "OtherNonAuraEnchantments" -> Right Affected.OtherNonAuraEnchantments
+    _ -> Left (Text.pack "unknown Affected: " <> t)
