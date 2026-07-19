@@ -1,6 +1,7 @@
 import qualified Pawl.ActivateSpec as ActivateSpec
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.CastSpec as CastSpec
+import qualified Pawl.CodecSpec as CodecSpec
 import qualified Pawl.CombatSpec as CombatSpec
 import qualified Pawl.CoreSpec as CoreSpec
 import qualified Pawl.DamageSpec as DamageSpec
@@ -35,6 +36,7 @@ testTree =
       ReplaySpec.tests,
       PropertySpec.tests,
       JsonSpec.tests,
+      CodecSpec.tests,
       ManaSpec.tests,
       CastSpec.tests,
       CombatSpec.tests,
