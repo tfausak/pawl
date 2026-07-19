@@ -5,12 +5,16 @@
 -- identity here is open-half machinery, not the rules core.
 module Pawl.Codec where
 
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Json as Json
+import qualified Pawl.Type.AbilityCost as AbilityCost
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.CardCriterion as CardCriterion
@@ -19,7 +23,7 @@ import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
-import Pawl.Type.Json (Value (Array, Null))
+import Pawl.Type.Json (Value (Array, Null, Object))
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
@@ -28,12 +32,16 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 
 -- Helpers --------------------------------------------------------------------
@@ -448,3 +456,105 @@ jsonToEffect value = do
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
     _ -> Left (Text.pack "unknown Effect: " <> t)
+
+-- Records & abilities --------------------------------------------------------
+
+targetSpecsToJson :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value
+targetSpecsToJson m =
+  listTo (\(k, v) -> Object [(Text.pack "slot", slotNameToJson k), (Text.pack "spec", targetSpecToJson v)]) (Map.toAscList m)
+
+jsonToTargetSpecs :: Value -> Either Text (Map.Map SlotName.SlotName TargetSpec.TargetSpec)
+jsonToTargetSpecs value =
+  let decodeEntry v = do
+        ps <- Json.asObject v
+        k <- Json.field (Text.pack "slot") ps >>= jsonToSlotName
+        s <- Json.field (Text.pack "spec") ps >>= jsonToTargetSpec
+        pure (k, s)
+   in Map.fromList <$> listFrom decodeEntry value
+
+typeLineToJson :: TypeLine.TypeLine -> Value
+typeLineToJson tl =
+  Object
+    [ (Text.pack "supertypes", setTo supertypeToJson (TypeLine.supertypes tl)),
+      (Text.pack "types", setTo cardTypeToJson (TypeLine.types tl)),
+      (Text.pack "subtypes", setTo subtypeToJson (TypeLine.subtypes tl))
+    ]
+
+jsonToTypeLine :: Value -> Either Text TypeLine.TypeLine
+jsonToTypeLine value = do
+  ps <- Json.asObject value
+  sup <- Json.field (Text.pack "supertypes") ps >>= setFrom jsonToSupertype
+  tys <- Json.field (Text.pack "types") ps >>= setFrom jsonToCardType
+  sub <- Json.field (Text.pack "subtypes") ps >>= setFrom jsonToSubtype
+  pure (TypeLine.MkTypeLine sup tys sub)
+
+staticAbilityToJson :: StaticAbility.StaticAbility -> Value
+staticAbilityToJson sa =
+  Object
+    [ (Text.pack "affected", affectedToJson (StaticAbility.affected sa)),
+      (Text.pack "modification", modificationToJson (StaticAbility.modification sa))
+    ]
+
+jsonToStaticAbility :: Value -> Either Text StaticAbility.StaticAbility
+jsonToStaticAbility value = do
+  ps <- Json.asObject value
+  a <- Json.field (Text.pack "affected") ps >>= jsonToAffected
+  m <- Json.field (Text.pack "modification") ps >>= jsonToModification
+  pure (StaticAbility.MkStaticAbility a m)
+
+abilityCostToJson :: AbilityCost.AbilityCost -> Value
+abilityCostToJson ac =
+  Object
+    [ (Text.pack "mana", maybeTo manaCostToJson (AbilityCost.mana ac)),
+      (Text.pack "additional", listTo additionalCostToJson (AbilityCost.additional ac))
+    ]
+
+jsonToAbilityCost :: Value -> Either Text AbilityCost.AbilityCost
+jsonToAbilityCost value = do
+  ps <- Json.asObject value
+  manaCost <- maybeFrom jsonToManaCost (Maybe.fromMaybe Null (Json.optField (Text.pack "mana") ps))
+  add <- Json.field (Text.pack "additional") ps >>= listFrom jsonToAdditionalCost
+  pure (AbilityCost.MkAbilityCost manaCost add)
+
+activatedAbilityToJson :: ActivatedAbility.ActivatedAbility -> Value
+activatedAbilityToJson aa =
+  Object
+    [ (Text.pack "cost", abilityCostToJson (ActivatedAbility.cost aa)),
+      (Text.pack "effects", listTo effectToJson (ActivatedAbility.effects aa)),
+      (Text.pack "targetSpecs", targetSpecsToJson (ActivatedAbility.targetSpecs aa))
+    ]
+
+jsonToActivatedAbility :: Value -> Either Text ActivatedAbility.ActivatedAbility
+jsonToActivatedAbility value = do
+  ps <- Json.asObject value
+  c <- Json.field (Text.pack "cost") ps >>= jsonToAbilityCost
+  es <- Json.field (Text.pack "effects") ps >>= listFrom jsonToEffect
+  ts <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
+  pure (ActivatedAbility.MkActivatedAbility c es ts)
+
+replacementEffectToJson :: ReplacementEffect.ReplacementEffect -> Value
+replacementEffectToJson (ReplacementEffect.RedirectZoneChange w t) =
+  Json.tagged (Text.pack "RedirectZoneChange") (Just (Array [zoneToJson w, zoneToJson t]))
+
+jsonToReplacementEffect :: Value -> Either Text ReplacementEffect.ReplacementEffect
+jsonToReplacementEffect value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("RedirectZoneChange", Just (Array [w, d])) -> ReplacementEffect.RedirectZoneChange <$> jsonToZone w <*> jsonToZone d
+    _ -> Left (Text.pack "unknown ReplacementEffect: " <> t)
+
+triggeredAbilityToJson :: TriggeredAbility.TriggeredAbility -> Value
+triggeredAbilityToJson ta =
+  Object
+    [ (Text.pack "condition", triggerConditionToJson (TriggeredAbility.condition ta)),
+      (Text.pack "effects", listTo effectToJson (TriggeredAbility.effects ta)),
+      (Text.pack "targetSpecs", targetSpecsToJson (TriggeredAbility.targetSpecs ta))
+    ]
+
+jsonToTriggeredAbility :: Value -> Either Text TriggeredAbility.TriggeredAbility
+jsonToTriggeredAbility value = do
+  ps <- Json.asObject value
+  c <- Json.field (Text.pack "condition") ps >>= jsonToTriggerCondition
+  es <- Json.field (Text.pack "effects") ps >>= listFrom jsonToEffect
+  ts <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
+  pure (TriggeredAbility.MkTriggeredAbility c es ts)

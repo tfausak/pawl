@@ -1,11 +1,16 @@
 -- Covers Pawl.Codec.
 module Pawl.CodecSpec where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec as Codec
+import qualified Pawl.Type.AbilityCost as AbilityCost
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Decimal as Decimal
 import qualified Pawl.Type.Duration as Duration
@@ -19,8 +24,12 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Supertype as Supertype
+import qualified Pawl.Type.TargetSpec as TargetSpec
+import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -93,5 +102,30 @@ tests =
             roundTrip "e3" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana (ManaType.Colored Color.Green)),
           HU.testCase "ExileAllGraveyards" $
             roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards
+        ],
+      Tasty.testGroup
+        "records"
+        [ HU.testCase "TypeLine" $
+            roundTrip
+              "tl"
+              Codec.typeLineToJson
+              Codec.jsonToTypeLine
+              (TypeLine.MkTypeLine (Set.singleton Supertype.Basic) (Set.singleton CardType.Land) (Set.singleton Subtype.Mountain)),
+          HU.testCase "ActivatedAbility" $
+            roundTrip
+              "aa"
+              Codec.activatedAbilityToJson
+              Codec.jsonToActivatedAbility
+              ( ActivatedAbility.MkActivatedAbility
+                  (AbilityCost.MkAbilityCost Nothing [AdditionalCost.TapSelf])
+                  [Effect.AddMana (ManaType.Colored Color.Green)]
+                  (Map.fromList [(SlotName.MkSlotName (Text.pack "t"), TargetSpec.CreatureTarget)])
+              ),
+          HU.testCase "ReplacementEffect" $
+            roundTrip
+              "re"
+              Codec.replacementEffectToJson
+              Codec.jsonToReplacementEffect
+              (ReplacementEffect.RedirectZoneChange Zone.Graveyard Zone.Exile)
         ]
     ]
