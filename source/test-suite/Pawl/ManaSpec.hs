@@ -21,9 +21,11 @@ import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ManaUnit as ManaUnit
+import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TargetSpec as TargetSpec
@@ -146,7 +148,16 @@ manaTests =
                   ActivatedAbility.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1)],
                   ActivatedAbility.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.AnyTarget
                 }
-         in HU.assertBool "no mana produced -> not mana" (not (Mana.isManaAbility ab))
+         in HU.assertBool "no mana produced -> not mana" (not (Mana.isManaAbility ab)),
+      HU.testCase "CR 605 a settled Llanowar Elves is a green mana source" $
+        let (elfId, gs) = S.addCreature Card.llanowarElvesPrinting S.alice (Setup.emptyGame S.bothPlayers)
+         in do
+              HU.assertBool "taps green" (elem (ManaType.Colored Color.Green) (Mana.manaTypesOf elfId gs))
+              HU.assertBool "is a mana source" (elem elfId (Mana.manaSources S.alice gs)),
+      HU.testCase "CR 302.6 a summoning-sick Llanowar Elves is NOT a mana source" $
+        let (elfId, g0) = S.addCreature Card.llanowarElvesPrinting S.alice (Setup.emptyGame S.bothPlayers)
+            sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) elfId (GameState.objects g0)}
+         in HU.assertBool "sick elf excluded" (notElem elfId (Mana.manaSources S.alice sick))
     ]
 
 tests :: Tasty.TestTree

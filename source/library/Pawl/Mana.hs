@@ -10,6 +10,8 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -26,6 +28,7 @@ import qualified Pawl.Type.ManaUnit as ManaUnit
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.Sickness as Sickness
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
@@ -53,12 +56,21 @@ subtypeMana subtype = case subtype of
   Subtype.Rat -> Nothing
   Subtype.Elephant -> Nothing
 
--- Every mana type an object could produce, derived from its PROJECTED subtypes
--- (CR 305.6, through the layer system: Blood Moon and Urborg change what a land
--- taps for). CR 305.7's "gains the appropriate mana ability" needs no explicit
--- grant -- the projected subtype IS the ability.
+-- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
+-- PLUS every printed activated ability that is a mana ability (CR 605.1a),
+-- resolved inline at payment and never on the stack. Read from the card's
+-- abilities directly here; Task 9 switches this to the projection (abilitiesOf)
+-- so Humility strips a creature's mana ability.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
-manaTypesOf oid gs = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesOf oid gs))
+manaTypesOf oid gs =
+  let fromSubtypes = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesOf oid gs))
+      fromAbilities = case Game.cardOf oid gs of
+        Nothing -> []
+        Just card ->
+          concatMap
+            (Maybe.mapMaybe Resolve.manaProduced . ActivatedAbility.effects)
+            (filter isManaAbility (Card.Type.activatedAbilities card))
+   in fromSubtypes ++ fromAbilities
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
 -- doesn't target (the loyalty clause is vacuous -- no planeswalkers). The ABI
@@ -89,9 +101,15 @@ emptyManaPools gs = gs {GameState.manaPool = Map.empty}
 -- controller: M0 has no controller field, and nothing in M1a can change control.
 manaSources :: PlayerId -> GameState -> [ObjectId]
 manaSources pid gs =
-  let isSource oid = case Game.lookupObject oid gs of
+  let notSickCreature oid = case Game.lookupObject oid gs of
         Nothing -> False
-        Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaTypesOf oid gs))
+        Just obj ->
+          -- CR 302.6: a sick creature can't use a {T} mana ability. A land is
+          -- never sick-gated. (M3e mana abilities all cost {T}.)
+          not (Set.member CardType.Creature (Projection.cardTypesOf oid gs) && Object.sickness obj == Sickness.Sick)
+      isSource oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaTypesOf oid gs)) && notSickCreature oid
    in filter isSource (Game.zoneMembers Zone.Battlefield pid gs)
 
 -- Activate an object's intrinsic mana ability: tap it, add its mana. CR 605.3:

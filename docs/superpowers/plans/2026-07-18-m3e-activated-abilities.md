@@ -969,7 +969,7 @@ git commit -m "Activate an ability onto the stack: Action.Activate + Pawl.Activa
 - Consumes: `isManaAbility`/`manaProduced` (Task 1), the printings (Task 2), the sickness field.
 - Produces: `Mana.manaTypesOf` returns a permanent's intrinsic subtype mana PLUS the mana of each printed ability that `isManaAbility`; `Mana.manaSources` excludes a summoning-sick creature whose mana ability needs `{T}`. `Action.Activate` already excludes mana abilities (Task 5, via `isManaAbility` in `activatable`), so no separate change is needed here — assert it.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/ManaSpec.hs`:
 
@@ -996,12 +996,12 @@ Add to `source/test-suite/Pawl/ActivateSpec.hs` — Llanowar Elves' ability must
          in HU.assertBool "no Activate for the mana ability" (not (any isActivate (Action.legalActions S.alice g1))),
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "green mana source"'`
 Expected: FAIL — `manaTypesOf` reads only the subtype (a creature has none), so the Elf is not yet a source; the assertion fails.
 
-- [ ] **Step 3: Read printed mana abilities in `manaTypesOf`**
+- [x] **Step 3: Read printed mana abilities in `manaTypesOf`**
 
 In `source/library/Pawl/Mana.hs`, extend `manaTypesOf` to add the mana of printed abilities classified as mana abilities. Add `import qualified Pawl.Type.Card as Card.Type`:
 
@@ -1022,7 +1022,7 @@ manaTypesOf oid gs =
    in fromSubtypes ++ fromAbilities
 ```
 
-- [ ] **Step 4: Exclude summoning-sick creatures in `manaSources`**
+- [x] **Step 4: Exclude summoning-sick creatures in `manaSources`**
 
 In `source/library/Pawl/Mana.hs`, extend `manaSources`' `isSource` so a summoning-sick creature is not a source (CR 302.6 — its mana ability needs `{T}`). Add `import qualified Pawl.Type.CardType as CardType`, `import qualified Pawl.Type.Sickness as Sickness`:
 
@@ -1041,12 +1041,12 @@ manaSources pid gs =
    in filter isSource (Game.zoneMembers Zone.Battlefield pid gs)
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — a settled Elf taps green and is a source; a sick Elf is not; the mana ability is never offered as a stack activation. **The falsifier:** an engine that put every activated ability on the stack would offer (or deadlock on) the Elf's ability; the classification keeps it inline.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

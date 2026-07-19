@@ -57,7 +57,11 @@ tests =
             -- creatures but two players, it targets a player. Resolve the stack.
             activated = snd (Engine.runGamePure S.identityAnswer g1 (Activate.activateAbility S.alice srcId (theAbility Card.prodigalSorcererPrinting)))
             resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
-         in HU.assertEqual "stack empty after resolution" [] (GameState.stack resolved)
+         in HU.assertEqual "stack empty after resolution" [] (GameState.stack resolved),
+      HU.testCase "CR 605.3b a mana ability is not offered as a stack activation" $
+        let (_, g0) = S.addCreature Card.llanowarElvesPrinting S.alice (Setup.emptyGame S.bothPlayers)
+            g1 = g0 {GameState.priority = Just S.alice}
+         in HU.assertBool "no Activate for the mana ability" (not (any isActivate (Action.legalActions S.alice g1)))
     ]
 
 isActivate :: A.Action -> Bool
