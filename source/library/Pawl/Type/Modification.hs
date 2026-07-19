@@ -20,4 +20,5 @@ data Modification
   | SetLandSubtype Subtype -- layer 4, CR 305.7 set (Blood Moon -> Mountain)
   | AddLandSubtype Subtype -- layer 4, CR 305.7 add (Urborg -> Swamp)
   | AddCardType CardType -- layer 4 (Opalescence -> Creature)
+  | ChangeSubtypeWord Subtype Subtype -- layer 3, CR 612 (Magical Hack: from -> to)
   deriving (Eq, Ord, Show)

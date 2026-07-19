@@ -251,6 +251,22 @@ tests =
         HU.assertEqual "set land subtype" Layer.Type (Projection.layer (Modification.SetLandSubtype Subtype.Mountain))
         HU.assertEqual "add land subtype" Layer.Type (Projection.layer (Modification.AddLandSubtype Subtype.Swamp))
         HU.assertEqual "add card type" Layer.Type (Projection.layer (Modification.AddCardType CardType.Creature)),
+      HU.testCase "CR 613.1c layer 3: ChangeSubtypeWord is Text" $
+        HU.assertEqual "text layer" Layer.Text (Projection.layer (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island)),
+      HU.testCase "CR 612.1 ChangeSubtypeWord rewrites a Forest's subtype to Island" $
+        let gs0 = S.landsInPlay Card.forestPrinting 1
+            landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+            gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Forest Subtype.Island) gs0
+         in HU.assertEqual "only Island" (Set.singleton Subtype.Island) (Projection.subtypesOf landId gs),
+      HU.testCase "CR 612.2 ChangeSubtypeWord for an absent type is a no-op" $
+        let gs0 = S.landsInPlay Card.forestPrinting 1
+            landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+            gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) gs0
+         in HU.assertEqual "still Forest" (Set.singleton Subtype.Forest) (Projection.subtypesOf landId gs),
       HU.testCase "CR 613.1d AddLandSubtype gives a Forest the Swamp subtype" $
         let gs0 = S.landsInPlay Card.forestPrinting 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of

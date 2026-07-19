@@ -37,6 +37,8 @@ subtypeMana subtype = case subtype of
   Subtype.Mountain -> Just (ManaType.Colored Color.Red)
   Subtype.Swamp -> Just (ManaType.Colored Color.Black)
   Subtype.Forest -> Just (ManaType.Colored Color.Green)
+  Subtype.Island -> Just (ManaType.Colored Color.Blue)
+  Subtype.Plains -> Just (ManaType.Colored Color.White)
   Subtype.Goblin -> Nothing
   Subtype.Warrior -> Nothing
   Subtype.Human -> Nothing

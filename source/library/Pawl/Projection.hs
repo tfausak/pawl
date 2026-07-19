@@ -43,6 +43,7 @@ layer m = case m of
   Modification.SetLandSubtype _ -> Layer.Type
   Modification.AddLandSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
+  Modification.ChangeSubtypeWord _ _ -> Layer.Text
 
 -- Apply one modification to characteristics-in-progress. THE ONE applier
 -- (Resolve : Effect :: Projection : Modification). P/T quantities are evaluated
@@ -79,6 +80,15 @@ applyModification gs oid m pc = case m of
         PC.keywords = Set.empty,
         PC.rulesTextActive = False
       }
+  -- CR 612.1/612.2: a text-changing effect replaces one basic land type word with
+  -- another where the word is used AS a land type -- here, in the projected type
+  -- line. Layer 3, so it folds before layer 4 (Type): a hacked basic Mountain is
+  -- an Island by the time mana (CR 305.6) reads its subtypes. Absent `from` is a
+  -- no-op.
+  Modification.ChangeSubtypeWord from to ->
+    if Set.member from (PC.subtypes pc)
+      then pc {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc))}
+      else pc
 
 -- CR 613.4b: layer 7b SETS base P/T to a specific value -- it ESTABLISHES P/T, so
 -- an object with no printed P/T that is set (an Opalescence-animated enchantment)

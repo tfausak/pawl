@@ -5,6 +5,8 @@ data Subtype
   = Mountain
   | Swamp
   | Forest
+  | Island
+  | Plains
   | Goblin
   | Warrior
   | Human

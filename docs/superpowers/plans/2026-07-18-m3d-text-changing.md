@@ -53,7 +53,7 @@ Claude-Session: https://claude.ai/code/session_012ghxv3K6WVbS8LApj4YUao
 **Interfaces:**
 - Produces: `Subtype.Island`, `Subtype.Plains`; `Modification.ChangeSubtypeWord :: Subtype -> Subtype -> Modification`, classified `Layer.Text`; `applyModification` rewrites an object's projected `subtypes` (replace `from` with `to` if present). `subtypeMana Island = Just (Colored Blue)`, `subtypeMana Plains = Just (Colored White)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/ProjectionSpec.hs` (the `Timestamp`, `Subtype`, `Modification`, `Layer`, `withEffect` imports/helpers are all present):
 
@@ -84,12 +84,12 @@ Add to `source/test-suite/Pawl/ManaSpec.hs` (mirror its style; it already import
         HU.assertEqual "plains" (Just (ManaType.Colored Color.White)) (Mana.subtypeMana Subtype.Plains),
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "ChangeSubtypeWord"'` and `cabal test --test-options='-p "Island taps blue"'`
 Expected: FAIL to compile — `Modification.ChangeSubtypeWord`, `Subtype.Island`, `Subtype.Plains` not in scope.
 
-- [ ] **Step 3: Add the two basic land subtypes**
+- [x] **Step 3: Add the two basic land subtypes**
 
 In `source/library/Pawl/Type/Subtype.hs`, add `Island` and `Plains` (keep the existing comment):
 
@@ -114,7 +114,7 @@ data Subtype
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Give the two subtypes their mana (CR 305.6)**
+- [x] **Step 4: Give the two subtypes their mana (CR 305.6)**
 
 In `source/library/Pawl/Mana.hs`, add the two arms to `subtypeMana` (before the creature-type `Nothing` arms):
 
@@ -123,7 +123,7 @@ In `source/library/Pawl/Mana.hs`, add the two arms to `subtypeMana` (before the 
   Subtype.Plains -> Just (ManaType.Colored Color.White)
 ```
 
-- [ ] **Step 5: Add the `ChangeSubtypeWord` modification**
+- [x] **Step 5: Add the `ChangeSubtypeWord` modification**
 
 In `source/library/Pawl/Type/Modification.hs`, extend the type (the `Subtype` import is already present) and its header comment:
 
@@ -134,7 +134,7 @@ In `source/library/Pawl/Type/Modification.hs`, extend the type (the `Subtype` im
   | ChangeSubtypeWord Subtype Subtype -- layer 3, CR 612 (Magical Hack: from -> to)
 ```
 
-- [ ] **Step 6: Classify and apply it in `Projection`**
+- [x] **Step 6: Classify and apply it in `Projection`**
 
 In `source/library/Pawl/Projection.hs`, add the `layer` arm:
 
@@ -156,12 +156,12 @@ Add the `applyModification` arm (inside the `case m of`):
       else pc
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. (`Layer.Text` sorts before `Layer.Type`, so the derived `Ord` already folds text-changing first; no restructure needed.)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

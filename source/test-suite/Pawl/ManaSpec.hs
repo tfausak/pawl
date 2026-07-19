@@ -66,6 +66,9 @@ manaTests =
           (Mana.subtypeMana Subtype.Mountain),
       HU.testCase "a Goblin grants no mana ability" $
         HU.assertEqual "none" Nothing (Mana.subtypeMana Subtype.Goblin),
+      HU.testCase "CR 305.6 Island taps blue, Plains taps white" $ do
+        HU.assertEqual "island" (Just (ManaType.Colored Color.Blue)) (Mana.subtypeMana Subtype.Island)
+        HU.assertEqual "plains" (Just (ManaType.Colored Color.White)) (Mana.subtypeMana Subtype.Plains),
       HU.testCase "an empty pool starts empty" $
         HU.assertEqual "empty" 0 (poolSize S.alice (S.mountainsInPlay 2)),
       HU.testCase "tapping a Mountain taps it and adds one red unit" $
