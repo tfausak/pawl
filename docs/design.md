@@ -107,6 +107,11 @@ A deep-embedded AST, loaded from files at runtime. Non-negotiable, for four reas
 3. Cards become inspectable, serializable, generable
 4. **Layer 3 becomes a tree transformation on a value you already have** — see §5
 
+Cards are still compiled-in Haskell values today (`Pawl.Card` — pure data, no
+lambdas, but Haskell modules all the same). **M3.5** is where this section is
+actually cashed: JSON files under `./data/cards/` become the source of truth.
+Until then the promise is declared, not redeemed.
+
 ### 2.8 `Card` vs. `Printing`
 
 `Printing = Card + metadata`. This is not a convenience — it is the rules' own abstraction boundary. Artist, art, and expansion symbol are **not characteristics** of an object; the rules' list of characteristics (name, mana cost, color, type line, P/T, …) deliberately excludes them. The "artist matters" cards are silver-bordered *precisely because* they reach across that line.
@@ -304,6 +309,63 @@ Notes the letters' specs must not lose:
 - **`git-bug 15de615`** (Setup: `emptyGame`/matchup player agreement by construction) lands at the **front of M3a** — the first letter to touch the setup seam (new printings and matchups for instant coverage; Magical Hack's `{U}` and the white gates need Island/Plains printings, cheap under M2d's per-player mono-color decks). The bug's own "revisit at Mindslaver" note predates this split; under it, every letter after M3a inherits whatever Setup does, so the unenforced invariant must not survive six letters of new fixtures.
 - **Random-game coverage will trail again.** Like M2c→M2d, most gates land as deterministic fixtures; an M2d-style coverage tail (a white or blue matchup for random games) should follow M3 rather than be discovered later.
 
+### M3.5 — Cards as data files (cashing §2.7)
+
+*(Pre-spec note, 2026-07-18. Numbered `.5` deliberately: it is an interstitial
+between M3 and M4 and does **not** renumber M4–M7, which are cited by number
+throughout.)*
+
+Cards today are hand-written `Printing` values compiled into `Pawl.Card` — pure
+data, no lambdas, but Haskell modules, which §2.7 names as not the end state.
+This milestone makes JSON the card representation and files the source of truth.
+**Zero opcodes, zero rules** — a representation change, and it is sequenced
+*before* M4 on purpose: proving the codec against the two-dozen-card M3 pool is
+cheap, and every M4 opcode is then born serializable instead of retrofitted
+across ~200 cards. It is also the honesty boundary — the round-trip is what
+mechanically forbids a closure from ever entering the card model (§2.7's
+"never Haskell modules" made enforceable rather than aspirational).
+
+Two steps, **A** then **B**:
+
+- **A — the codec and the honesty round-trip.** A hand-rolled JSON
+  parser/renderer (`Pawl.Type.Json` for the value; `Pawl.Json` for parse and
+  render) plus a `Card ⇆ Json` codec. The payoff is a structural round-trip
+  property over `allPrintings`: `jsonToCard . cardToJson ≡ Right`. This is the
+  "keeps us honest" check — it proves the card model is fully first-order data,
+  and fails loudly the day a lambda is smuggled in. Self-contained; does not
+  touch the engine loop.
+- **B — files become the source of truth.** Render every card to
+  `./data/cards/<slug>.json` (slugified name or Gatherer ID — the spec picks
+  one), commit the files, and flip `Pawl.Card` from hand-written values to a
+  loader that parses them. The invariant that makes B safe is A's property, now
+  load-bearing: the committed files parse back to byte-identical cards.
+  **"Runtime" is the test suite** — the loader serves the tests; there is no
+  engine-shipped card database and no embedding to design yet.
+
+Pre-spec notes for whoever writes the spec (option 1, when this milestone is next
+up):
+
+- **No aeson** (`prefer-boot-libraries`; a hand-rolled JSON parser needs zero
+  dependencies).
+- **Lift-and-shift from scrod, don't reinvent.** `Scrod/Json/Value.hs`
+  (github.com/tfausak/scrod) is the same author and largely the same house
+  style; port it near-verbatim, reconciling only residual gaps (export lists,
+  extension pragmas). Clone into `_scratch/` for reference. Steal scrod's own
+  **`Decimal`** type with it: it exists precisely to carry JSON numbers without
+  `Rational`, which is exactly the call to make here.
+- **The numeric tower is the trap (§2.12).** JSON numbers decode to
+  `Decimal`/`Integer`, never `Double` — fixed-width floats are barred by the
+  arbitrary-precision rule. And `Quantity`, mana symbols, subtypes and card
+  types are tagged sums: they serialize as tagged objects, never bare JSON
+  scalars. A `power` of `*` is not a number.
+- **Codec shape** — a `ToJson`/`FromJson` class pair versus free
+  `xToJson`/`jsonToX` functions — is the spec's call; either way the round-trip
+  law holds and decode returns `Either`, so a malformed file is a loud test
+  failure, not a partial crash.
+- `allPrintings` is already the hygiene registry ("a printing not listed here
+  escapes the hygiene net"); the round-trip property iterates it, and at B the
+  loader is what repopulates it.
+
 ### M4 — The vocabulary
 
 **Rule 701 (Keyword Actions) is your opcode list, written by Wizards.** ~55 entries, numbered, individually specified: Activate, Attach, Cast, Counter, Create, Destroy, Discard, Exchange, Exile, Fight, Mill, Play, Reveal, Sacrifice, Scry, Search, Shuffle, Tap/Untap, Explore, Surveil, Amass, Connive, Venture, Manifest, Meld, Discover, Time Travel, Convert…
@@ -360,6 +422,35 @@ Bot (MCTS over suspended continuations — resuming twice with different decisio
 **The trap:** if `DealDamage` is implemented wrong, every card using it round-trips *perfectly* and every card is *wrong*. The round-trip validates that a card **says** the right thing. It says nothing about whether the interpreter **does** the right thing.
 
 So the open half needs hand-written scenario tests per opcode. That work doesn't scale and doesn't parallelize with an LLM. It's the real cost center — not the cards.
+
+### Breadth over depth, and the opcode definition-of-done
+
+*(Added 2026-07-18.)*
+
+Two coupled commitments about how the open half is populated.
+
+**An effect is not done until a card exercises it in a gameplay-level test.**
+Not a unit test of the executor in isolation — a scenario that casts or resolves
+the effect through the stack and asserts on the resulting game state. Prefer a
+**real, recognizable** card (the `tests-prefer-real-cards` discipline). A
+**labeled synthetic crutch with a documented expiry** naming the milestone that
+retires it is legitimate — but *only* when a real card would drag in something
+not yet built, which is exactly the `Landform` and synthetic-deathtrampler
+pattern already in use. This is the §1 invariant's testing corollary: coverage
+is per-*classification*/opcode, and the card is how you prove the interpreter
+**does** the right thing — the round-trip proves only that the card **says** it
+(the central trap above).
+
+**Breadth is the progress signal; card count is not.** What to optimize is
+effect coverage — how many distinct opcodes have a card and a passing
+gameplay test. 200 cards spanning removal, draw, lifelink, counters, tokens,
+sacrifice, bounce and mill are worth far more than 2,000 near-duplicate vanilla
+creatures. **The card-count metric is deliberately deferred:** it graduates to a
+tracked health number *eventually* (beside §6's compiled-in count and the
+round-trip %), once the M4 vocabulary and M6 transpiler make volume meaningful —
+but chasing it early manufactures motion without progress and is a burnout trap.
+Cheap JSON card files (M3.5) are what make breadth low-friction to pursue when
+that time comes.
 
 ### Errata and rulings — the partial oracle for the open half
 
