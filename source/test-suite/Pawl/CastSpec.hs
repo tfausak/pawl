@@ -248,7 +248,16 @@ castTests =
       HU.testCase "with too little mana, Panglacial is not castable-while-searching" $
         let base = S.landsInPlay Card.forestPrinting 3
             (_, gs) = S.addLibraryCard Card.panglacialWurmPrinting S.alice base
-         in HU.assertEqual "unaffordable, so no options" 0 (length (Cast.castableWhileSearching S.alice gs))
+         in HU.assertEqual "unaffordable, so no options" 0 (length (Cast.castableWhileSearching S.alice gs)),
+      HU.testCase "castWhileSearching casts Panglacial from the library onto the stack" $
+        let base = S.landsInPlay Card.forestPrinting 7
+            (_, gs) = S.addLibraryCard Card.panglacialWurmPrinting S.alice base
+            after = snd (Engine.runGamePure castFirstOption gs (Cast.castWhileSearching S.alice))
+            onStack = length (filter (nameOnStack (Text.pack "Panglacial Wurm") after) (GameState.stack after))
+         in do
+              HU.assertEqual "Panglacial is on the stack" 1 onStack
+              HU.assertEqual "Panglacial left the library" 0 (S.countByName (Text.pack "Panglacial Wurm") S.alice after)
+              HU.assertEqual "seven Forests tapped to pay {5}{G}{G}" 7 (S.tappedCount S.alice after)
     ]
 
 -- Discards from the BACK of hand. Deliberately unlike every fallback, so the
@@ -267,6 +276,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> lastN (fromIntegral n) ids
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
+  Prompt.CastWhileSearching {} -> Nothing
 
 lastN :: Int -> [a] -> [a]
 lastN n xs = drop (length xs - n) xs
@@ -367,3 +377,30 @@ tests =
   Tasty.testGroup
     "Cast"
     [castTests, castEngineTests, stackTests, discardTests, sicknessTests, magicalHackTests]
+
+-- Casts the first offered option, then declines (the loop re-offers until empty).
+castFirstOption :: Prompt.Prompt r -> r
+castFirstOption p = case p of
+  Prompt.CastWhileSearching _ _ options -> case options of
+    oid : _ -> Just oid
+    [] -> Nothing
+  Prompt.Shuffle ids -> ids
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
+  Prompt.ChooseAction {} -> A.Pass
+  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter S.isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
+  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> Nothing
+
+nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
+nameOnStack wanted gs oid = case Game.lookupObject oid gs of
+  Just o -> case Object.source o of
+    Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
+    Source.OfAbility _ _ -> False
+    Source.OfTrigger _ _ -> False
+  Nothing -> False

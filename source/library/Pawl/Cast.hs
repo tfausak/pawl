@@ -1,5 +1,6 @@
 module Pawl.Cast where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
@@ -98,6 +99,29 @@ castableWhileSearching pid gs =
         Nothing -> False
         Just cost -> Mana.canPay pid cost gs
    in filter (\oid -> permitted oid && affordable oid && targetable oid gs) (Game.zoneMembers Zone.Library pid gs)
+
+-- CR 601.3 (Panglacial): while a player searches their own library, offer them
+-- the chance to cast a castable-while-searching card from it, before any card is
+-- found (per the ruling). Loops so multiple copies may be cast (also per the
+-- ruling); each cast removes a card from the library, so castableWhileSearching
+-- shrinks and the loop terminates. castSpell is the re-entrant call -- casting
+-- mid-resolution, the whole point.
+castWhileSearching :: PlayerId -> Game ()
+castWhileSearching pid = do
+  gs <- State.get
+  case castableWhileSearching pid gs of
+    [] -> pure ()
+    options -> do
+      let decider = Decide.deciderFor pid gs
+      choice <- Trans.lift (Program.prompt (Prompt.CastWhileSearching decider pid options))
+      case choice of
+        Nothing -> pure ()
+        Just oid ->
+          -- Reject-not-repair: an option not in the offered set is a no-op that
+          -- ends the loop, never a repair.
+          Monad.when (elem oid options) $ do
+            castSpell pid oid
+            castWhileSearching pid
 
 -- CR 601: choose targets (601.2c), pay (601.2f-h), move to the stack (601.2a),
 -- stamp the choices on the NEW stack incarnation (CR 400.7). Prompting before

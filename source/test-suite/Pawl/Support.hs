@@ -93,6 +93,7 @@ identityAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
+  Prompt.CastWhileSearching {} -> Nothing
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -120,6 +121,7 @@ castAnswer p = case p of
             [] -> A.Pass
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
+  Prompt.CastWhileSearching {} -> Nothing
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -140,6 +142,7 @@ aggressiveAnswer p = case p of
       [] -> Map.empty
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
+  Prompt.CastWhileSearching {} -> Nothing
 
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
@@ -164,6 +167,7 @@ playLandAnswer p = case p of
           [] -> A.Pass
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
+  Prompt.CastWhileSearching {} -> Nothing
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -211,6 +215,7 @@ randomAnswer p = case p of
      in fmap (Map.mapMaybe id) (traverse pickFrom sets)
   Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> pure Nothing
+  Prompt.CastWhileSearching {} -> pure Nothing
 
 -- Total index into a list; the engine always offers at least Pass, so the
 -- fallback is unreachable in practice but keeps this free of partial functions.

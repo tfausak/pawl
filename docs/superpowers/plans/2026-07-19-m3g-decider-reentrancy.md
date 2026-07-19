@@ -827,7 +827,7 @@ git commit -m "CastingPermission + castableWhileSearching + searchesLibrary + Pa
 **Interfaces:**
 - Produces: `Prompt.CastWhileSearching :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)`; `Response.CastWhileSearched (Maybe ObjectId)`; `Cast.castWhileSearching :: PlayerId -> Game ()` (loops: offer the castable-while-searching options, cast the chosen card via `castSpell`, repeat until declined or none remain).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/CastSpec.hs`. Drive the loop directly with a scripted interpreter that casts the one option (add imports `qualified Pawl.Engine as Engine`, `qualified Pawl.Type.Prompt as Prompt`, `qualified Data.Text as Text` if absent):
 
@@ -877,12 +877,12 @@ nameOnStack wanted gs oid = case Game.lookupObject oid gs of
 
 (Add imports as the compiler flags — `qualified Pawl.Type.Action as A`, `qualified Pawl.Type.Subtype as Subtype`, `qualified Pawl.Type.GameState as GameState`, `qualified Pawl.Type.Object as Object`, `qualified Pawl.Type.ObjectId as ObjectId`, `qualified Pawl.Type.Source as Source`, `qualified Pawl.Type.Printing as Printing`, `qualified Pawl.Type.Card as Card.Type`, `qualified Pawl.Game as Game`, `qualified Data.Set as Set`, `qualified Data.Map.Strict as Map`.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "casts Panglacial from the library onto the stack"'`
 Expected: FAIL to compile — `Prompt.CastWhileSearching`, `Cast.castWhileSearching` not in scope.
 
-- [ ] **Step 3: Add the prompt**
+- [x] **Step 3: Add the prompt**
 
 In `source/library/Pawl/Type/Prompt.hs`, add the constructor to the `Prompt` GADT:
 
@@ -895,7 +895,7 @@ In `source/library/Pawl/Type/Prompt.hs`, add the constructor to the `Prompt` GAD
   CastWhileSearching :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
 ```
 
-- [ ] **Step 4: Add the response and its serialization**
+- [x] **Step 4: Add the response and its serialization**
 
 In `source/library/Pawl/Type/Response.hs`, add the constructor:
 
@@ -916,13 +916,13 @@ In `source/library/Pawl/Replay.hs`, add arms:
 ```
 `defaultAnswer`: `Prompt.CastWhileSearching {} -> Nothing` (declining is always legal — the least eventful fallback when a transcript runs short).
 
-- [ ] **Step 5: Add the arm to every exhaustive `Prompt` match**
+- [x] **Step 5: Add the arm to every exhaustive `Prompt` match**
 
 The new constructor forces an arm on **every** `case p of` over `Prompt` that lacks a catch-all `_` wildcard. Under the `pedantic` flag `-Wincomplete-patterns` is an error, so **the build enumerates every site exactly** — build, read the warning list, and add the arm to each. Add `Prompt.CastWhileSearching {} -> Nothing` to non-monadic answerers, and `Prompt.CastWhileSearching {} -> pure Nothing` to monadic ones (those returning `State.State … r`).
 
 Known homes (let the build confirm the full set — do not rely on this list being complete): `source/test-suite/Pawl/Support.hs` (`identityAnswer`, `castAnswer`, `aggressiveAnswer`, `playLandAnswer`, and the monadic `randomAnswer`); the group-local answerers in `EngineSpec.hs` (`slaveAnswer`, Task 5), `GameSpec.hs` (`recordingAnswer` — monadic), `CastSpec.hs` (`liar`, `discardLastAnswer`, `hackAnswer`), `ResolveSpec.hs` (`findFirst`, `findNothing`, `boltAnswer`, `atBob`), and any full answerer in `ActivateSpec.hs`/`CombatSpec.hs`. (`Pawl.Replay`'s `encode`/`decode`/`defaultAnswer` are already handled in Step 4. The Task 7/8 test interpreters `castFirstOption`/`castPanglacial` are written *with* the arm, so they are already complete.)
 
-- [ ] **Step 6: Add the `castWhileSearching` loop to `Cast`**
+- [x] **Step 6: Add the `castWhileSearching` loop to `Cast`**
 
 In `source/library/Pawl/Cast.hs`, add `import qualified Control.Monad.Trans.Class as Trans` and `import qualified Pawl.Type.Program as Program` (if absent) and `import qualified Pawl.Type.Prompt as Prompt` (if absent):
 
@@ -953,12 +953,12 @@ castWhileSearching pid = do
             else pure ()
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — Panglacial is cast onto the stack, leaves the library, and seven Forests are tapped.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

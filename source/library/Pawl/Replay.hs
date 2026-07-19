@@ -30,6 +30,7 @@ encode p answer = case p of
   Prompt.ChooseTargets {} -> Response.ChoseTargets answer
   Prompt.ChooseBasicLandTypes {} -> Response.ChoseBasicLandTypes answer
   Prompt.SearchLibrary {} -> Response.Searched answer
+  Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -67,6 +68,9 @@ decode p response = case p of
   Prompt.SearchLibrary {} -> case response of
     Response.Searched found -> Just found
     _ -> Nothing
+  Prompt.CastWhileSearching {} -> case response of
+    Response.CastWhileSearched found -> Just found
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -102,6 +106,9 @@ defaultAnswer p = case p of
   -- CR 701.23b: failing to find is always legal, and is the least eventful
   -- fallback when a transcript runs short on a search.
   Prompt.SearchLibrary {} -> Nothing
+  -- Declining the re-entrant cast is always legal -- the least eventful fallback
+  -- when a transcript runs short.
+  Prompt.CastWhileSearching {} -> Nothing
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

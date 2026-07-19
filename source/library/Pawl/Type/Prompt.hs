@@ -46,3 +46,9 @@ data Prompt r where
   -- criterion (the engine pre-filters to legal choices); Nothing is "fail to
   -- find," always permitted for a search of one's own library for a quality.
   SearchLibrary :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
+  -- The re-entrant cast opportunity during a library search (Panglacial Wurm).
+  -- The [ObjectId] is the searcher's library cards castable-while-searching (the
+  -- engine pre-filters to permitted, affordable, fillable). Nothing = decline /
+  -- done. Offered in a loop before the search finds (per the ruling), so multiple
+  -- copies may be cast. CR 605.3a permits mana activation to pay.
+  CastWhileSearching :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)

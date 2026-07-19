@@ -22,4 +22,7 @@ data Response
   | -- CR 701.23: the library card a search found (Nothing = failed to find),
     -- serialized so a DecisionLog replays a tutor deterministically.
     Searched (Maybe ObjectId)
+  | -- CR 601.3 (Panglacial): the library card cast while searching (Nothing =
+    -- declined), serialized so a DecisionLog replays the re-entrant cast.
+    CastWhileSearched (Maybe ObjectId)
   deriving (Eq, Show)
