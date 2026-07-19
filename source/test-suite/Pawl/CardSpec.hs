@@ -134,6 +134,7 @@ cardTests =
                   Card.Type.keywords = Set.empty,
                   Card.Type.staticAbilities = [],
                   Card.Type.effects = [],
+                  Card.Type.activatedAbilities = [],
                   Card.Type.targetSpecs = Map.empty
                 }
          in do
@@ -159,8 +160,8 @@ lintTests =
                 (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
                 Card.allPrintings
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (23 at M3d)" $
-        HU.assertEqual "count" 23 (length Card.allPrintings),
+      HU.testCase "the registry holds every printing (25 at M3e Task 2)" $
+        HU.assertEqual "count" 25 (length Card.allPrintings),
       HU.testCase "the lint itself catches a dangling reference" $
         let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
          in HU.assertBool "misauthored card detected" (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)),
@@ -272,8 +273,22 @@ m3cCardTests =
               HU.assertBool "not a permanent target" (Map.null (Card.Type.targetSpecs card))
     ]
 
+m3eCardTests :: Tasty.TestTree
+m3eCardTests =
+  Tasty.testGroup
+    "M3eCards"
+    [ HU.testCase "Prodigal Sorcerer has one non-mana activated ability" $
+        case Card.Type.activatedAbilities (Printing.card Card.prodigalSorcererPrinting) of
+          [ab] -> HU.assertBool "not a mana ability" (not (Mana.isManaAbility ab))
+          _ -> HU.assertFailure "expected exactly one ability",
+      HU.testCase "Llanowar Elves has one mana activated ability" $
+        case Card.Type.activatedAbilities (Printing.card Card.llanowarElvesPrinting) of
+          [ab] -> HU.assertBool "mana ability" (Mana.isManaAbility ab)
+          _ -> HU.assertFailure "expected exactly one ability"
+    ]
+
 tests :: Tasty.TestTree
 tests =
   Tasty.testGroup
     "Card"
-    [cardTests, lintTests, m2aCardTests, m2bCardTests, m2cCardTests, basicLandTests, m3cCardTests]
+    [cardTests, lintTests, m2aCardTests, m2bCardTests, m2cCardTests, basicLandTests, m3cCardTests, m3eCardTests]

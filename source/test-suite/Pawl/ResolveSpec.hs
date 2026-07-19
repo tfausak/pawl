@@ -185,6 +185,7 @@ resolveTests =
                   Card.Type.keywords = Set.empty,
                   Card.Type.staticAbilities = [],
                   Card.Type.effects = [Effect.ChangeText slot],
+                  Card.Type.activatedAbilities = [],
                   Card.Type.targetSpecs = Map.empty
                 }
          in do

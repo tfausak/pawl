@@ -3,6 +3,7 @@ module Pawl.Type.Card where
 import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Data.Text (Text)
+import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.Effect (Effect)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
@@ -35,6 +36,11 @@ data Card = MkCard
     -- The card's rules text as data. Ordered: CR 608.2c resolves instructions
     -- in the order written.
     effects :: [Effect],
+    -- CR 602: this card's printed activated abilities. Empty for all but the few
+    -- printings that grant one. The closed half reads these through
+    -- Pawl.Projection.abilitiesOf (Task 9), never directly: layer 6 (Humility)
+    -- removes abilities.
+    activatedAbilities :: [ActivatedAbility],
     -- The target slots effects reference by name. A Map, not a parallel list:
     -- slots have no order, only names, and nothing aligns by position.
     targetSpecs :: Map SlotName TargetSpec

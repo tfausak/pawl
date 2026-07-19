@@ -3,6 +3,9 @@ module Pawl.Card where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Type.AbilityCost as AbilityCost
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
@@ -45,6 +48,7 @@ mountainPrinting =
             Card.keywords = Set.empty,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -69,6 +73,7 @@ swampPrinting =
             Card.keywords = Set.empty,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -93,6 +98,7 @@ forestPrinting =
             Card.keywords = Set.empty,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -125,6 +131,7 @@ pikerPrinting =
             Card.keywords = Set.empty,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -165,6 +172,7 @@ birdMaidenPrinting =
             Card.keywords = Set.singleton Keyword.Flying,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -197,6 +205,7 @@ nimbleBirdstickerPrinting =
             Card.keywords = Set.singleton Keyword.Reach,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -228,6 +237,7 @@ ogreSentryPrinting =
             Card.keywords = Set.singleton Keyword.Defender,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -261,6 +271,7 @@ windseekerCentaurPrinting =
             Card.keywords = Set.singleton Keyword.Vigilance,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -290,6 +301,7 @@ goblinChariotPrinting =
             Card.keywords = Set.singleton Keyword.Haste,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -324,6 +336,7 @@ sabretoothTigerPrinting =
             Card.keywords = Set.singleton Keyword.FirstStrike,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -353,6 +366,7 @@ ridgetopRaptorPrinting =
             Card.keywords = Set.singleton Keyword.DoubleStrike,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -381,6 +395,7 @@ typhoidRatsPrinting =
             Card.keywords = Set.singleton Keyword.Deathtouch,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -412,6 +427,7 @@ warMammothPrinting =
             Card.keywords = Set.singleton Keyword.Trample,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -440,6 +456,7 @@ lightningBoltPrinting =
             Card.keywords = Set.empty,
             Card.staticAbilities = [],
             Card.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3)],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget
           }
     }
@@ -465,6 +482,7 @@ giantGrowthPrinting =
             Card.keywords = Set.empty,
             Card.staticAbilities = [],
             Card.effects = [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) (SlotName.MkSlotName (Text.pack "target"))],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget
           }
     }
@@ -506,6 +524,7 @@ humilityPrinting =
                 StaticAbility.MkStaticAbility Affected.AllCreatures (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
               ],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -538,6 +557,7 @@ serpentsGiftPrinting =
             Card.keywords = Set.empty,
             Card.staticAbilities = [],
             Card.effects = [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Deathtouch) (SlotName.MkSlotName (Text.pack "target"))],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget
           }
     }
@@ -571,6 +591,7 @@ bloodMoonPrinting =
             Card.staticAbilities =
               [StaticAbility.MkStaticAbility Affected.AllNonbasicLands (Modification.SetLandSubtype Subtype.Mountain)],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -598,6 +619,7 @@ urborgPrinting =
             Card.staticAbilities =
               [StaticAbility.MkStaticAbility Affected.AllLands (Modification.AddLandSubtype Subtype.Swamp)],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -636,6 +658,7 @@ opalescencePrinting =
                 StaticAbility.MkStaticAbility Affected.OtherNonAuraEnchantments (Modification.SetBasePowerToughness Quantity.ManaValue Quantity.ManaValue)
               ],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -659,6 +682,7 @@ islandPrinting =
             Card.keywords = Set.empty,
             Card.staticAbilities = [],
             Card.effects = [],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -688,6 +712,7 @@ magicalHackPrinting =
             Card.keywords = Set.empty,
             Card.staticAbilities = [],
             Card.effects = [Effect.ChangeText (SlotName.MkSlotName (Text.pack "target"))],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.SpellOrPermanentTarget
           }
     }
@@ -717,7 +742,74 @@ landformPrinting =
             Card.keywords = Set.empty,
             Card.staticAbilities = [],
             Card.effects = [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetLandSubtype Subtype.Swamp) (SlotName.MkSlotName (Text.pack "target"))],
+            Card.activatedAbilities = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.LandTarget
+          }
+    }
+
+-- Prodigal Sorcerer: {2}{U}, 1/1, "{T}: This creature deals 1 damage to any
+-- target." Scryfall-verified 2026-07-18. Reuses DealDamage; the ability goes on
+-- the stack (it targets and adds no mana). Subtypes Wizard/Sorcerer omitted (no
+-- tribal in M3e).
+prodigalSorcererPrinting :: Printing.Printing
+prodigalSorcererPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Prodigal Sorcerer",
+            Card.manaCost =
+              Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Blue)]),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Creature,
+                  TypeLine.subtypes = Set.singleton Subtype.Human
+                },
+            Card.power = Just (Power.MkPower (Quantity.Literal 1)),
+            Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
+            Card.keywords = Set.empty,
+            Card.staticAbilities = [],
+            Card.effects = [],
+            Card.activatedAbilities =
+              [ ActivatedAbility.MkActivatedAbility
+                  { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = [AdditionalCost.TapSelf]},
+                    ActivatedAbility.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1)],
+                    ActivatedAbility.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget
+                  }
+              ],
+            Card.targetSpecs = Map.empty
+          }
+    }
+
+-- Llanowar Elves: {G}, 1/1, "{T}: Add {G}." Scryfall-verified 2026-07-18. A
+-- printed activated MANA ability (CR 605.1a): it does not use the stack. Subtypes
+-- Elf/Druid omitted (no tribal in M3e).
+llanowarElvesPrinting :: Printing.Printing
+llanowarElvesPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Llanowar Elves",
+            Card.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Creature,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Just (Power.MkPower (Quantity.Literal 1)),
+            Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
+            Card.keywords = Set.empty,
+            Card.staticAbilities = [],
+            Card.effects = [],
+            Card.activatedAbilities =
+              [ ActivatedAbility.MkActivatedAbility
+                  { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = [AdditionalCost.TapSelf]},
+                    ActivatedAbility.effects = [Effect.AddMana (ManaType.Colored Color.Green)],
+                    ActivatedAbility.targetSpecs = Map.empty
+                  }
+              ],
+            Card.targetSpecs = Map.empty
           }
     }
 
@@ -747,7 +839,9 @@ allPrintings =
     opalescencePrinting,
     islandPrinting,
     magicalHackPrinting,
-    landformPrinting
+    landformPrinting,
+    prodigalSorcererPrinting,
+    llanowarElvesPrinting
   ]
 
 isLand :: Card.Card -> Bool

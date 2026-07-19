@@ -249,7 +249,7 @@ git commit -m "Add activated-ability types + AddMana + the CR 605 mana-ability c
 - Consumes: `ActivatedAbility` (Task 1).
 - Produces: `Card.activatedAbilities :: [ActivatedAbility]` (empty for all but the two new printings); `Card.prodigalSorcererPrinting`, `Card.llanowarElvesPrinting` in `allPrintings`. Prodigal Sorcerer's one ability: cost `{T}`, effect `DealDamage "target" 1`, spec `AnyTarget`. Llanowar Elves' one ability: cost `{T}`, effect `AddMana Green`, no slots.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/CardSpec.hs`. Assert the printings carry the abilities the classifier expects (add imports `qualified Pawl.Card as Card`, `qualified Pawl.Type.Printing as Printing`, `qualified Pawl.Type.Card as Card.Type`, `qualified Pawl.Mana as Mana` if absent):
 
@@ -264,12 +264,12 @@ Add to `source/test-suite/Pawl/CardSpec.hs`. Assert the printings carry the abil
           _ -> HU.assertFailure "expected exactly one ability",
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "activated ability"'`
 Expected: FAIL to compile — `Card.Type.activatedAbilities`, `Card.prodigalSorcererPrinting`, `Card.llanowarElvesPrinting` not in scope.
 
-- [ ] **Step 3: Add the field to `Card`**
+- [x] **Step 3: Add the field to `Card`**
 
 In `source/library/Pawl/Type/Card.hs`, add `import Pawl.Type.ActivatedAbility (ActivatedAbility)` and the field (after `effects`, before `targetSpecs`):
 
@@ -281,11 +281,11 @@ In `source/library/Pawl/Type/Card.hs`, add `import Pawl.Type.ActivatedAbility (A
     activatedAbilities :: [ActivatedAbility],
 ```
 
-- [ ] **Step 4: Seed `activatedAbilities = []` at every existing `MkCard`**
+- [x] **Step 4: Seed `activatedAbilities = []` at every existing `MkCard`**
 
 Every `Card.MkCard { ... }` now needs `Card.activatedAbilities = []` (or `Card.Type.activatedAbilities = []` in tests). The build enumerates any missed one via `-Wmissing-fields` (a pedantic error). Add the line (next to `effects`) at each site. Known sites: every printing in `source/library/Pawl/Card.hs`; the hand-built `Card.Type.MkCard` in `source/test-suite/Pawl/ResolveSpec.hs` (the `textChangeSlots` test from M3d). Build after this step to let the compiler list any others.
 
-- [ ] **Step 5: Add the two printings and register them**
+- [x] **Step 5: Add the two printings and register them**
 
 In `source/library/Pawl/Card.hs` (imports for `ActivatedAbility`, `AbilityCost`, `AdditionalCost`, `Effect`, `TargetSpec`, `SlotName`, `Quantity` are needed — add any absent, mirroring existing qualified style):
 
@@ -366,12 +366,12 @@ Register both in `allPrintings` (after `landformPrinting`):
   ]
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. If the build errors on a missing field, add `Card.activatedAbilities = []` at that `MkCard` site.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
