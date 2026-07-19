@@ -226,21 +226,29 @@ apnapOrder gs pend =
 
 -- CR 117.5: each time a player would receive priority, perform state-based
 -- actions, then put triggered abilities on the stack, repeating until neither
--- does anything. Then priority is granted (by the caller).
+-- does anything. Then priority is granted (by the caller). The repeat is gated on
+-- two cheap booleans -- whether an SBA fired and whether a trigger was placed --
+-- so a settle that changes nothing (the common case) costs one board projection,
+-- NOT a deep GameState equality check.
 settleForPriority :: Game ()
 settleForPriority = do
-  before <- State.get
-  checkSba
+  gs <- State.get
+  let (acted, gs') = Sba.performStateBasedActions gs
+  State.put gs'
   placed <- placePendingTriggers
-  after <- State.get
-  Monad.when (placed || before /= after) settleForPriority
+  Monad.when (acted || placed) settleForPriority
 
 priorityLoop :: Game ()
 priorityLoop = do
   active <- State.gets GameState.activePlayer
   State.modify' $ \gs -> gs {GameState.priority = Just active, GameState.passes = 0}
+  -- settleForPriority (CR 117.5) runs where the board can CHANGE -- once at entry,
+  -- and after each resolution or board-changing action -- never after a bare
+  -- priority pass. A pass leaves the game state untouched, so re-running the SBA
+  -- projection then would be pure waste; the last settle already saw this exact
+  -- state. This is the standard "check SBAs only after a game event" reading of
+  -- CR 117.5, observably identical to settling on every priority grant.
   let loop = do
-        settleForPriority
         finished <- State.gets (Maybe.isJust . GameState.result)
         if finished
           then State.modify' (\gs -> gs {GameState.priority = Nothing})
@@ -261,6 +269,7 @@ priorityLoop = do
                         [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
                         _ -> do
                           Stack.resolveTop
+                          settleForPriority
                           State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (GameState.activePlayer g)})
                           loop
                       else do
@@ -268,15 +277,19 @@ priorityLoop = do
                         loop
                   Action.Type.Play oid -> do
                     State.modify' (\g -> let played = Event.changeZone oid Zone.Battlefield g in played {GameState.landPlayed = Set.insert p (GameState.landPlayed played), GameState.passes = 0, GameState.priority = Just p})
+                    settleForPriority
                     loop
                   Action.Type.Cast oid -> do
                     Cast.castSpell p oid
                     State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                    settleForPriority
                     loop
                   Action.Type.Activate oid ability -> do
                     Activate.activateAbility p oid ability
                     State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                    settleForPriority
                     loop
+  settleForPriority
   loop
 
 handoffTurn :: Game ()

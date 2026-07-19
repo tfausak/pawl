@@ -86,7 +86,15 @@ creatureDies gs pc oid =
 -- enough in M1b: a creature dying cannot cause another SBA, because nothing
 -- gains or loses life when a creature dies. Revisit when it can.
 checkStateBasedActions :: GameState -> GameState
-checkStateBasedActions gs =
+checkStateBasedActions = snd . performStateBasedActions
+
+-- One SBA pass, also reporting whether any state-based action was PERFORMED (a
+-- creature buried or a player departed). CR 704.4: the caller repeats the check
+-- while that flag is True. The flag lets the CR 117.5 settle loop (Engine) decide
+-- whether to repeat WITHOUT a deep GameState comparison -- the common case (no SBA
+-- fires) then costs one projection, not a full-state equality traversal.
+performStateBasedActions :: GameState -> (Bool, GameState)
+performStateBasedActions gs =
   let -- CR 704.5f/g are checked against the state BEFORE any of them apply: SBAs
       -- are simultaneous. Project the whole board once (one gather) and judge each
       -- object against it, rather than re-projecting per object.
@@ -108,4 +116,7 @@ checkStateBasedActions gs =
       -- drained here: dying/buried were computed from the pre-drain gs, so every
       -- 704.5h victim is found before its event is discarded.
       drained = departed {GameState.damageEvents = []}
-   in drained {GameState.result = outcome <|> GameState.result drained}
+      -- A state-based action was performed iff a creature was buried or a player
+      -- left. Draining damageEvents alone is not an SBA and does not force a repeat.
+      acted = not (null dying) || not (null leaving)
+   in (acted, drained {GameState.result = outcome <|> GameState.result drained})
