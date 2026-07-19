@@ -16,4 +16,7 @@ data TargetSpec
   | -- A land permanent on the battlefield (projected card-type Land). Used by the
     -- M3d fixture "target land becomes ...".
     LandTarget
+  | -- CR 115: "target player" -- a player still in the game. The players-only
+    -- restriction AnyTarget does not express (Mindslaver, M3g).
+    PlayerTarget
   deriving (Eq, Ord, Show)

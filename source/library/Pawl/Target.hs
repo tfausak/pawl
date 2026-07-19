@@ -42,6 +42,7 @@ legalRecipients spec gs =
           let isLand oid = Set.member CardType.Land (Projection.cardTypesOf oid gs)
               lands = filter isLand (Set.toList (GameState.battlefield gs))
            in Set.fromList (map Recipient.ToObject lands)
+        TargetSpec.PlayerTarget -> Set.fromList players
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is

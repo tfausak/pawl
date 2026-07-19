@@ -1019,6 +1019,7 @@ isPermanentType cardType = case cardType of
   CardType.Creature -> True
   CardType.Instant -> False
   CardType.Enchantment -> True
+  CardType.Artifact -> True
 
 -- The classification resolution dispatches on (CR 608.3). This is the whole
 -- reason the engine never needs to know WHICH card is resolving.

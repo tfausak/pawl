@@ -126,7 +126,11 @@ targetTests =
               [] -> ObjectId.MkObjectId 999
          in do
               HU.assertBool "the land is legal" (Set.member (Recipient.ToObject landId) (Target.legalRecipients TargetSpec.LandTarget gs))
-              HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) (Target.legalRecipients TargetSpec.LandTarget gs)))
+              HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) (Target.legalRecipients TargetSpec.LandTarget gs))),
+      HU.testCase "CR 115: PlayerTarget is exactly the players still in the game" $
+        let gs = Setup.emptyGame S.bothPlayers
+            expected = Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]
+         in HU.assertEqual "both players, no creatures" expected (Target.legalRecipients TargetSpec.PlayerTarget gs)
     ]
 
 resolveTests :: Tasty.TestTree
