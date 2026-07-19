@@ -45,6 +45,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
@@ -524,6 +525,18 @@ atBobAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToPlayer S.bob)) sets
   _ -> S.identityAnswer p
 
+-- Add k cards of a printing to pid's hand (each a fresh Hand-zone object).
+handCards :: Printing.Printing -> PlayerId.PlayerId -> Int -> GameState.GameState -> GameState.GameState
+handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
+  where
+    addOne g =
+      let (oid, g1) = Game.freshObjectId g
+          obj = Object.MkObject pid (Source.OfCard printing) Zone.Hand TapState.Untapped 0 Sickness.Settled Map.empty (Timestamp.MkTimestamp 0)
+       in g1
+            { GameState.objects = Map.insert oid obj (GameState.objects g1),
+              GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
+            }
+
 zoneChangeTests :: Cards.Cards -> Tasty.TestTree
 zoneChangeTests cards =
   Tasty.testGroup
@@ -606,7 +619,32 @@ zoneChangeTests cards =
             after = Sba.checkStateBasedActions (snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop))
          in do
               HU.assertEqual "two milled" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
-              HU.assertBool "bob did not lose (milling is not drawing)" (not (Set.member S.bob (GameState.drewFromEmpty after)))
+              HU.assertBool "bob did not lose (milling is not drawing)" (not (Set.member S.bob (GameState.drewFromEmpty after))),
+      HU.testCase "CR 701.8 Mind Rot discards two chosen cards from a hand of three" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 3
+            withHand = handCards (Cards.pikerPrinting cards) S.bob 3 base
+            (gs, spellId) = S.handOne (Cards.mindRotPrinting cards) withHand
+            cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "one card left in bob's hand" 1 (S.handSize S.bob after)
+              HU.assertEqual "two cards in bob's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 701.8b a forced full-hand discard is not prompted" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 3
+            withHand = handCards (Cards.pikerPrinting cards) S.bob 2 base
+            (gs, spellId) = S.handOne (Cards.mindRotPrinting cards) withHand
+            -- Answer ChooseDiscard with [] so a prompt would discard nothing;
+            -- aim the spell at bob.
+            noDiscard q = case q of
+              Prompt.ChooseDiscard {} -> []
+              Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToPlayer S.bob)) sets
+              _ -> S.identityAnswer q
+            cast = snd (Engine.runGamePure noDiscard gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure noDiscard cast Stack.resolveTop)
+         in do
+              -- Elision (hand == count): the whole hand is discarded without asking.
+              HU.assertEqual "bob's hand emptied" 0 (S.handSize S.bob after)
+              HU.assertEqual "both cards discarded" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
     ]
 
 drawCardTests :: Cards.Cards -> Tasty.TestTree

@@ -59,4 +59,9 @@ data Effect
     -- to their graveyard). Milling a short/empty library mills fewer, no penalty
     -- (CR 701.13b) -- unlike Draw, which loses on empty.
     Mill SlotName Quantity
+  | -- CR 701.8: the slot's target player discards this many. The DISCARDING player
+    -- chooses which (CR 701.8a) via Prompt.ChooseDiscard, routed through
+    -- Decide.deciderFor. A hand smaller than the count discards all of it (CR
+    -- 701.8b), forced -- so it is not prompted.
+    Discard SlotName Quantity
   deriving (Eq, Ord, Show)

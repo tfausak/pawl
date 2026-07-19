@@ -995,7 +995,7 @@ Delivers `Effect.Discard SlotName Quantity`, reusing the existing `Prompt.Choose
 - Consumes: `Prompt.ChooseDiscard`, `Decide.deciderFor` (existing).
 - Produces: `Effect.Discard SlotName Quantity`; `Cards.mindRotPrinting`. `Resolve.slotsOf (Effect.Discard s _) == Set.singleton s`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Mind Rot is `{2}{B}` and targets a player. To exercise the real choice, put extra cards in the target's hand; to exercise the forced elision, leave the hand equal to the count and answer `ChooseDiscard` with `[]` (so a *prompted* discard would discard nothing, distinguishing prompt from elision). A local helper puts `k` cards in a player's hand.
 
@@ -1045,12 +1045,12 @@ Add to `zoneChangeTests` (`atBobAnswer` was defined in Task 7 in this same file)
               HU.assertEqual "both cards discarded" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: compile failure — `Cards.mindRotPrinting` / `Effect.Discard` not in scope (red).
 
-- [ ] **Step 3: Add the `Discard` constructor**
+- [x] **Step 3: Add the `Discard` constructor**
 
 ```haskell
   | -- CR 701.8: the slot's target player discards this many. The DISCARDING player
@@ -1060,11 +1060,11 @@ Expected: compile failure — `Cards.mindRotPrinting` / `Effect.Discard` not in 
     Discard SlotName Quantity
 ```
 
-- [ ] **Step 4: Add the classification arms**
+- [x] **Step 4: Add the classification arms**
 
 `slotsOf`: `Effect.Discard slot _ -> Set.singleton slot`. `readsX`: `Effect.Discard _ quantity -> quantity == Quantity.Type.X`. `manaProduced`: `Effect.Discard {} -> Nothing`. `searchesLibrary`: `Effect.Discard {} -> False`. `rewriteEffect`: `Effect.Discard {} -> effect`.
 
-- [ ] **Step 5: Add the executor arm**
+- [x] **Step 5: Add the executor arm**
 
 `applyEffect` (the module imports `Decide`, `Program`, `Prompt`, `Trans`, `Recipient`, `List`; mirror `Engine.discardToHandSize`'s safety filter):
 
@@ -1091,7 +1091,7 @@ Expected: compile failure — `Cards.mindRotPrinting` / `Effect.Discard` not in 
       _ -> pure ()
 ```
 
-- [ ] **Step 6: Add the codec arm**
+- [x] **Step 6: Add the codec arm**
 
 `effectToJson`: `Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))`. `jsonToEffect`:
 
@@ -1101,7 +1101,7 @@ Expected: compile failure — `Cards.mindRotPrinting` / `Effect.Discard` not in 
       _ -> Left (Text.pack "Discard expects [slot, quantity]")
 ```
 
-- [ ] **Step 7: Create and register Mind Rot**
+- [x] **Step 7: Create and register Mind Rot**
 
 Create `data/cards/mind-rot.json`:
 
@@ -1111,7 +1111,7 @@ Create `data/cards/mind-rot.json`:
 
 Register in `Cards.hs`.
 
-- [ ] **Step 8: Card-data test and count → 38**
+- [x] **Step 8: Card-data test and count → 38**
 
 Bump count to 38. Add to `m4bCardTests`:
 
@@ -1123,12 +1123,12 @@ Bump count to 38. Add to `m4bCardTests`:
               HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.PlayerTarget) (Card.Type.targetSpecs c)
 ```
 
-- [ ] **Step 9: Run tests to verify they pass**
+- [x] **Step 9: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: PASS (both discard tests green; count 38; round-trip green over 38 printings; D4 lint green).
 
-- [ ] **Step 10: Format, lint, commit**
+- [x] **Step 10: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

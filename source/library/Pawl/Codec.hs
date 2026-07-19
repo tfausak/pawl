@@ -458,6 +458,7 @@ effectToJson e = case e of
   Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array [slotNameToJson s, zoneToJson z]))
   Effect.Draw q -> Json.tagged (Text.pack "Draw") (Just (quantityToJson q))
   Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array [slotNameToJson s, quantityToJson q]))
+  Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
 
 jsonToEffect :: Value -> Either Text Effect.Effect
 jsonToEffect value = do
@@ -482,6 +483,9 @@ jsonToEffect value = do
     "Mill" -> case mv of
       Just (Array [s, q]) -> Effect.Mill <$> jsonToSlotName s <*> jsonToQuantity q
       _ -> Left (Text.pack "Mill expects [slot, quantity]")
+    "Discard" -> case mv of
+      Just (Array [s, q]) -> Effect.Discard <$> jsonToSlotName s <*> jsonToQuantity q
+      _ -> Left (Text.pack "Discard expects [slot, quantity]")
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------

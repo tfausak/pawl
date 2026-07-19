@@ -67,6 +67,7 @@ slotsOf effect = case effect of
   Effect.MoveToZone slot _ -> Set.singleton slot
   Effect.Draw _ -> Set.empty
   Effect.Mill slot _ -> Set.singleton slot
+  Effect.Discard slot _ -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -88,6 +89,7 @@ readsX = any effectReadsX
       Effect.MoveToZone {} -> False
       Effect.Draw quantity -> quantity == Quantity.Type.X
       Effect.Mill _ quantity -> quantity == Quantity.Type.X
+      Effect.Discard _ quantity -> quantity == Quantity.Type.X
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -105,6 +107,7 @@ manaProduced effect = case effect of
   Effect.MoveToZone {} -> Nothing
   Effect.Draw _ -> Nothing
   Effect.Mill {} -> Nothing
+  Effect.Discard {} -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -122,6 +125,7 @@ searchesLibrary effect = case effect of
   Effect.MoveToZone {} -> False
   Effect.Draw _ -> False
   Effect.Mill {} -> False
+  Effect.Discard {} -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -159,6 +163,7 @@ rewriteEffect pairs effect = case effect of
   Effect.MoveToZone {} -> effect
   Effect.Draw _ -> effect
   Effect.Mill {} -> effect
+  Effect.Discard {} -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -381,6 +386,27 @@ applyEffect source controller bound legality chosen effect = case effect of
             _ -> gs
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
+  Effect.Discard slot quantity -> do
+    gs <- State.get
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just (Recipient.ToPlayer target), True) ->
+        case Quantity.evaluate gs source quantity of
+          Just n
+            | n > 0 -> do
+                let held = Game.zoneMembers Zone.Hand target gs
+                    bury cs g = List.foldl' (\g1 c -> Event.changeZone c Zone.Graveyard g1) g cs
+                if fromInteger n >= length held
+                  -- CR 701.8b: the whole hand is forced -- no choice, so no prompt.
+                  then State.modify' (bury held)
+                  else do
+                    -- CR 701.8a: the discarding player chooses which cards.
+                    let decider = Decide.deciderFor target gs
+                    choices <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider target held (fromInteger n)))
+                    let toDiscard = take (fromInteger n) (filter (\c -> elem c held) choices)
+                    State.modify' (bury toDiscard)
+          _ -> pure ()
+      -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
+      _ -> pure ()
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

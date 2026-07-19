@@ -166,8 +166,8 @@ lintTests cards =
                 (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
                 (Cards.allPrintings cards)
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (37 at M4b Task 7)" $
-        HU.assertEqual "count" 37 (length (Cards.allPrintings cards)),
+      HU.testCase "the registry holds every printing (38 at M4b Task 8)" $
+        HU.assertEqual "count" 38 (length (Cards.allPrintings cards)),
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $
         let card = Printing.card (Cards.blazePrinting cards)
             red = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -359,6 +359,11 @@ m4bCardTests cards =
         let c = Printing.card (Cards.tomeScourPrinting cards)
          in do
               HU.assertEqual "effect mills five" [Effect.Mill (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 5)] (Card.Type.effects c)
+              HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.PlayerTarget) (Card.Type.targetSpecs c),
+      HU.testCase "Mind Rot is a {2}{B} Sorcery making a target player discard two" $
+        let c = Printing.card (Cards.mindRotPrinting cards)
+         in do
+              HU.assertEqual "effect discards two" [Effect.Discard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 2)] (Card.Type.effects c)
               HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.PlayerTarget) (Card.Type.targetSpecs c)
     ]
 
