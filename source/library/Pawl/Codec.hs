@@ -19,6 +19,8 @@ import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Json (Value (Array, Null))
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
@@ -281,3 +283,17 @@ jsonToCardCriterion =
   decodeNullary
     (Text.pack "CardCriterion")
     [(Text.pack "BasicLandCard", CardCriterion.BasicLandCard)]
+
+-- Newtypes -------------------------------------------------------------------
+
+slotNameToJson :: SlotName.SlotName -> Value
+slotNameToJson (SlotName.MkSlotName t) = Json.jText t
+
+jsonToSlotName :: Value -> Either Text SlotName.SlotName
+jsonToSlotName value = SlotName.MkSlotName <$> Json.asText value
+
+objectIdToJson :: ObjectId.ObjectId -> Value
+objectIdToJson (ObjectId.MkObjectId n) = natTo n
+
+jsonToObjectId :: Value -> Either Text ObjectId.ObjectId
+jsonToObjectId value = ObjectId.MkObjectId <$> natFrom value

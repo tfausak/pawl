@@ -2,10 +2,13 @@
 module Pawl.CodecSpec where
 
 import Data.Text (Text)
+import qualified Data.Text as Text
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Json as Json
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -27,5 +30,12 @@ tests =
             roundTrip "zone" Codec.zoneToJson Codec.jsonToZone Zone.Graveyard,
           HU.testCase "unknown tag fails" $
             HU.assertBool "left" (either (const True) (const False) (Codec.jsonToColor (Json.Object [])))
+        ],
+      Tasty.testGroup
+        "newtypes"
+        [ HU.testCase "SlotName" $
+            roundTrip "slot" Codec.slotNameToJson Codec.jsonToSlotName (SlotName.MkSlotName (Text.pack "x")),
+          HU.testCase "ObjectId" $
+            roundTrip "oid" Codec.objectIdToJson Codec.jsonToObjectId (ObjectId.MkObjectId 7)
         ]
     ]
