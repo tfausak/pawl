@@ -1,6 +1,7 @@
 module Pawl.Type.Effect where
 
 import Pawl.Type.Duration (Duration)
+import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.Modification (Modification)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.SlotName (SlotName)
@@ -20,4 +21,8 @@ data Effect
     -- caster's binding (Object.chosenSubtypes) and baked into a stored
     -- ChangeSubtypeWord continuous effect. Resolve stores it; Projection applies it.
     ChangeText SlotName
+  | -- CR 605: add one unit of this mana type. Executed by Mana.tapForMana at
+    -- payment (CR 605.3b: a mana ability never uses the stack); Resolve.applyEffect
+    -- never runs it. Read by Resolve.manaProduced (the "produces mana?" ABI bit).
+    AddMana ManaType
   deriving (Eq, Ord, Show)

@@ -22,11 +22,13 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -34,6 +36,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Sickness as Sickness
@@ -187,6 +190,9 @@ resolveTests =
          in do
               HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))
               HU.assertEqual "textChangeSlots" [slot] (Resolve.textChangeSlots card),
+      HU.testCase "CR 605 manaProduced reads AddMana, nothing else" $ do
+        HU.assertEqual "add mana" (Just (ManaType.Colored Color.Green)) (Resolve.manaProduced (Effect.AddMana (ManaType.Colored Color.Green)))
+        HU.assertEqual "damage produces no mana" Nothing (Resolve.manaProduced (Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1))),
       HU.testCase "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $
         -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
         -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten

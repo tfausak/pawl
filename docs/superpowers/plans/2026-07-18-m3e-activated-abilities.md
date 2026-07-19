@@ -56,7 +56,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 **Interfaces:**
 - Produces: `AdditionalCost.AdditionalCost` = `TapSelf | SacrificeSelf`; `AbilityCost.MkAbilityCost { additional :: [AdditionalCost] }`; `ActivatedAbility.MkActivatedAbility { cost :: AbilityCost, effects :: [Effect], targetSpecs :: Map SlotName TargetSpec }`; `Effect.AddMana :: ManaType -> Effect`; `Resolve.manaProduced :: Effect -> Maybe ManaType`; `Mana.isManaAbility :: ActivatedAbility -> Bool`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to the `Mana` test group in `source/test-suite/Pawl/ManaSpec.hs` (add imports `qualified Pawl.Type.ActivatedAbility as ActivatedAbility`, `qualified Pawl.Type.AbilityCost as AbilityCost`, `qualified Pawl.Type.Effect as Effect`, `qualified Pawl.Type.ManaType as ManaType`, `qualified Pawl.Type.Color as Color`, `qualified Pawl.Type.TargetSpec as TargetSpec`, `qualified Pawl.Type.SlotName as SlotName`, `qualified Data.Map.Strict as Map`, `qualified Data.Text as Text` if absent):
 
@@ -99,12 +99,12 @@ Add to the `Resolve` test group in `source/test-suite/Pawl/ResolveSpec.hs`:
 
 (Add `qualified Pawl.Type.ManaType as ManaType`, `qualified Pawl.Type.Color as Color` to `ResolveSpec` if absent.)
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "is a mana ability"'`
 Expected: FAIL to compile — `ActivatedAbility`, `AbilityCost`, `Effect.AddMana`, `Mana.isManaAbility`, `Resolve.manaProduced` not in scope.
 
-- [ ] **Step 3: Create the three ability types**
+- [x] **Step 3: Create the three ability types**
 
 `source/library/Pawl/Type/AdditionalCost.hs`:
 
@@ -160,7 +160,7 @@ data ActivatedAbility = MkActivatedAbility
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the `AddMana` opcode**
+- [x] **Step 4: Add the `AddMana` opcode**
 
 In `source/library/Pawl/Type/Effect.hs`, add the import `import Pawl.Type.ManaType (ManaType)` and the constructor (extend the header comment):
 
@@ -171,7 +171,7 @@ In `source/library/Pawl/Type/Effect.hs`, add the import `import Pawl.Type.ManaTy
     AddMana ManaType
 ```
 
-- [ ] **Step 5: Add the classifiers and the `AddMana` arms in `Resolve`**
+- [x] **Step 5: Add the classifiers and the `AddMana` arms in `Resolve`**
 
 In `source/library/Pawl/Resolve.hs`, add `import Pawl.Type.ManaType (ManaType)`. Add the `slotsOf` arm:
 
@@ -208,7 +208,7 @@ Add the `applyEffect` arm (a documented no-op — Task 3 makes `applyEffect` mon
   Effect.AddMana _ -> gs
 ```
 
-- [ ] **Step 6: Add `isManaAbility` in `Mana`**
+- [x] **Step 6: Add `isManaAbility` in `Mana`**
 
 In `source/library/Pawl/Mana.hs`, add imports `import qualified Pawl.Resolve as Resolve`, `import qualified Pawl.Type.ActivatedAbility as ActivatedAbility`. Add:
 
@@ -223,12 +223,12 @@ isManaAbility ab =
     && Map.null (ActivatedAbility.targetSpecs ab)
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

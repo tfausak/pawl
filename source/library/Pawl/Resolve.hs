@@ -20,6 +20,7 @@ import qualified Pawl.Type.Effect as Effect
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
+import Pawl.Type.ManaType (ManaType)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
@@ -38,6 +39,17 @@ slotsOf effect = case effect of
   Effect.DealDamage slot _ -> Set.singleton slot
   Effect.ModifyTarget _ _ slot -> Set.singleton slot
   Effect.ChangeText slot -> Set.singleton slot
+  Effect.AddMana _ -> Set.empty
+
+-- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
+-- classification (design.md risk register). Read by Mana.isManaAbility to keep
+-- mana abilities off the stack. Casing on Effect is Resolve's charter.
+manaProduced :: Effect -> Maybe ManaType
+manaProduced effect = case effect of
+  Effect.AddMana mt -> Just mt
+  Effect.DealDamage _ _ -> Nothing
+  Effect.ModifyTarget {} -> Nothing
+  Effect.ChangeText _ -> Nothing
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -59,6 +71,7 @@ rewriteEffect pairs effect = case effect of
     Effect.ModifyTarget duration (Projection.rewriteModification pairs modification) slot
   Effect.DealDamage _ _ -> effect
   Effect.ChangeText _ -> effect
+  Effect.AddMana _ -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -153,6 +166,10 @@ applyEffect source bound legality chosen gs effect = case effect of
                     }
              in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
       _ -> gs
+  -- CR 605.3b: a mana ability never resolves on the stack. AddMana is applied by
+  -- Mana.tapForMana at payment, never here. Reaching this arm means a mana ability
+  -- was wrongly put on the stack -- an isManaAbility classification bug.
+  Effect.AddMana _ -> gs
 
 -- The object a recipient names, if any (CR 612 targets a spell or permanent, not
 -- a player).

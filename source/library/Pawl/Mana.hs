@@ -8,6 +8,8 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Resolve as Resolve
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Color as Color
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -57,6 +59,15 @@ subtypeMana subtype = case subtype of
 -- grant -- the projected subtype IS the ability.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
 manaTypesOf oid gs = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesOf oid gs))
+
+-- CR 605.1a: an activated ability is a mana ability if it could add mana AND
+-- doesn't target (the loyalty clause is vacuous -- no planeswalkers). The ABI
+-- predicate read at two sites: manaTypesOf includes a mana ability as a source
+-- (Task 6); Action.legalActions excludes it from the stack (Task 5).
+isManaAbility :: ActivatedAbility.ActivatedAbility -> Bool
+isManaAbility ab =
+  not (null (Maybe.mapMaybe Resolve.manaProduced (ActivatedAbility.effects ab)))
+    && Map.null (ActivatedAbility.targetSpecs ab)
 
 -- CR 106.4. Absent from the map means an empty pool.
 poolOf :: PlayerId -> GameState -> Mana

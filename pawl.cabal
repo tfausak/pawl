@@ -75,7 +75,10 @@ library
     Pawl.Stack
     Pawl.Target
     Pawl.Turn
+    Pawl.Type.AbilityCost
     Pawl.Type.Action
+    Pawl.Type.ActivatedAbility
+    Pawl.Type.AdditionalCost
     Pawl.Type.Affected
     Pawl.Type.AttackTarget
     Pawl.Type.BeginningStep

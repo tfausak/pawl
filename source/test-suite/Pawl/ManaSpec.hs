@@ -1,6 +1,8 @@
 -- Covers Pawl.Mana: mana payment and castability.
 module Pawl.ManaSpec where
 
+import qualified Data.Map.Strict as Map
+import qualified Data.Text as Text
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
@@ -9,7 +11,10 @@ import qualified Pawl.Mana as Mana
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Type.AbilityCost as AbilityCost
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Mana as Mana.Type
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -18,7 +23,10 @@ import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ManaUnit as ManaUnit
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -114,7 +122,31 @@ manaTests =
             (_, gs) = S.addCreature Card.bloodMoonPrinting S.alice g1
          in do
               HU.assertBool "red available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf urborgId gs)
-              HU.assertBool "black not available (stripped)" (ManaType.Colored Color.Black `notElem` Mana.manaTypesOf urborgId gs)
+              HU.assertBool "black not available (stripped)" (ManaType.Colored Color.Black `notElem` Mana.manaTypesOf urborgId gs),
+      HU.testCase "CR 605.1a a {T}: Add {G} ability is a mana ability" $
+        let ab =
+              ActivatedAbility.MkActivatedAbility
+                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = []},
+                  ActivatedAbility.effects = [Effect.AddMana (ManaType.Colored Color.Green)],
+                  ActivatedAbility.targetSpecs = Map.empty
+                }
+         in HU.assertBool "mana ability" (Mana.isManaAbility ab),
+      HU.testCase "CR 605.1a an ability that targets is NOT a mana ability" $
+        let ab =
+              ActivatedAbility.MkActivatedAbility
+                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = []},
+                  ActivatedAbility.effects = [Effect.AddMana (ManaType.Colored Color.Green)],
+                  ActivatedAbility.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.AnyTarget
+                }
+         in HU.assertBool "targets -> not mana" (not (Mana.isManaAbility ab)),
+      HU.testCase "CR 605.1a a damage ability is NOT a mana ability" $
+        let ab =
+              ActivatedAbility.MkActivatedAbility
+                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = []},
+                  ActivatedAbility.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1)],
+                  ActivatedAbility.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.AnyTarget
+                }
+         in HU.assertBool "no mana produced -> not mana" (not (Mana.isManaAbility ab))
     ]
 
 tests :: Tasty.TestTree
