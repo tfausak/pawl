@@ -32,6 +32,7 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import Pawl.Type.Timestamp (Timestamp)
 import qualified Pawl.Type.Toughness as Toughness
+import Pawl.Type.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Type.TypeLine as TypeLine
 
 -- CR 613.1: the layer a modification applies in. THE ABI classification the
@@ -58,7 +59,7 @@ applyModification gs oid m pc = case m of
   Modification.GainKeyword k ->
     pc {PC.keywords = Set.insert k (PC.keywords pc)}
   Modification.LoseAllAbilities ->
-    pc {PC.keywords = Set.empty, PC.activatedAbilities = [], PC.replacementEffects = []}
+    pc {PC.keywords = Set.empty, PC.activatedAbilities = [], PC.replacementEffects = [], PC.triggeredAbilities = []}
   Modification.SetBasePowerToughness p t ->
     pc
       { PC.power = setPT (PC.power pc) (Quantity.evaluate gs oid p),
@@ -157,7 +158,8 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.subtypes = Set.empty,
         PC.rulesTextActive = True,
         PC.activatedAbilities = [],
-        PC.replacementEffects = []
+        PC.replacementEffects = [],
+        PC.triggeredAbilities = []
       }
   Just card ->
     PC.MkProjectedCharacteristics
@@ -172,7 +174,8 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
         PC.rulesTextActive = True,
         PC.activatedAbilities = Card.Type.activatedAbilities card,
-        PC.replacementEffects = Card.Type.replacementEffects card
+        PC.replacementEffects = Card.Type.replacementEffects card,
+        PC.triggeredAbilities = Card.Type.triggeredAbilities card
       }
 
 -- affects evaluated against an object's BASE characteristics (used by
@@ -361,6 +364,11 @@ replacementsAffecting gs =
    in if not (any baseHas onBattlefield)
         then []
         else concatMap (\oid -> replacementsOf oid gs) onBattlefield
+
+-- CR 603 / 613 layer 6: an object's triggered abilities after the layer system,
+-- the same projection posture as abilitiesOf. A Humility'd creature has none.
+triggeredAbilitiesOf :: ObjectId -> GameState -> [TriggeredAbility]
+triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 
 subtypesOf :: ObjectId -> GameState -> Set Subtype.Subtype
 subtypesOf oid gs = PC.subtypes (project oid gs)

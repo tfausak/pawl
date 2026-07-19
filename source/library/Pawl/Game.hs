@@ -75,6 +75,7 @@ cardOf oid gs = case lookupObject oid gs of
   Just obj -> case Object.source obj of
     Source.OfCard printing -> Just (Printing.card printing)
     Source.OfAbility _ _ -> Nothing
+    Source.OfTrigger _ _ -> Nothing
 
 -- Who controls an object (CR 108.4). Nothing when the id is unknown.
 --

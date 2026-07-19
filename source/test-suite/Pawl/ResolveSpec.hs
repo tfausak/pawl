@@ -50,6 +50,8 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Timestamp as Timestamp
+import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -191,6 +193,7 @@ resolveTests =
                   Card.Type.effects = [Effect.ChangeText slot],
                   Card.Type.activatedAbilities = [],
                   Card.Type.replacementEffects = [],
+                  Card.Type.triggeredAbilities = [],
                   Card.Type.targetSpecs = Map.empty
                 }
          in do
@@ -319,7 +322,33 @@ resolveTests =
             abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty Map.empty ts
             g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
             resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
-         in HU.assertEqual "nothing entered the battlefield" Set.empty (GameState.battlefield resolved)
+         in HU.assertEqual "nothing entered the battlefield" Set.empty (GameState.battlefield resolved),
+      HU.testCase "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $
+        let g0 = Setup.emptyGame S.bothPlayers
+            (ripId, g1) = S.addCreature Card.restInPeacePrinting S.alice g0
+            (deadId, g2) = S.addLibraryCard Card.pikerPrinting S.bob g1
+            -- move the Piker into bob's graveyard
+            g3 = Event.changeZone deadId Zone.Graveyard g2
+            ability = TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters [Effect.ExileAllGraveyards] Map.empty
+            (abilId, g4) = Game.freshObjectId g3
+            (ts, g5) = Game.freshTimestamp g4
+            abilObj =
+              Object.MkObject
+                { Object.owner = S.alice,
+                  Object.source = Source.OfTrigger ripId ability,
+                  Object.zone = Zone.Stack,
+                  Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
+                  Object.sickness = Sickness.Settled,
+                  Object.targets = Map.empty,
+                  Object.chosenSubtypes = Map.empty,
+                  Object.timestamp = ts
+                }
+            g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
+            resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
+         in do
+              HU.assertEqual "bob's graveyard is empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
+              HU.assertEqual "ability ceased" Nothing (Game.lookupObject abilId resolved)
     ]
 
 findFirst :: Prompt.Prompt r -> r

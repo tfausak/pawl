@@ -10,6 +10,7 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.Zone as Zone
 
 -- CR 608.3: a resolving permanent spell becomes a permanent on the battlefield;
@@ -36,3 +37,5 @@ resolveTop = do
             then State.modify' (Event.changeZone oid Zone.Battlefield)
             else Resolve.resolveSpell oid
         Source.OfAbility srcId ability -> Resolve.resolveAbility oid srcId ability
+        Source.OfTrigger srcId ability ->
+          Resolve.resolveEffects oid srcId (TriggeredAbility.effects ability) (TriggeredAbility.targetSpecs ability)

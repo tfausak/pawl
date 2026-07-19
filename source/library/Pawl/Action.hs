@@ -23,6 +23,7 @@ playableLands pid gs =
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Card.isLand (Printing.card printing)
           Source.OfAbility _ _ -> False
+          Source.OfTrigger _ _ -> False
         Nothing -> False
    in filter isLandObject (Game.zoneMembers Zone.Hand pid gs)
 

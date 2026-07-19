@@ -136,6 +136,7 @@ cardTests =
                   Card.Type.effects = [],
                   Card.Type.activatedAbilities = [],
                   Card.Type.replacementEffects = [],
+                  Card.Type.triggeredAbilities = [],
                   Card.Type.targetSpecs = Map.empty
                 }
          in do

@@ -3,6 +3,7 @@ module Pawl.Resolve where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -42,6 +43,7 @@ import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TapState as TapState
+import Pawl.Type.TargetSpec (TargetSpec)
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 
@@ -56,6 +58,7 @@ slotsOf effect = case effect of
   Effect.ChangeText slot -> Set.singleton slot
   Effect.AddMana _ -> Set.empty
   Effect.Search _ -> Set.empty
+  Effect.ExileAllGraveyards -> Set.empty
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -67,6 +70,7 @@ manaProduced effect = case effect of
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText _ -> Nothing
   Effect.Search _ -> Nothing
+  Effect.ExileAllGraveyards -> Nothing
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -98,6 +102,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ChangeText _ -> effect
   Effect.AddMana _ -> effect
   Effect.Search _ -> effect
+  Effect.ExileAllGraveyards -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -134,19 +139,18 @@ resolveSpell oid = do
                 Monad.mapM_ (applyEffect oid (Object.owner obj) (Object.chosenSubtypes obj) legality chosen) (effectsOf oid gs)
                 State.modify' (Event.changeZone oid Zone.Graveyard)
 
--- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
--- (srcId), not the ability object -- so DealDamage comes from Prodigal Sorcerer
--- (CR 608.2g). Reuses applyEffect with the same per-slot legality and CR 608.2b
--- fizzle as a spell. CR 608.2n: the ability then ceases to exist -- removed from
--- the stack and objects, NOT buried (an ability is not a card).
-resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility -> Game ()
-resolveAbility abilId srcId ability = do
+-- CR 608.2: the executor shared by an activated ability (M3e) and a triggered
+-- ability (M3f) on the stack. Re-validate filled slots (CR 608.2b), fold
+-- applyEffect over the effects with `srcId` (the source permanent) as the effect
+-- source (CR 608.2g), then the ability ceases (CR 608.2n). `stackId` is the
+-- ability object's own id.
+resolveEffects :: ObjectId -> ObjectId -> [Effect] -> Map.Map SlotName TargetSpec -> Game ()
+resolveEffects stackId srcId effects specs = do
   gs <- State.get
-  case Game.lookupObject abilId gs of
+  case Game.lookupObject stackId gs of
     Nothing -> pure ()
     Just obj ->
-      let specs = ActivatedAbility.targetSpecs ability
-          chosen = Object.targets obj
+      let chosen = Object.targets obj
           legalSlot slot recipient = case Map.lookup slot specs of
             Nothing -> False
             Just spec -> Target.stillLegal recipient spec gs
@@ -154,8 +158,17 @@ resolveAbility abilId srcId ability = do
           fizzles = not (Map.null specs) && not (or (Map.elems legality))
        in do
             Monad.unless fizzles $
-              Monad.mapM_ (applyEffect srcId (Object.owner obj) (Object.chosenSubtypes obj) legality chosen) (ActivatedAbility.effects ability)
-            State.modify' (cease abilId)
+              Monad.mapM_ (applyEffect srcId (Object.owner obj) (Object.chosenSubtypes obj) legality chosen) effects
+            State.modify' (cease stackId)
+
+-- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
+-- (srcId), not the ability object -- so DealDamage comes from Prodigal Sorcerer
+-- (CR 608.2g). Reuses applyEffect with the same per-slot legality and CR 608.2b
+-- fizzle as a spell. CR 608.2n: the ability then ceases to exist -- removed from
+-- the stack and objects, NOT buried (an ability is not a card).
+resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility -> Game ()
+resolveAbility abilId srcId ability =
+  resolveEffects abilId srcId (ActivatedAbility.effects ability) (ActivatedAbility.targetSpecs ability)
 
 -- CR 608.2n: an ability leaves the stack and ceases to exist (no graveyard).
 cease :: ObjectId -> GameState -> GameState
@@ -251,6 +264,13 @@ applyEffect source controller bound legality chosen effect = case effect of
           lib <- State.gets (Game.zoneMembers Zone.Library controller)
           shuffled <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
           State.modify' (reorderLibrary controller shuffled)
+  -- Rest in Peace's ETB: exile every card in every graveyard (CR 400.7 each move
+  -- funnels through changeZone). A graveyard->exile move matches no M3f
+  -- replacement or trigger, so no cascade.
+  Effect.ExileAllGraveyards -> do
+    gs <- State.get
+    let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Map.keys (GameState.players gs))
+    State.modify' (\g -> List.foldl' (\g1 c -> Event.changeZone c Zone.Exile g1) g gyCards)
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

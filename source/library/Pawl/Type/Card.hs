@@ -13,6 +13,7 @@ import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.StaticAbility (StaticAbility)
 import Pawl.Type.TargetSpec (TargetSpec)
 import Pawl.Type.Toughness (Toughness)
+import Pawl.Type.TriggeredAbility (TriggeredAbility)
 import Pawl.Type.TypeLine (TypeLine)
 
 data Card = MkCard
@@ -47,6 +48,9 @@ data Card = MkCard
     -- so layer 6 LoseAllAbilities strips them uniformly. Empty for all but Rest
     -- in Peace.
     replacementEffects :: [ReplacementEffect],
+    -- CR 603: this card's triggered abilities, read through
+    -- Pawl.Projection.triggeredAbilitiesOf. Empty for all but Rest in Peace.
+    triggeredAbilities :: [TriggeredAbility],
     -- The target slots effects reference by name. A Map, not a parallel list:
     -- slots have no order, only names, and nothing aligns by position.
     targetSpecs :: Map SlotName TargetSpec

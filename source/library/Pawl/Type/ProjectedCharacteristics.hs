@@ -6,6 +6,7 @@ import Pawl.Type.CardType (CardType)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.Subtype (Subtype)
+import Pawl.Type.TriggeredAbility (TriggeredAbility)
 
 -- The characteristics of an object after the layer fold (design.md §2.5). Maybe
 -- P/T because a land has none. cardTypes/subtypes are the projected type line
@@ -24,6 +25,9 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     activatedAbilities :: [ActivatedAbility],
     -- CR 614 layer 6: the object's replacement effects after the layer system,
     -- the same projection posture as activatedAbilities. Emptied by LoseAllAbilities.
-    replacementEffects :: [ReplacementEffect]
+    replacementEffects :: [ReplacementEffect],
+    -- CR 603 layer 6: the object's triggered abilities after the layer system,
+    -- the same projection posture as activatedAbilities. Emptied by LoseAllAbilities.
+    triggeredAbilities :: [TriggeredAbility]
   }
   deriving (Eq, Show)

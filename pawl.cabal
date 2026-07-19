@@ -135,6 +135,8 @@ library
     Pawl.Type.TargetSpec
     Pawl.Type.Timestamp
     Pawl.Type.Toughness
+    Pawl.Type.TriggerCondition
+    Pawl.Type.TriggeredAbility
     Pawl.Type.TypeLine
     Pawl.Type.Zone
     Pawl.Type.ZoneChange

@@ -28,6 +28,8 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
+import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 
@@ -53,6 +55,7 @@ mountainPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -79,6 +82,7 @@ swampPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -105,6 +109,7 @@ forestPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -139,6 +144,7 @@ pikerPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -181,6 +187,7 @@ birdMaidenPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -215,6 +222,7 @@ nimbleBirdstickerPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -248,6 +256,7 @@ ogreSentryPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -283,6 +292,7 @@ windseekerCentaurPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -314,6 +324,7 @@ goblinChariotPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -350,6 +361,7 @@ sabretoothTigerPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -381,6 +393,7 @@ ridgetopRaptorPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -411,6 +424,7 @@ typhoidRatsPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -444,6 +458,7 @@ warMammothPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -474,6 +489,7 @@ lightningBoltPrinting =
             Card.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3)],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget
           }
     }
@@ -501,6 +517,7 @@ giantGrowthPrinting =
             Card.effects = [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) (SlotName.MkSlotName (Text.pack "target"))],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget
           }
     }
@@ -544,6 +561,7 @@ humilityPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -578,6 +596,7 @@ serpentsGiftPrinting =
             Card.effects = [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Deathtouch) (SlotName.MkSlotName (Text.pack "target"))],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget
           }
     }
@@ -613,6 +632,7 @@ bloodMoonPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -642,6 +662,7 @@ urborgPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -682,6 +703,7 @@ opalescencePrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -707,6 +729,7 @@ islandPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -738,6 +761,7 @@ magicalHackPrinting =
             Card.effects = [Effect.ChangeText (SlotName.MkSlotName (Text.pack "target"))],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.SpellOrPermanentTarget
           }
     }
@@ -769,6 +793,7 @@ landformPrinting =
             Card.effects = [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetLandSubtype Subtype.Swamp) (SlotName.MkSlotName (Text.pack "target"))],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.LandTarget
           }
     }
@@ -804,6 +829,7 @@ prodigalSorcererPrinting =
                   }
               ],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -837,6 +863,7 @@ llanowarElvesPrinting =
                   }
               ],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -872,6 +899,7 @@ evolvingWildsPrinting =
                   }
               ],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -901,6 +929,13 @@ restInPeacePrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [ReplacementEffect.RedirectZoneChange Zone.Graveyard Zone.Exile],
+            Card.triggeredAbilities =
+              [ TriggeredAbility.MkTriggeredAbility
+                  { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+                    TriggeredAbility.effects = [Effect.ExileAllGraveyards],
+                    TriggeredAbility.targetSpecs = Map.empty
+                  }
+              ],
             Card.targetSpecs = Map.empty
           }
     }
@@ -927,6 +962,7 @@ plainsPrinting =
             Card.effects = [],
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
             Card.targetSpecs = Map.empty
           }
     }

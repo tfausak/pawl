@@ -30,4 +30,7 @@ data Effect
     -- criterion, put it onto the battlefield tapped, then shuffle (Evolving
     -- Wilds' exact shape; destination/tapped are baked in for now).
     Search CardCriterion
+  | -- CR 701.10 / Rest in Peace: exile every card in every graveyard. Targetless
+    -- and bulk (Rest in Peace's exact shape); a general exile-from-zone is future.
+    ExileAllGraveyards
   deriving (Eq, Ord, Show)

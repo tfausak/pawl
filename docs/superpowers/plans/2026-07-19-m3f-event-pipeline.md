@@ -455,7 +455,7 @@ git commit -m "Project replacement effects; add zoneChanges; add Rest in Peace +
 - Consumes: `applyReplacements` (Task 2), `Projection.replacementsAffecting` (Task 3), `GameState.zoneChanges` (Task 3).
 - Produces: `Event.changeZone` now (a) redirects a graveyard-bound object to exile whenever a Rest in Peace is on the battlefield, and (b) appends the resolved `ZoneChange` (carrying the post-move id and the resolved destination) to `GameState.zoneChanges`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/EventSpec.hs` (add imports `qualified Pawl.Card as Card`, `qualified Pawl.Setup as Setup`, `qualified Pawl.Support as S`, `qualified Pawl.Game as Game`, `qualified Pawl.Type.GameState as GameState`, `qualified Data.Set as Set`, `qualified Pawl.Type.Object as Object`):
 
@@ -482,12 +482,12 @@ Add to `source/test-suite/Pawl/EventSpec.hs` (add imports `qualified Pawl.Card a
          in HU.assertEqual "in graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "sent to the graveyard is exiled"'`
 Expected: FAIL — the redirect is not wired, so the Piker lands in the graveyard.
 
-- [ ] **Step 3: Wire replacements + emission into `changeZone`**
+- [x] **Step 3: Wire replacements + emission into `changeZone`**
 
 In `source/library/Pawl/Event.hs`, add `import qualified Pawl.Projection as Projection` (and `import qualified Pawl.Type.ZoneChange as ZoneChange` / `import Pawl.Type.ZoneChange (ZoneChange)` if Task 2 did not already add them). The `Zone` type is already imported from Task 1; no `Zone` constructor is referenced here. Replace `changeZone`:
 
@@ -515,12 +515,12 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
      in moved {GameState.zoneChanges = GameState.zoneChanges moved ++ [emitted]}
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the Piker is exiled with Rest in Peace out, the event records `Exile`, and without RiP it goes to the graveyard. The whole existing suite stays green (no other card has a replacement, so `replacementsAffecting` short-circuits to `[]` and behavior is unchanged).
 
-- [ ] **Step 5: Verify the falsifiers the gate names (stack spell + discard)**
+- [x] **Step 5: Verify the falsifiers the gate names (stack spell + discard)**
 
 These already pass through the same funnel; add two more assertions to confirm the funnel-generality (a resolving spell and a discard are not creature deaths):
 
@@ -536,7 +536,7 @@ These already pass through the same funnel; add two more assertions to confirm t
 Run: `cabal test --test-options='-p "resolving spell is exiled"'`
 Expected: PASS. (This exercises a stack→graveyard move — a case a battlefield-only "when a creature dies" hook would miss.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
