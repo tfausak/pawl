@@ -11,6 +11,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Target as Target
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
@@ -109,6 +110,37 @@ resolveSpell oid = do
               else do
                 Monad.mapM_ (applyEffect oid (Object.chosenSubtypes obj) legality chosen) (effectsOf oid gs)
                 State.modify' (Game.changeZone oid Zone.Graveyard)
+
+-- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
+-- (srcId), not the ability object -- so DealDamage comes from Prodigal Sorcerer
+-- (CR 608.2g). Reuses applyEffect with the same per-slot legality and CR 608.2b
+-- fizzle as a spell. CR 608.2n: the ability then ceases to exist -- removed from
+-- the stack and objects, NOT buried (an ability is not a card).
+resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility -> Game ()
+resolveAbility abilId srcId ability = do
+  gs <- State.get
+  case Game.lookupObject abilId gs of
+    Nothing -> pure ()
+    Just obj ->
+      let specs = ActivatedAbility.targetSpecs ability
+          chosen = Object.targets obj
+          legalSlot slot recipient = case Map.lookup slot specs of
+            Nothing -> False
+            Just spec -> Target.stillLegal recipient spec gs
+          legality = Map.mapWithKey legalSlot chosen
+          fizzles = not (Map.null specs) && not (or (Map.elems legality))
+       in do
+            Monad.unless fizzles $
+              Monad.mapM_ (applyEffect srcId (Object.chosenSubtypes obj) legality chosen) (ActivatedAbility.effects ability)
+            State.modify' (cease abilId)
+
+-- CR 608.2n: an ability leaves the stack and ceases to exist (no graveyard).
+cease :: ObjectId -> GameState -> GameState
+cease abilId gs =
+  gs
+    { GameState.stack = filter (/= abilId) (GameState.stack gs),
+      GameState.objects = Map.delete abilId (GameState.objects gs)
+    }
 
 -- One effect, applied. The case on the constructor is THIS module's charter.
 applyEffect :: ObjectId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect -> Game ()

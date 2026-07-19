@@ -19,7 +19,9 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
+import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.Action as A
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Color as Color
@@ -254,7 +256,37 @@ resolveTests =
             after = snd (Engine.runGamePure S.identityAnswer hacked Stack.resolveTop)
          in -- Blood Moon entered as a NEW object; the hack (locked to the spell id)
             -- no longer names it, so nonbasic lands are Mountains, not Islands.
-            HU.assertEqual "hack lost: nonbasic land is Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf nonbasicId after)
+            HU.assertEqual "hack lost: nonbasic land is Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf nonbasicId after),
+      HU.testCase "CR 608.2n a resolving ability deals its damage and ceases" $
+        let (srcId, g0) = S.addCreature Card.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
+            ability = case Card.Type.activatedAbilities (Printing.card Card.prodigalSorcererPrinting) of
+              ab : _ -> ab
+              [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost []) [] Map.empty
+            (abilId, g1) = Game.freshObjectId g0
+            (ts, g2) = Game.freshTimestamp g1
+            slot = SlotName.MkSlotName (Text.pack "target")
+            abilObj =
+              Object.MkObject
+                { Object.owner = S.alice,
+                  Object.source = Source.OfAbility srcId ability,
+                  Object.zone = Zone.Stack,
+                  Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
+                  Object.sickness = Sickness.Settled,
+                  Object.targets = Map.singleton slot (Recipient.ToPlayer S.bob),
+                  Object.chosenSubtypes = Map.empty,
+                  Object.timestamp = ts
+                }
+            g3 =
+              g2
+                { GameState.objects = Map.insert abilId abilObj (GameState.objects g2),
+                  GameState.stack = abilId : GameState.stack g2
+                }
+            resolved = snd (Engine.runGamePure S.identityAnswer g3 Stack.resolveTop)
+         in do
+              HU.assertEqual "bob took 1" (Just 19) (S.lifeOf S.bob resolved)
+              HU.assertEqual "ability object gone" Nothing (Game.lookupObject abilId resolved)
+              HU.assertEqual "stack empty" [] (GameState.stack resolved)
     ]
 
 -- Casts every castable spell (targets via lookupMin: creatures first),

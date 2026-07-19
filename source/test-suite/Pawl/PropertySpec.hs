@@ -35,6 +35,7 @@ castsNamed name s =
         Nothing -> False
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Card.Type.name (Printing.card printing) == name
+          Source.OfAbility _ _ -> False
       inGrave pid = any named (Game.zoneMembers Zone.Graveyard pid gs)
    in any inGrave [S.alice, S.bob]
 

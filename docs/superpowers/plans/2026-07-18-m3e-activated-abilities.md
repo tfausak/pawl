@@ -556,7 +556,7 @@ git commit -m "Make spell/stack resolution Game-monadic (no behavior change; rea
 - Consumes: `ActivatedAbility` (Task 1), monadic resolution (Task 3).
 - Produces: `Source.OfAbility :: ObjectId -> ActivatedAbility -> Source`; `Resolve.resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility -> Game ()` (ability-object id, source-permanent id, the ability) — folds `applyEffect` with the source permanent as the effect source, then the ability ceases (removed from stack and objects, CR 608.2n); `Stack.resolveTop` resolves an `OfAbility` object.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to the `Resolve` group in `source/test-suite/Pawl/ResolveSpec.hs`. Hand-build an ability object on the stack whose source is a Prodigal Sorcerer, targeting bob, and resolve the top of the stack; assert 1 damage dealt and the ability object gone (add imports `qualified Pawl.Type.Source as Source`, `qualified Pawl.Type.ActivatedAbility as ActivatedAbility`, `qualified Pawl.Type.AbilityCost as AbilityCost`, `qualified Pawl.Type.Recipient as Recipient`, `qualified Pawl.Stack as Stack`, `qualified Pawl.Engine as Engine` if absent):
 
@@ -595,12 +595,12 @@ Add to the `Resolve` group in `source/test-suite/Pawl/ResolveSpec.hs`. Hand-buil
 
 (`Object.MkObject`, `TapState`, `Sickness`, `Zone` imports are already in `ResolveSpec` from M3d; add any the compiler flags. The starting life is 20 — confirm against `Setup`; adjust `Just 19` if the default differs.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "deals its damage and ceases"'`
 Expected: FAIL to compile — `Source.OfAbility`, `Resolve.resolveAbility` not in scope.
 
-- [ ] **Step 3: Add the `OfAbility` source**
+- [x] **Step 3: Add the `OfAbility` source**
 
 In `source/library/Pawl/Type/Source.hs`, add imports `import Pawl.Type.ActivatedAbility (ActivatedAbility)`, `import Pawl.Type.ObjectId (ObjectId)`, and the constructor (it is now a `data`, not a `newtype`):
 
@@ -614,7 +614,7 @@ data Source
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Handle `OfAbility` in `Game.cardOf` and other `Source` matches**
+- [x] **Step 4: Handle `OfAbility` in `Game.cardOf` and other `Source` matches**
 
 In `source/library/Pawl/Game.hs`, `cardOf`'s `case Object.source obj of` gains:
 
@@ -626,7 +626,7 @@ The build enumerates every other exhaustive `case Object.source`. Add an `OfAbil
 - `source/library/Pawl/Action.hs`, `playableLands`' `isLandObject` — `Source.OfAbility _ _ -> False`.
 - `source/test-suite/Pawl/Support.hs`, `creaturesInPlay` and `countByName` — `Source.OfAbility _ _ -> False`.
 
-- [ ] **Step 5: Add `resolveAbility` and the `resolveTop` arm**
+- [x] **Step 5: Add `resolveAbility` and the `resolveTop` arm**
 
 In `source/library/Pawl/Resolve.hs`, add `import qualified Pawl.Type.ActivatedAbility as ActivatedAbility`. Add:
 
@@ -669,12 +669,12 @@ In `source/library/Pawl/Stack.hs`, add the `OfAbility` arm to `resolveTop`'s `ca
         Source.OfAbility srcId ability -> Resolve.resolveAbility oid srcId ability
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — bob is at 19, the ability object is gone, the stack is empty.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

@@ -419,6 +419,7 @@ creaturesInPlay pid gs =
         Nothing -> False
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Card.isCreature (Printing.card printing)
+          Source.OfAbility _ _ -> False
    in length (filter isCreatureObject (Game.zoneMembers Zone.Battlefield pid gs))
 
 countByName :: Text.Text -> PlayerId.PlayerId -> GameState.GameState -> Int
@@ -427,6 +428,7 @@ countByName wanted pid gs =
         Nothing -> False
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
+          Source.OfAbility _ _ -> False
       inLibrary = filter named (Game.zoneMembers Zone.Library pid gs)
       inHand = filter named (Game.zoneMembers Zone.Hand pid gs)
    in length inLibrary + length inHand

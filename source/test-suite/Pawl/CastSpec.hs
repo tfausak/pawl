@@ -141,7 +141,8 @@ stackTests =
                   HU.assertEqual "zone" Zone.Battlefield (Object.zone obj)
                   case Object.source obj of
                     Source.OfCard printing ->
-                      HU.assertBool "creature" (Card.isCreature (Printing.card printing)),
+                      HU.assertBool "creature" (Card.isCreature (Printing.card printing))
+                    Source.OfAbility _ _ -> HU.assertFailure "expected a card source",
       HU.testCase "resolving conserves objects" $
         HU.assertEqual
           "conserved"
@@ -197,7 +198,8 @@ castTests =
                   HU.assertEqual "zone" Zone.Stack (Object.zone obj)
                   case Object.source obj of
                     Source.OfCard printing ->
-                      HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name (Printing.card printing)),
+                      HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name (Printing.card printing))
+                    Source.OfAbility _ _ -> HU.assertFailure "expected a card source",
       HU.testCase "CR 117.1a a Bolt is castable outside a main phase" $
         let (gs, oid) = S.boltInHand 1 (Phase.Beginning BeginningStep.Upkeep)
          in HU.assertBool "instant speed" (Cast.castable S.alice oid gs),

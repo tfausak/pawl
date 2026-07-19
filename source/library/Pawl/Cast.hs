@@ -31,6 +31,8 @@ costOf oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
   Just obj -> case Object.source obj of
     Source.OfCard printing -> Card.Type.manaCost (Printing.card printing)
+    -- An ability on the stack is not a spell; it has no mana cost to cast.
+    Source.OfAbility _ _ -> Nothing
 
 -- CR 601.3a / 302.1: a creature spell may be cast only when its controller could
 -- cast a sorcery -- a main phase of their own turn, with an empty stack. (The

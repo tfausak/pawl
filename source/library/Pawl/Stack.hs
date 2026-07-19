@@ -34,3 +34,4 @@ resolveTop = do
           if Card.isPermanent (Printing.card printing)
             then State.modify' (Game.changeZone oid Zone.Battlefield)
             else Resolve.resolveSpell oid
+        Source.OfAbility srcId ability -> Resolve.resolveAbility oid srcId ability
