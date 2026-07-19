@@ -198,6 +198,45 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   here. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-18-m3e-activated-abilities-design.md` and
   `docs/superpowers/plans/2026-07-18-m3e-activated-abilities.md`.
+- **M3g is complete** (the payoff pair — a player-controlling *Decider* and
+  cast-during-resolution *re-entrancy*, the two seams the day-one substrate was
+  built for). **Mindslaver** (`{6}` Legendary Artifact, `{4}, {T}, Sacrifice:
+  You control target player during that player's next turn`) is CR 723 control as
+  a turn-scheduled store: a new `Effect.ControlPlayerNextTurn SlotName` opcode
+  installs `GameState.pendingControl :: Map PlayerId Decider` (keyed to the chosen
+  `PlayerTarget`, valued by the ability's controller — CR 723.5); `Engine
+  .handoffTurn` promotes the new active player's pending entry to
+  `GameState.activeControl :: Maybe Decider` and deletes it (CR 723.1b), so
+  overwriting `activeControl` every turn start is what expires a prior control (CR
+  723.1); and `Decide.deciderFor` reads that store — the *single* switch that
+  routes the controlled player's decisions to the controller while every resource
+  (mana, cards, life) stays the controlled player's (CR 723.3/723.5a), gated by
+  `pid == activePlayer` so one `Maybe` suffices. **Panglacial Wurm** (`{5}{G}{G}`
+  9/5 Trample, "while you're searching your library, you may cast this from your
+  library") is the re-entrant cast: a `CastingPermission.CastFromLibraryWhileSearching`
+  classification on `Card.castingPermissions` (read from the card in the library,
+  NOT the projection — CR 613 does not reach the library, CR 113.6), a
+  `Cast.castWhileSearching` loop offering `Prompt.CastWhileSearching` and calling
+  `Cast.castSpell` mid-resolution. Because `Cast`/`Mana` import `Resolve` (so
+  `Resolve` sits *below* them and cannot call `castSpell`), the offer is
+  orchestrated one layer up in `Stack.resolveTop` — which asks
+  `Resolve.searchesLibrary` before resolving an ability and, since the ability is
+  still on the stack, lands the cast *on top* of it (the ruling's sequence). New
+  types/fields: `CardType.Artifact` (CR 301, first artifact), `TargetSpec
+  .PlayerTarget` (CR 115), `Effect.ControlPlayerNextTurn`, `CastingPermission`,
+  `AbilityCost.mana :: Maybe ManaCost` (the mana half of activation costs, CR
+  602.1b — Mindslaver's `{4}` is the first `Just`; `Activate` checks and pays it),
+  `Prompt.CastWhileSearching` + `Response.CastWhileSearched` (replay round-trip).
+  `Resolve` grows `ControlPlayerNextTurn` and `searchesLibrary` arms but stays the
+  sole `case`-on-`Effect` home; `Cast` is the sole reader of `CastingPermission`
+  (`permitsCastWhileSearching`, a membership test). Named elisions: the legend rule
+  CR 704.5j is **elided** (Mindslaver is singleton and sacrificed as a cost; it
+  must land suppressible — Mirror Gallery); CR 723.4 information visibility is a
+  `PlayerView` concern (no `PlayerView` yet); CR 723.2 limited-duration control is
+  future. Cards are deterministic fixtures (no random-game entry). Spec and plan
+  kept as reference:
+  `docs/superpowers/specs/2026-07-19-m3g-decider-reentrancy-design.md` and
+  `docs/superpowers/plans/2026-07-19-m3g-decider-reentrancy.md`.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is

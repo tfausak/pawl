@@ -1087,16 +1087,16 @@ git commit -m "Re-entrancy gate: cast Panglacial during Evolving Wilds' search (
 
 **Interfaces:** none — documentation only.
 
-- [ ] **Step 1: Add the M3g completion note**
+- [x] **Step 1: Add the M3g completion note**
 
 In `CLAUDE.md`, after the M3f note in the "Current work and tracking" list, add a bullet in the same voice summarizing M3g: the payoff pair (Decider CR 723 via `pendingControl`/`activeControl` read by `deciderFor`, promoted in `handoffTurn`; Mindslaver), re-entrancy (Panglacial cast from library mid-search, orchestrated in `Stack.resolveTop` because `Cast`/`Mana` sit above `Resolve`), the new types (`CardType.Artifact`, `TargetSpec.PlayerTarget`, `Effect.ControlPlayerNextTurn`, `CastingPermission`, `AbilityCost.mana`, `Prompt.CastWhileSearching`), and the named elisions (legend rule CR 704.5j — singleton, must land suppressible; CR 723.4 visibility — no PlayerView; CR 723.2 limited-duration control). Cite the spec and plan paths as the other milestones do.
 
-- [ ] **Step 2: Verify the plan is fully ticked**
+- [x] **Step 2: Verify the plan is fully ticked**
 
 Run: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-19-m3g-decider-reentrancy.md`
 Expected: `0` (every step checked). If not, finish the unchecked steps — never edit the plan to satisfy the grep.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
