@@ -39,6 +39,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity.Type
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.SlotName (SlotName)
@@ -62,6 +63,23 @@ slotsOf effect = case effect of
   Effect.Search _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
+
+-- D4 (the value half): does any of these effects read X? A card that reads X
+-- must declare {X} in its cost (the lint), the same reads-equal-declares contract
+-- slotsOf draws for target slots. Casing on Effect/Quantity is this module's
+-- charter. NOTE: when an opcode gains a Quantity field, add its arm here -- the
+-- compiler will not force it, since Quantity is compared by ==.
+readsX :: [Effect] -> Bool
+readsX = any effectReadsX
+  where
+    effectReadsX effect = case effect of
+      Effect.DealDamage _ quantity -> quantity == Quantity.Type.X
+      Effect.ModifyTarget {} -> False
+      Effect.ChangeText _ -> False
+      Effect.AddMana _ -> False
+      Effect.Search _ -> False
+      Effect.ExileAllGraveyards -> False
+      Effect.ControlPlayerNextTurn _ -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep

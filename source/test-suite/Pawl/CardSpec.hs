@@ -5,6 +5,7 @@ module Pawl.CardSpec where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Mana as Mana
@@ -178,6 +179,22 @@ lintTests cards =
       HU.testCase "the lint itself catches a dangling reference" $
         let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
          in HU.assertBool "misauthored card detected" (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)),
+      HU.testCase "every printing that reads X declares {X}, and vice versa" $
+        let readsX c = Resolve.readsX (Card.Type.effects c)
+            hasVariable c = case Card.Type.manaCost c of
+              Nothing -> False
+              Just (ManaCost.MkManaCost syms) -> elem ManaSymbol.Variable syms
+            offenders =
+              filter
+                (\p -> readsX (Printing.card p) /= hasVariable (Printing.card p))
+                (Cards.allPrintings cards)
+         in HU.assertEqual "X read iff {X} declared" [] (map (Card.Type.name . Printing.card) offenders),
+      HU.testCase "the reserved X slot is never a declared target slot" $
+        let offenders =
+              filter
+                (Map.member Binding.variableX . Card.Type.targetSpecs . Printing.card)
+                (Cards.allPrintings cards)
+         in HU.assertEqual "no card names the X slot" [] (map (Card.Type.name . Printing.card) offenders),
       HU.testCase "Lightning Bolt is in the red pool with one AnyTarget slot" $
         let card = Printing.card (Cards.lightningBoltPrinting cards)
          in do

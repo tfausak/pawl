@@ -759,7 +759,7 @@ git commit -m "M4a: Blaze as card data, plus CardType.Sorcery"
 **Interfaces:**
 - Produces: `Resolve.readsX :: [Effect] -> Bool` (an effect list references `Quantity.X`); a lint conjunct "reads X ⟺ cost has a Variable"; the reserved X slot exempt from the target-slot equality.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/CardSpec.hs`, extend `lintTests`:
 
@@ -784,12 +784,12 @@ In `source/test-suite/Pawl/CardSpec.hs`, extend `lintTests`:
 
 Also confirm the existing "slot reads equal declared slots" test still passes for Blaze (its `"target"` slot is declared and read; `Quantity.X` contributes no slot to `slotsOf`).
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | tail -20`
 Expected: FAIL — `Resolve.readsX` not in scope.
 
-- [ ] **Step 3: Add the X-reader classifier**
+- [x] **Step 3: Add the X-reader classifier**
 
 In `source/library/Pawl/Resolve.hs`, alongside `slotsOf`:
 
@@ -813,12 +813,12 @@ readsX = any effectReadsX
 
 (A future opcode carrying a `Quantity` extends this match — the compiler will not force it since `Quantity` is compared by `==`, so add a note: when an opcode gains a `Quantity` field, add its arm here.)
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -15`
 Expected: PASS.
 
-- [ ] **Step 5: Format, lint, commit**
+- [x] **Step 5: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
