@@ -8,6 +8,7 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Duration as Duration
@@ -813,6 +814,40 @@ llanowarElvesPrinting =
           }
     }
 
+-- Evolving Wilds: Land, "{T}, Sacrifice this land: Search your library for a
+-- basic land card, put it onto the battlefield tapped, then shuffle."
+-- Scryfall-verified 2026-07-18. Its ability is NOT a mana ability (it fetches a
+-- land but adds no mana) so it uses the stack -- the CR 605 false branch on a
+-- mana-adjacent card.
+evolvingWildsPrinting :: Printing.Printing
+evolvingWildsPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Evolving Wilds",
+            Card.manaCost = Nothing,
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Land,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities = [],
+            Card.effects = [],
+            Card.activatedAbilities =
+              [ ActivatedAbility.MkActivatedAbility
+                  { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = [AdditionalCost.TapSelf, AdditionalCost.SacrificeSelf]},
+                    ActivatedAbility.effects = [Effect.Search CardCriterion.BasicLandCard],
+                    ActivatedAbility.targetSpecs = Map.empty
+                  }
+              ],
+            Card.targetSpecs = Map.empty
+          }
+    }
+
 -- The registry the dataflow lint and future golden tests iterate. A printing
 -- not listed here escapes the hygiene net -- add every new printing.
 allPrintings :: [Printing.Printing]
@@ -841,7 +876,8 @@ allPrintings =
     magicalHackPrinting,
     landformPrinting,
     prodigalSorcererPrinting,
-    llanowarElvesPrinting
+    llanowarElvesPrinting,
+    evolvingWildsPrinting
   ]
 
 isLand :: Card.Card -> Bool

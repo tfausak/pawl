@@ -1330,7 +1330,7 @@ git commit -m "Add the Search opcode: tutor a basic land to the battlefield tapp
 - Consumes: `SacrificeSelf` payment (Task 5's `payAdditional`/`canPayAdditional`), the `Search` opcode (Task 7), activation (Task 5).
 - Produces: `Card.evolvingWildsPrinting` (in `allPrintings`), a Land with one ability: cost `[TapSelf, SacrificeSelf]`, effect `[Search BasicLandCard]`, no slots. `SacrificeSelf` was already implemented in Task 5; this task exercises it end-to-end.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ActivateSpec.hs` (add imports `qualified Pawl.Mana as Mana`, `qualified Data.Set as Set`, `qualified Pawl.Type.Zone as Zone`, `qualified Pawl.Type.Prompt as Prompt` if absent), plus a local `findFirst` answerer at module top level:
 
@@ -1370,12 +1370,12 @@ Then the tests:
 
 (`S.addCreature` puts a permanent on the battlefield settled regardless of its type — reuse it for the land; a comment notes it stands in for a played land.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "Evolving Wilds sacrifices"'`
 Expected: FAIL to compile — `Card.evolvingWildsPrinting` not in scope.
 
-- [ ] **Step 3: Add the Evolving Wilds printing**
+- [x] **Step 3: Add the Evolving Wilds printing**
 
 In `source/library/Pawl/Card.hs`:
 
@@ -1423,12 +1423,12 @@ Add `import qualified Pawl.Type.CardCriterion as CardCriterion` to `Card.hs`, an
   ]
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — Evolving Wilds sacrifices itself, its ability (not a mana ability) resolves off the stack, and a Forest enters tapped; a sick land's ability is still offered.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
