@@ -38,4 +38,10 @@ data Effect
     -- Installs pending control keyed to the slot's chosen player, with the
     -- ability's controller as the decider. Mindslaver's exact shape.
     ControlPlayerNextTurn SlotName
+  | -- CR 701.7 / 700.4: destroy the slot's target permanent -- move it to its
+    -- owner's graveyard via the changeZone funnel UNLESS it is indestructible.
+    -- NOT MoveToZone slot Graveyard: the indestructible check is why this is its
+    -- own opcode (Murder vs Darksteel Myr). A future interceptable "destroy event"
+    -- (regeneration, CR 615) is M4d.
+    Destroy SlotName
   deriving (Eq, Ord, Show)

@@ -257,7 +257,7 @@ Delivers `Effect.Destroy` and its indestructible-aware executor, gated by Murder
 - Consumes: `Cards.darksteelMyrPrinting`, `Projection.hasKeyword`, `Event.changeZone` (all existing).
 - Produces: `Effect.Destroy SlotName`; `Cards.murderPrinting :: Cards.Cards -> Printing.Printing`. `Resolve.slotsOf (Effect.Destroy s) == Set.singleton s`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add a `zoneChangeTests` group to `source/test-suite/Pawl/ResolveSpec.hs`. It reuses `S.landsInPlay`, `S.addCreature`, `S.handOne`, `S.identityAnswer`, `Cast.castSpell`, `Stack.resolveTop`. `identityAnswer`'s `ChooseTargets` picks `Set.lookupMin`, which for a single-creature board is that creature.
 
@@ -299,12 +299,12 @@ Wire `zoneChangeTests cards` into `tests` alongside the others:
 tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: compile failure — `Cards.murderPrinting` and `Effect.Destroy` not in scope (red).
 
-- [ ] **Step 3: Add the `Destroy` constructor**
+- [x] **Step 3: Add the `Destroy` constructor**
 
 In `source/library/Pawl/Type/Effect.hs`, add after `ControlPlayerNextTurn` (order does not matter for `data`, but keep the block tidy):
 
@@ -317,11 +317,11 @@ In `source/library/Pawl/Type/Effect.hs`, add after `ControlPlayerNextTurn` (orde
     Destroy SlotName
 ```
 
-- [ ] **Step 4: Add the `Destroy` classification arms**
+- [x] **Step 4: Add the `Destroy` classification arms**
 
 In `source/library/Pawl/Resolve.hs`, add an arm to each classification function. `slotsOf`: `Effect.Destroy slot -> Set.singleton slot`. `readsX`'s `effectReadsX`: `Effect.Destroy _ -> False`. `manaProduced`: `Effect.Destroy _ -> Nothing`. `searchesLibrary`: `Effect.Destroy _ -> False`. `rewriteEffect`: `Effect.Destroy _ -> effect` (no rewritable land-type word).
 
-- [ ] **Step 5: Add the `Destroy` executor arm**
+- [x] **Step 5: Add the `Destroy` executor arm**
 
 In `source/library/Pawl/Resolve.hs`, add to `applyEffect` (the module already imports `Keyword`, `Projection`, `Event`, `Recipient`):
 
@@ -342,11 +342,11 @@ In `source/library/Pawl/Resolve.hs`, add to `applyEffect` (the module already im
         _ -> gs
 ```
 
-- [ ] **Step 6: Add the `Destroy` codec arm**
+- [x] **Step 6: Add the `Destroy` codec arm**
 
 In `source/library/Pawl/Codec.hs`, `effectToJson`: `Effect.Destroy s -> Json.tagged (Text.pack "Destroy") (Just (slotNameToJson s))`. In `jsonToEffect`: `"Destroy" -> withValue mv (fmap Effect.Destroy . jsonToSlotName)`.
 
-- [ ] **Step 7: Create and register Murder**
+- [x] **Step 7: Create and register Murder**
 
 Create `data/cards/murder.json` (single line + trailing newline):
 
@@ -356,7 +356,7 @@ Create `data/cards/murder.json` (single line + trailing newline):
 
 In `Cards.hs`: add `murderPrinting :: Printing.Printing` to `MkCards`, `murderPrinting_ <- loadPrinting "murder"`, the record line, and the `allPrintings` entry.
 
-- [ ] **Step 8: Add the card-data test and bump the count**
+- [x] **Step 8: Add the card-data test and bump the count**
 
 Bump the `CardSpec.hs` count assertion to 33 (`"...(33 at M4b Task 2)"`, `33`). Add to `m4bCardTests`:
 
@@ -373,12 +373,12 @@ Bump the `CardSpec.hs` count assertion to 33 (`"...(33 at M4b Task 2)"`, `33`). 
 
 (`Effect`, `SlotName`, `TargetSpec`, `Color`, `ManaType` are already imported in `CardSpec.hs`.)
 
-- [ ] **Step 9: Run tests to verify they pass**
+- [x] **Step 9: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: PASS (Destroy gate green; count 33; D4 lint green — Murder reads `{target}` and declares `{target}`; honesty round-trip green).
 
-- [ ] **Step 10: Format, lint, commit**
+- [x] **Step 10: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

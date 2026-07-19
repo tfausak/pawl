@@ -165,8 +165,8 @@ lintTests cards =
                 (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
                 (Cards.allPrintings cards)
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (32 at M4b Task 1)" $
-        HU.assertEqual "count" 32 (length (Cards.allPrintings cards)),
+      HU.testCase "the registry holds every printing (33 at M4b Task 2)" $
+        HU.assertEqual "count" 33 (length (Cards.allPrintings cards)),
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $
         let card = Printing.card (Cards.blazePrinting cards)
             red = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -328,7 +328,15 @@ m4bCardTests cards =
               HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) (Card.Type.manaCost c)
               HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 0))) (Card.Type.power c)
               HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
-              HU.assertEqual "keyword" (Set.singleton Keyword.Indestructible) (Card.Type.keywords c)
+              HU.assertEqual "keyword" (Set.singleton Keyword.Indestructible) (Card.Type.keywords c),
+      HU.testCase "Murder is a {1}{B}{B} Instant that destroys a target creature" $
+        let c = Printing.card (Cards.murderPrinting cards)
+            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+         in do
+              HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black, black])) (Card.Type.manaCost c)
+              HU.assertBool "an instant" (Card.isInstant c)
+              HU.assertEqual "effect destroys the target slot" [Effect.Destroy (SlotName.MkSlotName (Text.pack "target"))] (Card.Type.effects c)
+              HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget) (Card.Type.targetSpecs c)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

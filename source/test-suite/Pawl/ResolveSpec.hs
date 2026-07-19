@@ -505,5 +505,35 @@ indestructibleTests cards =
               HU.assertEqual "Myr in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
     ]
 
+-- alice controls `n` Swamps and holds `printing` in a main phase with priority;
+-- bob controls one `foe`. Returns (foe's id, post-cast-and-resolve state).
+castBlackRemovalAt :: Cards.Cards -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+castBlackRemovalAt cards printing foe =
+  let base = S.landsInPlay (Cards.swampPrinting cards) 3
+      (foeId, withFoe) = S.addCreature foe S.bob base
+      (gs, spellId) = S.handOne printing withFoe
+      cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+      resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+   in (foeId, resolved)
+
+zoneChangeTests :: Cards.Cards -> Tasty.TestTree
+zoneChangeTests cards =
+  Tasty.testGroup
+    "ZoneChange"
+    [ HU.testCase "CR 701.7 Murder destroys a normal creature into its owner's graveyard" $
+        let (_, after) = castBlackRemovalAt cards (Cards.murderPrinting cards) (Cards.pikerPrinting cards)
+         in do
+              HU.assertEqual "no creature survives" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "Piker in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 700.4 Murder does nothing to an indestructible creature (destroy /= move)" $
+        let (_, after) = castBlackRemovalAt cards (Cards.murderPrinting cards) (Cards.darksteelMyrPrinting cards)
+         in do
+              -- The falsifier: modelling Destroy as MoveToZone slot Graveyard would
+              -- bury the Myr. It stays; the spell still resolved and was buried.
+              HU.assertEqual "Myr still on the battlefield" 1 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "bob's graveyard empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+              HU.assertEqual "Murder in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards]

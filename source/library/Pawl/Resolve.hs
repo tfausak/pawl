@@ -63,6 +63,7 @@ slotsOf effect = case effect of
   Effect.Search _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
+  Effect.Destroy slot -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -80,6 +81,7 @@ readsX = any effectReadsX
       Effect.Search _ -> False
       Effect.ExileAllGraveyards -> False
       Effect.ControlPlayerNextTurn _ -> False
+      Effect.Destroy _ -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -93,6 +95,7 @@ manaProduced effect = case effect of
   Effect.Search _ -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
+  Effect.Destroy _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -106,6 +109,7 @@ searchesLibrary effect = case effect of
   Effect.AddMana _ -> False
   Effect.ExileAllGraveyards -> False
   Effect.ControlPlayerNextTurn _ -> False
+  Effect.Destroy _ -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -139,6 +143,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Search _ -> effect
   Effect.ExileAllGraveyards -> effect
   Effect.ControlPlayerNextTurn _ -> effect
+  Effect.Destroy _ -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -315,6 +320,20 @@ applyEffect source controller bound legality chosen effect = case effect of
           -- (CR 723.5). Map.insert overwrites a prior pending control (CR 723.1a).
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
+        _ -> gs
+  Effect.Destroy slot ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just recipient, True) -> case recipientObject recipient of
+          Nothing -> gs
+          Just target ->
+            -- CR 700.4: an indestructible permanent can't be destroyed -- the
+            -- effect does nothing (no move). Read through the projection, so a
+            -- Humility'd permanent (keywords stripped) can be destroyed.
+            if Projection.hasKeyword Keyword.Indestructible target gs
+              then gs
+              else Event.changeZone target Zone.Graveyard gs
+        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> gs
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds

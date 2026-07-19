@@ -452,6 +452,7 @@ effectToJson e = case e of
   Effect.Search c -> Json.tagged (Text.pack "Search") (Just (cardCriterionToJson c))
   Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
+  Effect.Destroy s -> Json.tagged (Text.pack "Destroy") (Just (slotNameToJson s))
 
 jsonToEffect :: Value -> Either Text Effect.Effect
 jsonToEffect value = do
@@ -468,6 +469,7 @@ jsonToEffect value = do
     "Search" -> withValue mv (fmap Effect.Search . jsonToCardCriterion)
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
+    "Destroy" -> withValue mv (fmap Effect.Destroy . jsonToSlotName)
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------
