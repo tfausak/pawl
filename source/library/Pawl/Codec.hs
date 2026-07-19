@@ -5,6 +5,7 @@
 -- identity here is open-half machinery, not the rules core.
 module Pawl.Codec where
 
+import qualified Data.Char as Char
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
@@ -622,3 +623,13 @@ printingToJson (Printing.MkPrinting c) = cardToJson c
 
 jsonToPrinting :: Value -> Either Text Printing.Printing
 jsonToPrinting value = Printing.MkPrinting <$> jsonToCard value
+
+-- Slug -----------------------------------------------------------------------
+
+-- The file name for a card: its name lowercased, every non-alphanumeric run
+-- (spaces, punctuation, "//") collapsed to a single "-". "Urborg, Tomb of
+-- Yawgmoth" -> "urborg-tomb-of-yawgmoth".
+slugify :: Text -> Text
+slugify t =
+  let keep c = if Char.isAlphaNum c then c else ' '
+   in Text.intercalate (Text.pack "-") (Text.words (Text.map keep (Text.toLower t)))

@@ -1,5 +1,6 @@
 import qualified Pawl.ActivateSpec as ActivateSpec
 import qualified Pawl.CardSpec as CardSpec
+import qualified Pawl.CardsSpec as CardsSpec
 import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.CodecSpec as CodecSpec
 import qualified Pawl.CombatSpec as CombatSpec
@@ -27,6 +28,7 @@ testTree =
     "pawl"
     [ CoreSpec.tests,
       CardSpec.tests,
+      CardsSpec.tests,
       TurnSpec.tests,
       GameSpec.tests,
       SetupSpec.tests,

@@ -173,6 +173,7 @@ test-suite pawl-test-suite
   other-modules:
     Pawl.ActivateSpec
     Pawl.CardSpec
+    Pawl.CardsSpec
     Pawl.CastSpec
     Pawl.CodecSpec
     Pawl.CombatSpec
