@@ -4,7 +4,7 @@ module Pawl.CardsSpec where
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
-import qualified Pawl.Card as Card
+import qualified Pawl.Cards as Cards
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
 import qualified Pawl.Type.Card as CardT
@@ -20,10 +20,10 @@ tests =
   Tasty.testGroup
     "Pawl.CardsSpec"
     [ HU.testCase "slugs are unique" $
-        let slugs = map slugOf Card.allPrintings
+        let slugs = map slugOf Cards.allPrintings
          in HU.assertEqual "unique" (List.sort slugs) (List.sort (List.nub slugs)),
       HU.testCase "each committed file re-parses to its compiled card (P3)" $
-        mapM_ checkFile Card.allPrintings
+        mapM_ checkFile Cards.allPrintings
     ]
 
 checkFile :: Printing.Printing -> HU.Assertion

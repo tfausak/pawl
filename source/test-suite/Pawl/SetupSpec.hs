@@ -5,7 +5,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
-import qualified Pawl.Card as Card
+import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Setup as Setup
@@ -22,30 +22,30 @@ deckTests =
   Tasty.testGroup
     "Deck"
     [ HU.testCase "the red deck is 60 cards" $
-        HU.assertEqual "size" 60 (Setup.deckSize Setup.redDeck),
+        HU.assertEqual "size" 60 (Setup.deckSize Cards.redDeck),
       HU.testCase "the green deck is 60 cards" $
-        HU.assertEqual "size" 60 (Setup.deckSize Setup.greenDeck),
+        HU.assertEqual "size" 60 (Setup.deckSize Cards.greenDeck),
       HU.testCase "the black deck is 60 cards" $
-        HU.assertEqual "size" 60 (Setup.deckSize Setup.blackDeck),
+        HU.assertEqual "size" 60 (Setup.deckSize Cards.blackDeck),
       HU.testCase "red deck composition" $
-        let Deck.MkDeck m = Setup.redDeck
+        let Deck.MkDeck m = Cards.redDeck
          in do
-              HU.assertEqual "mountains" (Just 36) (Map.lookup Card.mountainPrinting m)
-              HU.assertEqual "pikers" (Just 12) (Map.lookup Card.pikerPrinting m)
-              HU.assertEqual "maidens" (Just 8) (Map.lookup Card.birdMaidenPrinting m)
-              HU.assertEqual "bolts" (Just 4) (Map.lookup Card.lightningBoltPrinting m),
+              HU.assertEqual "mountains" (Just 36) (Map.lookup Cards.mountainPrinting m)
+              HU.assertEqual "pikers" (Just 12) (Map.lookup Cards.pikerPrinting m)
+              HU.assertEqual "maidens" (Just 8) (Map.lookup Cards.birdMaidenPrinting m)
+              HU.assertEqual "bolts" (Just 4) (Map.lookup Cards.lightningBoltPrinting m),
       HU.testCase "green deck composition" $
-        let Deck.MkDeck m = Setup.greenDeck
+        let Deck.MkDeck m = Cards.greenDeck
          in do
-              HU.assertEqual "forests" (Just 36) (Map.lookup Card.forestPrinting m)
-              HU.assertEqual "mammoths" (Just 16) (Map.lookup Card.warMammothPrinting m)
-              HU.assertEqual "giant growths" (Just 4) (Map.lookup Card.giantGrowthPrinting m)
-              HU.assertEqual "serpent's gifts" (Just 4) (Map.lookup Card.serpentsGiftPrinting m),
+              HU.assertEqual "forests" (Just 36) (Map.lookup Cards.forestPrinting m)
+              HU.assertEqual "mammoths" (Just 16) (Map.lookup Cards.warMammothPrinting m)
+              HU.assertEqual "giant growths" (Just 4) (Map.lookup Cards.giantGrowthPrinting m)
+              HU.assertEqual "serpent's gifts" (Just 4) (Map.lookup Cards.serpentsGiftPrinting m),
       HU.testCase "black deck composition" $
-        let Deck.MkDeck m = Setup.blackDeck
+        let Deck.MkDeck m = Cards.blackDeck
          in do
-              HU.assertEqual "swamps" (Just 36) (Map.lookup Card.swampPrinting m)
-              HU.assertEqual "rats" (Just 24) (Map.lookup Card.typhoidRatsPrinting m),
+              HU.assertEqual "swamps" (Just 36) (Map.lookup Cards.swampPrinting m)
+              HU.assertEqual "rats" (Just 24) (Map.lookup Cards.typhoidRatsPrinting m),
       HU.testCase "36 Mountains per player after a red-red setup" $
         HU.assertEqual "mountains" 36 (S.countByName (Text.pack "Mountain") S.alice setupState),
       HU.testCase "8 Bird Maidens per player after a red-red setup" $

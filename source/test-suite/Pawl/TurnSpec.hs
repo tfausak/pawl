@@ -2,7 +2,7 @@
 module Pawl.TurnSpec where
 
 import qualified Data.Sequence as Seq
-import qualified Pawl.Card as Card
+import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -94,7 +94,7 @@ skipTests =
       HU.testCase "CR 508.8 an attacker keeps the declare blockers step" $
         -- The control: with an attacker, the step after declare attackers is
         -- declare blockers, exactly as before. So the skip is not "always skip".
-        let (gs, _, _) = S.combatBoardOf [Card.pikerPrinting] []
+        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting] []
             after = snd (Engine.runGamePure S.aggressiveAnswer gs Engine.runStep)
          in HU.assertEqual "declare blockers still next" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase after),
       HU.testCase "CR 508.8 an attacker-less combat changes no life total" $

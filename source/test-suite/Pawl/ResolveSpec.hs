@@ -8,7 +8,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Card as Card
+import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
@@ -194,7 +194,7 @@ resolveTests =
               Card.Type.MkCard
                 { Card.Type.name = Text.pack "T",
                   Card.Type.manaCost = Nothing,
-                  Card.Type.typeLine = Card.Type.typeLine (Printing.card Card.lightningBoltPrinting),
+                  Card.Type.typeLine = Card.Type.typeLine (Printing.card Cards.lightningBoltPrinting),
                   Card.Type.power = Nothing,
                   Card.Type.toughness = Nothing,
                   Card.Type.keywords = Set.empty,
@@ -216,7 +216,7 @@ resolveTests =
         -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
         -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten
         -- (Swamp -> Mountain) it is SetLandSubtype Mountain -> {Mountain}.
-        let base = S.landsInPlay Card.forestPrinting 1
+        let base = S.landsInPlay Cards.forestPrinting 1
             targetLand = case Game.zoneMembers Zone.Battlefield S.alice base of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
@@ -225,7 +225,7 @@ resolveTests =
             landformObj =
               Object.MkObject
                 { Object.owner = S.alice,
-                  Object.source = Source.OfCard Card.landformPrinting,
+                  Object.source = Source.OfCard Cards.landformPrinting,
                   Object.zone = Zone.Stack,
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
@@ -249,12 +249,12 @@ resolveTests =
               HU.assertEqual "target land became Mountain, not Swamp" (Set.singleton Subtype.Mountain) (Projection.subtypesOf targetLand after),
       HU.testCase "CR 400.7 hacking Blood Moon on the stack is lost when it resolves" $
         let base = Setup.emptyGame S.bothPlayers
-            (nonbasicId, g1) = S.addCreature Card.urborgPrinting S.alice base
+            (nonbasicId, g1) = S.addCreature Cards.urborgPrinting S.alice base
             (bloodMoonSpellId, g2) = Game.freshObjectId g1
             bmObj =
               Object.MkObject
                 { Object.owner = S.alice,
-                  Object.source = Source.OfCard Card.bloodMoonPrinting,
+                  Object.source = Source.OfCard Cards.bloodMoonPrinting,
                   Object.zone = Zone.Stack,
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
@@ -274,8 +274,8 @@ resolveTests =
             -- no longer names it, so nonbasic lands are Mountains, not Islands.
             HU.assertEqual "hack lost: nonbasic land is Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf nonbasicId after),
       HU.testCase "CR 608.2n a resolving ability deals its damage and ceases" $
-        let (srcId, g0) = S.addCreature Card.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
-            ability = case Card.Type.activatedAbilities (Printing.card Card.prodigalSorcererPrinting) of
+        let (srcId, g0) = S.addCreature Cards.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
+            ability = case Card.Type.activatedAbilities (Printing.card Cards.prodigalSorcererPrinting) of
               ab : _ -> ab
               [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [] Map.empty
             (abilId, g1) = Game.freshObjectId g0
@@ -307,7 +307,7 @@ resolveTests =
         -- The fetched card gets a NEW object id (CR 400.7 changeZone), so assert by
         -- count/tapped-count, never by the library incarnation's id.
         let base = Setup.emptyGame S.bothPlayers
-            (_, g1) = S.addLibraryCard Card.mountainPrinting S.alice base
+            (_, g1) = S.addLibraryCard Cards.mountainPrinting S.alice base
             ability =
               ActivatedAbility.MkActivatedAbility
                 (AbilityCost.MkAbilityCost Nothing [])
@@ -325,7 +325,7 @@ resolveTests =
               HU.assertEqual "library empty" [] (Game.zoneMembers Zone.Library S.alice resolved),
       HU.testCase "CR 701.23b Search may fail to find" $
         let base = Setup.emptyGame S.bothPlayers
-            (_, g1) = S.addLibraryCard Card.mountainPrinting S.alice base
+            (_, g1) = S.addLibraryCard Cards.mountainPrinting S.alice base
             ability = ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [Effect.Search CardCriterion.BasicLandCard] Map.empty
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
@@ -335,8 +335,8 @@ resolveTests =
          in HU.assertEqual "nothing entered the battlefield" Set.empty (GameState.battlefield resolved),
       HU.testCase "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $
         let g0 = Setup.emptyGame S.bothPlayers
-            (ripId, g1) = S.addCreature Card.restInPeacePrinting S.alice g0
-            (deadId, g2) = S.addLibraryCard Card.pikerPrinting S.bob g1
+            (ripId, g1) = S.addCreature Cards.restInPeacePrinting S.alice g0
+            (deadId, g2) = S.addLibraryCard Cards.pikerPrinting S.bob g1
             -- move the Piker into bob's graveyard
             g3 = Event.changeZone deadId Zone.Graveyard g2
             ability = TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters [Effect.ExileAllGraveyards] Map.empty
@@ -361,7 +361,7 @@ resolveTests =
               HU.assertEqual "ability ceased" Nothing (Game.lookupObject abilId resolved),
       HU.testCase "CR 723.1: Mindslaver's ability installs pending control, promoted next turn" $
         let g0 = Setup.emptyGame S.bothPlayers
-            (srcId, g1) = S.addCreature Card.mindslaverPrinting S.alice g0
+            (srcId, g1) = S.addCreature Cards.mindslaverPrinting S.alice g0
             slot = SlotName.MkSlotName (Text.pack "target")
             ability =
               ActivatedAbility.MkActivatedAbility
@@ -430,12 +430,12 @@ boltAnswer p = case p of
 twoBoltState :: GameState.GameState
 twoBoltState =
   let (_, withPiker) = S.addPiker S.bob (S.mountainsInPlay 2)
-      (gs1, _oid1) = S.handOne Card.lightningBoltPrinting withPiker
+      (gs1, _oid1) = S.handOne Cards.lightningBoltPrinting withPiker
       (oid2, gs2) = Game.freshObjectId gs1
       obj =
         Object.MkObject
           { Object.owner = S.alice,
-            Object.source = Source.OfCard Card.lightningBoltPrinting,
+            Object.source = Source.OfCard Cards.lightningBoltPrinting,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,

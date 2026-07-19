@@ -7,7 +7,6 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import Numeric.Natural (Natural)
-import qualified Pawl.Card as Card
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -33,46 +32,6 @@ import qualified Pawl.Type.Zone as Zone
 
 startingLife :: Integer
 startingLife = 20
-
--- Every deck is 36 land + 24 creature = 60, so two players conserve 120 objects
--- in any matchup. redDeck is M0's deck; greenDeck and blackDeck make M2c's
--- trampler and deathtoucher castable (git-bug 14138aa). Each deck is mono-color,
--- which is what keeps Mana.payCost's source elision legitimate.
--- 36 land + 24 spells = 60. Maiden stays at 8 so flying still gets random-game
--- coverage, and four Bolts keep combat fed (enough Pikers for the engagement
--- guards) while making instant speed fire in some seed (git-bug 15de615's sibling
--- exit criterion).
-redDeck :: Deck.Deck
-redDeck =
-  Deck.MkDeck $
-    Map.fromList
-      [ (Card.mountainPrinting, 36),
-        (Card.pikerPrinting, 12),
-        (Card.birdMaidenPrinting, 8),
-        (Card.lightningBoltPrinting, 4)
-      ]
-
--- Still 36 land + 24 spells = 60. Giant Growth and Serpent's Gift give
--- continuous effects random-game coverage (M3b); War Mammoth stays plentiful
--- (16, down from 24) so combat still happens and Serpent's Gift has a
--- trampler to grant deathtouch to.
-greenDeck :: Deck.Deck
-greenDeck =
-  Deck.MkDeck $
-    Map.fromList
-      [ (Card.forestPrinting, 36),
-        (Card.warMammothPrinting, 16),
-        (Card.giantGrowthPrinting, 4),
-        (Card.serpentsGiftPrinting, 4)
-      ]
-
-blackDeck :: Deck.Deck
-blackDeck =
-  Deck.MkDeck $
-    Map.fromList
-      [ (Card.swampPrinting, 36),
-        (Card.typhoidRatsPrinting, 24)
-      ]
 
 deckSize :: Deck.Deck -> Natural
 deckSize (Deck.MkDeck m) = sum (Map.elems m)

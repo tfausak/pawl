@@ -14,6 +14,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Card as Card
+import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -157,9 +158,9 @@ stackTests =
          in HU.assertEqual "unchanged" gs (snd (Engine.runGamePure S.identityAnswer gs Stack.resolveTop)),
       HU.testCase "CR 601.3: cast Panglacial during Evolving Wilds' search, then it resolves 9/5" $
         let g0 = Setup.emptyGame S.bothPlayers
-            (ewId, g1) = S.addCreature Card.evolvingWildsPrinting S.alice g0
-            g2 = List.foldl' (\g _ -> snd (S.addCreature Card.forestPrinting S.alice g)) g1 [1 .. (7 :: Int)]
-            (_, g3) = S.addLibraryCard Card.panglacialWurmPrinting S.alice g2
+            (ewId, g1) = S.addCreature Cards.evolvingWildsPrinting S.alice g0
+            g2 = List.foldl' (\g _ -> snd (S.addCreature Cards.forestPrinting S.alice g)) g1 [1 .. (7 :: Int)]
+            (_, g3) = S.addLibraryCard Cards.panglacialWurmPrinting S.alice g2
             g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
          in case Projection.abilitiesOf ewId g4 of
               ewAbility : _ ->
@@ -175,9 +176,9 @@ stackTests =
               [] -> HU.assertFailure "Evolving Wilds should have an activated ability",
       HU.testCase "declining the cast resolves the search normally, Panglacial stays" $
         let g0 = Setup.emptyGame S.bothPlayers
-            (ewId, g1) = S.addCreature Card.evolvingWildsPrinting S.alice g0
-            g2 = List.foldl' (\g _ -> snd (S.addCreature Card.forestPrinting S.alice g)) g1 [1 .. (7 :: Int)]
-            (_, g3) = S.addLibraryCard Card.panglacialWurmPrinting S.alice g2
+            (ewId, g1) = S.addCreature Cards.evolvingWildsPrinting S.alice g0
+            g2 = List.foldl' (\g _ -> snd (S.addCreature Cards.forestPrinting S.alice g)) g1 [1 .. (7 :: Int)]
+            (_, g3) = S.addLibraryCard Cards.panglacialWurmPrinting S.alice g2
             g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
          in case Projection.abilitiesOf ewId g4 of
               ewAbility : _ ->
@@ -273,16 +274,16 @@ castTests =
               HU.assertEqual "nothing on the stack" 0 (length (GameState.stack after))
               HU.assertEqual "nothing paid" 0 (S.tappedCount S.alice after),
       HU.testCase "Panglacial Wurm in the library is castable-while-searching with mana" $
-        let base = S.landsInPlay Card.forestPrinting 7
-            (_, gs) = S.addLibraryCard Card.panglacialWurmPrinting S.alice base
+        let base = S.landsInPlay Cards.forestPrinting 7
+            (_, gs) = S.addLibraryCard Cards.panglacialWurmPrinting S.alice base
          in HU.assertEqual "one castable-while-searching option" 1 (length (Cast.castableWhileSearching S.alice gs)),
       HU.testCase "with too little mana, Panglacial is not castable-while-searching" $
-        let base = S.landsInPlay Card.forestPrinting 3
-            (_, gs) = S.addLibraryCard Card.panglacialWurmPrinting S.alice base
+        let base = S.landsInPlay Cards.forestPrinting 3
+            (_, gs) = S.addLibraryCard Cards.panglacialWurmPrinting S.alice base
          in HU.assertEqual "unaffordable, so no options" 0 (length (Cast.castableWhileSearching S.alice gs)),
       HU.testCase "castWhileSearching casts Panglacial from the library onto the stack" $
-        let base = S.landsInPlay Card.forestPrinting 7
-            (_, gs) = S.addLibraryCard Card.panglacialWurmPrinting S.alice base
+        let base = S.landsInPlay Cards.forestPrinting 7
+            (_, gs) = S.addLibraryCard Cards.panglacialWurmPrinting S.alice base
             after = snd (Engine.runGamePure castFirstOption gs (Cast.castWhileSearching S.alice))
             onStack = length (filter (nameOnStack (Text.pack "Panglacial Wurm") after) (GameState.stack after))
          in do
@@ -386,9 +387,9 @@ magicalHackTests =
         -- Magical Hack in hand. The Mountain is added FIRST so it has the lowest
         -- object id and identityAnswer's ChooseTargets (Set.lookupMin over the
         -- ToObject recipients) picks it, not the Island. Hack Mountain -> Island.
-        let (mountainId, g0) = S.addCreature Card.mountainPrinting S.alice (Setup.emptyGame S.bothPlayers)
-            (islandId, g1) = S.addCreature Card.islandPrinting S.alice g0
-            (gs, hackId) = handInPlay Card.magicalHackPrinting g1
+        let (mountainId, g0) = S.addCreature Cards.mountainPrinting S.alice (Setup.emptyGame S.bothPlayers)
+            (islandId, g1) = S.addCreature Cards.islandPrinting S.alice g0
+            (gs, hackId) = handInPlay Cards.magicalHackPrinting g1
             cast = snd (Engine.runGamePure hackAnswer gs (Cast.castSpell S.alice hackId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in do
@@ -397,7 +398,7 @@ magicalHackTests =
               HU.assertBool "hacked Mountain taps blue" (elem (ManaType.Colored Color.Blue) (Mana.manaTypesOf mountainId resolved))
               HU.assertBool "hacked Mountain no longer taps red" (notElem (ManaType.Colored Color.Red) (Mana.manaTypesOf mountainId resolved)),
       HU.testCase "CR 601.2c Magical Hack with no legal target is uncastable" $
-        let (gs, hackId) = handInPlay Card.magicalHackPrinting (Setup.emptyGame S.bothPlayers)
+        let (gs, hackId) = handInPlay Cards.magicalHackPrinting (Setup.emptyGame S.bothPlayers)
          in -- Empty battlefield and stack: SpellOrPermanentTarget has no legal
             -- recipient (and there is no mana either), so it is uncastable.
             HU.assertBool "no target -> uncastable" (not (Cast.castable S.alice hackId gs))

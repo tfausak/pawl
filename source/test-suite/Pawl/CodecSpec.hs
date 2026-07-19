@@ -5,7 +5,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Card as Card
+import qualified Pawl.Cards as Cards
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as J
 import qualified Pawl.Type.AbilityCost as AbilityCost
@@ -135,10 +135,10 @@ tests =
       Tasty.testGroup
         "honesty round-trip over allPrintings"
         [ HU.testCase "P1: jsonToPrinting . printingToJson == Right" $
-            mapM_ (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (Codec.jsonToPrinting (Codec.printingToJson p))) Card.allPrintings,
+            mapM_ (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (Codec.jsonToPrinting (Codec.printingToJson p))) Cards.allPrintings,
           HU.testCase "P2: through text" $
             mapM_
               (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (J.parse (J.render (Codec.printingToJson p)) >>= Codec.jsonToPrinting))
-              Card.allPrintings
+              Cards.allPrintings
         ]
     ]

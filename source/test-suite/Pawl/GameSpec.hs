@@ -12,7 +12,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Action as Action
-import qualified Pawl.Card as Card
+import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -91,7 +91,7 @@ gameTests =
               ( Just
                   Object.MkObject
                     { Object.owner = S.alice,
-                      Object.source = Source.OfCard Card.mountainPrinting,
+                      Object.source = Source.OfCard Cards.mountainPrinting,
                       Object.zone = Zone.Battlefield,
                       Object.tapped = TapState.Untapped,
                       Object.damage = 0,
@@ -309,7 +309,7 @@ ruleTests =
       HU.testCase "CR 723.3/723.5: alice decides for bob, but bob's resources move" $
         -- bob's main phase, controlled by alice, with a Mountain and a Bolt.
         let g0 = Setup.emptyGame S.bothPlayers
-            (_mtnId, g1) = S.addCreature Card.mountainPrinting S.bob g0
+            (_mtnId, g1) = S.addCreature Cards.mountainPrinting S.bob g0
             (_boltId, g2) = handBobBolt g1
             g3 =
               g2
@@ -345,7 +345,7 @@ handBobBolt gs =
       obj =
         Object.MkObject
           { Object.owner = S.bob,
-            Object.source = Source.OfCard Card.lightningBoltPrinting,
+            Object.source = Source.OfCard Cards.lightningBoltPrinting,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,

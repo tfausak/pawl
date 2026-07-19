@@ -18,6 +18,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Card as Card
+import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
@@ -58,10 +59,10 @@ bothPlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
 bothPlayers = alice NonEmpty.:| [bob]
 
 redRed :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
-redRed = Setup.mirror Setup.redDeck bothPlayers
+redRed = Setup.mirror Cards.redDeck bothPlayers
 
 greenBlack :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
-greenBlack = (alice, Setup.greenDeck) NonEmpty.:| [(bob, Setup.blackDeck)]
+greenBlack = (alice, Cards.greenDeck) NonEmpty.:| [(bob, Cards.blackDeck)]
 
 matchups :: [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
 matchups = [redRed, greenBlack]
@@ -70,7 +71,7 @@ matchups = [redRed, greenBlack]
 -- only loss condition reachable is CR 704.5b deck-out. Used by the durable
 -- lands-only-decks property.
 landsOnly :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
-landsOnly = Setup.mirror (Deck.MkDeck (Map.singleton Card.mountainPrinting 60)) bothPlayers
+landsOnly = Setup.mirror (Deck.MkDeck (Map.singleton Cards.mountainPrinting 60)) bothPlayers
 
 isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
@@ -265,7 +266,7 @@ addCreature printing pid gs =
       )
 
 addPiker :: PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
-addPiker = addCreature Card.pikerPrinting
+addPiker = addCreature Cards.pikerPrinting
 
 -- One card of a printing in pid's library.
 addLibraryCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
@@ -294,7 +295,7 @@ addLibraryCard printing pid gs =
 -- Humility on the battlefield under bob's control (it is not a creature, so
 -- AllCreatures does not touch it). Returns the updated state.
 withHumility :: GameState.GameState -> GameState.GameState
-withHumility gs = snd (addCreature Card.humilityPrinting bob gs)
+withHumility gs = snd (addCreature Cards.humilityPrinting bob gs)
 
 -- alice controls n untapped basic lands of one printing, nothing else.
 landsInPlay :: Printing.Printing -> Int -> GameState.GameState
@@ -322,7 +323,7 @@ landsInPlay land n =
 
 -- alice controls n untapped Mountains on the battlefield, nothing else.
 mountainsInPlay :: Int -> GameState.GameState
-mountainsInPlay = landsInPlay Card.mountainPrinting
+mountainsInPlay = landsInPlay Cards.mountainPrinting
 
 -- Put one card of a printing into alice's hand in a main phase with priority.
 handOne :: Printing.Printing -> GameState.GameState -> (GameState.GameState, ObjectId.ObjectId)
@@ -360,7 +361,7 @@ pikerInHand n ph =
       obj =
         Object.MkObject
           { Object.owner = alice,
-            Object.source = Source.OfCard Card.pikerPrinting,
+            Object.source = Source.OfCard Cards.pikerPrinting,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
@@ -382,7 +383,7 @@ pikerInHand n ph =
 -- alice has n untapped Mountains in play and one Lightning Bolt in hand.
 boltInHand :: Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
 boltInHand n ph =
-  let (gs, oid) = handOne Card.lightningBoltPrinting (mountainsInPlay n)
+  let (gs, oid) = handOne Cards.lightningBoltPrinting (mountainsInPlay n)
    in (gs {GameState.phase = ph}, oid)
 
 -- alice is active with one Settled creature per printing in `mine`; bob defends
@@ -419,7 +420,7 @@ combatBoardOf mine theirs =
 -- alice is active with `a` Settled Pikers; bob defends with `b` Settled Pikers.
 -- Returns the attackers' ids and the blockers' ids alongside the state.
 combatBoard :: Int -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
-combatBoard a b = combatBoardOf (replicate a Card.pikerPrinting) (replicate b Card.pikerPrinting)
+combatBoard a b = combatBoardOf (replicate a Cards.pikerPrinting) (replicate b Cards.pikerPrinting)
 
 -- Attack with everything, block per the given plan, then deal damage.
 fightWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
@@ -499,16 +500,16 @@ handSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 
 pikerCard :: Card.Type.Card
-pikerCard = Printing.card Card.pikerPrinting
+pikerCard = Printing.card Cards.pikerPrinting
 
 -- The printings M2a adds, paired with the single keyword each must carry.
 m2aPrintings :: [(Printing.Printing, Keyword.Keyword)]
 m2aPrintings =
-  [ (Card.birdMaidenPrinting, Keyword.Flying),
-    (Card.nimbleBirdstickerPrinting, Keyword.Reach),
-    (Card.ogreSentryPrinting, Keyword.Defender),
-    (Card.windseekerCentaurPrinting, Keyword.Vigilance),
-    (Card.goblinChariotPrinting, Keyword.Haste)
+  [ (Cards.birdMaidenPrinting, Keyword.Flying),
+    (Cards.nimbleBirdstickerPrinting, Keyword.Reach),
+    (Cards.ogreSentryPrinting, Keyword.Defender),
+    (Cards.windseekerCentaurPrinting, Keyword.Vigilance),
+    (Cards.goblinChariotPrinting, Keyword.Haste)
   ]
 
 -- A GameState with a single Mountain in alice's hand, in a chosen phase.
@@ -518,7 +519,7 @@ oneMountainState ph =
       obj =
         Object.MkObject
           { Object.owner = alice,
-            Object.source = Source.OfCard Card.mountainPrinting,
+            Object.source = Source.OfCard Cards.mountainPrinting,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
@@ -566,7 +567,7 @@ drawStep = Engine.runTurnBasedActions (Phase.Beginning BeginningStep.DrawStep)
 boltAtBobsPiker :: (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
 boltAtBobsPiker =
   let (_, withPiker) = addPiker bob (mountainsInPlay 1)
-      (gs, oid) = handOne Card.lightningBoltPrinting withPiker
+      (gs, oid) = handOne Cards.lightningBoltPrinting withPiker
    in (gs, snd (Engine.runGamePure identityAnswer gs (Cast.castSpell alice oid)), oid)
 
 -- The single creature bob controls in a fixture built by addPiker.

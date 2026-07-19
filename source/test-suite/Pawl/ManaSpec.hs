@@ -3,7 +3,7 @@ module Pawl.ManaSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
-import qualified Pawl.Card as Card
+import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
@@ -45,13 +45,13 @@ castabilityTests =
   Tasty.testGroup
     "Castability"
     [ HU.testCase "War Mammoth is cast off four Forests and resolves onto the battlefield" $
-        let gs = resolvedCreature Card.forestPrinting Card.warMammothPrinting 4
+        let gs = resolvedCreature Cards.forestPrinting Cards.warMammothPrinting 4
          in do
               HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
               HU.assertEqual "one creature in play" 1 (S.creaturesInPlay S.alice gs)
               HU.assertEqual "lands tapped" 4 (S.tappedCount S.alice gs),
       HU.testCase "Typhoid Rats is cast off one Swamp and resolves onto the battlefield" $
-        let gs = resolvedCreature Card.swampPrinting Card.typhoidRatsPrinting 1
+        let gs = resolvedCreature Cards.swampPrinting Cards.typhoidRatsPrinting 1
          in do
               HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
               HU.assertEqual "one creature in play" 1 (S.creaturesInPlay S.alice gs)
@@ -112,16 +112,16 @@ manaTests =
                 HU.assertEqual "emptied" 0 (poolSize S.alice (Mana.emptyManaPools (Mana.tapForMana oid gs))),
       HU.testCase "CR 305.6/305.7 an Urborg'd Mountain taps for black too" $
         let base = Setup.emptyGame S.bothPlayers
-            (mountainId, g1) = S.addCreature Card.mountainPrinting S.alice base
-            (_, gs) = S.addCreature Card.urborgPrinting S.alice g1
+            (mountainId, g1) = S.addCreature Cards.mountainPrinting S.alice base
+            (_, gs) = S.addCreature Cards.urborgPrinting S.alice g1
          in -- Urborg adds Swamp to all lands, so the Mountain taps for black too.
             do
               HU.assertBool "black available" (ManaType.Colored Color.Black `elem` Mana.manaTypesOf mountainId gs)
               HU.assertBool "red still available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf mountainId gs),
       HU.testCase "CR 305.6/305.7 a Blood Moon'd Urborg taps for red only" $
         let base = Setup.emptyGame S.bothPlayers
-            (urborgId, g1) = S.addCreature Card.urborgPrinting S.alice base
-            (_, gs) = S.addCreature Card.bloodMoonPrinting S.alice g1
+            (urborgId, g1) = S.addCreature Cards.urborgPrinting S.alice base
+            (_, gs) = S.addCreature Cards.bloodMoonPrinting S.alice g1
          in do
               HU.assertBool "red available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf urborgId gs)
               HU.assertBool "black not available (stripped)" (ManaType.Colored Color.Black `notElem` Mana.manaTypesOf urborgId gs),
@@ -150,12 +150,12 @@ manaTests =
                 }
          in HU.assertBool "no mana produced -> not mana" (not (Mana.isManaAbility ab)),
       HU.testCase "CR 605 a settled Llanowar Elves is a green mana source" $
-        let (elfId, gs) = S.addCreature Card.llanowarElvesPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        let (elfId, gs) = S.addCreature Cards.llanowarElvesPrinting S.alice (Setup.emptyGame S.bothPlayers)
          in do
               HU.assertBool "taps green" (elem (ManaType.Colored Color.Green) (Mana.manaTypesOf elfId gs))
               HU.assertBool "is a mana source" (elem elfId (Mana.manaSources S.alice gs)),
       HU.testCase "CR 302.6 a summoning-sick Llanowar Elves is NOT a mana source" $
-        let (elfId, g0) = S.addCreature Card.llanowarElvesPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        let (elfId, g0) = S.addCreature Cards.llanowarElvesPrinting S.alice (Setup.emptyGame S.bothPlayers)
             sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) elfId (GameState.objects g0)}
          in HU.assertBool "sick elf excluded" (notElem elfId (Mana.manaSources S.alice sick))
     ]
