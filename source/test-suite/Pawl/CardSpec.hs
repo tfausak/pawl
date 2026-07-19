@@ -165,8 +165,8 @@ lintTests cards =
                 (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
                 (Cards.allPrintings cards)
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (31 at M4a Task 8)" $
-        HU.assertEqual "count" 31 (length (Cards.allPrintings cards)),
+      HU.testCase "the registry holds every printing (32 at M4b Task 1)" $
+        HU.assertEqual "count" 32 (length (Cards.allPrintings cards)),
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $
         let card = Printing.card (Cards.blazePrinting cards)
             red = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -317,8 +317,22 @@ m3eCardTests cards =
           _ -> HU.assertFailure "expected exactly one ability"
     ]
 
+m4bCardTests :: Cards.Cards -> Tasty.TestTree
+m4bCardTests cards =
+  Tasty.testGroup
+    "M4bCards"
+    [ HU.testCase "Darksteel Myr is a {3} 0/1 Artifact Creature with indestructible" $
+        let c = Printing.card (Cards.darksteelMyrPrinting cards)
+         in do
+              HU.assertEqual "name" (Text.pack "Darksteel Myr") (Card.Type.name c)
+              HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) (Card.Type.manaCost c)
+              HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 0))) (Card.Type.power c)
+              HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
+              HU.assertEqual "keyword" (Set.singleton Keyword.Indestructible) (Card.Type.keywords c)
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
     "Card"
-    [cardTests cards, lintTests cards, m2aCardTests cards, m2bCardTests cards, m2cCardTests cards, basicLandTests cards, m3cCardTests cards, m3eCardTests cards]
+    [cardTests cards, lintTests cards, m2aCardTests cards, m2bCardTests cards, m2cCardTests cards, basicLandTests cards, m3cCardTests cards, m3eCardTests cards, m4bCardTests cards]

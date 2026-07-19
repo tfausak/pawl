@@ -12,6 +12,7 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Departure as Departure
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
@@ -66,21 +67,27 @@ woundedByDeathtouch gs oid =
 creatureDies :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool
 creatureDies gs pc oid =
   let isCreature = Set.member CardType.Creature (PC.cardTypes pc)
+      -- CR 700.4 / 702.12b: indestructible stops "destroy" and lethal-damage/
+      -- deathtouch state-based actions (704.5g/704.5h) but NOT 704.5f (toughness
+      -- 0 or less is a put-into-graveyard, not a destruction). Read off the
+      -- already-projected keywords, so Humility (layer 6) strips it.
+      indestructible = Set.member Keyword.Indestructible (PC.keywords pc)
    in isCreature && case PC.toughness pc of
         -- An unevaluable toughness means NO state-based action, not a crash.
         -- Unreachable in M1b (every toughness is a Literal); reachable at M3.
         Nothing -> False
         Just toughness ->
-          -- CR 704.5f: toughness 0 or less.
+          -- CR 704.5f: toughness 0 or less. Ungated by indestructible.
           (toughness <= 0)
-            -- CR 704.5g: damage marked is lethal.
-            || ( case Game.lookupObject oid gs of
-                   Nothing -> False
-                   Just obj -> toInteger (Object.damage obj) >= toughness
+            -- CR 704.5g: lethal marked damage. Guarded.
+            || ( not indestructible
+                   && ( case Game.lookupObject oid gs of
+                          Nothing -> False
+                          Just obj -> toInteger (Object.damage obj) >= toughness
+                      )
                )
-            -- CR 704.5h: wounded by a deathtouch source (toughness > 0 already,
-            -- since 704.5f handled <= 0).
-            || woundedByDeathtouch gs oid
+            -- CR 704.5h: wounded by a deathtouch source. Guarded.
+            || (not indestructible && woundedByDeathtouch gs oid)
 
 -- CR 704.3 says to repeat until no state-based action is performed. One pass is
 -- enough in M1b: a creature dying cannot cause another SBA, because nothing

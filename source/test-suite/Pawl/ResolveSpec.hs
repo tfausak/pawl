@@ -476,5 +476,34 @@ fizzleTests cards =
               HU.assertEqual "the loop released priority" Nothing (GameState.priority after)
     ]
 
+indestructibleTests :: Cards.Cards -> Tasty.TestTree
+indestructibleTests cards =
+  Tasty.testGroup
+    "Indestructible"
+    [ HU.testCase "CR 704.5g an indestructible creature survives lethal marked damage" $
+        let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            -- Myr is 0/1; 3 marked damage is lethal (704.5g) but indestructible saves it.
+            after = Sba.checkStateBasedActions (S.markDamage myrId 3 gs)
+         in do
+              HU.assertEqual "Myr still on the battlefield" 1 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "Myr not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 704.5h an indestructible creature survives deathtouch" $
+        let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            -- Zero marked damage (so 704.5g is silent) plus a deathtouch event isolates
+            -- the 704.5h path; indestructible must guard it too (CR 700.4).
+            wounded = gs {GameState.damageEvents = [DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True]}
+            after = Sba.checkStateBasedActions wounded
+         in HU.assertEqual "Myr survives deathtouch" 1 (S.creaturesInPlay S.bob after),
+      HU.testCase "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $
+        let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            -- A test-local -0/-1 drops Myr (0/1) to 0/0; 704.5f is a put-into-graveyard,
+            -- not a destroy, so indestructible does not apply (Myr's own reminder text).
+            zeroed = withEffect myrId (Timestamp.MkTimestamp 5) (Modification.ModifyPowerToughness (Quantity.Literal 0) (Quantity.Literal (-1))) gs
+            after = Sba.checkStateBasedActions zeroed
+         in do
+              HU.assertEqual "Myr left the battlefield" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "Myr in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards]

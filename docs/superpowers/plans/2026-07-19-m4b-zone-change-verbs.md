@@ -68,7 +68,7 @@ Delivers the keyword and its SBA readers (CR 704.5g/704.5h guarded, 704.5f not),
 **Interfaces:**
 - Produces: `Keyword.Indestructible`; `Subtype.Myr`; `Cards.darksteelMyrPrinting :: Cards.Cards -> Printing.Printing`; `Sba.creatureDies` now guards 704.5g/704.5h with indestructibility.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/ResolveSpec.hs` a new group and wire it into `tests`. `withEffect` (already defined in this module) applies a test-local continuous effect for the 704.5f case; `DamageEvent`/`Recipient`/`Modification`/`Quantity`/`Keyword` are already imported.
 
@@ -110,12 +110,12 @@ tests :: Cards.Cards -> Tasty.TestTree
 tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards]
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 | tail -30`
 Expected: compile failure — `Cards.darksteelMyrPrinting` and `Keyword`/`Subtype` references not in scope (red).
 
-- [ ] **Step 3: Add the keyword and subtype constructors**
+- [x] **Step 3: Add the keyword and subtype constructors**
 
 In `source/library/Pawl/Type/Keyword.hs`, insert `Indestructible -- 702.12` in rule-number order (between `Haste -- 702.10` and `Reach -- 702.17`):
 
@@ -140,11 +140,11 @@ In `source/library/Pawl/Type/Subtype.hs`, append `Myr` after `Elephant` (a creat
 
 (No other module cases exhaustively on `Subtype` — verified: only `Mana.subtypeMana` and `Codec`.)
 
-- [ ] **Step 4: Add the codec arms**
+- [x] **Step 4: Add the codec arms**
 
 In `source/library/Pawl/Codec.hs`, add `Indestructible` to `keywordToJson` (case arm `Keyword.Indestructible -> "Indestructible"`) and to the `jsonToKeyword` table (`(Text.pack "Indestructible", Keyword.Indestructible)`), keeping rule-number order. Add `Myr` to `subtypeToJson` (`Subtype.Myr -> "Myr"`) and to the `jsonToSubtype` table (`(Text.pack "Myr", Subtype.Myr)`).
 
-- [ ] **Step 5: Add the indestructible guard to the SBA**
+- [x] **Step 5: Add the indestructible guard to the SBA**
 
 In `source/library/Pawl/Sba.hs`, `creatureDies` (lines ~66-83): read indestructibility off the already-projected characteristics and guard 704.5g and 704.5h, leaving 704.5f ungated.
 
@@ -175,7 +175,7 @@ creatureDies gs pc oid =
 
 Add `import qualified Pawl.Type.Keyword as Keyword` to `Pawl.Sba` (alphabetical within its import group).
 
-- [ ] **Step 6: Create the Darksteel Myr card file**
+- [x] **Step 6: Create the Darksteel Myr card file**
 
 Create `data/cards/darksteel-myr.json` with exactly this content (single line, then one trailing newline — the `CardsSpec` P3 byte-stability check enforces `render(card) <> "\n"`; `types` is `[Creature, Artifact]` because the render sorts by the `CardType` `Ord`, where `Creature` precedes `Artifact`):
 
@@ -185,11 +185,11 @@ Create `data/cards/darksteel-myr.json` with exactly this content (single line, t
 
 (If `CardsSpec` P3 later reports a byte mismatch, regenerate the exact bytes: `cabal repl pawl:test:test`, then `Data.Text.IO.putStr (Pawl.Json.render (Pawl.Codec.cardToJson <the card>) <> Data.Text.pack "\n")` and copy the output. The content above is computed to match.)
 
-- [ ] **Step 7: Register the card**
+- [x] **Step 7: Register the card**
 
 In `source/test-suite/Pawl/Cards.hs`: add the field `darksteelMyrPrinting :: Printing.Printing` to `MkCards`; add `darksteelMyrPrinting_ <- loadPrinting "darksteel-myr"` in `loadCards`; add `darksteelMyrPrinting = darksteelMyrPrinting_` to the returned record; add `darksteelMyrPrinting cards,` to `allPrintings`.
 
-- [ ] **Step 8: Add the card-data test and bump the registry count**
+- [x] **Step 8: Add the card-data test and bump the registry count**
 
 In `source/test-suite/Pawl/CardSpec.hs`, bump the registry-count assertion from 31 to 32:
 
@@ -223,12 +223,12 @@ tests cards =
     [cardTests cards, lintTests cards, m2aCardTests cards, m2bCardTests cards, m2cCardTests cards, basicLandTests cards, m3cCardTests cards, m3eCardTests cards, m4bCardTests cards]
 ```
 
-- [ ] **Step 9: Run tests to verify they pass**
+- [x] **Step 9: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: PASS (indestructible group green, card group green, count = 32, honesty round-trip green over 32 printings).
 
-- [ ] **Step 10: Format, lint, commit**
+- [x] **Step 10: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

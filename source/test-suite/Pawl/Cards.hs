@@ -44,7 +44,8 @@ data Cards = MkCards
     plainsPrinting :: Printing.Printing,
     mindslaverPrinting :: Printing.Printing,
     panglacialWurmPrinting :: Printing.Printing,
-    blazePrinting :: Printing.Printing
+    blazePrinting :: Printing.Printing,
+    darksteelMyrPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -88,6 +89,7 @@ loadCards = do
   mindslaverPrinting_ <- loadPrinting "mindslaver"
   panglacialWurmPrinting_ <- loadPrinting "panglacial-wurm"
   blazePrinting_ <- loadPrinting "blaze"
+  darksteelMyrPrinting_ <- loadPrinting "darksteel-myr"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -120,7 +122,8 @@ loadCards = do
         plainsPrinting = plainsPrinting_,
         mindslaverPrinting = mindslaverPrinting_,
         panglacialWurmPrinting = panglacialWurmPrinting_,
-        blazePrinting = blazePrinting_
+        blazePrinting = blazePrinting_,
+        darksteelMyrPrinting = darksteelMyrPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -155,7 +158,8 @@ allPrintings cards =
     plainsPrinting cards,
     mindslaverPrinting cards,
     panglacialWurmPrinting cards,
-    blazePrinting cards
+    blazePrinting cards,
+    darksteelMyrPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

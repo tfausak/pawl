@@ -25,6 +25,7 @@ data Keyword
   | FirstStrike -- 702.7
   | Flying -- 702.9
   | Haste -- 702.10
+  | Indestructible -- 702.12
   | Reach -- 702.17
   | Trample -- 702.19
   | Vigilance -- 702.20

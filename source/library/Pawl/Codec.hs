@@ -147,6 +147,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Beast -> "Beast"
   Subtype.Rat -> "Rat"
   Subtype.Elephant -> "Elephant"
+  Subtype.Myr -> "Myr"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -167,7 +168,8 @@ jsonToSubtype =
       (Text.pack "Dinosaur", Subtype.Dinosaur),
       (Text.pack "Beast", Subtype.Beast),
       (Text.pack "Rat", Subtype.Rat),
-      (Text.pack "Elephant", Subtype.Elephant)
+      (Text.pack "Elephant", Subtype.Elephant),
+      (Text.pack "Myr", Subtype.Myr)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -191,6 +193,7 @@ keywordToJson k = nullary . Text.pack $ case k of
   Keyword.FirstStrike -> "FirstStrike"
   Keyword.Flying -> "Flying"
   Keyword.Haste -> "Haste"
+  Keyword.Indestructible -> "Indestructible"
   Keyword.Reach -> "Reach"
   Keyword.Trample -> "Trample"
   Keyword.Vigilance -> "Vigilance"
@@ -205,6 +208,7 @@ jsonToKeyword =
       (Text.pack "FirstStrike", Keyword.FirstStrike),
       (Text.pack "Flying", Keyword.Flying),
       (Text.pack "Haste", Keyword.Haste),
+      (Text.pack "Indestructible", Keyword.Indestructible),
       (Text.pack "Reach", Keyword.Reach),
       (Text.pack "Trample", Keyword.Trample),
       (Text.pack "Vigilance", Keyword.Vigilance)
