@@ -294,12 +294,18 @@ priorityLoop = do
 
 handoffTurn :: Game ()
 handoffTurn = State.modify' $ \gs ->
-  gs
-    { GameState.activePlayer = nextInOrder (GameState.turnOrder gs) (GameState.activePlayer gs),
-      GameState.turnNumber = GameState.turnNumber gs + 1,
-      GameState.phase = Turn.firstPhase,
-      GameState.remaining = Turn.laterPhases
-    }
+  let newActive = nextInOrder (GameState.turnOrder gs) (GameState.activePlayer gs)
+   in gs
+        { GameState.activePlayer = newActive,
+          GameState.turnNumber = GameState.turnNumber gs + 1,
+          GameState.phase = Turn.firstPhase,
+          GameState.remaining = Turn.laterPhases,
+          -- CR 723.1/723.1b: the new active player's pending control (if any)
+          -- becomes this turn's active control; overwriting activeControl every
+          -- turn is what ends a prior control at the next turn's start (CR 723.1).
+          GameState.activeControl = Map.lookup newActive (GameState.pendingControl gs),
+          GameState.pendingControl = Map.delete newActive (GameState.pendingControl gs)
+        }
 
 -- Consume the schedule: the next step becomes current. An empty schedule means
 -- the turn is over, so hand off. Replaces the old `Turn.next` walk -- the turn is

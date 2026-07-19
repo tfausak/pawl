@@ -236,7 +236,7 @@ git commit -m "Add the mana half of activation costs: AbilityCost.mana (CR 602.1
 **Interfaces:**
 - Produces: `GameState.pendingControl :: Map PlayerId Decider`; `GameState.activeControl :: Maybe Decider`; `Decide.deciderFor pid gs` returns the active-control decider when `pid` is the active player and `activeControl` is set, else `MkDecider pid`; `Engine.handoffTurn` sets `activeControl = Map.lookup newActive pendingControl` and deletes that pending entry.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `source/test-suite/Pawl/DecideSpec.hs`:
 
@@ -272,12 +272,12 @@ tests =
 
 Wire `Pawl.DecideSpec.tests` into `source/test-suite/Main.hs`'s `testTree` and add `Pawl.DecideSpec` to the test-suite `other-modules` list in `pawl.cabal`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "route to the controller"'`
 Expected: FAIL to compile — `GameState.activeControl`, `GameState.pendingControl` not fields.
 
-- [ ] **Step 3: Add the two fields to `GameState`**
+- [x] **Step 3: Add the two fields to `GameState`**
 
 In `source/library/Pawl/Type/GameState.hs`, add `import Pawl.Type.Decider (Decider)` and the fields (after `landPlayed`):
 
@@ -295,7 +295,7 @@ In `source/library/Pawl/Type/GameState.hs`, add `import Pawl.Type.Decider (Decid
 
 (`Map` and `PlayerId` are already imported in `GameState`.)
 
-- [ ] **Step 4: Seed both fields at every full `MkGameState`**
+- [x] **Step 4: Seed both fields at every full `MkGameState`**
 
 `-Wmissing-fields` lists them. In `source/library/Pawl/Setup.hs` (`emptyGame`) and `source/test-suite/Pawl/Support.hs` (`oneMountainState`), add next to `landPlayed`:
 
@@ -304,7 +304,7 @@ In `source/library/Pawl/Type/GameState.hs`, add `import Pawl.Type.Decider (Decid
           GameState.activeControl = Nothing,
 ```
 
-- [ ] **Step 5: Make `deciderFor` read `activeControl`**
+- [x] **Step 5: Make `deciderFor` read `activeControl`**
 
 Replace `source/library/Pawl/Decide.hs`:
 
@@ -328,7 +328,7 @@ deciderFor pid gs = case GameState.activeControl gs of
   _ -> Decider.MkDecider pid
 ```
 
-- [ ] **Step 6: Promote pending control at turn start in `handoffTurn`**
+- [x] **Step 6: Promote pending control at turn start in `handoffTurn`**
 
 In `source/library/Pawl/Engine.hs`, replace `handoffTurn`:
 
@@ -351,12 +351,12 @@ handoffTurn = State.modify' $ \gs ->
 
 (`Map` is already imported in `Engine`.)
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. The whole suite stays green — `activeControl` is `Nothing` everywhere, so `deciderFor` is unchanged in behavior.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

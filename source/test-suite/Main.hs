@@ -4,6 +4,7 @@ import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.CombatSpec as CombatSpec
 import qualified Pawl.CoreSpec as CoreSpec
 import qualified Pawl.DamageSpec as DamageSpec
+import qualified Pawl.DecideSpec as DecideSpec
 import qualified Pawl.EventSpec as EventSpec
 import qualified Pawl.GameSpec as GameSpec
 import qualified Pawl.ManaSpec as ManaSpec
@@ -28,6 +29,7 @@ testTree =
       GameSpec.tests,
       SetupSpec.tests,
       DamageSpec.tests,
+      DecideSpec.tests,
       EventSpec.tests,
       ReplaySpec.tests,
       PropertySpec.tests,

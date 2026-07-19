@@ -170,6 +170,7 @@ test-suite pawl-test-suite
     Pawl.CombatSpec
     Pawl.CoreSpec
     Pawl.DamageSpec
+    Pawl.DecideSpec
     Pawl.EventSpec
     Pawl.GameSpec
     Pawl.ManaSpec

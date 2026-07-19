@@ -7,6 +7,7 @@ import Numeric.Natural (Natural)
 import Pawl.Type.Combat (Combat)
 import Pawl.Type.ContinuousEffect (ContinuousEffect)
 import Pawl.Type.DamageEvent (DamageEvent)
+import Pawl.Type.Decider (Decider)
 import Pawl.Type.Mana (Mana)
 import Pawl.Type.Object (Object)
 import Pawl.Type.ObjectId (ObjectId)
@@ -58,6 +59,15 @@ data GameState = MkGameState
     -- stored continuous effects (at CR 611 creation). See Timestamp.
     nextTimestamp :: Timestamp,
     drewFromEmpty :: Set PlayerId,
-    landPlayed :: Set PlayerId
+    landPlayed :: Set PlayerId,
+    -- CR 723.1: pending player-controlling effects, keyed by the player to be
+    -- controlled. Map.insert overwrites (CR 723.1a, last created wins). Promoted
+    -- to activeControl at the actual start of that player's turn (CR 723.1b).
+    pendingControl :: Map PlayerId Decider,
+    -- CR 723.1/723.3: the decider controlling the ACTIVE player this turn, if any.
+    -- Only the active player is ever controlled during their turn, so one Maybe
+    -- suffices. Overwritten every turn start, so control ends at the next turn's
+    -- beginning (CR 723.1).
+    activeControl :: Maybe Decider
   }
   deriving (Eq, Show)

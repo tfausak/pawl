@@ -547,7 +547,9 @@ oneMountainState ph =
           GameState.nextObjectId = ObjectId.MkObjectId 1,
           GameState.nextTimestamp = Timestamp.MkTimestamp 1,
           GameState.drewFromEmpty = mempty,
-          GameState.landPlayed = mempty
+          GameState.landPlayed = mempty,
+          GameState.pendingControl = Map.empty,
+          GameState.activeControl = Nothing
         }
 
 drawStep :: Game.Type.Game ()

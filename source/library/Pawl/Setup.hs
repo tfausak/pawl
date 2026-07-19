@@ -120,7 +120,9 @@ emptyGame order =
           GameState.nextObjectId = ObjectId.MkObjectId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
-          GameState.landPlayed = mempty
+          GameState.landPlayed = mempty,
+          GameState.pendingControl = Map.empty,
+          GameState.activeControl = Nothing
         }
 
 createCard :: PlayerId -> Printing -> Game ObjectId
