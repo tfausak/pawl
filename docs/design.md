@@ -171,6 +171,8 @@ This is load-bearing, not a party trick. **Designing for Little Girl gets you Ta
 
 Sequenced to retire *architectural* risk first, not to maximize card count. The ABI is the thing you can't cheaply change later; Lightning Bolt will still be there in six months and will take an afternoon.
 
+This section is the **forward plan**. For what has actually landed — one distilled entry per completed milestone, with its gate card, the decision it proved, the opcodes/types it added, and every elision and its named expiry — see the completion log in `progress.md`. Milestones **M0 through M3g are complete**.
+
 ### M0 — A complete game with zero cards
 
 60 Mountains vs. 60 Mountains. Both players draw, tap, pass, deck out. No effects, no vocabulary, no oracle text.
