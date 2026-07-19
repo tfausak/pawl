@@ -456,6 +456,7 @@ effectToJson e = case e of
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
   Effect.Destroy s -> Json.tagged (Text.pack "Destroy") (Just (slotNameToJson s))
   Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array [slotNameToJson s, zoneToJson z]))
+  Effect.Draw q -> Json.tagged (Text.pack "Draw") (Just (quantityToJson q))
 
 jsonToEffect :: Value -> Either Text Effect.Effect
 jsonToEffect value = do
@@ -476,6 +477,7 @@ jsonToEffect value = do
     "MoveToZone" -> case mv of
       Just (Array [s, z]) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z
       _ -> Left (Text.pack "MoveToZone expects [slot, zone]")
+    "Draw" -> withValue mv (fmap Effect.Draw . jsonToQuantity)
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------

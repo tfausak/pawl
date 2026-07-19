@@ -166,8 +166,8 @@ lintTests cards =
                 (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
                 (Cards.allPrintings cards)
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (35 at M4b Task 4)" $
-        HU.assertEqual "count" 35 (length (Cards.allPrintings cards)),
+      HU.testCase "the registry holds every printing (36 at M4b Task 6)" $
+        HU.assertEqual "count" 36 (length (Cards.allPrintings cards)),
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $
         let card = Printing.card (Cards.blazePrinting cards)
             red = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -349,7 +349,12 @@ m4bCardTests cards =
          in do
               HU.assertBool "not an instant" (not (Card.isInstant c))
               HU.assertEqual "effect exiles" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile] (Card.Type.effects c)
-              HU.assertEqual "creature-or-enchantment slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureOrEnchantmentTarget) (Card.Type.targetSpecs c)
+              HU.assertEqual "creature-or-enchantment slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureOrEnchantmentTarget) (Card.Type.targetSpecs c),
+      HU.testCase "Divination is a {2}{U} Sorcery that draws two cards with no target" $
+        let c = Printing.card (Cards.divinationPrinting cards)
+         in do
+              HU.assertEqual "effect draws two" [Effect.Draw (Quantity.Type.Literal 2)] (Card.Type.effects c)
+              HU.assertBool "no target slots" (Map.null (Card.Type.targetSpecs c))
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

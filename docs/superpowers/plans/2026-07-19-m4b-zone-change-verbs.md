@@ -738,7 +738,7 @@ Delivers `Effect.Draw Quantity`, gated by Divination drawing two, plus the draw-
 - Consumes: `Event.drawCard` (Task 5), `Quantity.evaluate` (existing).
 - Produces: `Effect.Draw Quantity`; `Cards.divinationPrinting`. `Resolve.slotsOf (Effect.Draw _) == Set.empty`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `zoneChangeTests` in `ResolveSpec.hs`. Divination is `{2}{U}` (three mana ≥1 blue) — three Islands.
 
@@ -762,12 +762,12 @@ Add to `zoneChangeTests` in `ResolveSpec.hs`. Divination is `{2}{U}` (three mana
          in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after)),
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: compile failure — `Cards.divinationPrinting` / `Effect.Draw` not in scope (red).
 
-- [ ] **Step 3: Add the `Draw` constructor**
+- [x] **Step 3: Add the `Draw` constructor**
 
 In `source/library/Pawl/Type/Effect.hs` (the module imports `Quantity`):
 
@@ -778,11 +778,11 @@ In `source/library/Pawl/Type/Effect.hs` (the module imports `Quantity`):
     Draw Quantity
 ```
 
-- [ ] **Step 4: Add the classification arms**
+- [x] **Step 4: Add the classification arms**
 
 `slotsOf`: `Effect.Draw _ -> Set.empty`. `readsX`: `Effect.Draw quantity -> quantity == Quantity.Type.X`. `manaProduced`: `Effect.Draw _ -> Nothing`. `searchesLibrary`: `Effect.Draw _ -> False`. `rewriteEffect`: `Effect.Draw _ -> effect`.
 
-- [ ] **Step 5: Add the executor arm**
+- [x] **Step 5: Add the executor arm**
 
 In `applyEffect`:
 
@@ -799,11 +799,11 @@ In `applyEffect`:
 
 (`List` and `Quantity` are already imported in `Resolve.hs`; the fold index `[1 .. n]` is `Integer`.)
 
-- [ ] **Step 6: Add the codec arm**
+- [x] **Step 6: Add the codec arm**
 
 `effectToJson`: `Effect.Draw q -> Json.tagged (Text.pack "Draw") (Just (quantityToJson q))`. `jsonToEffect`: `"Draw" -> withValue mv (fmap Effect.Draw . jsonToQuantity)`.
 
-- [ ] **Step 7: Create and register Divination**
+- [x] **Step 7: Create and register Divination**
 
 Create `data/cards/divination.json`:
 
@@ -813,7 +813,7 @@ Create `data/cards/divination.json`:
 
 Register in `Cards.hs`.
 
-- [ ] **Step 8: Card-data test and count → 36**
+- [x] **Step 8: Card-data test and count → 36**
 
 Bump count to 36. Add to `m4bCardTests`:
 
@@ -825,12 +825,12 @@ Bump count to 36. Add to `m4bCardTests`:
               HU.assertBool "no target slots" (Map.null (Card.Type.targetSpecs c)),
 ```
 
-- [ ] **Step 9: Run tests to verify they pass**
+- [x] **Step 9: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: PASS (draw + loss green; count 36; the D4 X-lint stays green — Divination reads no `X` and declares no `{X}`; round-trip green).
 
-- [ ] **Step 10: Format, lint, commit**
+- [x] **Step 10: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

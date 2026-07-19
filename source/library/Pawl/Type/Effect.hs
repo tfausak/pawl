@@ -51,4 +51,8 @@ data Effect
     -- data; one opcode for every targeted single-object move. Distinct from
     -- Destroy (unconditional move, no indestructible check).
     MoveToZone SlotName Zone
+  | -- CR 120: the controller draws this many cards. Targetless (a spell's
+    -- controller draws, CR 120.2). Empty-library draw is a loss (CR 121.3),
+    -- unlike Mill -- the semantic asymmetry that keeps Draw and Mill separate.
+    Draw Quantity
   deriving (Eq, Ord, Show)

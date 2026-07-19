@@ -562,7 +562,24 @@ zoneChangeTests cards =
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in do
               HU.assertEqual "the enchantment left the battlefield" Nothing (Game.lookupObject ripId after)
-              HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after))
+              HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
+      HU.testCase "CR 120 Divination draws its controller two cards" $
+        let base = S.landsInPlay (Cards.islandPrinting cards) 3
+            (_, g1) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice base
+            (_, g2) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice g1
+            (gs, spellId) = S.handOne (Cards.divinationPrinting cards) g2
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "two cards drawn to hand" 2 (S.handSize S.alice after)
+              HU.assertEqual "library emptied" [] (Game.zoneMembers Zone.Library S.alice after),
+      HU.testCase "CR 121.3 a Draw that outruns the library records the loss" $
+        let base = S.landsInPlay (Cards.islandPrinting cards) 3
+            (_, g1) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice base
+            (gs, spellId) = S.handOne (Cards.divinationPrinting cards) g1
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after))
     ]
 
 drawCardTests :: Cards.Cards -> Tasty.TestTree
