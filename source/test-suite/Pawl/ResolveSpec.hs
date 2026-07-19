@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -23,15 +24,19 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
@@ -352,7 +357,44 @@ resolveTests =
             resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
          in do
               HU.assertEqual "bob's graveyard is empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
-              HU.assertEqual "ability ceased" Nothing (Game.lookupObject abilId resolved)
+              HU.assertEqual "ability ceased" Nothing (Game.lookupObject abilId resolved),
+      HU.testCase "CR 723.1: Mindslaver's ability installs pending control, promoted next turn" $
+        let g0 = Setup.emptyGame S.bothPlayers
+            (srcId, g1) = S.addCreature Card.mindslaverPrinting S.alice g0
+            slot = SlotName.MkSlotName (Text.pack "target")
+            ability =
+              ActivatedAbility.MkActivatedAbility
+                { ActivatedAbility.cost =
+                    AbilityCost.MkAbilityCost
+                      { AbilityCost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
+                        AbilityCost.additional = [AdditionalCost.TapSelf, AdditionalCost.SacrificeSelf]
+                      },
+                  ActivatedAbility.effects = [Effect.ControlPlayerNextTurn slot],
+                  ActivatedAbility.targetSpecs = Map.singleton slot TargetSpec.PlayerTarget
+                }
+            (abilId, g2) = Game.freshObjectId g1
+            (ts, g3) = Game.freshTimestamp g2
+            abilObj =
+              Object.MkObject
+                { Object.owner = S.alice,
+                  Object.source = Source.OfAbility srcId ability,
+                  Object.zone = Zone.Stack,
+                  Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
+                  Object.sickness = Sickness.Settled,
+                  Object.targets = Map.singleton slot (Recipient.ToPlayer S.bob),
+                  Object.chosenSubtypes = Map.empty,
+                  Object.timestamp = ts
+                }
+            g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = abilId : GameState.stack g3}
+            resolved = snd (Engine.runGamePure S.identityAnswer g4 Stack.resolveTop)
+            bobsTurn = snd (Engine.runGamePure S.identityAnswer resolved Engine.handoffTurn)
+            afterBob = snd (Engine.runGamePure S.identityAnswer bobsTurn Engine.handoffTurn)
+         in do
+              HU.assertEqual "control pending for bob" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl resolved))
+              HU.assertEqual "promoted on bob's turn" (Just (Decider.MkDecider S.alice)) (GameState.activeControl bobsTurn)
+              HU.assertEqual "bob's decisions route to alice" (Decider.MkDecider S.alice) (Decide.deciderFor S.bob bobsTurn)
+              HU.assertEqual "control expired after bob's turn" (Decider.MkDecider S.bob) (Decide.deciderFor S.bob afterBob)
     ]
 
 findFirst :: Prompt.Prompt r -> r

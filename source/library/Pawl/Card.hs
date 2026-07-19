@@ -967,6 +967,46 @@ plainsPrinting =
           }
     }
 
+-- Mindslaver: {6}, Legendary Artifact, "{4}, {T}, Sacrifice Mindslaver: You
+-- control target player during that player's next turn." Scryfall-verified
+-- 2026-07-19. Legendary is represented but the CR 704.5j legend-rule SBA is
+-- ELIDED (M3g keeps it singleton; it is sacrificed as a cost). The parenthetical
+-- "see all cards" is CR 723.4 (deferred, no PlayerView).
+mindslaverPrinting :: Printing.Printing
+mindslaverPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Mindslaver",
+            Card.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.Generic 6]),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.singleton Supertype.Legendary,
+                  TypeLine.types = Set.singleton CardType.Artifact,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities = [],
+            Card.effects = [],
+            Card.activatedAbilities =
+              [ ActivatedAbility.MkActivatedAbility
+                  { ActivatedAbility.cost =
+                      AbilityCost.MkAbilityCost
+                        { AbilityCost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
+                          AbilityCost.additional = [AdditionalCost.TapSelf, AdditionalCost.SacrificeSelf]
+                        },
+                    ActivatedAbility.effects = [Effect.ControlPlayerNextTurn (SlotName.MkSlotName (Text.pack "target"))],
+                    ActivatedAbility.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.PlayerTarget
+                  }
+              ],
+            Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
+            Card.targetSpecs = Map.empty
+          }
+    }
+
 -- The registry the dataflow lint and future golden tests iterate. A printing
 -- not listed here escapes the hygiene net -- add every new printing.
 allPrintings :: [Printing.Printing]
@@ -998,7 +1038,8 @@ allPrintings =
     llanowarElvesPrinting,
     evolvingWildsPrinting,
     restInPeacePrinting,
-    plainsPrinting
+    plainsPrinting,
+    mindslaverPrinting
   ]
 
 isLand :: Card.Card -> Bool

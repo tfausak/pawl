@@ -33,4 +33,8 @@ data Effect
   | -- CR 701.10 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk (Rest in Peace's exact shape); a general exile-from-zone is future.
     ExileAllGraveyards
+  | -- CR 723.1: "you control target player during that player's next turn."
+    -- Installs pending control keyed to the slot's chosen player, with the
+    -- ability's controller as the decider. Mindslaver's exact shape.
+    ControlPlayerNextTurn SlotName
   deriving (Eq, Ord, Show)

@@ -23,6 +23,7 @@ import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Effect as Effect
@@ -59,6 +60,7 @@ slotsOf effect = case effect of
   Effect.AddMana _ -> Set.empty
   Effect.Search _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
+  Effect.ControlPlayerNextTurn slot -> Set.singleton slot
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -71,6 +73,7 @@ manaProduced effect = case effect of
   Effect.ChangeText _ -> Nothing
   Effect.Search _ -> Nothing
   Effect.ExileAllGraveyards -> Nothing
+  Effect.ControlPlayerNextTurn _ -> Nothing
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -103,6 +106,7 @@ rewriteEffect pairs effect = case effect of
   Effect.AddMana _ -> effect
   Effect.Search _ -> effect
   Effect.ExileAllGraveyards -> effect
+  Effect.ControlPlayerNextTurn _ -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -271,6 +275,15 @@ applyEffect source controller bound legality chosen effect = case effect of
     gs <- State.get
     let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Map.keys (GameState.players gs))
     State.modify' (\g -> List.foldl' (\g1 c -> Event.changeZone c Zone.Exile g1) g gyCards)
+  Effect.ControlPlayerNextTurn slot ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just (Recipient.ToPlayer target), True) ->
+          -- CR 723.1: schedule control of `target` by this ability's controller
+          -- (CR 723.5). Map.insert overwrites a prior pending control (CR 723.1a).
+          gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
+        -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
+        _ -> gs
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

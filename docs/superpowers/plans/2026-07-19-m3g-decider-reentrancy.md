@@ -377,7 +377,7 @@ git commit -m "Add the turn-scheduled control store: pendingControl/activeContro
 - Consumes: `resolveEffects`/`resolveAbility`/`OfAbility` (M3e/M3f), `PlayerTarget` (Task 1), `AbilityCost.mana` (Task 2), `pendingControl` (Task 3).
 - Produces: `Effect.ControlPlayerNextTurn SlotName`; `applyEffect … (Effect.ControlPlayerNextTurn slot)` installs `pendingControl[target] = MkDecider controller` when the slot holds a legal `ToPlayer target`; `Card.mindslaverPrinting`. Mindslaver's ability: `cost = MkAbilityCost (Just {4}) [TapSelf, SacrificeSelf]`, `effects = [ControlPlayerNextTurn "target"]`, `targetSpecs = { "target" ↦ PlayerTarget }`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to the `Resolve` group in `source/test-suite/Pawl/ResolveSpec.hs`. Hand-build Mindslaver's ability on the stack (targeting bob), resolve it, assert `pendingControl`, then `handoffTurn` and assert `activeControl` + `deciderFor` + expiry (add imports as the compiler flags — `qualified Pawl.Type.Effect as Effect`, `qualified Pawl.Type.ActivatedAbility as ActivatedAbility`, `qualified Pawl.Type.AbilityCost as AbilityCost`, `qualified Pawl.Type.AdditionalCost as AdditionalCost`, `qualified Pawl.Type.ManaCost as ManaCost`, `qualified Pawl.Type.ManaSymbol as ManaSymbol`, `qualified Pawl.Type.SlotName as SlotName`, `qualified Pawl.Type.Recipient as Recipient`, `qualified Pawl.Type.Source as Source`, `qualified Pawl.Type.Decider as Decider`, `qualified Pawl.Type.Object as Object`, `qualified Pawl.Type.TapState as TapState`, `qualified Pawl.Type.Sickness as Sickness`, `qualified Pawl.Type.Zone as Zone`, `qualified Pawl.Type.TargetSpec as TargetSpec`, `qualified Pawl.Stack as Stack`, `qualified Pawl.Engine as Engine`, `qualified Pawl.Decide as Decide`, `qualified Data.Text as Text`):
 
@@ -424,12 +424,12 @@ Add to the `Resolve` group in `source/test-suite/Pawl/ResolveSpec.hs`. Hand-buil
 
 (`addCreature` puts Mindslaver on the battlefield; the ability is hand-built and resolved directly, skipping activation — the effect reads the *controller* (alice, the ability object's owner), never the source permanent, so the un-sacrificed Mindslaver does not matter here. `TargetSpec` and `Map` are already imported in `ResolveSpec`.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "installs pending control"'`
 Expected: FAIL to compile — `Effect.ControlPlayerNextTurn`, `Card.mindslaverPrinting` not in scope.
 
-- [ ] **Step 3: Add the opcode**
+- [x] **Step 3: Add the opcode**
 
 In `source/library/Pawl/Type/Effect.hs`, add the constructor:
 
@@ -440,7 +440,7 @@ In `source/library/Pawl/Type/Effect.hs`, add the constructor:
     ControlPlayerNextTurn SlotName
 ```
 
-- [ ] **Step 4: Add the four `Resolve` arms**
+- [x] **Step 4: Add the four `Resolve` arms**
 
 In `source/library/Pawl/Resolve.hs`, add `import qualified Pawl.Type.Decider as Decider`. Add arms:
 
@@ -463,7 +463,7 @@ In `source/library/Pawl/Resolve.hs`, add `import qualified Pawl.Type.Decider as 
 
 (`Recipient`, `Map`, `GameState`, `State` are already imported in `Resolve`.)
 
-- [ ] **Step 5: Add Mindslaver and register it**
+- [x] **Step 5: Add Mindslaver and register it**
 
 In `source/library/Pawl/Card.hs`, add (match the file's existing import aliases; `CardType.Artifact`, `Supertype.Legendary`, `TargetSpec.PlayerTarget` are all in scope after Task 1):
 
@@ -511,12 +511,12 @@ mindslaverPrinting =
 
 Add `mindslaverPrinting` to `allPrintings` (append to the current tail — after `panglacialWurmPrinting` if Task 6 has landed, else after the last existing entry; order within the list does not matter).
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the ability resolves, installs pending control, promotes on bob's turn, and expires the turn after.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
