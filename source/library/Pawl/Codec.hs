@@ -17,6 +17,7 @@ import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CastingPermission as CastingPermission
@@ -31,6 +32,7 @@ import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Power as Power
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.SlotName as SlotName
@@ -558,3 +560,65 @@ jsonToTriggeredAbility value = do
   es <- Json.field (Text.pack "effects") ps >>= listFrom jsonToEffect
   ts <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
   pure (TriggeredAbility.MkTriggeredAbility c es ts)
+
+-- Card & Printing ------------------------------------------------------------
+
+cardToJson :: CardT.Card -> Value
+cardToJson c =
+  Object
+    [ (Text.pack "name", Json.jText (CardT.name c)),
+      (Text.pack "manaCost", maybeTo manaCostToJson (CardT.manaCost c)),
+      (Text.pack "typeLine", typeLineToJson (CardT.typeLine c)),
+      (Text.pack "power", maybeTo powerToJson (CardT.power c)),
+      (Text.pack "toughness", maybeTo toughnessToJson (CardT.toughness c)),
+      (Text.pack "keywords", setTo keywordToJson (CardT.keywords c)),
+      (Text.pack "staticAbilities", listTo staticAbilityToJson (CardT.staticAbilities c)),
+      (Text.pack "effects", listTo effectToJson (CardT.effects c)),
+      (Text.pack "activatedAbilities", listTo activatedAbilityToJson (CardT.activatedAbilities c)),
+      (Text.pack "replacementEffects", listTo replacementEffectToJson (CardT.replacementEffects c)),
+      (Text.pack "triggeredAbilities", listTo triggeredAbilityToJson (CardT.triggeredAbilities c)),
+      (Text.pack "castingPermissions", listTo castingPermissionToJson (CardT.castingPermissions c)),
+      (Text.pack "targetSpecs", targetSpecsToJson (CardT.targetSpecs c))
+    ]
+
+getOpt :: Text -> [(Text, Value)] -> Value
+getOpt k ps = Maybe.fromMaybe Null (Json.optField k ps)
+
+jsonToCard :: Value -> Either Text CardT.Card
+jsonToCard value = do
+  ps <- Json.asObject value
+  name <- Json.field (Text.pack "name") ps >>= Json.asText
+  manaCost <- maybeFrom jsonToManaCost (getOpt (Text.pack "manaCost") ps)
+  typeLine <- Json.field (Text.pack "typeLine") ps >>= jsonToTypeLine
+  power <- maybeFrom jsonToPower (getOpt (Text.pack "power") ps)
+  toughness <- maybeFrom jsonToToughness (getOpt (Text.pack "toughness") ps)
+  keywords <- Json.field (Text.pack "keywords") ps >>= setFrom jsonToKeyword
+  statics <- Json.field (Text.pack "staticAbilities") ps >>= listFrom jsonToStaticAbility
+  effects <- Json.field (Text.pack "effects") ps >>= listFrom jsonToEffect
+  activated <- Json.field (Text.pack "activatedAbilities") ps >>= listFrom jsonToActivatedAbility
+  replacements <- Json.field (Text.pack "replacementEffects") ps >>= listFrom jsonToReplacementEffect
+  triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
+  permissions <- Json.field (Text.pack "castingPermissions") ps >>= listFrom jsonToCastingPermission
+  targets <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
+  pure
+    CardT.MkCard
+      { CardT.name = name,
+        CardT.manaCost = manaCost,
+        CardT.typeLine = typeLine,
+        CardT.power = power,
+        CardT.toughness = toughness,
+        CardT.keywords = keywords,
+        CardT.staticAbilities = statics,
+        CardT.effects = effects,
+        CardT.activatedAbilities = activated,
+        CardT.replacementEffects = replacements,
+        CardT.triggeredAbilities = triggered,
+        CardT.castingPermissions = permissions,
+        CardT.targetSpecs = targets
+      }
+
+printingToJson :: Printing.Printing -> Value
+printingToJson (Printing.MkPrinting c) = cardToJson c
+
+jsonToPrinting :: Value -> Either Text Printing.Printing
+jsonToPrinting value = Printing.MkPrinting <$> jsonToCard value

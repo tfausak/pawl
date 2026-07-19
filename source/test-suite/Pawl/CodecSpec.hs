@@ -5,11 +5,14 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Pawl.Card as Card
 import qualified Pawl.Codec as Codec
+import qualified Pawl.Json as J
 import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Decimal as Decimal
@@ -23,6 +26,7 @@ import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Power as Power
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.SlotName as SlotName
@@ -127,5 +131,14 @@ tests =
               Codec.replacementEffectToJson
               Codec.jsonToReplacementEffect
               (ReplacementEffect.RedirectZoneChange Zone.Graveyard Zone.Exile)
+        ],
+      Tasty.testGroup
+        "honesty round-trip over allPrintings"
+        [ HU.testCase "P1: jsonToPrinting . printingToJson == Right" $
+            mapM_ (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (Codec.jsonToPrinting (Codec.printingToJson p))) Card.allPrintings,
+          HU.testCase "P2: through text" $
+            mapM_
+              (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (J.parse (J.render (Codec.printingToJson p)) >>= Codec.jsonToPrinting))
+              Card.allPrintings
         ]
     ]
