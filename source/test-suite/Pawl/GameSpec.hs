@@ -23,6 +23,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
@@ -32,6 +33,7 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
@@ -302,7 +304,30 @@ ruleTests =
           (Just (Status.Departed Departure.Lost))
           (fmap Player.status (Map.lookup S.alice (GameState.players deckedOut))),
       HU.testCase "CR 704.5b the survivor wins" $
-        HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result deckedOut)
+        HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result deckedOut),
+      HU.testCase "CR 723.3/723.5: alice decides for bob, but bob's resources move" $
+        -- bob's main phase, controlled by alice, with a Mountain and a Bolt.
+        let g0 = Setup.emptyGame S.bothPlayers
+            (_mtnId, g1) = S.addCreature Card.mountainPrinting S.bob g0
+            (_boltId, g2) = handBobBolt g1
+            g3 =
+              g2
+                { GameState.activePlayer = S.bob,
+                  GameState.phase = Phase.PrecombatMain,
+                  GameState.priority = Just S.bob,
+                  GameState.activeControl = Just (Decider.MkDecider S.alice)
+                }
+            after = snd (Engine.runGamePure slaveAnswer g3 Engine.priorityLoop)
+            boltInBobGrave =
+              length
+                ( filter
+                    (namedIs (Text.pack "Lightning Bolt"))
+                    (map (\i -> Game.lookupObject i after) (Game.zoneMembers Zone.Graveyard S.bob after))
+                )
+         in do
+              HU.assertEqual "bob took 3 from his own Bolt" (Just 17) (S.lifeOf S.bob after)
+              HU.assertEqual "bob's Bolt is in bob's graveyard" 1 boltInBobGrave
+              HU.assertEqual "the Mountain (bob's) is tapped" 1 (S.tappedCount S.bob after)
     ]
 
 tests :: Tasty.TestTree
@@ -310,3 +335,62 @@ tests =
   Tasty.testGroup
     "Game"
     [gameTests, actionTests, objectFactTests, engineTests, ruleTests]
+
+-- One Lightning Bolt in bob's hand.
+handBobBolt :: GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+handBobBolt gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj =
+        Object.MkObject
+          { Object.owner = S.bob,
+            Object.source = Source.OfCard Card.lightningBoltPrinting,
+            Object.zone = Zone.Hand,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled,
+            Object.targets = Map.empty,
+            Object.chosenSubtypes = Map.empty,
+            Object.timestamp = ts
+          }
+   in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
+
+namedIs :: Text.Text -> Maybe Object.Object -> Bool
+namedIs wanted mo = case mo of
+  Just o -> case Object.source o of
+    Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
+    Source.OfAbility _ _ -> False
+    Source.OfTrigger _ _ -> False
+  Nothing -> False
+
+-- The controller's strategy: when asked to decide for bob (the CONTROLLED player,
+-- routed because the prompt's Decider is alice), cast the Bolt at bob; otherwise
+-- pass. A naive engine that ignored control would send the prompt with Decider =
+-- bob, this interpreter would pass, and bob's life would stay 20 -- the falsifier.
+slaveAnswer :: Prompt.Prompt r -> r
+slaveAnswer p = case p of
+  Prompt.ChooseAction (Decider.MkDecider d) player actions ->
+    if player == S.bob && d == S.alice
+      then case filter isCastAction actions of
+        h : _ -> h
+        [] -> A.Pass
+      else A.Pass
+  Prompt.ChooseTargets _ _ _ sets ->
+    Map.mapMaybe
+      (\s -> if Set.member (Recipient.ToPlayer S.bob) s then Just (Recipient.ToPlayer S.bob) else Set.lookupMin s)
+      sets
+  Prompt.Shuffle ids -> ids
+  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter S.isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
+  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> Nothing
+
+isCastAction :: A.Action -> Bool
+isCastAction a = case a of
+  A.Cast _ -> True
+  _ -> False

@@ -534,7 +534,7 @@ git commit -m "ControlPlayerNextTurn opcode + Mindslaver: control installs + pro
 - Consumes: everything from Tasks 1–4, plus `Engine.priorityLoop`, `Cast`/`Lightning Bolt` (M3a).
 - Produces: no library change — a gameplay-level gate proving CR 723.3/723.5/723.5a.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/EngineSpec.hs`. It builds bob's main phase under alice's control, with a decider-and-player-branching interpreter that makes bob Lightning Bolt himself only because alice decides for him (add imports as the compiler flags — `qualified Pawl.Type.Decider as Decider`, `qualified Pawl.Type.Recipient as Recipient`, `qualified Pawl.Type.Prompt as Prompt`, `qualified Pawl.Type.Action as A`, `qualified Pawl.Type.Phase as Phase`, `qualified Pawl.Type.Zone as Zone`, `qualified Pawl.Type.GameState as GameState`, `qualified Pawl.Game as Game`, `qualified Pawl.Type.Source as Source`, `qualified Pawl.Type.Printing as Printing`, `qualified Pawl.Type.Card as Card.Type`, `qualified Data.Set as Set`, `qualified Data.Map.Strict as Map`, `qualified Data.Text as Text`):
 
@@ -629,14 +629,14 @@ isCast a = case a of
 
 (Add imports `qualified Pawl.Type.Object as Object`, `qualified Pawl.Type.ObjectId as ObjectId`, `qualified Pawl.Type.TapState as TapState`, `qualified Pawl.Type.Sickness as Sickness`, `qualified Pawl.Type.Subtype as Subtype`, `qualified Data.Sequence as Seq` if absent. `slaveAnswer` covers exactly the prompts that exist at Task 5; Task 7 adds the `CastWhileSearching` arm to it when that prompt is introduced.)
 
-- [ ] **Step 2: Run test to verify it fails, then passes**
+- [x] **Step 2: Run test to verify it fails, then passes**
 
 If Task 4 is complete this should PASS immediately (the routing already works). Confirm it is a genuine gate by temporarily hardcoding `Decide.deciderFor pid _ = Decider.MkDecider pid` (ignoring control): the test must then FAIL (bob's life stays 20, no Bolt cast). Restore `deciderFor`.
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "alice decides for bob"'`
 Expected: PASS (and FAIL under the hardcoded-`deciderFor` falsifier check).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
