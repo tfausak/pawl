@@ -32,6 +32,7 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -245,6 +246,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseAction {} -> A.Pass
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> lastN (fromIntegral n) ids
+  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
 
 lastN :: Int -> [a] -> [a]
 lastN n xs = drop (length xs - n) xs

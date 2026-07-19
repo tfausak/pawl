@@ -400,7 +400,7 @@ git commit -m "Store cast-time basic-land-type bindings on the Object (CR 400.7-
 **Interfaces:**
 - Produces: `Prompt.ChooseBasicLandTypes :: Decider -> PlayerId -> ObjectId -> SlotName -> Prompt (Subtype, Subtype)` — choose the `from` and `to` basic land types for a text-changer's slot. Always answerable (the five basics), so it never gates castability.
 
-- [ ] **Step 1: Add the prompt constructor**
+- [x] **Step 1: Add the prompt constructor**
 
 In `source/library/Pawl/Type/Prompt.hs`, add the import `import Pawl.Type.Subtype (Subtype)` and the constructor:
 
@@ -413,12 +413,12 @@ In `source/library/Pawl/Type/Prompt.hs`, add the import `import Pawl.Type.Subtyp
   ChooseBasicLandTypes :: Decider -> PlayerId -> ObjectId -> SlotName -> Prompt (Subtype, Subtype)
 ```
 
-- [ ] **Step 2: Run the build to verify it fails**
+- [x] **Step 2: Run the build to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `-Wincomplete-patterns` (pedantic error) on every `Prompt r -> r` matcher lacking the new constructor.
 
-- [ ] **Step 3: Add the arm to the pure answerers in `Support`**
+- [x] **Step 3: Add the arm to the pure answerers in `Support`**
 
 In `source/test-suite/Pawl/Support.hs`, add to each of `identityAnswer`, `castAnswer`, `aggressiveAnswer`, `playLandAnswer` a canonical (identity) pair — a hack that changes nothing, safe for any game that never means to cast a text-changer (add `qualified Pawl.Type.Subtype as Subtype` to the imports):
 
@@ -432,7 +432,7 @@ For `randomAnswer` (it returns `State.State Random.StdGen r`), the arm must be m
   Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
 ```
 
-- [ ] **Step 4: Add the arm to the benchmark answerers**
+- [x] **Step 4: Add the arm to the benchmark answerers**
 
 In `source/benchmark/Main.hs`, add `import qualified Pawl.Type.Subtype as Subtype` and the same pure arm to each `Prompt r -> r` answerer the build flags (`alwaysPass`, `castAnswer`, `fightAnswer`):
 
@@ -440,12 +440,12 @@ In `source/benchmark/Main.hs`, add `import qualified Pawl.Type.Subtype as Subtyp
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
 ```
 
-- [ ] **Step 5: Run the build and tests**
+- [x] **Step 5: Run the build and tests**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. Any remaining `-Wincomplete-patterns` names a test-local answerer without a `_ ->` fallback — add the pure arm there too.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

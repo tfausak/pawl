@@ -254,6 +254,7 @@ recordingAnswer p = case p of
     pure $ case filter isCast actions of
       h : _ -> h
       [] -> A.Pass
+  Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.

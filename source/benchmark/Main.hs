@@ -12,6 +12,7 @@ import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.Result (Result)
+import qualified Pawl.Type.Subtype as Subtype
 import qualified Test.Tasty.Bench as Bench
 
 isCreatureRecipient :: Recipient.Recipient -> Bool
@@ -32,6 +33,7 @@ alwaysPass p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
+  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
 
 -- Casts when legal, otherwise passes: the benchmark that actually exercises the
 -- stack, mana payment, and resolution.
@@ -53,6 +55,7 @@ castAnswer p = case p of
      in case filter isCast actions of
           h : _ -> h
           [] -> Action.Pass
+  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
 
 -- Casts, attacks, and blocks: the benchmark that exercises combat.
 fightAnswer :: Prompt.Prompt r -> r
@@ -75,6 +78,7 @@ fightAnswer p = case p of
      in case filter isCast actions of
           h : _ -> h
           [] -> Action.Pass
+  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
 
 -- Two players, seeded from the benchmark's argument.
 playersFrom :: Natural -> NonEmpty.NonEmpty PlayerId

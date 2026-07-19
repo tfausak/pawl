@@ -6,6 +6,7 @@ import Pawl.Type.Action (Action)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.SlotName (SlotName)
+import Pawl.Type.Subtype (Subtype)
 
 data Response
   = ChoseAction Action
@@ -15,4 +16,7 @@ data Response
   | DeclaredBlockers (Map ObjectId ObjectId)
   | AssignedCombatDamage (Map Recipient Natural)
   | ChoseTargets (Map SlotName Recipient)
+  | -- CR 612 / the D4 binding: the (from, to) basic land types a text-changer's
+    -- caster chose, serialized so a DecisionLog replays the hack deterministically.
+    ChoseBasicLandTypes (Subtype, Subtype)
   deriving (Eq, Show)

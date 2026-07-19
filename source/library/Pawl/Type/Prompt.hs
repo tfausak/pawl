@@ -11,6 +11,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.SlotName (SlotName)
+import Pawl.Type.Subtype (Subtype)
 
 data Prompt r where
   ChooseAction :: Decider -> PlayerId -> [Action] -> Prompt Action
@@ -35,3 +36,9 @@ data Prompt r where
   -- position. Not asked when the spell has no slots: zero slots is no choice
   -- at all, and where the rules leave nothing to ask, don't prompt.
   ChooseTargets :: Decider -> PlayerId -> ObjectId -> Map SlotName (Set Recipient) -> Prompt (Map SlotName Recipient)
+  -- CR 612 / the D4 binding: choose the two basic land types for a text-changing
+  -- spell's slot (Magical Hack: "one basic land type" -> "another"). Bound at cast
+  -- alongside ChooseTargets; the legal set is always the five basics, so unlike a
+  -- target it never gates castability. Cast-vs-resolution timing is elided as
+  -- indistinguishable (spec §3), expiry named there.
+  ChooseBasicLandTypes :: Decider -> PlayerId -> ObjectId -> SlotName -> Prompt (Subtype, Subtype)
