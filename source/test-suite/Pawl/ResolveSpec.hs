@@ -532,7 +532,17 @@ zoneChangeTests cards =
               -- bury the Myr. It stays; the spell still resolved and was buried.
               HU.assertEqual "Myr still on the battlefield" 1 (S.creaturesInPlay S.bob after)
               HU.assertEqual "bob's graveyard empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
-              HU.assertEqual "Murder in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+              HU.assertEqual "Murder in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 400.7 Unsummon returns a creature to its owner's hand" $
+        let base = S.landsInPlay (Cards.islandPrinting cards) 1
+            (_, withPiker) = S.addPiker cards S.bob base
+            (gs, spellId) = S.handOne (Cards.unsummonPrinting cards) withPiker
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "no creature on the battlefield" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "a card in bob's hand (its owner)" 1 (S.handSize S.bob after)
+              HU.assertEqual "Unsummon in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

@@ -405,7 +405,7 @@ Delivers `Effect.MoveToZone SlotName Zone` and its executor, gated by Unsummon r
 **Interfaces:**
 - Produces: `Effect.MoveToZone SlotName Zone`; `Cards.unsummonPrinting`. `Resolve.slotsOf (Effect.MoveToZone s _) == Set.singleton s`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `zoneChangeTests` in `ResolveSpec.hs`:
 
@@ -422,12 +422,12 @@ Add to `zoneChangeTests` in `ResolveSpec.hs`:
               HU.assertEqual "Unsummon in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: compile failure — `Cards.unsummonPrinting` / `Effect.MoveToZone` not in scope (red).
 
-- [ ] **Step 3: Add the `MoveToZone` constructor**
+- [x] **Step 3: Add the `MoveToZone` constructor**
 
 In `source/library/Pawl/Type/Effect.hs`:
 
@@ -442,11 +442,11 @@ In `source/library/Pawl/Type/Effect.hs`:
 
 Add `import Pawl.Type.Zone (Zone)` to `Pawl.Type.Effect` (alphabetical).
 
-- [ ] **Step 4: Add the classification arms**
+- [x] **Step 4: Add the classification arms**
 
 In `Resolve.hs`: `slotsOf`: `Effect.MoveToZone slot _ -> Set.singleton slot`. `readsX`: `Effect.MoveToZone {} -> False`. `manaProduced`: `Effect.MoveToZone {} -> Nothing`. `searchesLibrary`: `Effect.MoveToZone {} -> False`. `rewriteEffect`: `Effect.MoveToZone {} -> effect`.
 
-- [ ] **Step 5: Add the executor arm**
+- [x] **Step 5: Add the executor arm**
 
 In `applyEffect`:
 
@@ -461,7 +461,7 @@ In `applyEffect`:
         _ -> gs
 ```
 
-- [ ] **Step 6: Add the codec arm**
+- [x] **Step 6: Add the codec arm**
 
 `effectToJson`: `Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array [slotNameToJson s, zoneToJson z]))`. `jsonToEffect`:
 
@@ -471,7 +471,7 @@ In `applyEffect`:
       _ -> Left (Text.pack "MoveToZone expects [slot, zone]")
 ```
 
-- [ ] **Step 7: Create and register Unsummon**
+- [x] **Step 7: Create and register Unsummon**
 
 Create `data/cards/unsummon.json`:
 
@@ -481,7 +481,7 @@ Create `data/cards/unsummon.json`:
 
 Register in `Cards.hs` (`unsummonPrinting`, `loadPrinting "unsummon"`, record line, `allPrintings`).
 
-- [ ] **Step 8: Card-data test and count → 34**
+- [x] **Step 8: Card-data test and count → 34**
 
 Bump count to 34. Add to `m4bCardTests`:
 
@@ -496,12 +496,12 @@ Bump count to 34. Add to `m4bCardTests`:
 
 Add `import qualified Pawl.Type.Zone as Zone` to `CardSpec.hs` (alphabetical).
 
-- [ ] **Step 9: Run tests to verify they pass**
+- [x] **Step 9: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: PASS (bounce green; count 34; round-trip green).
 
-- [ ] **Step 10: Format, lint, commit**
+- [x] **Step 10: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

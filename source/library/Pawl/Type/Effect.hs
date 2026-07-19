@@ -6,6 +6,7 @@ import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.Modification (Modification)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.SlotName (SlotName)
+import Pawl.Type.Zone (Zone)
 
 -- The ISA (design.md section 1): first-order, non-recursive, no functions in
 -- any field. The ONLY module that may case on a constructor is Pawl.Resolve --
@@ -44,4 +45,10 @@ data Effect
     -- own opcode (Murder vs Darksteel Myr). A future interceptable "destroy event"
     -- (regeneration, CR 615) is M4d.
     Destroy SlotName
+  | -- CR 400.7: move the slot's target object to a zone through the changeZone
+    -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries
+    -- Object.owner); targeted exile = MoveToZone slot Exile. The destination is
+    -- data; one opcode for every targeted single-object move. Distinct from
+    -- Destroy (unconditional move, no indestructible check).
+    MoveToZone SlotName Zone
   deriving (Eq, Ord, Show)

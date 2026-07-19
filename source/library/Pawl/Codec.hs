@@ -453,6 +453,7 @@ effectToJson e = case e of
   Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
   Effect.Destroy s -> Json.tagged (Text.pack "Destroy") (Just (slotNameToJson s))
+  Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array [slotNameToJson s, zoneToJson z]))
 
 jsonToEffect :: Value -> Either Text Effect.Effect
 jsonToEffect value = do
@@ -470,6 +471,9 @@ jsonToEffect value = do
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
     "Destroy" -> withValue mv (fmap Effect.Destroy . jsonToSlotName)
+    "MoveToZone" -> case mv of
+      Just (Array [s, z]) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z
+      _ -> Left (Text.pack "MoveToZone expects [slot, zone]")
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------

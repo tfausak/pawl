@@ -64,6 +64,7 @@ slotsOf effect = case effect of
   Effect.ExileAllGraveyards -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
   Effect.Destroy slot -> Set.singleton slot
+  Effect.MoveToZone slot _ -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -82,6 +83,7 @@ readsX = any effectReadsX
       Effect.ExileAllGraveyards -> False
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy _ -> False
+      Effect.MoveToZone {} -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -96,6 +98,7 @@ manaProduced effect = case effect of
   Effect.ExileAllGraveyards -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.Destroy _ -> Nothing
+  Effect.MoveToZone {} -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -110,6 +113,7 @@ searchesLibrary effect = case effect of
   Effect.ExileAllGraveyards -> False
   Effect.ControlPlayerNextTurn _ -> False
   Effect.Destroy _ -> False
+  Effect.MoveToZone {} -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -144,6 +148,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ExileAllGraveyards -> effect
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy _ -> effect
+  Effect.MoveToZone {} -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -334,6 +339,14 @@ applyEffect source controller bound legality chosen effect = case effect of
               then gs
               else Event.changeZone target Zone.Graveyard gs
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
+        _ -> gs
+  Effect.MoveToZone slot zone ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just recipient, True) -> case recipientObject recipient of
+          Nothing -> gs
+          -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative.
+          Just target -> Event.changeZone target zone gs
         _ -> gs
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds

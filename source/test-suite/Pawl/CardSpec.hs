@@ -29,6 +29,7 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TypeLine as TypeLine
+import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -165,8 +166,8 @@ lintTests cards =
                 (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
                 (Cards.allPrintings cards)
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (33 at M4b Task 2)" $
-        HU.assertEqual "count" 33 (length (Cards.allPrintings cards)),
+      HU.testCase "the registry holds every printing (34 at M4b Task 3)" $
+        HU.assertEqual "count" 34 (length (Cards.allPrintings cards)),
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $
         let card = Printing.card (Cards.blazePrinting cards)
             red = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -336,7 +337,13 @@ m4bCardTests cards =
               HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black, black])) (Card.Type.manaCost c)
               HU.assertBool "an instant" (Card.isInstant c)
               HU.assertEqual "effect destroys the target slot" [Effect.Destroy (SlotName.MkSlotName (Text.pack "target"))] (Card.Type.effects c)
-              HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget) (Card.Type.targetSpecs c)
+              HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget) (Card.Type.targetSpecs c),
+      HU.testCase "Unsummon is a {U} Instant that bounces a target creature to hand" $
+        let c = Printing.card (Cards.unsummonPrinting cards)
+            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+         in do
+              HU.assertEqual "cost" (Just (ManaCost.MkManaCost [blue])) (Card.Type.manaCost c)
+              HU.assertEqual "effect returns to hand" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand] (Card.Type.effects c)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
