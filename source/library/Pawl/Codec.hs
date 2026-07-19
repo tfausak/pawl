@@ -358,6 +358,7 @@ quantityToJson :: Quantity.Quantity -> Value
 quantityToJson q = case q of
   Quantity.Literal n -> Json.tagged (Text.pack "Literal") (Just (Json.jInt n))
   Quantity.ManaValue -> nullary (Text.pack "ManaValue")
+  Quantity.X -> nullary (Text.pack "X")
 
 jsonToQuantity :: Value -> Either Text Quantity.Quantity
 jsonToQuantity value = do
@@ -365,6 +366,7 @@ jsonToQuantity value = do
   case (Text.unpack t, mv) of
     ("Literal", Just v) -> Quantity.Literal <$> Json.asInteger v
     ("ManaValue", _) -> Right Quantity.ManaValue
+    ("X", _) -> Right Quantity.X
     _ -> Left (Text.pack "unknown Quantity: " <> t)
 
 powerToJson :: Power.Power -> Value

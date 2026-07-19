@@ -23,4 +23,9 @@ data Quantity
     -- computed quantity (Opalescence's "base P/T equal to its mana value"),
     -- evaluated against the affected object.
     ManaValue
+  | -- CR 601.2b: X -- a value the caster chose while casting, read from the
+    -- object's binding environment (Pawl.Binding.variableX). One-shot only: a
+    -- continuous effect must FREEZE this to a Literal when stored (Projection.hs
+    -- note), which no M4a card exercises.
+    X
   deriving (Eq, Ord, Show)

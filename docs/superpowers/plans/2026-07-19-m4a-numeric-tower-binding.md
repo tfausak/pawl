@@ -471,7 +471,7 @@ git commit -m "M4a: Mana.substituteX and the X=0 castability floor"
 - Produces: `Quantity.X`; `Quantity.evaluate` resolves `X` from the source object's `bindings`.
 - Consumes: `Binding.amountOf`, `Binding.variableX` (Task 1); `Game.lookupObject`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/QuantitySpec.hs`, seed an object carrying an amount and assert `evaluate` reads it:
 
@@ -487,12 +487,12 @@ In `source/test-suite/Pawl/QuantitySpec.hs`, seed an object carrying an amount a
 
 Build `gs`/`oid` with the existing Support fixture that installs a stack object (reuse the ResolveSpec pattern), setting `Object.bindings = Binding.fromChoices Map.empty Map.empty (Just 5)`.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | tail -20`
 Expected: FAIL — `X` not a constructor of `Quantity`.
 
-- [ ] **Step 3: Add the constructor and the evaluation arm**
+- [x] **Step 3: Add the constructor and the evaluation arm**
 
 In `source/library/Pawl/Type/Quantity.hs`:
 
@@ -518,18 +518,18 @@ In `source/library/Pawl/Quantity.hs`, add to `evaluate`:
 
 Add `import qualified Pawl.Binding as Binding` and `import qualified Pawl.Type.Object as Object`.
 
-- [ ] **Step 4: Add the Codec arms**
+- [x] **Step 4: Add the Codec arms**
 
 In `source/library/Pawl/Codec.hs`:
 - `quantityToJson` (~357): add `Quantity.X -> nullary (Text.pack "X")`.
 - `jsonToQuantity` (~364): add `("X", _) -> Right Quantity.X`.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -15`
 Expected: PASS.
 
-- [ ] **Step 6: Format, lint, commit**
+- [x] **Step 6: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

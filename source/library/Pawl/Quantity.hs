@@ -1,10 +1,12 @@
 module Pawl.Quantity where
 
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Game as Game
 import qualified Pawl.Type.Card as Card
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Quantity (Quantity)
 import qualified Pawl.Type.Quantity as Quantity
@@ -14,6 +16,10 @@ evaluate :: GameState -> ObjectId -> Quantity -> Maybe Integer
 evaluate gs oid quantity = case quantity of
   Quantity.Literal n -> Just n
   Quantity.ManaValue -> fmap manaValueOf (Game.cardOf oid gs)
+  -- CR 601.2b: read the chosen X from the source object's binding environment.
+  Quantity.X -> case Game.lookupObject oid gs of
+    Nothing -> Nothing
+    Just obj -> fmap toInteger (Binding.amountOf Binding.variableX (Object.bindings obj))
 
 -- CR 202.3: the mana value is the total amount of mana in the cost -- each
 -- generic symbol contributes its number, each colored/typed symbol contributes

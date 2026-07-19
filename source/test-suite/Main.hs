@@ -30,7 +30,7 @@ testTree :: Cards.Cards -> Tasty.TestTree
 testTree cards =
   Tasty.testGroup
     "pawl"
-    [ CoreSpec.tests,
+    [ CoreSpec.tests cards,
       BindingSpec.tests,
       CardSpec.tests cards,
       CardsSpec.tests cards,
