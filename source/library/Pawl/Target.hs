@@ -43,6 +43,12 @@ legalRecipients spec gs =
               lands = filter isLand (Set.toList (GameState.battlefield gs))
            in Set.fromList (map Recipient.ToObject lands)
         TargetSpec.PlayerTarget -> Set.fromList players
+        TargetSpec.CreatureOrEnchantmentTarget ->
+          let ok oid =
+                let ts = Projection.cardTypesOf oid gs
+                 in Set.member CardType.Creature ts || Set.member CardType.Enchantment ts
+              matches = filter ok (Set.toList (GameState.battlefield gs))
+           in Set.fromList (map Recipient.ToObject matches)
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is

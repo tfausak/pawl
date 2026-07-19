@@ -529,7 +529,7 @@ Delivers the broadened target spec and Angelic Edict exiling a creature and (exe
 - Consumes: `Projection.cardTypesOf`, `CardType.Enchantment` (existing).
 - Produces: `TargetSpec.CreatureOrEnchantmentTarget`; `Cards.angelicEdictPrinting`. `Target.legalRecipients CreatureOrEnchantmentTarget` returns `Recipient.ToObject` of battlefield creatures and enchantments.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `zoneChangeTests`. Angelic Edict is `{4}{W}` (five mana ≥1 white) — use five Plains; it is a Sorcery, so `handOne`'s main-phase/priority/empty-stack state satisfies sorcery speed.
 
@@ -556,12 +556,12 @@ Add to `zoneChangeTests`. Angelic Edict is `{4}{W}` (five mana ≥1 white) — u
               HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: compile failure — `Cards.angelicEdictPrinting` / `TargetSpec.CreatureOrEnchantmentTarget` not in scope (red).
 
-- [ ] **Step 3: Add the target spec**
+- [x] **Step 3: Add the target spec**
 
 In `source/library/Pawl/Type/TargetSpec.hs`:
 
@@ -571,7 +571,7 @@ In `source/library/Pawl/Type/TargetSpec.hs`:
     CreatureOrEnchantmentTarget
 ```
 
-- [ ] **Step 4: Add the `legalRecipients` arm**
+- [x] **Step 4: Add the `legalRecipients` arm**
 
 In `source/library/Pawl/Target.hs`, add a case arm (the module imports `Projection`, `CardType`, `GameState`, `Recipient`, `Set`):
 
@@ -584,11 +584,11 @@ In `source/library/Pawl/Target.hs`, add a case arm (the module imports `Projecti
            in Set.fromList (map Recipient.ToObject matches)
 ```
 
-- [ ] **Step 5: Add the codec arms**
+- [x] **Step 5: Add the codec arms**
 
 In `Codec.hs`, add `TargetSpec.CreatureOrEnchantmentTarget -> "CreatureOrEnchantmentTarget"` to `targetSpecToJson` and `(Text.pack "CreatureOrEnchantmentTarget", TargetSpec.CreatureOrEnchantmentTarget)` to the `jsonToTargetSpec` table.
 
-- [ ] **Step 6: Create and register Angelic Edict**
+- [x] **Step 6: Create and register Angelic Edict**
 
 Create `data/cards/angelic-edict.json` (slug `angelic-edict`):
 
@@ -598,7 +598,7 @@ Create `data/cards/angelic-edict.json` (slug `angelic-edict`):
 
 Register in `Cards.hs` (`angelicEdictPrinting`, `loadPrinting "angelic-edict"`, record line, `allPrintings`).
 
-- [ ] **Step 7: Card-data test and count → 35**
+- [x] **Step 7: Card-data test and count → 35**
 
 Bump count to 35. Add to `m4bCardTests`:
 
@@ -611,12 +611,12 @@ Bump count to 35. Add to `m4bCardTests`:
               HU.assertEqual "creature-or-enchantment slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureOrEnchantmentTarget) (Card.Type.targetSpecs c),
 ```
 
-- [ ] **Step 8: Run tests to verify they pass**
+- [x] **Step 8: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: PASS (both exile tests green; count 35; round-trip green).
 
-- [ ] **Step 9: Format, lint, commit**
+- [x] **Step 9: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

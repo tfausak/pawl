@@ -542,7 +542,27 @@ zoneChangeTests cards =
          in do
               HU.assertEqual "no creature on the battlefield" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "a card in bob's hand (its owner)" 1 (S.handSize S.bob after)
-              HU.assertEqual "Unsummon in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+              HU.assertEqual "Unsummon in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 701.10 Angelic Edict exiles a target creature" $
+        let base = S.landsInPlay (Cards.plainsPrinting cards) 5
+            (_, withPiker) = S.addPiker cards S.bob base
+            (gs, spellId) = S.handOne (Cards.angelicEdictPrinting cards) withPiker
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "no creature on the battlefield" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
+      HU.testCase "CR 115 Angelic Edict may exile an enchantment (non-creature permanent)" $
+        let base = S.landsInPlay (Cards.plainsPrinting cards) 5
+            -- bob controls only Rest in Peace (an enchantment, not a creature), so
+            -- it is the single legal CreatureOrEnchantmentTarget.
+            (ripId, withRip) = S.addCreature (Cards.restInPeacePrinting cards) S.bob base
+            (gs, spellId) = S.handOne (Cards.angelicEdictPrinting cards) withRip
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "the enchantment left the battlefield" Nothing (Game.lookupObject ripId after)
+              HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after))
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

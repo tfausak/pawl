@@ -47,7 +47,8 @@ data Cards = MkCards
     blazePrinting :: Printing.Printing,
     darksteelMyrPrinting :: Printing.Printing,
     murderPrinting :: Printing.Printing,
-    unsummonPrinting :: Printing.Printing
+    unsummonPrinting :: Printing.Printing,
+    angelicEdictPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -94,6 +95,7 @@ loadCards = do
   darksteelMyrPrinting_ <- loadPrinting "darksteel-myr"
   murderPrinting_ <- loadPrinting "murder"
   unsummonPrinting_ <- loadPrinting "unsummon"
+  angelicEdictPrinting_ <- loadPrinting "angelic-edict"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -129,7 +131,8 @@ loadCards = do
         blazePrinting = blazePrinting_,
         darksteelMyrPrinting = darksteelMyrPrinting_,
         murderPrinting = murderPrinting_,
-        unsummonPrinting = unsummonPrinting_
+        unsummonPrinting = unsummonPrinting_,
+        angelicEdictPrinting = angelicEdictPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -167,7 +170,8 @@ allPrintings cards =
     blazePrinting cards,
     darksteelMyrPrinting cards,
     murderPrinting cards,
-    unsummonPrinting cards
+    unsummonPrinting cards,
+    angelicEdictPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

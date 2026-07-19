@@ -19,4 +19,7 @@ data TargetSpec
   | -- CR 115: "target player" -- a player still in the game. The players-only
     -- restriction AnyTarget does not express (Mindslaver, M3g).
     PlayerTarget
+  | -- CR 115: "target creature or enchantment" (Angelic Edict). The first spec
+    -- admitting a non-creature permanent -- named as ToObject, like LandTarget.
+    CreatureOrEnchantmentTarget
   deriving (Eq, Ord, Show)

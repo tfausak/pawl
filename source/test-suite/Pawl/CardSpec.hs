@@ -166,8 +166,8 @@ lintTests cards =
                 (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
                 (Cards.allPrintings cards)
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (34 at M4b Task 3)" $
-        HU.assertEqual "count" 34 (length (Cards.allPrintings cards)),
+      HU.testCase "the registry holds every printing (35 at M4b Task 4)" $
+        HU.assertEqual "count" 35 (length (Cards.allPrintings cards)),
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $
         let card = Printing.card (Cards.blazePrinting cards)
             red = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -343,7 +343,13 @@ m4bCardTests cards =
             blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
          in do
               HU.assertEqual "cost" (Just (ManaCost.MkManaCost [blue])) (Card.Type.manaCost c)
-              HU.assertEqual "effect returns to hand" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand] (Card.Type.effects c)
+              HU.assertEqual "effect returns to hand" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand] (Card.Type.effects c),
+      HU.testCase "Angelic Edict is a {4}{W} Sorcery exiling a creature or enchantment" $
+        let c = Printing.card (Cards.angelicEdictPrinting cards)
+         in do
+              HU.assertBool "not an instant" (not (Card.isInstant c))
+              HU.assertEqual "effect exiles" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile] (Card.Type.effects c)
+              HU.assertEqual "creature-or-enchantment slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureOrEnchantmentTarget) (Card.Type.targetSpecs c)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
