@@ -1548,13 +1548,13 @@ git commit -m "abilitiesOf as a projection: Humility strips activated abilities 
 
 ## Final verification
 
-- [ ] **All `- [ ] **Step` checkboxes above are ticked.** Confirm: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-18-m3e-activated-abilities.md` reaches `0`.
-- [ ] **Clean build, warning-free:** `cabal clean && cabal build all --enable-tests --enable-benchmarks` (incremental builds hide warnings from unchanged modules).
-- [ ] **Full suite green:** `cabal test`.
-- [ ] **Lint clean:** `git add -A && hooky fix && git add -A && hooky run`.
-- [ ] **Exit criteria (spec § "Goal and scope") all demonstrated:** activation on the stack + cease (Task 4/5), the mana-ability true branch with no stack (Task 6), summoning sickness (Tasks 5, 6, 8), sacrifice + Search (Tasks 7, 8), the `abilitiesOf` projection strip (Task 9).
-- [ ] **Update `CLAUDE.md`** with the M3e completion note (mirror the M3d entry's shape), and **close the milestone** if tracked. Do NOT close git-bug `65ce714` (the mana-source-choice expiry) — it remains open by design (spec §9).
-- [ ] **Commit the doc update:**
+- [x] **All `- [ ] **Step` checkboxes above are ticked.** Confirm: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-18-m3e-activated-abilities.md` reaches `0`.
+- [x] **Clean build, warning-free:** `cabal clean && cabal build all --enable-tests --enable-benchmarks` (incremental builds hide warnings from unchanged modules).
+- [x] **Full suite green:** `cabal test`.
+- [x] **Lint clean:** `git add -A && hooky fix && git add -A && hooky run`.
+- [x] **Exit criteria (spec § "Goal and scope") all demonstrated:** activation on the stack + cease (Task 4/5), the mana-ability true branch with no stack (Task 6), summoning sickness (Tasks 5, 6, 8), sacrifice + Search (Tasks 7, 8), the `abilitiesOf` projection strip (Task 9).
+- [x] **Update `CLAUDE.md`** with the M3e completion note (mirror the M3d entry's shape), and **close the milestone** if tracked. Do NOT close git-bug `65ce714` (the mana-source-choice expiry) — it remains open by design (spec §9).
+- [x] **Commit the doc update:**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

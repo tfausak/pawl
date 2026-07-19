@@ -162,6 +162,42 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   are blue deterministic fixtures (no random-game entry). Spec and plan kept as
   reference: `docs/superpowers/specs/2026-07-18-m3d-text-changing-design.md` and
   `docs/superpowers/plans/2026-07-18-m3d-text-changing.md`.
+- **M3e is complete** (activated abilities as first-class objects on the stack,
+  proving the CR 605 mana-ability ABI predicate). An `ActivatedAbility` (an
+  `AbilityCost` of `AdditionalCost`s + reused `Effect`s + target slots) rides the
+  stack as a `Source.OfAbility srcId ability` incarnation, minted by
+  `Action.Activate` carrying the ability **value** (validated by membership in
+  `Projection.abilitiesOf`, never an index). `Resolve.resolveAbility` runs it
+  through the same executor and CR 608.2b fizzle as a spell — with the *source
+  permanent* (not the ability object) as the effect source (CR 608.2g) — then the
+  ability **ceases** (removed from stack + objects, CR 608.2n) rather than being
+  buried. **The go/no-go — one ABI predicate, `Mana.isManaAbility`** (structure:
+  produces mana via `Resolve.manaProduced` AND targets nothing, CR 605.1a) — is
+  read at exactly two sites: `Mana.manaTypesOf` counts a mana ability as a source
+  (resolved inline at payment, CR 605.3b, never the stack); `Activate.activatable`
+  (hence `Action.legalActions`) excludes it from stack activations. Three real
+  cards land the two branches: **Prodigal Sorcerer** `{T}: deal 1` (targets → the
+  stack), **Llanowar Elves** `{T}: Add {G}` (the mana ability, inline, the
+  falsifier an engine that stacked it would deadlock on), **Evolving Wilds** `{T},
+  Sacrifice: Search` (fetches but adds no mana → the stack, the CR 605 false
+  branch on a mana-adjacent card). Two opcodes: `Effect.AddMana ManaType` (a
+  documented no-op in `applyEffect`; executed at payment) and `Effect.Search
+  CardCriterion` (CR 701.23 tutor — prompts `SearchLibrary`, puts a
+  `CardCriterion.BasicLandCard` onto the battlefield tapped, then shuffles;
+  fail-to-find allowed, CR 701.23b), which forced resolution `Game`-monadic
+  (`resolveSpell`/`resolveTop`/`applyEffect`, no behavior change) and a
+  `Response.Searched` for replay round-trip. `AdditionalCost` = `TapSelf` (CR
+  302.6 sickness-gates a *creature*'s `{T}`, never a land's) `| SacrificeSelf` (CR
+  701.21). `abilitiesOf` is a projection (the `keywordsOf` move —
+  `ProjectedCharacteristics.activatedAbilities`, emptied by layer-6
+  `LoseAllAbilities`), the single switch that makes Humility strip a creature's
+  activated **and** mana abilities. `Action`/`Source` are now `data` (both derive
+  `Ord`). Cards are deterministic fixtures (no random-game entry). `git-bug
+  65ce714` (payCost must prompt when mana sources are distinguishable) stays
+  **open** by design — the mana-source elision expires at the first dual land, not
+  here. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-18-m3e-activated-abilities-design.md` and
+  `docs/superpowers/plans/2026-07-18-m3e-activated-abilities.md`.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
