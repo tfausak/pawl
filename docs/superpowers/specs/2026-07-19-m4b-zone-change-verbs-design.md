@@ -339,10 +339,12 @@ speed.
   after combat damage and the SBA sweep, Myr survives with 2 damage marked.
 - **Indestructible survives deathtouch (704.5h).** A deathtouch source deals Myr 1;
   the 704.5h SBA does not destroy it.
-- **704.5f still kills it (the second falsifier).** Reduce Myr's toughness to 0
-  (a −1/−1 effect, or a synthetic toughness-set fixture labeled with its expiry);
-  the SBA puts it into the graveyard despite indestructible. Cite CR 704.5f and
-  Darksteel Myr's reminder text.
+- **704.5f still kills it (the second falsifier).** Reduce Myr's toughness to 0 or
+  less via a **labeled synthetic** toughness-setting `ModifyTarget` fixture (a
+  `−0/−1`-style modification, the `Landform`/synthetic-deathtrampler pattern) whose
+  expiry names the first real **−1/−1** ability/card; the SBA puts Myr into the
+  graveyard despite indestructible. A real −1/−1 replaces the synthetic when one
+  lands. Cite CR 704.5f and Darksteel Myr's reminder text.
 
 **Move tests (step 2).**
 
@@ -373,8 +375,11 @@ serializable through `Pawl.Codec`.
 
 **Random-game coverage.** The gate and riders land as deterministic fixtures;
 following the M2d/M3 pattern, a black/blue random-game deck entry for the
-highest-value verbs (Destroy, Draw, bounce) can follow M4b rather than gate it,
-so the funnel-through-random-play coverage trails by one step as it has before.
+highest-value verbs (Destroy, Draw, bounce) trails M4b rather than gating it, so
+the funnel-through-random-play coverage lags by one step as it has before. This
+is a **fast follow**, not an open-ended defer — it lands immediately after the
+deterministic fixtures, before M4c, so the funnel gets random-play exercise while
+M4b is still fresh (an explicit final plan task, or a same-day follow-on commit).
 
 **Properties** (`runMatch`, all matchups): every M2d/M3/M4a invariant as it
 stands — conservation under CR 400.7 (each zone change mints one id and retires
