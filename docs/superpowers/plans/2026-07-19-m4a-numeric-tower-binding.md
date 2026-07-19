@@ -692,7 +692,7 @@ git commit -m "M4a: castSpell prompts and binds X (CR 601.2b), paying the substi
 **Interfaces:**
 - Produces: `CardType.Sorcery`; `Cards.blazePrinting :: Cards -> Printing`; Blaze in `allPrintings` and `redDeck`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/CardSpec.hs` (or `CardsSpec`), assert Blaze loads with the right shape:
 
@@ -706,12 +706,12 @@ In `source/test-suite/Pawl/CardSpec.hs` (or `CardsSpec`), assert Blaze loads wit
               HU.assertEqual "effect deals X" [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.Type.X] (Card.Type.effects card),
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | tail -20`
 Expected: FAIL — `Cards.blazePrinting` not in scope; `CardType.Sorcery` not a constructor.
 
-- [ ] **Step 3: Add `CardType.Sorcery` and its Codec**
+- [x] **Step 3: Add `CardType.Sorcery` and its Codec**
 
 In `source/library/Pawl/Type/CardType.hs`, add after `Instant`:
 
@@ -725,7 +725,7 @@ In `source/library/Pawl/Codec.hs`:
 - `cardTypeToJson` (~115): add `CardType.Sorcery -> "Sorcery"`.
 - `jsonToCardType` assoc list (~123): add `(Text.pack "Sorcery", CardType.Sorcery)`.
 
-- [ ] **Step 4: Write `data/cards/blaze.json`**
+- [x] **Step 4: Write `data/cards/blaze.json`**
 
 Create `data/cards/blaze.json` (one line, matching the pool's render format):
 
@@ -733,16 +733,16 @@ Create `data/cards/blaze.json` (one line, matching the pool's render format):
 {"name":"Blaze","manaCost":[{"type":"Variable"},{"type":"OfType","value":{"type":"Colored","value":{"type":"Red"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Sorcery"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"effects":[{"type":"DealDamage","value":["target",{"type":"X"}]}],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"targetSpecs":[{"slot":"target","spec":{"type":"AnyTarget"}}]}
 ```
 
-- [ ] **Step 5: Register Blaze in `Cards.hs`**
+- [x] **Step 5: Register Blaze in `Cards.hs`**
 
 In `source/test-suite/Pawl/Cards.hs`: add `blazePrinting :: Printing.Printing` to the record; `blazePrinting_ <- loadPrinting "blaze"` in the loader; `blazePrinting = blazePrinting_` in the record build; add `blazePrinting cards,` to `allPrintings`; and add `(blazePrinting cards, 4)` to `redDeck`. Update `CardSpec.hs:168` count assertion from `30` to `31`.
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -20`
 Expected: PASS — Blaze loads; the honesty round-trip (`jsonToCard . cardToJson`) holds for it; the count test reads 31.
 
-- [ ] **Step 7: Format, lint, commit**
+- [x] **Step 7: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

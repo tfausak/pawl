@@ -28,6 +28,8 @@ isPermanentType cardType = case cardType of
   CardType.Instant -> False
   CardType.Enchantment -> True
   CardType.Artifact -> True
+  -- CR 307 / 608.3: a sorcery is not a permanent; it goes to the graveyard.
+  CardType.Sorcery -> False
 
 -- The classification resolution dispatches on (CR 608.3). This is the whole
 -- reason the engine never needs to know WHICH card is resolving.

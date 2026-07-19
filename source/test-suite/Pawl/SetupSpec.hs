@@ -31,9 +31,10 @@ deckTests cards =
         let Deck.MkDeck m = Cards.redDeck cards
          in do
               HU.assertEqual "mountains" (Just 36) (Map.lookup (Cards.mountainPrinting cards) m)
-              HU.assertEqual "pikers" (Just 12) (Map.lookup (Cards.pikerPrinting cards) m)
+              HU.assertEqual "pikers" (Just 8) (Map.lookup (Cards.pikerPrinting cards) m)
               HU.assertEqual "maidens" (Just 8) (Map.lookup (Cards.birdMaidenPrinting cards) m)
-              HU.assertEqual "bolts" (Just 4) (Map.lookup (Cards.lightningBoltPrinting cards) m),
+              HU.assertEqual "bolts" (Just 4) (Map.lookup (Cards.lightningBoltPrinting cards) m)
+              HU.assertEqual "blazes" (Just 4) (Map.lookup (Cards.blazePrinting cards) m),
       HU.testCase "green deck composition" $
         let Deck.MkDeck m = Cards.greenDeck cards
          in do
@@ -50,10 +51,12 @@ deckTests cards =
         HU.assertEqual "mountains" 36 (S.countByName (Text.pack "Mountain") S.alice (setupState cards)),
       HU.testCase "8 Bird Maidens per player after a red-red setup" $
         HU.assertEqual "maidens" 8 (S.countByName (Text.pack "Bird Maiden") S.alice (setupState cards)),
-      HU.testCase "12 Pikers per player after a red-red setup" $
-        HU.assertEqual "pikers" 12 (S.countByName (Text.pack "Goblin Piker") S.bob (setupState cards)),
+      HU.testCase "8 Pikers per player after a red-red setup" $
+        HU.assertEqual "pikers" 8 (S.countByName (Text.pack "Goblin Piker") S.bob (setupState cards)),
       HU.testCase "4 Lightning Bolts per player after a red-red setup" $
-        HU.assertEqual "bolts" 4 (S.countByName (Text.pack "Lightning Bolt") S.alice (setupState cards))
+        HU.assertEqual "bolts" 4 (S.countByName (Text.pack "Lightning Bolt") S.alice (setupState cards)),
+      HU.testCase "4 Blazes per player after a red-red setup" $
+        HU.assertEqual "blazes" 4 (S.countByName (Text.pack "Blaze") S.alice (setupState cards))
     ]
 
 setupState :: Cards.Cards -> GameState.GameState

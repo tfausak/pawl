@@ -164,8 +164,17 @@ lintTests cards =
                 (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
                 (Cards.allPrintings cards)
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (30 at M3g Task 6)" $
-        HU.assertEqual "count" 30 (length (Cards.allPrintings cards)),
+      HU.testCase "the registry holds every printing (31 at M4a Task 8)" $
+        HU.assertEqual "count" 31 (length (Cards.allPrintings cards)),
+      HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $
+        let card = Printing.card (Cards.blazePrinting cards)
+            red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+         in do
+              HU.assertEqual "name" (Text.pack "Blaze") (Card.Type.name card)
+              HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Variable, red])) (Card.Type.manaCost card)
+              HU.assertBool "sorcery, not instant" (not (Card.isInstant card))
+              HU.assertEqual "one AnyTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget) (Card.Type.targetSpecs card)
+              HU.assertEqual "effect deals X" [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.Type.X] (Card.Type.effects card),
       HU.testCase "the lint itself catches a dangling reference" $
         let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
          in HU.assertBool "misauthored card detected" (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)),

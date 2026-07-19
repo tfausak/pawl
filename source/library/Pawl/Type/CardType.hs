@@ -10,4 +10,7 @@ data CardType
     Enchantment
   | -- CR 301: an artifact, a permanent type. Mindslaver is the first (M3g).
     Artifact
+  | -- CR 307: a sorcery, cast only at sorcery speed (not a permanent). Blaze is
+    -- the first sorcery printing (M4a).
+    Sorcery
   deriving (Eq, Ord, Show)

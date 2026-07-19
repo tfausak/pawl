@@ -43,7 +43,8 @@ data Cards = MkCards
     restInPeacePrinting :: Printing.Printing,
     plainsPrinting :: Printing.Printing,
     mindslaverPrinting :: Printing.Printing,
-    panglacialWurmPrinting :: Printing.Printing
+    panglacialWurmPrinting :: Printing.Printing,
+    blazePrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -86,6 +87,7 @@ loadCards = do
   plainsPrinting_ <- loadPrinting "plains"
   mindslaverPrinting_ <- loadPrinting "mindslaver"
   panglacialWurmPrinting_ <- loadPrinting "panglacial-wurm"
+  blazePrinting_ <- loadPrinting "blaze"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -117,7 +119,8 @@ loadCards = do
         restInPeacePrinting = restInPeacePrinting_,
         plainsPrinting = plainsPrinting_,
         mindslaverPrinting = mindslaverPrinting_,
-        panglacialWurmPrinting = panglacialWurmPrinting_
+        panglacialWurmPrinting = panglacialWurmPrinting_,
+        blazePrinting = blazePrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -151,7 +154,8 @@ allPrintings cards =
     restInPeacePrinting cards,
     plainsPrinting cards,
     mindslaverPrinting cards,
-    panglacialWurmPrinting cards
+    panglacialWurmPrinting cards,
+    blazePrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck
@@ -159,9 +163,13 @@ redDeck cards =
   Deck.MkDeck $
     Map.fromList
       [ (mountainPrinting cards, 36),
-        (pikerPrinting cards, 12),
+        (pikerPrinting cards, 8),
         (birdMaidenPrinting cards, 8),
-        (lightningBoltPrinting cards, 4)
+        (lightningBoltPrinting cards, 4),
+        -- Blaze swaps in for four Pikers to keep the deck at 60 (so the CR 400.7
+        -- conservation counts stay 120); the variable red cost gives the random
+        -- red matchup its X-payment coverage (M4a spec §6).
+        (blazePrinting cards, 4)
       ]
 
 greenDeck :: Cards -> Deck.Deck

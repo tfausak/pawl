@@ -115,6 +115,7 @@ cardTypeToJson c = nullary . Text.pack $ case c of
   CardType.Instant -> "Instant"
   CardType.Enchantment -> "Enchantment"
   CardType.Artifact -> "Artifact"
+  CardType.Sorcery -> "Sorcery"
 
 jsonToCardType :: Value -> Either Text CardType.CardType
 jsonToCardType =
@@ -124,7 +125,8 @@ jsonToCardType =
       (Text.pack "Creature", CardType.Creature),
       (Text.pack "Instant", CardType.Instant),
       (Text.pack "Enchantment", CardType.Enchantment),
-      (Text.pack "Artifact", CardType.Artifact)
+      (Text.pack "Artifact", CardType.Artifact),
+      (Text.pack "Sorcery", CardType.Sorcery)
     ]
 
 subtypeToJson :: Subtype.Subtype -> Value
