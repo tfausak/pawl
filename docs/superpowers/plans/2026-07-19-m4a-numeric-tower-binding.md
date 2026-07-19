@@ -624,7 +624,7 @@ git commit -m "M4a: ChooseX prompt, ChoseX response, and replay wiring"
 - Consumes: `ChooseX` (Task 6), `substituteX` (Task 4), `Binding.fromChoices` (Task 1), `ManaSymbol.Variable`.
 - Produces: a cast that, for a `{X}`-cost spell, prompts X first (CR 601.2b), pays the substituted cost, and stamps the amount into the stack object's `bindings`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/CastSpec.hs`, cast a Variable-cost spell (use Blaze if Task 8 lands first, or a synthetic `{X}{R}` fixture) with an answerer returning X=3; assert the stack object carries the amount and the substituted cost was paid:
 
@@ -638,12 +638,12 @@ In `source/test-suite/Pawl/CastSpec.hs`, cast a Variable-cost spell (use Blaze i
               HU.assertEqual "four mana spent" 4 (manaSpent gs0 after),
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | tail -20`
 Expected: FAIL — `castSpell` does not prompt `ChooseX`; amount is `Nothing`.
 
-- [ ] **Step 3: Add the X step to `castSpell`**
+- [x] **Step 3: Add the X step to `castSpell`**
 
 In `source/library/Pawl/Cast.hs`, before the target prompt (CR 601.2b precedes 601.2c), choose X when the cost carries a `Variable`, thread it into both the paid cost and the stamped bindings:
 
@@ -667,12 +667,12 @@ In `source/library/Pawl/Cast.hs`, before the target prompt (CR 601.2b precedes 6
 
 Replace the existing single-map stamp (from Task 2's `Binding.fromChoices chosen bound Nothing`) with `Binding.fromChoices chosen bound mAmount`. Add `import qualified Pawl.Type.ManaSymbol as ManaSymbol` and `import qualified Pawl.Type.ManaCost as ManaCost` if not already present.
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -15`
 Expected: PASS.
 
-- [ ] **Step 5: Format, lint, commit**
+- [x] **Step 5: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

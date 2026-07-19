@@ -29,8 +29,11 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -38,6 +41,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
@@ -263,6 +267,16 @@ castTests cards =
                     "the Piker is the target"
                     (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToCreature (S.pikerOf base)))
                     (Binding.targetsOf (Object.bindings obj)),
+      HU.testCase "casting a {X}{R} spell at X=3 stamps amount 3 and pays {3}{R}" $
+        let (gs0, oid) = S.handOne (blazishPrinting cards) (S.mountainsInPlay cards 4)
+            after = snd (Engine.runGamePure answerX3 gs0 (Cast.castSpell S.alice oid))
+         in case GameState.stack after of
+              [] -> HU.assertFailure "expected the spell on the stack"
+              top : _ -> case Game.lookupObject top after of
+                Nothing -> HU.assertFailure "stack id should resolve"
+                Just obj -> do
+                  HU.assertEqual "amount bound" (Just 3) (Binding.amountOf Binding.variableX (Object.bindings obj))
+                  HU.assertEqual "four mana spent (paid {3}{R})" 4 (S.tappedCount S.alice after),
       HU.testCase "an illegal target answer makes the cast a no-op" $
         let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
             liar :: Prompt.Prompt r -> r
@@ -292,6 +306,30 @@ castTests cards =
               HU.assertEqual "Panglacial left the library" 0 (S.countByName (Text.pack "Panglacial Wurm") S.alice after)
               HU.assertEqual "seven Forests tapped to pay {5}{G}{G}" 7 (S.tappedCount S.alice after)
     ]
+
+-- A synthetic {X}{R} "deal X to any target" spell, derived from Lightning Bolt's
+-- real shape (an AnyTarget instant) by swapping in a Variable cost and an X-reading
+-- effect. A labeled crutch: it exercises castSpell's X path (Task 7) before Blaze
+-- as data lands (Task 8); Task 10's Blaze gameplay tests are the real coverage.
+blazishPrinting :: Cards.Cards -> Printing.Printing
+blazishPrinting cards =
+  let bolt = Printing.card (Cards.lightningBoltPrinting cards)
+      red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+   in Printing.MkPrinting
+        bolt
+          { Card.Type.name = Text.pack "Synthetic X Burn",
+            Card.Type.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.Variable, red]),
+            Card.Type.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.X]
+          }
+
+-- Chooses X=3 and aims every target slot at bob; other prompts take the identity
+-- fallback. Casing on a GADT prompt with an identityAnswer default is the liar
+-- pattern from the illegal-target test.
+answerX3 :: Prompt.Prompt r -> r
+answerX3 p = case p of
+  Prompt.ChooseX {} -> 3
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToPlayer S.bob)) sets
+  _ -> S.identityAnswer p
 
 -- Discards from the BACK of hand. Deliberately unlike every fallback, so the
 -- CR 514.2 test proves the prompted choice is actually honored.

@@ -20,6 +20,8 @@ import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.ManaCost (ManaCost)
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
@@ -145,6 +147,14 @@ castSpell pid oid = do
       Just card -> do
         let decider = Decide.deciderFor pid gs
             sets = Target.legalSets (Card.Type.targetSpecs card) gs
+            -- CR 601.2b precedes 601.2c: choose X before targets, and only when
+            -- the cost carries a Variable (a spell with no {X} is not asked).
+            hasVariable = case cost of
+              ManaCost.MkManaCost symbols -> elem ManaSymbol.Variable symbols
+        mAmount <-
+          if hasVariable
+            then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid)))
+            else pure Nothing
         chosen <-
           if Map.null sets
             then pure Map.empty
@@ -161,7 +171,9 @@ castSpell pid oid = do
                   pair <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider pid oid slot))
                   pure (slot, pair)
             bound <- fmap Map.fromList (traverse ask textSlots)
-            case Mana.payCost pid cost gs of
+            -- CR 601.2f: pay the cost with X substituted (identity when no {X}).
+            let paidCost = maybe cost (\x -> Mana.substituteX x cost) mAmount
+            case Mana.payCost pid paidCost gs of
               Nothing -> pure ()
               Just paid -> do
                 let moved = Event.changeZone oid Zone.Stack paid
@@ -172,7 +184,7 @@ castSpell pid oid = do
                       moved
                         { GameState.objects =
                             Map.adjust
-                              (\o -> o {Object.bindings = Binding.fromChoices chosen bound Nothing})
+                              (\o -> o {Object.bindings = Binding.fromChoices chosen bound mAmount})
                               top
                               (GameState.objects moved)
                         }
