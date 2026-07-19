@@ -548,7 +548,7 @@ git commit -m "M4a: Quantity.X, evaluated from the object binding environment, w
 **Interfaces:**
 - Produces: `Prompt.ChooseX :: Decider -> PlayerId -> ObjectId -> Prompt Natural`; `Response.ChoseX Natural`; the `Replay` record/replay arms.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a replay round-trip unit mirroring the existing `Searched`/`ChoseBasicLandTypes` coverage:
 
@@ -560,12 +560,12 @@ Add a replay round-trip unit mirroring the existing `Searched`/`ChoseBasicLandTy
 
 (Match the actual `Replay` helper names — `Replay.hs:30` records via a `toResponse`-style function and `63` replays via a `fromResponse`-style function; use whichever the file exposes.)
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | tail -20`
 Expected: FAIL — `ChooseX`/`ChoseX` not in scope.
 
-- [ ] **Step 3: Add the prompt and response**
+- [x] **Step 3: Add the prompt and response**
 
 In `source/library/Pawl/Type/Prompt.hs`:
 
@@ -588,24 +588,24 @@ In `source/library/Pawl/Type/Response.hs`, add to the sum:
 
 Add `import Numeric.Natural (Natural)` to `Response.hs` if not already present (it is).
 
-- [ ] **Step 4: Wire `Replay` (record and replay)**
+- [x] **Step 4: Wire `Replay` (record and replay)**
 
 In `source/library/Pawl/Replay.hs`:
 - Record side (~30-33): `Prompt.ChooseX {} -> Response.ChoseX answer`.
 - Replay side (~63-72): `Response.ChoseX n -> Just n`.
 
-- [ ] **Step 5: Add a `ChooseX` arm to every interpreter the compiler flags**
+- [x] **Step 5: Add a `ChooseX` arm to every interpreter the compiler flags**
 
 The `Prompt` GADT is matched exhaustively in each Support.hs answerer. Add a `Prompt.ChooseX` arm to each:
 - Deterministic/identity answerers (`Support.hs` ~93,103,133,152): `Prompt.ChooseX {} -> 0` (X=0 is always payable and observationally neutral where these answerers cast nothing that has {X}).
 - The `StdGen`-driven random answerer (`Support.hs` ~207): `Prompt.ChooseX {} -> pure smallX` where `smallX` is a bounded draw (e.g. `0..3`) from the generator — Blaze under random play should sometimes choose nonzero X to exercise `substituteX`. Match the answerer's existing `StdGen` threading style.
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -15`
 Expected: PASS.
 
-- [ ] **Step 7: Format, lint, commit**
+- [x] **Step 7: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

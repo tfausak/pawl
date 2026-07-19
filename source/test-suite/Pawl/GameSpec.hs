@@ -261,6 +261,7 @@ recordingAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> pure Nothing
   Prompt.CastWhileSearching {} -> pure Nothing
+  Prompt.ChooseX {} -> pure 0
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
@@ -391,6 +392,7 @@ slaveAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
+  Prompt.ChooseX {} -> 0
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of

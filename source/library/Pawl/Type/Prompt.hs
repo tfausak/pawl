@@ -52,3 +52,9 @@ data Prompt r where
   -- done. Offered in a loop before the search finds (per the ruling), so multiple
   -- copies may be cast. CR 605.3a permits mana activation to pay.
   CastWhileSearching :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
+  -- CR 601.2b: choose the value of X while casting (the ObjectId is the spell).
+  -- Any Natural; payment (reject-not-repair) rejects an unaffordable choice, so
+  -- the engine computes no maximum. Prompted before targets (CR 601.2b precedes
+  -- 601.2c), and only when the cost contains a Variable symbol -- a spell with no
+  -- {X} is not asked (where the rules leave nothing to choose, don't prompt).
+  ChooseX :: Decider -> PlayerId -> ObjectId -> Prompt Natural

@@ -25,4 +25,7 @@ data Response
   | -- CR 601.3 (Panglacial): the library card cast while searching (Nothing =
     -- declined), serialized so a DecisionLog replays the re-entrant cast.
     CastWhileSearched (Maybe ObjectId)
+  | -- CR 601.2b: the value of X a caster chose, serialized so a DecisionLog
+    -- replays a variable-cost spell deterministically.
+    ChoseX Natural
   deriving (Eq, Show)

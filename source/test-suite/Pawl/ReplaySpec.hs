@@ -41,6 +41,9 @@ combatReplayTests =
              in HU.assertEqual "round trip" (Just answer) (Replay.decode damagePrompt (Replay.encode damagePrompt answer)),
           HU.testCase "a mismatched response decodes to Nothing" $
             HU.assertEqual "mismatch" Nothing (Replay.decode attackPrompt (Response.Shuffled [oid])),
+          HU.testCase "ChooseX records and replays a Natural" $
+            let p = Prompt.ChooseX decider S.alice oid
+             in HU.assertEqual "round trip" (Just (4 :: Natural.Natural)) (Replay.decode p (Replay.encode p 4)),
           HU.testCase "defaultAnswer attacks with nothing" $
             HU.assertEqual "no attacks" [] (Replay.defaultAnswer attackPrompt),
           HU.testCase "defaultAnswer blocks with nothing" $

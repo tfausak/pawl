@@ -95,6 +95,7 @@ identityAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
+  Prompt.ChooseX {} -> 0
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -123,6 +124,7 @@ castAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
+  Prompt.ChooseX {} -> 0
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -144,6 +146,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
+  Prompt.ChooseX {} -> 0
 
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
@@ -169,6 +172,7 @@ playLandAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
+  Prompt.ChooseX {} -> 0
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -217,6 +221,13 @@ randomAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> pure Nothing
   Prompt.CastWhileSearching {} -> pure Nothing
+  -- A small bounded X (0..3) so a variable-cost spell sometimes chooses nonzero,
+  -- exercising substituteX under random play; payment rejects an unaffordable draw.
+  Prompt.ChooseX {} -> do
+    g <- State.get
+    let (i, g') = Random.uniformR (0 :: Int, 3) g
+    State.put g'
+    pure (fromIntegral i)
 
 -- Total index into a list; the engine always offers at least Pass, so the
 -- fallback is unreachable in practice but keeps this free of partial functions.
