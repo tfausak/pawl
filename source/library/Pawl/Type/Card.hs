@@ -8,6 +8,7 @@ import Pawl.Type.Effect (Effect)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
 import Pawl.Type.Power (Power)
+import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.StaticAbility (StaticAbility)
 import Pawl.Type.TargetSpec (TargetSpec)
@@ -41,6 +42,11 @@ data Card = MkCard
     -- Pawl.Projection.abilitiesOf (Task 9), never directly: layer 6 (Humility)
     -- removes abilities.
     activatedAbilities :: [ActivatedAbility],
+    -- CR 614: this card's replacement effects, active while it is on the
+    -- battlefield. Read through Pawl.Projection.replacementsOf (never directly)
+    -- so layer 6 LoseAllAbilities strips them uniformly. Empty for all but Rest
+    -- in Peace.
+    replacementEffects :: [ReplacementEffect],
     -- The target slots effects reference by name. A Map, not a parallel list:
     -- slots have no order, only names, and nothing aligns by position.
     targetSpecs :: Map SlotName TargetSpec

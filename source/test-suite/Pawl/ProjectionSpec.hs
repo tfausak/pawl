@@ -29,6 +29,7 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Timestamp as Timestamp
@@ -385,5 +386,14 @@ tests =
         let (pikerId, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
             gsA = withDynamicEffect Affected.AllLands (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Swamp) gs0
             gs = withEffect pikerId (Timestamp.MkTimestamp 20) (Modification.AddCardType CardType.Land) gsA
-         in HU.assertBool "timestamp-only: no Swamp yet (known-incomplete, tracked)" (not (Set.member Subtype.Swamp (Projection.subtypesOf pikerId gs)))
+         in HU.assertBool "timestamp-only: no Swamp yet (known-incomplete, tracked)" (not (Set.member Subtype.Swamp (Projection.subtypesOf pikerId gs))),
+      HU.testCase "CR 614: Rest in Peace projects its graveyard->exile replacement" $
+        let (rip, gs) = S.addCreature Card.restInPeacePrinting S.alice (Setup.emptyGame S.bothPlayers)
+         in HU.assertEqual
+              "one redirect replacement"
+              [ReplacementEffect.RedirectZoneChange Zone.Graveyard Zone.Exile]
+              (Projection.replacementsOf rip gs),
+      HU.testCase "a vanilla creature projects no replacements" $
+        let (piker, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+         in HU.assertEqual "none" [] (Projection.replacementsOf piker gs)
     ]

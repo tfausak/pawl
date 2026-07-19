@@ -26,6 +26,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Power as Power
 import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
+import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
@@ -57,7 +58,7 @@ applyModification gs oid m pc = case m of
   Modification.GainKeyword k ->
     pc {PC.keywords = Set.insert k (PC.keywords pc)}
   Modification.LoseAllAbilities ->
-    pc {PC.keywords = Set.empty, PC.activatedAbilities = []}
+    pc {PC.keywords = Set.empty, PC.activatedAbilities = [], PC.replacementEffects = []}
   Modification.SetBasePowerToughness p t ->
     pc
       { PC.power = setPT (PC.power pc) (Quantity.evaluate gs oid p),
@@ -155,7 +156,8 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.cardTypes = Set.empty,
         PC.subtypes = Set.empty,
         PC.rulesTextActive = True,
-        PC.activatedAbilities = []
+        PC.activatedAbilities = [],
+        PC.replacementEffects = []
       }
   Just card ->
     PC.MkProjectedCharacteristics
@@ -169,7 +171,8 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
         PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
         PC.rulesTextActive = True,
-        PC.activatedAbilities = Card.Type.activatedAbilities card
+        PC.activatedAbilities = Card.Type.activatedAbilities card,
+        PC.replacementEffects = Card.Type.replacementEffects card
       }
 
 -- affects evaluated against an object's BASE characteristics (used by
@@ -339,6 +342,25 @@ keywordsOf oid gs = PC.keywords (project oid gs)
 -- same projection posture as keywordsOf. A Humility'd creature has none.
 abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility]
 abilitiesOf oid gs = PC.activatedAbilities (project oid gs)
+
+-- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
+-- the same projection posture as abilitiesOf. A Humility'd creature has none.
+replacementsOf :: ObjectId -> GameState -> [ReplacementEffect]
+replacementsOf oid gs = PC.replacementEffects (project oid gs)
+
+-- CR 614.6: every replacement effect active on the battlefield. Short-circuits
+-- when no permanent has one in its base card, so an ordinary zone change (a draw,
+-- a land entering) does NOT project the whole board -- projection runs only once
+-- a replacement source is actually present.
+replacementsAffecting :: GameState -> [ReplacementEffect]
+replacementsAffecting gs =
+  let onBattlefield = Set.toList (GameState.battlefield gs)
+      baseHas oid = case Game.cardOf oid gs of
+        Nothing -> False
+        Just card -> not (null (Card.Type.replacementEffects card))
+   in if not (any baseHas onBattlefield)
+        then []
+        else concatMap (\oid -> replacementsOf oid gs) onBattlefield
 
 subtypesOf :: ObjectId -> GameState -> Set Subtype.Subtype
 subtypesOf oid gs = PC.subtypes (project oid gs)

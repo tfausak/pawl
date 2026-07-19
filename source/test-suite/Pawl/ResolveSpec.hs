@@ -190,6 +190,7 @@ resolveTests =
                   Card.Type.staticAbilities = [],
                   Card.Type.effects = [Effect.ChangeText slot],
                   Card.Type.activatedAbilities = [],
+                  Card.Type.replacementEffects = [],
                   Card.Type.targetSpecs = Map.empty
                 }
          in do

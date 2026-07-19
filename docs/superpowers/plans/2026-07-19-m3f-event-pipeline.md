@@ -129,7 +129,7 @@ git commit -m "Relocate changeZone from Pawl.Game to Pawl.Event (no behavior cha
 **Interfaces:**
 - Produces: `ZoneChange.MkZoneChange { object :: ObjectId, from :: Zone, to :: Zone }`; `ReplacementEffect.RedirectZoneChange { whenDestination :: Zone, toDestination :: Zone }`; `Event.applyReplacements :: [ReplacementEffect] -> ZoneChange -> ZoneChange` (each replacement gets one opportunity, CR 614.5; a redirect that fires produces a destination it no longer matches, so the fold terminates).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `source/test-suite/Pawl/EventSpec.hs`:
 
@@ -165,12 +165,12 @@ tests =
 
 Wire `Pawl.EventSpec.tests` into `source/test-suite/Main.hs`'s `testTree` (add the import and list entry) and add `Pawl.EventSpec` to the test-suite `other-modules` list in `pawl.cabal`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "redirected to exile"'`
 Expected: FAIL to compile — `Pawl.Event.applyReplacements`, `ZoneChange`, `ReplacementEffect` not in scope.
 
-- [ ] **Step 3: Create the two types**
+- [x] **Step 3: Create the two types**
 
 `source/library/Pawl/Type/ZoneChange.hs`:
 
@@ -210,7 +210,7 @@ data ReplacementEffect = RedirectZoneChange
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add `applyReplacements` to `Pawl.Event`**
+- [x] **Step 4: Add `applyReplacements` to `Pawl.Event`**
 
 In `source/library/Pawl/Event.hs`, add imports `import qualified Data.List as List`, `import Pawl.Type.ReplacementEffect (ReplacementEffect)`, `import qualified Pawl.Type.ReplacementEffect as ReplacementEffect`, `import Pawl.Type.ZoneChange (ZoneChange)`, `import qualified Pawl.Type.ZoneChange as ZoneChange`. Add:
 
@@ -231,12 +231,12 @@ applyOne zc re = case re of
       else zc
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

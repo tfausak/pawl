@@ -107,6 +107,7 @@ emptyGame order =
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.damageEvents = [],
+          GameState.zoneChanges = [],
           GameState.continuousEffects = [],
           GameState.turnOrder = order_,
           GameState.activePlayer = NonEmpty.head order,
