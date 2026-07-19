@@ -3,12 +3,17 @@
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text.IO as TextIO
 import Numeric.Natural (Natural)
+import qualified Pawl.Codec as Codec
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Json as Json
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Type.Action as Action
+import qualified Pawl.Type.Deck as Deck
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.Result (Result)
@@ -93,29 +98,50 @@ playersFrom n = PlayerId.MkPlayerId n NonEmpty.:| [PlayerId.MkPlayerId (n + 1)]
 -- Takes the first player's id so the whole game genuinely depends on the
 -- benchmark's argument; otherwise GHC floats the result out and times a cached
 -- value rather than the game. NOINLINE keeps it from being folded back in.
-goldfish :: Natural -> Result
-goldfish n =
+goldfish :: Deck.Deck -> Natural -> Result
+goldfish deck n =
   let players = playersFrom n
-   in fst (Engine.runMatchPure alwaysPass (Setup.mirror Setup.redDeck players))
+   in fst (Engine.runMatchPure alwaysPass (Setup.mirror deck players))
 {-# NOINLINE goldfish #-}
 
 -- Parameterized for the same reason as 'goldfish'.
-casting :: Natural -> Result
-casting n =
+casting :: Deck.Deck -> Natural -> Result
+casting deck n =
   let players = playersFrom n
-   in fst (Engine.runMatchPure castAnswer (Setup.mirror Setup.redDeck players))
+   in fst (Engine.runMatchPure castAnswer (Setup.mirror deck players))
 {-# NOINLINE casting #-}
 
-fighting :: Natural -> Result
-fighting n =
+fighting :: Deck.Deck -> Natural -> Result
+fighting deck n =
   let players = playersFrom n
-   in fst (Engine.runMatchPure fightAnswer (Setup.mirror Setup.redDeck players))
+   in fst (Engine.runMatchPure fightAnswer (Setup.mirror deck players))
 {-# NOINLINE fighting #-}
 
+-- Load one card from its committed JSON file, failing loudly (in IO, never
+-- `error` in pure code) on a missing or malformed file.
+loadPrinting :: String -> IO Printing.Printing
+loadPrinting slug = do
+  contents <- TextIO.readFile ("data/cards/" <> slug <> ".json")
+  case Json.parse contents >>= Codec.jsonToPrinting of
+    Right p -> pure p
+    Left err -> ioError (userError ("card " <> slug <> ": " <> show err))
+
+-- The redDeck recipe (slug -> count), loaded from files -- the proof that
+-- files -> parse -> a real game works end-to-end. Duplicated here rather than
+-- shared through a compiled card module (the non-scalable path design rejects).
+loadRedDeck :: IO Deck.Deck
+loadRedDeck = do
+  mountain <- loadPrinting "mountain"
+  piker <- loadPrinting "goblin-piker"
+  maiden <- loadPrinting "bird-maiden"
+  bolt <- loadPrinting "lightning-bolt"
+  pure (Deck.MkDeck (Map.fromList [(mountain, 36), (piker, 12), (maiden, 8), (bolt, 4)]))
+
 main :: IO ()
-main =
+main = do
+  deck <- loadRedDeck
   Bench.defaultMain
-    [ Bench.bench "goldfish 2p" $ Bench.whnf goldfish 0,
-      Bench.bench "casting 2p" $ Bench.whnf casting 0,
-      Bench.bench "fighting 2p" $ Bench.whnf fighting 0
+    [ Bench.bench "goldfish 2p" $ Bench.whnf (goldfish deck) 0,
+      Bench.bench "casting 2p" $ Bench.whnf (casting deck) 0,
+      Bench.bench "fighting 2p" $ Bench.whnf (fighting deck) 0
     ]
