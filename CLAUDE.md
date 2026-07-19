@@ -35,7 +35,7 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 
 ## Current work and tracking
 
-- **M0–M3g, M3.5, and M4a are complete** — a zero-card game, then casting, combat, the
+- **M0–M3g, M3.5, M4a, and M4b are complete** — a zero-card game, then casting, combat, the
   keyword seam, first/double strike, deathtouch/trample, and the M3 effect-DSL gate
   cards through the payoff pair (Mindslaver's CR 723 control + Panglacial Wurm's
   cast-during-search re-entrancy), then **M3.5** (cards as data files: a hand-rolled
@@ -47,7 +47,11 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   on a unified `Object.bindings :: Map SlotName Binding` environment that replaced
   the parallel `targets`/`chosenSubtypes` maps; X is chosen at cast via `ChooseX`,
   stored under the reserved `Binding.variableX` slot, and re-read at resolution by
-  `Quantity.evaluate`). **M4b is next.** The **milestone completion log** — one distilled entry per milestone with
+  `Quantity.evaluate`), then **M4b** (the targeted zone-change verbs —
+  `Destroy`/`MoveToZone`/`Draw`/`Mill`/`Discard` plus the `Indestructible`
+  keyword — each executed only by `Resolve.applyEffect` through M3f's
+  `Event.changeZone` funnel, gated by Murder vs. Darksteel Myr proving
+  destroy ≠ move-to-graveyard). **M4c (tokens) is next.** The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, the opcodes/types it added, and every
   elision and its named expiry — lives in `docs/progress.md`. The forward path
   (M0–M7 and the M3a–M3g split) is in `docs/design.md` §3; each milestone's

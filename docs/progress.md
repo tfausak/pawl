@@ -336,3 +336,38 @@ end of every entry.
   substitution precedes source selection. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-19-m4a-numeric-tower-binding-design.md` and
   `docs/superpowers/plans/2026-07-19-m4a-numeric-tower-binding.md`.
+- **M4b is complete** (the targeted zone-change opcode family. **Gate: Murder**
+  (`{1}{B}{B}` Instant, "Destroy target creature") vs. **Darksteel Myr** (`{3}`
+  0/1 Artifact Creature, Indestructible): the falsifier is that modelling destroy
+  as a move-to-graveyard buries the Myr, so `Effect.Destroy` is its own opcode
+  that consults CR 700.4 indestructibility before funnelling to the graveyard.
+  Five opcodes, all executed only by `Resolve.applyEffect` through M3f's
+  `Event.changeZone` funnel — proving it generalizes past Rest in Peace's single
+  redirect into card-driven verbs: `Destroy SlotName`; `MoveToZone SlotName Zone`
+  (Unsummon bounces to Hand, Angelic Edict exiles); `Draw Quantity` (Divination,
+  controller-targetless, empty-library loss preserved via the consolidated
+  `Event.drawCard`); `Mill SlotName Quantity` (Tome Scour, target player, short
+  library mills fewer with no loss, CR 701.13b); `Discard SlotName Quantity`
+  (Mind Rot, reusing `Prompt.ChooseDiscard`, the discarding player choosing per
+  CR 701.8a). **`Keyword.Indestructible`** (CR 702.12) is read through the
+  projection at two independent sites — the `Destroy` opcode and `Sba.creatureDies`
+  (guarding CR 704.5g lethal damage and 704.5h deathtouch but **not** 704.5f
+  toughness ≤ 0, which is a put-into-graveyard, not a destruction) — so Humility
+  strips it for free. New types: `TargetSpec.CreatureOrEnchantmentTarget` (the
+  first spec admitting a non-creature permanent, exercised by exiling an
+  enchantment), `Subtype.Myr`. The single-card draw was consolidated into one
+  `Event.drawCard` shared by the draw step, opening hands, and the Draw opcode.
+  Seven cards (Darksteel Myr, Murder, Unsummon, Angelic Edict, Divination, Tome
+  Scour, Mind Rot), Scryfall-verified, deterministic fixtures, with a fast-follow
+  random-game matchup (blue/black) carrying the high-value verbs. **Named
+  elisions/expiries**: Destroy is a plain check-then-move, not yet an interceptable
+  destroy event — regeneration/prevention (CR 615) makes it replaceable at **M4d**;
+  the 704.5f toughness-drop test uses a synthetic `-0/-1` continuous effect until
+  the first real **−1/−1** ability; a forced full-hand discard is elided (not
+  prompted) per the engine-makes-no-choices rule; derived references ("its
+  controller"/"its power", Path/Swords) and a lifegain opcode are deferred with the
+  first card that needs them; `MoveToZone slot Graveyard` (an unconditional
+  put-into-graveyard, distinct from Destroy) awaits its first card. Spec and plan
+  kept as reference:
+  `docs/superpowers/specs/2026-07-19-m4b-zone-change-verbs-design.md` and
+  `docs/superpowers/plans/2026-07-19-m4b-zone-change-verbs.md`.

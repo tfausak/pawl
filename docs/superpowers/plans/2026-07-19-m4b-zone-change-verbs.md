@@ -1225,7 +1225,7 @@ Record M4b in the completion log and flip the forward-status notes, matching the
 - Modify: `docs/progress.md` (new M4b entry after the M4a entry)
 - Modify: `CLAUDE.md` (the "Current work and tracking" bullet)
 
-- [ ] **Step 1: Append the M4b completion-log entry**
+- [x] **Step 1: Append the M4b completion-log entry**
 
 Add to `docs/progress.md`, after the M4a entry, one distilled bullet in the house style (gate card, decision proved, opcodes/types added, elisions with named expiries):
 
@@ -1267,11 +1267,11 @@ Add to `docs/progress.md`, after the M4a entry, one distilled bullet in the hous
   `docs/superpowers/plans/2026-07-19-m4b-zone-change-verbs.md`.
 ```
 
-- [ ] **Step 2: Update the CLAUDE.md status bullet**
+- [x] **Step 2: Update the CLAUDE.md status bullet**
 
 In `CLAUDE.md`, the "Current work and tracking" section: change "**M0–M3g, M3.5, and M4a are complete**" to include M4b, update the M4a parenthetical to note M4b landed the zone-change verbs, and change "**M4b is next.**" to "**M4c (tokens) is next.**" Keep the sentence about the milestone completion log and the forward path unchanged.
 
-- [ ] **Step 3: Verify the docs and commit**
+- [x] **Step 3: Verify the docs and commit**
 
 Run: `grep -c "M4b is complete" docs/progress.md` (expect 1) and re-read the two edits.
 
