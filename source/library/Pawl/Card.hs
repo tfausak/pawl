@@ -10,6 +10,7 @@ import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
@@ -56,6 +57,7 @@ mountainPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -83,6 +85,7 @@ swampPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -110,6 +113,7 @@ forestPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -145,6 +149,7 @@ pikerPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -188,6 +193,7 @@ birdMaidenPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -223,6 +229,7 @@ nimbleBirdstickerPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -257,6 +264,7 @@ ogreSentryPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -293,6 +301,7 @@ windseekerCentaurPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -325,6 +334,7 @@ goblinChariotPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -362,6 +372,7 @@ sabretoothTigerPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -394,6 +405,7 @@ ridgetopRaptorPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -425,6 +437,7 @@ typhoidRatsPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -459,6 +472,7 @@ warMammothPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -490,6 +504,7 @@ lightningBoltPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget
           }
     }
@@ -518,6 +533,7 @@ giantGrowthPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget
           }
     }
@@ -562,6 +578,7 @@ humilityPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -597,6 +614,7 @@ serpentsGiftPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget
           }
     }
@@ -633,6 +651,7 @@ bloodMoonPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -663,6 +682,7 @@ urborgPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -704,6 +724,7 @@ opalescencePrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -730,6 +751,7 @@ islandPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -762,6 +784,7 @@ magicalHackPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.SpellOrPermanentTarget
           }
     }
@@ -794,6 +817,7 @@ landformPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.LandTarget
           }
     }
@@ -830,6 +854,7 @@ prodigalSorcererPrinting =
               ],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -864,6 +889,7 @@ llanowarElvesPrinting =
               ],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -900,6 +926,7 @@ evolvingWildsPrinting =
               ],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -936,6 +963,7 @@ restInPeacePrinting =
                     TriggeredAbility.targetSpecs = Map.empty
                   }
               ],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -963,6 +991,7 @@ plainsPrinting =
             Card.activatedAbilities = [],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
             Card.targetSpecs = Map.empty
           }
     }
@@ -1003,6 +1032,38 @@ mindslaverPrinting =
               ],
             Card.replacementEffects = [],
             Card.triggeredAbilities = [],
+            Card.castingPermissions = [],
+            Card.targetSpecs = Map.empty
+          }
+    }
+
+-- Panglacial Wurm: {5}{G}{G}, Creature - Wurm, 9/5, "Trample / While you're
+-- searching your library, you may cast this card from your library."
+-- Scryfall-verified 2026-07-19. Trample is M2c; the body needs no opcode. The
+-- permission is read from the card in the library (not projected).
+panglacialWurmPrinting :: Printing.Printing
+panglacialWurmPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Panglacial Wurm",
+            Card.manaCost =
+              Just (ManaCost.MkManaCost [ManaSymbol.Generic 5, ManaSymbol.OfType (ManaType.Colored Color.Green), ManaSymbol.OfType (ManaType.Colored Color.Green)]),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Creature,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Just (Power.MkPower (Quantity.Literal 9)),
+            Card.toughness = Just (Toughness.MkToughness (Quantity.Literal 5)),
+            Card.keywords = Set.singleton Keyword.Trample,
+            Card.staticAbilities = [],
+            Card.effects = [],
+            Card.activatedAbilities = [],
+            Card.replacementEffects = [],
+            Card.triggeredAbilities = [],
+            Card.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
             Card.targetSpecs = Map.empty
           }
     }
@@ -1039,7 +1100,8 @@ allPrintings =
     evolvingWildsPrinting,
     restInPeacePrinting,
     plainsPrinting,
-    mindslaverPrinting
+    mindslaverPrinting,
+    panglacialWurmPrinting
   ]
 
 isLand :: Card.Card -> Bool

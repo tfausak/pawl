@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Data.Text (Text)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
+import Pawl.Type.CastingPermission (CastingPermission)
 import Pawl.Type.Effect (Effect)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
@@ -51,6 +52,11 @@ data Card = MkCard
     -- CR 603: this card's triggered abilities, read through
     -- Pawl.Projection.triggeredAbilitiesOf. Empty for all but Rest in Peace.
     triggeredAbilities :: [TriggeredAbility],
+    -- CR 601.3: this card's casting permissions -- zone/condition exceptions to
+    -- normal timing. Read directly from the card (NOT the projection): the
+    -- permission functions in the library (CR 113.6), where the CR 613 layer
+    -- system does not reach. Empty for all but Panglacial Wurm.
+    castingPermissions :: [CastingPermission],
     -- The target slots effects reference by name. A Map, not a parallel list:
     -- slots have no order, only names, and nothing aligns by position.
     targetSpecs :: Map SlotName TargetSpec

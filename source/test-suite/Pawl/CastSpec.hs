@@ -240,7 +240,15 @@ castTests =
             after = snd (Engine.runGamePure liar gs (Cast.castSpell S.alice oid))
          in do
               HU.assertEqual "nothing on the stack" 0 (length (GameState.stack after))
-              HU.assertEqual "nothing paid" 0 (S.tappedCount S.alice after)
+              HU.assertEqual "nothing paid" 0 (S.tappedCount S.alice after),
+      HU.testCase "Panglacial Wurm in the library is castable-while-searching with mana" $
+        let base = S.landsInPlay Card.forestPrinting 7
+            (_, gs) = S.addLibraryCard Card.panglacialWurmPrinting S.alice base
+         in HU.assertEqual "one castable-while-searching option" 1 (length (Cast.castableWhileSearching S.alice gs)),
+      HU.testCase "with too little mana, Panglacial is not castable-while-searching" $
+        let base = S.landsInPlay Card.forestPrinting 3
+            (_, gs) = S.addLibraryCard Card.panglacialWurmPrinting S.alice base
+         in HU.assertEqual "unaffordable, so no options" 0 (length (Cast.castableWhileSearching S.alice gs))
     ]
 
 -- Discards from the BACK of hand. Deliberately unlike every fallback, so the

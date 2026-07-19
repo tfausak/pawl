@@ -13,6 +13,7 @@ import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CastingPermission as CastingPermission
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -77,6 +78,26 @@ castable pid oid gs = case costOf oid gs of
 
 castableSpells :: PlayerId -> GameState -> [ObjectId]
 castableSpells pid gs = filter (\oid -> castable pid oid gs) (Game.zoneMembers Zone.Hand pid gs)
+
+-- CR 601.3 (Panglacial): may this card be cast from the library while its
+-- controller searches their own library? A membership test on the card's casting
+-- permissions -- Cast is the sole reader of CastingPermission, and this is a
+-- classification, never card identity.
+permitsCastWhileSearching :: Card.Type.Card -> Bool
+permitsCastWhileSearching card =
+  elem CastingPermission.CastFromLibraryWhileSearching (Card.Type.castingPermissions card)
+
+-- The library cards this player may cast while searching their own library:
+-- permitted, affordable (Mana.canPay), and with a fillable target set (Cast
+-- .targetable). Deliberately omits timingOk -- the permission IS the CR 601.3
+-- timing exception (the ruling: "follows all normal rules ... except for timing").
+castableWhileSearching :: PlayerId -> GameState -> [ObjectId]
+castableWhileSearching pid gs =
+  let permitted oid = maybe False permitsCastWhileSearching (Game.cardOf oid gs)
+      affordable oid = case costOf oid gs of
+        Nothing -> False
+        Just cost -> Mana.canPay pid cost gs
+   in filter (\oid -> permitted oid && affordable oid && targetable oid gs) (Game.zoneMembers Zone.Library pid gs)
 
 -- CR 601: choose targets (601.2c), pay (601.2f-h), move to the stack (601.2a),
 -- stamp the choices on the NEW stack incarnation (CR 400.7). Prompting before

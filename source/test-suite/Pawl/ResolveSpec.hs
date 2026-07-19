@@ -203,6 +203,7 @@ resolveTests =
                   Card.Type.activatedAbilities = [],
                   Card.Type.replacementEffects = [],
                   Card.Type.triggeredAbilities = [],
+                  Card.Type.castingPermissions = [],
                   Card.Type.targetSpecs = Map.empty
                 }
          in do

@@ -661,7 +661,7 @@ git commit -m "Gate: Mindslaver routes bob's decisions to alice while bob's reso
 **Interfaces:**
 - Produces: `CastingPermission.CastFromLibraryWhileSearching`; `Card.castingPermissions :: [CastingPermission]`; `Cast.permitsCastWhileSearching :: Card.Card -> Bool`; `Cast.castableWhileSearching :: PlayerId -> GameState -> [ObjectId]` (library cards with the permission, affordable, and fillable — deliberately NOT timing-gated); `Resolve.searchesLibrary :: Effect -> Bool`; `Card.panglacialWurmPrinting`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/CastSpec.hs` (add imports `qualified Pawl.Cast as Cast`, `qualified Pawl.Support as S` if absent):
 
@@ -678,12 +678,12 @@ Add to `source/test-suite/Pawl/CastSpec.hs` (add imports `qualified Pawl.Cast as
 
 (`S.landsInPlay Card.forestPrinting 7` gives alice seven untapped Forests; Panglacial costs `{5}{G}{G}` = 7 mana.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "castable-while-searching with mana"'`
 Expected: FAIL to compile — `Cast.castableWhileSearching`, `Card.panglacialWurmPrinting` not in scope.
 
-- [ ] **Step 3: Create `CastingPermission`**
+- [x] **Step 3: Create `CastingPermission`**
 
 `source/library/Pawl/Type/CastingPermission.hs`:
 
@@ -700,7 +700,7 @@ data CastingPermission = CastFromLibraryWhileSearching
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the `castingPermissions` field to `Card`**
+- [x] **Step 4: Add the `castingPermissions` field to `Card`**
 
 In `source/library/Pawl/Type/Card.hs`, add `import Pawl.Type.CastingPermission (CastingPermission)` and the field (after `triggeredAbilities`, before `targetSpecs`):
 
@@ -712,7 +712,7 @@ In `source/library/Pawl/Type/Card.hs`, add `import Pawl.Type.CastingPermission (
     castingPermissions :: [CastingPermission],
 ```
 
-- [ ] **Step 5: Add `searchesLibrary` to `Resolve`**
+- [x] **Step 5: Add `searchesLibrary` to `Resolve`**
 
 In `source/library/Pawl/Resolve.hs`, add (casing on `Effect` is Resolve's charter):
 
@@ -731,7 +731,7 @@ searchesLibrary effect = case effect of
   Effect.ControlPlayerNextTurn _ -> False
 ```
 
-- [ ] **Step 6: Add the classifier and enumerator to `Cast`**
+- [x] **Step 6: Add the classifier and enumerator to `Cast`**
 
 In `source/library/Pawl/Cast.hs`, add `import qualified Pawl.Type.CastingPermission as CastingPermission`. Add:
 
@@ -761,7 +761,7 @@ castableWhileSearching pid gs =
 
 (`Card.Type`, `Mana`, `Game`, `Zone`, `costOf`, `targetable`, `PlayerId`, `GameState`, `ObjectId` are already in scope in `Cast`.)
 
-- [ ] **Step 7: Seed `castingPermissions = []` everywhere, then add Panglacial**
+- [x] **Step 7: Seed `castingPermissions = []` everywhere, then add Panglacial**
 
 `-Wmissing-fields` lists every printing. Add `Card.castingPermissions = []` (after `triggeredAbilities`) at every printing in `source/library/Pawl/Card.hs` and every hand-built `Card.Type.MkCard` in tests. Then add:
 
@@ -800,12 +800,12 @@ panglacialWurmPrinting =
 
 (Add `import qualified Pawl.Type.CastingPermission as CastingPermission` to `Card.hs`. Match existing aliases: `Power`, `Toughness`, `Quantity`, `Keyword`, `ManaType`, `Color`, `ManaSymbol`, `ManaCost`. Register `panglacialWurmPrinting` in `allPrintings`.)
 
-- [ ] **Step 8: Run tests to verify they pass**
+- [x] **Step 8: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

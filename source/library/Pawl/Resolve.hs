@@ -75,6 +75,19 @@ manaProduced effect = case effect of
   Effect.ExileAllGraveyards -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
 
+-- CR 601.3 (Panglacial): does this effect search a library? The classification
+-- Stack asks before resolving, to offer the cast-while-searching opportunity.
+-- Search searches the controller's own library; every other effect does not.
+searchesLibrary :: Effect -> Bool
+searchesLibrary effect = case effect of
+  Effect.Search _ -> True
+  Effect.DealDamage _ _ -> False
+  Effect.ModifyTarget {} -> False
+  Effect.ChangeText _ -> False
+  Effect.AddMana _ -> False
+  Effect.ExileAllGraveyards -> False
+  Effect.ControlPlayerNextTurn _ -> False
+
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
 matchesCriterion :: CardCriterion.CardCriterion -> Card.Card -> Bool
