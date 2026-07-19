@@ -51,6 +51,7 @@ legalAssignment thresholds power answer =
       isDefender r = case r of
         Recipient.ToPlayer _ -> True
         Recipient.ToCreature _ -> False
+        Recipient.ToObject _ -> False
       defenderAmount = sum (Map.elems (Map.filterWithKey (\r _ -> isDefender r) answer))
       blockerThresholds = Map.filterWithKey (\r _ -> not (isDefender r)) thresholds
       everyBlockerLethal = all (\(r, t) -> assigned r >= t) (Map.toList blockerThresholds)
@@ -160,6 +161,7 @@ applyDamage events gs =
         Recipient.ToPlayer pid ->
           let drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
            in g {GameState.players = Map.adjust drain pid (GameState.players g)}
+        Recipient.ToObject _ -> g
       marked = List.foldl' markOne gs events
    in marked {GameState.damageEvents = GameState.damageEvents marked ++ events}
 

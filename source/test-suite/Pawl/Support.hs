@@ -75,6 +75,7 @@ isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True
   Recipient.ToPlayer _ -> False
+  Recipient.ToObject _ -> False
 
 -- Identity interpreter: shuffle returns ids unchanged; actions never occur here.
 identityAnswer :: Prompt.Prompt r -> r

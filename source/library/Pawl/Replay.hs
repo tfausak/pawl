@@ -80,6 +80,7 @@ defaultAnswer p = case p of
         isCreatureRecipient r = case r of
           Recipient.ToCreature _ -> True
           Recipient.ToPlayer _ -> False
+          Recipient.ToObject _ -> False
      in case blockers of
           r : _ -> Map.singleton r n
           [] -> Map.empty

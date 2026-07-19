@@ -7,7 +7,9 @@ import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
+import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.GameState (GameState)
+import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.SlotName (SlotName)
@@ -32,6 +34,14 @@ legalRecipients spec gs =
    in case spec of
         TargetSpec.AnyTarget -> Set.fromList (creatures ++ players)
         TargetSpec.CreatureTarget -> Set.fromList creatures
+        TargetSpec.SpellOrPermanentTarget ->
+          let onStack = map Recipient.ToObject (GameState.stack gs)
+              permanents = map Recipient.ToObject (Set.toList (GameState.battlefield gs))
+           in Set.fromList (onStack ++ permanents)
+        TargetSpec.LandTarget ->
+          let isLand oid = Set.member CardType.Land (Projection.cardTypesOf oid gs)
+              lands = filter isLand (Set.toList (GameState.battlefield gs))
+           in Set.fromList (map Recipient.ToObject lands)
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is

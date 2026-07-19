@@ -10,4 +10,10 @@ data TargetSpec
     -- The first spec whose legal set can be EMPTY, which falsifies M3a's
     -- CR 601.2c targeting gate (Giant Growth with no creature is uncastable).
     CreatureTarget
+  | -- CR 115: "target spell or permanent" -- any object on the stack, or any
+    -- permanent on the battlefield. The first target that reaches the stack.
+    SpellOrPermanentTarget
+  | -- A land permanent on the battlefield (projected card-type Land). Used by the
+    -- M3d fixture "target land becomes ...".
+    LandTarget
   deriving (Eq, Ord, Show)

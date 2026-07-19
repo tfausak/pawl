@@ -21,6 +21,7 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.Prompt as Prompt
@@ -79,7 +80,20 @@ targetTests =
             gone = Game.changeZone oid Zone.Graveyard gs
          in do
               HU.assertBool "legal while fielded" (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gs)
-              HU.assertBool "illegal once moved" (not (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gone))
+              HU.assertBool "illegal once moved" (not (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gone)),
+      HU.testCase "CR 115 SpellOrPermanentTarget offers battlefield permanents and stack spells" $
+        let (permId, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
+         in HU.assertBool
+              "the permanent is a legal object target"
+              (Set.member (Recipient.ToObject permId) (Target.legalRecipients TargetSpec.SpellOrPermanentTarget gs)),
+      HU.testCase "LandTarget offers a land as an object target, not a creature or player" $
+        let gs = S.mountainsInPlay 1
+            landId = case Game.zoneMembers Zone.Battlefield S.alice gs of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+         in do
+              HU.assertBool "the land is legal" (Set.member (Recipient.ToObject landId) (Target.legalRecipients TargetSpec.LandTarget gs))
+              HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) (Target.legalRecipients TargetSpec.LandTarget gs)))
     ]
 
 resolveTests :: Tasty.TestTree

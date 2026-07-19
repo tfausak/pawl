@@ -13,4 +13,8 @@ import Pawl.Type.PlayerId (PlayerId)
 data Recipient
   = ToCreature ObjectId
   | ToPlayer PlayerId
+  | -- A spell on the stack or a permanent, named generically (Magical Hack's
+    -- "target spell or permanent", the fixture's "target land"). Text-changing
+    -- does not care about creature-ness, so it does not reuse ToCreature.
+    ToObject ObjectId
   deriving (Eq, Ord, Show)

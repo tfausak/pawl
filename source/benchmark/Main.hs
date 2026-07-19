@@ -18,6 +18,7 @@ isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True
   Recipient.ToPlayer _ -> False
+  Recipient.ToObject _ -> False
 
 alwaysPass :: Prompt.Prompt r -> r
 alwaysPass p = case p of

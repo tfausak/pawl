@@ -184,7 +184,7 @@ git commit -m "Rewrite the projected type line at layer 3 (CR 612 ChangeSubtypeW
 **Interfaces:**
 - Produces: `Recipient.ToObject :: ObjectId -> Recipient`; `TargetSpec.SpellOrPermanentTarget`, `TargetSpec.LandTarget`; `Target.legalRecipients` maps `SpellOrPermanentTarget` to `ToObject` over `GameState.stack` ++ battlefield, and `LandTarget` to `ToObject` over battlefield lands (projected `Land`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to the `Target` group in `source/test-suite/Pawl/ResolveSpec.hs`:
 
@@ -206,12 +206,12 @@ Add to the `Target` group in `source/test-suite/Pawl/ResolveSpec.hs`:
 
 (Add `qualified Pawl.Type.ObjectId as ObjectId` to `ResolveSpec` imports if absent.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "SpellOrPermanentTarget"'`
 Expected: FAIL to compile — `TargetSpec.SpellOrPermanentTarget` and `Recipient.ToObject` not in scope.
 
-- [ ] **Step 3: Add the `ToObject` recipient**
+- [x] **Step 3: Add the `ToObject` recipient**
 
 In `source/library/Pawl/Type/Recipient.hs`, add the constructor and extend the comment:
 
@@ -226,7 +226,7 @@ data Recipient
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the two target specs**
+- [x] **Step 4: Add the two target specs**
 
 In `source/library/Pawl/Type/TargetSpec.hs`:
 
@@ -239,7 +239,7 @@ In `source/library/Pawl/Type/TargetSpec.hs`:
     LandTarget
 ```
 
-- [ ] **Step 5: Enumerate them in `Target.legalRecipients`**
+- [x] **Step 5: Enumerate them in `Target.legalRecipients`**
 
 In `source/library/Pawl/Target.hs`, add the two arms to the `case spec of` (the `stack`/battlefield reads use `GameState.stack` and `Game.zoneMembers`/the battlefield set; `Projection.cardTypesOf` gives projected land-ness). Add `import qualified Pawl.Type.CardType as CardType` and `import qualified Pawl.Type.GameState as GameState` if absent:
 
@@ -254,7 +254,7 @@ In `source/library/Pawl/Target.hs`, add the two arms to the `case spec of` (the 
            in Set.fromList (map Recipient.ToObject lands)
 ```
 
-- [ ] **Step 6: Add the `ToObject` arm to every exhaustive `Recipient` match**
+- [x] **Step 6: Add the `ToObject` arm to every exhaustive `Recipient` match**
 
 Adding a `Recipient` constructor makes every exhaustive match incomplete (`-Wincomplete-patterns`, a pedantic error). A `ToObject` never receives combat or spell damage in M3d (damage targets are `AnyTarget` → `ToCreature`/`ToPlayer`), so each arm is a safe no-op / `False`. Three known sites:
 
@@ -285,12 +285,12 @@ isCreatureRecipient r = case r of
 
 **Note:** the build enumerates any other incomplete `Recipient` match; add `Recipient.ToObject _ -> ...` wherever flagged (the `ModifyTarget` arm in `Resolve` has a `_ -> gs` fallback and is unaffected until Task 8).
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
