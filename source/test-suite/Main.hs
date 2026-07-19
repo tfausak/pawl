@@ -1,4 +1,5 @@
 import qualified Pawl.ActivateSpec as ActivateSpec
+import qualified Pawl.BindingSpec as BindingSpec
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Cards as Cards
 import qualified Pawl.CardsSpec as CardsSpec
@@ -30,6 +31,7 @@ testTree cards =
   Tasty.testGroup
     "pawl"
     [ CoreSpec.tests,
+      BindingSpec.tests,
       CardSpec.tests cards,
       CardsSpec.tests cards,
       TurnSpec.tests cards,

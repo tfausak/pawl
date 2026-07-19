@@ -61,6 +61,7 @@ library
     Pawl
     Pawl.Action
     Pawl.Activate
+    Pawl.Binding
     Pawl.Card
     Pawl.Cast
     Pawl.Codec
@@ -88,6 +89,7 @@ library
     Pawl.Type.Affected
     Pawl.Type.AttackTarget
     Pawl.Type.BeginningStep
+    Pawl.Type.Binding
     Pawl.Type.Card
     Pawl.Type.CardCriterion
     Pawl.Type.CardType
@@ -172,6 +174,7 @@ test-suite pawl-test-suite
   -- cabal-gild: discover source/test-suite --exclude source/test-suite/Main.hs
   other-modules:
     Pawl.ActivateSpec
+    Pawl.BindingSpec
     Pawl.Cards
     Pawl.CardSpec
     Pawl.CardsSpec

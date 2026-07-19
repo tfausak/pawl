@@ -73,7 +73,7 @@ Copied from the spec (`docs/superpowers/specs/2026-07-19-m4a-numeric-tower-bindi
   - `Binding.amountOf :: SlotName -> Map SlotName Binding -> Maybe Natural`
   - `Binding.fromChoices :: Map SlotName Recipient -> Map SlotName (Subtype, Subtype) -> Maybe Natural -> Map SlotName Binding`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `source/test-suite/Pawl/BindingSpec.hs`:
 
@@ -112,12 +112,12 @@ tests =
     ]
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | tail -20`
 Expected: FAIL — `Could not find module 'Pawl.Type.Binding'` / `Pawl.Binding`.
 
-- [ ] **Step 3: Write the `Binding` type**
+- [x] **Step 3: Write the `Binding` type**
 
 Create `source/library/Pawl/Type/Binding.hs`:
 
@@ -151,7 +151,7 @@ empty :: Binding
 empty = MkBinding {target = Nothing, subtypes = Nothing, amount = Nothing}
 ```
 
-- [ ] **Step 4: Write the `Pawl.Binding` logic module**
+- [x] **Step 4: Write the `Pawl.Binding` logic module**
 
 Create `source/library/Pawl/Binding.hs`:
 
@@ -222,16 +222,16 @@ firstJust a b = maybe b Just a
 
 (Note the `{-# LANGUAGE NamedFieldPuns #-}` pragma is on `Pawl.Type.Binding` for the record; `Pawl.Binding` uses qualified field updates and needs no pragma.)
 
-- [ ] **Step 5: Wire `BindingSpec` into the suite**
+- [x] **Step 5: Wire `BindingSpec` into the suite**
 
 In `source/test-suite/pawl.cabal`, add `Pawl.BindingSpec` to `other-modules` (keep alphabetical). In `source/test-suite/Pawl/Main.hs`, import `qualified Pawl.BindingSpec as BindingSpec` and add `BindingSpec.tests` to the aggregated `testTree`.
 
-- [ ] **Step 6: Run test to verify it passes**
+- [x] **Step 6: Run test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -20`
 Expected: PASS — `Pawl.Binding` group green; whole suite still green.
 
-- [ ] **Step 7: Format, lint, commit**
+- [x] **Step 7: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
