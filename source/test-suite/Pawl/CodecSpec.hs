@@ -5,9 +5,15 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Decimal as Decimal
 import qualified Pawl.Type.Json as Json
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Power as Power
+import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
@@ -37,5 +43,25 @@ tests =
             roundTrip "slot" Codec.slotNameToJson Codec.jsonToSlotName (SlotName.MkSlotName (Text.pack "x")),
           HU.testCase "ObjectId" $
             roundTrip "oid" Codec.objectIdToJson Codec.jsonToObjectId (ObjectId.MkObjectId 7)
+        ],
+      Tasty.testGroup
+        "mana + quantity (tagged-sum trap)"
+        [ HU.testCase "Quantity.Literal is a tagged object with numeric value" $
+            HU.assertEqual
+              "shape"
+              (Json.Object [(Text.pack "type", Json.String (Text.pack "Literal")), (Text.pack "value", Json.Number (Decimal.mkDecimal 3 0))])
+              (Codec.quantityToJson (Quantity.Literal 3)),
+          HU.testCase "Quantity.ManaValue is nullary tagged" $
+            roundTrip "mv" Codec.quantityToJson Codec.jsonToQuantity Quantity.ManaValue,
+          HU.testCase "Quantity.Literal round-trips" $
+            roundTrip "lit" Codec.quantityToJson Codec.jsonToQuantity (Quantity.Literal 5),
+          HU.testCase "ManaCost round-trips" $
+            roundTrip
+              "cost"
+              Codec.manaCostToJson
+              Codec.jsonToManaCost
+              (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]),
+          HU.testCase "Power round-trips" $
+            roundTrip "pow" Codec.powerToJson Codec.jsonToPower (Power.MkPower (Quantity.Literal 2))
         ]
     ]

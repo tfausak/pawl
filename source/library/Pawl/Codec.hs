@@ -19,11 +19,17 @@ import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Json (Value (Array, Null))
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Power as Power
+import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
+import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.Zone as Zone
 
@@ -297,3 +303,62 @@ objectIdToJson (ObjectId.MkObjectId n) = natTo n
 
 jsonToObjectId :: Value -> Either Text ObjectId.ObjectId
 jsonToObjectId value = ObjectId.MkObjectId <$> natFrom value
+
+-- Mana, quantity, power/toughness --------------------------------------------
+
+manaTypeToJson :: ManaType.ManaType -> Value
+manaTypeToJson mt = case mt of
+  ManaType.Colored c -> Json.tagged (Text.pack "Colored") (Just (colorToJson c))
+  ManaType.Colorless -> nullary (Text.pack "Colorless")
+
+jsonToManaType :: Value -> Either Text ManaType.ManaType
+jsonToManaType value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Colored", Just v) -> ManaType.Colored <$> jsonToColor v
+    ("Colorless", _) -> Right ManaType.Colorless
+    _ -> Left (Text.pack "unknown ManaType: " <> t)
+
+manaSymbolToJson :: ManaSymbol.ManaSymbol -> Value
+manaSymbolToJson ms = case ms of
+  ManaSymbol.Generic n -> Json.tagged (Text.pack "Generic") (Just (natTo n))
+  ManaSymbol.OfType mt -> Json.tagged (Text.pack "OfType") (Just (manaTypeToJson mt))
+
+jsonToManaSymbol :: Value -> Either Text ManaSymbol.ManaSymbol
+jsonToManaSymbol value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Generic", Just v) -> ManaSymbol.Generic <$> natFrom v
+    ("OfType", Just v) -> ManaSymbol.OfType <$> jsonToManaType v
+    _ -> Left (Text.pack "unknown ManaSymbol: " <> t)
+
+manaCostToJson :: ManaCost.ManaCost -> Value
+manaCostToJson (ManaCost.MkManaCost xs) = listTo manaSymbolToJson xs
+
+jsonToManaCost :: Value -> Either Text ManaCost.ManaCost
+jsonToManaCost value = ManaCost.MkManaCost <$> listFrom jsonToManaSymbol value
+
+quantityToJson :: Quantity.Quantity -> Value
+quantityToJson q = case q of
+  Quantity.Literal n -> Json.tagged (Text.pack "Literal") (Just (Json.jInt n))
+  Quantity.ManaValue -> nullary (Text.pack "ManaValue")
+
+jsonToQuantity :: Value -> Either Text Quantity.Quantity
+jsonToQuantity value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Literal", Just v) -> Quantity.Literal <$> Json.asInteger v
+    ("ManaValue", _) -> Right Quantity.ManaValue
+    _ -> Left (Text.pack "unknown Quantity: " <> t)
+
+powerToJson :: Power.Power -> Value
+powerToJson (Power.MkPower q) = quantityToJson q
+
+jsonToPower :: Value -> Either Text Power.Power
+jsonToPower value = Power.MkPower <$> jsonToQuantity value
+
+toughnessToJson :: Toughness.Toughness -> Value
+toughnessToJson (Toughness.MkToughness q) = quantityToJson q
+
+jsonToToughness :: Value -> Either Text Toughness.Toughness
+jsonToToughness value = Toughness.MkToughness <$> jsonToQuantity value
