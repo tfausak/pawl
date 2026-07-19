@@ -9,6 +9,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
@@ -144,7 +145,7 @@ resolveSpell oid = do
       Nothing -> pure ()
       Just card ->
         let specs = Card.targetSpecs card
-            chosen = Object.targets obj
+            chosen = Binding.targetsOf (Object.bindings obj)
             legalSlot slot recipient = case Map.lookup slot specs of
               Nothing -> False
               Just spec -> Target.stillLegal recipient spec gs
@@ -153,7 +154,7 @@ resolveSpell oid = do
          in if fizzles
               then State.modify' (Event.changeZone oid Zone.Graveyard)
               else do
-                Monad.mapM_ (applyEffect oid (Object.owner obj) (Object.chosenSubtypes obj) legality chosen) (effectsOf oid gs)
+                Monad.mapM_ (applyEffect oid (Object.owner obj) (Binding.subtypesOf (Object.bindings obj)) legality chosen) (effectsOf oid gs)
                 State.modify' (Event.changeZone oid Zone.Graveyard)
 
 -- CR 608.2: the executor shared by an activated ability (M3e) and a triggered
@@ -167,7 +168,7 @@ resolveEffects stackId srcId effects specs = do
   case Game.lookupObject stackId gs of
     Nothing -> pure ()
     Just obj ->
-      let chosen = Object.targets obj
+      let chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipient = case Map.lookup slot specs of
             Nothing -> False
             Just spec -> Target.stillLegal recipient spec gs
@@ -175,7 +176,7 @@ resolveEffects stackId srcId effects specs = do
           fizzles = not (Map.null specs) && not (or (Map.elems legality))
        in do
             Monad.unless fizzles $
-              Monad.mapM_ (applyEffect srcId (Object.owner obj) (Object.chosenSubtypes obj) legality chosen) effects
+              Monad.mapM_ (applyEffect srcId (Object.owner obj) (Binding.subtypesOf (Object.bindings obj)) legality chosen) effects
             State.modify' (cease stackId)
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent

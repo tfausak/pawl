@@ -5,6 +5,7 @@ import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
@@ -167,7 +168,7 @@ castSpell pid oid = do
                       moved
                         { GameState.objects =
                             Map.adjust
-                              (\o -> o {Object.targets = chosen, Object.chosenSubtypes = bound})
+                              (\o -> o {Object.bindings = Binding.fromChoices chosen bound Nothing})
                               top
                               (GameState.objects moved)
                         }

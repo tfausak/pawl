@@ -13,6 +13,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
@@ -261,7 +262,7 @@ castTests cards =
                   HU.assertEqual
                     "the Piker is the target"
                     (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToCreature (S.pikerOf base)))
-                    (Object.targets obj),
+                    (Binding.targetsOf (Object.bindings obj)),
       HU.testCase "an illegal target answer makes the cast a no-op" $
         let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
             liar :: Prompt.Prompt r -> r
@@ -357,8 +358,7 @@ handInPlay printing board =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = ts
           }
    in ( g2

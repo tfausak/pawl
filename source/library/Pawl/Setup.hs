@@ -97,8 +97,7 @@ createCard pid printing = do
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = ts
           }
       gs3 =

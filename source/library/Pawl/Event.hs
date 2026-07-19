@@ -43,7 +43,7 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
         dest = ZoneChange.to resolved
         (newId, gs1) = Game.freshObjectId gs
         (ts, gs1b) = Game.freshTimestamp gs1
-        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.targets = Map.empty, Object.chosenSubtypes = Map.empty, Object.timestamp = ts}
+        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.timestamp = ts}
         gs2 = Game.removeFromZones pid oid gs1b
         gs3 = gs2 {GameState.objects = Map.insert newId newObj (Map.delete oid (GameState.objects gs2))}
         moved = Game.insertIntoZone dest pid newId gs3

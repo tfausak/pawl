@@ -210,8 +210,7 @@ placeOne (srcId, controller, ability) = do
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = ts
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}

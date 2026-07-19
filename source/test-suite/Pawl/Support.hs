@@ -254,8 +254,7 @@ addCreature printing pid gs =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = ts
           }
    in ( oid,
@@ -281,8 +280,7 @@ addLibraryCard printing pid gs =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = ts
           }
    in ( oid,
@@ -311,8 +309,7 @@ landsInPlay land n =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.targets = Map.empty,
-                  Object.chosenSubtypes = Map.empty,
+                  Object.bindings = Map.empty,
                   Object.timestamp = ts
                 }
          in gs2
@@ -338,8 +335,7 @@ handOne printing base =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = ts
           }
    in ( gs2
@@ -366,8 +362,7 @@ pikerInHand cards n ph =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = ts
           }
       gs3 =
@@ -524,8 +519,7 @@ oneMountainState cards ph =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = Timestamp.MkTimestamp 0
           }
    in GameState.MkGameState

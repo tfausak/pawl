@@ -5,6 +5,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -85,8 +86,7 @@ activateAbility pid srcId ability = do
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = ts
           }
       onStack =
@@ -106,7 +106,7 @@ activateAbility pid srcId ability = do
   if not (keysAgree && eachLegal)
     then State.put gs -- reject: the whole activation is a no-op
     else do
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.targets = chosen}) abilId (GameState.objects g)})
+      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing}) abilId (GameState.objects g)})
       let additional = AbilityCost.additional (ActivatedAbility.cost ability)
           payAll g = List.foldl' (payAdditional srcId) g additional
       case AbilityCost.mana (ActivatedAbility.cost ability) of

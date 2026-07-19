@@ -251,7 +251,7 @@ git commit -m "M4a: the Binding record and its logic module (no wiring yet)"
 - Consumes: `Binding.fromChoices`, `Binding.targetsOf`, `Binding.subtypesOf`, `Binding.empty` (Task 1).
 - Produces: `Object.bindings :: Map SlotName Binding` (replacing `Object.targets`, `Object.chosenSubtypes`).
 
-- [ ] **Step 1: Rewrite the CR 400.7 reset tests first (they are the behavior spec)**
+- [x] **Step 1: Rewrite the CR 400.7 reset tests first (they are the behavior spec)**
 
 In `source/test-suite/Pawl/GameSpec.hs`, replace the two reset tests (`~113-133`) so they assert on `bindings`:
 
@@ -269,12 +269,12 @@ In `source/test-suite/Pawl/GameSpec.hs`, replace the two reset tests (`~113-133`
 
 Match the exact fixture plumbing of the existing test (the `someOid`, the move). Add `import qualified Pawl.Binding as Binding` and `import qualified Pawl.Type.Binding` as needed.
 
-- [ ] **Step 2: Run to verify the reset test fails to compile**
+- [x] **Step 2: Run to verify the reset test fails to compile**
 
 Run: `cabal build all --enable-tests 2>&1 | tail -20`
 Expected: FAIL — `Object.bindings` not in scope / `targets` still the field.
 
-- [ ] **Step 3: Change the `Object` type**
+- [x] **Step 3: Change the `Object` type**
 
 In `source/library/Pawl/Type/Object.hs`, delete the `targets` and `chosenSubtypes` fields and their comments; add:
 
@@ -289,7 +289,7 @@ In `source/library/Pawl/Type/Object.hs`, delete the `targets` and `chosenSubtype
 
 Add `import Pawl.Type.Binding (Binding)`; drop the now-unused `Recipient`/`Subtype` imports if the compiler flags them (they may still be used elsewhere — let `-Weverything` guide).
 
-- [ ] **Step 4: Migrate the library constructors and readers**
+- [x] **Step 4: Migrate the library constructors and readers**
 
 - `Setup.hs:100-101`, `Engine.hs:213-214`, `Activate.hs:88-89`: replace the two `Map.empty` field lines with `Object.bindings = Map.empty,`.
 - `Event.hs:46`: replace `Object.targets = Map.empty, Object.chosenSubtypes = Map.empty` with `Object.bindings = Map.empty`.
@@ -298,19 +298,19 @@ Add `import Pawl.Type.Binding (Binding)`; drop the now-unused `Recipient`/`Subty
 - `Resolve.hs:147,170`: `chosen = Object.targets obj` becomes `chosen = Binding.targetsOf (Object.bindings obj)`.
 - `Resolve.hs:156,178`: `Object.chosenSubtypes obj` becomes `Binding.subtypesOf (Object.bindings obj)`. Add `import qualified Pawl.Binding as Binding` to `Resolve.hs`. (`applyEffect`'s signature is unchanged — it still takes the projected `Map SlotName (Subtype, Subtype)` and `Map SlotName Recipient`.)
 
-- [ ] **Step 5: Migrate the test constructors and readers**
+- [x] **Step 5: Migrate the test constructors and readers**
 
 - `Support.hs` (six sites), `CastSpec.hs:360-361`, `GameSpec.hs:99-100,353-354`: replace each `Object.targets = Map.empty, Object.chosenSubtypes = Map.empty` pair with `Object.bindings = Map.empty`.
 - `CastSpec.hs:264`: `Object.targets obj` becomes `Binding.targetsOf (Object.bindings obj)`.
 - `ResolveSpec.hs:233`: `Object.targets = Map.singleton slot (Recipient.ToObject targetLand)` becomes `Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToObject targetLand)) Map.empty Nothing`.
 - Add `import qualified Pawl.Binding as Binding` to each touched test module.
 
-- [ ] **Step 6: Build and run the full suite**
+- [x] **Step 6: Build and run the full suite**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -25`
 Expected: PASS — the entire M3a–M3g suite green, including the rewritten reset test. `cabal clean` first so no unchanged-module warnings are hidden.
 
-- [ ] **Step 7: Format, lint, commit**
+- [x] **Step 7: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

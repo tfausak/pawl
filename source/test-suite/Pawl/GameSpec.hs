@@ -12,6 +12,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Action as Action
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
@@ -96,41 +97,41 @@ gameTests cards =
                       Object.tapped = TapState.Untapped,
                       Object.damage = 0,
                       Object.sickness = Sickness.Sick,
-                      Object.targets = Map.empty,
-                      Object.chosenSubtypes = Map.empty,
+                      Object.bindings = Map.empty,
                       -- changeZone draws a fresh timestamp; oneMountainState's
                       -- nextTimestamp starts at 1 (object 0 already holds 0).
                       Object.timestamp = Timestamp.MkTimestamp 1
                     }
               )
               (Game.lookupObject (ObjectId.MkObjectId 1) after),
-          HU.testCase "CR 400.7 changeZone forgets a spell's targets" $
-            let base = S.oneMountainState cards Phase.PrecombatMain
-                stamped =
-                  base
-                    { GameState.objects =
-                        Map.adjust
-                          (\o -> o {Object.targets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToPlayer S.alice)})
-                          (ObjectId.MkObjectId 0)
-                          (GameState.objects base)
-                    }
-                moved = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
-                landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
-             in HU.assertEqual "reset" [Map.empty] (map Object.targets landed),
-          HU.testCase "CR 400.7 changeZone resets chosenSubtypes" $
+          HU.testCase "CR 400.7 changeZone forgets a spell's bindings" $
             let base = S.oneMountainState cards Phase.PrecombatMain
                 slot = SlotName.MkSlotName (Text.pack "target")
                 stamped =
                   base
                     { GameState.objects =
                         Map.adjust
-                          (\o -> o {Object.chosenSubtypes = Map.singleton slot (Subtype.Mountain, Subtype.Island)})
+                          (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.alice)) Map.empty Nothing})
+                          (ObjectId.MkObjectId 0)
+                          (GameState.objects base)
+                    }
+                moved = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
+                landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
+             in HU.assertEqual "reset" [Map.empty] (map Object.bindings landed),
+          HU.testCase "CR 400.7 changeZone resets a word-swap binding" $
+            let base = S.oneMountainState cards Phase.PrecombatMain
+                slot = SlotName.MkSlotName (Text.pack "target")
+                stamped =
+                  base
+                    { GameState.objects =
+                        Map.adjust
+                          (\o -> o {Object.bindings = Binding.fromChoices Map.empty (Map.singleton slot (Subtype.Mountain, Subtype.Island)) Nothing})
                           (ObjectId.MkObjectId 0)
                           (GameState.objects base)
                     }
                 moved = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
                 newObj = Game.lookupObject (ObjectId.MkObjectId 1) moved
-             in HU.assertEqual "reset to empty" (Just Map.empty) (fmap Object.chosenSubtypes newObj),
+             in HU.assertEqual "reset to empty" (Just Map.empty) (fmap Object.bindings newObj),
           HU.testCase "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $
             let (oid, gs) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
                 before = GameState.nextTimestamp gs
@@ -350,8 +351,7 @@ handBobBolt cards gs =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = ts
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})

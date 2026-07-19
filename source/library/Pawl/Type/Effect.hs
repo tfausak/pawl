@@ -19,8 +19,9 @@ data Effect
     ModifyTarget Duration Modification SlotName
   | -- CR 612: rewrite basic-land-type words in the target spell or permanent. The
     -- SlotName is the target slot; the two basic land types are read from the
-    -- caster's binding (Object.chosenSubtypes) and baked into a stored
-    -- ChangeSubtypeWord continuous effect. Resolve stores it; Projection applies it.
+    -- caster's binding (Binding.subtypes on Object.bindings) and baked into a
+    -- stored ChangeSubtypeWord continuous effect. Resolve stores it; Projection
+    -- applies it.
     ChangeText SlotName
   | -- CR 605: add one unit of this mana type. Executed by Mana.tapForMana at
     -- payment (CR 605.3b: a mana ability never uses the stack); Resolve.applyEffect

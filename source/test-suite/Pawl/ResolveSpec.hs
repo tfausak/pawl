@@ -8,6 +8,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Decide as Decide
@@ -230,8 +231,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.targets = Map.singleton slot (Recipient.ToObject targetLand),
-                  Object.chosenSubtypes = Map.empty,
+                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToObject targetLand)) Map.empty Nothing,
                   Object.timestamp = Timestamp.MkTimestamp 0
                 }
             g2 =
@@ -259,8 +259,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.targets = Map.empty,
-                  Object.chosenSubtypes = Map.empty,
+                  Object.bindings = Map.empty,
                   Object.timestamp = Timestamp.MkTimestamp 0
                 }
             g3 =
@@ -289,8 +288,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.targets = Map.singleton slot (Recipient.ToPlayer S.bob),
-                  Object.chosenSubtypes = Map.empty,
+                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing,
                   Object.timestamp = ts
                 }
             g3 =
@@ -316,7 +314,7 @@ resolveTests cards =
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj =
-              Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty Map.empty ts
+              Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty ts
             g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
             resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
          in do
@@ -329,7 +327,7 @@ resolveTests cards =
             ability = ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [Effect.Search CardCriterion.BasicLandCard] Map.empty
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
-            abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty Map.empty ts
+            abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty ts
             g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
             resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
          in HU.assertEqual "nothing entered the battlefield" Set.empty (GameState.battlefield resolved),
@@ -350,8 +348,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.targets = Map.empty,
-                  Object.chosenSubtypes = Map.empty,
+                  Object.bindings = Map.empty,
                   Object.timestamp = ts
                 }
             g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
@@ -383,8 +380,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.targets = Map.singleton slot (Recipient.ToPlayer S.bob),
-                  Object.chosenSubtypes = Map.empty,
+                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing,
                   Object.timestamp = ts
                 }
             g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = abilId : GameState.stack g3}
@@ -440,8 +436,7 @@ twoBoltState cards =
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.targets = Map.empty,
-            Object.chosenSubtypes = Map.empty,
+            Object.bindings = Map.empty,
             Object.timestamp = Timestamp.MkTimestamp 0
           }
    in gs2

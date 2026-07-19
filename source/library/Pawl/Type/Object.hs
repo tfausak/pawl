@@ -2,12 +2,11 @@ module Pawl.Type.Object where
 
 import Data.Map.Strict (Map)
 import Numeric.Natural (Natural)
+import Pawl.Type.Binding (Binding)
 import Pawl.Type.PlayerId (PlayerId)
-import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.Sickness (Sickness)
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Source (Source)
-import Pawl.Type.Subtype (Subtype)
 import Pawl.Type.TapState (TapState)
 import Pawl.Type.Timestamp (Timestamp)
 import Pawl.Type.Zone (Zone)
@@ -26,16 +25,12 @@ data Object = MkObject
     damage :: Natural,
     -- CR 302.6. Per-incarnation state: reset by changeZone.
     sickness :: Sickness,
-    -- CR 601.2c: the targets chosen while casting, by slot name. Empty for
-    -- everything but a spell on the stack. Per-incarnation state: reset by
-    -- changeZone, so CR 400.7 forgets them when the spell moves.
-    targets :: Map SlotName Recipient,
-    -- CR 612 / the D4 binding: the basic-land-type pairs chosen while casting a
-    -- text-changing spell, by slot name. Empty for everything but a text-changer
-    -- on the stack. Per-incarnation state: reset by changeZone, so CR 400.7
-    -- forgets them when the spell moves -- the negative Magical-Hack-on-a-spell
-    -- test (Task 8) rides on exactly this reset.
-    chosenSubtypes :: Map SlotName (Subtype, Subtype),
+    -- CR 601.2: the choices bound while casting, by slot name. Empty for
+    -- everything but a spell or ability on the stack. Per-incarnation state:
+    -- reset by changeZone, so CR 400.7 forgets them when the object moves.
+    -- Replaces the M3a `targets` and M3d `chosenSubtypes` fields, unified as the
+    -- risk-register's D4 named binding slots when X arrived (the second customer).
+    bindings :: Map SlotName Binding,
     -- CR 613.7d: when this object entered its current zone. A static ability's
     -- continuous effect shares this timestamp (CR 613.7a); stamped fresh on every
     -- zone change (CR 400.7 makes each a new object). Read by the projection when
