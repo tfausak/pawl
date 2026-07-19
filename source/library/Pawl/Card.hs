@@ -640,6 +640,58 @@ opalescencePrinting =
           }
     }
 
+-- The Island's blue mana ability is granted from its subtype by CR 305.6.
+islandPrinting :: Printing.Printing
+islandPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Island",
+            Card.manaCost = Nothing,
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.singleton Supertype.Basic,
+                  TypeLine.types = Set.singleton CardType.Land,
+                  TypeLine.subtypes = Set.singleton Subtype.Island
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities = [],
+            Card.effects = [],
+            Card.targetSpecs = Map.empty
+          }
+    }
+
+-- Magical Hack: {U}, Instant, "Change the text of target spell or permanent by
+-- replacing all instances of one basic land type with another. (... This effect
+-- lasts indefinitely.)" Scryfall-verified 2026-07-18. One ChangeText effect over a
+-- SpellOrPermanentTarget slot; the two basic land types are the caster's binding
+-- (Object.chosenSubtypes). The layer-3 canary (design.md §5): its effect AST word
+-- is rewritten at resolution and gather, never special-cased.
+magicalHackPrinting :: Printing.Printing
+magicalHackPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Magical Hack",
+            Card.manaCost =
+              Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)]),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Instant,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities = [],
+            Card.effects = [Effect.ChangeText (SlotName.MkSlotName (Text.pack "target"))],
+            Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.SpellOrPermanentTarget
+          }
+    }
+
 -- The registry the dataflow lint and future golden tests iterate. A printing
 -- not listed here escapes the hygiene net -- add every new printing.
 allPrintings :: [Printing.Printing]
@@ -663,7 +715,9 @@ allPrintings =
     serpentsGiftPrinting,
     bloodMoonPrinting,
     urborgPrinting,
-    opalescencePrinting
+    opalescencePrinting,
+    islandPrinting,
+    magicalHackPrinting
   ]
 
 isLand :: Card.Card -> Bool

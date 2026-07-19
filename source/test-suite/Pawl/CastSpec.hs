@@ -7,6 +7,7 @@ module Pawl.CastSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Action as Action
@@ -14,14 +15,18 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
+import qualified Pawl.Mana as Mana
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -33,6 +38,7 @@ import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -281,8 +287,69 @@ discardTests =
          in HU.assertEqual "kept the front seven" expected kept
     ]
 
+-- Put one card of a printing into alice's hand over an existing board, in a main
+-- phase with priority.
+handInPlay :: Printing.Printing -> GameState.GameState -> (GameState.GameState, ObjectId.ObjectId)
+handInPlay printing board =
+  let (oid, g1) = Game.freshObjectId board
+      (ts, g2) = Game.freshTimestamp g1
+      obj =
+        Object.MkObject
+          { Object.owner = S.alice,
+            Object.source = Source.OfCard printing,
+            Object.zone = Zone.Hand,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled,
+            Object.targets = Map.empty,
+            Object.chosenSubtypes = Map.empty,
+            Object.timestamp = ts
+          }
+   in ( g2
+          { GameState.objects = Map.insert oid obj (GameState.objects g2),
+            GameState.hand = Map.insertWith (Seq.><) S.alice (Seq.singleton oid) (GameState.hand g2),
+            GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        oid
+      )
+
+-- Casts, targeting a permanent (lookupMin picks the lowest ToObject id) and
+-- hacking Mountain -> Island.
+hackAnswer :: Prompt.Prompt r -> r
+hackAnswer p = case p of
+  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Island)
+  _ -> S.identityAnswer p
+
+magicalHackTests :: Tasty.TestTree
+magicalHackTests =
+  Tasty.testGroup
+    "MagicalHack"
+    [ HU.testCase "CR 612/305.6 a hacked basic Mountain taps for its new color" $
+        -- alice: one Mountain to hack and one Island (blue for the {U}), plus a
+        -- Magical Hack in hand. The Mountain is added FIRST so it has the lowest
+        -- object id and identityAnswer's ChooseTargets (Set.lookupMin over the
+        -- ToObject recipients) picks it, not the Island. Hack Mountain -> Island.
+        let (mountainId, g0) = S.addCreature Card.mountainPrinting S.alice (Setup.emptyGame S.bothPlayers)
+            (islandId, g1) = S.addCreature Card.islandPrinting S.alice g0
+            (gs, hackId) = handInPlay Card.magicalHackPrinting g1
+            cast = snd (Engine.runGamePure hackAnswer gs (Cast.castSpell S.alice hackId))
+            resolved = Stack.resolveTop cast
+         in do
+              HU.assertBool "island untouched, still blue" (elem (ManaType.Colored Color.Blue) (Mana.manaTypesOf islandId resolved))
+              HU.assertEqual "hacked Mountain projects Island" (Set.singleton Subtype.Island) (Projection.subtypesOf mountainId resolved)
+              HU.assertBool "hacked Mountain taps blue" (elem (ManaType.Colored Color.Blue) (Mana.manaTypesOf mountainId resolved))
+              HU.assertBool "hacked Mountain no longer taps red" (notElem (ManaType.Colored Color.Red) (Mana.manaTypesOf mountainId resolved)),
+      HU.testCase "CR 601.2c Magical Hack with no legal target is uncastable" $
+        let (gs, hackId) = handInPlay Card.magicalHackPrinting (Setup.emptyGame S.bothPlayers)
+         in -- Empty battlefield and stack: SpellOrPermanentTarget has no legal
+            -- recipient (and there is no mana either), so it is uncastable.
+            HU.assertBool "no target -> uncastable" (not (Cast.castable S.alice hackId gs))
+    ]
+
 tests :: Tasty.TestTree
 tests =
   Tasty.testGroup
     "Cast"
-    [castTests, castEngineTests, stackTests, discardTests, sicknessTests]
+    [castTests, castEngineTests, stackTests, discardTests, sicknessTests, magicalHackTests]

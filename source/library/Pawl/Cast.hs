@@ -8,6 +8,7 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Card as Card.Type
@@ -88,26 +89,36 @@ castSpell pid oid = do
     Just cost -> case Game.cardOf oid gs of
       Nothing -> pure ()
       Just card -> do
-        let sets = Target.legalSets (Card.Type.targetSpecs card) gs
+        let decider = Decide.deciderFor pid gs
+            sets = Target.legalSets (Card.Type.targetSpecs card) gs
         chosen <-
           if Map.null sets
             then pure Map.empty
-            else do
-              let decider = Decide.deciderFor pid gs
-              Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid oid sets))
+            else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid oid sets))
         let keysAgree = Map.keysSet chosen == Map.keysSet sets
             eachLegal = and (Map.intersectionWith Set.member chosen sets)
         if not (keysAgree && eachLegal)
           then pure ()
-          else case Mana.payCost pid cost gs of
-            Nothing -> pure ()
-            Just paid -> do
-              let moved = Game.changeZone oid Zone.Stack paid
-              case GameState.stack moved of
-                [] -> State.put moved
-                top : _ ->
-                  State.put
-                    moved
-                      { GameState.objects =
-                          Map.adjust (\o -> o {Object.targets = chosen}) top (GameState.objects moved)
-                      }
+          else do
+            -- CR 612 binding: choose the basic land types for each text-change
+            -- slot. Always answerable (the five basics), so no castability gate.
+            let textSlots = Resolve.textChangeSlots card
+                ask slot = do
+                  pair <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider pid oid slot))
+                  pure (slot, pair)
+            bound <- fmap Map.fromList (traverse ask textSlots)
+            case Mana.payCost pid cost gs of
+              Nothing -> pure ()
+              Just paid -> do
+                let moved = Game.changeZone oid Zone.Stack paid
+                case GameState.stack moved of
+                  [] -> State.put moved
+                  top : _ ->
+                    State.put
+                      moved
+                        { GameState.objects =
+                            Map.adjust
+                              (\o -> o {Object.targets = chosen, Object.chosenSubtypes = bound})
+                              top
+                              (GameState.objects moved)
+                        }

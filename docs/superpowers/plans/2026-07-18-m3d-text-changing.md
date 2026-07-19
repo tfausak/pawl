@@ -617,7 +617,7 @@ git commit -m "Add the ChangeText opcode: store an Indefinite ChangeSubtypeWord 
 - Consumes: `ChooseBasicLandTypes` (Task 4), `textChangeSlots`/`ChangeText` (Task 5), `SpellOrPermanentTarget` (Task 2).
 - Produces: `Card.magicalHackPrinting` (in `allPrintings`); `Cast.castSpell` prompts `ChooseBasicLandTypes` for each `textChangeSlot` and stamps the pairs onto the new stack `Object.chosenSubtypes`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/CastSpec.hs` a dedicated answerer and an end-to-end test. Magical Hack costs `{U}`, so the caster needs blue mana — give alice an Island in play (Task 1 makes an Island tap blue). Add `qualified Pawl.Projection as Projection`, `qualified Pawl.Stack as Stack`, `qualified Pawl.Type.Subtype as Subtype`, `qualified Pawl.Type.Recipient as Recipient` if absent:
 
@@ -690,12 +690,12 @@ handInPlay printing board =
 
 (Add `qualified Data.Sequence as Seq`, `qualified Pawl.Mana as Mana`, `qualified Pawl.Type.Color as Color`, `qualified Pawl.Type.ManaType as ManaType`, `qualified Pawl.Type.Timestamp as Timestamp` to `CastSpec` if absent, and wire `magicalHackTests` into `CastSpec.tests`.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "hacked basic Mountain"'`
 Expected: FAIL to compile — `Card.magicalHackPrinting`, `Card.islandPrinting` not in scope.
 
-- [ ] **Step 3: Add the Island printing and Magical Hack**
+- [x] **Step 3: Add the Island printing and Magical Hack**
 
 In `source/library/Pawl/Card.hs`, add an `islandPrinting` (mirroring `mountainPrinting`, subtype `Island`) and `magicalHackPrinting`, then register both in `allPrintings`:
 
@@ -762,7 +762,7 @@ Append both to `allPrintings` (after `opalescencePrinting`):
   ]
 ```
 
-- [ ] **Step 4: Prompt and store the binding in `Cast`**
+- [x] **Step 4: Prompt and store the binding in `Cast`**
 
 In `source/library/Pawl/Cast.hs`, add `import qualified Pawl.Resolve as Resolve` and `import qualified Control.Monad as Monad` (if absent). In `castSpell`, after `chosen` is obtained and validated, prompt the land-type bindings and stamp both maps on the new stack object. Replace the tail of `castSpell` (from the `let decider`/`sets` block through the `State.put`) with:
 
@@ -804,12 +804,12 @@ In `source/library/Pawl/Cast.hs`, add `import qualified Pawl.Resolve as Resolve`
 
 (If `traverse` needs `import qualified Data.Traversable`, it is in `Prelude`; no import required. `Monad` may be unneeded — drop it if unused to stay warning-clean.)
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the hacked Mountain taps blue and not red; Magical Hack with no target is uncastable. This is the first end-to-end exercise of the `ChangeText` executor (Task 5).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
