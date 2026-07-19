@@ -5,12 +5,14 @@
 module Pawl.CastSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Action as Action
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
@@ -152,7 +154,36 @@ stackTests =
           (Game.objectCount (snd (Engine.runGamePure S.identityAnswer pikerOnStack Stack.resolveTop))),
       HU.testCase "resolving an empty stack is a no-op" $
         let gs = Setup.emptyGame S.bothPlayers
-         in HU.assertEqual "unchanged" gs (snd (Engine.runGamePure S.identityAnswer gs Stack.resolveTop))
+         in HU.assertEqual "unchanged" gs (snd (Engine.runGamePure S.identityAnswer gs Stack.resolveTop)),
+      HU.testCase "CR 601.3: cast Panglacial during Evolving Wilds' search, then it resolves 9/5" $
+        let g0 = Setup.emptyGame S.bothPlayers
+            (ewId, g1) = S.addCreature Card.evolvingWildsPrinting S.alice g0
+            g2 = List.foldl' (\g _ -> snd (S.addCreature Card.forestPrinting S.alice g)) g1 [1 .. (7 :: Int)]
+            (_, g3) = S.addLibraryCard Card.panglacialWurmPrinting S.alice g2
+            g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+         in case Projection.abilitiesOf ewId g4 of
+              ewAbility : _ ->
+                let action = do
+                      Activate.activateAbility S.alice ewId ewAbility
+                      Stack.resolveTop -- Evolving Wilds' ability: cast Panglacial, then search + shuffle + cease
+                      Stack.resolveTop -- Panglacial resolves onto the battlefield
+                    after = snd (Engine.runGamePure castPanglacial g4 action)
+                 in do
+                      HU.assertEqual "Panglacial is a 9/5 on the battlefield" 1 (S.countOnBattlefieldByName (Text.pack "Panglacial Wurm") S.alice after)
+                      HU.assertEqual "Panglacial left the library" 0 (S.countByName (Text.pack "Panglacial Wurm") S.alice after)
+                      HU.assertEqual "seven Forests tapped for {5}{G}{G}" 7 (S.tappedCount S.alice after)
+              [] -> HU.assertFailure "Evolving Wilds should have an activated ability",
+      HU.testCase "declining the cast resolves the search normally, Panglacial stays" $
+        let g0 = Setup.emptyGame S.bothPlayers
+            (ewId, g1) = S.addCreature Card.evolvingWildsPrinting S.alice g0
+            g2 = List.foldl' (\g _ -> snd (S.addCreature Card.forestPrinting S.alice g)) g1 [1 .. (7 :: Int)]
+            (_, g3) = S.addLibraryCard Card.panglacialWurmPrinting S.alice g2
+            g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+         in case Projection.abilitiesOf ewId g4 of
+              ewAbility : _ ->
+                let after = snd (Engine.runGamePure S.identityAnswer g4 (do Activate.activateAbility S.alice ewId ewAbility; Stack.resolveTop))
+                 in HU.assertEqual "Panglacial still in the library" 1 (S.countByName (Text.pack "Panglacial Wurm") S.alice after)
+              [] -> HU.assertFailure "Evolving Wilds should have an activated ability"
     ]
 
 castTests :: Tasty.TestTree
@@ -404,3 +435,21 @@ nameOnStack wanted gs oid = case Game.lookupObject oid gs of
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False
   Nothing -> False
+
+castPanglacial :: Prompt.Prompt r -> r
+castPanglacial p = case p of
+  Prompt.CastWhileSearching _ _ options -> case options of
+    oid : _ -> Just oid
+    [] -> Nothing
+  Prompt.SearchLibrary {} -> Nothing
+  Prompt.Shuffle ids -> ids
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
+  Prompt.ChooseAction {} -> A.Pass
+  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter S.isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
+  Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)

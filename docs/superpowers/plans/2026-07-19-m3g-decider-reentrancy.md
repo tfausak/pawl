@@ -977,7 +977,7 @@ git commit -m "CastWhileSearching prompt + serialization + the re-entrant cast l
 - Consumes: `Cast.castWhileSearching` (Task 7), `Resolve.searchesLibrary` (Task 6), `Activate.activateAbility` (M3e).
 - Produces: `Stack.resolveTop`'s `OfAbility` arm runs `Cast.castWhileSearching (Object.owner obj)` before `resolveAbility` when any of the ability's effects `searchesLibrary`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/StackSpec.hs`. Activate Evolving Wilds and, during its search, cast Panglacial; assert the interleave and the eventual 9/5 (add imports as the compiler flags — `qualified Pawl.Activate as Activate`, `qualified Pawl.Projection as Projection`, `qualified Pawl.Engine as Engine`, `qualified Pawl.Stack as Stack`, `qualified Pawl.Type.Prompt as Prompt`, `qualified Pawl.Type.Phase as Phase`, `qualified Pawl.Type.GameState as GameState`, `qualified Data.List as List`, `qualified Data.Text as Text`, `qualified Data.Map.Strict as Map`, `qualified Data.Set as Set`):
 
@@ -1038,12 +1038,12 @@ castPanglacial p = case p of
 
 (Add imports `qualified Pawl.Type.Action as A`, `qualified Pawl.Type.Subtype as Subtype` if absent.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "cast Panglacial during"'`
 Expected: FAIL — without the `Stack` wiring, `CastWhileSearching` is never prompted, so Panglacial stays in the library and never reaches the battlefield.
 
-- [ ] **Step 3: Wire the cast offer into `resolveTop`**
+- [x] **Step 3: Wire the cast offer into `resolveTop`**
 
 In `source/library/Pawl/Stack.hs`, add `import qualified Control.Monad as Monad`, `import qualified Pawl.Cast as Cast`, and `import qualified Pawl.Type.ActivatedAbility as ActivatedAbility`. Replace the `OfAbility` arm:
 
@@ -1063,12 +1063,12 @@ In `source/library/Pawl/Stack.hs`, add `import qualified Control.Monad as Monad`
 
 (`Object.owner obj` is the ability's controller; `obj` is already bound in `resolveTop`.)
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — Panglacial is cast during the search, the search finishes, and on the next resolution Panglacial enters as a 9/5; the negative control leaves it in the library.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
