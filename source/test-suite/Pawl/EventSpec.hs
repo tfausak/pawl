@@ -11,6 +11,7 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
@@ -57,5 +58,21 @@ tests =
             (bolt, g1) = S.addLibraryCard Card.lightningBoltPrinting S.bob g0
             onStack = g1 {GameState.stack = bolt : GameState.stack g1, GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Stack}) bolt (GameState.objects g1)}
             after = Event.changeZone bolt Zone.Graveyard onStack
-         in HU.assertEqual "spell exiled, graveyard empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+         in HU.assertEqual "spell exiled, graveyard empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 603.6a: Rest in Peace entering yields its ETB trigger" $
+        let (ripId, gs) = S.addCreature Card.restInPeacePrinting S.alice (Setup.emptyGame S.bothPlayers)
+            -- an event describing RiP having entered the battlefield
+            entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
+         in case Event.triggersFrom [entered] gs of
+              [(srcId, controller, _)] -> do
+                HU.assertEqual "source is RiP" ripId srcId
+                HU.assertEqual "controller is alice" S.alice controller
+              _ -> HU.assertFailure "expected exactly one pending trigger",
+      HU.testCase "a graveyard-bound event yields no enters trigger" $
+        let (ripId, gs) = S.addCreature Card.restInPeacePrinting S.alice (Setup.emptyGame S.bothPlayers)
+            toGrave = ZoneChange.MkZoneChange ripId Zone.Battlefield Zone.Graveyard
+         in HU.assertEqual "no triggers" 0 (length (Event.triggersFrom [toGrave] gs)),
+      HU.testCase "SelfEnters matches only a battlefield destination" $ do
+        HU.assertBool "enters battlefield matches" (Event.matchesTrigger TriggerCondition.SelfEnters (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) Zone.Stack Zone.Battlefield))
+        HU.assertBool "enters graveyard does not" (not (Event.matchesTrigger TriggerCondition.SelfEnters (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) Zone.Battlefield Zone.Graveyard)))
     ]

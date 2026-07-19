@@ -13,11 +13,17 @@ import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.TapState as TapState
+import Pawl.Type.TriggerCondition (TriggerCondition)
+import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import Pawl.Type.TriggeredAbility (TriggeredAbility)
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import Pawl.Type.Zone (Zone)
+import qualified Pawl.Type.Zone as Zone
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
 
@@ -60,3 +66,27 @@ applyOne zc re = case re of
     if ZoneChange.to zc == whenDest
       then zc {ZoneChange.to = toDest}
       else zc
+
+-- CR 603.6a: does this condition fire on this event? SelfEnters fires when the
+-- bearer's object entered the battlefield -- so the event's destination is the
+-- battlefield. This module is the sole home of casing on TriggerCondition.
+matchesTrigger :: TriggerCondition -> ZoneChange -> Bool
+matchesTrigger cond zc = case cond of
+  TriggerCondition.SelfEnters -> ZoneChange.to zc == Zone.Battlefield
+
+-- The battlefield/enters pass of the three-pass trigger scan (leaves-the-
+-- battlefield and phase-step passes are future). For each event with to =
+-- Battlefield, the newcomer (`object`) is checked for triggered abilities whose
+-- condition matches; each becomes a pending trigger paired with its source id and
+-- controller (CR 603.3a).
+triggersFrom :: [ZoneChange] -> GameState -> [(ObjectId, PlayerId, TriggeredAbility)]
+triggersFrom changes gs =
+  let fromOne zc =
+        let srcId = ZoneChange.object zc
+         in case Game.controllerOf srcId gs of
+              Nothing -> []
+              Just ctrl ->
+                map
+                  (\ab -> (srcId, ctrl, ab))
+                  (filter (\ab -> matchesTrigger (TriggeredAbility.condition ab) zc) (Projection.triggeredAbilitiesOf srcId gs))
+   in concatMap fromOne changes

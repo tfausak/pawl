@@ -566,7 +566,7 @@ git commit -m "changeZone applies replacements + emits the resolved event: Rest 
 - Consumes: `resolveAbility`/`OfAbility` (M3e), `Event.changeZone` (Task 1), `applyEffect` (M3e, monadic).
 - Produces: `TriggerCondition.SelfEnters`; `TriggeredAbility.MkTriggeredAbility { condition :: TriggerCondition, effects :: [Effect], targetSpecs :: Map SlotName TargetSpec }`; `Effect.ExileAllGraveyards`; `Source.OfTrigger :: ObjectId -> TriggeredAbility -> Source`; `Card.triggeredAbilities :: [TriggeredAbility]`; `PC.triggeredAbilities`; `Projection.triggeredAbilitiesOf :: ObjectId -> GameState -> [TriggeredAbility]`; `Resolve.resolveEffects :: ObjectId -> ObjectId -> [Effect] -> Map SlotName TargetSpec -> Game ()` (stack-object id, source id, effects, specs — re-validate CR 608.2b, fold `applyEffect` with the source, then cease CR 608.2n). Rest in Peace's `triggeredAbilities = [MkTriggeredAbility SelfEnters [ExileAllGraveyards] Map.empty]`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to the `Resolve` group in `source/test-suite/Pawl/ResolveSpec.hs`. Hand-build an `OfTrigger` object (Rest in Peace's ETB) on the stack with a card already in a graveyard, resolve, and assert the graveyard is exiled and the trigger object ceased (add imports as the compiler flags — `Source`, `TriggeredAbility`, `TriggerCondition`, `Effect`, `Stack`, `Engine`, `Object`, `Zone`, `TapState`, `Sickness`, `Timestamp`):
 
@@ -602,12 +602,12 @@ Add to the `Resolve` group in `source/test-suite/Pawl/ResolveSpec.hs`. Hand-buil
 
 (The Piker in the graveyard is exiled by the ETB, *not* by the replacement — Rest in Peace's replacement only intercepts moves *to* the graveyard, and this card is already there. The ETB's `changeZone deadId Exile` moves it out.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "ETB exiles graveyards and ceases"'`
 Expected: FAIL to compile — `TriggeredAbility`, `TriggerCondition`, `Effect.ExileAllGraveyards`, `Source.OfTrigger` not in scope.
 
-- [ ] **Step 3: Create the trigger types**
+- [x] **Step 3: Create the trigger types**
 
 `source/library/Pawl/Type/TriggerCondition.hs`:
 
@@ -645,7 +645,7 @@ data TriggeredAbility = MkTriggeredAbility
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the `ExileAllGraveyards` opcode**
+- [x] **Step 4: Add the `ExileAllGraveyards` opcode**
 
 In `source/library/Pawl/Type/Effect.hs`, add the constructor (extend the header comment):
 
@@ -655,7 +655,7 @@ In `source/library/Pawl/Type/Effect.hs`, add the constructor (extend the header 
     ExileAllGraveyards
 ```
 
-- [ ] **Step 5: Add the `OfTrigger` source**
+- [x] **Step 5: Add the `OfTrigger` source**
 
 In `source/library/Pawl/Type/Source.hs`, add `import Pawl.Type.TriggeredAbility (TriggeredAbility)` and the constructor:
 
@@ -666,11 +666,11 @@ In `source/library/Pawl/Type/Source.hs`, add `import Pawl.Type.TriggeredAbility 
     OfTrigger ObjectId TriggeredAbility
 ```
 
-- [ ] **Step 6: Handle `OfTrigger` in `cardOf` and other `Source` matches**
+- [x] **Step 6: Handle `OfTrigger` in `cardOf` and other `Source` matches**
 
 In `source/library/Pawl/Game.hs`, `cardOf`'s `case Object.source obj of` gains `Source.OfTrigger _ _ -> Nothing`. The build enumerates every other exhaustive `case Object.source` (all "not a card"): `Action.hs` `playableLands` (`Source.OfTrigger _ _ -> False`), `Support.hs` `creaturesInPlay` and `countByName` (`Source.OfTrigger _ _ -> False`).
 
-- [ ] **Step 7: Add the `Card`/`PC` `triggeredAbilities` field, seed + strip, and the accessor**
+- [x] **Step 7: Add the `Card`/`PC` `triggeredAbilities` field, seed + strip, and the accessor**
 
 In `source/library/Pawl/Type/Card.hs`, add `import Pawl.Type.TriggeredAbility (TriggeredAbility)` and the field (after `replacementEffects`):
 
@@ -691,7 +691,7 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 
 Seed `Card.triggeredAbilities = []` at every printing and hand-built `MkCard` (build lists them).
 
-- [ ] **Step 8: Give Rest in Peace its ETB**
+- [x] **Step 8: Give Rest in Peace its ETB**
 
 In `source/library/Pawl/Card.hs`, change Rest in Peace's `Card.triggeredAbilities = []` to (add imports `TriggeredAbility`, `TriggerCondition`, `Effect` if absent):
 
@@ -705,7 +705,7 @@ In `source/library/Pawl/Card.hs`, change Rest in Peace's `Card.triggeredAbilitie
               ],
 ```
 
-- [ ] **Step 9: Add the `ExileAllGraveyards` executor arm + the four classifier arms**
+- [x] **Step 9: Add the `ExileAllGraveyards` executor arm + the four classifier arms**
 
 In `source/library/Pawl/Resolve.hs`, add `import qualified Pawl.Event as Event` and `import qualified Data.List as List` (if absent). Add arms:
 
@@ -726,7 +726,7 @@ In `source/library/Pawl/Resolve.hs`, add `import qualified Pawl.Event as Event` 
 
 (Add `import qualified Pawl.Type.GameState as GameState` if not already qualified for `players`; `Map.keys`, `Zone`, `Game.zoneMembers` are already in scope in `Resolve`.)
 
-- [ ] **Step 10: Refactor `resolveAbility` into a shared `resolveEffects`; add the `OfTrigger` resolution arm**
+- [x] **Step 10: Refactor `resolveAbility` into a shared `resolveEffects`; add the `OfTrigger` resolution arm**
 
 In `source/library/Pawl/Resolve.hs`, add `import qualified Pawl.Type.TriggeredAbility as TriggeredAbility` and `import Pawl.Type.SlotName (SlotName)` / `import Pawl.Type.TargetSpec (TargetSpec)` (if absent). Replace `resolveAbility` with a thin wrapper over the new shared executor:
 
@@ -767,12 +767,12 @@ In `source/library/Pawl/Stack.hs`, add `import qualified Pawl.Type.TriggeredAbil
           Resolve.resolveEffects oid srcId (TriggeredAbility.effects ability) (TriggeredAbility.targetSpecs ability)
 ```
 
-- [ ] **Step 11: Run tests to verify they pass**
+- [x] **Step 11: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the ETB exiles bob's graveyard and the trigger object ceases; the M3e activated-ability tests stay green (they now route through `resolveEffects`).
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
