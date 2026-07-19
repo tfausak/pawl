@@ -641,7 +641,7 @@ Behavior-preserving refactor: extract one `Event.drawCard` and route `Engine.dra
 **Interfaces:**
 - Produces: `Event.drawCard :: PlayerId -> GameState -> GameState` — moves the top library card to hand (CR 121.2) or, on an empty library, records `drewFromEmpty` (CR 121.3 → 704.5b). `Engine.drawFor` and `Setup.drawCard` become thin wrappers.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `ResolveSpec.hs` a small group (or fold into `zoneChangeTests`):
 
@@ -665,12 +665,12 @@ drawCardTests cards =
 
 Wire `drawCardTests cards` into `tests`.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: compile failure — `Event.drawCard` not in scope (red).
 
-- [ ] **Step 3: Add `Event.drawCard`**
+- [x] **Step 3: Add `Event.drawCard`**
 
 In `source/library/Pawl/Event.hs`, add (the module imports `Game`, `GameState`, `Zone`, `PlayerId`; add `import qualified Data.Set as Set` to its import group):
 
@@ -685,7 +685,7 @@ drawCard pid gs = case Game.zoneMembers Zone.Library pid gs of
   top : _ -> changeZone top Zone.Hand gs
 ```
 
-- [ ] **Step 4: Route the two existing draws through it**
+- [x] **Step 4: Route the two existing draws through it**
 
 In `source/library/Pawl/Engine.hs`, replace `drawFor`:
 
@@ -705,12 +705,12 @@ drawCard pid = State.modify' (Event.drawCard pid)
 
 (Setup's opening-hand draw never empties a freshly built 60-card library, so recording `drewFromEmpty` there is unreachable — behavior is preserved.)
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: PASS — the new unit tests green and the whole existing suite green (draw step, deck-out loss, opening hands unchanged). Warning-clean.
 
-- [ ] **Step 6: Format, lint, commit**
+- [x] **Step 6: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

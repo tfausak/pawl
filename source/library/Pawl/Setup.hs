@@ -116,11 +116,7 @@ shuffleLibrary pid = do
   State.put gs {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library gs)}
 
 drawCard :: PlayerId -> Game ()
-drawCard pid = do
-  gs <- State.get
-  case Game.zoneMembers Zone.Library pid gs of
-    [] -> pure ()
-    top : _ -> State.put (Event.changeZone top Zone.Hand gs)
+drawCard pid = State.modify' (Event.drawCard pid)
 
 -- Build each player's library from their deck's multiset, shuffle, draw.
 createDeck :: PlayerId -> Deck.Deck -> Game ()

@@ -7,6 +7,7 @@ module Pawl.Event where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import Pawl.Type.GameState (GameState)
@@ -51,6 +52,15 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
         -- object's id -- what an enters trigger scans.
         emitted = ZoneChange.MkZoneChange newId fromZone dest
      in moved {GameState.zoneChanges = GameState.zoneChanges moved ++ [emitted]}
+
+-- CR 121.2/121.3: the single-card draw. Move pid's top library card to their
+-- hand; an empty library records the failed draw (CR 704.5b makes it a loss at
+-- the next state-based-action check). The primitive shared by the draw step
+-- (Engine.drawFor), opening hands (Setup.drawCard), and the Draw effect (Resolve).
+drawCard :: PlayerId -> GameState -> GameState
+drawCard pid gs = case Game.zoneMembers Zone.Library pid gs of
+  [] -> gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
+  top : _ -> changeZone top Zone.Hand gs
 
 -- CR 614: rewrite the proposed zone change by each active replacement. CR 614.5:
 -- a replacement gets ONE opportunity -- applied left-to-right, each sees the

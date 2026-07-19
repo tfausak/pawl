@@ -86,12 +86,7 @@ checkSba :: Game ()
 checkSba = State.modify' Sba.checkStateBasedActions
 
 drawFor :: PlayerId -> Game ()
-drawFor pid = do
-  gs <- State.get
-  case Game.zoneMembers Zone.Library pid gs of
-    -- CR 121.3: the draw fails and is remembered; CR 704.5b turns it into a loss.
-    [] -> State.put gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
-    top : _ -> State.put (Event.changeZone top Zone.Hand gs)
+drawFor pid = State.modify' (Event.drawCard pid)
 
 untapAll :: PlayerId -> Game ()
 untapAll pid = do

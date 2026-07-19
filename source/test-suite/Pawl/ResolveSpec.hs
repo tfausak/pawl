@@ -565,5 +565,21 @@ zoneChangeTests cards =
               HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after))
     ]
 
+drawCardTests :: Cards.Cards -> Tasty.TestTree
+drawCardTests cards =
+  Tasty.testGroup
+    "DrawCard"
+    [ HU.testCase "CR 121.2 drawCard moves the top library card to hand" $
+        let base = Setup.emptyGame S.bothPlayers
+            (_, withCard) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice base
+            after = Event.drawCard S.alice withCard
+         in do
+              HU.assertEqual "one card in hand" 1 (S.handSize S.alice after)
+              HU.assertEqual "library empty" [] (Game.zoneMembers Zone.Library S.alice after),
+      HU.testCase "CR 121.3 drawing from an empty library records the failed draw" $
+        let after = Event.drawCard S.alice (Setup.emptyGame S.bothPlayers)
+         in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after))
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards]
