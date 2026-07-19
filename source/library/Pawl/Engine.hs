@@ -34,6 +34,7 @@ import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
+import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Phase as Phase
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
@@ -41,7 +42,9 @@ import Pawl.Type.Prompt (Prompt)
 import qualified Pawl.Type.Prompt as Prompt
 import Pawl.Type.Result (Result)
 import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.Zone as Zone
 
 -- The interpreter seam: every decision the engine suspends on is answered here.
@@ -178,74 +181,102 @@ runTurnBasedActions phase = do
 -- the stack and hands priority back to the active player; only an EMPTY stack
 -- ends the step. M0 could skip that distinction because its stack was always
 -- empty.
+-- CR 603.3: put each triggered ability that fired since the last placement on the
+-- stack, in APNAP order (CR 603.3b). M3f has at most one trigger controlled by one
+-- player, so the ordering is trivial and the own-order/two-part choice (CR 603.3b)
+-- is elided until a second simultaneous trigger exists. Draining zoneChanges makes
+-- an event fire its triggers once (CR 603.2c). Targets are chosen as the ability is
+-- placed (CR 603.3d); no M3f trigger targets. Returns whether any were placed.
+placePendingTriggers :: Game Bool
+placePendingTriggers = do
+  gs <- State.get
+  let changes = GameState.zoneChanges gs
+      pending = Event.triggersFrom changes gs
+  State.modify' (\g -> g {GameState.zoneChanges = []})
+  Monad.mapM_ placeOne (apnapOrder gs pending)
+  pure (not (null pending))
+
+-- Put one triggered ability on the stack as a fresh OfTrigger object.
+placeOne :: (ObjectId, PlayerId, TriggeredAbility.TriggeredAbility) -> Game ()
+placeOne (srcId, controller, ability) = do
+  gs <- State.get
+  let (abilId, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj =
+        Object.MkObject
+          { Object.owner = controller,
+            Object.source = Source.OfTrigger srcId ability,
+            Object.zone = Zone.Stack,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled,
+            Object.targets = Map.empty,
+            Object.chosenSubtypes = Map.empty,
+            Object.timestamp = ts
+          }
+  State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
+
+-- CR 603.3b: active player's triggers first, then the others. Stable within a
+-- controller (M3f never has two from one controller, so order within is moot).
+apnapOrder :: GameState -> [(a, PlayerId, b)] -> [(a, PlayerId, b)]
+apnapOrder gs pend =
+  let active = GameState.activePlayer gs
+      mine (_, p, _) = p == active
+   in filter mine pend ++ filter (not . mine) pend
+
+-- CR 117.5: each time a player would receive priority, perform state-based
+-- actions, then put triggered abilities on the stack, repeating until neither
+-- does anything. Then priority is granted (by the caller).
+settleForPriority :: Game ()
+settleForPriority = do
+  before <- State.get
+  checkSba
+  placed <- placePendingTriggers
+  after <- State.get
+  Monad.when (placed || before /= after) settleForPriority
+
 priorityLoop :: Game ()
 priorityLoop = do
   active <- State.gets GameState.activePlayer
   State.modify' $ \gs -> gs {GameState.priority = Just active, GameState.passes = 0}
   let loop = do
-        gs <- State.get
-        case GameState.priority gs of
-          Nothing -> pure ()
-          Just p -> do
-            let decider = Decide.deciderFor p gs
-                actions = Action.legalActions p gs
-            chosen <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
-            case chosen of
-              Action.Type.Pass -> do
-                let passes = GameState.passes gs + 1
-                    playing = length (Sba.stillPlaying gs)
-                if passes >= fromIntegral playing
-                  then case GameState.stack gs of
-                    [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
-                    _ -> do
-                      -- CR 117.5 / 704.3: state-based actions are performed
-                      -- before any player would receive priority -- which is
-                      -- exactly now, after a resolution. A creature the spell
-                      -- killed must be buried before the next player acts, and
-                      -- a game the spell ended must actually end.
-                      Stack.resolveTop
-                      checkSba
-                      resolved <- State.get
-                      case GameState.result resolved of
-                        Just _ ->
-                          State.put resolved {GameState.priority = Nothing, GameState.passes = 0}
-                        Nothing -> do
-                          State.put
-                            resolved
-                              { GameState.passes = 0,
-                                GameState.priority = Just (GameState.activePlayer resolved)
-                              }
+        settleForPriority
+        finished <- State.gets (Maybe.isJust . GameState.result)
+        if finished
+          then State.modify' (\gs -> gs {GameState.priority = Nothing})
+          else do
+            gs <- State.get
+            case GameState.priority gs of
+              Nothing -> pure ()
+              Just p -> do
+                let decider = Decide.deciderFor p gs
+                    actions = Action.legalActions p gs
+                chosen <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
+                case chosen of
+                  Action.Type.Pass -> do
+                    let passes = GameState.passes gs + 1
+                        playing = length (Sba.stillPlaying gs)
+                    if passes >= fromIntegral playing
+                      then case GameState.stack gs of
+                        [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
+                        _ -> do
+                          Stack.resolveTop
+                          State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (GameState.activePlayer g)})
                           loop
-                  else do
-                    State.put
-                      gs
-                        { GameState.passes = passes,
-                          GameState.priority = Just (nextStillPlaying gs p)
-                        }
+                      else do
+                        State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}
+                        loop
+                  Action.Type.Play oid -> do
+                    State.modify' (\g -> let played = Event.changeZone oid Zone.Battlefield g in played {GameState.landPlayed = Set.insert p (GameState.landPlayed played), GameState.passes = 0, GameState.priority = Just p})
                     loop
-              Action.Type.Play oid -> do
-                -- CR 305.1: playing a land is a special action; it resolves
-                -- immediately and does not use the stack.
-                let played = Event.changeZone oid Zone.Battlefield gs
-                State.put
-                  played
-                    { GameState.landPlayed = Set.insert p (GameState.landPlayed played),
-                      GameState.passes = 0,
-                      -- CR 117.3c: the player who took the action keeps
-                      -- priority. M0 said activePlayer here, which was only
-                      -- accidentally right because lands are active-player-only.
-                      GameState.priority = Just p
-                    }
-                loop
-              Action.Type.Cast oid -> do
-                Cast.castSpell p oid
-                -- CR 117.3c again: casting does not hand priority away.
-                State.modify' $ \g -> g {GameState.passes = 0, GameState.priority = Just p}
-                loop
-              Action.Type.Activate oid ability -> do
-                Activate.activateAbility p oid ability
-                State.modify' $ \g -> g {GameState.passes = 0, GameState.priority = Just p}
-                loop
+                  Action.Type.Cast oid -> do
+                    Cast.castSpell p oid
+                    State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                    loop
+                  Action.Type.Activate oid ability -> do
+                    Activate.activateAbility p oid ability
+                    State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                    loop
   loop
 
 handoffTurn :: Game ()

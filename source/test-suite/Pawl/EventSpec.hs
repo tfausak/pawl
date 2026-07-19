@@ -2,7 +2,10 @@ module Pawl.EventSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Card as Card
+import qualified Pawl.Cast as Cast
+import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Setup as Setup
@@ -74,5 +77,18 @@ tests =
          in HU.assertEqual "no triggers" 0 (length (Event.triggersFrom [toGrave] gs)),
       HU.testCase "SelfEnters matches only a battlefield destination" $ do
         HU.assertBool "enters battlefield matches" (Event.matchesTrigger TriggerCondition.SelfEnters (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) Zone.Stack Zone.Battlefield))
-        HU.assertBool "enters graveyard does not" (not (Event.matchesTrigger TriggerCondition.SelfEnters (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) Zone.Battlefield Zone.Graveyard)))
+        HU.assertBool "enters graveyard does not" (not (Event.matchesTrigger TriggerCondition.SelfEnters (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) Zone.Battlefield Zone.Graveyard))),
+      HU.testCase "CR 603/614 whole card: cast Rest in Peace, ETB exiles graveyards, then deaths are exiled" $
+        let base = S.landsInPlay Card.plainsPrinting 2
+            (deadId, withDead) = S.addLibraryCard Card.pikerPrinting S.alice base
+            g0 = Event.changeZone deadId Zone.Graveyard withDead -- a card already in the graveyard
+            (g1, ripId) = S.handOne Card.restInPeacePrinting g0
+            afterCast = snd (Engine.runGamePure S.identityAnswer g1 (Cast.castSpell S.alice ripId))
+            -- run priority: both players pass, RiP resolves and enters, its ETB is
+            -- placed (CR 117.5) and resolves, exiling the graveyard.
+            settled = snd (Engine.runGamePure S.identityAnswer afterCast Engine.priorityLoop)
+         in do
+              HU.assertEqual "alice's graveyard exiled by the ETB" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
+              HU.assertEqual "Rest in Peace is on the battlefield" 1 (S.countOnBattlefieldByName (Text.pack "Rest in Peace") S.alice settled)
+              HU.assertEqual "stack empty" [] (GameState.stack settled)
     ]

@@ -465,6 +465,17 @@ countByName wanted pid gs =
       inHand = filter named (Game.zoneMembers Zone.Hand pid gs)
    in length inLibrary + length inHand
 
+-- How many of pid's battlefield objects are copies of a card with this name.
+countOnBattlefieldByName :: Text.Text -> PlayerId.PlayerId -> GameState.GameState -> Int
+countOnBattlefieldByName wanted pid gs =
+  let named oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> case Object.source obj of
+          Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
+          Source.OfAbility _ _ -> False
+          Source.OfTrigger _ _ -> False
+   in length (filter named (Game.zoneMembers Zone.Battlefield pid gs))
+
 damageOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural.Natural
 damageOf oid gs = fmap Object.damage (Game.lookupObject oid gs)
 

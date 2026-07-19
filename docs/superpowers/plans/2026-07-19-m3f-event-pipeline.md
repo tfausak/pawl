@@ -791,7 +791,7 @@ git commit -m "Triggered abilities on the stack: OfTrigger + ExileAllGraveyards 
 - Consumes: `Projection.triggeredAbilitiesOf` (Task 5), `GameState.zoneChanges` (Task 3), `ZoneChange` (Task 2).
 - Produces: `Event.matchesTrigger :: TriggerCondition -> ZoneChange -> Bool` (SelfEnters ⇔ the event's destination is the battlefield); `Event.triggersFrom :: [ZoneChange] -> GameState -> [(ObjectId, PlayerId, TriggeredAbility)]` (the battlefield/enters pass: for each event with `to = Battlefield`, the newcomer's projected triggered abilities whose condition matches, each paired with the newcomer's id and its controller CR 603.3a).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/EventSpec.hs` (add imports `qualified Pawl.Type.TriggerCondition as TriggerCondition`, `qualified Pawl.Type.PlayerId as PlayerId`):
 
@@ -814,12 +814,12 @@ Add to `source/test-suite/Pawl/EventSpec.hs` (add imports `qualified Pawl.Type.T
         HU.assertBool "enters graveyard does not" (not (Event.matchesTrigger TriggerCondition.SelfEnters (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) Zone.Battlefield Zone.Graveyard)))
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "Rest in Peace entering yields"'`
 Expected: FAIL to compile — `Event.triggersFrom`, `Event.matchesTrigger` not in scope.
 
-- [ ] **Step 3: Add `matchesTrigger` and `triggersFrom`**
+- [x] **Step 3: Add `matchesTrigger` and `triggersFrom`**
 
 In `source/library/Pawl/Event.hs`, add imports `import Pawl.Type.PlayerId (PlayerId)`, `import Pawl.Type.TriggerCondition (TriggerCondition)`, `import qualified Pawl.Type.TriggerCondition as TriggerCondition`, `import Pawl.Type.TriggeredAbility (TriggeredAbility)`, `import qualified Pawl.Type.TriggeredAbility as TriggeredAbility`. Add:
 
@@ -851,12 +851,12 @@ triggersFrom changes gs =
 
 (`let` not `where`, per the style guide; `Game.controllerOf` already exists and is total. The `Maybe` import is unnecessary here — drop it if you added it.)
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
