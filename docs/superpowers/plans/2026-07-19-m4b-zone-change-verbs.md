@@ -855,7 +855,7 @@ Delivers `Effect.Mill SlotName Quantity`, gated by Tome Scour milling five from 
 **Interfaces:**
 - Produces: `Effect.Mill SlotName Quantity`; `Cards.tomeScourPrinting`. `Resolve.slotsOf (Effect.Mill s _) == Set.singleton s`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 First add `import qualified Data.List as List` to `ResolveSpec.hs` (this file does **not** currently import it, and the helpers below use `List.foldl'`).
 
@@ -896,12 +896,12 @@ Add to `zoneChangeTests`:
 
 (`List` is already imported in `ResolveSpec.hs`; `Prompt` too.)
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: compile failure — `Cards.tomeScourPrinting` / `Effect.Mill` not in scope (red).
 
-- [ ] **Step 3: Add the `Mill` constructor**
+- [x] **Step 3: Add the `Mill` constructor**
 
 ```haskell
   | -- CR 701.13: the slot's target player mills this many (top N of their library
@@ -910,11 +910,11 @@ Expected: compile failure — `Cards.tomeScourPrinting` / `Effect.Mill` not in s
     Mill SlotName Quantity
 ```
 
-- [ ] **Step 4: Add the classification arms**
+- [x] **Step 4: Add the classification arms**
 
 `slotsOf`: `Effect.Mill slot _ -> Set.singleton slot`. `readsX`: `Effect.Mill _ quantity -> quantity == Quantity.Type.X`. `manaProduced`: `Effect.Mill {} -> Nothing`. `searchesLibrary`: `Effect.Mill {} -> False`. `rewriteEffect`: `Effect.Mill {} -> effect`.
 
-- [ ] **Step 5: Add the executor arm**
+- [x] **Step 5: Add the executor arm**
 
 ```haskell
   Effect.Mill slot quantity ->
@@ -932,7 +932,7 @@ Expected: compile failure — `Cards.tomeScourPrinting` / `Effect.Mill` not in s
         _ -> gs
 ```
 
-- [ ] **Step 6: Add the codec arm**
+- [x] **Step 6: Add the codec arm**
 
 `effectToJson`: `Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array [slotNameToJson s, quantityToJson q]))`. `jsonToEffect`:
 
@@ -942,7 +942,7 @@ Expected: compile failure — `Cards.tomeScourPrinting` / `Effect.Mill` not in s
       _ -> Left (Text.pack "Mill expects [slot, quantity]")
 ```
 
-- [ ] **Step 7: Create and register Tome Scour**
+- [x] **Step 7: Create and register Tome Scour**
 
 Create `data/cards/tome-scour.json`:
 
@@ -952,7 +952,7 @@ Create `data/cards/tome-scour.json`:
 
 Register in `Cards.hs`.
 
-- [ ] **Step 8: Card-data test and count → 37**
+- [x] **Step 8: Card-data test and count → 37**
 
 Bump count to 37. Add to `m4bCardTests`:
 
@@ -964,12 +964,12 @@ Bump count to 37. Add to `m4bCardTests`:
               HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.PlayerTarget) (Card.Type.targetSpecs c),
 ```
 
-- [ ] **Step 9: Run tests to verify they pass**
+- [x] **Step 9: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: PASS (mill + short-library green; count 37; round-trip green).
 
-- [ ] **Step 10: Format, lint, commit**
+- [x] **Step 10: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

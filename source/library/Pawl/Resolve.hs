@@ -66,6 +66,7 @@ slotsOf effect = case effect of
   Effect.Destroy slot -> Set.singleton slot
   Effect.MoveToZone slot _ -> Set.singleton slot
   Effect.Draw _ -> Set.empty
+  Effect.Mill slot _ -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -86,6 +87,7 @@ readsX = any effectReadsX
       Effect.Destroy _ -> False
       Effect.MoveToZone {} -> False
       Effect.Draw quantity -> quantity == Quantity.Type.X
+      Effect.Mill _ quantity -> quantity == Quantity.Type.X
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -102,6 +104,7 @@ manaProduced effect = case effect of
   Effect.Destroy _ -> Nothing
   Effect.MoveToZone {} -> Nothing
   Effect.Draw _ -> Nothing
+  Effect.Mill {} -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -118,6 +121,7 @@ searchesLibrary effect = case effect of
   Effect.Destroy _ -> False
   Effect.MoveToZone {} -> False
   Effect.Draw _ -> False
+  Effect.Mill {} -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -154,6 +158,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Destroy _ -> effect
   Effect.MoveToZone {} -> effect
   Effect.Draw _ -> effect
+  Effect.Mill {} -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -362,6 +367,20 @@ applyEffect source controller bound legality chosen effect = case effect of
             -- library top and the CR 121.3 empty-library loss is preserved.
             State.modify' (\g -> List.foldl' (\g1 _ -> Event.drawCard controller g1) g [1 .. n])
       _ -> pure ()
+  Effect.Mill slot quantity ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just (Recipient.ToPlayer target), True) ->
+          case Quantity.evaluate gs source quantity of
+            Just n
+              | n > 0 ->
+                  -- CR 701.13/701.13b: top min(n, library) of the target's library to
+                  -- their graveyard, funnelled so each move mints a new incarnation.
+                  let topN = take (fromInteger n) (Game.zoneMembers Zone.Library target gs)
+                   in List.foldl' (\g c -> Event.changeZone c Zone.Graveyard g) gs topN
+            _ -> gs
+        -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
+        _ -> gs
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

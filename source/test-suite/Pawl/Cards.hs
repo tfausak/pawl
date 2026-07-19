@@ -49,7 +49,8 @@ data Cards = MkCards
     murderPrinting :: Printing.Printing,
     unsummonPrinting :: Printing.Printing,
     angelicEdictPrinting :: Printing.Printing,
-    divinationPrinting :: Printing.Printing
+    divinationPrinting :: Printing.Printing,
+    tomeScourPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -98,6 +99,7 @@ loadCards = do
   unsummonPrinting_ <- loadPrinting "unsummon"
   angelicEdictPrinting_ <- loadPrinting "angelic-edict"
   divinationPrinting_ <- loadPrinting "divination"
+  tomeScourPrinting_ <- loadPrinting "tome-scour"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -135,7 +137,8 @@ loadCards = do
         murderPrinting = murderPrinting_,
         unsummonPrinting = unsummonPrinting_,
         angelicEdictPrinting = angelicEdictPrinting_,
-        divinationPrinting = divinationPrinting_
+        divinationPrinting = divinationPrinting_,
+        tomeScourPrinting = tomeScourPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -175,7 +178,8 @@ allPrintings cards =
     murderPrinting cards,
     unsummonPrinting cards,
     angelicEdictPrinting cards,
-    divinationPrinting cards
+    divinationPrinting cards,
+    tomeScourPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

@@ -55,4 +55,8 @@ data Effect
     -- controller draws, CR 120.2). Empty-library draw is a loss (CR 121.3),
     -- unlike Mill -- the semantic asymmetry that keeps Draw and Mill separate.
     Draw Quantity
+  | -- CR 701.13: the slot's target player mills this many (top N of their library
+    -- to their graveyard). Milling a short/empty library mills fewer, no penalty
+    -- (CR 701.13b) -- unlike Draw, which loses on empty.
+    Mill SlotName Quantity
   deriving (Eq, Ord, Show)

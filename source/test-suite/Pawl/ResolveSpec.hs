@@ -4,6 +4,7 @@
 -- the CR 608.2b fizzle.
 module Pawl.ResolveSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -516,6 +517,13 @@ castBlackRemovalAt cards printing foe =
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (foeId, resolved)
 
+-- Answers ChooseTargets by pointing every slot at bob (the opponent), otherwise
+-- behaves like identityAnswer. Used to aim a player-targeting spell at bob.
+atBobAnswer :: Prompt.Prompt r -> r
+atBobAnswer p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToPlayer S.bob)) sets
+  _ -> S.identityAnswer p
+
 zoneChangeTests :: Cards.Cards -> Tasty.TestTree
 zoneChangeTests cards =
   Tasty.testGroup
@@ -579,7 +587,26 @@ zoneChangeTests cards =
             (gs, spellId) = S.handOne (Cards.divinationPrinting cards) g1
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after))
+         in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after)),
+      HU.testCase "CR 701.13 Tome Scour mills five from a target player's library" $
+        let base = S.landsInPlay (Cards.islandPrinting cards) 1
+            withLib = List.foldl' (\g _ -> snd (S.addLibraryCard (Cards.pikerPrinting cards) S.bob g)) base [1 .. (6 :: Int)]
+            (gs, spellId) = S.handOne (Cards.tomeScourPrinting cards) withLib
+            cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "five milled to graveyard" 5 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+              HU.assertEqual "one card left in library" 1 (length (Game.zoneMembers Zone.Library S.bob after)),
+      HU.testCase "CR 701.13b milling a short library mills fewer with no loss" $
+        let base = S.landsInPlay (Cards.islandPrinting cards) 1
+            (_, g1) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob base
+            (_, g2) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob g1
+            (gs, spellId) = S.handOne (Cards.tomeScourPrinting cards) g2
+            cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+            after = Sba.checkStateBasedActions (snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop))
+         in do
+              HU.assertEqual "two milled" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+              HU.assertBool "bob did not lose (milling is not drawing)" (not (Set.member S.bob (GameState.drewFromEmpty after)))
     ]
 
 drawCardTests :: Cards.Cards -> Tasty.TestTree
