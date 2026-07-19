@@ -261,7 +261,7 @@ git commit -m "Add ZoneChange + ReplacementEffect + the pure applyReplacements c
 - Consumes: `ReplacementEffect` (Task 2). This task adds **only** the `replacementEffects` field to `Card`/`PC` — the `triggeredAbilities` field waits for Task 5, where `TriggeredAbility` is created (types live in the task that first uses them, per TDD-locality). The cost is that Task 5 re-touches each `MkCard` to seed the second field; both passes are mechanical, driven by `-Wmissing-fields`.
 - Produces: `Card.replacementEffects :: [ReplacementEffect]`; `PC.replacementEffects :: [ReplacementEffect]`; `GameState.zoneChanges :: [ZoneChange]`; `Projection.replacementsOf :: ObjectId -> GameState -> [ReplacementEffect]`; `Projection.replacementsAffecting :: GameState -> [ReplacementEffect]`; `Card.restInPeacePrinting`, `Card.plainsPrinting`. Rest in Peace's `replacementEffects = [RedirectZoneChange Graveyard Exile]`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ProjectionSpec.hs` (add imports `qualified Pawl.Type.ReplacementEffect as ReplacementEffect`, `qualified Pawl.Type.Zone as Zone`, `qualified Pawl.Support as S` if absent — mirror existing style):
 
@@ -279,12 +279,12 @@ Add to `source/test-suite/Pawl/ProjectionSpec.hs` (add imports `qualified Pawl.T
 
 (`S.addCreature` puts a permanent on the battlefield settled; Rest in Peace is an enchantment, but `addCreature` is a generic "put this printing on the battlefield" helper despite the name — see `Support.hs`.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "projects its graveyard"'`
 Expected: FAIL to compile — `Projection.replacementsOf`, `Card.restInPeacePrinting`, `Card.Type.replacementEffects` not in scope.
 
-- [ ] **Step 3: Add the `replacementEffects` field to `Card`**
+- [x] **Step 3: Add the `replacementEffects` field to `Card`**
 
 In `source/library/Pawl/Type/Card.hs`, add `import Pawl.Type.ReplacementEffect (ReplacementEffect)` and the field (after `activatedAbilities`, before `targetSpecs`):
 
@@ -296,7 +296,7 @@ In `source/library/Pawl/Type/Card.hs`, add `import Pawl.Type.ReplacementEffect (
     replacementEffects :: [ReplacementEffect],
 ```
 
-- [ ] **Step 4: Add the `replacementEffects` field to `ProjectedCharacteristics`**
+- [x] **Step 4: Add the `replacementEffects` field to `ProjectedCharacteristics`**
 
 In `source/library/Pawl/Type/ProjectedCharacteristics.hs`, add `import Pawl.Type.ReplacementEffect (ReplacementEffect)` and the field (after `activatedAbilities`):
 
@@ -306,7 +306,7 @@ In `source/library/Pawl/Type/ProjectedCharacteristics.hs`, add `import Pawl.Type
     replacementEffects :: [ReplacementEffect],
 ```
 
-- [ ] **Step 5: Add the `zoneChanges` field to `GameState`**
+- [x] **Step 5: Add the `zoneChanges` field to `GameState`**
 
 In `source/library/Pawl/Type/GameState.hs`, add `import Pawl.Type.ZoneChange (ZoneChange)` and the field (after `damageEvents`):
 
@@ -317,7 +317,7 @@ In `source/library/Pawl/Type/GameState.hs`, add `import Pawl.Type.ZoneChange (Zo
     zoneChanges :: [ZoneChange],
 ```
 
-- [ ] **Step 6: Seed the PC field (base) and strip it (LoseAllAbilities)**
+- [x] **Step 6: Seed the PC field (base) and strip it (LoseAllAbilities)**
 
 In `source/library/Pawl/Projection.hs`, add `import Pawl.Type.ReplacementEffect (ReplacementEffect)`. In `baseCharacteristics`, the `Nothing` branch sets `PC.replacementEffects = []` and the `Just card` branch sets `PC.replacementEffects = Card.Type.replacementEffects card` (mirror the two `activatedAbilities` lines). In `applyModification`'s `LoseAllAbilities` arm, add `PC.replacementEffects = []`:
 
@@ -326,7 +326,7 @@ In `source/library/Pawl/Projection.hs`, add `import Pawl.Type.ReplacementEffect 
     pc {PC.keywords = Set.empty, PC.activatedAbilities = [], PC.replacementEffects = []}
 ```
 
-- [ ] **Step 7: Add the projection accessors**
+- [x] **Step 7: Add the projection accessors**
 
 In `source/library/Pawl/Projection.hs`, add (near `abilitiesOf`):
 
@@ -353,11 +353,11 @@ replacementsAffecting gs =
 
 (`Card.Type` is already imported in `Projection` as `Card.Type`; confirm the alias and reuse it.)
 
-- [ ] **Step 8: Seed `zoneChanges = []` at every full `MkGameState`**
+- [x] **Step 8: Seed `zoneChanges = []` at every full `MkGameState`**
 
 `-Wmissing-fields` lists them. Known sites: `source/library/Pawl/Setup.hs` (`emptyGame`), `source/test-suite/Pawl/Support.hs` (`oneMountainState`). Add `GameState.zoneChanges = []` next to `GameState.damageEvents = []` at each.
 
-- [ ] **Step 9: Seed `replacementEffects = []` at every `MkCard`, then add Rest in Peace and Plains**
+- [x] **Step 9: Seed `replacementEffects = []` at every `MkCard`, then add Rest in Peace and Plains**
 
 `-Wmissing-fields` lists every printing. Add `Card.replacementEffects = []` (next to `activatedAbilities`) at each existing printing in `source/library/Pawl/Card.hs` and any hand-built `Card.Type.MkCard` in tests (e.g. `ResolveSpec.hs`). Then add the two printings (imports for `ReplacementEffect`, `Zone`, and `Subtype.Plains` as needed):
 
@@ -431,12 +431,12 @@ plainsPrinting =
 
 (Use the actual tail of the current `allPrintings` list; append the two new names.)
 
-- [ ] **Step 10: Run tests to verify they pass**
+- [x] **Step 10: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. Fix any `-Wmissing-fields` site the build names.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
