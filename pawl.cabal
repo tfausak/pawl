@@ -50,6 +50,7 @@ common executable
 library
   import: library
   build-depends:
+    bytestring ^>=0.12,
     containers ^>=0.8,
     text ^>=2.1.3,
     transformers ^>=0.6.1,
@@ -67,6 +68,7 @@ library
     Pawl.Engine
     Pawl.Event
     Pawl.Game
+    Pawl.Json
     Pawl.Mana
     Pawl.Projection
     Pawl.Quantity

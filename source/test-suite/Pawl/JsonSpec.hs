@@ -1,6 +1,8 @@
 -- Covers Pawl.Type.Decimal, Pawl.Type.Json, Pawl.Json.
 module Pawl.JsonSpec where
 
+import qualified Data.Text as Text
+import qualified Pawl.Json as J
 import qualified Pawl.Type.Decimal as Decimal
 import qualified Pawl.Type.Json as Json
 import qualified Test.Tasty as Tasty
@@ -23,5 +25,14 @@ tests =
         "Value"
         [ HU.testCase "equality distinguishes constructors" $
             HU.assertBool "null /= true" (Json.Null /= Json.Boolean True)
+        ],
+      Tasty.testGroup
+        "render"
+        [ HU.testCase "renders an integer" $
+            HU.assertEqual "5" (Text.pack "5") (J.render (J.jInt 5)),
+          HU.testCase "renders a tagged nullary" $
+            HU.assertEqual "tag" (Text.pack "{\"type\":\"ManaValue\"}") (J.render (J.tagged (Text.pack "ManaValue") Nothing)),
+          HU.testCase "escapes strings" $
+            HU.assertEqual "quote" (Text.pack "\"a\\\"b\"") (J.render (J.jText (Text.pack "a\"b")))
         ]
     ]
