@@ -1071,7 +1071,7 @@ git commit -m "Read printed mana abilities as sources; exclude sick creatures (C
 - Consumes: monadic `applyEffect` (Task 3).
 - Produces: `CardCriterion.CardCriterion` = `BasicLandCard`; `Effect.Search :: CardCriterion -> Effect`; `Prompt.SearchLibrary :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)`; `Resolve.matchesCriterion :: CardCriterion -> Card -> Bool`; `applyEffect`'s `Search` arm prompts the controller to find a matching library card, puts it onto the battlefield tapped, then shuffles (CR 701.23; fail-to-find allowed, 701.23b).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to the `Resolve` group in `source/test-suite/Pawl/ResolveSpec.hs`. Build a state where alice has a Mountain in her library and resolve a bare `Search BasicLandCard` effect (via a hand-built ability object or directly through `applyEffect`); assert the Mountain is on the battlefield tapped and gone from the library. Use an answerer that finds the first match:
 
@@ -1154,12 +1154,12 @@ addLibraryCard printing pid gs =
 
 (Add imports to `ResolveSpec`: `qualified Pawl.Type.CardCriterion as CardCriterion`.)
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "fetches a basic land"'`
 Expected: FAIL to compile — `CardCriterion`, `Effect.Search`, `Prompt.SearchLibrary`, `S.addLibraryCard` not in scope.
 
-- [ ] **Step 3: Add `CardCriterion` and the `Search` opcode**
+- [x] **Step 3: Add `CardCriterion` and the `Search` opcode**
 
 `source/library/Pawl/Type/CardCriterion.hs`:
 
@@ -1183,7 +1183,7 @@ In `source/library/Pawl/Type/Effect.hs`, add `import Pawl.Type.CardCriterion (Ca
     Search CardCriterion
 ```
 
-- [ ] **Step 4: Add the `SearchLibrary` prompt**
+- [x] **Step 4: Add the `SearchLibrary` prompt**
 
 In `source/library/Pawl/Type/Prompt.hs`, add the constructor:
 
@@ -1194,7 +1194,7 @@ In `source/library/Pawl/Type/Prompt.hs`, add the constructor:
   SearchLibrary :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
 ```
 
-- [ ] **Step 5: Add the `Resolve` arms and the `Search` executor**
+- [x] **Step 5: Add the `Resolve` arms and the `Search` executor**
 
 In `source/library/Pawl/Resolve.hs`, add the `slotsOf` arm (`Search` names no slot):
 
@@ -1290,7 +1290,7 @@ reorderLibrary pid order gs =
 
 (Add imports `import Pawl.Type.PlayerId (PlayerId)`, `import qualified Data.Sequence as Seq`, `import qualified Pawl.Decide as Decide`, `import qualified Pawl.Type.Program as Program`, `import qualified Pawl.Type.Prompt as Prompt`, `import qualified Control.Monad.Trans.Class as Trans`, `import qualified Pawl.Type.TapState as TapState` to `Resolve`. `Zone`/`Object`/`GameState` are already imported.)
 
-- [ ] **Step 6: Add the `SearchLibrary` arm to every answerer**
+- [x] **Step 6: Add the `SearchLibrary` arm to every answerer**
 
 `-Wincomplete-patterns` (pedantic) flags every `Prompt r -> r` matcher. In `source/test-suite/Pawl/Support.hs`, add to `identityAnswer`, `castAnswer`, `aggressiveAnswer`, `playLandAnswer` a canonical fail-to-find (finding nothing is always legal and never wedges a random game):
 
@@ -1306,12 +1306,12 @@ For `randomAnswer` (monadic):
 
 In `source/benchmark/Main.hs`, add `Prompt.SearchLibrary {} -> Nothing` to each flagged answerer.
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the Mountain is fetched to the battlefield tapped and gone from the library; fail-to-find leaves the battlefield empty.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

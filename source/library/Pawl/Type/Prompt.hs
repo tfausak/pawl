@@ -42,3 +42,7 @@ data Prompt r where
   -- target it never gates castability. Cast-vs-resolution timing is elided as
   -- indistinguishable (spec §3), expiry named there.
   ChooseBasicLandTypes :: Decider -> PlayerId -> ObjectId -> SlotName -> Prompt (Subtype, Subtype)
+  -- CR 701.23 / 701.23b: the [ObjectId] is the library cards MATCHING the
+  -- criterion (the engine pre-filters to legal choices); Nothing is "fail to
+  -- find," always permitted for a search of one's own library for a quality.
+  SearchLibrary :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)

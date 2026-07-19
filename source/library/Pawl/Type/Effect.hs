@@ -1,5 +1,6 @@
 module Pawl.Type.Effect where
 
+import Pawl.Type.CardCriterion (CardCriterion)
 import Pawl.Type.Duration (Duration)
 import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.Modification (Modification)
@@ -25,4 +26,8 @@ data Effect
     -- payment (CR 605.3b: a mana ability never uses the stack); Resolve.applyEffect
     -- never runs it. Read by Resolve.manaProduced (the "produces mana?" ABI bit).
     AddMana ManaType
+  | -- CR 701.23: search the controller's library for a card matching the
+    -- criterion, put it onto the battlefield tapped, then shuffle (Evolving
+    -- Wilds' exact shape; destination/tapped are baked in for now).
+    Search CardCriterion
   deriving (Eq, Ord, Show)

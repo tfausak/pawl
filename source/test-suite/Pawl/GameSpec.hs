@@ -255,6 +255,7 @@ recordingAnswer p = case p of
       h : _ -> h
       [] -> A.Pass
   Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> pure Nothing
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.

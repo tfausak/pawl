@@ -92,6 +92,7 @@ identityAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> Nothing
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -118,6 +119,7 @@ castAnswer p = case p of
             h : _ -> h
             [] -> A.Pass
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> Nothing
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -137,6 +139,7 @@ aggressiveAnswer p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> Nothing
 
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
@@ -160,6 +163,7 @@ playLandAnswer p = case p of
           h : _ -> h
           [] -> A.Pass
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> Nothing
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -206,6 +210,7 @@ randomAnswer p = case p of
             [] -> Nothing
      in fmap (Map.mapMaybe id) (traverse pickFrom sets)
   Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> pure Nothing
 
 -- Total index into a list; the engine always offers at least Pass, so the
 -- fallback is unreachable in practice but keeps this free of partial functions.
@@ -256,6 +261,30 @@ addCreature printing pid gs =
 
 addPiker :: PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addPiker = addCreature Card.pikerPrinting
+
+-- One card of a printing in pid's library.
+addLibraryCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addLibraryCard printing pid gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.source = Source.OfCard printing,
+            Object.zone = Zone.Library,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Sick,
+            Object.targets = Map.empty,
+            Object.chosenSubtypes = Map.empty,
+            Object.timestamp = ts
+          }
+   in ( oid,
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.library = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.library gs2)
+          }
+      )
 
 -- Humility on the battlefield under bob's control (it is not a creature, so
 -- AllCreatures does not touch it). Returns the updated state.

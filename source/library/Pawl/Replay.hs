@@ -29,6 +29,7 @@ encode p answer = case p of
   Prompt.AssignCombatDamage {} -> Response.AssignedCombatDamage answer
   Prompt.ChooseTargets {} -> Response.ChoseTargets answer
   Prompt.ChooseBasicLandTypes {} -> Response.ChoseBasicLandTypes answer
+  Prompt.SearchLibrary {} -> Response.Searched answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -63,6 +64,9 @@ decode p response = case p of
   Prompt.ChooseBasicLandTypes {} -> case response of
     Response.ChoseBasicLandTypes pair -> Just pair
     _ -> Nothing
+  Prompt.SearchLibrary {} -> case response of
+    Response.Searched found -> Just found
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -95,6 +99,9 @@ defaultAnswer p = case p of
   -- A canonical identity hack (Mountain -> Mountain changes nothing): the fallback
   -- when a transcript runs short on a text-changer's binding.
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  -- CR 701.23b: failing to find is always legal, and is the least eventful
+  -- fallback when a transcript runs short on a search.
+  Prompt.SearchLibrary {} -> Nothing
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

@@ -24,6 +24,7 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
@@ -286,8 +287,50 @@ resolveTests =
          in do
               HU.assertEqual "bob took 1" (Just 19) (S.lifeOf S.bob resolved)
               HU.assertEqual "ability object gone" Nothing (Game.lookupObject abilId resolved)
-              HU.assertEqual "stack empty" [] (GameState.stack resolved)
+              HU.assertEqual "stack empty" [] (GameState.stack resolved),
+      HU.testCase "CR 701.23 Search fetches a basic land to the battlefield tapped" $
+        -- The fetched card gets a NEW object id (CR 400.7 changeZone), so assert by
+        -- count/tapped-count, never by the library incarnation's id.
+        let base = Setup.emptyGame S.bothPlayers
+            (_, g1) = S.addLibraryCard Card.mountainPrinting S.alice base
+            ability =
+              ActivatedAbility.MkActivatedAbility
+                (AbilityCost.MkAbilityCost [])
+                [Effect.Search CardCriterion.BasicLandCard]
+                Map.empty
+            (abilId, g2) = Game.freshObjectId g1
+            (ts, g3) = Game.freshTimestamp g2
+            abilObj =
+              Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty Map.empty ts
+            g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
+            resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
+         in do
+              HU.assertEqual "one permanent on the battlefield" 1 (length (Game.zoneMembers Zone.Battlefield S.alice resolved))
+              HU.assertEqual "it is tapped" 1 (S.tappedCount S.alice resolved)
+              HU.assertEqual "library empty" [] (Game.zoneMembers Zone.Library S.alice resolved),
+      HU.testCase "CR 701.23b Search may fail to find" $
+        let base = Setup.emptyGame S.bothPlayers
+            (_, g1) = S.addLibraryCard Card.mountainPrinting S.alice base
+            ability = ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost []) [Effect.Search CardCriterion.BasicLandCard] Map.empty
+            (abilId, g2) = Game.freshObjectId g1
+            (ts, g3) = Game.freshTimestamp g2
+            abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty Map.empty ts
+            g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
+            resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
+         in HU.assertEqual "nothing entered the battlefield" Set.empty (GameState.battlefield resolved)
     ]
+
+findFirst :: Prompt.Prompt r -> r
+findFirst p = case p of
+  Prompt.SearchLibrary _ _ matches -> case matches of
+    m : _ -> Just m
+    [] -> Nothing
+  _ -> S.identityAnswer p
+
+findNothing :: Prompt.Prompt r -> r
+findNothing p = case p of
+  Prompt.SearchLibrary {} -> Nothing
+  _ -> S.identityAnswer p
 
 -- Casts every castable spell (targets via lookupMin: creatures first),
 -- otherwise passes. Drives the Bolt-vs-Bolt integration falsifier.

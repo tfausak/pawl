@@ -34,6 +34,7 @@ alwaysPass p = case p of
       [] -> Map.empty
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> Nothing
 
 -- Casts when legal, otherwise passes: the benchmark that actually exercises the
 -- stack, mana payment, and resolution.
@@ -56,6 +57,7 @@ castAnswer p = case p of
           h : _ -> h
           [] -> Action.Pass
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> Nothing
 
 -- Casts, attacks, and blocks: the benchmark that exercises combat.
 fightAnswer :: Prompt.Prompt r -> r
@@ -79,6 +81,7 @@ fightAnswer p = case p of
           h : _ -> h
           [] -> Action.Pass
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> Nothing
 
 -- Two players, seeded from the benchmark's argument.
 playersFrom :: Natural -> NonEmpty.NonEmpty PlayerId

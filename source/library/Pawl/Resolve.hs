@@ -1,12 +1,15 @@
 module Pawl.Resolve where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Damage as Damage
+import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
@@ -14,6 +17,8 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.CardCriterion as CardCriterion
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Duration as Duration
@@ -27,10 +32,16 @@ import Pawl.Type.ManaType (ManaType)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.Prompt as Prompt
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Subtype (Subtype)
+import qualified Pawl.Type.Supertype as Supertype
+import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 
 -- THE ONE LEGITIMATE HOME of `case effect of`: this module is the VM's opcode
@@ -43,6 +54,7 @@ slotsOf effect = case effect of
   Effect.ModifyTarget _ _ slot -> Set.singleton slot
   Effect.ChangeText slot -> Set.singleton slot
   Effect.AddMana _ -> Set.empty
+  Effect.Search _ -> Set.empty
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -53,6 +65,15 @@ manaProduced effect = case effect of
   Effect.DealDamage _ _ -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText _ -> Nothing
+  Effect.Search _ -> Nothing
+
+-- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
+-- a Land with the Basic supertype.
+matchesCriterion :: CardCriterion.CardCriterion -> Card.Card -> Bool
+matchesCriterion crit card = case crit of
+  CardCriterion.BasicLandCard ->
+    Set.member CardType.Land (TypeLine.types (Card.typeLine card))
+      && Set.member Supertype.Basic (TypeLine.supertypes (Card.typeLine card))
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -75,6 +96,7 @@ rewriteEffect pairs effect = case effect of
   Effect.DealDamage _ _ -> effect
   Effect.ChangeText _ -> effect
   Effect.AddMana _ -> effect
+  Effect.Search _ -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -108,7 +130,7 @@ resolveSpell oid = do
          in if fizzles
               then State.modify' (Game.changeZone oid Zone.Graveyard)
               else do
-                Monad.mapM_ (applyEffect oid (Object.chosenSubtypes obj) legality chosen) (effectsOf oid gs)
+                Monad.mapM_ (applyEffect oid (Object.owner obj) (Object.chosenSubtypes obj) legality chosen) (effectsOf oid gs)
                 State.modify' (Game.changeZone oid Zone.Graveyard)
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
@@ -131,7 +153,7 @@ resolveAbility abilId srcId ability = do
           fizzles = not (Map.null specs) && not (or (Map.elems legality))
        in do
             Monad.unless fizzles $
-              Monad.mapM_ (applyEffect srcId (Object.chosenSubtypes obj) legality chosen) (ActivatedAbility.effects ability)
+              Monad.mapM_ (applyEffect srcId (Object.owner obj) (Object.chosenSubtypes obj) legality chosen) (ActivatedAbility.effects ability)
             State.modify' (cease abilId)
 
 -- CR 608.2n: an ability leaves the stack and ceases to exist (no graveyard).
@@ -143,8 +165,11 @@ cease abilId gs =
     }
 
 -- One effect, applied. The case on the constructor is THIS module's charter.
-applyEffect :: ObjectId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect -> Game ()
-applyEffect source bound legality chosen effect = case effect of
+-- `controller` is the controller of the resolving spell/ability -- who searches
+-- their own library (CR 701.23), never the effect `source` (for an ability, the
+-- source permanent may already be sacrificed as a cost).
+applyEffect :: ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect -> Game ()
+applyEffect source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -209,6 +234,45 @@ applyEffect source bound legality chosen effect = case effect of
   -- Mana.tapForMana at payment, never here. Reaching this arm means a mana ability
   -- was wrongly put on the stack -- an isManaAbility classification bug.
   Effect.AddMana _ -> pure ()
+  Effect.Search crit ->
+    let matches1 g oid = case Game.cardOf oid g of
+          Nothing -> False
+          Just card -> matchesCriterion crit card
+     in do
+          gs <- State.get
+          let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
+              decider = Decide.deciderFor controller gs
+          found <- Trans.lift (Program.prompt (Prompt.SearchLibrary decider controller matches))
+          case found of
+            Nothing -> pure ()
+            Just cardId -> State.modify' (putTapped cardId)
+          -- CR 701.23: shuffle the (possibly reduced) library afterward.
+          lib <- State.gets (Game.zoneMembers Zone.Library controller)
+          shuffled <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
+          State.modify' (reorderLibrary controller shuffled)
+
+-- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
+-- shape). changeZone mints a new object; tap it by id after the move.
+putTapped :: ObjectId -> GameState -> GameState
+putTapped cardId gs =
+  let moved = Game.changeZone cardId Zone.Battlefield gs
+   in case newestBattlefieldOf cardId gs moved of
+        Nothing -> moved
+        Just newId ->
+          moved {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) newId (GameState.objects moved)}
+
+-- The single battlefield id present after a one-object move that was absent
+-- before (changeZone mints a fresh id, CR 400.7).
+newestBattlefieldOf :: ObjectId -> GameState -> GameState -> Maybe ObjectId
+newestBattlefieldOf _ before after =
+  case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before)) of
+    newId : _ -> Just newId
+    [] -> Nothing
+
+-- Write the shuffled order back to a player's library.
+reorderLibrary :: PlayerId -> [ObjectId] -> GameState -> GameState
+reorderLibrary pid order gs =
+  gs {GameState.library = Map.insert pid (Seq.fromList order) (GameState.library gs)}
 
 -- The object a recipient names, if any (CR 612 targets a spell or permanent, not
 -- a player).

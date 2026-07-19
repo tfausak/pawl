@@ -255,6 +255,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> lastN (fromIntegral n) ids
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
+  Prompt.SearchLibrary {} -> Nothing
 
 lastN :: Int -> [a] -> [a]
 lastN n xs = drop (length xs - n) xs

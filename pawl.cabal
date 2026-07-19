@@ -84,6 +84,7 @@ library
     Pawl.Type.AttackTarget
     Pawl.Type.BeginningStep
     Pawl.Type.Card
+    Pawl.Type.CardCriterion
     Pawl.Type.CardType
     Pawl.Type.Color
     Pawl.Type.Combat
