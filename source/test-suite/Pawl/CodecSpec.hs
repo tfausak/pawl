@@ -8,6 +8,8 @@ import qualified Pawl.Codec as Codec
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Decimal as Decimal
+import qualified Pawl.Type.Duration as Duration
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.Json as Json
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -80,5 +82,16 @@ tests =
             roundTrip "a1" Codec.affectedToJson Codec.jsonToAffected Affected.AllCreatures,
           HU.testCase "TheseObjects" $
             roundTrip "a2" Codec.affectedToJson Codec.jsonToAffected (Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1]))
+        ],
+      Tasty.testGroup
+        "effect"
+        [ HU.testCase "DealDamage" $
+            roundTrip "e1" Codec.effectToJson Codec.jsonToEffect (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3)),
+          HU.testCase "ModifyTarget" $
+            roundTrip "e2" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (SlotName.MkSlotName (Text.pack "t"))),
+          HU.testCase "AddMana" $
+            roundTrip "e3" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana (ManaType.Colored Color.Green)),
+          HU.testCase "ExileAllGraveyards" $
+            roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards
         ]
     ]

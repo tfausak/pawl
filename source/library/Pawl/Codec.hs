@@ -18,6 +18,7 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Duration as Duration
+import qualified Pawl.Type.Effect as Effect
 import Pawl.Type.Json (Value (Array, Null))
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -418,3 +419,32 @@ jsonToAffected value = do
     "AllNonbasicLands" -> Right Affected.AllNonbasicLands
     "OtherNonAuraEnchantments" -> Right Affected.OtherNonAuraEnchantments
     _ -> Left (Text.pack "unknown Affected: " <> t)
+
+-- Effect ---------------------------------------------------------------------
+
+effectToJson :: Effect.Effect -> Value
+effectToJson e = case e of
+  Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array [slotNameToJson s, quantityToJson q]))
+  Effect.ModifyTarget d m s -> Json.tagged (Text.pack "ModifyTarget") (Just (Array [durationToJson d, modificationToJson m, slotNameToJson s]))
+  Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (slotNameToJson s))
+  Effect.AddMana mt -> Json.tagged (Text.pack "AddMana") (Just (manaTypeToJson mt))
+  Effect.Search c -> Json.tagged (Text.pack "Search") (Just (cardCriterionToJson c))
+  Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
+  Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
+
+jsonToEffect :: Value -> Either Text Effect.Effect
+jsonToEffect value = do
+  (t, mv) <- Json.tag value
+  case Text.unpack t of
+    "DealDamage" -> case mv of
+      Just (Array [s, q]) -> Effect.DealDamage <$> jsonToSlotName s <*> jsonToQuantity q
+      _ -> Left (Text.pack "DealDamage expects [slot, quantity]")
+    "ModifyTarget" -> case mv of
+      Just (Array [d, m, s]) -> Effect.ModifyTarget <$> jsonToDuration d <*> jsonToModification m <*> jsonToSlotName s
+      _ -> Left (Text.pack "ModifyTarget expects [duration, modification, slot]")
+    "ChangeText" -> withValue mv (fmap Effect.ChangeText . jsonToSlotName)
+    "AddMana" -> withValue mv (fmap Effect.AddMana . jsonToManaType)
+    "Search" -> withValue mv (fmap Effect.Search . jsonToCardCriterion)
+    "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
+    "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
+    _ -> Left (Text.pack "unknown Effect: " <> t)
