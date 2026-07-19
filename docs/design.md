@@ -378,6 +378,49 @@ Add the obvious English verbs (draw, damage, life, counters, +N/+N) alongside. V
 
 **The cards are not the long pole. The vocabulary is.** "All the cards" isn't a third piece of comparable size once the DSL exists; it's derived. What's open-ended is the tail of opcodes needed by the last 15%, each bought at the price of a full scenario test suite.
 
+#### The split: M4a–M4g *(planning pass 2026-07-19, at M3.5's completion — pre-spec)*
+
+M4 is the first **open-half** milestone. Unlike M0–M3 it grows forever, and §4
+makes *opcode breadth with a passing gameplay test* — not card count — the
+progress signal. So M4 is **not** "spec ~150 opcodes." Most of the "vocabulary"
+is not new architecture: M3f's `Event.changeZone` funnel already carries
+replacements and triggers, so draw, discard, mill, bounce, exile, and most of
+destroy collapse into one **targeted zone-change family** riding a funnel that
+exists. What remains genuinely *structural* gets the M2/M3 treatment — one axis
+per letter, each carrying the card that **falsifies its own naive
+implementation** — ordered here by **descending machinery risk** after the two
+fixed leaders (X is upstream of every opcode; zone-verbs is the highest
+card-count payoff, per §4).
+
+| | Axis | New machinery | Gate / falsifier |
+|---|---|---|---|
+| **M4a** | The numeric tower's X + the general binding environment | `Quantity.X` (the type's reserved `Variable`); `ManaSymbol.Variable` (`{X}`); `Object.bindings` unifies targets/subtypes/X into `Map SlotName Binding` — the risk-register's "named binding slots," with X the second customer after targets | **Blaze** (`{X}{R}`, "deal X to any target"): X is chosen at cast and **re-read at resolution**, so a stored literal is wrong, and it can't be paid unless the mana covers the chosen value |
+| **M4b** | Zone-change verbs | Prove the M3f funnel generalizes past RiP's redirect; **Destroy ≠ move-to-graveyard** (indestructible, CR 700.4). Volume riders: draw, bounce, mill, discard, exile | **Doom Blade** vs. an **indestructible** creature: routing "move to graveyard" does nothing |
+| **M4c** | Tokens | The first *card-less* object — breaks "every `Object` references a `Printing`" | A token leaving the battlefield **ceases to exist** (CR 704.5d); its characteristics come from the effect, not a printing |
+| **M4d** | Prevention (CR 615) | The *cancel* replacement shape (vs. M3f's *redirect*); regeneration's one-shot shield | **Fog** ("prevent all combat damage"): cancels an event the damage funnel would otherwise complete |
+| **M4e** | Counter target spell | The first effect that *targets the stack* | **Cancel**: must target the stack; fizzles if the spell has already left (CR 608.2b) |
+| **M4f** | Counters | +1/+1 as persistent permanent state, layer 7d (below Giant Growth's 7c) | A +1/+1 counter meeting a −1/−1 counter → CR 704.5q annihilation SBA |
+| **M4g** | Modal | A choice at cast binds which effects and targets apply | A charm whose chosen mode determines its legal targets |
+
+**Ordering.** `a → b` are fixed (X is upstream of every quantity; zone-verbs is
+the payoff). `c → g` are mutually independent and ordered hardest-machinery-first:
+tokens break the object model, prevention adds a new replacement *shape* to the
+M3f pipeline, counter-spell adds stack targeting, counters is state on the
+existing projection, modal is choice-binding on existing infra. Each letter
+re-derives its exact gate from real cards and `rules.txt` when written; the later
+letters are a roadmap, not a contract.
+
+**The volume line — after the seams.** Once the seams exist, the remaining CR 701
+keyword actions and the "obvious English verbs" §4 names (life gain/loss,
+scry/surveil, fight, tap/untap-as-effect, non-counter pumps, reveal, shuffle)
+land as **batches**, each with a real card and a gameplay-level test, tracked by
+**opcode breadth, not card count** (§4's deferred-metric note). A batch that
+demands machinery none of the seven seams built **promotes to a new letter** —
+this table is the seams known at M3.5's completion, not a closed enumeration. The
+closed-half finiteness that let M0–M3 enumerate every letter up front does not
+hold for the open half; the table is expected to grow a letter or two as the tail
+teaches where the next wall is.
+
 ### M5 — The nightmares, as rules sections
 
 These are **not** exotic opcodes. They're numbered sections of the closed half:
