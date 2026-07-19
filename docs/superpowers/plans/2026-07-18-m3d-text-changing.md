@@ -830,7 +830,7 @@ git commit -m "Cast Magical Hack: bind land types and hack a Mountain's color (C
 - Consumes: `ChangeSubtypeWord` (Task 1), Blood Moon (already in the repo), the projection fold.
 - Produces: `Projection.textChangesAffecting :: ObjectId -> GameState -> [(Subtype, Subtype)]`; `Projection.rewriteModification :: [(Subtype, Subtype)] -> Modification -> Modification`; `gather` rewrites each battlefield permanent's static-ability modifications by the text-changes affecting it, before folding them onto other objects.
 
-- [ ] **Step 1: Write the failing tests (the go/no-go)**
+- [x] **Step 1: Write the failing tests (the go/no-go)**
 
 Add to `source/test-suite/Pawl/ProjectionSpec.hs`. Blood Moon and a nonbasic land (Urborg is the repo's nonbasic land) on the battlefield, and a `ChangeSubtypeWord Mountain Island` stored effect targeting the real Blood Moon id (via `withEffect`, which locks to `TheseObjects`). "Order" here is the hack's stored-effect timestamp vs. Blood Moon's own object timestamp — the read-point-2 rewrite is applied at `gather` regardless, so both must give Island:
 
@@ -851,12 +851,12 @@ Add to `source/test-suite/Pawl/ProjectionSpec.hs`. Blood Moon and a nonbasic lan
          in HU.assertEqual "nonbasic land is Island, order-independent" (Set.singleton Subtype.Island) (Projection.subtypesOf nonbasicId gs),
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "hacking Blood Moon"'`
 Expected: FAIL — without the gather rewrite, Blood Moon's printed `SetLandSubtype Mountain` still applies, so the nonbasic land projects `{Mountain}`, not `{Island}`.
 
-- [ ] **Step 3: Add `textChangesAffecting` and `rewriteModification`**
+- [x] **Step 3: Add `textChangesAffecting` and `rewriteModification`**
 
 In `source/library/Pawl/Projection.hs`, add `import qualified Data.Maybe as Maybe` (if absent). Add both functions (both are legitimate `case`-on-`Modification`, Projection's charter):
 
@@ -890,7 +890,7 @@ rewriteModification pairs m =
    in List.foldl' apply1 m pairs
 ```
 
-- [ ] **Step 4: Rewrite static-ability words in `gather`**
+- [x] **Step 4: Rewrite static-ability words in `gather`**
 
 In `source/library/Pawl/Projection.hs`, in `gather`, change `fromPermanent` so a live permanent's static-ability modifications are rewritten by the text-changes affecting it before being gathered (read-point 2). Replace the `then` branch's `map (fromStatic permId permObj) ...`:
 
@@ -918,12 +918,12 @@ In `source/library/Pawl/Projection.hs`, in `gather`, change `fromPermanent` so a
 
 (The old `fromStatic` helper is now inlined as `gatherOne`; delete `fromStatic` if it becomes unused, or keep it and map `rewriteModification` over the modification first — either way stay warning-clean.)
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — both orders give the nonbasic land `{Island}`. **This is the go/no-go: the effect AST is rewritten inside an ability, the part XMage cannot do.** If it cannot be made to pass, Phases 1–2 still stand — **stop and report**, do not weaken the assertion.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

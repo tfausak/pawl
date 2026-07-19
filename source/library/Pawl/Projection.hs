@@ -3,6 +3,7 @@ module Pawl.Projection where
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
@@ -217,6 +218,34 @@ liveGiven setEffs visited oid gs =
                && affectsBase src oid aff gs
         in not (any strips setEffs)
 
+-- Every basic-land-type pair a ChangeSubtypeWord continuous effect imposes on
+-- `oid` (CR 612). Stored resolution effects only (a text-change is stored by
+-- Resolve's ChangeText, never a static ability at M3d); read against BASE
+-- characteristics since ChangeSubtypeWord always uses a TheseObjects fixed set,
+-- so no projection recursion is needed and nothing loops.
+textChangesAffecting :: ObjectId -> GameState -> [(Subtype.Subtype, Subtype.Subtype)]
+textChangesAffecting oid gs =
+  let pairOf eff = case ContinuousEffect.modification eff of
+        Modification.ChangeSubtypeWord from to ->
+          if affects (ContinuousEffect.source eff) oid (ContinuousEffect.affected eff) (baseCharacteristics oid gs) gs
+            then Just (from, to)
+            else Nothing
+        _ -> Nothing
+   in Maybe.mapMaybe pairOf (GameState.continuousEffects gs)
+
+-- Apply text-changes to a modification's basic-land-type words (CR 612.1/612.2):
+-- SetLandSubtype/AddLandSubtype carry a land-type word; every other modification
+-- has none to rewrite here. Projection's charter (it cases on Modification); it is
+-- delegated to by Resolve.rewriteEffect for the inner modification of ModifyTarget.
+rewriteModification :: [(Subtype.Subtype, Subtype.Subtype)] -> Modification -> Modification
+rewriteModification pairs m =
+  let swap from to s = if s == from then to else s
+      apply1 acc (from, to) = case acc of
+        Modification.SetLandSubtype s -> Modification.SetLandSubtype (swap from to s)
+        Modification.AddLandSubtype s -> Modification.AddLandSubtype (swap from to s)
+        _ -> acc
+   in List.foldl' apply1 m pairs
+
 -- Every continuous effect in the game: stored resolution effects, plus the
 -- static abilities of every battlefield permanent (CR 613.7a: with the
 -- permanent's own timestamp), dropping a permanent whose static abilities are
@@ -234,21 +263,28 @@ gather gs =
             gModification = ContinuousEffect.modification eff
           }
       stored = map fromStored (GameState.continuousEffects gs)
-      fromStatic permId permObj sa =
-        MkGathered
-          { gSource = permId,
-            gAffected = StaticAbility.affected sa,
-            gLayer = layer (StaticAbility.modification sa),
-            gTimestamp = Object.timestamp permObj,
-            gModification = StaticAbility.modification sa
-          }
       fromPermanent permId = case Game.lookupObject permId gs of
         Nothing -> []
         Just permObj -> case Game.cardOf permId gs of
           Nothing -> []
           Just card ->
             if null setEffs || liveGiven setEffs Set.empty permId gs
-              then map (fromStatic permId permObj) (Card.Type.staticAbilities card)
+              then
+                -- Read-point 2 (CR 612): rewrite each static ability's basic-land-
+                -- type words by the text-changes affecting THIS source, before its
+                -- effect is folded onto any other object. Hack Blood Moon's
+                -- SetLandSubtype Mountain -> SetLandSubtype Island.
+                let changes = textChangesAffecting permId gs
+                    gatherOne sa =
+                      let m = rewriteModification changes (StaticAbility.modification sa)
+                       in MkGathered
+                            { gSource = permId,
+                              gAffected = StaticAbility.affected sa,
+                              gLayer = layer m,
+                              gTimestamp = Object.timestamp permObj,
+                              gModification = m
+                            }
+                 in map gatherOne (Card.Type.staticAbilities card)
               else []
       static_ = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
    in stored ++ static_

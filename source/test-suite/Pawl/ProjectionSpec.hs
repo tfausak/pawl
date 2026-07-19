@@ -317,6 +317,20 @@ tests =
       HU.testCase "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Urborg older)" $
         let (forestId, _, gs) = bloodMoonUrborg True
          in HU.assertEqual "Forest stays a Forest, order-independent" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs),
+      HU.testCase "CR 612 hacking Blood Moon Mountain->Island: nonbasic lands become Islands (hack newer)" $
+        let base = Setup.emptyGame S.bothPlayers
+            (nonbasicId, g1) = S.addCreature Card.urborgPrinting S.alice base
+            (bloodMoonId, g2) = S.addCreature Card.bloodMoonPrinting S.alice g1
+            gs = withEffect bloodMoonId (Timestamp.MkTimestamp 500) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g2
+         in HU.assertEqual "nonbasic land is now Island" (Set.singleton Subtype.Island) (Projection.subtypesOf nonbasicId gs),
+      HU.testCase "CR 612 hacking Blood Moon is order-independent (hack older)" $
+        let base = Setup.emptyGame S.bothPlayers
+            (nonbasicId, g1) = S.addCreature Card.urborgPrinting S.alice base
+            (bloodMoonId, g2) = S.addCreature Card.bloodMoonPrinting S.alice g1
+            -- Timestamp 1 is older than Blood Moon's own object timestamp; the
+            -- outcome must not change.
+            gs = withEffect bloodMoonId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g2
+         in HU.assertEqual "nonbasic land is Island, order-independent" (Set.singleton Subtype.Island) (Projection.subtypesOf nonbasicId gs),
       HU.testCase "CR 305.2 Opalescence makes Humility a creature: legal creature target and SBA-killable" $
         let base = Setup.emptyGame S.bothPlayers
             (humilityId, g1) = S.addCreature Card.humilityPrinting S.alice base
