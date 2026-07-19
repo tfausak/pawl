@@ -12,18 +12,22 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Action as A
+import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Result as Result
@@ -145,7 +149,24 @@ resolveTests =
       HU.testCase "a cast Bolt reaches its owner's graveyard" $
         let (_, cast, _) = S.boltAtBobsPiker
             after = Stack.resolveTop cast
-         in HU.assertEqual "one card in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+         in HU.assertEqual "one card in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 612 slotsOf and textChangeSlots find a ChangeText slot" $
+        let slot = SlotName.MkSlotName (Text.pack "target")
+            card =
+              Card.Type.MkCard
+                { Card.Type.name = Text.pack "T",
+                  Card.Type.manaCost = Nothing,
+                  Card.Type.typeLine = Card.Type.typeLine (Printing.card Card.lightningBoltPrinting),
+                  Card.Type.power = Nothing,
+                  Card.Type.toughness = Nothing,
+                  Card.Type.keywords = Set.empty,
+                  Card.Type.staticAbilities = [],
+                  Card.Type.effects = [Effect.ChangeText slot],
+                  Card.Type.targetSpecs = Map.empty
+                }
+         in do
+              HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))
+              HU.assertEqual "textChangeSlots" [slot] (Resolve.textChangeSlots card)
     ]
 
 -- Casts every castable spell (targets via lookupMin: creatures first),

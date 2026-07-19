@@ -2,6 +2,7 @@ module Pawl.Resolve where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Damage as Damage
@@ -13,16 +14,19 @@ import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Effect as Effect
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.SlotName (SlotName)
+import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Zone as Zone
 
 -- THE ONE LEGITIMATE HOME of `case effect of`: this module is the VM's opcode
@@ -33,6 +37,17 @@ slotsOf :: Effect -> Set SlotName
 slotsOf effect = case effect of
   Effect.DealDamage slot _ -> Set.singleton slot
   Effect.ModifyTarget _ _ slot -> Set.singleton slot
+  Effect.ChangeText slot -> Set.singleton slot
+
+-- The target slots of ChangeText effects: the slots whose land-type pair Cast
+-- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
+-- this classification rather than casing on Effect itself.
+textChangeSlots :: Card.Card -> [SlotName]
+textChangeSlots card =
+  let slotOf effect = case effect of
+        Effect.ChangeText slot -> Just slot
+        _ -> Nothing
+   in Maybe.mapMaybe slotOf (Card.effects card)
 
 -- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if
 -- the spell has slots and ALL are now illegal, it does not resolve -- it moves
@@ -57,11 +72,11 @@ resolveSpell oid gs =
                 fizzles = not (Map.null specs) && not (or (Map.elems legality))
              in if fizzles
                   then bury gs
-                  else bury (List.foldl' (applyEffect oid legality chosen) gs (Card.effects card))
+                  else bury (List.foldl' (applyEffect oid (Object.chosenSubtypes obj) legality chosen) gs (Card.effects card))
 
 -- One effect, applied. The case on the constructor is THIS module's charter.
-applyEffect :: ObjectId -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> GameState -> Effect -> GameState
-applyEffect source legality chosen gs effect = case effect of
+applyEffect :: ObjectId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> GameState -> Effect -> GameState
+applyEffect source bound legality chosen gs effect = case effect of
   Effect.DealDamage slot quantity ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Quantity.evaluate gs source quantity of
@@ -95,3 +110,33 @@ applyEffect source legality chosen gs effect = case effect of
       -- A creature-only modification cannot land on a player (CreatureTarget) or
       -- an illegal slot (CR 608.2b): no-op.
       _ -> gs
+  Effect.ChangeText slot ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality, Map.lookup slot bound) of
+      (Just recipient, True, Just (from, to)) ->
+        case recipientObject recipient of
+          Nothing -> gs
+          Just target ->
+            -- CR 611 / 612: an indefinite continuous effect over the one target
+            -- (CR 611.2c fixed set). The (from, to) is the caster's binding, baked
+            -- in here; Projection rewrites both the target's type line and, at
+            -- gather, any static-ability words (Task 7). Resolve CONSTRUCTS the
+            -- Modification but never cases on one.
+            let (ts, gs1) = Game.freshTimestamp gs
+                eff =
+                  ContinuousEffect.MkContinuousEffect
+                    { ContinuousEffect.source = source,
+                      ContinuousEffect.timestamp = ts,
+                      ContinuousEffect.duration = Duration.Indefinite,
+                      ContinuousEffect.modification = Modification.ChangeSubtypeWord from to,
+                      ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+                    }
+             in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+      _ -> gs
+
+-- The object a recipient names, if any (CR 612 targets a spell or permanent, not
+-- a player).
+recipientObject :: Recipient -> Maybe ObjectId
+recipientObject r = case r of
+  Recipient.ToObject oid -> Just oid
+  Recipient.ToCreature oid -> Just oid
+  Recipient.ToPlayer _ -> Nothing

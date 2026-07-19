@@ -6,5 +6,6 @@ module Pawl.Type.Duration where
 -- re-derived from the battlefield". Grows WhileSourceOnBattlefield,
 -- UntilYourNextTurn, etc. as cards need them.
 data Duration
-  = UntilEndOfTurn
+  = UntilEndOfTurn -- CR 514.2 (M3b)
+  | Indefinite -- CR 611: "lasts indefinitely" (Magical Hack); cleanup never drops it
   deriving (Eq, Ord, Show)

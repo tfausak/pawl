@@ -466,7 +466,7 @@ git commit -m "Add the ChooseBasicLandTypes value-choice prompt (CR 612 binding)
 - Consumes: `Recipient.ToObject` (Task 2), `Object.chosenSubtypes` (Task 3).
 - Produces: `Effect.ChangeText :: SlotName -> Effect`; `Duration.Indefinite`; `Resolve.textChangeSlots :: Card.Card -> [SlotName]` (the slots a text-changer binds land types for); `applyEffect`'s `ChangeText` arm stores an `Indefinite` `ChangeSubtypeWord from to` continuous effect on the target object, reading `(from, to)` from the object's `chosenSubtypes`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Test the opcode's classification directly — self-contained, so Task 5 is green on its own (the executor's *observable* effect is driven end-to-end in Task 6, where `magicalHackPrinting` exists). Add to the `Resolve` group in `source/test-suite/Pawl/ResolveSpec.hs` (add `qualified Pawl.Resolve as Resolve`, `qualified Pawl.Type.Effect as Effect`, `qualified Pawl.Type.Card as Card.Type`, `qualified Pawl.Type.Duration as Duration` to imports if absent):
 
@@ -492,12 +492,12 @@ Test the opcode's classification directly — self-contained, so Task 5 is green
 
 (`Duration.Indefinite` is exercised by the executor in Task 6; here we only need the opcode and its classifications to exist and be found. Add `qualified Pawl.Type.Printing as Printing` if absent.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "textChangeSlots find"'`
 Expected: FAIL to compile — `Effect.ChangeText`, `Duration.Indefinite`, `Resolve.textChangeSlots` not in scope.
 
-- [ ] **Step 3: Add `Indefinite`**
+- [x] **Step 3: Add `Indefinite`**
 
 In `source/library/Pawl/Type/Duration.hs`:
 
@@ -508,7 +508,7 @@ data Duration
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the `ChangeText` opcode**
+- [x] **Step 4: Add the `ChangeText` opcode**
 
 In `source/library/Pawl/Type/Effect.hs`, extend the type and the header comment:
 
@@ -524,7 +524,7 @@ data Effect
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 5: Extend `Resolve` — `slotsOf`, `textChangeSlots`, the `ChangeText` arm, and thread the binding**
+- [x] **Step 5: Extend `Resolve` — `slotsOf`, `textChangeSlots`, the `ChangeText` arm, and thread the binding**
 
 In `source/library/Pawl/Resolve.hs`, add imports `import qualified Data.Maybe as Maybe`, `import qualified Pawl.Type.Duration as Duration`, `import qualified Pawl.Type.Modification as Modification`, `import Pawl.Type.Subtype (Subtype)`. Add the `slotsOf` arm:
 
@@ -592,12 +592,12 @@ recipientObject r = case r of
 
 Update the `DealDamage`/`ModifyTarget` arms' access to the renamed parameters if needed — the extra `bound` parameter is inserted before `legality`; both existing arms ignore `bound`, so only the signature and the `applyEffect ... ` call in `resolveSpell` change.
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — `slotsOf`/`textChangeSlots` find the `ChangeText` slot. The executor's observable behavior is driven end-to-end in Task 6.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

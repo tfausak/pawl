@@ -15,4 +15,9 @@ data Effect
     -- Modification (layer 7c vs 6). Resolve stores it; it never cases on the
     -- Modification.
     ModifyTarget Duration Modification SlotName
+  | -- CR 612: rewrite basic-land-type words in the target spell or permanent. The
+    -- SlotName is the target slot; the two basic land types are read from the
+    -- caster's binding (Object.chosenSubtypes) and baked into a stored
+    -- ChangeSubtypeWord continuous effect. Resolve stores it; Projection applies it.
+    ChangeText SlotName
   deriving (Eq, Ord, Show)
