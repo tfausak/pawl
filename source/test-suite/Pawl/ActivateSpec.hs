@@ -47,44 +47,44 @@ theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [] Map.empty
 
-tests :: Tasty.TestTree
-tests =
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards =
   Tasty.testGroup
     "Pawl.Activate"
     [ HU.testCase "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $
-        let (srcId, g0) = S.addCreature Cards.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        let (srcId, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             g1 = g0 {GameState.priority = Just S.alice}
-            after = snd (Engine.runGamePure S.identityAnswer g1 (Activate.activateAbility S.alice srcId (theAbility Cards.prodigalSorcererPrinting)))
+            after = snd (Engine.runGamePure S.identityAnswer g1 (Activate.activateAbility S.alice srcId (theAbility (Cards.prodigalSorcererPrinting cards))))
          in do
               HU.assertEqual "one thing on the stack" 1 (length (GameState.stack after))
               HU.assertEqual "source tapped" (Just TapState.Tapped) (fmap Object.tapped (Game.lookupObject srcId after)),
       HU.testCase "CR 602.5/302.6 a summoning-sick creature's {T} ability is not offered" $
-        let (srcId, g0) = S.addCreature Cards.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        let (srcId, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) srcId (GameState.objects g0), GameState.priority = Just S.alice}
          in HU.assertBool "no Activate offered" (not (any isActivate (Action.legalActions S.alice sick))),
       HU.testCase "CR 602 a settled Prodigal Sorcerer's ability IS offered" $
-        let (_, g0) = S.addCreature Cards.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        let (_, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             g1 = g0 {GameState.priority = Just S.alice}
          in HU.assertBool "Activate offered" (any isActivate (Action.legalActions S.alice g1)),
       HU.testCase "CR 602 activating then resolving deals 1 damage and the ability ceases" $
-        let (srcId, g0) = S.addCreature Cards.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        let (srcId, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             g1 = g0 {GameState.priority = Just S.alice}
             -- identityAnswer's ChooseTargets picks the lowest recipient; with no
             -- creatures but two players, it targets a player. Resolve the stack.
-            activated = snd (Engine.runGamePure S.identityAnswer g1 (Activate.activateAbility S.alice srcId (theAbility Cards.prodigalSorcererPrinting)))
+            activated = snd (Engine.runGamePure S.identityAnswer g1 (Activate.activateAbility S.alice srcId (theAbility (Cards.prodigalSorcererPrinting cards))))
             resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
          in HU.assertEqual "stack empty after resolution" [] (GameState.stack resolved),
       HU.testCase "CR 605.3b a mana ability is not offered as a stack activation" $
-        let (_, g0) = S.addCreature Cards.llanowarElvesPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        let (_, g0) = S.addCreature (Cards.llanowarElvesPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             g1 = g0 {GameState.priority = Just S.alice}
          in HU.assertBool "no Activate for the mana ability" (not (any isActivate (Action.legalActions S.alice g1))),
       HU.testCase "CR 701.21/701.23 Evolving Wilds sacrifices itself and fetches a basic land tapped" $
         -- The fetched land gets a NEW id (CR 400.7); assert by count/tapped-count.
         let base = Setup.emptyGame S.bothPlayers
-            (wildsId, g1) = S.addCreature Cards.evolvingWildsPrinting S.alice base
-            (_, g2) = S.addLibraryCard Cards.forestPrinting S.alice g1
+            (wildsId, g1) = S.addCreature (Cards.evolvingWildsPrinting cards) S.alice base
+            (_, g2) = S.addLibraryCard (Cards.forestPrinting cards) S.alice g1
             g3 = g2 {GameState.priority = Just S.alice}
-            ability = theAbility Cards.evolvingWildsPrinting
+            ability = theAbility (Cards.evolvingWildsPrinting cards)
             activated = snd (Engine.runGamePure findFirst g3 (Activate.activateAbility S.alice wildsId ability))
             resolved = snd (Engine.runGamePure findFirst activated Stack.resolveTop)
          in do
@@ -94,17 +94,17 @@ tests =
               HU.assertEqual "the fetched land is tapped" 1 (S.tappedCount S.alice resolved),
       HU.testCase "CR 302.6 a freshly-added land can tap+sac immediately (no summoning sickness)" $
         let base = Setup.emptyGame S.bothPlayers
-            (wildsId, g1) = S.addCreature Cards.evolvingWildsPrinting S.alice base
+            (wildsId, g1) = S.addCreature (Cards.evolvingWildsPrinting cards) S.alice base
             -- Force it Sick: a land ignores sickness, so the ability is still offered.
             g2 = g1 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) wildsId (GameState.objects g1), GameState.priority = Just S.alice}
          in HU.assertBool "land ability offered despite sickness" (any isActivate (Action.legalActions S.alice g2)),
       HU.testCase "CR 613/602 a Humility'd Prodigal Sorcerer's ability is not offered" $
-        let (_, g0) = S.addCreature Cards.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
-            gs = (S.withHumility g0) {GameState.priority = Just S.alice}
+        let (_, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            gs = (S.withHumility cards g0) {GameState.priority = Just S.alice}
          in HU.assertBool "no Activate under Humility" (not (any isActivate (Action.legalActions S.alice gs))),
       HU.testCase "CR 602.1b: an activation with a mana cost needs the mana" $
-        let gs = S.mountainsInPlay 1
-            (srcId, gs1) = S.addCreature Cards.pikerPrinting S.alice gs
+        let gs = S.mountainsInPlay cards 1
+            (srcId, gs1) = S.addCreature (Cards.pikerPrinting cards) S.alice gs
             costlyAbility =
               ActivatedAbility.MkActivatedAbility
                 { ActivatedAbility.cost =

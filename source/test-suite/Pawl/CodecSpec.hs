@@ -41,8 +41,8 @@ import qualified Test.Tasty.HUnit as HU
 roundTrip :: (Eq a, Show a) => String -> (a -> Json.Value) -> (Json.Value -> Either Text a) -> a -> HU.Assertion
 roundTrip label enc dec x = HU.assertEqual label (Right x) (dec (enc x))
 
-tests :: Tasty.TestTree
-tests =
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards =
   Tasty.testGroup
     "Pawl.CodecSpec"
     [ Tasty.testGroup
@@ -135,10 +135,10 @@ tests =
       Tasty.testGroup
         "honesty round-trip over allPrintings"
         [ HU.testCase "P1: jsonToPrinting . printingToJson == Right" $
-            mapM_ (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (Codec.jsonToPrinting (Codec.printingToJson p))) Cards.allPrintings,
+            mapM_ (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (Codec.jsonToPrinting (Codec.printingToJson p))) (Cards.allPrintings cards),
           HU.testCase "P2: through text" $
             mapM_
               (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (J.parse (J.render (Codec.printingToJson p)) >>= Codec.jsonToPrinting))
-              Cards.allPrintings
+              (Cards.allPrintings cards)
         ]
     ]

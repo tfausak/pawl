@@ -1,168 +1,183 @@
-{-# LANGUAGE TemplateHaskell #-}
-
--- The M3.5 flip: every printing is spliced from its committed data/cards
--- JSON at compile time (via the temporary Pawl.Cards.Load TH shim), so the
--- files are the single source of truth and the hand-written MkCard literals
--- are gone. The decks stay here (they are built from card values).
+-- The card pool, loaded from the committed data/cards JSON at test-suite start
+-- (M3.5's named expiry, cashed): every fixture reads the files -- the source of
+-- truth -- through the same codec the benchmark uses, so the pure top-level
+-- splices and the TH shim are gone. The loaded 'Cards' record is threaded into
+-- every 'tests' tree from 'Main'; the decks and 'allPrintings' are functions of
+-- it. A malformed or missing file fails loudly in IO, never 'error' in pure code.
 module Pawl.Cards where
 
 import qualified Data.Map.Strict as Map
-import qualified Pawl.Cards.Load as Load
+import qualified Data.Text.IO as TextIO
+import qualified Pawl.Codec as Codec
+import qualified Pawl.Json as Json
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.Printing as Printing
 
-mountainPrinting :: Printing.Printing
-mountainPrinting = $(Load.loadPrinting "mountain")
+data Cards = MkCards
+  { mountainPrinting :: Printing.Printing,
+    swampPrinting :: Printing.Printing,
+    forestPrinting :: Printing.Printing,
+    pikerPrinting :: Printing.Printing,
+    birdMaidenPrinting :: Printing.Printing,
+    nimbleBirdstickerPrinting :: Printing.Printing,
+    ogreSentryPrinting :: Printing.Printing,
+    windseekerCentaurPrinting :: Printing.Printing,
+    goblinChariotPrinting :: Printing.Printing,
+    sabretoothTigerPrinting :: Printing.Printing,
+    ridgetopRaptorPrinting :: Printing.Printing,
+    typhoidRatsPrinting :: Printing.Printing,
+    warMammothPrinting :: Printing.Printing,
+    lightningBoltPrinting :: Printing.Printing,
+    giantGrowthPrinting :: Printing.Printing,
+    humilityPrinting :: Printing.Printing,
+    serpentsGiftPrinting :: Printing.Printing,
+    bloodMoonPrinting :: Printing.Printing,
+    urborgPrinting :: Printing.Printing,
+    opalescencePrinting :: Printing.Printing,
+    islandPrinting :: Printing.Printing,
+    magicalHackPrinting :: Printing.Printing,
+    landformPrinting :: Printing.Printing,
+    prodigalSorcererPrinting :: Printing.Printing,
+    llanowarElvesPrinting :: Printing.Printing,
+    evolvingWildsPrinting :: Printing.Printing,
+    restInPeacePrinting :: Printing.Printing,
+    plainsPrinting :: Printing.Printing,
+    mindslaverPrinting :: Printing.Printing,
+    panglacialWurmPrinting :: Printing.Printing
+  }
+  deriving (Eq, Show)
 
-swampPrinting :: Printing.Printing
-swampPrinting = $(Load.loadPrinting "swamp")
+loadPrinting :: String -> IO Printing.Printing
+loadPrinting slug = do
+  contents <- TextIO.readFile ("data/cards/" <> slug <> ".json")
+  case Json.parse contents >>= Codec.jsonToPrinting of
+    Right p -> pure p
+    Left err -> ioError (userError ("card " <> slug <> ": " <> show err))
 
-forestPrinting :: Printing.Printing
-forestPrinting = $(Load.loadPrinting "forest")
+loadCards :: IO Cards
+loadCards = do
+  mountainPrinting_ <- loadPrinting "mountain"
+  swampPrinting_ <- loadPrinting "swamp"
+  forestPrinting_ <- loadPrinting "forest"
+  pikerPrinting_ <- loadPrinting "goblin-piker"
+  birdMaidenPrinting_ <- loadPrinting "bird-maiden"
+  nimbleBirdstickerPrinting_ <- loadPrinting "nimble-birdsticker"
+  ogreSentryPrinting_ <- loadPrinting "ogre-sentry"
+  windseekerCentaurPrinting_ <- loadPrinting "windseeker-centaur"
+  goblinChariotPrinting_ <- loadPrinting "goblin-chariot"
+  sabretoothTigerPrinting_ <- loadPrinting "sabretooth-tiger"
+  ridgetopRaptorPrinting_ <- loadPrinting "ridgetop-raptor"
+  typhoidRatsPrinting_ <- loadPrinting "typhoid-rats"
+  warMammothPrinting_ <- loadPrinting "war-mammoth"
+  lightningBoltPrinting_ <- loadPrinting "lightning-bolt"
+  giantGrowthPrinting_ <- loadPrinting "giant-growth"
+  humilityPrinting_ <- loadPrinting "humility"
+  serpentsGiftPrinting_ <- loadPrinting "serpent-s-gift"
+  bloodMoonPrinting_ <- loadPrinting "blood-moon"
+  urborgPrinting_ <- loadPrinting "urborg-tomb-of-yawgmoth"
+  opalescencePrinting_ <- loadPrinting "opalescence"
+  islandPrinting_ <- loadPrinting "island"
+  magicalHackPrinting_ <- loadPrinting "magical-hack"
+  landformPrinting_ <- loadPrinting "landform"
+  prodigalSorcererPrinting_ <- loadPrinting "prodigal-sorcerer"
+  llanowarElvesPrinting_ <- loadPrinting "llanowar-elves"
+  evolvingWildsPrinting_ <- loadPrinting "evolving-wilds"
+  restInPeacePrinting_ <- loadPrinting "rest-in-peace"
+  plainsPrinting_ <- loadPrinting "plains"
+  mindslaverPrinting_ <- loadPrinting "mindslaver"
+  panglacialWurmPrinting_ <- loadPrinting "panglacial-wurm"
+  pure
+    MkCards
+      { mountainPrinting = mountainPrinting_,
+        swampPrinting = swampPrinting_,
+        forestPrinting = forestPrinting_,
+        pikerPrinting = pikerPrinting_,
+        birdMaidenPrinting = birdMaidenPrinting_,
+        nimbleBirdstickerPrinting = nimbleBirdstickerPrinting_,
+        ogreSentryPrinting = ogreSentryPrinting_,
+        windseekerCentaurPrinting = windseekerCentaurPrinting_,
+        goblinChariotPrinting = goblinChariotPrinting_,
+        sabretoothTigerPrinting = sabretoothTigerPrinting_,
+        ridgetopRaptorPrinting = ridgetopRaptorPrinting_,
+        typhoidRatsPrinting = typhoidRatsPrinting_,
+        warMammothPrinting = warMammothPrinting_,
+        lightningBoltPrinting = lightningBoltPrinting_,
+        giantGrowthPrinting = giantGrowthPrinting_,
+        humilityPrinting = humilityPrinting_,
+        serpentsGiftPrinting = serpentsGiftPrinting_,
+        bloodMoonPrinting = bloodMoonPrinting_,
+        urborgPrinting = urborgPrinting_,
+        opalescencePrinting = opalescencePrinting_,
+        islandPrinting = islandPrinting_,
+        magicalHackPrinting = magicalHackPrinting_,
+        landformPrinting = landformPrinting_,
+        prodigalSorcererPrinting = prodigalSorcererPrinting_,
+        llanowarElvesPrinting = llanowarElvesPrinting_,
+        evolvingWildsPrinting = evolvingWildsPrinting_,
+        restInPeacePrinting = restInPeacePrinting_,
+        plainsPrinting = plainsPrinting_,
+        mindslaverPrinting = mindslaverPrinting_,
+        panglacialWurmPrinting = panglacialWurmPrinting_
+      }
 
-pikerPrinting :: Printing.Printing
-pikerPrinting = $(Load.loadPrinting "goblin-piker")
-
-birdMaidenPrinting :: Printing.Printing
-birdMaidenPrinting = $(Load.loadPrinting "bird-maiden")
-
-nimbleBirdstickerPrinting :: Printing.Printing
-nimbleBirdstickerPrinting = $(Load.loadPrinting "nimble-birdsticker")
-
-ogreSentryPrinting :: Printing.Printing
-ogreSentryPrinting = $(Load.loadPrinting "ogre-sentry")
-
-windseekerCentaurPrinting :: Printing.Printing
-windseekerCentaurPrinting = $(Load.loadPrinting "windseeker-centaur")
-
-goblinChariotPrinting :: Printing.Printing
-goblinChariotPrinting = $(Load.loadPrinting "goblin-chariot")
-
-sabretoothTigerPrinting :: Printing.Printing
-sabretoothTigerPrinting = $(Load.loadPrinting "sabretooth-tiger")
-
-ridgetopRaptorPrinting :: Printing.Printing
-ridgetopRaptorPrinting = $(Load.loadPrinting "ridgetop-raptor")
-
-typhoidRatsPrinting :: Printing.Printing
-typhoidRatsPrinting = $(Load.loadPrinting "typhoid-rats")
-
-warMammothPrinting :: Printing.Printing
-warMammothPrinting = $(Load.loadPrinting "war-mammoth")
-
-lightningBoltPrinting :: Printing.Printing
-lightningBoltPrinting = $(Load.loadPrinting "lightning-bolt")
-
-giantGrowthPrinting :: Printing.Printing
-giantGrowthPrinting = $(Load.loadPrinting "giant-growth")
-
-humilityPrinting :: Printing.Printing
-humilityPrinting = $(Load.loadPrinting "humility")
-
-serpentsGiftPrinting :: Printing.Printing
-serpentsGiftPrinting = $(Load.loadPrinting "serpent-s-gift")
-
-bloodMoonPrinting :: Printing.Printing
-bloodMoonPrinting = $(Load.loadPrinting "blood-moon")
-
-urborgPrinting :: Printing.Printing
-urborgPrinting = $(Load.loadPrinting "urborg-tomb-of-yawgmoth")
-
-opalescencePrinting :: Printing.Printing
-opalescencePrinting = $(Load.loadPrinting "opalescence")
-
-islandPrinting :: Printing.Printing
-islandPrinting = $(Load.loadPrinting "island")
-
-magicalHackPrinting :: Printing.Printing
-magicalHackPrinting = $(Load.loadPrinting "magical-hack")
-
-landformPrinting :: Printing.Printing
-landformPrinting = $(Load.loadPrinting "landform")
-
-prodigalSorcererPrinting :: Printing.Printing
-prodigalSorcererPrinting = $(Load.loadPrinting "prodigal-sorcerer")
-
-llanowarElvesPrinting :: Printing.Printing
-llanowarElvesPrinting = $(Load.loadPrinting "llanowar-elves")
-
-evolvingWildsPrinting :: Printing.Printing
-evolvingWildsPrinting = $(Load.loadPrinting "evolving-wilds")
-
-restInPeacePrinting :: Printing.Printing
-restInPeacePrinting = $(Load.loadPrinting "rest-in-peace")
-
-plainsPrinting :: Printing.Printing
-plainsPrinting = $(Load.loadPrinting "plains")
-
-mindslaverPrinting :: Printing.Printing
-mindslaverPrinting = $(Load.loadPrinting "mindslaver")
-
-panglacialWurmPrinting :: Printing.Printing
-panglacialWurmPrinting = $(Load.loadPrinting "panglacial-wurm")
-
--- The registry the dataflow lint and future golden tests iterate. A printing
--- not listed here escapes the hygiene net -- add every new printing.
-allPrintings :: [Printing.Printing]
-allPrintings =
-  [ mountainPrinting,
-    swampPrinting,
-    forestPrinting,
-    pikerPrinting,
-    birdMaidenPrinting,
-    nimbleBirdstickerPrinting,
-    ogreSentryPrinting,
-    windseekerCentaurPrinting,
-    goblinChariotPrinting,
-    sabretoothTigerPrinting,
-    ridgetopRaptorPrinting,
-    typhoidRatsPrinting,
-    warMammothPrinting,
-    lightningBoltPrinting,
-    giantGrowthPrinting,
-    humilityPrinting,
-    serpentsGiftPrinting,
-    bloodMoonPrinting,
-    urborgPrinting,
-    opalescencePrinting,
-    islandPrinting,
-    magicalHackPrinting,
-    landformPrinting,
-    prodigalSorcererPrinting,
-    llanowarElvesPrinting,
-    evolvingWildsPrinting,
-    restInPeacePrinting,
-    plainsPrinting,
-    mindslaverPrinting,
-    panglacialWurmPrinting
+allPrintings :: Cards -> [Printing.Printing]
+allPrintings cards =
+  [ mountainPrinting cards,
+    swampPrinting cards,
+    forestPrinting cards,
+    pikerPrinting cards,
+    birdMaidenPrinting cards,
+    nimbleBirdstickerPrinting cards,
+    ogreSentryPrinting cards,
+    windseekerCentaurPrinting cards,
+    goblinChariotPrinting cards,
+    sabretoothTigerPrinting cards,
+    ridgetopRaptorPrinting cards,
+    typhoidRatsPrinting cards,
+    warMammothPrinting cards,
+    lightningBoltPrinting cards,
+    giantGrowthPrinting cards,
+    humilityPrinting cards,
+    serpentsGiftPrinting cards,
+    bloodMoonPrinting cards,
+    urborgPrinting cards,
+    opalescencePrinting cards,
+    islandPrinting cards,
+    magicalHackPrinting cards,
+    landformPrinting cards,
+    prodigalSorcererPrinting cards,
+    llanowarElvesPrinting cards,
+    evolvingWildsPrinting cards,
+    restInPeacePrinting cards,
+    plainsPrinting cards,
+    mindslaverPrinting cards,
+    panglacialWurmPrinting cards
   ]
 
--- The concrete decks, relocated from Pawl.Setup (M3.5): they are built from card
--- values, so they live with the cards, not in the engine library.
-redDeck :: Deck.Deck
-redDeck =
+redDeck :: Cards -> Deck.Deck
+redDeck cards =
   Deck.MkDeck $
     Map.fromList
-      [ (mountainPrinting, 36),
-        (pikerPrinting, 12),
-        (birdMaidenPrinting, 8),
-        (lightningBoltPrinting, 4)
+      [ (mountainPrinting cards, 36),
+        (pikerPrinting cards, 12),
+        (birdMaidenPrinting cards, 8),
+        (lightningBoltPrinting cards, 4)
       ]
 
-greenDeck :: Deck.Deck
-greenDeck =
+greenDeck :: Cards -> Deck.Deck
+greenDeck cards =
   Deck.MkDeck $
     Map.fromList
-      [ (forestPrinting, 36),
-        (warMammothPrinting, 16),
-        (giantGrowthPrinting, 4),
-        (serpentsGiftPrinting, 4)
+      [ (forestPrinting cards, 36),
+        (warMammothPrinting cards, 16),
+        (giantGrowthPrinting cards, 4),
+        (serpentsGiftPrinting cards, 4)
       ]
 
-blackDeck :: Deck.Deck
-blackDeck =
+blackDeck :: Cards -> Deck.Deck
+blackDeck cards =
   Deck.MkDeck $
     Map.fromList
-      [ (swampPrinting, 36),
-        (typhoidRatsPrinting, 24)
+      [ (swampPrinting cards, 36),
+        (typhoidRatsPrinting cards, 24)
       ]

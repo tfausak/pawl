@@ -1,8 +1,5 @@
-{-# LANGUAGE DeriveLift #-}
-
 module Pawl.Type.Effect where
 
-import Language.Haskell.TH.Syntax (Lift)
 import Pawl.Type.CardCriterion (CardCriterion)
 import Pawl.Type.Duration (Duration)
 import Pawl.Type.ManaType (ManaType)
@@ -40,4 +37,4 @@ data Effect
     -- Installs pending control keyed to the slot's chosen player, with the
     -- ability's controller as the decider. Mindslaver's exact shape.
     ControlPlayerNextTurn SlotName
-  deriving (Eq, Lift, Ord, Show)
+  deriving (Eq, Ord, Show)

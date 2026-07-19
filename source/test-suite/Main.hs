@@ -1,5 +1,6 @@
 import qualified Pawl.ActivateSpec as ActivateSpec
 import qualified Pawl.CardSpec as CardSpec
+import qualified Pawl.Cards as Cards
 import qualified Pawl.CardsSpec as CardsSpec
 import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.CodecSpec as CodecSpec
@@ -20,29 +21,31 @@ import qualified Pawl.TurnSpec as TurnSpec
 import qualified Test.Tasty as Tasty
 
 main :: IO ()
-main = Tasty.defaultMain testTree
+main = do
+  cards <- Cards.loadCards
+  Tasty.defaultMain (testTree cards)
 
-testTree :: Tasty.TestTree
-testTree =
+testTree :: Cards.Cards -> Tasty.TestTree
+testTree cards =
   Tasty.testGroup
     "pawl"
     [ CoreSpec.tests,
-      CardSpec.tests,
-      CardsSpec.tests,
-      TurnSpec.tests,
-      GameSpec.tests,
-      SetupSpec.tests,
-      DamageSpec.tests,
+      CardSpec.tests cards,
+      CardsSpec.tests cards,
+      TurnSpec.tests cards,
+      GameSpec.tests cards,
+      SetupSpec.tests cards,
+      DamageSpec.tests cards,
       DecideSpec.tests,
-      EventSpec.tests,
-      ReplaySpec.tests,
-      PropertySpec.tests,
+      EventSpec.tests cards,
+      ReplaySpec.tests cards,
+      PropertySpec.tests cards,
       JsonSpec.tests,
-      CodecSpec.tests,
-      ManaSpec.tests,
-      CastSpec.tests,
-      CombatSpec.tests,
-      ResolveSpec.tests,
-      ProjectionSpec.tests,
-      ActivateSpec.tests
+      CodecSpec.tests cards,
+      ManaSpec.tests cards,
+      CastSpec.tests cards,
+      CombatSpec.tests cards,
+      ResolveSpec.tests cards,
+      ProjectionSpec.tests cards,
+      ActivateSpec.tests cards
     ]

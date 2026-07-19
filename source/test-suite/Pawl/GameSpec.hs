@@ -49,24 +49,24 @@ import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-objectFactTests :: Tasty.TestTree
-objectFactTests =
+objectFactTests :: Cards.Cards -> Tasty.TestTree
+objectFactTests cards =
   Tasty.testGroup
     "ObjectFacts"
     [ HU.testCase "a Piker's power and toughness are 2 and 1" $
-        let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
          in do
               HU.assertEqual "power" (Just 2) (Projection.powerOf oid gs)
               HU.assertEqual "toughness" (Just 1) (Projection.toughnessOf oid gs),
       HU.testCase "a Mountain has no power or toughness" $
-        let gs = S.mountainsInPlay 1
+        let gs = S.mountainsInPlay cards 1
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
               [] -> HU.assertFailure "fixture should have one Mountain"
               oid : _ -> do
                 HU.assertEqual "power" Nothing (Projection.powerOf oid gs)
                 HU.assertEqual "toughness" Nothing (Projection.toughnessOf oid gs),
       HU.testCase "controllerOf is the owner while nothing can change control" $
-        let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual "controller" (Just S.bob) (Game.controllerOf oid gs),
       HU.testCase "an unknown id has no facts" $
         let gs = Setup.emptyGame S.bothPlayers
@@ -76,9 +76,9 @@ objectFactTests =
               HU.assertEqual "controller" Nothing (Game.controllerOf missing gs)
     ]
 
-gameTests :: Tasty.TestTree
-gameTests =
-  let after = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield (S.oneMountainState Phase.PrecombatMain)
+gameTests :: Cards.Cards -> Tasty.TestTree
+gameTests cards =
+  let after = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield (S.oneMountainState cards Phase.PrecombatMain)
    in Tasty.testGroup
         "Game"
         [ HU.testCase "changeZone preserves object count" $
@@ -91,7 +91,7 @@ gameTests =
               ( Just
                   Object.MkObject
                     { Object.owner = S.alice,
-                      Object.source = Source.OfCard Cards.mountainPrinting,
+                      Object.source = Source.OfCard (Cards.mountainPrinting cards),
                       Object.zone = Zone.Battlefield,
                       Object.tapped = TapState.Untapped,
                       Object.damage = 0,
@@ -105,7 +105,7 @@ gameTests =
               )
               (Game.lookupObject (ObjectId.MkObjectId 1) after),
           HU.testCase "CR 400.7 changeZone forgets a spell's targets" $
-            let base = S.oneMountainState Phase.PrecombatMain
+            let base = S.oneMountainState cards Phase.PrecombatMain
                 stamped =
                   base
                     { GameState.objects =
@@ -118,7 +118,7 @@ gameTests =
                 landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
              in HU.assertEqual "reset" [Map.empty] (map Object.targets landed),
           HU.testCase "CR 400.7 changeZone resets chosenSubtypes" $
-            let base = S.oneMountainState Phase.PrecombatMain
+            let base = S.oneMountainState cards Phase.PrecombatMain
                 slot = SlotName.MkSlotName (Text.pack "target")
                 stamped =
                   base
@@ -132,7 +132,7 @@ gameTests =
                 newObj = Game.lookupObject (ObjectId.MkObjectId 1) moved
              in HU.assertEqual "reset to empty" (Just Map.empty) (fmap Object.chosenSubtypes newObj),
           HU.testCase "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $
-            let (oid, gs) = S.addPiker S.bob (S.mountainsInPlay 1)
+            let (oid, gs) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
                 before = GameState.nextTimestamp gs
                 movedState = Event.changeZone oid Zone.Graveyard gs
                 movedId = case Game.zoneMembers Zone.Graveyard S.bob movedState of
@@ -147,31 +147,31 @@ gameTests =
           HU.testCase "a fresh game has no continuous effects" $
             HU.assertEqual "empty" [] (GameState.continuousEffects (Setup.emptyGame S.bothPlayers)),
           HU.testCase "a vanilla printing declares no static abilities" $
-            HU.assertEqual "empty" [] (Card.Type.staticAbilities S.pikerCard)
+            HU.assertEqual "empty" [] (Card.Type.staticAbilities (S.pikerCard cards))
         ]
 
-actionTests :: Tasty.TestTree
-actionTests =
+actionTests :: Cards.Cards -> Tasty.TestTree
+actionTests cards =
   Tasty.testGroup
     "Action"
     [ HU.testCase "a land in hand is playable in a main phase" $
-        HU.assertBool "play" (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice (S.oneMountainState Phase.PrecombatMain)),
+        HU.assertBool "play" (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice (S.oneMountainState cards Phase.PrecombatMain)),
       HU.testCase "passing is always legal" $
-        HU.assertBool "pass" (A.Pass `elem` Action.legalActions S.alice (S.oneMountainState Phase.PrecombatMain)),
+        HU.assertBool "pass" (A.Pass `elem` Action.legalActions S.alice (S.oneMountainState cards Phase.PrecombatMain)),
       HU.testCase "no land play outside a main phase" $
-        HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice (S.oneMountainState (Phase.Beginning BeginningStep.Upkeep))),
+        HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice (S.oneMountainState cards (Phase.Beginning BeginningStep.Upkeep))),
       HU.testCase "no second land after one is played" $
-        let gs = (S.oneMountainState Phase.PrecombatMain) {GameState.landPlayed = Set.singleton S.alice}
+        let gs = (S.oneMountainState cards Phase.PrecombatMain) {GameState.landPlayed = Set.singleton S.alice}
          in HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice gs)
     ]
 
-goldfishResult :: (Result.Result, GameState.GameState)
-goldfishResult =
-  Engine.runMatchPure S.identityAnswer S.redRed
+goldfishResult :: Cards.Cards -> (Result.Result, GameState.GameState)
+goldfishResult cards =
+  Engine.runMatchPure S.identityAnswer (S.redRed cards)
 
-landState :: GameState.GameState
-landState =
-  snd (Engine.runGamePure S.playLandAnswer (Setup.emptyGame S.bothPlayers) (Engine.playFrom S.redRed))
+landState :: Cards.Cards -> GameState.GameState
+landState cards =
+  snd (Engine.runGamePure S.playLandAnswer (Setup.emptyGame S.bothPlayers) (Engine.playFrom (S.redRed cards)))
 
 -- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With one land play per
 -- turn (CR 305.2) a player can never have more lands out than turns taken.
@@ -180,50 +180,50 @@ turnsTaken pid gs =
   let total = fromIntegral (GameState.turnNumber gs)
    in if pid == S.alice then (total + 1) `div` 2 else total `div` 2
 
-engineTests :: Tasty.TestTree
-engineTests =
+engineTests :: Cards.Cards -> Tasty.TestTree
+engineTests cards =
   Tasty.testGroup
     "Engine"
     [ HU.testCase "goldfish game ends with the starting player winning" $
-        HU.assertEqual "winner" (Result.Won S.alice) (fst goldfishResult),
+        HU.assertEqual "winner" (Result.Won S.alice) (fst (goldfishResult cards)),
       HU.testCase "card conservation holds at end" $
-        HU.assertEqual "objects" 120 (Game.objectCount (snd goldfishResult)),
+        HU.assertEqual "objects" 120 (Game.objectCount (snd (goldfishResult cards))),
       HU.testCase "playing lands fills the battlefield" $
         HU.assertBool "non-empty" $
-          not (null (Game.zoneMembers Zone.Battlefield S.alice landState)),
+          not (null (Game.zoneMembers Zone.Battlefield S.alice (landState cards))),
       HU.testCase "land play conserves cards" $
-        HU.assertEqual "objects" 120 (Game.objectCount landState),
+        HU.assertEqual "objects" 120 (Game.objectCount (landState cards)),
       HU.testCase "CR 305.2 at most one land per turn" $
         HU.assertBool "no double land plays" $
-          length (Game.zoneMembers Zone.Battlefield S.alice landState) <= turnsTaken S.alice landState
-            && length (Game.zoneMembers Zone.Battlefield S.bob landState) <= turnsTaken S.bob landState
+          length (Game.zoneMembers Zone.Battlefield S.alice (landState cards)) <= turnsTaken S.alice (landState cards)
+            && length (Game.zoneMembers Zone.Battlefield S.bob (landState cards)) <= turnsTaken S.bob (landState cards)
     ]
 
--- Run setup, then a scripted tweak, then whatever steps the scenario needs.
-scenario :: Game.Type.Game () -> GameState.GameState
-scenario steps =
-  snd $ Engine.runGamePure S.identityAnswer (Setup.emptyGame (NonEmpty.map fst S.redRed)) $ do
-    Setup.newGame S.redRed
+-- Run setup, then a scripted tweak, then whatever steps the (scenario cards) needs.
+scenario :: Cards.Cards -> Game.Type.Game () -> GameState.GameState
+scenario cards steps =
+  snd $ Engine.runGamePure S.identityAnswer (Setup.emptyGame (NonEmpty.map fst (S.redRed cards))) $ do
+    Setup.newGame (S.redRed cards)
     steps
 
 -- Alice starts, so her turn-1 draw is skipped.
-aliceFirstDraw :: GameState.GameState
-aliceFirstDraw = scenario S.drawStep
+aliceFirstDraw :: Cards.Cards -> GameState.GameState
+aliceFirstDraw cards = scenario cards S.drawStep
 
 -- Bob is not the starting player, so his draw happens normally.
-bobFirstDraw :: GameState.GameState
-bobFirstDraw = scenario $ do
+bobFirstDraw :: Cards.Cards -> GameState.GameState
+bobFirstDraw cards = scenario cards $ do
   State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
   S.drawStep
 
-bobAfterCleanup :: GameState.GameState
-bobAfterCleanup = scenario $ do
+bobAfterCleanup :: Cards.Cards -> GameState.GameState
+bobAfterCleanup cards = scenario cards $ do
   State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
   S.drawStep
   Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)
 
-deckedOut :: GameState.GameState
-deckedOut = scenario $ do
+deckedOut :: Cards.Cards -> GameState.GameState
+deckedOut cards = scenario cards $ do
   State.modify' $ \gs ->
     gs
       { GameState.library = Map.insert S.alice Seq.empty (GameState.library gs),
@@ -263,22 +263,22 @@ recordingAnswer p = case p of
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
-askedPlayers :: [PlayerId.PlayerId]
-askedPlayers =
-  let (gs, _) = S.pikerInHand 3 Phase.PrecombatMain
+askedPlayers :: Cards.Cards -> [PlayerId.PlayerId]
+askedPlayers cards =
+  let (gs, _) = S.pikerInHand cards 3 Phase.PrecombatMain
    in State.execState
         (Program.foldProgramM recordingAnswer (State.runStateT Engine.priorityLoop gs))
         []
 
-ruleTests :: Tasty.TestTree
-ruleTests =
+ruleTests :: Cards.Cards -> Tasty.TestTree
+ruleTests cards =
   Tasty.testGroup
     "Rules"
     [ HU.testCase "CR 117.4 a full round of passes resolves the stack, not the step" $
         -- With a spell on the stack, everyone passing must RESOLVE it and keep
         -- the step alive. Under M0's rule the step would simply end with the
         -- spell still sitting on the stack.
-        let (gs, oid) = S.pikerInHand 3 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand cards 3 Phase.PrecombatMain
             steps = do
               Cast.castSpell S.alice oid
               Engine.priorityLoop
@@ -290,27 +290,27 @@ ruleTests =
         -- alice is asked, casts, and must be asked AGAIN before bob gets a turn.
         -- If priority wrongly advanced to the next player, this would be
         -- [alice, bob, ...] instead.
-        HU.assertEqual "alice twice, then bob" [S.alice, S.alice, S.bob] (take 3 askedPlayers),
+        HU.assertEqual "alice twice, then bob" [S.alice, S.alice, S.bob] (take 3 (askedPlayers cards)),
       HU.testCase "CR 103.7a starting player skips first draw" $ do
-        HU.assertEqual "hand" 7 (S.handSize S.alice aliceFirstDraw)
-        HU.assertEqual "library" 53 (librarySize S.alice aliceFirstDraw),
+        HU.assertEqual "hand" 7 (S.handSize S.alice (aliceFirstDraw cards))
+        HU.assertEqual "library" 53 (librarySize S.alice (aliceFirstDraw cards)),
       HU.testCase "CR 103.7a only the starting player skips" $ do
-        HU.assertEqual "hand" 8 (S.handSize S.bob bobFirstDraw)
-        HU.assertEqual "library" 52 (librarySize S.bob bobFirstDraw),
+        HU.assertEqual "hand" 8 (S.handSize S.bob (bobFirstDraw cards))
+        HU.assertEqual "library" 52 (librarySize S.bob (bobFirstDraw cards)),
       HU.testCase "CR 514.2 discard to hand size" $
-        HU.assertEqual "hand" 7 (S.handSize S.bob bobAfterCleanup),
+        HU.assertEqual "hand" 7 (S.handSize S.bob (bobAfterCleanup cards)),
       HU.testCase "CR 704.5b deck-out loses" $
         HU.assertEqual
           "alice departed"
           (Just (Status.Departed Departure.Lost))
-          (fmap Player.status (Map.lookup S.alice (GameState.players deckedOut))),
+          (fmap Player.status (Map.lookup S.alice (GameState.players (deckedOut cards)))),
       HU.testCase "CR 704.5b the survivor wins" $
-        HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result deckedOut),
+        HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result (deckedOut cards)),
       HU.testCase "CR 723.3/723.5: alice decides for bob, but bob's resources move" $
         -- bob's main phase, controlled by alice, with a Mountain and a Bolt.
         let g0 = Setup.emptyGame S.bothPlayers
-            (_mtnId, g1) = S.addCreature Cards.mountainPrinting S.bob g0
-            (_boltId, g2) = handBobBolt g1
+            (_mtnId, g1) = S.addCreature (Cards.mountainPrinting cards) S.bob g0
+            (_boltId, g2) = handBobBolt cards g1
             g3 =
               g2
                 { GameState.activePlayer = S.bob,
@@ -331,21 +331,21 @@ ruleTests =
               HU.assertEqual "the Mountain (bob's) is tapped" 1 (S.tappedCount S.bob after)
     ]
 
-tests :: Tasty.TestTree
-tests =
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards =
   Tasty.testGroup
     "Game"
-    [gameTests, actionTests, objectFactTests, engineTests, ruleTests]
+    [gameTests cards, actionTests cards, objectFactTests cards, engineTests cards, ruleTests cards]
 
 -- One Lightning Bolt in bob's hand.
-handBobBolt :: GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
-handBobBolt gs =
+handBobBolt :: Cards.Cards -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+handBobBolt cards gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = S.bob,
-            Object.source = Source.OfCard Cards.lightningBoltPrinting,
+            Object.source = Source.OfCard (Cards.lightningBoltPrinting cards),
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,

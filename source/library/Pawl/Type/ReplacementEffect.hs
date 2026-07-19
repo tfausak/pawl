@@ -1,8 +1,5 @@
-{-# LANGUAGE DeriveLift #-}
-
 module Pawl.Type.ReplacementEffect where
 
-import Language.Haskell.TH.Syntax (Lift)
 import Pawl.Type.Zone (Zone)
 
 -- CR 614.1a: a replacement effect. Classified by the event pattern it intercepts:
@@ -14,4 +11,4 @@ data ReplacementEffect = RedirectZoneChange
   { whenDestination :: Zone,
     toDestination :: Zone
   }
-  deriving (Eq, Lift, Ord, Show)
+  deriving (Eq, Ord, Show)

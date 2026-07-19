@@ -50,13 +50,13 @@ import qualified Test.Tasty.HUnit as HU
 sicknessOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Sickness.Sickness
 sicknessOf oid gs = fmap Object.sickness (Game.lookupObject oid gs)
 
-sicknessTests :: Tasty.TestTree
-sicknessTests =
+sicknessTests :: Cards.Cards -> Tasty.TestTree
+sicknessTests cards =
   Tasty.testGroup
     "Sickness"
     [ HU.testCase "CR 302.6 a permanent entering the battlefield is summoning sick" $
         -- changeZone mints a new object, so the id to inspect is the new one.
-        let (gs, oid) = S.pikerInHand 3 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand cards 3 Phase.PrecombatMain
             after = Event.changeZone oid Zone.Battlefield gs
          in case Game.zoneMembers Zone.Battlefield S.alice after of
               [] -> HU.assertFailure "expected a permanent"
@@ -64,30 +64,30 @@ sicknessTests =
                 [] -> HU.assertFailure "the new permanent should be Sick"
                 _ -> pure (),
       HU.testCase "CR 302.6 the untap step settles the active player's permanents" $
-        let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
             sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
             after = snd (Engine.runGamePure S.identityAnswer sick (Engine.settleAll S.alice))
          in HU.assertEqual "settled" (Just Sickness.Settled) (sicknessOf oid after),
       HU.testCase "CR 302.6 settling does not touch the other player's permanents" $
-        let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
             sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
             after = snd (Engine.runGamePure S.identityAnswer sick (Engine.settleAll S.alice))
          in HU.assertEqual "still sick" (Just Sickness.Sick) (sicknessOf oid after)
     ]
 
-castGameState :: GameState.GameState
-castGameState =
-  snd (Engine.runMatchPure S.castAnswer S.redRed)
+castGameState :: Cards.Cards -> GameState.GameState
+castGameState cards =
+  snd (Engine.runMatchPure S.castAnswer (S.redRed cards))
 
-castEngineTests :: Tasty.TestTree
-castEngineTests =
+castEngineTests :: Cards.Cards -> Tasty.TestTree
+castEngineTests cards =
   Tasty.testGroup
     "CastEngine"
     [ HU.testCase "a castable Piker is offered as a legal action" $
-        let (gs, oid) = S.pikerInHand 2 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand cards 2 Phase.PrecombatMain
          in HU.assertBool "offered" (elem (A.Cast oid) (Action.legalActions S.alice gs)),
       HU.testCase "an unaffordable Piker is not offered" $
-        let (gs, oid) = S.pikerInHand 1 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand cards 1 Phase.PrecombatMain
          in HU.assertBool "not offered" (notElem (A.Cast oid) (Action.legalActions S.alice gs)),
       -- M3a: the red deck now carries Lightning Bolt, so castAnswer casts removal
       -- that clears the board -- creaturesInPlay at end is no longer a valid proxy
@@ -98,43 +98,43 @@ castEngineTests =
       HU.testCase "casting actually happens in a full game" $
         HU.assertBool
           "a spell resolved and dealt damage"
-          (any (\pl -> Player.life pl < Setup.startingLife) (Map.elems (GameState.players castGameState))),
+          (any (\pl -> Player.life pl < Setup.startingLife) (Map.elems (GameState.players (castGameState cards)))),
       HU.testCase "a casting game still terminates" $
-        HU.assertBool "has result" (Maybe.isJust (GameState.result castGameState)),
+        HU.assertBool "has result" (Maybe.isJust (GameState.result (castGameState cards))),
       HU.testCase "a casting game conserves objects" $
-        HU.assertEqual "objects" 120 (Game.objectCount castGameState),
+        HU.assertEqual "objects" 120 (Game.objectCount (castGameState cards)),
       HU.testCase "CR 500.4 no mana floats at the end of a game" $
-        HU.assertEqual "pools empty" Map.empty (GameState.manaPool castGameState)
+        HU.assertEqual "pools empty" Map.empty (GameState.manaPool (castGameState cards))
     ]
 
 -- A Piker cast and left on the stack, ready to resolve.
-pikerOnStack :: GameState.GameState
-pikerOnStack =
-  let (gs, oid) = S.pikerInHand 3 Phase.PrecombatMain
+pikerOnStack :: Cards.Cards -> GameState.GameState
+pikerOnStack cards =
+  let (gs, oid) = S.pikerInHand cards 3 Phase.PrecombatMain
    in snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
 
-stackTests :: Tasty.TestTree
-stackTests =
+stackTests :: Cards.Cards -> Tasty.TestTree
+stackTests cards =
   Tasty.testGroup
     "Stack"
     [ HU.testCase "CR 608.3 a resolving creature spell becomes a permanent" $
-        let after = snd (Engine.runGamePure S.identityAnswer pikerOnStack Stack.resolveTop)
+        let after = snd (Engine.runGamePure S.identityAnswer (pikerOnStack cards) Stack.resolveTop)
          in do
               HU.assertEqual "stack empty" 0 (length (GameState.stack after))
               -- Four, not one: pikerInHand 3 leaves three Mountains in play.
               HU.assertEqual "four permanents" 4 (length (Game.zoneMembers Zone.Battlefield S.alice after))
               HU.assertEqual "one of them a creature" 1 (S.creaturesInPlay S.alice after),
       HU.testCase "CR 400.7 the permanent is a new object" $
-        let after = snd (Engine.runGamePure S.identityAnswer pikerOnStack Stack.resolveTop)
-         in case GameState.stack pikerOnStack of
+        let after = snd (Engine.runGamePure S.identityAnswer (pikerOnStack cards) Stack.resolveTop)
+         in case GameState.stack (pikerOnStack cards) of
               [] -> HU.assertFailure "fixture should have a spell on the stack"
               top : _ -> HU.assertEqual "old id gone" Nothing (Game.lookupObject top after),
       HU.testCase "the permanent is a Piker on the battlefield" $
         -- The object the spell resolved INTO, not just any permanent: the
         -- fixture already has three Mountains in play, and zoneMembers is
         -- ordered by id, so the front of that list is Mountain id 0.
-        let before = Game.zoneMembers Zone.Battlefield S.alice pikerOnStack
-            after = snd (Engine.runGamePure S.identityAnswer pikerOnStack Stack.resolveTop)
+        let before = Game.zoneMembers Zone.Battlefield S.alice (pikerOnStack cards)
+            after = snd (Engine.runGamePure S.identityAnswer (pikerOnStack cards) Stack.resolveTop)
             isNew o = notElem o before
             fresh = filter isNew (Game.zoneMembers Zone.Battlefield S.alice after)
          in case fresh of
@@ -151,16 +151,16 @@ stackTests =
       HU.testCase "resolving conserves objects" $
         HU.assertEqual
           "conserved"
-          (Game.objectCount pikerOnStack)
-          (Game.objectCount (snd (Engine.runGamePure S.identityAnswer pikerOnStack Stack.resolveTop))),
+          (Game.objectCount (pikerOnStack cards))
+          (Game.objectCount (snd (Engine.runGamePure S.identityAnswer (pikerOnStack cards) Stack.resolveTop))),
       HU.testCase "resolving an empty stack is a no-op" $
         let gs = Setup.emptyGame S.bothPlayers
          in HU.assertEqual "unchanged" gs (snd (Engine.runGamePure S.identityAnswer gs Stack.resolveTop)),
       HU.testCase "CR 601.3: cast Panglacial during Evolving Wilds' search, then it resolves 9/5" $
         let g0 = Setup.emptyGame S.bothPlayers
-            (ewId, g1) = S.addCreature Cards.evolvingWildsPrinting S.alice g0
-            g2 = List.foldl' (\g _ -> snd (S.addCreature Cards.forestPrinting S.alice g)) g1 [1 .. (7 :: Int)]
-            (_, g3) = S.addLibraryCard Cards.panglacialWurmPrinting S.alice g2
+            (ewId, g1) = S.addCreature (Cards.evolvingWildsPrinting cards) S.alice g0
+            g2 = List.foldl' (\g _ -> snd (S.addCreature (Cards.forestPrinting cards) S.alice g)) g1 [1 .. (7 :: Int)]
+            (_, g3) = S.addLibraryCard (Cards.panglacialWurmPrinting cards) S.alice g2
             g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
          in case Projection.abilitiesOf ewId g4 of
               ewAbility : _ ->
@@ -176,9 +176,9 @@ stackTests =
               [] -> HU.assertFailure "Evolving Wilds should have an activated ability",
       HU.testCase "declining the cast resolves the search normally, Panglacial stays" $
         let g0 = Setup.emptyGame S.bothPlayers
-            (ewId, g1) = S.addCreature Cards.evolvingWildsPrinting S.alice g0
-            g2 = List.foldl' (\g _ -> snd (S.addCreature Cards.forestPrinting S.alice g)) g1 [1 .. (7 :: Int)]
-            (_, g3) = S.addLibraryCard Cards.panglacialWurmPrinting S.alice g2
+            (ewId, g1) = S.addCreature (Cards.evolvingWildsPrinting cards) S.alice g0
+            g2 = List.foldl' (\g _ -> snd (S.addCreature (Cards.forestPrinting cards) S.alice g)) g1 [1 .. (7 :: Int)]
+            (_, g3) = S.addLibraryCard (Cards.panglacialWurmPrinting cards) S.alice g2
             g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
          in case Projection.abilitiesOf ewId g4 of
               ewAbility : _ ->
@@ -187,32 +187,32 @@ stackTests =
               [] -> HU.assertFailure "Evolving Wilds should have an activated ability"
     ]
 
-castTests :: Tasty.TestTree
-castTests =
+castTests :: Cards.Cards -> Tasty.TestTree
+castTests cards =
   Tasty.testGroup
     "Cast"
     [ HU.testCase "a Piker is castable with two Mountains in a main phase" $
-        let (gs, oid) = S.pikerInHand 2 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand cards 2 Phase.PrecombatMain
          in HU.assertBool "castable" (Cast.castable S.alice oid gs),
       HU.testCase "a Piker is not castable with one Mountain" $
-        let (gs, oid) = S.pikerInHand 1 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand cards 1 Phase.PrecombatMain
          in HU.assertBool "unaffordable" (not (Cast.castable S.alice oid gs)),
       HU.testCase "CR 601.3a no creature spell in the upkeep" $
-        let (gs, oid) = S.pikerInHand 2 (Phase.Beginning BeginningStep.Upkeep)
+        let (gs, oid) = S.pikerInHand cards 2 (Phase.Beginning BeginningStep.Upkeep)
          in HU.assertBool "wrong timing" (not (Cast.castable S.alice oid gs)),
       HU.testCase "CR 601.3a no creature spell with a non-empty stack" $
-        let (gs, oid) = S.pikerInHand 2 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand cards 2 Phase.PrecombatMain
             busy = gs {GameState.stack = [ObjectId.MkObjectId 999]}
          in HU.assertBool "stack not empty" (not (Cast.castable S.alice oid busy)),
       HU.testCase "CR 601.3a a non-active player cannot cast at sorcery speed" $
-        let (gs, oid) = S.pikerInHand 2 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand cards 2 Phase.PrecombatMain
             bobsTurn = gs {GameState.activePlayer = S.bob}
          in HU.assertBool "not active" (not (Cast.castable S.alice oid bobsTurn)),
       HU.testCase "a Mountain in hand is not castable: lands have no mana cost" $
         HU.assertBool "no cost" $
-          not (Cast.castable S.alice (ObjectId.MkObjectId 0) (S.oneMountainState Phase.PrecombatMain)),
+          not (Cast.castable S.alice (ObjectId.MkObjectId 0) (S.oneMountainState cards Phase.PrecombatMain)),
       HU.testCase "CR 601 casting puts a NEW object on the stack and taps two lands" $
-        let (gs, oid) = S.pikerInHand 3 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand cards 3 Phase.PrecombatMain
             after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
          in do
               HU.assertEqual "stack depth" 1 (length (GameState.stack after))
@@ -222,7 +222,7 @@ castTests =
               -- CR 400.7: the card on the stack is a new object, not the old id.
               HU.assertEqual "old id gone" Nothing (Game.lookupObject oid after),
       HU.testCase "the stack object is still a Piker on the stack" $
-        let (gs, oid) = S.pikerInHand 3 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand cards 3 Phase.PrecombatMain
             after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
          in case GameState.stack after of
               [] -> HU.assertFailure "expected one object on the stack"
@@ -236,22 +236,22 @@ castTests =
                     Source.OfAbility _ _ -> HU.assertFailure "expected a card source"
                     Source.OfTrigger _ _ -> HU.assertFailure "expected a card source",
       HU.testCase "CR 117.1a a Bolt is castable outside a main phase" $
-        let (gs, oid) = S.boltInHand 1 (Phase.Beginning BeginningStep.Upkeep)
+        let (gs, oid) = S.boltInHand cards 1 (Phase.Beginning BeginningStep.Upkeep)
          in HU.assertBool "instant speed" (Cast.castable S.alice oid gs),
       HU.testCase "CR 117.1a a Bolt is castable on the opponent's turn" $
-        let (gs, oid) = S.boltInHand 1 Phase.PrecombatMain
+        let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
             bobsTurn = gs {GameState.activePlayer = S.bob}
          in HU.assertBool "not my turn, still castable" (Cast.castable S.alice oid bobsTurn),
       HU.testCase "CR 117.1a a Bolt is castable with a non-empty stack" $
-        let (gs, oid) = S.boltInHand 1 Phase.PrecombatMain
+        let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
             busy = gs {GameState.stack = [ObjectId.MkObjectId 999]}
          in HU.assertBool "in response" (Cast.castable S.alice oid busy),
       HU.testCase "a Bolt in the graveyard is not castable" $
-        let (gs, oid) = S.boltInHand 1 Phase.PrecombatMain
+        let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
             buried = Event.changeZone oid Zone.Graveyard gs
          in HU.assertEqual "nothing castable" [] (Cast.castableSpells S.alice buried),
       HU.testCase "CR 601.2c casting a Bolt stamps the chosen target on the stack object" $
-        let (base, gs, _) = S.boltAtBobsPiker
+        let (base, gs, _) = S.boltAtBobsPiker cards
          in case GameState.stack gs of
               [] -> HU.assertFailure "expected the Bolt on the stack"
               top : _ -> case Game.lookupObject top gs of
@@ -263,7 +263,7 @@ castTests =
                     (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToCreature (S.pikerOf base)))
                     (Object.targets obj),
       HU.testCase "an illegal target answer makes the cast a no-op" $
-        let (gs, oid) = S.boltInHand 1 Phase.PrecombatMain
+        let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
             liar :: Prompt.Prompt r -> r
             liar p = case p of
               Prompt.ChooseTargets _ _ _ sets ->
@@ -274,16 +274,16 @@ castTests =
               HU.assertEqual "nothing on the stack" 0 (length (GameState.stack after))
               HU.assertEqual "nothing paid" 0 (S.tappedCount S.alice after),
       HU.testCase "Panglacial Wurm in the library is castable-while-searching with mana" $
-        let base = S.landsInPlay Cards.forestPrinting 7
-            (_, gs) = S.addLibraryCard Cards.panglacialWurmPrinting S.alice base
+        let base = S.landsInPlay (Cards.forestPrinting cards) 7
+            (_, gs) = S.addLibraryCard (Cards.panglacialWurmPrinting cards) S.alice base
          in HU.assertEqual "one castable-while-searching option" 1 (length (Cast.castableWhileSearching S.alice gs)),
       HU.testCase "with too little mana, Panglacial is not castable-while-searching" $
-        let base = S.landsInPlay Cards.forestPrinting 3
-            (_, gs) = S.addLibraryCard Cards.panglacialWurmPrinting S.alice base
+        let base = S.landsInPlay (Cards.forestPrinting cards) 3
+            (_, gs) = S.addLibraryCard (Cards.panglacialWurmPrinting cards) S.alice base
          in HU.assertEqual "unaffordable, so no options" 0 (length (Cast.castableWhileSearching S.alice gs)),
       HU.testCase "castWhileSearching casts Panglacial from the library onto the stack" $
-        let base = S.landsInPlay Cards.forestPrinting 7
-            (_, gs) = S.addLibraryCard Cards.panglacialWurmPrinting S.alice base
+        let base = S.landsInPlay (Cards.forestPrinting cards) 7
+            (_, gs) = S.addLibraryCard (Cards.panglacialWurmPrinting cards) S.alice base
             after = snd (Engine.runGamePure castFirstOption gs (Cast.castWhileSearching S.alice))
             onStack = length (filter (nameOnStack (Text.pack "Panglacial Wurm") after) (GameState.stack after))
          in do
@@ -314,11 +314,11 @@ lastN :: Int -> [a] -> [a]
 lastN n xs = drop (length xs - n) xs
 
 -- Bob draws to eight, then discards at cleanup under discardLastAnswer.
-bobDiscardChoice :: (GameState.GameState, [ObjectId.ObjectId])
-bobDiscardChoice =
+bobDiscardChoice :: Cards.Cards -> (GameState.GameState, [ObjectId.ObjectId])
+bobDiscardChoice cards =
   let start = Setup.emptyGame S.bothPlayers
       steps = do
-        Setup.newGame S.redRed
+        Setup.newGame (S.redRed cards)
         State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
         S.drawStep
         beforeCleanup <- State.gets (Game.zoneMembers Zone.Hand S.bob)
@@ -327,14 +327,14 @@ bobDiscardChoice =
       (held, final) = Engine.runGamePure discardLastAnswer start steps
    in (final, held)
 
-discardTests :: Tasty.TestTree
-discardTests =
+discardTests :: Cards.Cards -> Tasty.TestTree
+discardTests cards =
   Tasty.testGroup
     "Discard"
     [ HU.testCase "CR 514.2 discard trims to hand size" $
-        HU.assertEqual "hand" 7 (S.handSize S.bob (fst bobDiscardChoice)),
+        HU.assertEqual "hand" 7 (S.handSize S.bob (fst (bobDiscardChoice cards))),
       HU.testCase "CR 514.2 the prompted choice is honored" $
-        let (final, held) = bobDiscardChoice
+        let (final, held) = bobDiscardChoice cards
             kept = Game.zoneMembers Zone.Hand S.bob final
             -- discardLastAnswer pitched the last card, so the first seven of the
             -- pre-cleanup hand are exactly what survives. Ids are stable here:
@@ -378,8 +378,8 @@ hackAnswer p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Island)
   _ -> S.identityAnswer p
 
-magicalHackTests :: Tasty.TestTree
-magicalHackTests =
+magicalHackTests :: Cards.Cards -> Tasty.TestTree
+magicalHackTests cards =
   Tasty.testGroup
     "MagicalHack"
     [ HU.testCase "CR 612/305.6 a hacked basic Mountain taps for its new color" $
@@ -387,9 +387,9 @@ magicalHackTests =
         -- Magical Hack in hand. The Mountain is added FIRST so it has the lowest
         -- object id and identityAnswer's ChooseTargets (Set.lookupMin over the
         -- ToObject recipients) picks it, not the Island. Hack Mountain -> Island.
-        let (mountainId, g0) = S.addCreature Cards.mountainPrinting S.alice (Setup.emptyGame S.bothPlayers)
-            (islandId, g1) = S.addCreature Cards.islandPrinting S.alice g0
-            (gs, hackId) = handInPlay Cards.magicalHackPrinting g1
+        let (mountainId, g0) = S.addCreature (Cards.mountainPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            (islandId, g1) = S.addCreature (Cards.islandPrinting cards) S.alice g0
+            (gs, hackId) = handInPlay (Cards.magicalHackPrinting cards) g1
             cast = snd (Engine.runGamePure hackAnswer gs (Cast.castSpell S.alice hackId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in do
@@ -398,17 +398,17 @@ magicalHackTests =
               HU.assertBool "hacked Mountain taps blue" (elem (ManaType.Colored Color.Blue) (Mana.manaTypesOf mountainId resolved))
               HU.assertBool "hacked Mountain no longer taps red" (notElem (ManaType.Colored Color.Red) (Mana.manaTypesOf mountainId resolved)),
       HU.testCase "CR 601.2c Magical Hack with no legal target is uncastable" $
-        let (gs, hackId) = handInPlay Cards.magicalHackPrinting (Setup.emptyGame S.bothPlayers)
+        let (gs, hackId) = handInPlay (Cards.magicalHackPrinting cards) (Setup.emptyGame S.bothPlayers)
          in -- Empty battlefield and stack: SpellOrPermanentTarget has no legal
             -- recipient (and there is no mana either), so it is uncastable.
             HU.assertBool "no target -> uncastable" (not (Cast.castable S.alice hackId gs))
     ]
 
-tests :: Tasty.TestTree
-tests =
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards =
   Tasty.testGroup
     "Cast"
-    [castTests, castEngineTests, stackTests, discardTests, sicknessTests, magicalHackTests]
+    [castTests cards, castEngineTests cards, stackTests cards, discardTests cards, sicknessTests cards, magicalHackTests cards]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

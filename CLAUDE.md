@@ -41,8 +41,9 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   cast-during-search re-entrancy), then **M3.5** (cards as data files: a hand-rolled
   JSON codec with the honesty round-trip, card data relocated out of the engine
   library into the test suite's `Pawl.Cards`, and `data/cards/*.json` as the source
-  of truth — benchmark loads by `IO`, test suite by a temporary TH shim). **M4 is
-  next.** The **milestone completion log** — one distilled entry per milestone with
+  of truth — both the benchmark and the test suite load the cards by `IO`; the
+  interim TH shim's named expiry was cashed before M4, so no `TemplateHaskell` or
+  `Lift` remains in the library). **M4 is next.** The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, the opcodes/types it added, and every
   elision and its named expiry — lives in `docs/progress.md`. The forward path
   (M0–M7 and the M3a–M3g split) is in `docs/design.md` §3; each milestone's

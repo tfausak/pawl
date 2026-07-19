@@ -58,20 +58,20 @@ bob = PlayerId.MkPlayerId 1
 bothPlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
 bothPlayers = alice NonEmpty.:| [bob]
 
-redRed :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
-redRed = Setup.mirror Cards.redDeck bothPlayers
+redRed :: Cards.Cards -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
+redRed cards = Setup.mirror (Cards.redDeck cards) bothPlayers
 
-greenBlack :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
-greenBlack = (alice, Cards.greenDeck) NonEmpty.:| [(bob, Cards.blackDeck)]
+greenBlack :: Cards.Cards -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
+greenBlack cards = (alice, Cards.greenDeck cards) NonEmpty.:| [(bob, Cards.blackDeck cards)]
 
-matchups :: [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
-matchups = [redRed, greenBlack]
+matchups :: Cards.Cards -> [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
+matchups cards = [redRed cards, greenBlack cards]
 
 -- A 60-basic-land mirror: no spell can be cast and no creature can attack, so the
 -- only loss condition reachable is CR 704.5b deck-out. Used by the durable
 -- lands-only-decks property.
-landsOnly :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
-landsOnly = Setup.mirror (Deck.MkDeck (Map.singleton Cards.mountainPrinting 60)) bothPlayers
+landsOnly :: Cards.Cards -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
+landsOnly cards = Setup.mirror (Deck.MkDeck (Map.singleton (Cards.mountainPrinting cards) 60)) bothPlayers
 
 isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
@@ -265,8 +265,8 @@ addCreature printing pid gs =
           }
       )
 
-addPiker :: PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
-addPiker = addCreature Cards.pikerPrinting
+addPiker :: Cards.Cards -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addPiker cards = addCreature (Cards.pikerPrinting cards)
 
 -- One card of a printing in pid's library.
 addLibraryCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
@@ -294,8 +294,8 @@ addLibraryCard printing pid gs =
 
 -- Humility on the battlefield under bob's control (it is not a creature, so
 -- AllCreatures does not touch it). Returns the updated state.
-withHumility :: GameState.GameState -> GameState.GameState
-withHumility gs = snd (addCreature Cards.humilityPrinting bob gs)
+withHumility :: Cards.Cards -> GameState.GameState -> GameState.GameState
+withHumility cards gs = snd (addCreature (Cards.humilityPrinting cards) bob gs)
 
 -- alice controls n untapped basic lands of one printing, nothing else.
 landsInPlay :: Printing.Printing -> Int -> GameState.GameState
@@ -322,8 +322,8 @@ landsInPlay land n =
    in List.foldl' add (Setup.emptyGame bothPlayers) [1 .. n]
 
 -- alice controls n untapped Mountains on the battlefield, nothing else.
-mountainsInPlay :: Int -> GameState.GameState
-mountainsInPlay = landsInPlay Cards.mountainPrinting
+mountainsInPlay :: Cards.Cards -> Int -> GameState.GameState
+mountainsInPlay cards = landsInPlay (Cards.mountainPrinting cards)
 
 -- Put one card of a printing into alice's hand in a main phase with priority.
 handOne :: Printing.Printing -> GameState.GameState -> (GameState.GameState, ObjectId.ObjectId)
@@ -353,15 +353,15 @@ handOne printing base =
       )
 
 -- alice has n untapped Mountains in play and one Piker in hand, in a chosen phase.
-pikerInHand :: Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
-pikerInHand n ph =
-  let base = mountainsInPlay n
+pikerInHand :: Cards.Cards -> Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
+pikerInHand cards n ph =
+  let base = mountainsInPlay cards n
       (oid, gs1) = Game.freshObjectId base
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = alice,
-            Object.source = Source.OfCard Cards.pikerPrinting,
+            Object.source = Source.OfCard (Cards.pikerPrinting cards),
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
@@ -381,9 +381,9 @@ pikerInHand n ph =
    in (gs3, oid)
 
 -- alice has n untapped Mountains in play and one Lightning Bolt in hand.
-boltInHand :: Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
-boltInHand n ph =
-  let (gs, oid) = handOne Cards.lightningBoltPrinting (mountainsInPlay n)
+boltInHand :: Cards.Cards -> Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
+boltInHand cards n ph =
+  let (gs, oid) = handOne (Cards.lightningBoltPrinting cards) (mountainsInPlay cards n)
    in (gs {GameState.phase = ph}, oid)
 
 -- alice is active with one Settled creature per printing in `mine`; bob defends
@@ -419,8 +419,8 @@ combatBoardOf mine theirs =
 
 -- alice is active with `a` Settled Pikers; bob defends with `b` Settled Pikers.
 -- Returns the attackers' ids and the blockers' ids alongside the state.
-combatBoard :: Int -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
-combatBoard a b = combatBoardOf (replicate a Cards.pikerPrinting) (replicate b Cards.pikerPrinting)
+combatBoard :: Cards.Cards -> Int -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+combatBoard cards a b = combatBoardOf (replicate a (Cards.pikerPrinting cards)) (replicate b (Cards.pikerPrinting cards))
 
 -- Attack with everything, block per the given plan, then deal damage.
 fightWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
@@ -499,27 +499,27 @@ tappedCount pid gs =
 handSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 
-pikerCard :: Card.Type.Card
-pikerCard = Printing.card Cards.pikerPrinting
+pikerCard :: Cards.Cards -> Card.Type.Card
+pikerCard cards = Printing.card (Cards.pikerPrinting cards)
 
 -- The printings M2a adds, paired with the single keyword each must carry.
-m2aPrintings :: [(Printing.Printing, Keyword.Keyword)]
-m2aPrintings =
-  [ (Cards.birdMaidenPrinting, Keyword.Flying),
-    (Cards.nimbleBirdstickerPrinting, Keyword.Reach),
-    (Cards.ogreSentryPrinting, Keyword.Defender),
-    (Cards.windseekerCentaurPrinting, Keyword.Vigilance),
-    (Cards.goblinChariotPrinting, Keyword.Haste)
+m2aPrintings :: Cards.Cards -> [(Printing.Printing, Keyword.Keyword)]
+m2aPrintings cards =
+  [ (Cards.birdMaidenPrinting cards, Keyword.Flying),
+    (Cards.nimbleBirdstickerPrinting cards, Keyword.Reach),
+    (Cards.ogreSentryPrinting cards, Keyword.Defender),
+    (Cards.windseekerCentaurPrinting cards, Keyword.Vigilance),
+    (Cards.goblinChariotPrinting cards, Keyword.Haste)
   ]
 
 -- A GameState with a single Mountain in alice's hand, in a chosen phase.
-oneMountainState :: Phase.Phase -> GameState.GameState
-oneMountainState ph =
+oneMountainState :: Cards.Cards -> Phase.Phase -> GameState.GameState
+oneMountainState cards ph =
   let oid = ObjectId.MkObjectId 0
       obj =
         Object.MkObject
           { Object.owner = alice,
-            Object.source = Source.OfCard Cards.mountainPrinting,
+            Object.source = Source.OfCard (Cards.mountainPrinting cards),
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
@@ -564,13 +564,13 @@ drawStep = Engine.runTurnBasedActions (Phase.Beginning BeginningStep.DrawStep)
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer
 -- (lookupMin prefers ToCreature over ToPlayer, and the Piker is the only
 -- creature). Returns (pre-cast state, post-cast state, Bolt's hand id).
-boltAtBobsPiker :: (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
-boltAtBobsPiker =
-  let (_, withPiker) = addPiker bob (mountainsInPlay 1)
-      (gs, oid) = handOne Cards.lightningBoltPrinting withPiker
+boltAtBobsPiker :: Cards.Cards -> (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
+boltAtBobsPiker cards =
+  let (_, withPiker) = addPiker cards bob (mountainsInPlay cards 1)
+      (gs, oid) = handOne (Cards.lightningBoltPrinting cards) withPiker
    in (gs, snd (Engine.runGamePure identityAnswer gs (Cast.castSpell alice oid)), oid)
 
--- The single creature bob controls in a fixture built by addPiker.
+-- The single creature bob controls in a fixture built by (addPiker cards).
 pikerOf :: GameState.GameState -> ObjectId.ObjectId
 pikerOf gs = case Game.zoneMembers Zone.Battlefield bob gs of
   oid : _ -> oid

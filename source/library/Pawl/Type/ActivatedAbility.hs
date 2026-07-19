@@ -1,9 +1,6 @@
-{-# LANGUAGE DeriveLift #-}
-
 module Pawl.Type.ActivatedAbility where
 
 import Data.Map.Strict (Map)
-import Language.Haskell.TH.Syntax (Lift)
 import Pawl.Type.AbilityCost (AbilityCost)
 import Pawl.Type.Effect (Effect)
 import Pawl.Type.SlotName (SlotName)
@@ -18,4 +15,4 @@ data ActivatedAbility = MkActivatedAbility
     effects :: [Effect],
     targetSpecs :: Map SlotName TargetSpec
   }
-  deriving (Eq, Lift, Ord, Show)
+  deriving (Eq, Ord, Show)

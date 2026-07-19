@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 
 -- Covers Pawl.Damage and Pawl.Sba: the damage funnel, deathtouch, trample, and
--- state-based actions. (m2cPropertyTests is deterministic fixture coverage, not
+-- state-based actions. ((m2cPropertyTests cards) is deterministic fixture coverage, not
 -- QuickCheck properties.)
 module Pawl.DamageSpec where
 
@@ -38,25 +38,25 @@ import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 import qualified Test.Tasty.QuickCheck as QC
 
-creatureSbaTests :: Tasty.TestTree
-creatureSbaTests =
+creatureSbaTests :: Cards.Cards -> Tasty.TestTree
+creatureSbaTests cards =
   Tasty.testGroup
     "CreatureSba"
     [ HU.testCase "CR 704.5g a creature with lethal damage is destroyed" $
-        let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
             after = Sba.checkStateBasedActions (S.markDamage oid 1 gs)
          in do
               HU.assertEqual "off the battlefield" [] (Game.zoneMembers Zone.Battlefield S.alice after)
               HU.assertEqual "in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       HU.testCase "CR 704.5g damage below toughness is not lethal" $
-        let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
             -- A Piker is 2/1, so 0 marked damage is survivable and 1 is not.
             after = Sba.checkStateBasedActions (S.markDamage oid 0 gs)
          in HU.assertEqual "still there" 1 (length (Game.zoneMembers Zone.Battlefield S.alice after)),
       HU.testCase "CR 704.5g a Mountain with damage marked is not destroyed" $
         -- Not a creature: 704.5f/g do not apply. This is the classification
         -- doing its job -- the check never asks WHICH card it is.
-        let gs = S.mountainsInPlay 1
+        let gs = S.mountainsInPlay cards 1
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
               [] -> HU.assertFailure "fixture should have one Mountain"
               oid : _ ->
@@ -65,7 +65,7 @@ creatureSbaTests =
                   1
                   (length (Game.zoneMembers Zone.Battlefield S.alice (Sba.checkStateBasedActions (S.markDamage oid 5 gs)))),
       HU.testCase "a destroyed creature conserves objects" $
-        let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
             marked = S.markDamage oid 1 gs
          in HU.assertEqual
               "conserved"
@@ -75,30 +75,30 @@ creatureSbaTests =
       -- creature to the graveyard" property: two 2/1 Pikers trade in combat and
       -- both die to the CR 704.5g state-based action.
       HU.testCase "a creature dies in a played-out combat" $
-        let (gs, _, _) = S.combatBoard 1 1
+        let (gs, _, _) = S.combatBoard cards 1 1
             after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "attacker died" 0 (S.creaturesInPlay S.alice after)
               HU.assertEqual "blocker died" 0 (S.creaturesInPlay S.bob after)
     ]
 
-damageTests :: Tasty.TestTree
-damageTests =
+damageTests :: Cards.Cards -> Tasty.TestTree
+damageTests cards =
   Tasty.testGroup
     "Damage"
     [ HU.testCase "a permanent starts with no damage marked" $
-        let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual "none" (Just 0) (S.damageOf oid gs),
       HU.testCase "CR 514.2 marked damage is removed" $
-        let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual "removed" (Just 0) (S.damageOf oid (Damage.removeAllDamage (S.markDamage oid 1 gs))),
       HU.testCase "CR 514.2 damage wears off at the cleanup step" $
-        let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
             marked = S.markDamage oid 1 gs
             after = snd (Engine.runGamePure S.identityAnswer marked (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
          in HU.assertEqual "worn off" (Just 0) (S.damageOf oid after),
       HU.testCase "CR 400.7 a new object carries no damage forward" $
-        let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
             marked = S.markDamage oid 1 gs
             after = Event.changeZone oid Zone.Graveyard marked
          in case Game.zoneMembers Zone.Graveyard S.alice after of
@@ -127,12 +127,12 @@ sbaTests =
          in HU.assertEqual "draw" (Just Result.Drawn) (GameState.result after)
     ]
 
-damageEventTests :: Tasty.TestTree
-damageEventTests =
+damageEventTests :: Cards.Cards -> Tasty.TestTree
+damageEventTests cards =
   Tasty.testGroup
     "DamageEvent"
     [ HU.testCase "a blocked 2/1 trade emits both damage events" $
-        let (gs, mine, theirs) = S.combatBoard 1 1
+        let (gs, mine, theirs) = S.combatBoard cards 1 1
             after = S.fightWith S.aggressiveAnswer gs
             events = GameState.damageEvents after
          in case (mine, theirs) of
@@ -144,7 +144,7 @@ damageEventTests =
                   elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False) events
               _ -> HU.assertFailure "fixture should have one creature per side",
       HU.testCase "an unblocked 2/1 emits a ToPlayer event" $
-        let (gs, mine, _) = S.combatBoard 1 0
+        let (gs, mine, _) = S.combatBoard cards 1 0
             after = S.fightWith S.aggressiveAnswer gs
          in case mine of
               a : _ ->
@@ -155,31 +155,31 @@ damageEventTests =
               _ -> HU.assertFailure "fixture should have an attacker"
     ]
 
-deathtouchTests :: Tasty.TestTree
-deathtouchTests =
+deathtouchTests :: Cards.Cards -> Tasty.TestTree
+deathtouchTests cards =
   Tasty.testGroup
     "Deathtouch"
     [ HU.testCase "CR 704.5h a 1/1 deathtoucher destroys a 3/3 it deals 1 to" $
         -- Typhoid Rats attacks, Ogre Sentry blocks. Rat deals 1 -> Ogre dies by
         -- 704.5h (toughness 3, not lethal by the numbers); Ogre's 3 kills the Rat.
-        let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting] [Cards.ogreSentryPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
             after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "the Ogre is dead" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "the Rat is dead" 0 (S.creaturesInPlay S.alice after),
       HU.testCase "CR 704.5g the control: a 2/1 without deathtouch leaves the 3/3 alive" $
-        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting] [Cards.ogreSentryPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting cards] [Cards.ogreSentryPrinting cards]
             after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
          in HU.assertEqual "the Ogre survives" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "the SBA check drains the damage events" $
-        let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting] [Cards.ogreSentryPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
             after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
          in HU.assertEqual "events drained" [] (GameState.damageEvents after),
       HU.testCase "CR 702.2e the deal-time bit is true for a real deathtoucher, false for a plain source" $
         -- Typhoid Rats (deathtouch) and Ogre Sentry trade combat damage under
         -- aggressiveAnswer (which DOES declare attackers). fightWith runs no SBAs,
         -- so the wave is still in damageEvents.
-        let (gs, rats, ogres) = S.combatBoardOf [Cards.typhoidRatsPrinting] [Cards.ogreSentryPrinting]
+        let (gs, rats, ogres) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
             fought = S.fightWith S.aggressiveAnswer gs
             ratId = case rats of r : _ -> r; [] -> ObjectId.MkObjectId 999
             ogreId = case ogres of o : _ -> o; [] -> ObjectId.MkObjectId 999
@@ -190,8 +190,8 @@ deathtouchTests =
       HU.testCase "CR 702.2e Humility removes deathtouch, so the deal-time bit is false" $
         -- Under Humility the Rat loses deathtouch (layer 6); its combat-damage
         -- event's bit is false -- asserted directly on the event, not via a kill.
-        let (gs0, rats, _) = S.combatBoardOf [Cards.typhoidRatsPrinting] [Cards.ogreSentryPrinting]
-            gs = S.withHumility gs0
+        let (gs0, rats, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
+            gs = S.withHumility cards gs0
             fought = S.fightWith S.aggressiveAnswer gs
             ratId = case rats of r : _ -> r; [] -> ObjectId.MkObjectId 999
             ratBit = any (\ev -> DamageEvent.source ev == ratId && DamageEvent.dealtByDeathtouch ev) (GameState.damageEvents fought)
@@ -297,14 +297,14 @@ tramplingAnswer p = case p of
           [] -> toBlockers
   _ -> S.aggressiveAnswer p
 
-trampleTests :: Tasty.TestTree
-trampleTests =
+trampleTests :: Cards.Cards -> Tasty.TestTree
+trampleTests cards =
   Tasty.testGroup
     "Trample"
     [ HU.testCase "CR 702.19b a 3/3 trampler spills excess onto the defending player" $
         -- War Mammoth (3/3 trample) blocked by a Piker (2/1): 1 lethal to the
         -- Piker, 2 to bob. Mammoth survives (2 marked < 3).
-        let (gs, _, _) = S.combatBoardOf [Cards.warMammothPrinting] [Cards.pikerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.warMammothPrinting cards] [Cards.pikerPrinting cards]
             after = Sba.checkStateBasedActions (S.fightWith tramplingAnswer gs)
          in do
               HU.assertEqual "bob took the 2 overflow" (Just 18) (S.lifeOf S.bob after)
@@ -314,13 +314,13 @@ trampleTests =
         -- Ogre Sentry is a 3/3 that cannot attack (defender), so use the Piker's
         -- existing behavior as the control: a blocked non-trample attacker deals
         -- nothing to the player. (combatDamageTests already asserts bob = 20.)
-        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting] [Cards.pikerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
             after = S.fightWith tramplingAnswer gs
          in HU.assertEqual "bob untouched by a non-trampler" (Just 20) (S.lifeOf S.bob after),
       HU.testCase "CR 702.19b defender-short assignment is rejected" $
         -- A cheat responder gives bob 3 while the Piker gets 0. Illegal: the
         -- attacker deals nothing, bob untouched, Piker survives.
-        let (gs, _, _) = S.combatBoardOf [Cards.warMammothPrinting] [Cards.pikerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.warMammothPrinting cards] [Cards.pikerPrinting cards]
             cheat p = case p of
               Prompt.AssignCombatDamage _ _ _ thresholds n ->
                 case filter (not . S.isCreatureRecipient) (Map.keys thresholds) of
@@ -336,7 +336,7 @@ trampleTests =
         -- cannot reach lethal on both (needs 6, has 3), so no overflow -- bob is
         -- untouched -- and the division among the Ogres is free. Real cards, the
         -- power-below-lethal case the property covers exhaustively.
-        let (gs, _, _) = S.combatBoardOf [Cards.warMammothPrinting] [Cards.ogreSentryPrinting, Cards.ogreSentryPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.warMammothPrinting cards] [Cards.ogreSentryPrinting cards, Cards.ogreSentryPrinting cards]
             dumpOne p = case p of
               Prompt.AssignCombatDamage _ _ _ thresholds n ->
                 case filter S.isCreatureRecipient (Map.keys thresholds) of
@@ -364,8 +364,8 @@ grantDeathtouch oid gs =
           }
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
-trampleDeathtouchTests :: Tasty.TestTree
-trampleDeathtouchTests =
+trampleDeathtouchTests :: Cards.Cards -> Tasty.TestTree
+trampleDeathtouchTests cards =
   Tasty.testGroup
     "TrampleDeathtouch"
     [ HU.testCase "CR 702.2c a deathtouch-granted trampler needs only 1 on the blocker, spilling the rest" $
@@ -373,7 +373,7 @@ trampleDeathtouchTests =
         -- lethal collapses to 1, so 1 to the Ogre and 2 tramples to bob; the Ogre
         -- still dies (704.5h, via the deal-time bit). Real cards replace M2c's
         -- synthetic deathtrampler.
-        let (gs0, mammoths, _) = S.combatBoardOf [Cards.warMammothPrinting] [Cards.ogreSentryPrinting]
+        let (gs0, mammoths, _) = S.combatBoardOf [Cards.warMammothPrinting cards] [Cards.ogreSentryPrinting cards]
             mammothId = case mammoths of
               m : _ -> m
               [] -> ObjectId.MkObjectId 999
@@ -385,13 +385,13 @@ trampleDeathtouchTests =
       HU.testCase "CR 702.19b the control: plain trample into the same 3/3 spills nothing" $
         -- War Mammoth (3/3 trample, NO deathtouch) into Ogre Sentry (3/3): lethal
         -- is 3, all 3 go to the Ogre, 0 tramples. Only deathtouch changes the spill.
-        let (gs, _, _) = S.combatBoardOf [Cards.warMammothPrinting] [Cards.ogreSentryPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.warMammothPrinting cards] [Cards.ogreSentryPrinting cards]
             after = Sba.checkStateBasedActions (S.fightWith tramplingAnswer gs)
          in HU.assertEqual "bob untouched without deathtouch" (Just 20) (S.lifeOf S.bob after)
     ]
 
-m2cPropertyTests :: Tasty.TestTree
-m2cPropertyTests =
+m2cPropertyTests :: Cards.Cards -> Tasty.TestTree
+m2cPropertyTests cards =
   Tasty.testGroup
     "M2cProperties"
     [ HU.testCase "a deathtoucher's victim with toughness > 0 is gone after the SBA" $
@@ -399,9 +399,9 @@ m2cPropertyTests =
         -- the M2c coverage; it becomes a random-game property when a deathtoucher
         -- joins a deck -- git-bug's castability work). Every toughness we throw at
         -- the 1/1 deathtoucher dies to it.
-        let victims = [Cards.pikerPrinting, Cards.nimbleBirdstickerPrinting, Cards.ogreSentryPrinting]
+        let victims = [Cards.pikerPrinting cards, Cards.nimbleBirdstickerPrinting cards, Cards.ogreSentryPrinting cards]
             killsIt v =
-              let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting] [v]
+              let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [v]
                   after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
                in S.creaturesInPlay S.bob after == 0
          in HU.assertBool "deathtouch kills every toughness" (all killsIt victims),
@@ -414,17 +414,17 @@ m2cPropertyTests =
         HU.assertBool "see TrampleDeathtouch and Deathtouch groups" True
     ]
 
-tests :: Tasty.TestTree
-tests =
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards =
   Tasty.testGroup
     "Damage"
-    [ damageTests,
-      damageEventTests,
-      deathtouchTests,
+    [ damageTests cards,
+      damageEventTests cards,
+      deathtouchTests cards,
       assignmentLegalityTests,
-      trampleTests,
-      trampleDeathtouchTests,
+      trampleTests cards,
+      trampleDeathtouchTests cards,
       sbaTests,
-      creatureSbaTests,
-      m2cPropertyTests
+      creatureSbaTests cards,
+      m2cPropertyTests cards
     ]

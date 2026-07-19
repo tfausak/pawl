@@ -1,8 +1,5 @@
-{-# LANGUAGE DeriveLift #-}
-
 module Pawl.Type.StaticAbility where
 
-import Language.Haskell.TH.Syntax (Lift)
 import Pawl.Type.Affected (Affected)
 import Pawl.Type.Modification (Modification)
 
@@ -17,4 +14,4 @@ data StaticAbility = MkStaticAbility
   { affected :: Affected,
     modification :: Modification
   }
-  deriving (Eq, Lift, Ord, Show)
+  deriving (Eq, Ord, Show)

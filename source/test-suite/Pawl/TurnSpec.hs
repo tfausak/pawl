@@ -71,8 +71,8 @@ turnDataTests =
               HU.assertEqual "remaining" Turn.laterPhases (GameState.remaining gs)
     ]
 
-skipTests :: Tasty.TestTree
-skipTests =
+skipTests :: Cards.Cards -> Tasty.TestTree
+skipTests cards =
   Tasty.testGroup
     "Skip"
     [ HU.testCase "CR 508.8 dropSkippedCombatSteps removes declare blockers and combat damage" $
@@ -94,7 +94,7 @@ skipTests =
       HU.testCase "CR 508.8 an attacker keeps the declare blockers step" $
         -- The control: with an attacker, the step after declare attackers is
         -- declare blockers, exactly as before. So the skip is not "always skip".
-        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting] []
+        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting cards] []
             after = snd (Engine.runGamePure S.aggressiveAnswer gs Engine.runStep)
          in HU.assertEqual "declare blockers still next" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase after),
       HU.testCase "CR 508.8 an attacker-less combat changes no life total" $
@@ -110,7 +110,7 @@ skipTests =
         -- bob holds a castable Bolt; nobody attacks. The blockers and damage
         -- steps are still dropped -- the priority windows an instant would use
         -- in them do not exist (CR 500.11: proceed as though they don't).
-        let (base, _) = S.boltInHand 1 (Phase.Combat CombatStep.DeclareAttackers)
+        let (base, _) = S.boltInHand cards 1 (Phase.Combat CombatStep.DeclareAttackers)
             armed = base {GameState.activePlayer = S.bob}
             after = snd (Engine.runGamePure S.identityAnswer armed (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers)))
             remaining = foldr (:) [] (GameState.remaining after)
@@ -124,5 +124,5 @@ dedupe xs = case xs of
   [] -> []
   h : t -> h : dedupe (filter (/= h) t)
 
-tests :: Tasty.TestTree
-tests = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests]
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests cards]

@@ -17,88 +17,88 @@ import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-deckTests :: Tasty.TestTree
-deckTests =
+deckTests :: Cards.Cards -> Tasty.TestTree
+deckTests cards =
   Tasty.testGroup
     "Deck"
     [ HU.testCase "the red deck is 60 cards" $
-        HU.assertEqual "size" 60 (Setup.deckSize Cards.redDeck),
+        HU.assertEqual "size" 60 (Setup.deckSize (Cards.redDeck cards)),
       HU.testCase "the green deck is 60 cards" $
-        HU.assertEqual "size" 60 (Setup.deckSize Cards.greenDeck),
+        HU.assertEqual "size" 60 (Setup.deckSize (Cards.greenDeck cards)),
       HU.testCase "the black deck is 60 cards" $
-        HU.assertEqual "size" 60 (Setup.deckSize Cards.blackDeck),
+        HU.assertEqual "size" 60 (Setup.deckSize (Cards.blackDeck cards)),
       HU.testCase "red deck composition" $
-        let Deck.MkDeck m = Cards.redDeck
+        let Deck.MkDeck m = Cards.redDeck cards
          in do
-              HU.assertEqual "mountains" (Just 36) (Map.lookup Cards.mountainPrinting m)
-              HU.assertEqual "pikers" (Just 12) (Map.lookup Cards.pikerPrinting m)
-              HU.assertEqual "maidens" (Just 8) (Map.lookup Cards.birdMaidenPrinting m)
-              HU.assertEqual "bolts" (Just 4) (Map.lookup Cards.lightningBoltPrinting m),
+              HU.assertEqual "mountains" (Just 36) (Map.lookup (Cards.mountainPrinting cards) m)
+              HU.assertEqual "pikers" (Just 12) (Map.lookup (Cards.pikerPrinting cards) m)
+              HU.assertEqual "maidens" (Just 8) (Map.lookup (Cards.birdMaidenPrinting cards) m)
+              HU.assertEqual "bolts" (Just 4) (Map.lookup (Cards.lightningBoltPrinting cards) m),
       HU.testCase "green deck composition" $
-        let Deck.MkDeck m = Cards.greenDeck
+        let Deck.MkDeck m = Cards.greenDeck cards
          in do
-              HU.assertEqual "forests" (Just 36) (Map.lookup Cards.forestPrinting m)
-              HU.assertEqual "mammoths" (Just 16) (Map.lookup Cards.warMammothPrinting m)
-              HU.assertEqual "giant growths" (Just 4) (Map.lookup Cards.giantGrowthPrinting m)
-              HU.assertEqual "serpent's gifts" (Just 4) (Map.lookup Cards.serpentsGiftPrinting m),
+              HU.assertEqual "forests" (Just 36) (Map.lookup (Cards.forestPrinting cards) m)
+              HU.assertEqual "mammoths" (Just 16) (Map.lookup (Cards.warMammothPrinting cards) m)
+              HU.assertEqual "giant growths" (Just 4) (Map.lookup (Cards.giantGrowthPrinting cards) m)
+              HU.assertEqual "serpent's gifts" (Just 4) (Map.lookup (Cards.serpentsGiftPrinting cards) m),
       HU.testCase "black deck composition" $
-        let Deck.MkDeck m = Cards.blackDeck
+        let Deck.MkDeck m = Cards.blackDeck cards
          in do
-              HU.assertEqual "swamps" (Just 36) (Map.lookup Cards.swampPrinting m)
-              HU.assertEqual "rats" (Just 24) (Map.lookup Cards.typhoidRatsPrinting m),
+              HU.assertEqual "swamps" (Just 36) (Map.lookup (Cards.swampPrinting cards) m)
+              HU.assertEqual "rats" (Just 24) (Map.lookup (Cards.typhoidRatsPrinting cards) m),
       HU.testCase "36 Mountains per player after a red-red setup" $
-        HU.assertEqual "mountains" 36 (S.countByName (Text.pack "Mountain") S.alice setupState),
+        HU.assertEqual "mountains" 36 (S.countByName (Text.pack "Mountain") S.alice (setupState cards)),
       HU.testCase "8 Bird Maidens per player after a red-red setup" $
-        HU.assertEqual "maidens" 8 (S.countByName (Text.pack "Bird Maiden") S.alice setupState),
+        HU.assertEqual "maidens" 8 (S.countByName (Text.pack "Bird Maiden") S.alice (setupState cards)),
       HU.testCase "12 Pikers per player after a red-red setup" $
-        HU.assertEqual "pikers" 12 (S.countByName (Text.pack "Goblin Piker") S.bob setupState),
+        HU.assertEqual "pikers" 12 (S.countByName (Text.pack "Goblin Piker") S.bob (setupState cards)),
       HU.testCase "4 Lightning Bolts per player after a red-red setup" $
-        HU.assertEqual "bolts" 4 (S.countByName (Text.pack "Lightning Bolt") S.alice setupState)
+        HU.assertEqual "bolts" 4 (S.countByName (Text.pack "Lightning Bolt") S.alice (setupState cards))
     ]
 
-setupState :: GameState.GameState
-setupState =
+setupState :: Cards.Cards -> GameState.GameState
+setupState cards =
   Program.foldProgram
     S.identityAnswer
-    (State.execStateT (Setup.newGame S.redRed) (Setup.emptyGame S.bothPlayers))
+    (State.execStateT (Setup.newGame (S.redRed cards)) (Setup.emptyGame S.bothPlayers))
 
-setupTests :: Tasty.TestTree
-setupTests =
+setupTests :: Cards.Cards -> Tasty.TestTree
+setupTests cards =
   Tasty.testGroup
     "Setup"
     [ HU.testCase "120 objects after setup" $
-        HU.assertEqual "count" 120 (Game.objectCount setupState),
+        HU.assertEqual "count" 120 (Game.objectCount (setupState cards)),
       HU.testCase "each library has 53 after opening draws" $
-        HU.assertEqual "library" 53 (length (Game.zoneMembers Zone.Library S.alice setupState)),
+        HU.assertEqual "library" 53 (length (Game.zoneMembers Zone.Library S.alice (setupState cards))),
       HU.testCase "each hand has 7" $
-        HU.assertEqual "hand" 7 (length (Game.zoneMembers Zone.Hand S.bob setupState)),
+        HU.assertEqual "hand" 7 (length (Game.zoneMembers Zone.Hand S.bob (setupState cards))),
       HU.testCase "active player is first in turn order" $
-        HU.assertEqual "active" S.alice (GameState.activePlayer setupState),
+        HU.assertEqual "active" S.alice (GameState.activePlayer (setupState cards)),
       HU.testCase "runMatch derives the players from the matchup (git-bug 15de615)" $
-        let (result, final) = Engine.runMatchPure S.identityAnswer S.redRed
+        let (result, final) = Engine.runMatchPure S.identityAnswer (S.redRed cards)
          in do
               HU.assertBool "has a result" (Maybe.isJust (GameState.result final))
               HU.assertEqual "both players have a life total" 2 (Map.size (GameState.players final))
               HU.assertEqual "the result is the run's result" (Just result) (GameState.result final)
     ]
 
-greenBlackSetup :: GameState.GameState
-greenBlackSetup =
+greenBlackSetup :: Cards.Cards -> GameState.GameState
+greenBlackSetup cards =
   Program.foldProgram
     S.identityAnswer
-    (State.execStateT (Setup.newGame S.greenBlack) (Setup.emptyGame S.bothPlayers))
+    (State.execStateT (Setup.newGame (S.greenBlack cards)) (Setup.emptyGame S.bothPlayers))
 
-greenBlackSetupTests :: Tasty.TestTree
-greenBlackSetupTests =
+greenBlackSetupTests :: Cards.Cards -> Tasty.TestTree
+greenBlackSetupTests cards =
   Tasty.testGroup
     "GreenBlackSetup"
     [ HU.testCase "alice's green deck deals 36 Forests" $
-        HU.assertEqual "forests" 36 (S.countByName (Text.pack "Forest") S.alice greenBlackSetup),
+        HU.assertEqual "forests" 36 (S.countByName (Text.pack "Forest") S.alice (greenBlackSetup cards)),
       HU.testCase "bob's black deck deals 36 Swamps" $
-        HU.assertEqual "swamps" 36 (S.countByName (Text.pack "Swamp") S.bob greenBlackSetup),
+        HU.assertEqual "swamps" 36 (S.countByName (Text.pack "Swamp") S.bob (greenBlackSetup cards)),
       HU.testCase "green-black setup conserves 120 objects" $
-        HU.assertEqual "count" 120 (Game.objectCount greenBlackSetup)
+        HU.assertEqual "count" 120 (Game.objectCount (greenBlackSetup cards))
     ]
 
-tests :: Tasty.TestTree
-tests = Tasty.testGroup "Setup" [setupTests, greenBlackSetupTests, deckTests]
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards = Tasty.testGroup "Setup" [setupTests cards, greenBlackSetupTests cards, deckTests cards]

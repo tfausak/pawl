@@ -1,9 +1,6 @@
-{-# LANGUAGE DeriveLift #-}
-
 module Pawl.Type.Affected where
 
 import Data.Set (Set)
-import Language.Haskell.TH.Syntax (Lift)
 import Pawl.Type.ObjectId (ObjectId)
 
 -- What a continuous effect applies to. CR 611.2c: a resolution effect's set is
@@ -17,4 +14,4 @@ data Affected
   | AllLands -- Urborg
   | AllNonbasicLands -- Blood Moon
   | OtherNonAuraEnchantments -- Opalescence ("each other"); self excluded by the effect's source at fold time
-  deriving (Eq, Lift, Ord, Show)
+  deriving (Eq, Ord, Show)

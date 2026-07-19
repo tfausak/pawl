@@ -1,8 +1,4 @@
-{-# LANGUAGE DeriveLift #-}
-
 module Pawl.Type.Duration where
-
-import Language.Haskell.TH.Syntax (Lift)
 
 -- How long a stored continuous effect lasts (CR 611.2). Only UntilEndOfTurn
 -- (CR 514.2 drops it during cleanup) exists at M3b; static-ability effects carry
@@ -12,4 +8,4 @@ import Language.Haskell.TH.Syntax (Lift)
 data Duration
   = UntilEndOfTurn -- CR 514.2 (M3b)
   | Indefinite -- CR 611: "lasts indefinitely" (Magical Hack); cleanup never drops it
-  deriving (Eq, Lift, Ord, Show)
+  deriving (Eq, Ord, Show)

@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Cards as Cards
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Replay as Replay
@@ -50,10 +51,10 @@ combatReplayTests =
             HU.assertEqual "all to one blocker" (Map.singleton (Recipient.ToCreature oid) 2) (Replay.defaultAnswer damagePrompt)
         ]
 
-replayTests :: Tasty.TestTree
-replayTests =
-  let start = Setup.emptyGame (NonEmpty.map fst S.redRed)
-      game = Engine.playFrom S.redRed
+replayTests :: Cards.Cards -> Tasty.TestTree
+replayTests cards =
+  let start = Setup.emptyGame (NonEmpty.map fst (S.redRed cards))
+      game = Engine.playFrom (S.redRed cards)
       -- Recorded with playLandAnswer, whose choices differ from Replay's
       -- exhausted-transcript fallback. That keeps these assertions honest: the
       -- transcript has to actually carry the decisions.
@@ -75,5 +76,5 @@ replayTests =
              in HU.assertEqual "decode . encode = Just" (Just answer) (Replay.decode p (Replay.encode p answer))
         ]
 
-tests :: Tasty.TestTree
-tests = Tasty.testGroup "Replay" [replayTests, combatReplayTests]
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards = Tasty.testGroup "Replay" [replayTests cards, combatReplayTests]

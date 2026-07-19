@@ -40,11 +40,11 @@ import qualified Test.Tasty.HUnit as HU
 -- alice has a Forest for mana, a Piker on the battlefield, and Giant Growth in
 -- hand, in her main phase. Cast Giant Growth (identityAnswer targets the only
 -- creature), then resolve it.
-giantGrowthOnPiker :: (ObjectId.ObjectId, GameState.GameState)
-giantGrowthOnPiker =
-  let base = S.landsInPlay Cards.forestPrinting 1
-      (pikerId, withPiker) = S.addPiker S.alice base
-      (gs, ggId) = S.handOne Cards.giantGrowthPrinting withPiker
+giantGrowthOnPiker :: Cards.Cards -> (ObjectId.ObjectId, GameState.GameState)
+giantGrowthOnPiker cards =
+  let base = S.landsInPlay (Cards.forestPrinting cards) 1
+      (pikerId, withPiker) = S.addPiker cards S.alice base
+      (gs, ggId) = S.handOne (Cards.giantGrowthPrinting cards) withPiker
       cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice ggId))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (pikerId, resolved)
@@ -76,12 +76,12 @@ withDynamicEffect aff ts m gs =
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
 -- The object timestamp of the (single) Humility on the battlefield.
-humilityTimestamp :: GameState.GameState -> Timestamp.Timestamp
-humilityTimestamp gs =
+humilityTimestamp :: Cards.Cards -> GameState.GameState -> Timestamp.Timestamp
+humilityTimestamp cards gs =
   let isHum oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> case Object.source obj of
-          Source.OfCard p -> Printing.card p == Printing.card Cards.humilityPrinting
+          Source.OfCard p -> Printing.card p == Printing.card (Cards.humilityPrinting cards)
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
       hums = filter isHum (Set.toList (GameState.battlefield gs))
@@ -93,25 +93,25 @@ humilityTimestamp gs =
 -- Blood Moon, Urborg, and a Forest on the battlefield. `urborgFirst` controls
 -- the timestamp order (fresh timestamps ascend with placement), to prove the
 -- outcome is order-INDEPENDENT (CR 613.8 dependency overrides CR 613.7).
-bloodMoonUrborg :: Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-bloodMoonUrborg urborgFirst =
+bloodMoonUrborg :: Cards.Cards -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+bloodMoonUrborg cards urborgFirst =
   let base = Setup.emptyGame S.bothPlayers
-      (forestId, g1) = S.addCreature Cards.forestPrinting S.alice base
+      (forestId, g1) = S.addCreature (Cards.forestPrinting cards) S.alice base
       place g =
         if urborgFirst
           then
-            let (u, g') = S.addCreature Cards.urborgPrinting S.alice g
-                (_, g'') = S.addCreature Cards.bloodMoonPrinting S.alice g'
+            let (u, g') = S.addCreature (Cards.urborgPrinting cards) S.alice g
+                (_, g'') = S.addCreature (Cards.bloodMoonPrinting cards) S.alice g'
              in (u, g'')
           else
-            let (_, g') = S.addCreature Cards.bloodMoonPrinting S.alice g
-                (u, g'') = S.addCreature Cards.urborgPrinting S.alice g'
+            let (_, g') = S.addCreature (Cards.bloodMoonPrinting cards) S.alice g
+                (u, g'') = S.addCreature (Cards.urborgPrinting cards) S.alice g'
              in (u, g'')
       (urborgId, gs) = place g1
    in (forestId, urborgId, gs)
 
-tests :: Tasty.TestTree
-tests =
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards =
   Tasty.testGroup
     "Projection"
     [ HU.testCase "layer classification matches CR 613.1" $ do
@@ -120,29 +120,29 @@ tests =
         HU.assertEqual "set base is 7b" Layer.SetPT (Projection.layer (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))
         HU.assertEqual "modify is 7c" Layer.ModifyPT (Projection.layer (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))),
       HU.testCase "no effects: the projection is the base printing (Piker is 2/1)" $
-        let (oid, gs) = S.addPiker S.bob (S.mountainsInPlay 1)
+        let (oid, gs) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
          in do
               HU.assertEqual "power" (Just 2) (Projection.powerOf oid gs)
               HU.assertEqual "toughness" (Just 1) (Projection.toughnessOf oid gs)
               HU.assertBool "no keywords" (Set.null (Projection.keywordsOf oid gs)),
       HU.testCase "CR 613.3 layer 7c +3/+3 raises a Piker to 5/4" $
-        let (oid, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
+        let (oid, gs0) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
             gs = withEffect oid (Timestamp.MkTimestamp 100) (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs0
          in do
               HU.assertEqual "power" (Just 5) (Projection.powerOf oid gs)
               HU.assertEqual "toughness" (Just 4) (Projection.toughnessOf oid gs),
       HU.testCase "CR 613 layer 6 GainKeyword adds deathtouch" $
-        let (oid, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
+        let (oid, gs0) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
             gs = withEffect oid (Timestamp.MkTimestamp 100) (Modification.GainKeyword Keyword.Deathtouch) gs0
          in HU.assertBool "has deathtouch" (Projection.hasKeyword Keyword.Deathtouch oid gs),
       HU.testCase "CR 613 layer 7b SetBasePowerToughness makes a Piker 1/1" $
-        let (oid, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
+        let (oid, gs0) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
             gs = withEffect oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)) gs0
          in do
               HU.assertEqual "power" (Just 1) (Projection.powerOf oid gs)
               HU.assertEqual "toughness" (Just 1) (Projection.toughnessOf oid gs),
       HU.testCase "CR 613 sublayer order: 7b then 7c, a set-1/1 Piker with +3/+3 is 4/4" $
-        let (oid, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
+        let (oid, gs0) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
             -- Deliberately give 7c the EARLIER timestamp to prove layer beats
             -- timestamp: 7b still applies first.
             gs1 = withEffect oid (Timestamp.MkTimestamp 50) (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs0
@@ -151,33 +151,33 @@ tests =
               HU.assertEqual "power 1 then +3" (Just 4) (Projection.powerOf oid gs)
               HU.assertEqual "toughness 1 then +3" (Just 4) (Projection.toughnessOf oid gs),
       HU.testCase "CR 613.7 within layer 6, timestamp order: later grant survives an earlier lose-all" $
-        let (oid, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
+        let (oid, gs0) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
             gs1 = withEffect oid (Timestamp.MkTimestamp 10) Modification.LoseAllAbilities gs0
             gs = withEffect oid (Timestamp.MkTimestamp 20) (Modification.GainKeyword Keyword.Deathtouch) gs1
          in HU.assertBool "grant wins" (Projection.hasKeyword Keyword.Deathtouch oid gs),
       HU.testCase "CR 613.7 within layer 6, timestamp order: earlier grant is erased by a later lose-all" $
-        let (oid, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
+        let (oid, gs0) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
             gs1 = withEffect oid (Timestamp.MkTimestamp 10) (Modification.GainKeyword Keyword.Deathtouch) gs0
             gs = withEffect oid (Timestamp.MkTimestamp 20) Modification.LoseAllAbilities gs1
          in HU.assertBool "lose-all wins" (not (Projection.hasKeyword Keyword.Deathtouch oid gs)),
       HU.testCase "a P/T modification never gives P/T to a land" $
-        let gs0 = S.mountainsInPlay 1
+        let gs0 = S.mountainsInPlay cards 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
             gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs0
          in HU.assertEqual "still no power" Nothing (Projection.powerOf landId gs),
       HU.testCase "CR 611 Giant Growth stores a +3/+3 effect; the Piker is 5/4" $
-        let (pikerId, gs) = giantGrowthOnPiker
+        let (pikerId, gs) = giantGrowthOnPiker cards
          in do
               HU.assertEqual "one stored effect" 1 (length (GameState.continuousEffects gs))
               HU.assertEqual "power" (Just 5) (Projection.powerOf pikerId gs)
               HU.assertEqual "toughness" (Just 4) (Projection.toughnessOf pikerId gs),
       HU.testCase "CR 601.2c Giant Growth is uncastable with no creature to target" $
-        let (gs, ggId) = S.handOne Cards.giantGrowthPrinting (S.landsInPlay Cards.forestPrinting 1)
+        let (gs, ggId) = S.handOne (Cards.giantGrowthPrinting cards) (S.landsInPlay (Cards.forestPrinting cards) 1)
          in HU.assertBool "no legal target, not castable" (not (Cast.castable S.alice ggId gs)),
       HU.testCase "CR 514.2 an until-end-of-turn effect wears off at cleanup" $
-        let (pikerId, cast) = giantGrowthOnPiker
+        let (pikerId, cast) = giantGrowthOnPiker cards
             -- Run the cleanup step's turn-based actions; the +3/+3 must be gone.
             afterCleanup = snd (Engine.runGamePure S.identityAnswer cast (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
          in do
@@ -185,32 +185,32 @@ tests =
               HU.assertEqual "Piker back to base power" (Just 2) (Projection.powerOf pikerId afterCleanup)
               HU.assertEqual "Piker back to base toughness" (Just 1) (Projection.toughnessOf pikerId afterCleanup),
       HU.testCase "CR 613 Humility makes every creature 1/1 with no abilities" $
-        let (flyerId, gs0) = S.addCreature Cards.birdMaidenPrinting S.bob (S.mountainsInPlay 1)
-            gs = S.withHumility gs0
+        let (flyerId, gs0) = S.addCreature (Cards.birdMaidenPrinting cards) S.bob (S.mountainsInPlay cards 1)
+            gs = S.withHumility cards gs0
          in do
               HU.assertEqual "power 1" (Just 1) (Projection.powerOf flyerId gs)
               HU.assertEqual "toughness 1" (Just 1) (Projection.toughnessOf flyerId gs)
               HU.assertBool "no flying" (not (Projection.hasKeyword Keyword.Flying flyerId gs)),
       HU.testCase "CR 613 layer 6: Humility strips a creature's activated abilities" $
-        let (sorcId, g0) = S.addCreature Cards.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
-            gs = S.withHumility g0
+        let (sorcId, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            gs = S.withHumility cards g0
          in HU.assertEqual "no abilities under Humility" [] (Projection.abilitiesOf sorcId gs),
       HU.testCase "without Humility the ability is present" $
-        let (sorcId, gs) = S.addCreature Cards.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        let (sorcId, gs) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual "one ability" 1 (length (Projection.abilitiesOf sorcId gs)),
       HU.testCase "CR 704.5g Humility's toughness drop makes an already-damaged creature die" $
-        let (mammothId, gs0) = S.addCreature Cards.warMammothPrinting S.bob (S.mountainsInPlay 1)
+        let (mammothId, gs0) = S.addCreature (Cards.warMammothPrinting cards) S.bob (S.mountainsInPlay cards 1)
             damaged = S.markDamage mammothId 2 gs0
-            underHumility = S.withHumility damaged
+            underHumility = S.withHumility cards damaged
             afterSba = Sba.checkStateBasedActions underHumility
          in do
               HU.assertEqual "survives at 3/3 with 2 marked" (Just 3) (Projection.toughnessOf mammothId damaged)
               HU.assertEqual "no creature survives once toughness is 1" 0 (S.creaturesInPlay S.bob afterSba),
       HU.testCase "CR 613 layer order: Giant Growth on a Humility'd Piker is 4/4" $
-        let base = S.landsInPlay Cards.forestPrinting 1
-            (pikerId, withPiker) = S.addPiker S.alice base
-            withHum = S.withHumility withPiker
-            (gs, ggId) = S.handOne Cards.giantGrowthPrinting withHum
+        let base = S.landsInPlay (Cards.forestPrinting cards) 1
+            (pikerId, withPiker) = S.addPiker cards S.alice base
+            withHum = S.withHumility cards withPiker
+            (gs, ggId) = S.handOne (Cards.giantGrowthPrinting cards) withHum
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice ggId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in do
@@ -221,9 +221,9 @@ tests =
         -- {2}{G} needs 3 total mana; 3 Forests, not 2 (a brief fixture bug --
         -- 2 Forests only pay {1}{G}, leaving the spell uncast and the assertion
         -- vacuously true off the base card's native trample).
-        let base = S.landsInPlay Cards.forestPrinting 3
-            (mammothId, withMammoth) = S.addCreature Cards.warMammothPrinting S.alice base
-            (gs, sgId) = S.handOne Cards.serpentsGiftPrinting withMammoth
+        let base = S.landsInPlay (Cards.forestPrinting cards) 3
+            (mammothId, withMammoth) = S.addCreature (Cards.warMammothPrinting cards) S.alice base
+            (gs, sgId) = S.handOne (Cards.serpentsGiftPrinting cards) withMammoth
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice sgId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in do
@@ -235,22 +235,22 @@ tests =
         -- creates) whose timestamp straddles Humility's object timestamp, to
         -- witness BOTH orders of CR 613.7 in layer 6. h-1 and h+1 make the
         -- relative order exact, not a guess.
-        let (mammothId, gs0) = S.addCreature Cards.warMammothPrinting S.bob (S.mountainsInPlay 1)
-            withHum = S.withHumility gs0
-            Timestamp.MkTimestamp h = humilityTimestamp withHum
+        let (mammothId, gs0) = S.addCreature (Cards.warMammothPrinting cards) S.bob (S.mountainsInPlay cards 1)
+            withHum = S.withHumility cards gs0
+            Timestamp.MkTimestamp h = humilityTimestamp cards withHum
             olderGrant = withEffect mammothId (Timestamp.MkTimestamp (h - 1)) (Modification.GainKeyword Keyword.Deathtouch) withHum
             newerGrant = withEffect mammothId (Timestamp.MkTimestamp (h + 1)) (Modification.GainKeyword Keyword.Deathtouch) withHum
          in do
               HU.assertBool "grant before Humility: erased" (not (Projection.hasKeyword Keyword.Deathtouch mammothId olderGrant))
               HU.assertBool "grant after Humility: survives" (Projection.hasKeyword Keyword.Deathtouch mammothId newerGrant),
       HU.testCase "projected type line: a Piker is a Creature - Goblin Warrior" $
-        let (oid, gs) = S.addPiker S.bob (S.mountainsInPlay 1)
+        let (oid, gs) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
          in do
               HU.assertBool "is a creature" (Projection.isCreatureOf oid gs)
               HU.assertEqual "card types" (Set.singleton CardType.Creature) (Projection.cardTypesOf oid gs)
               HU.assertEqual "subtypes" (Set.fromList [Subtype.Goblin, Subtype.Warrior]) (Projection.subtypesOf oid gs),
       HU.testCase "projected type line: a Mountain is a Land - Mountain, not a creature" $
-        let gs = S.mountainsInPlay 1
+        let gs = S.mountainsInPlay cards 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
@@ -264,48 +264,48 @@ tests =
       HU.testCase "CR 613.1c layer 3: ChangeSubtypeWord is Text" $
         HU.assertEqual "text layer" Layer.Text (Projection.layer (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island)),
       HU.testCase "CR 612.1 ChangeSubtypeWord rewrites a Forest's subtype to Island" $
-        let gs0 = S.landsInPlay Cards.forestPrinting 1
+        let gs0 = S.landsInPlay (Cards.forestPrinting cards) 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
             gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Forest Subtype.Island) gs0
          in HU.assertEqual "only Island" (Set.singleton Subtype.Island) (Projection.subtypesOf landId gs),
       HU.testCase "CR 612.2 ChangeSubtypeWord for an absent type is a no-op" $
-        let gs0 = S.landsInPlay Cards.forestPrinting 1
+        let gs0 = S.landsInPlay (Cards.forestPrinting cards) 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
             gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) gs0
          in HU.assertEqual "still Forest" (Set.singleton Subtype.Forest) (Projection.subtypesOf landId gs),
       HU.testCase "CR 613.1d AddLandSubtype gives a Forest the Swamp subtype" $
-        let gs0 = S.landsInPlay Cards.forestPrinting 1
+        let gs0 = S.landsInPlay (Cards.forestPrinting cards) 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
             gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.AddLandSubtype Subtype.Swamp) gs0
          in HU.assertEqual "Forest and Swamp" (Set.fromList [Subtype.Forest, Subtype.Swamp]) (Projection.subtypesOf landId gs),
       HU.testCase "CR 305.7 SetLandSubtype sets a Forest to only Mountain" $
-        let gs0 = S.landsInPlay Cards.forestPrinting 1
+        let gs0 = S.landsInPlay (Cards.forestPrinting cards) 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
             gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.SetLandSubtype Subtype.Mountain) gs0
          in HU.assertEqual "only Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf landId gs),
       HU.testCase "CR 613.1d AddCardType makes a land a creature" $
-        let gs0 = S.landsInPlay Cards.forestPrinting 1
+        let gs0 = S.landsInPlay (Cards.forestPrinting cards) 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
             gs = withEffect landId (Timestamp.MkTimestamp 100) (Modification.AddCardType CardType.Creature) gs0
          in HU.assertBool "now a creature" (Projection.isCreatureOf landId gs),
       HU.testCase "CR 202.3 SetBasePowerToughness ManaValue sets a Piker to its mana value ({1}{R} = 2)" $
-        let (oid, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
+        let (oid, gs0) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
             gs = withEffect oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness Quantity.ManaValue Quantity.ManaValue) gs0
          in do
               HU.assertEqual "power = mana value" (Just 2) (Projection.powerOf oid gs)
               HU.assertEqual "toughness = mana value" (Just 2) (Projection.toughnessOf oid gs),
       HU.testCase "CR 613 affected-set reads the partial: a layer-4 creature-add is seen by a layer-6 AllCreatures grant" $
-        let gs0 = S.landsInPlay Cards.forestPrinting 1
+        let gs0 = S.landsInPlay (Cards.forestPrinting cards) 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
@@ -316,37 +316,37 @@ tests =
             gs = withDynamicEffect Affected.AllCreatures (Timestamp.MkTimestamp 200) (Modification.GainKeyword Keyword.Flying) gs1
          in HU.assertBool "land gained flying because it became a creature" (Projection.hasKeyword Keyword.Flying landId gs),
       HU.testCase "CR 305.7/613.8 Blood Moon strips Urborg: Urborg is only a Mountain (Blood Moon older)" $
-        let (_, urborgId, gs) = bloodMoonUrborg False
+        let (_, urborgId, gs) = bloodMoonUrborg cards False
          in HU.assertEqual "Urborg subtypes" (Set.singleton Subtype.Mountain) (Projection.subtypesOf urborgId gs),
       HU.testCase "CR 305.7/613.8 Blood Moon strips Urborg: Urborg is only a Mountain (Urborg older)" $
-        let (_, urborgId, gs) = bloodMoonUrborg True
+        let (_, urborgId, gs) = bloodMoonUrborg cards True
          in HU.assertEqual "Urborg subtypes, order-independent" (Set.singleton Subtype.Mountain) (Projection.subtypesOf urborgId gs),
       HU.testCase "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Blood Moon older)" $
-        let (forestId, _, gs) = bloodMoonUrborg False
+        let (forestId, _, gs) = bloodMoonUrborg cards False
          in HU.assertEqual "Forest stays a Forest" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs),
       HU.testCase "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Urborg older)" $
-        let (forestId, _, gs) = bloodMoonUrborg True
+        let (forestId, _, gs) = bloodMoonUrborg cards True
          in HU.assertEqual "Forest stays a Forest, order-independent" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs),
       HU.testCase "CR 612 hacking Blood Moon Mountain->Island: nonbasic lands become Islands (hack newer)" $
         let base = Setup.emptyGame S.bothPlayers
-            (nonbasicId, g1) = S.addCreature Cards.urborgPrinting S.alice base
-            (bloodMoonId, g2) = S.addCreature Cards.bloodMoonPrinting S.alice g1
+            (nonbasicId, g1) = S.addCreature (Cards.urborgPrinting cards) S.alice base
+            (bloodMoonId, g2) = S.addCreature (Cards.bloodMoonPrinting cards) S.alice g1
             gs = withEffect bloodMoonId (Timestamp.MkTimestamp 500) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g2
          in HU.assertEqual "nonbasic land is now Island" (Set.singleton Subtype.Island) (Projection.subtypesOf nonbasicId gs),
       HU.testCase "CR 612 hacking Blood Moon is order-independent (hack older)" $
         let base = Setup.emptyGame S.bothPlayers
-            (nonbasicId, g1) = S.addCreature Cards.urborgPrinting S.alice base
-            (bloodMoonId, g2) = S.addCreature Cards.bloodMoonPrinting S.alice g1
+            (nonbasicId, g1) = S.addCreature (Cards.urborgPrinting cards) S.alice base
+            (bloodMoonId, g2) = S.addCreature (Cards.bloodMoonPrinting cards) S.alice g1
             -- Timestamp 1 is older than Blood Moon's own object timestamp; the
             -- outcome must not change.
             gs = withEffect bloodMoonId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g2
          in HU.assertEqual "nonbasic land is Island, order-independent" (Set.singleton Subtype.Island) (Projection.subtypesOf nonbasicId gs),
       HU.testCase "CR 305.2 Opalescence makes Humility a creature: legal creature target and SBA-killable" $
         let base = Setup.emptyGame S.bothPlayers
-            (humilityId, g1) = S.addCreature Cards.humilityPrinting S.alice base
+            (humilityId, g1) = S.addCreature (Cards.humilityPrinting cards) S.alice base
             -- Opalescence AFTER Humility, so Opalescence's 7b (mana value 4) wins
             -- the timestamp race: Humility is a 4/4 creature.
-            (_, g2) = S.addCreature Cards.opalescencePrinting S.alice g1
+            (_, g2) = S.addCreature (Cards.opalescencePrinting cards) S.alice g1
          in do
               HU.assertBool "Humility is a creature" (Projection.isCreatureOf humilityId g2)
               HU.assertEqual "base P/T = its mana value" (Just 4) (Projection.toughnessOf humilityId g2)
@@ -355,27 +355,27 @@ tests =
               HU.assertBool "lethal damage destroys the animated enchantment" (not (Set.member humilityId (GameState.battlefield afterSba))),
       HU.testCase "CR 613 Humility + Opalescence: a real creature is 1/1 with no abilities" $
         let base = Setup.emptyGame S.bothPlayers
-            (pikerId, g1) = S.addPiker S.alice base
-            (_, g2) = S.addCreature Cards.humilityPrinting S.alice g1
-            (_, gs) = S.addCreature Cards.opalescencePrinting S.alice g2
+            (pikerId, g1) = S.addPiker cards S.alice base
+            (_, g2) = S.addCreature (Cards.humilityPrinting cards) S.alice g1
+            (_, gs) = S.addCreature (Cards.opalescencePrinting cards) S.alice g2
          in do
               HU.assertEqual "power 1" (Just 1) (Projection.powerOf pikerId gs)
               HU.assertEqual "toughness 1" (Just 1) (Projection.toughnessOf pikerId gs)
               HU.assertBool "no abilities" (Set.null (Projection.keywordsOf pikerId gs)),
       HU.testCase "CR 613.7 Humility + Opalescence: Humility is 4/4 when Opalescence is newer" $
         let base = Setup.emptyGame S.bothPlayers
-            (humilityId, g1) = S.addCreature Cards.humilityPrinting S.alice base
-            (_, gs) = S.addCreature Cards.opalescencePrinting S.alice g1
+            (humilityId, g1) = S.addCreature (Cards.humilityPrinting cards) S.alice base
+            (_, gs) = S.addCreature (Cards.opalescencePrinting cards) S.alice g1
          in HU.assertEqual "Opalescence's mana-value 7b wins" (Just 4) (Projection.powerOf humilityId gs),
       HU.testCase "CR 613.7 Humility + Opalescence: Humility is 1/1 when Humility is newer" $
         let base = Setup.emptyGame S.bothPlayers
-            (_, g1) = S.addCreature Cards.opalescencePrinting S.alice base
-            (humilityId, gs) = S.addCreature Cards.humilityPrinting S.alice g1
+            (_, g1) = S.addCreature (Cards.opalescencePrinting cards) S.alice base
+            (humilityId, gs) = S.addCreature (Cards.humilityPrinting cards) S.alice g1
          in HU.assertEqual "Humility's 1/1 7b wins" (Just 1) (Projection.powerOf humilityId gs),
       HU.testCase "CR 305.2 Opalescence is not itself a creature (\"each other\")" $
         let base = Setup.emptyGame S.bothPlayers
-            (opalId, g1) = S.addCreature Cards.opalescencePrinting S.alice base
-            (_, gs) = S.addCreature Cards.humilityPrinting S.alice g1
+            (opalId, g1) = S.addCreature (Cards.opalescencePrinting cards) S.alice base
+            (_, gs) = S.addCreature (Cards.humilityPrinting cards) S.alice g1
          in HU.assertBool "Opalescence stays a non-creature enchantment" (not (Projection.isCreatureOf opalId gs)),
       HU.testCase "CR 613.7 within layer 4, timestamp order (EXPIRES at CR 613.8b, git-bug f90e0c4)" $
         -- A Piker made a Land by B (layer 4, TheseObjects), and A = AddLandSubtype
@@ -384,17 +384,17 @@ tests =
         -- The CR 613.8b-correct answer is that A depends on B (B changes what A
         -- applies to), so B applies first and the Piker WOULD gain Swamp. When the
         -- topological resolver lands, flip this assertion to assert the Swamp.
-        let (pikerId, gs0) = S.addPiker S.bob (S.mountainsInPlay 1)
+        let (pikerId, gs0) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
             gsA = withDynamicEffect Affected.AllLands (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Swamp) gs0
             gs = withEffect pikerId (Timestamp.MkTimestamp 20) (Modification.AddCardType CardType.Land) gsA
          in HU.assertBool "timestamp-only: no Swamp yet (known-incomplete, tracked)" (not (Set.member Subtype.Swamp (Projection.subtypesOf pikerId gs))),
       HU.testCase "CR 614: Rest in Peace projects its graveyard->exile replacement" $
-        let (rip, gs) = S.addCreature Cards.restInPeacePrinting S.alice (Setup.emptyGame S.bothPlayers)
+        let (rip, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual
               "one redirect replacement"
               [ReplacementEffect.RedirectZoneChange Zone.Graveyard Zone.Exile]
               (Projection.replacementsOf rip gs),
       HU.testCase "a vanilla creature projects no replacements" $
-        let (piker, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
+        let (piker, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual "none" [] (Projection.replacementsOf piker gs)
     ]

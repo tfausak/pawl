@@ -34,17 +34,17 @@ import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-combatDamageTests :: Tasty.TestTree
-combatDamageTests =
+combatDamageTests :: Cards.Cards -> Tasty.TestTree
+combatDamageTests cards =
   Tasty.testGroup
     "CombatDamage"
     [ HU.testCase "CR 510.1b an unblocked attacker damages the defending player" $
-        let (gs, _, _) = S.combatBoard 1 0
+        let (gs, _, _) = S.combatBoard cards 1 0
             after = S.fightWith S.aggressiveAnswer gs
          in -- A Piker is a 2/1, and bob starts at 20.
             HU.assertEqual "bob took 2" (Just 18) (S.lifeOf S.bob after),
       HU.testCase "CR 509 a blocked attacker does not damage the player" $
-        let (gs, _, _) = S.combatBoard 1 1
+        let (gs, _, _) = S.combatBoard cards 1 1
             after = S.fightWith S.aggressiveAnswer gs
          in HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after),
       HU.testCase "CR 510.1c a single blocker takes all the damage, unprompted" $
@@ -53,7 +53,7 @@ combatDamageTests =
         -- power), so it is rejected and the blocker takes 0 -- and the assertion
         -- below fails. That is why this proves "unprompted" without an `error`,
         -- which the no-partial-functions rule forbids anyway.
-        let (gs, _, theirs) = S.combatBoard 1 1
+        let (gs, _, theirs) = S.combatBoard cards 1 1
             noAssign :: Prompt.Prompt r -> r
             noAssign p = case p of
               Prompt.AssignCombatDamage {} -> Map.empty
@@ -65,13 +65,13 @@ combatDamageTests =
       HU.testCase "CR 510.2 a 2/1 trade kills BOTH creatures" $
         -- The simultaneity test. Sequential damage kills only one, because the
         -- blocker would be in the graveyard before it dealt its damage.
-        let (gs, _, _) = S.combatBoard 1 1
+        let (gs, _, _) = S.combatBoard cards 1 1
             after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "alice's is dead" 0 (S.creaturesInPlay S.alice after)
               HU.assertEqual "bob's is dead" 0 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 510.1c a free division of 2 across two blockers kills both" $
-        let (gs, _, theirs) = S.combatBoard 1 2
+        let (gs, _, theirs) = S.combatBoard cards 1 2
             split :: Prompt.Prompt r -> r
             split p = case p of
               Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (map (\r -> (r, 1)) (filter S.isCreatureRecipient (Map.keys thresholds)))
@@ -81,7 +81,7 @@ combatDamageTests =
               HU.assertEqual "both blockers dead" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "expected two blockers" 2 (length theirs),
       HU.testCase "CR 510.1c the same 2 damage on one blocker kills only it" $
-        let (gs, _, _) = S.combatBoard 1 2
+        let (gs, _, _) = S.combatBoard cards 1 2
             dump :: Prompt.Prompt r -> r
             dump p = case p of
               Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -94,7 +94,7 @@ combatDamageTests =
       HU.testCase "CR 510.1e an illegal division is rejected and deals nothing" $
         -- Not a reachable game state: this is the engine's defense against a
         -- broken interpreter. See the spec, section 3.
-        let (gs, _, _) = S.combatBoard 1 2
+        let (gs, _, _) = S.combatBoard cards 1 2
             cheat :: Prompt.Prompt r -> r
             cheat p = case p of
               Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (map (\r -> (r, 99)) (filter S.isCreatureRecipient (Map.keys thresholds)))
@@ -104,7 +104,7 @@ combatDamageTests =
       -- The deterministic successor to the retired "combat happens" property: an
       -- unblocked 2/1 attacker reduces the defender's life by its power.
       HU.testCase "combat deals damage to the defending player" $
-        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting] []
+        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting cards] []
             after = S.runCombat S.aggressiveAnswer gs
          in HU.assertEqual "defender took two" (Just 18) (S.lifeOf S.bob after)
     ]
@@ -112,18 +112,18 @@ combatDamageTests =
 declaredAttackers :: GameState.GameState -> [ObjectId.ObjectId]
 declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
 
-declareTests :: Tasty.TestTree
-declareTests =
+declareTests :: Cards.Cards -> Tasty.TestTree
+declareTests cards =
   Tasty.testGroup
     "Declare"
     [ HU.testCase "CR 508.1f declaring an attacker taps it" $
-        let (gs, mine, _) = S.combatBoard 1 1
+        let (gs, mine, _) = S.combatBoard cards 1 1
             after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
          in do
               HU.assertEqual "one attacker" mine (declaredAttackers after)
               HU.assertEqual "tapped" 1 (S.tappedCount S.alice after),
       HU.testCase "CR 508.1 attackers attack the defending player" $
-        let (gs, mine, _) = S.combatBoard 1 1
+        let (gs, mine, _) = S.combatBoard cards 1 1
             after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
          in case mine of
               [] -> HU.assertFailure "fixture should have an attacker"
@@ -134,7 +134,7 @@ declareTests =
                   (Map.lookup oid (Combat.Type.attackers (GameState.combat after))),
       HU.testCase "an illegal attacker in the answer is dropped" $
         -- The interpreter names bob's creature. It is not alice's to attack with.
-        let (gs, _, theirs) = S.combatBoard 1 1
+        let (gs, _, theirs) = S.combatBoard cards 1 1
             liar :: Prompt.Prompt r -> r
             liar p = case p of
               Prompt.DeclareAttackers {} -> theirs
@@ -142,7 +142,7 @@ declareTests =
             after = snd (Engine.runGamePure liar gs (Combat.declareAttackers S.alice))
          in HU.assertEqual "nothing attacks" [] (declaredAttackers after),
       HU.testCase "CR 509.1 a blocker is recorded against the attacker it blocks" $
-        let (gs, mine, theirs) = S.combatBoard 1 1
+        let (gs, mine, theirs) = S.combatBoard cards 1 1
             steps = do
               Combat.declareAttackers S.alice
               Combat.declareBlockers
@@ -152,7 +152,7 @@ declareTests =
               attacker : _ ->
                 HU.assertEqual "blocked by bob's creature" (Set.fromList theirs) (Combat.blockersOf attacker after),
       HU.testCase "an unblocked attacker has no blockers" $
-        let (gs, mine, _) = S.combatBoard 1 0
+        let (gs, mine, _) = S.combatBoard cards 1 0
             steps = do
               Combat.declareAttackers S.alice
               Combat.declareBlockers
@@ -163,7 +163,7 @@ declareTests =
       HU.testCase "no legal attackers means no prompt and no attacks" $
         -- combatBoard 0 1 gives alice nothing. A prompt here would be the engine
         -- asking a question with exactly one answer.
-        let (gs, _, _) = S.combatBoard 0 1
+        let (gs, _, _) = S.combatBoard cards 0 1
             after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
          in HU.assertEqual "nothing attacks" [] (declaredAttackers after),
       -- The end-to-end summoning sickness scenario the spec names: a creature
@@ -171,7 +171,7 @@ declareTests =
       -- controller's untap step has settled it. The halves are tested in Tasks 1
       -- and 4; this proves they compose.
       HU.testCase "CR 302.6 a creature cannot attack the turn it arrives, and can after untapping" $
-        let (gs, _, _) = S.combatBoard 1 1
+        let (gs, _, _) = S.combatBoard cards 1 1
             arrived = justArrived gs
             sameTurn = snd (Engine.runGamePure S.aggressiveAnswer arrived (Combat.declareAttackers S.alice))
             nextTurn =
@@ -184,32 +184,32 @@ declareTests =
               HU.assertEqual "can attack after untapping" 1 (length (declaredAttackers nextTurn))
     ]
 
-defenderTests :: Tasty.TestTree
-defenderTests =
+defenderTests :: Cards.Cards -> Tasty.TestTree
+defenderTests cards =
   Tasty.testGroup
     "Defender"
     [ HU.testCase "CR 702.3b a creature with defender can't attack" $
-        let (gs, mine, _) = S.combatBoardOf [Cards.ogreSentryPrinting] [Cards.pikerPrinting]
+        let (gs, mine, _) = S.combatBoardOf [Cards.ogreSentryPrinting cards] [Cards.pikerPrinting cards]
          in case mine of
               [] -> HU.assertFailure "fixture should have one creature"
               oid : _ -> HU.assertBool "can't attack" (not (Combat.canAttack S.alice oid gs)),
       HU.testCase "CR 702.3b a creature with defender is not offered as a legal attacker" $
-        let (gs, _, _) = S.combatBoardOf [Cards.ogreSentryPrinting] [Cards.pikerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.ogreSentryPrinting cards] [Cards.pikerPrinting cards]
          in HU.assertEqual "none" [] (Combat.legalAttackers S.alice gs),
       HU.testCase "CR 702.3b defender does not stop it blocking" $
         -- 702.3b says "can't attack" and nothing else. A defender that could not
         -- block would be a Wall in the pre-2004 sense, and that is not the rule.
-        let (gs, _, theirs) = S.combatBoardOf [Cards.pikerPrinting] [Cards.ogreSentryPrinting]
+        let (gs, _, theirs) = S.combatBoardOf [Cards.pikerPrinting cards] [Cards.ogreSentryPrinting cards]
          in case theirs of
               [] -> HU.assertFailure "fixture should have one blocker"
               oid : _ -> HU.assertBool "may block" (Combat.canBlock S.bob oid gs),
       HU.testCase "a creature without defender is still offered" $
         -- The control. If defender were implemented as "nothing may attack", the
         -- test above would pass and this one would fail.
-        let (gs, mine, _) = S.combatBoardOf [Cards.pikerPrinting] [Cards.pikerPrinting]
+        let (gs, mine, _) = S.combatBoardOf [Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
          in HU.assertEqual "one" mine (Combat.legalAttackers S.alice gs),
       HU.testCase "CR 702.3b a defender is skipped but its neighbor still attacks" $
-        let (gs, mine, _) = S.combatBoardOf [Cards.ogreSentryPrinting, Cards.pikerPrinting] [Cards.pikerPrinting]
+        let (gs, mine, _) = S.combatBoardOf [Cards.ogreSentryPrinting cards, Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
          in case mine of
               [_, piker] -> HU.assertEqual "only the piker" [piker] (Combat.legalAttackers S.alice gs)
               _ -> HU.assertFailure "fixture should have two creatures"
@@ -224,28 +224,28 @@ justArrived gs =
   let sicken o = if Object.owner o == S.alice then o {Object.sickness = Sickness.Sick} else o
    in gs {GameState.objects = Map.map sicken (GameState.objects gs)}
 
-hasteTests :: Tasty.TestTree
-hasteTests =
+hasteTests :: Cards.Cards -> Tasty.TestTree
+hasteTests cards =
   Tasty.testGroup
     "Haste"
     [ HU.testCase "CR 702.10b a creature with haste attacks the turn it arrives" $
-        let (gs, _, _) = S.combatBoardOf [Cards.goblinChariotPrinting] [Cards.pikerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.goblinChariotPrinting cards] [Cards.pikerPrinting cards]
             after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.alice))
          in HU.assertEqual "attacks" 1 (length (declaredAttackers after)),
       HU.testCase "CR 302.6 the same creature without haste cannot" $
         -- The control. Goblin Chariot and Goblin Piker are both 2/2-ish Goblin
         -- Warriors; the ONLY difference the engine can see is the keyword.
-        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting] [Cards.pikerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
             after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.alice))
          in HU.assertEqual "cannot attack" [] (declaredAttackers after),
       HU.testCase "CR 702.10b haste is not needed once the creature has settled" $
-        let (gs, mine, _) = S.combatBoardOf [Cards.pikerPrinting] [Cards.pikerPrinting]
+        let (gs, mine, _) = S.combatBoardOf [Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
             after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
          in HU.assertEqual "attacks" mine (declaredAttackers after),
       HU.testCase "CR 702.10b a hasty creature and a sick one, in the same declaration" $
         -- Both sick; only the Chariot may attack. A blanket "sickness ignored"
         -- bug would let both through.
-        let (gs, mine, _) = S.combatBoardOf [Cards.goblinChariotPrinting, Cards.pikerPrinting] [Cards.pikerPrinting]
+        let (gs, mine, _) = S.combatBoardOf [Cards.goblinChariotPrinting cards, Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
             after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.alice))
          in case mine of
               [chariot, _] -> HU.assertEqual "only the chariot" [chariot] (declaredAttackers after)
@@ -259,12 +259,12 @@ attacking mine theirs =
       after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
    in (after, ours, yours)
 
-evasionTests :: Tasty.TestTree
-evasionTests =
+evasionTests :: Cards.Cards -> Tasty.TestTree
+evasionTests cards =
   Tasty.testGroup
     "Evasion"
     [ HU.testCase "CR 702.9b a declaration in which a ground creature blocks a flier is illegal" $
-        let (gs, mine, theirs) = attacking [Cards.birdMaidenPrinting] [Cards.pikerPrinting]
+        let (gs, mine, theirs) = attacking [Cards.birdMaidenPrinting cards] [Cards.pikerPrinting cards]
          in case (mine, theirs) of
               (a : _, b : _) ->
                 HU.assertBool "illegal" (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs))
@@ -272,7 +272,7 @@ evasionTests =
       HU.testCase "CR 702.17b a reach creature may block a flier" $
         -- THE FALSIFIER. Fails against any implementation that asks "does the
         -- blocker have flying?"
-        let (gs, mine, theirs) = attacking [Cards.birdMaidenPrinting] [Cards.nimbleBirdstickerPrinting]
+        let (gs, mine, theirs) = attacking [Cards.birdMaidenPrinting cards] [Cards.nimbleBirdstickerPrinting cards]
          in case (mine, theirs) of
               (a : _, b : _) ->
                 HU.assertBool "legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)
@@ -280,13 +280,13 @@ evasionTests =
       HU.testCase "CR 702.9b a flier may block a ground creature" $
         -- The asymmetry: 702.9b's second sentence. Fails if flying is implemented
         -- as a symmetric predicate.
-        let (gs, mine, theirs) = attacking [Cards.pikerPrinting] [Cards.birdMaidenPrinting]
+        let (gs, mine, theirs) = attacking [Cards.pikerPrinting cards] [Cards.birdMaidenPrinting cards]
          in case (mine, theirs) of
               (a : _, b : _) ->
                 HU.assertBool "legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)
               _ -> HU.assertFailure "fixture should have an attacker and a blocker",
       HU.testCase "CR 702.9b a flier may block a flier" $
-        let (gs, mine, theirs) = attacking [Cards.birdMaidenPrinting] [Cards.birdMaidenPrinting]
+        let (gs, mine, theirs) = attacking [Cards.birdMaidenPrinting cards] [Cards.birdMaidenPrinting cards]
          in case (mine, theirs) of
               (a : _, b : _) ->
                 HU.assertBool "legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)
@@ -294,7 +294,7 @@ evasionTests =
       HU.testCase "CR 509.1a a ground creature is still a legal blocker while a flier attacks" $
         -- 509.1a is about the blocker ALONE: it can block SOMETHING. This test
         -- fails if evasion is wrongly implemented as a filter on the candidates.
-        let (gs, _, theirs) = attacking [Cards.birdMaidenPrinting] [Cards.pikerPrinting]
+        let (gs, _, theirs) = attacking [Cards.birdMaidenPrinting cards] [Cards.pikerPrinting cards]
          in HU.assertEqual "still offered" theirs (Combat.legalBlockers S.bob gs),
       HU.testCase "CR 509.1b an illegal declaration is rejected WHOLE, not repaired" $
         -- aggressiveAnswer blocks the first attacker with EVERYTHING, so bob
@@ -303,7 +303,7 @@ evasionTests =
         -- let the Birdsticker's block stand -- which is what M1b does today, and
         -- is unsound: under menace, dropping one blocker from a pair manufactures
         -- an illegal single block.
-        let (gs, _, _) = S.combatBoardOf [Cards.birdMaidenPrinting] [Cards.nimbleBirdstickerPrinting, Cards.pikerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.birdMaidenPrinting cards] [Cards.nimbleBirdstickerPrinting cards, Cards.pikerPrinting cards]
             steps = do
               Combat.declareAttackers S.alice
               Combat.declareBlockers
@@ -314,7 +314,7 @@ evasionTests =
       HU.testCase "CR 509.1b a wholly legal declaration is accepted" $
         -- The control for the test above: with only the reach creature, the same
         -- interpreter produces a legal declaration and the block stands.
-        let (gs, _, theirs) = S.combatBoardOf [Cards.birdMaidenPrinting] [Cards.nimbleBirdstickerPrinting]
+        let (gs, _, theirs) = S.combatBoardOf [Cards.birdMaidenPrinting cards] [Cards.nimbleBirdstickerPrinting cards]
             steps = do
               Combat.declareAttackers S.alice
               Combat.declareBlockers
@@ -324,11 +324,11 @@ evasionTests =
               a : _ -> HU.assertEqual "the reach creature blocks" (Set.fromList theirs) (Combat.blockersOf a after),
       HU.testCase "CR 509.1a a Mountain is not a legal blocker, flier or no flier" $
         -- The classification, from the other side: `canBlock` asks
-        -- is-it-a-creature, never which card it is. M1b tests "a land may not
+        -- is-it-a-creature, never which card it is. M1b (tests cards) "a land may not
         -- attack" but never that a land may not BLOCK, so this closes a real gap
         -- rather than restating one.
-        let (gs, mine, _) = attacking [Cards.birdMaidenPrinting] []
-            withLand = snd (S.addCreature Cards.mountainPrinting S.bob gs)
+        let (gs, mine, _) = attacking [Cards.birdMaidenPrinting cards] []
+            withLand = snd (S.addCreature (Cards.mountainPrinting cards) S.bob gs)
          in case mine of
               [] -> HU.assertFailure "fixture should have an attacker"
               _ : _ -> HU.assertEqual "no legal blockers" [] (Combat.legalBlockers S.bob withLand),
@@ -337,7 +337,7 @@ evasionTests =
         -- flying: nothing may block, bob takes 1, and both creatures live.
         -- WITHOUT flying: the Piker blocks, bob takes 0, and the two TRADE (Bird
         -- Maiden is 1/2, Piker is 2/1). All three assertions distinguish them.
-        let (gs, _, _) = S.combatBoardOf [Cards.birdMaidenPrinting] [Cards.pikerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.birdMaidenPrinting cards] [Cards.pikerPrinting cards]
             after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "bob took 1" (Just 19) (S.lifeOf S.bob after)
@@ -345,14 +345,14 @@ evasionTests =
               HU.assertEqual "the would-be blocker lives" 1 (S.creaturesInPlay S.bob after)
     ]
 
-vigilanceTests :: Tasty.TestTree
-vigilanceTests =
+vigilanceTests :: Cards.Cards -> Tasty.TestTree
+vigilanceTests cards =
   Tasty.testGroup
     "Vigilance"
     [ HU.testCase "CR 702.20b attacking doesn't tap a creature with vigilance, but does tap its neighbor" $
         -- Both creatures in ONE declaration, so a blanket "nothing taps" bug
         -- cannot pass: the Piker must still tap.
-        let (gs, mine, _) = S.combatBoardOf [Cards.windseekerCentaurPrinting, Cards.pikerPrinting] [Cards.pikerPrinting]
+        let (gs, mine, _) = S.combatBoardOf [Cards.windseekerCentaurPrinting cards, Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
             after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
          in case mine of
               [centaur, piker] -> do
@@ -363,12 +363,12 @@ vigilanceTests =
       HU.testCase "CR 702.20b vigilance still attacks" $
         -- Vigilance is not a legality question: the creature is declared as an
         -- attacker exactly as normal. It simply skips CR 508.1f's tap.
-        let (gs, mine, _) = S.combatBoardOf [Cards.windseekerCentaurPrinting] [Cards.pikerPrinting]
+        let (gs, mine, _) = S.combatBoardOf [Cards.windseekerCentaurPrinting cards] [Cards.pikerPrinting cards]
             after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
          in HU.assertEqual "attacking" mine (declaredAttackers after),
       HU.testCase "CR 702.20b an untapped vigilant attacker can still be blocked" $
         -- It is attacking, so it is in the Combat record, tapped or not.
-        let (gs, mine, theirs) = S.combatBoardOf [Cards.windseekerCentaurPrinting] [Cards.pikerPrinting]
+        let (gs, mine, theirs) = S.combatBoardOf [Cards.windseekerCentaurPrinting cards] [Cards.pikerPrinting cards]
             steps = do
               Combat.declareAttackers S.alice
               Combat.declareBlockers
@@ -378,63 +378,63 @@ vigilanceTests =
               attacker : _ -> HU.assertEqual "blocked" (Set.fromList theirs) (Combat.blockersOf attacker after)
     ]
 
-combatLegalityTests :: Tasty.TestTree
-combatLegalityTests =
+combatLegalityTests :: Cards.Cards -> Tasty.TestTree
+combatLegalityTests cards =
   Tasty.testGroup
     "CombatLegality"
     [ HU.testCase "a Settled untapped creature may attack" $
-        let (gs, mine, _) = S.combatBoard 1 0
+        let (gs, mine, _) = S.combatBoard cards 1 0
          in case mine of
               [] -> HU.assertFailure "fixture should have an attacker"
               oid : _ -> HU.assertBool "may attack" (Combat.canAttack S.alice oid gs),
       HU.testCase "CR 302.6 a summoning sick creature may not attack" $
-        let (gs, mine, _) = S.combatBoard 1 0
+        let (gs, mine, _) = S.combatBoard cards 1 0
          in case mine of
               [] -> HU.assertFailure "fixture should have an attacker"
               oid : _ ->
                 let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
                  in HU.assertBool "may not attack" (not (Combat.canAttack S.alice oid sick)),
       HU.testCase "CR 508.1a a tapped creature may not attack" $
-        let (gs, mine, _) = S.combatBoard 1 0
+        let (gs, mine, _) = S.combatBoard cards 1 0
          in case mine of
               [] -> HU.assertFailure "fixture should have an attacker"
               oid : _ ->
                 let tapped = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
                  in HU.assertBool "may not attack" (not (Combat.canAttack S.alice oid tapped)),
       HU.testCase "a land may not attack" $
-        let gs = (S.mountainsInPlay 1) {GameState.activePlayer = S.alice}
+        let gs = (S.mountainsInPlay cards 1) {GameState.activePlayer = S.alice}
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
               [] -> HU.assertFailure "fixture should have one Mountain"
               oid : _ -> HU.assertBool "may not attack" (not (Combat.canAttack S.alice oid gs)),
       HU.testCase "you may not attack with a creature you do not control" $
-        let (gs, _, theirs) = S.combatBoard 1 1
+        let (gs, _, theirs) = S.combatBoard cards 1 1
          in case theirs of
               [] -> HU.assertFailure "fixture should have a blocker"
               oid : _ -> HU.assertBool "not alice's" (not (Combat.canAttack S.alice oid gs)),
       -- CR 302.6 restricts attacking and tap abilities. It says NOTHING about
       -- blocking, and getting this wrong is the classic beginner bug.
       HU.testCase "CR 302.6 a summoning sick creature MAY block" $
-        let (gs, _, theirs) = S.combatBoard 1 1
+        let (gs, _, theirs) = S.combatBoard cards 1 1
          in case theirs of
               [] -> HU.assertFailure "fixture should have a blocker"
               oid : _ ->
                 let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
                  in HU.assertBool "may block" (Combat.canBlock S.bob oid sick),
       HU.testCase "CR 509.1a a tapped creature may not block" $
-        let (gs, _, theirs) = S.combatBoard 1 1
+        let (gs, _, theirs) = S.combatBoard cards 1 1
          in case theirs of
               [] -> HU.assertFailure "fixture should have a blocker"
               oid : _ ->
                 let tapped = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
                  in HU.assertBool "may not block" (not (Combat.canBlock S.bob oid tapped)),
       HU.testCase "legalAttackers lists exactly the active player's creatures" $
-        let (gs, mine, _) = S.combatBoard 2 3
+        let (gs, mine, _) = S.combatBoard cards 2 3
          in HU.assertEqual "two" mine (Combat.legalAttackers S.alice gs),
       HU.testCase "the defending player is the non-active player" $
-        let (gs, _, _) = S.combatBoard 1 1
+        let (gs, _, _) = S.combatBoard cards 1 1
          in HU.assertEqual "bob defends" [S.bob] (Combat.defendingPlayers gs),
       HU.testCase "combat starts empty and clears" $
-        let (gs, mine, _) = S.combatBoard 1 0
+        let (gs, mine, _) = S.combatBoard cards 1 0
             busy = case mine of
               [] -> gs
               oid : _ ->
@@ -451,8 +451,8 @@ combatLegalityTests =
               HU.assertEqual "clears" Map.empty (Combat.Type.attackers (GameState.combat (Combat.clearCombat busy)))
     ]
 
-keywordTests :: Tasty.TestTree
-keywordTests =
+keywordTests :: Cards.Cards -> Tasty.TestTree
+keywordTests cards =
   let gs0 = Setup.emptyGame S.bothPlayers
       -- Each M2a printing carries exactly its one keyword and no other.
       carriesOnly (printing, keyword) =
@@ -463,14 +463,14 @@ keywordTests =
               HU.assertBool "hasKeyword" (Projection.hasKeyword keyword oid gs)
    in Tasty.testGroup
         "Keyword"
-        ( map carriesOnly S.m2aPrintings
+        ( map carriesOnly (S.m2aPrintings cards)
             ++ [ HU.testCase "a Piker has no keywords" $
-                   let (oid, gs) = S.addPiker S.alice gs0
+                   let (oid, gs) = S.addPiker cards S.alice gs0
                     in do
                          HU.assertEqual "none" Set.empty (Projection.keywordsOf oid gs)
                          HU.assertBool "no flying" (not (Projection.hasKeyword Keyword.Flying oid gs)),
                  HU.testCase "a Mountain has no keywords" $
-                   let gs = S.mountainsInPlay 1
+                   let gs = S.mountainsInPlay cards 1
                     in case Game.zoneMembers Zone.Battlefield S.alice gs of
                          [] -> HU.assertFailure "fixture should have one Mountain"
                          oid : _ -> HU.assertEqual "none" Set.empty (Projection.keywordsOf oid gs),
@@ -480,7 +480,7 @@ keywordTests =
                  -- passes while the reach case above also passes, the two keywords
                  -- are genuinely distinct rather than one flag.
                  HU.testCase "reach is not flying" $
-                   let (oid, gs) = S.addCreature Cards.nimbleBirdstickerPrinting S.alice gs0
+                   let (oid, gs) = S.addCreature (Cards.nimbleBirdstickerPrinting cards) S.alice gs0
                     in HU.assertBool "no flying" (not (Projection.hasKeyword Keyword.Flying oid gs))
                ]
         )
@@ -498,15 +498,15 @@ runToFirstStrikeDone answer gs0 =
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 24 gs0
 
-firstStrikeTests :: Tasty.TestTree
-firstStrikeTests =
+firstStrikeTests :: Cards.Cards -> Tasty.TestTree
+firstStrikeTests cards =
   Tasty.testGroup
     "FirstStrike"
     [ HU.testCase "CR 702.7b a first striker kills a vanilla blocker and lives" $
         -- The tiger (2/1 first strike) kills the Piker (2/1) in the first-strike
         -- step; the SBA between steps buries it before it can deal, so the tiger
         -- survives at zero damage.
-        let (gs, _, _) = S.combatBoardOf [Cards.sabretoothTigerPrinting] [Cards.pikerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.sabretoothTigerPrinting cards] [Cards.pikerPrinting cards]
             after = S.runCombat S.aggressiveAnswer gs
          in do
               HU.assertEqual "the blocker is dead" 0 (S.creaturesInPlay S.bob after)
@@ -514,29 +514,29 @@ firstStrikeTests =
       HU.testCase "CR 510.2 the control: two vanilla 2/1s trade" $
         -- With a Piker in the tiger's place there is one combat damage step and
         -- both die. So first strike is the sole cause above.
-        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting] [Cards.pikerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
             after = S.runCombat S.aggressiveAnswer gs
          in do
               HU.assertEqual "alice's is dead" 0 (S.creaturesInPlay S.alice after)
               HU.assertEqual "bob's is dead" 0 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 702.4b a double striker deals twice to an unblocked player" $
         -- The raptor (2/1 double strike) deals 2 in each step: bob loses 4.
-        let (gs, _, _) = S.combatBoardOf [Cards.ridgetopRaptorPrinting] []
+        let (gs, _, _) = S.combatBoardOf [Cards.ridgetopRaptorPrinting cards] []
             after = S.runCombat S.aggressiveAnswer gs
          in HU.assertEqual "bob took 4" (Just 16) (S.lifeOf S.bob after),
       HU.testCase "CR 702.7b the control: a first striker deals once to a player" $
-        let (gs, _, _) = S.combatBoardOf [Cards.sabretoothTigerPrinting] []
+        let (gs, _, _) = S.combatBoardOf [Cards.sabretoothTigerPrinting cards] []
             after = S.runCombat S.aggressiveAnswer gs
          in HU.assertEqual "bob took 2" (Just 18) (S.lifeOf S.bob after),
       HU.testCase "CR 510.1b the control: a vanilla creature deals once to a player" $
-        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting] []
+        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting cards] []
             after = S.runCombat S.aggressiveAnswer gs
          in HU.assertEqual "bob took 2" (Just 18) (S.lifeOf S.bob after),
       HU.testCase "CR 510.4 double strike kills a 3/3 across two steps; first strike does not" $
         -- The raptor deals 2 + 2 = 4 to the Ogre (3/3), killing it. A first
         -- striker deals 2 once, and the Ogre lives.
-        let raptorVs = S.combatBoardOf [Cards.ridgetopRaptorPrinting] [Cards.ogreSentryPrinting]
-            tigerVs = S.combatBoardOf [Cards.sabretoothTigerPrinting] [Cards.ogreSentryPrinting]
+        let raptorVs = S.combatBoardOf [Cards.ridgetopRaptorPrinting cards] [Cards.ogreSentryPrinting cards]
+            tigerVs = S.combatBoardOf [Cards.sabretoothTigerPrinting cards] [Cards.ogreSentryPrinting cards]
             afterRaptor = S.runCombat S.aggressiveAnswer (frst raptorVs)
             afterTiger = S.runCombat S.aggressiveAnswer (frst tigerVs)
          in do
@@ -546,7 +546,7 @@ firstStrikeTests =
         -- Raptor (double strike) and tiger (first strike) each block-kill the
         -- other in the first step. Neither is "remaining" for the second step, so
         -- no second-wave damage; both are simply dead.
-        let (gs, _, _) = S.combatBoardOf [Cards.ridgetopRaptorPrinting] [Cards.sabretoothTigerPrinting]
+        let (gs, _, _) = S.combatBoardOf [Cards.ridgetopRaptorPrinting cards] [Cards.sabretoothTigerPrinting cards]
             after = S.runCombat S.aggressiveAnswer gs
          in do
               HU.assertEqual "attacker dead" 0 (S.creaturesInPlay S.alice after)
@@ -557,7 +557,7 @@ firstStrikeTests =
         -- step: raptor 2 + Piker 2 = 4. bob: 20 - 8 = 12. The naive "strikers in
         -- step one, everyone else in step two" drops the raptor's second hit and
         -- lands bob at 14.
-        let (gs, _, _) = S.combatBoardOf [Cards.sabretoothTigerPrinting, Cards.ridgetopRaptorPrinting, Cards.pikerPrinting] []
+        let (gs, _, _) = S.combatBoardOf [Cards.sabretoothTigerPrinting cards, Cards.ridgetopRaptorPrinting cards, Cards.pikerPrinting cards] []
             mid = runToFirstStrikeDone S.aggressiveAnswer gs
             after = S.runCombat S.aggressiveAnswer gs
          in do
@@ -569,13 +569,13 @@ firstStrikeTests =
 frst :: (a, b, c) -> a
 frst (a, _, _) = a
 
-m2bExitTests :: Tasty.TestTree
-m2bExitTests =
+m2bExitTests :: Cards.Cards -> Tasty.TestTree
+m2bExitTests cards =
   Tasty.testGroup
     "M2bExit"
     [ HU.testCase "the milestone: first strike breaks the trade, double strike doubles the hit, no attacker no damage" $
-        let trade = S.runCombat S.aggressiveAnswer (frst (S.combatBoardOf [Cards.sabretoothTigerPrinting] [Cards.pikerPrinting]))
-            doubled = S.runCombat S.aggressiveAnswer (frst (S.combatBoardOf [Cards.ridgetopRaptorPrinting] []))
+        let trade = S.runCombat S.aggressiveAnswer (frst (S.combatBoardOf [Cards.sabretoothTigerPrinting cards] [Cards.pikerPrinting cards]))
+            doubled = S.runCombat S.aggressiveAnswer (frst (S.combatBoardOf [Cards.ridgetopRaptorPrinting cards] []))
             quiet = S.runCombat S.aggressiveAnswer (frst (S.combatBoardOf [] []))
          in do
               HU.assertEqual "first striker lives" 1 (S.creaturesInPlay S.alice trade)
@@ -584,18 +584,18 @@ m2bExitTests =
               HU.assertEqual "an attacker-less turn deals nothing" (Just 20) (S.lifeOf S.bob quiet)
     ]
 
-tests :: Tasty.TestTree
-tests =
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards =
   Tasty.testGroup
     "Combat"
-    [ combatLegalityTests,
-      declareTests,
-      combatDamageTests,
-      keywordTests,
-      firstStrikeTests,
-      m2bExitTests,
-      defenderTests,
-      vigilanceTests,
-      hasteTests,
-      evasionTests
+    [ combatLegalityTests cards,
+      declareTests cards,
+      combatDamageTests cards,
+      keywordTests cards,
+      firstStrikeTests cards,
+      m2bExitTests cards,
+      defenderTests cards,
+      vigilanceTests cards,
+      hasteTests cards,
+      evasionTests cards
     ]

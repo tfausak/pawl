@@ -15,15 +15,15 @@ import qualified Test.Tasty.HUnit as HU
 slugOf :: Printing.Printing -> Text.Text
 slugOf = Codec.slugify . CardT.name . Printing.card
 
-tests :: Tasty.TestTree
-tests =
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards =
   Tasty.testGroup
     "Pawl.CardsSpec"
     [ HU.testCase "slugs are unique" $
-        let slugs = map slugOf Cards.allPrintings
+        let slugs = map slugOf (Cards.allPrintings cards)
          in HU.assertEqual "unique" (List.sort slugs) (List.sort (List.nub slugs)),
       HU.testCase "each committed file re-parses to its compiled card (P3)" $
-        mapM_ checkFile Cards.allPrintings
+        mapM_ checkFile (Cards.allPrintings cards)
     ]
 
 checkFile :: Printing.Printing -> HU.Assertion

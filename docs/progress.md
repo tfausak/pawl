@@ -267,22 +267,24 @@ end of every entry.
   is enforced by the module graph, not discipline. **Files are the source of
   truth**: every card renders to a committed `data/cards/<slug>.json`, the
   hand-written `MkCard` literals are **deleted**, and both non-engine consumers
-  read the files — the benchmark by true `IO` loading (the scalable path, proven
-  end-to-end at runtime), the test suite by a compile-time Template Haskell shim
-  (`Pawl.Cards.Load` `runIO`-reads + `addDependentFile` + `fail`s on a `Left` +
-  `lift`s the `Printing`; `Lift` is derived on the whole card-AST closure via
-  per-module `DeriveLift`, with `containers`/`text` supplying the `Map`/`Set`/`Text`
-  instances on GHC 9.14 — the §9 risk resolved with no orphans). **Named expiry:
-  the TH shim is temporary** — a later milestone converts the test suite to `IO`
-  loading like the benchmark and deletes `TemplateHaskell`/`DeriveLift`; recorded
-  so it cannot become load-bearing silently. (Two other expiries opened: `Either
+  read the files — both by true `IO` loading. The benchmark loads only the cards
+  its decks name; the test suite loads the whole pool once in `main` and threads a
+  `Pawl.Cards.Cards` record into every `tests` tree (the decks and `allPrintings`
+  are functions of it). **The TH shim's named expiry was cashed immediately**: the
+  milestone first shipped a compile-time Template Haskell shim (`Pawl.Cards.Load`
+  splicing `Lift`-derived `Printing`s) to keep the fixtures pure without churning
+  ~15 files, then — before M4 — converted the test suite to `IO` loading like the
+  benchmark and deleted the shim, `TemplateHaskell`, and the per-module `DeriveLift`
+  (so the **engine library no longer links `template-haskell`** — the closed half
+  is back to boot-libs-for-real-reasons). (Two other expiries stay open: `Either
   Text` decode errors may become path-aware for M6 transpiler output, and the
   `Card`-granularity codec extends to `Printing`-granularity when `Printing` grows
   metadata.) The engine library stays pure (all file reading is the benchmark's
-  `IO` and the shim's compile-time `runIO`); the codec is total (`Either`, never a
-  partial `head`). Note: the plan's `git grep 'MkCard' == nothing` check is an
-  over-broad proxy for "the pool literals are gone" — two pre-existing inline
-  unit-test fixtures (synthetic "Some Instant"/"T" cards, no JSON files) correctly
-  remain; `Pawl.Cards` itself is pure splices. Spec and plan kept as reference:
+  and the test suite's `IO`); the codec is total (`Either`, never a partial
+  `head`). Note: the plan's `git grep 'MkCard' == nothing` check is an over-broad
+  proxy for "the pool literals are gone" — two pre-existing inline unit-test
+  fixtures (synthetic "Some Instant"/"T" cards, no JSON files) correctly remain;
+  `Pawl.Cards` itself names no card literally (it loads them all from disk). Spec
+  and plan kept as reference:
   `docs/superpowers/specs/2026-07-19-m3.5-cards-as-data-files-design.md` and
   `docs/superpowers/plans/2026-07-19-m3.5-cards-as-data-files.md`.

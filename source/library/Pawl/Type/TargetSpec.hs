@@ -1,8 +1,4 @@
-{-# LANGUAGE DeriveLift #-}
-
 module Pawl.Type.TargetSpec where
-
-import Language.Haskell.TH.Syntax (Lift)
 
 -- What a target slot may legally hold. Classification data, never a predicate
 -- function. AnyTarget is "any target": a creature or a player (CR 115.4's
@@ -23,4 +19,4 @@ data TargetSpec
   | -- CR 115: "target player" -- a player still in the game. The players-only
     -- restriction AnyTarget does not express (Mindslaver, M3g).
     PlayerTarget
-  deriving (Eq, Lift, Ord, Show)
+  deriving (Eq, Ord, Show)

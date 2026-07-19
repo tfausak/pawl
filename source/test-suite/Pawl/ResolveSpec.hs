@@ -75,12 +75,12 @@ withEffect oid ts m gs =
           }
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
-targetTests :: Tasty.TestTree
-targetTests =
+targetTests :: Cards.Cards -> Tasty.TestTree
+targetTests cards =
   Tasty.testGroup
     "Target"
     [ HU.testCase "CR 115.4 AnyTarget offers every creature and every playing player" $
-        let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual
               "creature and both players"
               (Set.fromList [Recipient.ToCreature oid, Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])
@@ -91,7 +91,7 @@ targetTests =
               "bob gone"
               (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients TargetSpec.AnyTarget gs))),
       HU.testCase "CR 608.2b a creature that left its zone is no longer legal" $
-        let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
             gone = Event.changeZone oid Zone.Graveyard gs
          in do
               HU.assertBool "legal while fielded" (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.AnyTarget gs)
@@ -104,7 +104,7 @@ targetTests =
               (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]))
               (Target.legalSets specs gs),
       HU.testCase "CR 115.4 CreatureTarget offers creatures but no players" $
-        let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual
               "just the creature"
               (Set.singleton (Recipient.ToCreature oid))
@@ -114,18 +114,18 @@ targetTests =
           "nothing to target"
           (Set.null (Target.legalRecipients TargetSpec.CreatureTarget (Setup.emptyGame S.bothPlayers))),
       HU.testCase "CR 608.2b a creature that left is no longer a legal CreatureTarget" $
-        let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
             gone = Event.changeZone oid Zone.Graveyard gs
          in do
               HU.assertBool "legal while fielded" (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gs)
               HU.assertBool "illegal once moved" (not (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gone)),
       HU.testCase "CR 115 SpellOrPermanentTarget offers battlefield permanents and stack spells" $
-        let (permId, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
+        let (permId, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertBool
               "the permanent is a legal object target"
               (Set.member (Recipient.ToObject permId) (Target.legalRecipients TargetSpec.SpellOrPermanentTarget gs)),
       HU.testCase "LandTarget offers a land as an object target, not a creature or player" $
-        let gs = S.mountainsInPlay 1
+        let gs = S.mountainsInPlay cards 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
@@ -138,37 +138,37 @@ targetTests =
          in HU.assertEqual "both players, no creatures" expected (Target.legalRecipients TargetSpec.PlayerTarget gs)
     ]
 
-resolveTests :: Tasty.TestTree
-resolveTests =
+resolveTests :: Cards.Cards -> Tasty.TestTree
+resolveTests cards =
   Tasty.testGroup
     "Resolve"
     [ HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $
-        let (_, cast, _) = S.boltAtBobsPiker
+        let (_, cast, _) = S.boltAtBobsPiker cards
             after = Sba.checkStateBasedActions (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
          in do
               HU.assertEqual "stack empty" 0 (length (GameState.stack after))
               HU.assertEqual "no creature survives" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "Piker in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
       HU.testCase "CR 608.2n the resolved Bolt is in its owner's graveyard" $
-        let (_, cast, _) = S.boltAtBobsPiker
+        let (_, cast, _) = S.boltAtBobsPiker cards
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "one card" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       HU.testCase "CR 120.3a a Bolt at a player drains life without marking" $
         -- No creature on the battlefield, so identityAnswer's lookupMin picks
         -- ToPlayer alice: a self-Bolt, which is legal Magic.
-        let (gs, oid) = S.boltInHand 1 Phase.PrecombatMain
+        let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "seventeen" (Just 17) (S.lifeOf S.alice after),
       HU.testCase "the resolved damage flows through the event funnel" $
-        let (_, cast, _) = S.boltAtBobsPiker
+        let (_, cast, _) = S.boltAtBobsPiker cards
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "one event of amount 3" [3] (map DamageEvent.amount (GameState.damageEvents after)),
       HU.testCase "resolving a Bolt conserves objects" $
-        let (_, cast, _) = S.boltAtBobsPiker
+        let (_, cast, _) = S.boltAtBobsPiker cards
          in HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))),
       HU.testCase "CR 608.2b a Bolt whose only target died fizzles" $
-        let (base, cast, _) = S.boltAtBobsPiker
+        let (base, cast, _) = S.boltAtBobsPiker cards
             -- Kill the Piker while the Bolt is on the stack, as Bolt B will in
             -- the integration test, then check state-based actions.
             dead = Sba.checkStateBasedActions (S.markDamage (S.pikerOf base) 3 cast)
@@ -178,14 +178,14 @@ resolveTests =
               HU.assertEqual "no damage was dealt" [] (GameState.damageEvents after)
               HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after),
       HU.testCase "CR 608.2b a fizzled spell applies none of its effects" $
-        let (base, cast, _) = S.boltAtBobsPiker
+        let (base, cast, _) = S.boltAtBobsPiker cards
             dead = Sba.checkStateBasedActions (S.markDamage (S.pikerOf base) 3 cast)
             after = snd (Engine.runGamePure S.identityAnswer dead Stack.resolveTop)
          in HU.assertEqual "life totals unchanged" (Just 20) (S.lifeOf S.alice after),
       -- The deterministic successor to the retired "instants happen" property: a
       -- Bolt cast in a game and resolved ends in its owner's graveyard.
       HU.testCase "a cast Bolt reaches its owner's graveyard" $
-        let (_, cast, _) = S.boltAtBobsPiker
+        let (_, cast, _) = S.boltAtBobsPiker cards
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "one card in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       HU.testCase "CR 612 slotsOf and textChangeSlots find a ChangeText slot" $
@@ -194,7 +194,7 @@ resolveTests =
               Card.Type.MkCard
                 { Card.Type.name = Text.pack "T",
                   Card.Type.manaCost = Nothing,
-                  Card.Type.typeLine = Card.Type.typeLine (Printing.card Cards.lightningBoltPrinting),
+                  Card.Type.typeLine = Card.Type.typeLine (Printing.card (Cards.lightningBoltPrinting cards)),
                   Card.Type.power = Nothing,
                   Card.Type.toughness = Nothing,
                   Card.Type.keywords = Set.empty,
@@ -216,7 +216,7 @@ resolveTests =
         -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
         -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten
         -- (Swamp -> Mountain) it is SetLandSubtype Mountain -> {Mountain}.
-        let base = S.landsInPlay Cards.forestPrinting 1
+        let base = S.landsInPlay (Cards.forestPrinting cards) 1
             targetLand = case Game.zoneMembers Zone.Battlefield S.alice base of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
@@ -225,7 +225,7 @@ resolveTests =
             landformObj =
               Object.MkObject
                 { Object.owner = S.alice,
-                  Object.source = Source.OfCard Cards.landformPrinting,
+                  Object.source = Source.OfCard (Cards.landformPrinting cards),
                   Object.zone = Zone.Stack,
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
@@ -249,12 +249,12 @@ resolveTests =
               HU.assertEqual "target land became Mountain, not Swamp" (Set.singleton Subtype.Mountain) (Projection.subtypesOf targetLand after),
       HU.testCase "CR 400.7 hacking Blood Moon on the stack is lost when it resolves" $
         let base = Setup.emptyGame S.bothPlayers
-            (nonbasicId, g1) = S.addCreature Cards.urborgPrinting S.alice base
+            (nonbasicId, g1) = S.addCreature (Cards.urborgPrinting cards) S.alice base
             (bloodMoonSpellId, g2) = Game.freshObjectId g1
             bmObj =
               Object.MkObject
                 { Object.owner = S.alice,
-                  Object.source = Source.OfCard Cards.bloodMoonPrinting,
+                  Object.source = Source.OfCard (Cards.bloodMoonPrinting cards),
                   Object.zone = Zone.Stack,
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
@@ -274,8 +274,8 @@ resolveTests =
             -- no longer names it, so nonbasic lands are Mountains, not Islands.
             HU.assertEqual "hack lost: nonbasic land is Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf nonbasicId after),
       HU.testCase "CR 608.2n a resolving ability deals its damage and ceases" $
-        let (srcId, g0) = S.addCreature Cards.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
-            ability = case Card.Type.activatedAbilities (Printing.card Cards.prodigalSorcererPrinting) of
+        let (srcId, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            ability = case Card.Type.activatedAbilities (Printing.card (Cards.prodigalSorcererPrinting cards)) of
               ab : _ -> ab
               [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [] Map.empty
             (abilId, g1) = Game.freshObjectId g0
@@ -307,7 +307,7 @@ resolveTests =
         -- The fetched card gets a NEW object id (CR 400.7 changeZone), so assert by
         -- count/tapped-count, never by the library incarnation's id.
         let base = Setup.emptyGame S.bothPlayers
-            (_, g1) = S.addLibraryCard Cards.mountainPrinting S.alice base
+            (_, g1) = S.addLibraryCard (Cards.mountainPrinting cards) S.alice base
             ability =
               ActivatedAbility.MkActivatedAbility
                 (AbilityCost.MkAbilityCost Nothing [])
@@ -325,7 +325,7 @@ resolveTests =
               HU.assertEqual "library empty" [] (Game.zoneMembers Zone.Library S.alice resolved),
       HU.testCase "CR 701.23b Search may fail to find" $
         let base = Setup.emptyGame S.bothPlayers
-            (_, g1) = S.addLibraryCard Cards.mountainPrinting S.alice base
+            (_, g1) = S.addLibraryCard (Cards.mountainPrinting cards) S.alice base
             ability = ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [Effect.Search CardCriterion.BasicLandCard] Map.empty
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
@@ -335,8 +335,8 @@ resolveTests =
          in HU.assertEqual "nothing entered the battlefield" Set.empty (GameState.battlefield resolved),
       HU.testCase "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $
         let g0 = Setup.emptyGame S.bothPlayers
-            (ripId, g1) = S.addCreature Cards.restInPeacePrinting S.alice g0
-            (deadId, g2) = S.addLibraryCard Cards.pikerPrinting S.bob g1
+            (ripId, g1) = S.addCreature (Cards.restInPeacePrinting cards) S.alice g0
+            (deadId, g2) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob g1
             -- move the Piker into bob's graveyard
             g3 = Event.changeZone deadId Zone.Graveyard g2
             ability = TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters [Effect.ExileAllGraveyards] Map.empty
@@ -361,7 +361,7 @@ resolveTests =
               HU.assertEqual "ability ceased" Nothing (Game.lookupObject abilId resolved),
       HU.testCase "CR 723.1: Mindslaver's ability installs pending control, promoted next turn" $
         let g0 = Setup.emptyGame S.bothPlayers
-            (srcId, g1) = S.addCreature Cards.mindslaverPrinting S.alice g0
+            (srcId, g1) = S.addCreature (Cards.mindslaverPrinting cards) S.alice g0
             slot = SlotName.MkSlotName (Text.pack "target")
             ability =
               ActivatedAbility.MkActivatedAbility
@@ -427,15 +427,15 @@ boltAnswer p = case p of
 -- her main phase. boltAnswer casts both (CR 117.3c keeps priority), both
 -- target the Piker (the only creature), and the priority loop resolves them
 -- LIFO: B kills the Piker, the mid-loop SBA buries it, A fizzles.
-twoBoltState :: GameState.GameState
-twoBoltState =
-  let (_, withPiker) = S.addPiker S.bob (S.mountainsInPlay 2)
-      (gs1, _oid1) = S.handOne Cards.lightningBoltPrinting withPiker
+twoBoltState :: Cards.Cards -> GameState.GameState
+twoBoltState cards =
+  let (_, withPiker) = S.addPiker cards S.bob (S.mountainsInPlay cards 2)
+      (gs1, _oid1) = S.handOne (Cards.lightningBoltPrinting cards) withPiker
       (oid2, gs2) = Game.freshObjectId gs1
       obj =
         Object.MkObject
           { Object.owner = S.alice,
-            Object.source = Source.OfCard Cards.lightningBoltPrinting,
+            Object.source = Source.OfCard (Cards.lightningBoltPrinting cards),
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
@@ -450,12 +450,12 @@ twoBoltState =
           GameState.hand = Map.adjust (oid2 Seq.<|) S.alice (GameState.hand gs2)
         }
 
-fizzleTests :: Tasty.TestTree
-fizzleTests =
+fizzleTests :: Cards.Cards -> Tasty.TestTree
+fizzleTests cards =
   Tasty.testGroup
     "Fizzle"
     [ HU.testCase "CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles" $
-        let after = snd (Engine.runGamePure boltAnswer twoBoltState Engine.priorityLoop)
+        let after = snd (Engine.runGamePure boltAnswer (twoBoltState cards) Engine.priorityLoop)
          in do
               HU.assertEqual "stack cleared" 0 (length (GameState.stack after))
               HU.assertEqual "Piker dead" 0 (S.creaturesInPlay S.bob after)
@@ -463,7 +463,7 @@ fizzleTests =
               HU.assertEqual "the Piker in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
               HU.assertEqual "bob's life untouched: the fizzled Bolt hit nothing" (Just 20) (S.lifeOf S.bob after),
       HU.testCase "CR 704.5a a Bolt can end the game mid-step" $
-        let (gs, oid) = S.boltInHand 1 Phase.PrecombatMain
+        let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
             lowBob =
               gs {GameState.players = Map.adjust (\pl -> pl {Player.life = 3}) S.bob (GameState.players gs)}
             atBob :: Prompt.Prompt r -> r
@@ -481,5 +481,5 @@ fizzleTests =
               HU.assertEqual "the loop released priority" Nothing (GameState.priority after)
     ]
 
-tests :: Tasty.TestTree
-tests = Tasty.testGroup "Resolve" [targetTests, resolveTests, fizzleTests]
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards]

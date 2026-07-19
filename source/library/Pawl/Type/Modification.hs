@@ -1,8 +1,5 @@
-{-# LANGUAGE DeriveLift #-}
-
 module Pawl.Type.Modification where
 
-import Language.Haskell.TH.Syntax (Lift)
 import Pawl.Type.CardType (CardType)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.Quantity (Quantity)
@@ -24,4 +21,4 @@ data Modification
   | AddLandSubtype Subtype -- layer 4, CR 305.7 add (Urborg -> Swamp)
   | AddCardType CardType -- layer 4 (Opalescence -> Creature)
   | ChangeSubtypeWord Subtype Subtype -- layer 3, CR 612 (Magical Hack: from -> to)
-  deriving (Eq, Lift, Ord, Show)
+  deriving (Eq, Ord, Show)
