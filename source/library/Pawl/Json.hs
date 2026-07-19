@@ -6,6 +6,7 @@ module Pawl.Json where
 
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as LazyByteString
+import qualified Data.Functor.Identity as Identity
 import qualified Data.Maybe as Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -13,6 +14,7 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Type.Decimal as Decimal
 import Pawl.Type.Json (Value)
 import qualified Pawl.Type.Json as Json
+import qualified Text.Parsec as Parsec
 
 -- Construction helpers -------------------------------------------------------
 
@@ -131,3 +133,111 @@ tag value = do
   ps <- asObject value
   t <- field (Text.pack "type") ps >>= asText
   pure (t, optField (Text.pack "value") ps)
+
+-- Parsing --------------------------------------------------------------------
+
+parse :: Text -> Either Text Value
+parse input = case Parsec.parse (whole document) "" input of
+  Left err -> Left (Text.pack (show err))
+  Right v -> Right v
+
+type P a = Parsec.ParsecT Text () Identity.Identity a
+
+whole :: P a -> P a
+whole p = spaces *> p <* spaces <* Parsec.eof
+
+spaces :: P ()
+spaces = Parsec.skipMany (Parsec.oneOf " \t\n\r")
+
+document :: P Value
+document =
+  Parsec.choice
+    [ Json.Null <$ Parsec.try (Parsec.string "null"),
+      Json.Boolean True <$ Parsec.try (Parsec.string "true"),
+      Json.Boolean False <$ Parsec.try (Parsec.string "false"),
+      Json.Number <$> pNumber,
+      Json.String <$> pString,
+      Json.Array <$> pArray,
+      Json.Object <$> pObject
+    ]
+
+lexeme :: P a -> P a
+lexeme p = p <* spaces
+
+pArray :: P [Value]
+pArray = Parsec.between (lexeme (Parsec.char '[')) (Parsec.char ']') (Parsec.sepBy (lexeme document) (lexeme (Parsec.char ',')))
+
+pObject :: P [(Text, Value)]
+pObject = Parsec.between (lexeme (Parsec.char '{')) (Parsec.char '}') (Parsec.sepBy (lexeme pPair) (lexeme (Parsec.char ',')))
+
+pPair :: P (Text, Value)
+pPair = do
+  k <- lexeme pString
+  _ <- lexeme (Parsec.char ':')
+  v <- lexeme document
+  pure (k, v)
+
+pString :: P Text
+pString = do
+  _ <- Parsec.char '"'
+  chars <- Parsec.many pChar
+  _ <- Parsec.char '"'
+  pure (Text.pack chars)
+
+pChar :: P Char
+pChar =
+  Parsec.choice
+    [ Parsec.char '\\' *> pEscape,
+      Parsec.satisfy (\c -> c /= '"' && c /= '\\')
+    ]
+
+pEscape :: P Char
+pEscape =
+  Parsec.choice
+    [ '"' <$ Parsec.char '"',
+      '\\' <$ Parsec.char '\\',
+      '/' <$ Parsec.char '/',
+      '\n' <$ Parsec.char 'n',
+      '\r' <$ Parsec.char 'r',
+      '\t' <$ Parsec.char 't',
+      '\b' <$ Parsec.char 'b',
+      '\f' <$ Parsec.char 'f',
+      Parsec.char 'u' *> pUnicode
+    ]
+
+pUnicode :: P Char
+pUnicode = do
+  ds <- Parsec.count 4 Parsec.hexDigit
+  pure (toEnum (foldl (\acc d -> acc * 16 + hexVal d) 0 ds))
+
+hexVal :: Char -> Int
+hexVal c = Maybe.fromMaybe 0 (lookup c (zip "0123456789abcdefABCDEF" ([0 .. 15] <> [10 .. 15])))
+
+pNumber :: P Decimal.Decimal
+pNumber = do
+  signF <- Parsec.option id (negate <$ Parsec.char '-')
+  intPart <- pInt
+  (fracPart, fracExp) <- Parsec.option (0, 0) pFrac
+  expPart <- Parsec.option 0 pExp
+  pure (Decimal.mkDecimal (signF (intPart * (10 ^ abs fracExp) + fracPart)) (fracExp + expPart))
+
+pInt :: P Integer
+pInt =
+  Parsec.choice
+    [ 0 <$ Parsec.char '0' <* Parsec.notFollowedBy Parsec.digit,
+      digitsToInteger <$> ((:) <$> Parsec.satisfy (\c -> c >= '1' && c <= '9') <*> Parsec.many Parsec.digit)
+    ]
+
+pFrac :: P (Integer, Integer)
+pFrac = do
+  ds <- Parsec.char '.' *> Parsec.many1 Parsec.digit
+  pure (digitsToInteger ds, negate (toInteger (length ds)))
+
+pExp :: P Integer
+pExp = do
+  _ <- Parsec.oneOf "eE"
+  signF <- Parsec.option id (Parsec.choice [id <$ Parsec.char '+', negate <$ Parsec.char '-'])
+  signF . digitsToInteger <$> Parsec.many1 Parsec.digit
+
+digitsToInteger :: String -> Integer
+digitsToInteger = foldl (\acc c -> acc * 10 + toInteger (fromEnum c - fromEnum '0')) 0

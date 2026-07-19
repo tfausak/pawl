@@ -8,6 +8,9 @@ import qualified Pawl.Type.Json as Json
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
+roundTrips :: Json.Value -> HU.Assertion
+roundTrips v = HU.assertEqual "round-trip" (Right v) (J.parse (J.render v))
+
 tests :: Tasty.TestTree
 tests =
   Tasty.testGroup
@@ -34,5 +37,19 @@ tests =
             HU.assertEqual "tag" (Text.pack "{\"type\":\"ManaValue\"}") (J.render (J.tagged (Text.pack "ManaValue") Nothing)),
           HU.testCase "escapes strings" $
             HU.assertEqual "quote" (Text.pack "\"a\\\"b\"") (J.render (J.jText (Text.pack "a\"b")))
+        ],
+      Tasty.testGroup
+        "parse round-trips render"
+        [ HU.testCase "integer" $ roundTrips (J.jInt 42),
+          HU.testCase "tagged with value" $
+            roundTrips (J.tagged (Text.pack "Literal") (Just (J.jInt 3))),
+          HU.testCase "nested array/object" $
+            roundTrips
+              ( Json.Array
+                  [ Json.Object [(Text.pack "k", J.jText (Text.pack "v\"x"))],
+                    Json.Boolean True,
+                    Json.Null
+                  ]
+              )
         ]
     ]
