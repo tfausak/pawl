@@ -2,6 +2,7 @@
 module Pawl.JsonSpec where
 
 import qualified Pawl.Type.Decimal as Decimal
+import qualified Pawl.Type.Json as Json
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -17,5 +18,10 @@ tests =
             HU.assertEqual "0" (Decimal.MkDecimal 0 0) (Decimal.mkDecimal 0 5),
           HU.testCase "keeps a bare integer" $
             HU.assertEqual "123" (Decimal.MkDecimal 123 0) (Decimal.mkDecimal 123 0)
+        ],
+      Tasty.testGroup
+        "Value"
+        [ HU.testCase "equality distinguishes constructors" $
+            HU.assertBool "null /= true" (Json.Null /= Json.Boolean True)
         ]
     ]
