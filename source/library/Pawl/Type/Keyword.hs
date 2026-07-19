@@ -1,4 +1,8 @@
+{-# LANGUAGE DeriveLift #-}
+
 module Pawl.Type.Keyword where
+
+import Language.Haskell.TH.Syntax (Lift)
 
 -- CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302.
@@ -28,4 +32,4 @@ data Keyword
   | Reach -- 702.17
   | Trample -- 702.19
   | Vigilance -- 702.20
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Lift, Ord, Show)

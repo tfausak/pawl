@@ -1,4 +1,8 @@
+{-# LANGUAGE DeriveLift #-}
+
 module Pawl.Type.Zone where
+
+import Language.Haskell.TH.Syntax (Lift)
 
 data Zone
   = Library
@@ -7,4 +11,4 @@ data Zone
   | Battlefield
   | Stack
   | Exile
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Lift, Ord, Show)

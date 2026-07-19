@@ -1,5 +1,8 @@
+{-# LANGUAGE DeriveLift #-}
+
 module Pawl.Type.AbilityCost where
 
+import Language.Haskell.TH.Syntax (Lift)
 import Pawl.Type.AdditionalCost (AdditionalCost)
 import Pawl.Type.ManaCost (ManaCost)
 
@@ -10,4 +13,4 @@ data AbilityCost = MkAbilityCost
   { mana :: Maybe ManaCost,
     additional :: [AdditionalCost]
   }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Lift, Ord, Show)

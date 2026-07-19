@@ -1,6 +1,9 @@
+{-# LANGUAGE DeriveLift #-}
+
 module Pawl.Type.SlotName where
 
 import Data.Text (Text)
+import Language.Haskell.TH.Syntax (Lift)
 
 -- The name of a binding slot (prior-art D4): an effect references a slot by
 -- name; casting fills it. Targets are the first binding slots, not the last --
@@ -8,4 +11,4 @@ import Data.Text (Text)
 -- lint (test suite) checks every reference resolves, so a dangling name is a
 -- failing test, never a silent no-op.
 newtype SlotName = MkSlotName Text
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Lift, Ord, Show)

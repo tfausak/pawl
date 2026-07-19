@@ -53,6 +53,7 @@ library
     bytestring ^>=0.12,
     containers ^>=0.8,
     parsec ^>=3.1.18,
+    template-haskell ^>=2.24,
     text ^>=2.1.3,
     transformers ^>=0.6.1,
 
@@ -164,6 +165,7 @@ test-suite pawl-test-suite
     tasty ^>=1.5.4,
     tasty-hunit ^>=0.10.2,
     tasty-quickcheck ^>=0.11.1,
+    template-haskell ^>=2.24,
     text ^>=2.1.3,
     transformers ^>=0.6.1,
 
@@ -173,6 +175,7 @@ test-suite pawl-test-suite
   other-modules:
     Pawl.ActivateSpec
     Pawl.Cards
+    Pawl.Cards.Load
     Pawl.CardSpec
     Pawl.CardsSpec
     Pawl.CastSpec

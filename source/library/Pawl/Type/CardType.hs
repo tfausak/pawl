@@ -1,4 +1,8 @@
+{-# LANGUAGE DeriveLift #-}
+
 module Pawl.Type.CardType where
+
+import Language.Haskell.TH.Syntax (Lift)
 
 -- Grows: Sorcery, Artifact, Planeswalker, Battle, …
 data CardType
@@ -10,4 +14,4 @@ data CardType
     Enchantment
   | -- CR 301: an artifact, a permanent type. Mindslaver is the first (M3g).
     Artifact
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Lift, Ord, Show)

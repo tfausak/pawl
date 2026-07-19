@@ -1,8 +1,11 @@
+{-# LANGUAGE DeriveLift #-}
+
 module Pawl.Type.Card where
 
 import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Data.Text (Text)
+import Language.Haskell.TH.Syntax (Lift)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.CastingPermission (CastingPermission)
 import Pawl.Type.Effect (Effect)
@@ -61,4 +64,4 @@ data Card = MkCard
     -- slots have no order, only names, and nothing aligns by position.
     targetSpecs :: Map SlotName TargetSpec
   }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Lift, Ord, Show)

@@ -1,4 +1,8 @@
+{-# LANGUAGE DeriveLift #-}
+
 module Pawl.Type.Quantity where
+
+import Language.Haskell.TH.Syntax (Lift)
 
 -- A number that may not be a literal number.
 --
@@ -23,4 +27,4 @@ data Quantity
     -- computed quantity (Opalescence's "base P/T equal to its mana value"),
     -- evaluated against the affected object.
     ManaValue
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Lift, Ord, Show)
