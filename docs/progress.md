@@ -288,3 +288,51 @@ end of every entry.
   and plan kept as reference:
   `docs/superpowers/specs/2026-07-19-m3.5-cards-as-data-files-design.md` and
   `docs/superpowers/plans/2026-07-19-m3.5-cards-as-data-files.md`.
+- **M4a is complete** (the numeric tower's `X` on a general binding environment —
+  the first letter of M4, leading because X is upstream of every opcode. **Gate
+  card: Blaze** (`{X}{R}` Sorcery, "Blaze deals X damage to any target"), chosen
+  because it falsifies its own naive implementation on exactly one axis: X is
+  *chosen at cast* (CR 601.2b) and *re-read at resolution* (CR 608.2b), the same
+  late-binding shape M3a used for targets. An engine that baked a literal at cast,
+  or treated `X` as 0 or as the `{X}` mana value, deals the wrong amount — the
+  falsifier is a code comment on the gate test. **Landed in two ordered phases.**
+  *Phase 1 (behavior-preserving refactor)*: the two parallel `Object` choice-maps
+  (`targets`, M3a; `chosenSubtypes`, M3d) unify into one `Object.bindings ::
+  Map SlotName Binding` — the risk-register's D4 "named binding slots," generalized
+  when X arrived as the **second customer**. `Pawl.Type.Binding` is a product
+  record (`target`/`subtypes`/`amount`, each `Maybe`) so one slot can carry several
+  kinds of choice at once (Magical Hack's slot is both targeted and word-swapped);
+  `Pawl.Binding` holds the logic — projections `targetsOf`/`subtypesOf`/`amountOf`,
+  the write-site `fromChoices`, and the reserved slot `variableX`. Every reader
+  migrated to a projection; the M3a–M3g suite (unchanged) is the regression net,
+  green before and after. *Phase 2 (X)*: `Quantity.X` (evaluated by
+  `Quantity.evaluate` against the source object's `bindings` at `variableX`);
+  `ManaSymbol.Variable` (the `{X}` symbol, contributing 0 off the stack per CR
+  202.3b); `Mana.substituteX` (CR 601.2f — each `Variable` becomes `Generic n`,
+  order preserved); `Prompt.ChooseX`/`Response.ChoseX` (replay-serialized so a
+  variable-cost cast replays deterministically); and `CardType.Sorcery` (first
+  sorcery printing; not a permanent, so it resolves to the graveyard). `Cast
+  .castSpell` prompts X first (CR 601.2b precedes 601.2c) and only when the cost
+  carries a `Variable`, pays the substituted cost, and stamps the chosen value into
+  `bindings`. The **castability floor** is `substituteX 0` (a caster may always
+  choose X=0, so Blaze is offered whenever `{R}` is affordable; the actual X is
+  gated at payment, reject-not-repair). The **D4 lint generalizes to the value
+  half**: `Resolve.readsX` — a card reads `X` iff it declares `{X}` in its cost —
+  with the reserved X slot exempt from the target-slot reads-equal-declares
+  equality. **Invariants preserved**: `Pawl.Resolve` stays the sole home of
+  `case effect of`/`case quantity of`; X is a genuine player choice and is
+  prompted (never elided). **Deck note**: Blaze joins `redDeck` for random X-cost
+  coverage by swapping in for four Goblin Pikers, keeping the deck at 60 (so the
+  CR 400.7 conservation counts stay 120) — a deliberate deviation from the plan's
+  literal "add four Blazes" (which would have grown the deck to 64), taken by user
+  direction when the gap surfaced. **Named expiries opened**: the rest of the
+  numeric tower (`Star`/`Plus`/`Half`/`Infinite`/`Count`) stays shape-only, each
+  due with its first card; X frozen to a `Literal` in a stored continuous effect
+  (the `Projection.hs` note) is due with the first `+X/+X` card; X in
+  activated-ability costs rides M3g's `AbilityCost.mana` and the same `ChooseX`;
+  a general `Quantity.Bound SlotName` (git-bug `c7a0077`) generalizes the single
+  reserved slot when a named or second amount lands; an engine-computed maximum X
+  is a deferred UI nicety. git-bug `65ce714` (mana-source prompt) is unchanged — X
+  substitution precedes source selection. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-19-m4a-numeric-tower-binding-design.md` and
+  `docs/superpowers/plans/2026-07-19-m4a-numeric-tower-binding.md`.
