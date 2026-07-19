@@ -443,11 +443,52 @@ magicalHackTests cards =
             HU.assertBool "no target -> uncastable" (not (Cast.castable S.alice hackId gs))
     ]
 
+-- Aims every target slot at bob and chooses X=0; the X=0 castability floor.
+answerX0 :: Prompt.Prompt r -> r
+answerX0 p = case p of
+  Prompt.ChooseX {} -> 0
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToPlayer S.bob)) sets
+  _ -> S.identityAnswer p
+
+-- How many Blazes sit in alice's hand (the reject-not-repair no-op check).
+blazeInHand :: GameState.GameState -> Int
+blazeInHand gs = length (filter (nameOnStack (Text.pack "Blaze") gs) (Game.zoneMembers Zone.Hand S.alice gs))
+
+blazeTests :: Cards.Cards -> Tasty.TestTree
+blazeTests cards =
+  Tasty.testGroup
+    "Blaze"
+    [ HU.testCase "Blaze at X=3 deals 3 to the opponent (CR 601.2b/f/h, 608.2)" $
+        -- Falsifier: an engine that ignored the chosen value (treated X as 0, or
+        -- as the {X} mana value) would leave bob at 20.
+        let (gs0, oid) = S.handOne (Cards.blazePrinting cards) (S.mountainsInPlay cards 4)
+            after = snd (Engine.runGamePure answerX3 gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop))
+         in do
+              HU.assertEqual "Bob at 17" (Just 17) (S.lifeOf S.bob after)
+              HU.assertEqual "four Mountains paid {3}{R}" 4 (S.tappedCount S.alice after),
+      HU.testCase "Blaze at X=0 is castable and deals nothing (the X=0 floor)" $
+        -- Falsifier: a floor that required {X} > 0 would make Blaze uncastable off
+        -- one Mountain, leaving it in hand.
+        let (gs0, oid) = S.handOne (Cards.blazePrinting cards) (S.mountainsInPlay cards 1)
+            after = snd (Engine.runGamePure answerX0 gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop))
+         in do
+              HU.assertEqual "Bob unharmed" (Just 20) (S.lifeOf S.bob after)
+              HU.assertEqual "one Mountain paid {R}" 1 (S.tappedCount S.alice after)
+              HU.assertEqual "Blaze resolved out of hand" 0 (blazeInHand after),
+      HU.testCase "Blaze at an unaffordable X is a no-op (reject-not-repair)" $
+        let (gs0, oid) = S.handOne (Cards.blazePrinting cards) (S.mountainsInPlay cards 1)
+            after = snd (Engine.runGamePure answerX3 gs0 (Cast.castSpell S.alice oid))
+         in do
+              HU.assertEqual "still in hand" 1 (blazeInHand after)
+              HU.assertEqual "no mana spent" 0 (S.tappedCount S.alice after)
+              HU.assertEqual "Bob unharmed" (Just 20) (S.lifeOf S.bob after)
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
     "Cast"
-    [castTests cards, castEngineTests cards, stackTests cards, discardTests cards, sicknessTests cards, magicalHackTests cards]
+    [castTests cards, castEngineTests cards, stackTests cards, discardTests cards, sicknessTests cards, magicalHackTests cards, blazeTests cards]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

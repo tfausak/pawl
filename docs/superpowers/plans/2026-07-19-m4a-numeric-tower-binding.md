@@ -836,7 +836,7 @@ git commit -m "M4a: generalize the D4 lint -- a card reads X iff it declares {X}
 **Interfaces:**
 - Consumes: everything above. Produces: gameplay-level assertions that Blaze deals the chosen X, X=0 is legal, and an unaffordable X is a no-op; plus random-game coverage via `redDeck`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add a Blaze gameplay group (deterministic fixtures, following the M3a Lightning Bolt scenario style):
 
@@ -858,28 +858,28 @@ Add a Blaze gameplay group (deterministic fixtures, following the M3a Lightning 
 
 Build the fixtures from the M3a red mana base (Mountains) plus Blaze in hand; `answerX3`/`answerX0` are answerers whose `Prompt.ChooseX` arm returns 3 / 0 and whose target arm picks Bob.
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `cabal build all --enable-tests 2>&1 | tail -20`
 Expected: FAIL — the fixtures/helpers are undefined (write them), then the assertions drive the behavior.
 
-- [ ] **Step 3: Implement the fixtures/helpers**
+- [x] **Step 3: Implement the fixtures/helpers**
 
 Add the `resolveBlaze` / `castBlaze` helpers (cast through the stack via `Engine.runGamePure` with the given answerer, then resolve the top), reusing existing CastSpec plumbing. No engine change should be needed — if a test fails on engine behavior, STOP: a green-code test failure is a plan bug, per `CLAUDE.md`.
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -20`
 Expected: PASS — all three scenarios green.
 
-- [ ] **Step 5: Confirm random-game coverage**
+- [x] **Step 5: Confirm random-game coverage**
 
 Run the property suite (it runs `runMatch` over the matchups, now with Blaze in `redDeck` and the `ChooseX` random answerer from Task 6). Confirm the red-matchup properties (conservation, termination, ids, no floating mana at end of step, life-never-increases, replay determinism) still hold with Blaze in the deck.
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: PASS — properties green; replay determinism now covers `ChoseX`.
 
-- [ ] **Step 6: Format, lint, commit**
+- [x] **Step 6: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
