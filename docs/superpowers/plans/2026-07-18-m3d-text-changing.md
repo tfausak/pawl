@@ -312,7 +312,7 @@ git commit -m "Target a spell or permanent: ToObject and the two target specs (C
 **Interfaces:**
 - Produces: `Object.chosenSubtypes :: Map SlotName (Subtype, Subtype)` — the basic-land-type pairs chosen while casting, by slot name; reset by `changeZone` (CR 400.7 per-incarnation state, like `targets`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/GameSpec.hs` (it already exercises `changeZone` resetting per-incarnation state; add `qualified Data.Map.Strict as Map`, `qualified Pawl.Type.SlotName as SlotName`, `qualified Pawl.Type.Subtype as Subtype`, `qualified Data.Text as Text` if absent):
 
@@ -333,12 +333,12 @@ Add to `source/test-suite/Pawl/GameSpec.hs` (it already exercises `changeZone` r
          in HU.assertEqual "reset to empty" (Just Map.empty) (fmap Object.chosenSubtypes newObj),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "resets chosenSubtypes"'`
 Expected: FAIL to compile — `Object.chosenSubtypes` not in scope.
 
-- [ ] **Step 3: Add the field**
+- [x] **Step 3: Add the field**
 
 In `source/library/Pawl/Type/Object.hs`, add the import `import Pawl.Type.Subtype (Subtype)` and the field (after `targets`, before `timestamp`):
 
@@ -351,7 +351,7 @@ In `source/library/Pawl/Type/Object.hs`, add the import `import Pawl.Type.Subtyp
     chosenSubtypes :: Map SlotName (Subtype, Subtype),
 ```
 
-- [ ] **Step 4: Reset it in `changeZone`**
+- [x] **Step 4: Reset it in `changeZone`**
 
 In `source/library/Pawl/Game.hs`, `changeZone`'s `newObj` record update — add `Object.chosenSubtypes = Map.empty`:
 
@@ -359,7 +359,7 @@ In `source/library/Pawl/Game.hs`, `changeZone`'s `newObj` record update — add 
         newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.targets = Map.empty, Object.chosenSubtypes = Map.empty, Object.timestamp = ts}
 ```
 
-- [ ] **Step 5: Seed it empty at every other constructor**
+- [x] **Step 5: Seed it empty at every other constructor**
 
 Add `Object.chosenSubtypes = Map.empty` to each `Object.MkObject` record. Sites (the build enumerates any missed one via `-Wmissing-fields`, which pedantic makes an error):
 - `source/library/Pawl/Setup.hs` (~line 130)
@@ -375,12 +375,12 @@ Each gets the line, e.g. in `addCreature`:
             Object.timestamp = ts
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. If the build errors on a missing field, add `Object.chosenSubtypes = Map.empty` at that site.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

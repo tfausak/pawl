@@ -7,6 +7,7 @@ import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.Sickness (Sickness)
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Source (Source)
+import Pawl.Type.Subtype (Subtype)
 import Pawl.Type.TapState (TapState)
 import Pawl.Type.Timestamp (Timestamp)
 import Pawl.Type.Zone (Zone)
@@ -29,6 +30,12 @@ data Object = MkObject
     -- everything but a spell on the stack. Per-incarnation state: reset by
     -- changeZone, so CR 400.7 forgets them when the spell moves.
     targets :: Map SlotName Recipient,
+    -- CR 612 / the D4 binding: the basic-land-type pairs chosen while casting a
+    -- text-changing spell, by slot name. Empty for everything but a text-changer
+    -- on the stack. Per-incarnation state: reset by changeZone, so CR 400.7
+    -- forgets them when the spell moves -- the negative Magical-Hack-on-a-spell
+    -- test (Task 8) rides on exactly this reset.
+    chosenSubtypes :: Map SlotName (Subtype, Subtype),
     -- CR 613.7d: when this object entered its current zone. A static ability's
     -- continuous effect shares this timestamp (CR 613.7a); stamped fresh on every
     -- zone change (CR 400.7 makes each a new object). Read by the projection when

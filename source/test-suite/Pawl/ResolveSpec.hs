@@ -179,6 +179,7 @@ twoBoltState =
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.targets = Map.empty,
+            Object.chosenSubtypes = Map.empty,
             Object.timestamp = Timestamp.MkTimestamp 0
           }
    in gs2

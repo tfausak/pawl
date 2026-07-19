@@ -237,6 +237,7 @@ addCreature printing pid gs =
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.targets = Map.empty,
+            Object.chosenSubtypes = Map.empty,
             Object.timestamp = ts
           }
    in ( oid,
@@ -269,6 +270,7 @@ landsInPlay land n =
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
                   Object.targets = Map.empty,
+                  Object.chosenSubtypes = Map.empty,
                   Object.timestamp = ts
                 }
          in gs2
@@ -295,6 +297,7 @@ handOne printing base =
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.targets = Map.empty,
+            Object.chosenSubtypes = Map.empty,
             Object.timestamp = ts
           }
    in ( gs2
@@ -322,6 +325,7 @@ pikerInHand n ph =
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.targets = Map.empty,
+            Object.chosenSubtypes = Map.empty,
             Object.timestamp = ts
           }
       gs3 =
@@ -464,6 +468,7 @@ oneMountainState ph =
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.targets = Map.empty,
+            Object.chosenSubtypes = Map.empty,
             Object.timestamp = Timestamp.MkTimestamp 0
           }
    in GameState.MkGameState

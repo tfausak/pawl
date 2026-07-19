@@ -39,6 +39,7 @@ import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
+import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
@@ -93,6 +94,7 @@ gameTests =
                       Object.damage = 0,
                       Object.sickness = Sickness.Sick,
                       Object.targets = Map.empty,
+                      Object.chosenSubtypes = Map.empty,
                       -- changeZone draws a fresh timestamp; oneMountainState's
                       -- nextTimestamp starts at 1 (object 0 already holds 0).
                       Object.timestamp = Timestamp.MkTimestamp 1
@@ -112,6 +114,20 @@ gameTests =
                 moved = Game.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
                 landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
              in HU.assertEqual "reset" [Map.empty] (map Object.targets landed),
+          HU.testCase "CR 400.7 changeZone resets chosenSubtypes" $
+            let base = S.oneMountainState Phase.PrecombatMain
+                slot = SlotName.MkSlotName (Text.pack "target")
+                stamped =
+                  base
+                    { GameState.objects =
+                        Map.adjust
+                          (\o -> o {Object.chosenSubtypes = Map.singleton slot (Subtype.Mountain, Subtype.Island)})
+                          (ObjectId.MkObjectId 0)
+                          (GameState.objects base)
+                    }
+                moved = Game.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
+                newObj = Game.lookupObject (ObjectId.MkObjectId 1) moved
+             in HU.assertEqual "reset to empty" (Just Map.empty) (fmap Object.chosenSubtypes newObj),
           HU.testCase "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $
             let (oid, gs) = S.addPiker S.bob (S.mountainsInPlay 1)
                 before = GameState.nextTimestamp gs
