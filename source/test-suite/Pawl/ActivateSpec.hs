@@ -20,6 +20,8 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
@@ -43,7 +45,7 @@ findFirst p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility
 theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost []) [] Map.empty
+  [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [] Map.empty
 
 tests :: Tasty.TestTree
 tests =
@@ -99,7 +101,21 @@ tests =
       HU.testCase "CR 613/602 a Humility'd Prodigal Sorcerer's ability is not offered" $
         let (_, g0) = S.addCreature Card.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
             gs = (S.withHumility g0) {GameState.priority = Just S.alice}
-         in HU.assertBool "no Activate under Humility" (not (any isActivate (Action.legalActions S.alice gs)))
+         in HU.assertBool "no Activate under Humility" (not (any isActivate (Action.legalActions S.alice gs))),
+      HU.testCase "CR 602.1b: an activation with a mana cost needs the mana" $
+        let gs = S.mountainsInPlay 1
+            (srcId, gs1) = S.addCreature Card.pikerPrinting S.alice gs
+            costlyAbility =
+              ActivatedAbility.MkActivatedAbility
+                { ActivatedAbility.cost =
+                    AbilityCost.MkAbilityCost
+                      { AbilityCost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
+                        AbilityCost.additional = []
+                      },
+                  ActivatedAbility.effects = [],
+                  ActivatedAbility.targetSpecs = Map.empty
+                }
+         in HU.assertBool "one Mountain cannot pay {2}" (not (Activate.activatable S.alice srcId costlyAbility gs1))
     ]
 
 isActivate :: A.Action -> Bool

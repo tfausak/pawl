@@ -53,7 +53,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 **Interfaces:**
 - Produces: `CardType.Artifact`; `TargetSpec.PlayerTarget`; `Target.legalRecipients TargetSpec.PlayerTarget gs = Set.fromList (map Recipient.ToPlayer (Sba.stillPlaying gs))`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/TargetSpec.hs` (in its test group; add imports `qualified Pawl.Type.TargetSpec as TargetSpec`, `qualified Pawl.Type.Recipient as Recipient`, `qualified Pawl.Setup as Setup`, `qualified Pawl.Support as S`, `qualified Pawl.Target as Target`, `qualified Data.Set as Set` if absent — mirror the file's existing style):
 
@@ -64,12 +64,12 @@ Add to `source/test-suite/Pawl/TargetSpec.hs` (in its test group; add imports `q
          in HU.assertEqual "both players, no creatures" expected (Target.legalRecipients TargetSpec.PlayerTarget gs),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "PlayerTarget is exactly"'`
 Expected: FAIL to compile — `TargetSpec.PlayerTarget` not in scope.
 
-- [ ] **Step 3: Add `Artifact` to `CardType` and its permanent arm**
+- [x] **Step 3: Add `Artifact` to `CardType` and its permanent arm**
 
 In `source/library/Pawl/Type/CardType.hs`, add the constructor (after `Enchantment`):
 
@@ -84,7 +84,7 @@ In `source/library/Pawl/Card.hs`, `isPermanentType` gains the arm (CR 301.1 — 
   CardType.Artifact -> True
 ```
 
-- [ ] **Step 4: Add `PlayerTarget` to `TargetSpec`**
+- [x] **Step 4: Add `PlayerTarget` to `TargetSpec`**
 
 In `source/library/Pawl/Type/TargetSpec.hs`, add the constructor (after `LandTarget`):
 
@@ -94,7 +94,7 @@ In `source/library/Pawl/Type/TargetSpec.hs`, add the constructor (after `LandTar
     PlayerTarget
 ```
 
-- [ ] **Step 5: Add the `PlayerTarget` arm to `legalRecipients`**
+- [x] **Step 5: Add the `PlayerTarget` arm to `legalRecipients`**
 
 In `source/library/Pawl/Target.hs`, the `case spec of` gains (the `players` binding is already in scope, computed for `AnyTarget`):
 
@@ -102,12 +102,12 @@ In `source/library/Pawl/Target.hs`, the `case spec of` gains (the `players` bind
         TargetSpec.PlayerTarget -> Set.fromList players
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -129,7 +129,7 @@ git commit -m "Add CardType.Artifact + TargetSpec.PlayerTarget (CR 115/301)"
 - Consumes: `Mana.canPay`, `Mana.payCost` (M3e, in `Pawl.Mana`).
 - Produces: `AbilityCost.MkAbilityCost { mana :: Maybe ManaCost, additional :: [AdditionalCost] }`; `Activate.activatable` now also requires the mana payable; `Activate.activateAbility` pays the mana (CR 602.1b) before the additional costs.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ActivateSpec.hs` (add imports as the compiler flags — `qualified Pawl.Type.AbilityCost as AbilityCost`, `qualified Pawl.Type.ManaCost as ManaCost`, `qualified Pawl.Type.ManaSymbol as ManaSymbol`, `qualified Pawl.Activate as Activate`, `qualified Pawl.Support as S`, `qualified Data.Map.Strict as Map`). This asserts an ability with a `{2}` mana cost is not activatable with only one Mountain:
 
@@ -152,12 +152,12 @@ Add to `source/test-suite/Pawl/ActivateSpec.hs` (add imports as the compiler fla
 
 (Add imports `qualified Pawl.Type.ActivatedAbility as ActivatedAbility`, `qualified Pawl.Card as Card` if absent. `S.mountainsInPlay 1` gives alice one untapped Mountain; `S.addCreature` adds the Piker as a settled source.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "needs the mana"'`
 Expected: FAIL to compile — `AbilityCost.mana` not a field (still a `newtype` with only `additional`).
 
-- [ ] **Step 3: Promote `AbilityCost` to `data` with a `mana` field**
+- [x] **Step 3: Promote `AbilityCost` to `data` with a `mana` field**
 
 Replace `source/library/Pawl/Type/AbilityCost.hs`:
 
@@ -177,11 +177,11 @@ data AbilityCost = MkAbilityCost
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Seed `mana = Nothing` at every existing `MkAbilityCost`**
+- [x] **Step 4: Seed `mana = Nothing` at every existing `MkAbilityCost`**
 
 `-Wmissing-fields` lists them. In `source/library/Pawl/Card.hs`, at Llanowar Elves (`llanowarElvesPrinting`), Evolving Wilds (`evolvingWildsPrinting`), and Prodigal Sorcerer (`prodigalSorcererPrinting`), change each `AbilityCost.MkAbilityCost {AbilityCost.additional = [...]}` to `AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = [...]}`. Fix any test that hand-builds an `MkAbilityCost` the same way (the build names them).
 
-- [ ] **Step 5: Check + pay the mana in `Activate`**
+- [x] **Step 5: Check + pay the mana in `Activate`**
 
 In `source/library/Pawl/Activate.hs`, extend `activatable` (add the mana conjunct after the `tapSicknessOk` line):
 
@@ -210,12 +210,12 @@ In `activateAbility`, replace the final `else` branch's cost payment (currently 
 
 (`Mana`, `List`, `AbilityCost`, `Map` are already imported in `Activate`.)
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the M3e activation tests (Llanowar, Prodigal, Evolving Wilds, all `mana = Nothing`) stay green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

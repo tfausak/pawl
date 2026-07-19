@@ -823,7 +823,7 @@ prodigalSorcererPrinting =
             Card.effects = [],
             Card.activatedAbilities =
               [ ActivatedAbility.MkActivatedAbility
-                  { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = [AdditionalCost.TapSelf]},
+                  { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = [AdditionalCost.TapSelf]},
                     ActivatedAbility.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1)],
                     ActivatedAbility.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget
                   }
@@ -857,7 +857,7 @@ llanowarElvesPrinting =
             Card.effects = [],
             Card.activatedAbilities =
               [ ActivatedAbility.MkActivatedAbility
-                  { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = [AdditionalCost.TapSelf]},
+                  { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = [AdditionalCost.TapSelf]},
                     ActivatedAbility.effects = [Effect.AddMana (ManaType.Colored Color.Green)],
                     ActivatedAbility.targetSpecs = Map.empty
                   }
@@ -893,7 +893,7 @@ evolvingWildsPrinting =
             Card.effects = [],
             Card.activatedAbilities =
               [ ActivatedAbility.MkActivatedAbility
-                  { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = [AdditionalCost.TapSelf, AdditionalCost.SacrificeSelf]},
+                  { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = [AdditionalCost.TapSelf, AdditionalCost.SacrificeSelf]},
                     ActivatedAbility.effects = [Effect.Search CardCriterion.BasicLandCard],
                     ActivatedAbility.targetSpecs = Map.empty
                   }

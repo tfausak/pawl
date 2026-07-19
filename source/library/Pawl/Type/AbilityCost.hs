@@ -1,12 +1,13 @@
 module Pawl.Type.AbilityCost where
 
 import Pawl.Type.AdditionalCost (AdditionalCost)
+import Pawl.Type.ManaCost (ManaCost)
 
--- The cost of an activated ability (CR 602.1). A `mana :: Maybe ManaCost` field
--- is the named future addition (no M3e gate has a mana symbol in its ability
--- cost); for now only the non-mana costs. A newtype today; becomes `data` when
--- that second field lands.
-newtype AbilityCost = MkAbilityCost
-  { additional :: [AdditionalCost]
+-- The cost of an activated ability (CR 602.1). A mana part (CR 602.1b) plus the
+-- non-mana additional costs. Nothing = no mana symbol in the cost (every M3e
+-- ability); Mindslaver's {4} is the first Just.
+data AbilityCost = MkAbilityCost
+  { mana :: Maybe ManaCost,
+    additional :: [AdditionalCost]
   }
   deriving (Eq, Ord, Show)

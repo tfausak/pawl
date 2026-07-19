@@ -66,6 +66,7 @@ activatable pid srcId ability gs =
     && all (canPayAdditional srcId gs) (AbilityCost.additional (ActivatedAbility.cost ability))
     && tapSicknessOk srcId ability gs
     && not (any Set.null (Map.elems (Target.legalSets (ActivatedAbility.targetSpecs ability) gs)))
+    && maybe True (\c -> Mana.canPay pid c gs) (AbilityCost.mana (ActivatedAbility.cost ability))
 
 -- CR 602.2: put the ability on the stack (a fresh OfAbility object), choose and
 -- stamp targets (602.2b), pay the additional costs, keep priority (117.3c).
@@ -106,7 +107,18 @@ activateAbility pid srcId ability = do
     then State.put gs -- reject: the whole activation is a no-op
     else do
       State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.targets = chosen}) abilId (GameState.objects g)})
-      State.modify' (\g -> List.foldl' (payAdditional srcId) g (AbilityCost.additional (ActivatedAbility.cost ability)))
+      let additional = AbilityCost.additional (ActivatedAbility.cost ability)
+          payAll g = List.foldl' (payAdditional srcId) g additional
+      case AbilityCost.mana (ActivatedAbility.cost ability) of
+        Nothing -> State.modify' payAll
+        Just cost -> do
+          g1 <- State.get
+          case Mana.payCost pid cost g1 of
+            -- activatable pre-checks canPay, so within the source elision this is
+            -- unreachable; reject-not-repair if a distinguishable source ever makes
+            -- payment fail (git-bug 65ce714).
+            Nothing -> State.put gs
+            Just paid -> State.put (payAll paid)
 
 -- Pay one additional cost against the source permanent.
 payAdditional :: ObjectId -> GameState -> AdditionalCost.AdditionalCost -> GameState

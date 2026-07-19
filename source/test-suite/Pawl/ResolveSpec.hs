@@ -271,7 +271,7 @@ resolveTests =
         let (srcId, g0) = S.addCreature Card.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
             ability = case Card.Type.activatedAbilities (Printing.card Card.prodigalSorcererPrinting) of
               ab : _ -> ab
-              [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost []) [] Map.empty
+              [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [] Map.empty
             (abilId, g1) = Game.freshObjectId g0
             (ts, g2) = Game.freshTimestamp g1
             slot = SlotName.MkSlotName (Text.pack "target")
@@ -304,7 +304,7 @@ resolveTests =
             (_, g1) = S.addLibraryCard Card.mountainPrinting S.alice base
             ability =
               ActivatedAbility.MkActivatedAbility
-                (AbilityCost.MkAbilityCost [])
+                (AbilityCost.MkAbilityCost Nothing [])
                 [Effect.Search CardCriterion.BasicLandCard]
                 Map.empty
             (abilId, g2) = Game.freshObjectId g1
@@ -320,7 +320,7 @@ resolveTests =
       HU.testCase "CR 701.23b Search may fail to find" $
         let base = Setup.emptyGame S.bothPlayers
             (_, g1) = S.addLibraryCard Card.mountainPrinting S.alice base
-            ability = ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost []) [Effect.Search CardCriterion.BasicLandCard] Map.empty
+            ability = ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [Effect.Search CardCriterion.BasicLandCard] Map.empty
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty Map.empty ts

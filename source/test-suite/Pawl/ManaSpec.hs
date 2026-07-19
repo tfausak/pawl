@@ -128,7 +128,7 @@ manaTests =
       HU.testCase "CR 605.1a a {T}: Add {G} ability is a mana ability" $
         let ab =
               ActivatedAbility.MkActivatedAbility
-                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = []},
+                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
                   ActivatedAbility.effects = [Effect.AddMana (ManaType.Colored Color.Green)],
                   ActivatedAbility.targetSpecs = Map.empty
                 }
@@ -136,7 +136,7 @@ manaTests =
       HU.testCase "CR 605.1a an ability that targets is NOT a mana ability" $
         let ab =
               ActivatedAbility.MkActivatedAbility
-                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = []},
+                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
                   ActivatedAbility.effects = [Effect.AddMana (ManaType.Colored Color.Green)],
                   ActivatedAbility.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.AnyTarget
                 }
@@ -144,7 +144,7 @@ manaTests =
       HU.testCase "CR 605.1a a damage ability is NOT a mana ability" $
         let ab =
               ActivatedAbility.MkActivatedAbility
-                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.additional = []},
+                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
                   ActivatedAbility.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1)],
                   ActivatedAbility.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.AnyTarget
                 }
