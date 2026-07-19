@@ -875,7 +875,7 @@ git commit -m "Detect enters triggers: Event.matchesTrigger + triggersFrom (CR 6
 - Consumes: `Event.triggersFrom` (Task 6), `Source.OfTrigger` (Task 5), `Stack.resolveTop` (Task 5), `checkSba` (existing).
 - Produces: `Engine.placePendingTriggers :: Game Bool` (drain `zoneChanges`, put matched triggers on the stack in APNAP order choosing targets, return whether any were placed); `Engine.settleForPriority :: Game ()` (CR 117.5: repeat `checkSba` + `placePendingTriggers` until neither changes state); `priorityLoop` runs `settleForPriority` at each boundary in place of the bare `checkSba`.
 
-- [ ] **Step 1: Write the failing end-to-end test**
+- [x] **Step 1: Write the failing end-to-end test**
 
 Add to `source/test-suite/Pawl/EventSpec.hs` (add imports `qualified Pawl.Cast as Cast`, `qualified Pawl.Type.Phase as Phase`, `qualified Pawl.Type.GameState as GameState`, and reuse existing ones). Cast Rest in Peace with white mana, run priority to resolution, and assert the whole card:
 
@@ -909,12 +909,12 @@ countOnBattlefieldByName wanted pid gs =
    in length (filter named (Game.zoneMembers Zone.Battlefield pid gs))
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "whole card: cast Rest in Peace"'`
 Expected: FAIL — `Engine.settleForPriority` is not wired, so the ETB is never placed and the graveyard survives (or the assertion on the helper fails to compile). If it compiles, the graveyard still has the Piker.
 
-- [ ] **Step 3: Add `placePendingTriggers` and `settleForPriority`**
+- [x] **Step 3: Add `placePendingTriggers` and `settleForPriority`**
 
 In `source/library/Pawl/Engine.hs`, add `import qualified Pawl.Event as Event`, `import qualified Pawl.Type.Source as Source`, `import qualified Pawl.Type.TriggeredAbility as TriggeredAbility`, and `import Pawl.Type.ObjectId (ObjectId)` (Engine imports `PlayerId` but not `ObjectId` — the pending-trigger tuple needs it). Add:
 
@@ -978,7 +978,7 @@ settleForPriority = do
 
 **Note on the fixpoint guard:** `before /= after` uses `GameState`'s derived `Eq`. `checkSba` drains `damageEvents`; when there are none it is a genuine no-op (`before == after`). `placePendingTriggers` clears `zoneChanges`; a second iteration finds it empty and places nothing, so the loop terminates.
 
-- [ ] **Step 4: Use `settleForPriority` in `priorityLoop`**
+- [x] **Step 4: Use `settleForPriority` in `priorityLoop`**
 
 In `source/library/Pawl/Engine.hs`, `priorityLoop`'s resolution branch currently runs `Stack.resolveTop` then `checkSba`. Replace that `checkSba` with `settleForPriority`, and add a `settleForPriority` at the top of the inner `loop` so triggers are placed before anyone acts (CR 117.5). Concretely, restructure the inner `loop`:
 
@@ -1025,19 +1025,19 @@ In `source/library/Pawl/Engine.hs`, `priorityLoop`'s resolution branch currently
 
 Key changes from the M3e body: (1) `settleForPriority` runs at the top of `loop` (was: a bare `checkSba` only after `resolveTop`); (2) the post-`resolveTop` result-bail is now handled by the next `loop`'s top `settleForPriority` + `finished` check, so the explicit `checkSba`/`result`-case after `resolveTop` is removed. Preserve the outer `priorityLoop` preamble (`priority := active`, `passes := 0`) exactly. This is behavior-preserving where no trigger fires: `settleForPriority` with no triggers is `checkSba` to a no-op fixpoint, and `runStep` already runs `checkSba` before `priorityLoop`, so the extra settle at entry is idempotent.
 
-- [ ] **Step 5: Run the whole suite**
+- [x] **Step 5: Run the whole suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the whole-card gate goes green, and every prior test (the priority loop is heavily covered) stays green. If a prior priority test changed count, the restructure diverged from behavior-preserving; diff against the M3e `priorityLoop` and reconcile — do **not** weaken an assertion.
 
-- [ ] **Step 6: Confirm replay determinism**
+- [x] **Step 6: Confirm replay determinism**
 
 The `DecisionLog` path now includes the RiP cast, the ETB placement (no target prompt), and the redirected zone changes. If `ReplaySpec` has a targeted deterministic case per milestone, add one that casts Rest in Peace and replays; otherwise the property suite's replay invariant (over the random matchups, which exclude RiP) already covers determinism and no change is needed. Run:
 
 Run: `cabal test --test-options='-p "Replay"'`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
