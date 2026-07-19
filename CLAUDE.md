@@ -135,6 +135,33 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   board from one `gather` per state-based-action sweep. Spec and plan kept as
   reference: `docs/superpowers/specs/2026-07-18-m3c-dependency-design.md` and
   `docs/superpowers/plans/2026-07-18-m3c-dependency.md`.
+- **M3d is complete** (layer 3 — the rewritable effect AST, gated by Magical Hack;
+  the M3 go/no-go for text-changing, a genuine GO. One new layer-3 `Modification`,
+  `ChangeSubtypeWord from to` (CR 612, `Layer.Text`, sorts before layer 4 by the
+  derived `Ord`), is read at **three** points, all through the projection so every
+  consumer cashes out with no special case: (1) **the type line** — `Projection`'s
+  own fold rewrites projected `subtypes` before layer 4, so a hacked basic Mountain
+  taps `{U}` (CR 305.6); (2) **a source's static abilities** — `gather` rewrites the
+  land-type words inside a live permanent's ability `Modification`s via
+  `Projection.textChangesAffecting`/`rewriteModification` **before** they fold onto
+  others, so hacking Blood Moon `Mountain→Island` makes nonbasic lands Islands
+  **order-independently** (the part XMage cannot do — the go/no-go); (3) **a
+  resolving spell's one-shot effects** — `Resolve.effectsOf`/`rewriteEffect` rewrite
+  the AST at resolution (delegating the inner `Modification` to
+  `Projection.rewriteModification`, so neither module touches the other's
+  constructors), so a fixture `Landform` (`{U}` "target land becomes a Swamp",
+  labeled synthetic crutch, spec §8) hacked `Swamp→Mountain` on the stack resolves
+  as Mountain, and a Blood Moon *spell* hacked on the stack loses the change on
+  resolution (CR 400.7 new object). The value choice binds at cast: `ChangeText
+  SlotName` opcode + `ChooseBasicLandTypes` prompt + `Object.chosenSubtypes` store
+  (reset by `changeZone`; serialized as `Response.ChoseBasicLandTypes` for replay),
+  keeping `Resolve` pure — an elision justified by indistinguishability, expiry in
+  §8. `Duration.Indefinite` (cleanup never drops it), `ToObject` recipient,
+  `SpellOrPermanentTarget`/`LandTarget` specs, and `Subtype.Island`/`Plains` land
+  with no rules-core casing on an effect's identity. Magical Hack and the fixture
+  are blue deterministic fixtures (no random-game entry). Spec and plan kept as
+  reference: `docs/superpowers/specs/2026-07-18-m3d-text-changing-design.md` and
+  `docs/superpowers/plans/2026-07-18-m3d-text-changing.md`.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
