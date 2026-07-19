@@ -10,7 +10,6 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import Pawl.Type.GameState (GameState)
@@ -57,19 +56,16 @@ subtypeMana subtype = case subtype of
   Subtype.Elephant -> Nothing
 
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
--- PLUS every printed activated ability that is a mana ability (CR 605.1a),
--- resolved inline at payment and never on the stack. Read from the card's
--- abilities directly here; Task 9 switches this to the projection (abilitiesOf)
--- so Humility strips a creature's mana ability.
+-- PLUS every projected activated ability that is a mana ability (CR 605.1a),
+-- resolved inline at payment and never on the stack. Read through the projection
+-- (abilitiesOf), so Humility (layer 6) strips a creature's mana ability too.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
 manaTypesOf oid gs =
   let fromSubtypes = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesOf oid gs))
-      fromAbilities = case Game.cardOf oid gs of
-        Nothing -> []
-        Just card ->
-          concatMap
-            (Maybe.mapMaybe Resolve.manaProduced . ActivatedAbility.effects)
-            (filter isManaAbility (Card.Type.activatedAbilities card))
+      fromAbilities =
+        concatMap
+          (Maybe.mapMaybe Resolve.manaProduced . ActivatedAbility.effects)
+          (filter isManaAbility (Projection.abilitiesOf oid gs))
    in fromSubtypes ++ fromAbilities
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND

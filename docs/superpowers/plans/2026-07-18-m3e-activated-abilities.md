@@ -1451,7 +1451,7 @@ git commit -m "Evolving Wilds: sacrifice cost + Search, end-to-end (CR 701.21/70
 - Consumes: the printings, `LoseAllAbilities` (M3b), `activatable`/`manaTypesOf` (Tasks 5–6).
 - Produces: `ProjectedCharacteristics.activatedAbilities :: [ActivatedAbility]`; `Projection.abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility]` (printed abilities minus layer-6 `LoseAllAbilities`). This task flips both consumers to the projection: `Activate.abilitiesFor` (used by `activatable`/`legalActions`) and `Mana.manaTypesOf`, so Humility strips a creature's activated *and* mana abilities.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/ProjectionSpec.hs` (Humility is `S.withHumility`; Prodigal Sorcerer is a creature, so `AllCreatures LoseAllAbilities` hits it):
 
@@ -1474,12 +1474,12 @@ Add to `source/test-suite/Pawl/ActivateSpec.hs` — a Humility'd Prodigal Sorcer
          in HU.assertBool "no Activate under Humility" (not (any isActivate (Action.legalActions S.alice gs))),
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "Humility strips"'`
 Expected: FAIL — `Projection.abilitiesOf` not in scope.
 
-- [ ] **Step 3: Add `activatedAbilities` to `ProjectedCharacteristics`**
+- [x] **Step 3: Add `activatedAbilities` to `ProjectedCharacteristics`**
 
 In `source/library/Pawl/Type/ProjectedCharacteristics.hs`, add `import Pawl.Type.ActivatedAbility (ActivatedAbility)` and the field:
 
@@ -1491,7 +1491,7 @@ In `source/library/Pawl/Type/ProjectedCharacteristics.hs`, add `import Pawl.Type
 
 Both `MkProjectedCharacteristics` sites in `Projection.baseCharacteristics` need the field: the `Nothing` (unknown card) case gets `PC.activatedAbilities = []`; the `Just card` case gets `PC.activatedAbilities = Card.Type.activatedAbilities card`.
 
-- [ ] **Step 4: Strip abilities in `LoseAllAbilities`, add `abilitiesOf`**
+- [x] **Step 4: Strip abilities in `LoseAllAbilities`, add `abilitiesOf`**
 
 In `source/library/Pawl/Projection.hs`, extend the `LoseAllAbilities` arm of `applyModification` to also clear abilities (CR 613 layer 6 removes ALL abilities — keywords, static, and activated):
 
@@ -1520,7 +1520,7 @@ abilitiesFor srcId gs = Projection.abilitiesOf srcId gs
 
 (`Pawl.Projection` is already imported in `Activate`; the `Game.cardOf`/`Card.Type` reads in the old body may leave `Card.Type` unused — drop that import if the build warns.)
 
-- [ ] **Step 5: Switch `manaTypesOf` to the projection**
+- [x] **Step 5: Switch `manaTypesOf` to the projection**
 
 In `source/library/Pawl/Mana.hs`, change `manaTypesOf`'s `fromAbilities` to read `Projection.abilitiesOf` instead of the printed `Card.Type.activatedAbilities`, so a Humility'd creature loses its mana ability too:
 
@@ -1532,12 +1532,12 @@ In `source/library/Pawl/Mana.hs`, change `manaTypesOf`'s `fromAbilities` to read
 
 (The `case Game.cardOf oid gs` wrapper is no longer needed for `fromAbilities`; `abilitiesOf` returns `[]` for an unknown object. Drop the now-unused `Card.Type` import if the build warns.)
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — a Humility'd Prodigal Sorcerer projects no abilities and offers no `Activate`; without Humility it has one. **The falsifier:** reading `Card.activatedAbilities` directly would still offer the ability under Humility.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

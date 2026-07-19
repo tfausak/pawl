@@ -13,7 +13,6 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
-import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
@@ -52,7 +51,7 @@ canPayAdditional srcId gs c = case c of
 -- Task 9 switches the body to `Projection.abilitiesOf srcId gs` so Humility
 -- (layer 6) strips them -- the single switch point, the keywordsOf pattern.
 abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility]
-abilitiesFor srcId gs = maybe [] Card.Type.activatedAbilities (Game.cardOf srcId gs)
+abilitiesFor = Projection.abilitiesOf
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities (abilitiesFor),
 -- it is not a mana ability (mana abilities are handled at payment, not the

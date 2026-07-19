@@ -8,6 +8,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Quantity as Quantity
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
@@ -56,7 +57,7 @@ applyModification gs oid m pc = case m of
   Modification.GainKeyword k ->
     pc {PC.keywords = Set.insert k (PC.keywords pc)}
   Modification.LoseAllAbilities ->
-    pc {PC.keywords = Set.empty}
+    pc {PC.keywords = Set.empty, PC.activatedAbilities = []}
   Modification.SetBasePowerToughness p t ->
     pc
       { PC.power = setPT (PC.power pc) (Quantity.evaluate gs oid p),
@@ -153,7 +154,8 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.toughness = Nothing,
         PC.cardTypes = Set.empty,
         PC.subtypes = Set.empty,
-        PC.rulesTextActive = True
+        PC.rulesTextActive = True,
+        PC.activatedAbilities = []
       }
   Just card ->
     PC.MkProjectedCharacteristics
@@ -166,7 +168,8 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
           Just (Toughness.MkToughness q) -> Quantity.evaluate gs oid q,
         PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
         PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
-        PC.rulesTextActive = True
+        PC.rulesTextActive = True,
+        PC.activatedAbilities = Card.Type.activatedAbilities card
       }
 
 -- affects evaluated against an object's BASE characteristics (used by
@@ -331,6 +334,11 @@ toughnessOf oid gs = PC.toughness (project oid gs)
 
 keywordsOf :: ObjectId -> GameState -> Set Keyword
 keywordsOf oid gs = PC.keywords (project oid gs)
+
+-- CR 602 / 613.1f: an object's activated abilities after the layer system, the
+-- same projection posture as keywordsOf. A Humility'd creature has none.
+abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility]
+abilitiesOf oid gs = PC.activatedAbilities (project oid gs)
 
 subtypesOf :: ObjectId -> GameState -> Set Subtype.Subtype
 subtypesOf oid gs = PC.subtypes (project oid gs)

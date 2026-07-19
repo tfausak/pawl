@@ -95,7 +95,11 @@ tests =
             (wildsId, g1) = S.addCreature Card.evolvingWildsPrinting S.alice base
             -- Force it Sick: a land ignores sickness, so the ability is still offered.
             g2 = g1 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) wildsId (GameState.objects g1), GameState.priority = Just S.alice}
-         in HU.assertBool "land ability offered despite sickness" (any isActivate (Action.legalActions S.alice g2))
+         in HU.assertBool "land ability offered despite sickness" (any isActivate (Action.legalActions S.alice g2)),
+      HU.testCase "CR 613/602 a Humility'd Prodigal Sorcerer's ability is not offered" $
+        let (_, g0) = S.addCreature Card.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
+            gs = (S.withHumility g0) {GameState.priority = Just S.alice}
+         in HU.assertBool "no Activate under Humility" (not (any isActivate (Action.legalActions S.alice gs)))
     ]
 
 isActivate :: A.Action -> Bool

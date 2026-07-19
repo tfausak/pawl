@@ -189,6 +189,13 @@ tests =
               HU.assertEqual "power 1" (Just 1) (Projection.powerOf flyerId gs)
               HU.assertEqual "toughness 1" (Just 1) (Projection.toughnessOf flyerId gs)
               HU.assertBool "no flying" (not (Projection.hasKeyword Keyword.Flying flyerId gs)),
+      HU.testCase "CR 613 layer 6: Humility strips a creature's activated abilities" $
+        let (sorcId, g0) = S.addCreature Card.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
+            gs = S.withHumility g0
+         in HU.assertEqual "no abilities under Humility" [] (Projection.abilitiesOf sorcId gs),
+      HU.testCase "without Humility the ability is present" $
+        let (sorcId, gs) = S.addCreature Card.prodigalSorcererPrinting S.alice (Setup.emptyGame S.bothPlayers)
+         in HU.assertEqual "one ability" 1 (length (Projection.abilitiesOf sorcId gs)),
       HU.testCase "CR 704.5g Humility's toughness drop makes an already-damaged creature die" $
         let (mammothId, gs0) = S.addCreature Card.warMammothPrinting S.bob (S.mountainsInPlay 1)
             damaged = S.markDamage mammothId 2 gs0

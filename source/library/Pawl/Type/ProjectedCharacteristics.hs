@@ -1,6 +1,7 @@
 module Pawl.Type.ProjectedCharacteristics where
 
 import Data.Set (Set)
+import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.CardType (CardType)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.Subtype (Subtype)
@@ -16,6 +17,9 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     toughness :: Maybe Integer,
     cardTypes :: Set CardType,
     subtypes :: Set Subtype,
-    rulesTextActive :: Bool
+    rulesTextActive :: Bool,
+    -- CR 602 / 613 layer 6: the object's activated abilities after the layer
+    -- system. Seeded from the card; emptied by LoseAllAbilities (Humility).
+    activatedAbilities :: [ActivatedAbility]
   }
   deriving (Eq, Show)
