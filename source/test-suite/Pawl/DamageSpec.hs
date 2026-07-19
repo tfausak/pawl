@@ -11,6 +11,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Card as Card
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
@@ -99,7 +100,7 @@ damageTests =
       HU.testCase "CR 400.7 a new object carries no damage forward" $
         let (oid, gs) = S.addPiker S.alice (Setup.emptyGame S.bothPlayers)
             marked = S.markDamage oid 1 gs
-            after = Game.changeZone oid Zone.Graveyard marked
+            after = Event.changeZone oid Zone.Graveyard marked
          in case Game.zoneMembers Zone.Graveyard S.alice after of
               [] -> HU.assertFailure "expected a card in the graveyard"
               new : _ -> HU.assertEqual "fresh object, no damage" (Just 0) (S.damageOf new after)

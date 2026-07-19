@@ -10,6 +10,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
@@ -128,10 +129,10 @@ resolveSpell oid = do
             legality = Map.mapWithKey legalSlot chosen
             fizzles = not (Map.null specs) && not (or (Map.elems legality))
          in if fizzles
-              then State.modify' (Game.changeZone oid Zone.Graveyard)
+              then State.modify' (Event.changeZone oid Zone.Graveyard)
               else do
                 Monad.mapM_ (applyEffect oid (Object.owner obj) (Object.chosenSubtypes obj) legality chosen) (effectsOf oid gs)
-                State.modify' (Game.changeZone oid Zone.Graveyard)
+                State.modify' (Event.changeZone oid Zone.Graveyard)
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
 -- (srcId), not the ability object -- so DealDamage comes from Prodigal Sorcerer
@@ -255,7 +256,7 @@ applyEffect source controller bound legality chosen effect = case effect of
 -- shape). changeZone mints a new object; tap it by id after the move.
 putTapped :: ObjectId -> GameState -> GameState
 putTapped cardId gs =
-  let moved = Game.changeZone cardId Zone.Battlefield gs
+  let moved = Event.changeZone cardId Zone.Battlefield gs
    in case newestBattlefieldOf cardId gs moved of
         Nothing -> moved
         Just newId ->

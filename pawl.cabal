@@ -65,6 +65,7 @@ library
     Pawl.Damage
     Pawl.Decide
     Pawl.Engine
+    Pawl.Event
     Pawl.Game
     Pawl.Mana
     Pawl.Projection

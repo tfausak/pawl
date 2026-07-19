@@ -12,9 +12,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.ObjectId as ObjectId
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
@@ -69,21 +67,6 @@ insertIntoZone zone pid oid gs = case zone of
   Zone.Battlefield -> gs {GameState.battlefield = Set.insert oid (GameState.battlefield gs)}
   Zone.Exile -> gs {GameState.exile = Set.insert oid (GameState.exile gs)}
   Zone.Stack -> gs {GameState.stack = oid : GameState.stack gs}
-
--- The single zone-change primitive (CR 400.7): the source object ceases; a NEW
--- object with a fresh id is created in the destination, carrying owner and
--- source forward and resetting per-incarnation state. No-op if the id is unknown.
-changeZone :: ObjectId -> Zone -> GameState -> GameState
-changeZone oid dest gs = case lookupObject oid gs of
-  Nothing -> gs
-  Just obj ->
-    let pid = Object.owner obj
-        (newId, gs1) = freshObjectId gs
-        (ts, gs1b) = freshTimestamp gs1
-        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.targets = Map.empty, Object.chosenSubtypes = Map.empty, Object.timestamp = ts}
-        gs2 = removeFromZones pid oid gs1b
-        gs3 = gs2 {GameState.objects = Map.insert newId newObj (Map.delete oid (GameState.objects gs2))}
-     in insertIntoZone dest pid newId gs3
 
 -- The card an object is a copy of. Nothing when the id is unknown.
 cardOf :: ObjectId -> GameState -> Maybe Card

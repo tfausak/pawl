@@ -14,6 +14,7 @@ import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
@@ -53,7 +54,7 @@ sicknessTests =
     [ HU.testCase "CR 302.6 a permanent entering the battlefield is summoning sick" $
         -- changeZone mints a new object, so the id to inspect is the new one.
         let (gs, oid) = S.pikerInHand 3 Phase.PrecombatMain
-            after = Game.changeZone oid Zone.Battlefield gs
+            after = Event.changeZone oid Zone.Battlefield gs
          in case Game.zoneMembers Zone.Battlefield S.alice after of
               [] -> HU.assertFailure "expected a permanent"
               ids -> case filter (\o -> sicknessOf o after == Just Sickness.Sick) ids of
@@ -213,7 +214,7 @@ castTests =
          in HU.assertBool "in response" (Cast.castable S.alice oid busy),
       HU.testCase "a Bolt in the graveyard is not castable" $
         let (gs, oid) = S.boltInHand 1 Phase.PrecombatMain
-            buried = Game.changeZone oid Zone.Graveyard gs
+            buried = Event.changeZone oid Zone.Graveyard gs
          in HU.assertEqual "nothing castable" [] (Cast.castableSpells S.alice buried),
       HU.testCase "CR 601.2c casting a Bolt stamps the chosen target on the stack object" $
         let (base, gs, _) = S.boltAtBobsPiker

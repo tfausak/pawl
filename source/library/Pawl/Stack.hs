@@ -2,6 +2,7 @@ module Pawl.Stack where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Pawl.Card as Card
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Resolve as Resolve
 import Pawl.Type.Game (Game)
@@ -32,6 +33,6 @@ resolveTop = do
       Just obj -> case Object.source obj of
         Source.OfCard printing ->
           if Card.isPermanent (Printing.card printing)
-            then State.modify' (Game.changeZone oid Zone.Battlefield)
+            then State.modify' (Event.changeZone oid Zone.Battlefield)
             else Resolve.resolveSpell oid
         Source.OfAbility srcId ability -> Resolve.resolveAbility oid srcId ability

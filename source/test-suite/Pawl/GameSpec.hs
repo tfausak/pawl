@@ -15,6 +15,7 @@ import qualified Pawl.Action as Action
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
@@ -75,7 +76,7 @@ objectFactTests =
 
 gameTests :: Tasty.TestTree
 gameTests =
-  let after = Game.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield (S.oneMountainState Phase.PrecombatMain)
+  let after = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield (S.oneMountainState Phase.PrecombatMain)
    in Tasty.testGroup
         "Game"
         [ HU.testCase "changeZone preserves object count" $
@@ -111,7 +112,7 @@ gameTests =
                           (ObjectId.MkObjectId 0)
                           (GameState.objects base)
                     }
-                moved = Game.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
+                moved = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
                 landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
              in HU.assertEqual "reset" [Map.empty] (map Object.targets landed),
           HU.testCase "CR 400.7 changeZone resets chosenSubtypes" $
@@ -125,13 +126,13 @@ gameTests =
                           (ObjectId.MkObjectId 0)
                           (GameState.objects base)
                     }
-                moved = Game.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
+                moved = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
                 newObj = Game.lookupObject (ObjectId.MkObjectId 1) moved
              in HU.assertEqual "reset to empty" (Just Map.empty) (fmap Object.chosenSubtypes newObj),
           HU.testCase "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $
             let (oid, gs) = S.addPiker S.bob (S.mountainsInPlay 1)
                 before = GameState.nextTimestamp gs
-                movedState = Game.changeZone oid Zone.Graveyard gs
+                movedState = Event.changeZone oid Zone.Graveyard gs
                 movedId = case Game.zoneMembers Zone.Graveyard S.bob movedState of
                   i : _ -> i
                   [] -> ObjectId.MkObjectId 999

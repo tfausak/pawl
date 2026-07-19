@@ -11,6 +11,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
@@ -84,7 +85,7 @@ targetTests =
               (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients TargetSpec.AnyTarget gs))),
       HU.testCase "CR 608.2b a creature that left its zone is no longer legal" $
         let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
-            gone = Game.changeZone oid Zone.Graveyard gs
+            gone = Event.changeZone oid Zone.Graveyard gs
          in do
               HU.assertBool "legal while fielded" (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.AnyTarget gs)
               HU.assertBool "illegal once moved" (not (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.AnyTarget gone)),
@@ -107,7 +108,7 @@ targetTests =
           (Set.null (Target.legalRecipients TargetSpec.CreatureTarget (Setup.emptyGame S.bothPlayers))),
       HU.testCase "CR 608.2b a creature that left is no longer a legal CreatureTarget" $
         let (oid, gs) = S.addPiker S.bob (Setup.emptyGame S.bothPlayers)
-            gone = Game.changeZone oid Zone.Graveyard gs
+            gone = Event.changeZone oid Zone.Graveyard gs
          in do
               HU.assertBool "legal while fielded" (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gs)
               HU.assertBool "illegal once moved" (not (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gone)),

@@ -17,6 +17,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
@@ -87,7 +88,7 @@ drawFor pid = do
   case Game.zoneMembers Zone.Library pid gs of
     -- CR 121.3: the draw fails and is remembered; CR 704.5b turns it into a loss.
     [] -> State.put gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
-    top : _ -> State.put (Game.changeZone top Zone.Hand gs)
+    top : _ -> State.put (Event.changeZone top Zone.Hand gs)
 
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
@@ -126,7 +127,7 @@ discardToHandSize pid = do
     chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (fromIntegral excess)))
     let inHand oid = List.elem oid held
         toDiscard = take excess (filter inHand chosen)
-        toGraveyard g oid = Game.changeZone oid Zone.Graveyard g
+        toGraveyard g oid = Event.changeZone oid Zone.Graveyard g
     State.modify' (\g -> List.foldl' toGraveyard g toDiscard)
 
 -- CR 103.7a: the starting player skips their first draw step.
@@ -225,7 +226,7 @@ priorityLoop = do
               Action.Type.Play oid -> do
                 -- CR 305.1: playing a land is a special action; it resolves
                 -- immediately and does not use the stack.
-                let played = Game.changeZone oid Zone.Battlefield gs
+                let played = Event.changeZone oid Zone.Battlefield gs
                 State.put
                   played
                     { GameState.landPlayed = Set.insert p (GameState.landPlayed played),

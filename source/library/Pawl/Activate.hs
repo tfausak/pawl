@@ -6,6 +6,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
@@ -112,4 +113,4 @@ payAdditional :: ObjectId -> GameState -> AdditionalCost.AdditionalCost -> GameS
 payAdditional srcId gs c = case c of
   AdditionalCost.TapSelf ->
     gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) srcId (GameState.objects gs)}
-  AdditionalCost.SacrificeSelf -> Game.changeZone srcId Zone.Graveyard gs
+  AdditionalCost.SacrificeSelf -> Event.changeZone srcId Zone.Graveyard gs

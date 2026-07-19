@@ -4,6 +4,7 @@ import Control.Applicative ((<|>))
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.CardType as CardType
@@ -94,7 +95,7 @@ checkStateBasedActions gs =
         Nothing -> False
         Just pc -> creatureDies gs pc oid
       dying = filter dies (Set.toList (GameState.battlefield gs))
-      bury g oid = Game.changeZone oid Zone.Graveyard g
+      bury g oid = Event.changeZone oid Zone.Graveyard g
       buried = List.foldl' bury gs dying
       leaving = filter (losesNow buried) (stillPlaying buried)
       departed = foldr depart buried leaving

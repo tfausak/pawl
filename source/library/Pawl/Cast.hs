@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Card as Card
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Resolve as Resolve
@@ -112,7 +113,7 @@ castSpell pid oid = do
             case Mana.payCost pid cost gs of
               Nothing -> pure ()
               Just paid -> do
-                let moved = Game.changeZone oid Zone.Stack paid
+                let moved = Event.changeZone oid Zone.Stack paid
                 case GameState.stack moved of
                   [] -> State.put moved
                   top : _ ->

@@ -9,6 +9,7 @@ import qualified Data.Sequence as Seq
 import Numeric.Natural (Natural)
 import qualified Pawl.Card as Card
 import qualified Pawl.Combat as Combat
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Deck as Deck
@@ -158,7 +159,7 @@ drawCard pid = do
   gs <- State.get
   case Game.zoneMembers Zone.Library pid gs of
     [] -> pure ()
-    top : _ -> State.put (Game.changeZone top Zone.Hand gs)
+    top : _ -> State.put (Event.changeZone top Zone.Hand gs)
 
 -- Build each player's library from their deck's multiset, shuffle, draw.
 createDeck :: PlayerId -> Deck.Deck -> Game ()
