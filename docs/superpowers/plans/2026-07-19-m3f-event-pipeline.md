@@ -52,11 +52,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 **Interfaces:**
 - Produces: `Event.changeZone :: ObjectId -> Zone -> GameState -> GameState` (byte-for-byte the old `Game.changeZone`). `Game.changeZone` no longer exists.
 
-- [ ] **Step 1: Note the regression baseline**
+- [x] **Step 1: Note the regression baseline**
 
 Run: `cabal test` and record the passing count. This task must end at the same count — it moves a function, nothing else.
 
-- [ ] **Step 2: Create `Pawl.Event` with `changeZone` moved verbatim**
+- [x] **Step 2: Create `Pawl.Event` with `changeZone` moved verbatim**
 
 Create `source/library/Pawl/Event.hs`. Copy the exact `changeZone` body from `Game.hs` (lines 73–86 at HEAD), keeping every field reset. It calls `Game.lookupObject`, `Game.freshObjectId`, `Game.freshTimestamp`, `Game.removeFromZones`, `Game.insertIntoZone` (all stay in `Game`):
 
@@ -94,20 +94,20 @@ changeZone oid dest gs = case Game.lookupObject oid gs of
      in Game.insertIntoZone dest pid newId gs3
 ```
 
-- [ ] **Step 3: Delete `changeZone` from `Pawl.Game`**
+- [x] **Step 3: Delete `changeZone` from `Pawl.Game`**
 
 Remove the `changeZone` definition (and its doc comment) from `source/library/Pawl/Game.hs`. Leave `lookupObject`, `freshObjectId`, `freshTimestamp`, `removeFromZones`, `insertIntoZone`, `cardOf`, `controllerOf`, `zoneMembers`, `objectCount` in place. Drop now-unused imports if the build flags them (e.g. `Sickness`, `TapState`, `Zone` may become unused in `Game.hs` — remove any the compiler warns on).
 
-- [ ] **Step 4: Retarget every caller**
+- [x] **Step 4: Retarget every caller**
 
 The build lists each unresolved `Game.changeZone`. At each, add `import qualified Pawl.Event as Event` and change `Game.changeZone` → `Event.changeZone`. Known library sites: `Stack.hs` (permanent resolution), `Setup.hs` (opening draws), `Engine.hs` (`drawFor`, land play, `discardToHandSize`), `Activate.hs` (`payAdditional` sacrifice), `Cast.hs`, `Resolve.hs` (`resolveSpell` bury, `putTapped`), `Sba.hs` (`bury`). Known test sites: `DamageSpec.hs`, `GameSpec.hs`, `CastSpec.hs`, `ResolveSpec.hs`.
 
-- [ ] **Step 5: Run the suite to verify no behavior changed**
+- [x] **Step 5: Run the suite to verify no behavior changed**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the same count as Step 1. A cycle error means a caller that `Pawl.Event` itself needs; there is none in M3f (Event imports only `Game` here).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

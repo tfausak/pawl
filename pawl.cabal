@@ -121,6 +121,7 @@ library
     Pawl.Type.Prompt
     Pawl.Type.Quantity
     Pawl.Type.Recipient
+    Pawl.Type.ReplacementEffect
     Pawl.Type.Response
     Pawl.Type.Result
     Pawl.Type.Sickness
@@ -136,6 +137,7 @@ library
     Pawl.Type.Toughness
     Pawl.Type.TypeLine
     Pawl.Type.Zone
+    Pawl.Type.ZoneChange
 
   hs-source-dirs: source/library
 
@@ -166,6 +168,7 @@ test-suite pawl-test-suite
     Pawl.CombatSpec
     Pawl.CoreSpec
     Pawl.DamageSpec
+    Pawl.EventSpec
     Pawl.GameSpec
     Pawl.ManaSpec
     Pawl.ProjectionSpec
