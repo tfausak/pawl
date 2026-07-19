@@ -129,35 +129,35 @@ resolveTests =
     "Resolve"
     [ HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $
         let (_, cast, _) = S.boltAtBobsPiker
-            after = Sba.checkStateBasedActions (Stack.resolveTop cast)
+            after = Sba.checkStateBasedActions (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
          in do
               HU.assertEqual "stack empty" 0 (length (GameState.stack after))
               HU.assertEqual "no creature survives" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "Piker in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
       HU.testCase "CR 608.2n the resolved Bolt is in its owner's graveyard" $
         let (_, cast, _) = S.boltAtBobsPiker
-            after = Stack.resolveTop cast
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "one card" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       HU.testCase "CR 120.3a a Bolt at a player drains life without marking" $
         -- No creature on the battlefield, so identityAnswer's lookupMin picks
         -- ToPlayer alice: a self-Bolt, which is legal Magic.
         let (gs, oid) = S.boltInHand 1 Phase.PrecombatMain
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
-            after = Stack.resolveTop cast
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "seventeen" (Just 17) (S.lifeOf S.alice after),
       HU.testCase "the resolved damage flows through the event funnel" $
         let (_, cast, _) = S.boltAtBobsPiker
-            after = Stack.resolveTop cast
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "one event of amount 3" [3] (map DamageEvent.amount (GameState.damageEvents after)),
       HU.testCase "resolving a Bolt conserves objects" $
         let (_, cast, _) = S.boltAtBobsPiker
-         in HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (Stack.resolveTop cast)),
+         in HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))),
       HU.testCase "CR 608.2b a Bolt whose only target died fizzles" $
         let (base, cast, _) = S.boltAtBobsPiker
             -- Kill the Piker while the Bolt is on the stack, as Bolt B will in
             -- the integration test, then check state-based actions.
             dead = Sba.checkStateBasedActions (S.markDamage (S.pikerOf base) 3 cast)
-            after = Stack.resolveTop dead
+            after = snd (Engine.runGamePure S.identityAnswer dead Stack.resolveTop)
          in do
               HU.assertEqual "Bolt in the graveyard, unresolved" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
               HU.assertEqual "no damage was dealt" [] (GameState.damageEvents after)
@@ -165,13 +165,13 @@ resolveTests =
       HU.testCase "CR 608.2b a fizzled spell applies none of its effects" $
         let (base, cast, _) = S.boltAtBobsPiker
             dead = Sba.checkStateBasedActions (S.markDamage (S.pikerOf base) 3 cast)
-            after = Stack.resolveTop dead
+            after = snd (Engine.runGamePure S.identityAnswer dead Stack.resolveTop)
          in HU.assertEqual "life totals unchanged" (Just 20) (S.lifeOf S.alice after),
       -- The deterministic successor to the retired "instants happen" property: a
       -- Bolt cast in a game and resolved ends in its owner's graveyard.
       HU.testCase "a cast Bolt reaches its owner's graveyard" $
         let (_, cast, _) = S.boltAtBobsPiker
-            after = Stack.resolveTop cast
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "one card in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       HU.testCase "CR 612 slotsOf and textChangeSlots find a ChangeText slot" $
         let slot = SlotName.MkSlotName (Text.pack "target")
@@ -224,7 +224,7 @@ resolveTests =
             -- A resolved Magical Hack already changed Swamp -> Mountain on the
             -- Landform spell (stored on the Landform's id).
             hacked = withEffect landformId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Swamp Subtype.Mountain) g2
-            after = Resolve.resolveSpell landformId hacked
+            after = snd (Engine.runGamePure S.identityAnswer hacked (Resolve.resolveSpell landformId))
          in do
               -- Landform's own subtype does not matter; its EFFECT was rewritten to
               -- SetLandSubtype Mountain, so the target land ends up a Mountain.
@@ -251,7 +251,7 @@ resolveTests =
                   GameState.stack = bloodMoonSpellId : GameState.stack g2
                 }
             hacked = withEffect bloodMoonSpellId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g3
-            after = Stack.resolveTop hacked
+            after = snd (Engine.runGamePure S.identityAnswer hacked Stack.resolveTop)
          in -- Blood Moon entered as a NEW object; the hack (locked to the spell id)
             -- no longer names it, so nonbasic lands are Mountains, not Islands.
             HU.assertEqual "hack lost: nonbasic land is Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf nonbasicId after)

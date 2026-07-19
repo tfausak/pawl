@@ -45,7 +45,7 @@ giantGrowthOnPiker =
       (pikerId, withPiker) = S.addPiker S.alice base
       (gs, ggId) = S.handOne Card.giantGrowthPrinting withPiker
       cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice ggId))
-      resolved = Stack.resolveTop cast
+      resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (pikerId, resolved)
 
 -- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`.
@@ -202,7 +202,7 @@ tests =
             withHum = S.withHumility withPiker
             (gs, ggId) = S.handOne Card.giantGrowthPrinting withHum
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice ggId))
-            resolved = Stack.resolveTop cast
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in do
               -- Layer 7b (set 1/1) before 7c (+3/+3): 1 then +3 = 4.
               HU.assertEqual "power" (Just 4) (Projection.powerOf pikerId resolved)
@@ -215,7 +215,7 @@ tests =
             (mammothId, withMammoth) = S.addCreature Card.warMammothPrinting S.alice base
             (gs, sgId) = S.handOne Card.serpentsGiftPrinting withMammoth
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice sgId))
-            resolved = Stack.resolveTop cast
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in do
               HU.assertBool "keeps trample" (Projection.hasKeyword Keyword.Trample mammothId resolved)
               HU.assertBool "gains deathtouch" (Projection.hasKeyword Keyword.Deathtouch mammothId resolved),

@@ -1,6 +1,7 @@
 module Pawl.Resolve where
 
-import qualified Data.List as List
+import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
@@ -17,6 +18,7 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Effect as Effect
+import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -87,89 +89,94 @@ effectsOf oid gs = case Game.cardOf oid gs of
 -- run in order (CR 608.2c), each skipping a slot whose target is illegal
 -- (illegal targets are unaffected; other parts still happen), and the spell
 -- goes to its owner's graveyard as the final part of resolution (CR 608.2n).
-resolveSpell :: ObjectId -> GameState -> GameState
-resolveSpell oid gs =
-  let bury = Game.changeZone oid Zone.Graveyard
-   in case Game.lookupObject oid gs of
-        Nothing -> gs
-        Just obj -> case Game.cardOf oid gs of
-          Nothing -> gs
-          Just card ->
-            let specs = Card.targetSpecs card
-                chosen = Object.targets obj
-                legalSlot slot recipient = case Map.lookup slot specs of
-                  Nothing -> False
-                  Just spec -> Target.stillLegal recipient spec gs
-                legality = Map.mapWithKey legalSlot chosen
-                fizzles = not (Map.null specs) && not (or (Map.elems legality))
-             in if fizzles
-                  then bury gs
-                  else bury (List.foldl' (applyEffect oid (Object.chosenSubtypes obj) legality chosen) gs (effectsOf oid gs))
+resolveSpell :: ObjectId -> Game ()
+resolveSpell oid = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Nothing -> pure ()
+    Just obj -> case Game.cardOf oid gs of
+      Nothing -> pure ()
+      Just card ->
+        let specs = Card.targetSpecs card
+            chosen = Object.targets obj
+            legalSlot slot recipient = case Map.lookup slot specs of
+              Nothing -> False
+              Just spec -> Target.stillLegal recipient spec gs
+            legality = Map.mapWithKey legalSlot chosen
+            fizzles = not (Map.null specs) && not (or (Map.elems legality))
+         in if fizzles
+              then State.modify' (Game.changeZone oid Zone.Graveyard)
+              else do
+                Monad.mapM_ (applyEffect oid (Object.chosenSubtypes obj) legality chosen) (effectsOf oid gs)
+                State.modify' (Game.changeZone oid Zone.Graveyard)
 
 -- One effect, applied. The case on the constructor is THIS module's charter.
-applyEffect :: ObjectId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> GameState -> Effect -> GameState
-applyEffect source bound legality chosen gs effect = case effect of
+applyEffect :: ObjectId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect -> Game ()
+applyEffect source bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Quantity.evaluate gs source quantity of
-        -- An unevaluable quantity is a no-op, the powerOf posture.
-        Nothing -> gs
-        Just n ->
-          if n <= 0
-            then gs
-            -- The applied effect IS the event (the M3a spec, section 4):
-            -- constructing this DamageEvent and funneling it is the whole
-            -- application. CR 120.3e / 120.3a live in applyDamage.
-            else Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n) (Projection.hasKeyword Keyword.Deathtouch source gs)] gs
-      _ -> gs
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just recipient, True) -> case Quantity.evaluate gs source quantity of
+          -- An unevaluable quantity is a no-op, the powerOf posture.
+          Nothing -> gs
+          Just n ->
+            if n <= 0
+              then gs
+              -- The applied effect IS the event (the M3a spec, section 4):
+              -- constructing this DamageEvent and funneling it is the whole
+              -- application. CR 120.3e / 120.3a live in applyDamage.
+              else Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n) (Projection.hasKeyword Keyword.Deathtouch source gs)] gs
+        _ -> gs
   Effect.ModifyTarget duration modification slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
-        Nothing -> gs
-        Just target ->
-          -- CR 611.2c: the affected set is locked to this one object now. The
-          -- Modification's quantities are stored as-is (Literals); CR 611.2b's
-          -- freeze is a no-op until X exists, at which point evaluate-and-freeze
-          -- here. See the M3b spec, section 3.
-          let (ts, gs1) = Game.freshTimestamp gs
-              eff =
-                ContinuousEffect.MkContinuousEffect
-                  { ContinuousEffect.source = source,
-                    ContinuousEffect.timestamp = ts,
-                    ContinuousEffect.duration = duration,
-                    ContinuousEffect.modification = modification,
-                    ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
-                  }
-           in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
-      -- A modification cannot land on a player (CreatureTarget/LandTarget name
-      -- objects) or an illegal slot (CR 608.2b): no-op.
-      _ -> gs
-  Effect.ChangeText slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality, Map.lookup slot bound) of
-      (Just recipient, True, Just (from, to)) ->
-        case recipientObject recipient of
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs
           Just target ->
-            -- CR 611 / 612: an indefinite continuous effect over the one target
-            -- (CR 611.2c fixed set). The (from, to) is the caster's binding, baked
-            -- in here; Projection rewrites both the target's type line and, at
-            -- gather, any static-ability words (Task 7). Resolve CONSTRUCTS the
-            -- Modification but never cases on one.
+            -- CR 611.2c: the affected set is locked to this one object now. The
+            -- Modification's quantities are stored as-is (Literals); CR 611.2b's
+            -- freeze is a no-op until X exists, at which point evaluate-and-freeze
+            -- here. See the M3b spec, section 3.
             let (ts, gs1) = Game.freshTimestamp gs
                 eff =
                   ContinuousEffect.MkContinuousEffect
                     { ContinuousEffect.source = source,
                       ContinuousEffect.timestamp = ts,
-                      ContinuousEffect.duration = Duration.Indefinite,
-                      ContinuousEffect.modification = Modification.ChangeSubtypeWord from to,
+                      ContinuousEffect.duration = duration,
+                      ContinuousEffect.modification = modification,
                       ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
                     }
              in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
-      _ -> gs
+        -- A modification cannot land on a player (CreatureTarget/LandTarget name
+        -- objects) or an illegal slot (CR 608.2b): no-op.
+        _ -> gs
+  Effect.ChangeText slot ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality, Map.lookup slot bound) of
+        (Just recipient, True, Just (from, to)) ->
+          case recipientObject recipient of
+            Nothing -> gs
+            Just target ->
+              -- CR 611 / 612: an indefinite continuous effect over the one target
+              -- (CR 611.2c fixed set). The (from, to) is the caster's binding, baked
+              -- in here; Projection rewrites both the target's type line and, at
+              -- gather, any static-ability words (Task 7). Resolve CONSTRUCTS the
+              -- Modification but never cases on one.
+              let (ts, gs1) = Game.freshTimestamp gs
+                  eff =
+                    ContinuousEffect.MkContinuousEffect
+                      { ContinuousEffect.source = source,
+                        ContinuousEffect.timestamp = ts,
+                        ContinuousEffect.duration = Duration.Indefinite,
+                        ContinuousEffect.modification = Modification.ChangeSubtypeWord from to,
+                        ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+                      }
+               in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+        _ -> gs
   -- CR 605.3b: a mana ability never resolves on the stack. AddMana is applied by
   -- Mana.tapForMana at payment, never here. Reaching this arm means a mana ability
   -- was wrongly put on the stack -- an isManaAbility classification bug.
-  Effect.AddMana _ -> gs
+  Effect.AddMana _ -> pure ()
 
 -- The object a recipient names, if any (CR 612 targets a spell or permanent, not
 -- a player).

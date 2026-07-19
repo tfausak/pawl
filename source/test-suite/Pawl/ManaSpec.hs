@@ -36,7 +36,7 @@ resolvedCreature :: Printing.Printing -> Printing.Printing -> Int -> GameState.G
 resolvedCreature land creature nLands =
   let (base, oid) = S.handOne creature (S.landsInPlay land nLands)
       afterCast = snd (Engine.runGamePure S.identityAnswer base (Cast.castSpell S.alice oid))
-   in Stack.resolveTop afterCast
+   in snd (Engine.runGamePure S.identityAnswer afterCast Stack.resolveTop)
 
 castabilityTests :: Tasty.TestTree
 castabilityTests =

@@ -392,11 +392,11 @@ git commit -m "Add the activatedAbilities field + Prodigal Sorcerer and Llanowar
 **Interfaces:**
 - Produces: `Resolve.resolveSpell :: ObjectId -> Game ()`; `Resolve.applyEffect :: ObjectId -> Map SlotName (Subtype, Subtype) -> Map SlotName Bool -> Map SlotName Recipient -> Effect -> Game ()`; `Stack.resolveTop :: Game ()`. Search (Task 7) prompts at resolution, so resolution must be monadic; this task lands the shape with no behavior change (spec §5, §9 — retires M3d's pure-`Resolve` posture).
 
-- [ ] **Step 1: Note the regression baseline**
+- [x] **Step 1: Note the regression baseline**
 
 Run: `cabal test` and record the passing count. This task must end at the same count (plus nothing) — it changes types, not behavior.
 
-- [ ] **Step 2: Convert `applyEffect` to `Game ()`**
+- [x] **Step 2: Convert `applyEffect` to `Game ()`**
 
 In `source/library/Pawl/Resolve.hs`, add `import Pawl.Type.Game (Game)` and `import qualified Control.Monad.Trans.State.Strict as State`. Convert `applyEffect` to `Game ()`: each arm's existing `GameState`-producing body is wrapped in `State.modify' $ \gs -> ...` (the body already binds `gs` and returns a `GameState`, so wrapping is mechanical), and the `gs` function parameter is dropped. `AddMana` becomes `pure ()`. The full converted function (`recipientObject` is unchanged from M3d):
 
@@ -453,7 +453,7 @@ applyEffect source bound legality chosen effect = case effect of
 
 (The `controller` argument that `Search` needs is added in Task 7, where it is first used — adding it here would be an unused parameter and fail the warning-clean build.)
 
-- [ ] **Step 3: Convert `resolveSpell` to `Game ()`**
+- [x] **Step 3: Convert `resolveSpell` to `Game ()`**
 
 Replace `resolveSpell`'s body so it reads state, computes fizzle, and either buries or folds `applyEffect` monadically:
 
@@ -482,7 +482,7 @@ resolveSpell oid = do
 
 (Add `import qualified Control.Monad as Monad` if absent. `effectsOf oid gs` is evaluated against the pre-resolution `gs`, matching M3d — the text-change set does not change mid-resolution.)
 
-- [ ] **Step 4: Convert `Stack.resolveTop` to `Game ()`**
+- [x] **Step 4: Convert `Stack.resolveTop` to `Game ()`**
 
 In `source/library/Pawl/Stack.hs`, make `resolveTop` monadic (add `import Pawl.Type.Game (Game)`, `import qualified Control.Monad.Trans.State.Strict as State`):
 
@@ -501,7 +501,7 @@ resolveTop = do
             else Resolve.resolveSpell oid
 ```
 
-- [ ] **Step 5: Update the priority-loop resolution site**
+- [x] **Step 5: Update the priority-loop resolution site**
 
 In `source/library/Pawl/Engine.hs`, `priorityLoop`'s full-round-of-passes branch currently does `let resolved = Sba.checkStateBasedActions (Stack.resolveTop gs)`. Replace with a monadic sequence:
 
@@ -524,16 +524,16 @@ In `source/library/Pawl/Engine.hs`, `priorityLoop`'s full-round-of-passes branch
 
 (`checkSba` already exists as `State.modify' Sba.checkStateBasedActions`. The `gs` bound at the top of `loop` is now stale after `resolveTop`; re-`get` as shown.)
 
-- [ ] **Step 6: Fix pure call sites in tests**
+- [x] **Step 6: Fix pure call sites in tests**
 
 Any test that wrote `Resolve.resolveSpell oid gs` or `Stack.resolveTop gs` now runs it through the interpreter. Replace with `snd (Engine.runGamePure S.identityAnswer gs (Resolve.resolveSpell oid))` (or `Stack.resolveTop`). Known sites: `source/test-suite/Pawl/ResolveSpec.hs` (Bolt resolution, Magical Hack resolution from M3d), `source/test-suite/Pawl/StackSpec.hs`, and any `Support` helper (e.g. a `resolveTop`-based fixture). The build's type errors list them exactly. Use `S.identityAnswer` unless the test needs a specific answer.
 
-- [ ] **Step 7: Run the suite to verify no behavior changed**
+- [x] **Step 7: Run the suite to verify no behavior changed**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the same tests as Step 1, green. If a count differs, a call site was mis-threaded; fix it — do not change any assertion.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

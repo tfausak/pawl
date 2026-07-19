@@ -114,14 +114,14 @@ stackTests =
   Tasty.testGroup
     "Stack"
     [ HU.testCase "CR 608.3 a resolving creature spell becomes a permanent" $
-        let after = Stack.resolveTop pikerOnStack
+        let after = snd (Engine.runGamePure S.identityAnswer pikerOnStack Stack.resolveTop)
          in do
               HU.assertEqual "stack empty" 0 (length (GameState.stack after))
               -- Four, not one: pikerInHand 3 leaves three Mountains in play.
               HU.assertEqual "four permanents" 4 (length (Game.zoneMembers Zone.Battlefield S.alice after))
               HU.assertEqual "one of them a creature" 1 (S.creaturesInPlay S.alice after),
       HU.testCase "CR 400.7 the permanent is a new object" $
-        let after = Stack.resolveTop pikerOnStack
+        let after = snd (Engine.runGamePure S.identityAnswer pikerOnStack Stack.resolveTop)
          in case GameState.stack pikerOnStack of
               [] -> HU.assertFailure "fixture should have a spell on the stack"
               top : _ -> HU.assertEqual "old id gone" Nothing (Game.lookupObject top after),
@@ -130,7 +130,7 @@ stackTests =
         -- fixture already has three Mountains in play, and zoneMembers is
         -- ordered by id, so the front of that list is Mountain id 0.
         let before = Game.zoneMembers Zone.Battlefield S.alice pikerOnStack
-            after = Stack.resolveTop pikerOnStack
+            after = snd (Engine.runGamePure S.identityAnswer pikerOnStack Stack.resolveTop)
             isNew o = notElem o before
             fresh = filter isNew (Game.zoneMembers Zone.Battlefield S.alice after)
          in case fresh of
@@ -146,10 +146,10 @@ stackTests =
         HU.assertEqual
           "conserved"
           (Game.objectCount pikerOnStack)
-          (Game.objectCount (Stack.resolveTop pikerOnStack)),
+          (Game.objectCount (snd (Engine.runGamePure S.identityAnswer pikerOnStack Stack.resolveTop))),
       HU.testCase "resolving an empty stack is a no-op" $
         let gs = Setup.emptyGame S.bothPlayers
-         in HU.assertEqual "unchanged" gs (Stack.resolveTop gs)
+         in HU.assertEqual "unchanged" gs (snd (Engine.runGamePure S.identityAnswer gs Stack.resolveTop))
     ]
 
 castTests :: Tasty.TestTree
@@ -335,7 +335,7 @@ magicalHackTests =
             (islandId, g1) = S.addCreature Card.islandPrinting S.alice g0
             (gs, hackId) = handInPlay Card.magicalHackPrinting g1
             cast = snd (Engine.runGamePure hackAnswer gs (Cast.castSpell S.alice hackId))
-            resolved = Stack.resolveTop cast
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in do
               HU.assertBool "island untouched, still blue" (elem (ManaType.Colored Color.Blue) (Mana.manaTypesOf islandId resolved))
               HU.assertEqual "hacked Mountain projects Island" (Set.singleton Subtype.Island) (Projection.subtypesOf mountainId resolved)

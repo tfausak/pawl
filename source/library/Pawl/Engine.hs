@@ -201,7 +201,9 @@ priorityLoop = do
                       -- exactly now, after a resolution. A creature the spell
                       -- killed must be buried before the next player acts, and
                       -- a game the spell ended must actually end.
-                      let resolved = Sba.checkStateBasedActions (Stack.resolveTop gs)
+                      Stack.resolveTop
+                      checkSba
+                      resolved <- State.get
                       case GameState.result resolved of
                         Just _ ->
                           State.put resolved {GameState.priority = Nothing, GameState.passes = 0}
