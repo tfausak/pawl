@@ -394,7 +394,7 @@ git commit -m "M4a: ManaSymbol.Variable ({X}) with Codec and zero contribution o
 - Produces: `Mana.substituteX :: Natural -> ManaCost -> ManaCost`.
 - Consumes: `ManaSymbol.Variable` (Task 3).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/ManaSpec.hs`:
 
@@ -414,12 +414,12 @@ In `source/test-suite/Pawl/ManaSpec.hs`:
               (Mana.substituteX 0 (ManaCost.MkManaCost [ManaSymbol.Variable, red])),
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | tail -20`
 Expected: FAIL — `substituteX` not in scope.
 
-- [ ] **Step 3: Implement `substituteX`**
+- [x] **Step 3: Implement `substituteX`**
 
 In `source/library/Pawl/Mana.hs`:
 
@@ -439,7 +439,7 @@ substituteX x (ManaCost.MkManaCost symbols) =
 
 (Per the style guide `let` is preferred over `where`, but a single trivial local helper as `where` matches surrounding `Mana.hs`; follow the file's local convention.)
 
-- [ ] **Step 4: Apply the castability floor**
+- [x] **Step 4: Apply the castability floor**
 
 In `source/library/Pawl/Cast.hs`, the affordability checks must treat a `{X}` cost as affordable when payable at X=0 (a caster may always choose X=0):
 - Line ~77 in `castable`: `&& Mana.canPay pid (Mana.substituteX 0 cost) gs`.
@@ -447,12 +447,12 @@ In `source/library/Pawl/Cast.hs`, the affordability checks must treat a `{X}` co
 
 (`substituteX 0` is the identity on any Variable-free cost, so every existing card is unaffected.)
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -15`
 Expected: PASS.
 
-- [ ] **Step 6: Format, lint, commit**
+- [x] **Step 6: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

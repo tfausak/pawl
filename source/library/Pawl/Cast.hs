@@ -75,7 +75,10 @@ castable pid oid gs = case costOf oid gs of
   Just cost ->
     timingOk pid oid gs
       && elem oid (Game.zoneMembers Zone.Hand pid gs)
-      && Mana.canPay pid cost gs
+      -- CR 601.2b: a {X} cost is affordable when payable at X=0 (the caster may
+      -- always choose X=0); substituteX 0 is the identity on any Variable-free
+      -- cost, so every existing card is unaffected.
+      && Mana.canPay pid (Mana.substituteX 0 cost) gs
       && targetable oid gs
 
 castableSpells :: PlayerId -> GameState -> [ObjectId]
@@ -98,7 +101,8 @@ castableWhileSearching pid gs =
   let permitted oid = maybe False permitsCastWhileSearching (Game.cardOf oid gs)
       affordable oid = case costOf oid gs of
         Nothing -> False
-        Just cost -> Mana.canPay pid cost gs
+        -- CR 601.2b castability floor: payable at X=0 (see Cast.castable).
+        Just cost -> Mana.canPay pid (Mana.substituteX 0 cost) gs
    in filter (\oid -> permitted oid && affordable oid && targetable oid gs) (Game.zoneMembers Zone.Library pid gs)
 
 -- CR 601.3 (Panglacial): while a player searches their own library, offer them

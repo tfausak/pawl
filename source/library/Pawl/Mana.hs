@@ -139,6 +139,18 @@ genericOf symbol = case symbol of
   -- (Task 4). The match must be total, so a bare {X} counts as 0 generic.
   ManaSymbol.Variable -> 0
 
+-- CR 601.2f: the total cost with X resolved -- each Variable symbol becomes
+-- Generic n, every other symbol unchanged, order preserved (ManaCost is a list,
+-- never fixed arity). Applied before any payment, so a Variable never reaches
+-- spend/canPay.
+substituteX :: Natural -> ManaCost -> ManaCost
+substituteX x (ManaCost.MkManaCost symbols) =
+  ManaCost.MkManaCost (map sub symbols)
+  where
+    sub symbol = case symbol of
+      ManaSymbol.Variable -> ManaSymbol.Generic x
+      other -> other
+
 takeTyped :: [ManaUnit] -> ManaType -> Maybe [ManaUnit]
 takeTyped units wanted = case List.break (\u -> ManaUnit.manaType u == wanted) units of
   (before, _ : after) -> Just (before ++ after)

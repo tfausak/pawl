@@ -69,7 +69,20 @@ manaTests :: Cards.Cards -> Tasty.TestTree
 manaTests cards =
   Tasty.testGroup
     "Mana"
-    [ HU.testCase "CR 305.6 a Mountain's red mana ability comes from its subtype" $
+    [ HU.testCase "substituteX replaces each Variable with Generic X, keeping order" $
+        let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+            cost = ManaCost.MkManaCost [ManaSymbol.Variable, red]
+         in HU.assertEqual
+              "X=3 -> {3}{R}"
+              (ManaCost.MkManaCost [ManaSymbol.Generic 3, red])
+              (Mana.substituteX 3 cost),
+      HU.testCase "substituteX 0 leaves a Variable-free cost payable" $
+        let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+         in HU.assertEqual
+              "floor is {0}{R}"
+              (ManaCost.MkManaCost [ManaSymbol.Generic 0, red])
+              (Mana.substituteX 0 (ManaCost.MkManaCost [ManaSymbol.Variable, red])),
+      HU.testCase "CR 305.6 a Mountain's red mana ability comes from its subtype" $
         HU.assertEqual
           "red"
           (Just (ManaType.Colored Color.Red))
