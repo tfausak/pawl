@@ -945,7 +945,7 @@ git commit -m "Rewrite a source's static-ability land words at gather (CR 612, h
 - Consumes: `textChangesAffecting`/`rewriteModification` (Task 7), `ChangeText`/`ToObject` (Tasks 5, 2).
 - Produces: `Resolve.effectsOf :: ObjectId -> GameState -> [Effect]` (a resolving spell's text-changed effects); `Resolve.rewriteEffect :: [(Subtype, Subtype)] -> Effect -> Effect`; `resolveSpell` runs `effectsOf` instead of `Card.effects`; `ModifyTarget` applies to a `ToObject` land target; `Card.landformPrinting` (the labeled fixture).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to the `Resolve` group in `source/test-suite/Pawl/ResolveSpec.hs`. The positive case: the fixture "Landform" (target land becomes a Swamp) on the stack, a `ChangeSubtypeWord Swamp Mountain` already stored on it, resolves making the target land a Mountain (read-point 3). The negative CR 400.7 case: hacking Blood Moon *on the stack* is lost when it resolves into a new permanent.
 
@@ -1015,12 +1015,12 @@ Add to the `Resolve` group in `source/test-suite/Pawl/ResolveSpec.hs`. The posit
 
 (`withEffect` is a `ProjectionSpec` helper; copy it into `ResolveSpec` or add a local equivalent. `Stack.resolveTop` is already imported in `ResolveSpec`.)
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "resolve reads projected effects"'`
 Expected: FAIL — `resolveSpell` reads `Card.effects` (the printed `SetLandSubtype Swamp`), so the target becomes a Swamp; and `Card.landformPrinting` is not in scope.
 
-- [ ] **Step 3: Add the fixture printing**
+- [x] **Step 3: Add the fixture printing**
 
 In `source/library/Pawl/Card.hs`, add the labeled fixture and register it:
 
@@ -1057,7 +1057,7 @@ landformPrinting =
 
 Append `landformPrinting` to `allPrintings`.
 
-- [ ] **Step 4: Make `ModifyTarget` accept a `ToObject` target**
+- [x] **Step 4: Make `ModifyTarget` accept a `ToObject` target**
 
 In `source/library/Pawl/Resolve.hs`, the `ModifyTarget` arm matches only `ToCreature`; generalize it to any object-naming recipient via `recipientObject` (Task 5). Replace its `case`:
 
@@ -1081,7 +1081,7 @@ In `source/library/Pawl/Resolve.hs`, the `ModifyTarget` arm matches only `ToCrea
       _ -> gs
 ```
 
-- [ ] **Step 5: Read projected effects in `resolveSpell`**
+- [x] **Step 5: Read projected effects in `resolveSpell`**
 
 In `source/library/Pawl/Resolve.hs`, add `rewriteEffect` and `effectsOf`, and make `resolveSpell` fold over `effectsOf oid gs` instead of `Card.effects card`:
 
@@ -1114,12 +1114,12 @@ Change the non-fizzle branch of `resolveSpell` to use `effectsOf oid gs`:
 
 (Add `import Pawl.Type.Subtype (Subtype)` if not already added in Task 5.)
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the hacked Landform resolves as Mountain (positive, read-point 3); the Blood-Moon-on-the-stack hack is lost on resolution (negative, CR 400.7).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

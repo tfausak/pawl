@@ -12,6 +12,7 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
@@ -19,10 +20,14 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Action as A
+import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -34,12 +39,27 @@ import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
+
+-- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`
+-- (mirrors ProjectionSpec.withEffect; used to pre-stamp a hack on a stack spell).
+withEffect :: ObjectId.ObjectId -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withEffect oid ts m gs =
+  let eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = ObjectId.MkObjectId 998,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.modification = m,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
 targetTests :: Tasty.TestTree
 targetTests =
@@ -166,7 +186,68 @@ resolveTests =
                 }
          in do
               HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))
-              HU.assertEqual "textChangeSlots" [slot] (Resolve.textChangeSlots card)
+              HU.assertEqual "textChangeSlots" [slot] (Resolve.textChangeSlots card),
+      HU.testCase "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $
+        -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
+        -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten
+        -- (Swamp -> Mountain) it is SetLandSubtype Mountain -> {Mountain}.
+        let base = S.landsInPlay Card.forestPrinting 1
+            targetLand = case Game.zoneMembers Zone.Battlefield S.alice base of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+            slot = SlotName.MkSlotName (Text.pack "target")
+            (landformId, g1) = Game.freshObjectId base
+            landformObj =
+              Object.MkObject
+                { Object.owner = S.alice,
+                  Object.source = Source.OfCard Card.landformPrinting,
+                  Object.zone = Zone.Stack,
+                  Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
+                  Object.sickness = Sickness.Settled,
+                  Object.targets = Map.singleton slot (Recipient.ToObject targetLand),
+                  Object.chosenSubtypes = Map.empty,
+                  Object.timestamp = Timestamp.MkTimestamp 0
+                }
+            g2 =
+              g1
+                { GameState.objects = Map.insert landformId landformObj (GameState.objects g1),
+                  GameState.stack = landformId : GameState.stack g1
+                }
+            -- A resolved Magical Hack already changed Swamp -> Mountain on the
+            -- Landform spell (stored on the Landform's id).
+            hacked = withEffect landformId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Swamp Subtype.Mountain) g2
+            after = Resolve.resolveSpell landformId hacked
+         in do
+              -- Landform's own subtype does not matter; its EFFECT was rewritten to
+              -- SetLandSubtype Mountain, so the target land ends up a Mountain.
+              HU.assertEqual "target land became Mountain, not Swamp" (Set.singleton Subtype.Mountain) (Projection.subtypesOf targetLand after),
+      HU.testCase "CR 400.7 hacking Blood Moon on the stack is lost when it resolves" $
+        let base = Setup.emptyGame S.bothPlayers
+            (nonbasicId, g1) = S.addCreature Card.urborgPrinting S.alice base
+            (bloodMoonSpellId, g2) = Game.freshObjectId g1
+            bmObj =
+              Object.MkObject
+                { Object.owner = S.alice,
+                  Object.source = Source.OfCard Card.bloodMoonPrinting,
+                  Object.zone = Zone.Stack,
+                  Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
+                  Object.sickness = Sickness.Settled,
+                  Object.targets = Map.empty,
+                  Object.chosenSubtypes = Map.empty,
+                  Object.timestamp = Timestamp.MkTimestamp 0
+                }
+            g3 =
+              g2
+                { GameState.objects = Map.insert bloodMoonSpellId bmObj (GameState.objects g2),
+                  GameState.stack = bloodMoonSpellId : GameState.stack g2
+                }
+            hacked = withEffect bloodMoonSpellId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g3
+            after = Stack.resolveTop hacked
+         in -- Blood Moon entered as a NEW object; the hack (locked to the spell id)
+            -- no longer names it, so nonbasic lands are Mountains, not Islands.
+            HU.assertEqual "hack lost: nonbasic land is Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf nonbasicId after)
     ]
 
 -- Casts every castable spell (targets via lookupMin: creatures first),

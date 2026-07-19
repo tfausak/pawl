@@ -692,6 +692,35 @@ magicalHackPrinting =
           }
     }
 
+-- LABELED SYNTHETIC FIXTURE (not a real card; spec §8). "Landform": {U}, Instant,
+-- "Target land becomes a Swamp until end of turn." The M3d positive
+-- spell-on-the-stack demonstrator: its ONE-SHOT effect carries a basic-land-type
+-- word (SetLandSubtype Swamp), so hacking it on the stack changes what it does.
+-- EXPIRES when a real non-Aura land-type spell (M4 Attach: Spreading Seas; or M4
+-- Destroy: Boil/Flashfires) replaces it.
+landformPrinting :: Printing.Printing
+landformPrinting =
+  Printing.MkPrinting
+    { Printing.card =
+        Card.MkCard
+          { Card.name = Text.pack "Landform",
+            Card.manaCost =
+              Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)]),
+            Card.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Instant,
+                  TypeLine.subtypes = Set.empty
+                },
+            Card.power = Nothing,
+            Card.toughness = Nothing,
+            Card.keywords = Set.empty,
+            Card.staticAbilities = [],
+            Card.effects = [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.SetLandSubtype Subtype.Swamp) (SlotName.MkSlotName (Text.pack "target"))],
+            Card.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.LandTarget
+          }
+    }
+
 -- The registry the dataflow lint and future golden tests iterate. A printing
 -- not listed here escapes the hygiene net -- add every new printing.
 allPrintings :: [Printing.Printing]
@@ -717,7 +746,8 @@ allPrintings =
     urborgPrinting,
     opalescencePrinting,
     islandPrinting,
-    magicalHackPrinting
+    magicalHackPrinting,
+    landformPrinting
   ]
 
 isLand :: Card.Card -> Bool

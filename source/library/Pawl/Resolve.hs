@@ -49,6 +49,25 @@ textChangeSlots card =
         _ -> Nothing
    in Maybe.mapMaybe slotOf (Card.effects card)
 
+-- Rewrite basic-land-type words in an effect's AST (CR 612). Cases on Effect
+-- (Resolve's charter); delegates the inner modification of ModifyTarget to
+-- Projection.rewriteModification, so neither module touches the other's
+-- constructors. DealDamage and ChangeText carry no rewritable land-type word.
+rewriteEffect :: [(Subtype, Subtype)] -> Effect -> Effect
+rewriteEffect pairs effect = case effect of
+  Effect.ModifyTarget duration modification slot ->
+    Effect.ModifyTarget duration (Projection.rewriteModification pairs modification) slot
+  Effect.DealDamage _ _ -> effect
+  Effect.ChangeText _ -> effect
+
+-- A resolving spell's PROJECTED effects: its printed effects with every
+-- text-change affecting it applied (CR 612). This is read-point 3 of the
+-- rewritable AST -- the resolver honors a spell hacked on the stack.
+effectsOf :: ObjectId -> GameState -> [Effect]
+effectsOf oid gs = case Game.cardOf oid gs of
+  Nothing -> []
+  Just card -> map (rewriteEffect (Projection.textChangesAffecting oid gs)) (Card.effects card)
+
 -- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if
 -- the spell has slots and ALL are now illegal, it does not resolve -- it moves
 -- to the graveyard with no effect applied (the fizzle). Otherwise the effects
@@ -72,7 +91,7 @@ resolveSpell oid gs =
                 fizzles = not (Map.null specs) && not (or (Map.elems legality))
              in if fizzles
                   then bury gs
-                  else bury (List.foldl' (applyEffect oid (Object.chosenSubtypes obj) legality chosen) gs (Card.effects card))
+                  else bury (List.foldl' (applyEffect oid (Object.chosenSubtypes obj) legality chosen) gs (effectsOf oid gs))
 
 -- One effect, applied. The case on the constructor is THIS module's charter.
 applyEffect :: ObjectId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> GameState -> Effect -> GameState
@@ -92,23 +111,25 @@ applyEffect source bound legality chosen gs effect = case effect of
       _ -> gs
   Effect.ModifyTarget duration modification slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just (Recipient.ToCreature target), True) ->
-        -- CR 611.2c: the affected set is locked to this one object now. The
-        -- Modification's quantities are stored as-is (Literals); CR 611.2b's
-        -- freeze is a no-op until X exists, at which point evaluate-and-freeze
-        -- here. See the M3b spec, section 3.
-        let (ts, gs1) = Game.freshTimestamp gs
-            eff =
-              ContinuousEffect.MkContinuousEffect
-                { ContinuousEffect.source = source,
-                  ContinuousEffect.timestamp = ts,
-                  ContinuousEffect.duration = duration,
-                  ContinuousEffect.modification = modification,
-                  ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
-                }
-         in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
-      -- A creature-only modification cannot land on a player (CreatureTarget) or
-      -- an illegal slot (CR 608.2b): no-op.
+      (Just recipient, True) -> case recipientObject recipient of
+        Nothing -> gs
+        Just target ->
+          -- CR 611.2c: the affected set is locked to this one object now. The
+          -- Modification's quantities are stored as-is (Literals); CR 611.2b's
+          -- freeze is a no-op until X exists, at which point evaluate-and-freeze
+          -- here. See the M3b spec, section 3.
+          let (ts, gs1) = Game.freshTimestamp gs
+              eff =
+                ContinuousEffect.MkContinuousEffect
+                  { ContinuousEffect.source = source,
+                    ContinuousEffect.timestamp = ts,
+                    ContinuousEffect.duration = duration,
+                    ContinuousEffect.modification = modification,
+                    ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+                  }
+           in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+      -- A modification cannot land on a player (CreatureTarget/LandTarget name
+      -- objects) or an illegal slot (CR 608.2b): no-op.
       _ -> gs
   Effect.ChangeText slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality, Map.lookup slot bound) of

@@ -159,8 +159,8 @@ lintTests =
                 (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
                 Card.allPrintings
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (22 at M3d)" $
-        HU.assertEqual "count" 22 (length Card.allPrintings),
+      HU.testCase "the registry holds every printing (23 at M3d)" $
+        HU.assertEqual "count" 23 (length Card.allPrintings),
       HU.testCase "the lint itself catches a dangling reference" $
         let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
          in HU.assertBool "misauthored card detected" (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)),
