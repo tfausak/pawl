@@ -7,6 +7,7 @@ import qualified Pawl.DamageSpec as DamageSpec
 import qualified Pawl.DecideSpec as DecideSpec
 import qualified Pawl.EventSpec as EventSpec
 import qualified Pawl.GameSpec as GameSpec
+import qualified Pawl.JsonSpec as JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
@@ -33,6 +34,7 @@ testTree =
       EventSpec.tests,
       ReplaySpec.tests,
       PropertySpec.tests,
+      JsonSpec.tests,
       ManaSpec.tests,
       CastSpec.tests,
       CombatSpec.tests,

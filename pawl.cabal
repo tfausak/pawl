@@ -94,6 +94,7 @@ library
     Pawl.Type.ContinuousEffect
     Pawl.Type.DamageEvent
     Pawl.Type.Decider
+    Pawl.Type.Decimal
     Pawl.Type.DecisionLog
     Pawl.Type.Deck
     Pawl.Type.Departure
@@ -174,6 +175,7 @@ test-suite pawl-test-suite
     Pawl.DecideSpec
     Pawl.EventSpec
     Pawl.GameSpec
+    Pawl.JsonSpec
     Pawl.ManaSpec
     Pawl.ProjectionSpec
     Pawl.PropertySpec
