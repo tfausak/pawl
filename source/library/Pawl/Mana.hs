@@ -129,11 +129,15 @@ typedOf :: ManaSymbol -> Maybe ManaType
 typedOf symbol = case symbol of
   ManaSymbol.OfType t -> Just t
   ManaSymbol.Generic _ -> Nothing
+  ManaSymbol.Variable -> Nothing
 
 genericOf :: ManaSymbol -> Natural
 genericOf symbol = case symbol of
   ManaSymbol.Generic n -> n
   ManaSymbol.OfType _ -> 0
+  -- Unreachable in payment: substituteX removes every Variable before canPay
+  -- (Task 4). The match must be total, so a bare {X} counts as 0 generic.
+  ManaSymbol.Variable -> 0
 
 takeTyped :: [ManaUnit] -> ManaType -> Maybe [ManaUnit]
 takeTyped units wanted = case List.break (\u -> ManaUnit.manaType u == wanted) units of

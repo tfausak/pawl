@@ -27,3 +27,5 @@ symbolValue :: ManaSymbol.ManaSymbol -> Integer
 symbolValue symbol = case symbol of
   ManaSymbol.Generic n -> toInteger n
   ManaSymbol.OfType _ -> 1
+  -- CR 202.3b: off the stack a variable's contribution to mana value is 0.
+  ManaSymbol.Variable -> 0

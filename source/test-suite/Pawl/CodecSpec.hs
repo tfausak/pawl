@@ -80,6 +80,8 @@ tests cards =
               Codec.manaCostToJson
               Codec.jsonToManaCost
               (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]),
+          HU.testCase "ManaSymbol.Variable round-trips" $
+            roundTrip "var" Codec.manaSymbolToJson Codec.jsonToManaSymbol ManaSymbol.Variable,
           HU.testCase "Power round-trips" $
             roundTrip "pow" Codec.powerToJson Codec.jsonToPower (Power.MkPower (Quantity.Literal 2))
         ],

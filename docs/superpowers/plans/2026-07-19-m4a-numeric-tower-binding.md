@@ -330,7 +330,7 @@ git commit -m "M4a: migrate Object.targets/chosenSubtypes to one bindings enviro
 **Interfaces:**
 - Produces: `ManaSymbol.Variable` (the `{X}` symbol); Codec arms; `Variable`-as-0 in the mana-value / generic-amount helpers.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In the codec spec, add a round-trip unit for the new symbol:
 
@@ -342,12 +342,12 @@ In the codec spec, add a round-trip unit for the new symbol:
           (Codec.jsonToManaSymbol (Codec.manaSymbolToJson ManaSymbol.Variable)),
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests 2>&1 | tail -20`
 Expected: FAIL — `Variable` not a constructor of `ManaSymbol`.
 
-- [ ] **Step 3: Add the constructor**
+- [x] **Step 3: Add the constructor**
 
 In `source/library/Pawl/Type/ManaSymbol.hs`:
 
@@ -362,7 +362,7 @@ data ManaSymbol
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Handle `Variable` in every `ManaSymbol` case (the compiler lists them)**
+- [x] **Step 4: Handle `Variable` in every `ManaSymbol` case (the compiler lists them)**
 
 - `Quantity.hs:26-29` `symbolValue`: add `ManaSymbol.Variable -> 0` (CR 202.3b — off the stack a variable's contribution is 0).
 - `Mana.hs:130-131` (typed extractor): add `ManaSymbol.Variable -> Nothing`.
@@ -370,12 +370,12 @@ data ManaSymbol
 - `Codec.hs:338-339` `manaSymbolToJson`: add `ManaSymbol.Variable -> nullary (Text.pack "Variable")`.
 - `Codec.hs:345-346` `jsonToManaSymbol`: add `("Variable", _) -> Right ManaSymbol.Variable`.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -15`
 Expected: PASS — round-trip green; suite green.
 
-- [ ] **Step 6: Format, lint, commit**
+- [x] **Step 6: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

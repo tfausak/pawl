@@ -337,6 +337,7 @@ manaSymbolToJson :: ManaSymbol.ManaSymbol -> Value
 manaSymbolToJson ms = case ms of
   ManaSymbol.Generic n -> Json.tagged (Text.pack "Generic") (Just (natTo n))
   ManaSymbol.OfType mt -> Json.tagged (Text.pack "OfType") (Just (manaTypeToJson mt))
+  ManaSymbol.Variable -> nullary (Text.pack "Variable")
 
 jsonToManaSymbol :: Value -> Either Text ManaSymbol.ManaSymbol
 jsonToManaSymbol value = do
@@ -344,6 +345,7 @@ jsonToManaSymbol value = do
   case (Text.unpack t, mv) of
     ("Generic", Just v) -> ManaSymbol.Generic <$> natFrom v
     ("OfType", Just v) -> ManaSymbol.OfType <$> jsonToManaType v
+    ("Variable", _) -> Right ManaSymbol.Variable
     _ -> Left (Text.pack "unknown ManaSymbol: " <> t)
 
 manaCostToJson :: ManaCost.ManaCost -> Value
