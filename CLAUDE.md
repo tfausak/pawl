@@ -35,15 +35,18 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 
 ## Current work and tracking
 
-- **M0–M3g are complete** — a zero-card game, then casting, combat, the keyword
-  seam, first/double strike, deathtouch/trample, and the M3 effect-DSL gate cards
-  through the payoff pair (Mindslaver's CR 723 control + Panglacial Wurm's
-  cast-during-search re-entrancy). The **milestone completion log** — one distilled
-  entry per milestone with its gate card, the decision it proved, the
-  opcodes/types it added, and every elision and its named expiry — lives in
-  `docs/progress.md`. The forward path (M0–M7 and the M3a–M3g split) is in
-  `docs/design.md` §3; each milestone's authoritative detail is its spec and plan
-  under `docs/superpowers/{specs,plans}/`.
+- **M0–M3g and M3.5 are complete** — a zero-card game, then casting, combat, the
+  keyword seam, first/double strike, deathtouch/trample, and the M3 effect-DSL gate
+  cards through the payoff pair (Mindslaver's CR 723 control + Panglacial Wurm's
+  cast-during-search re-entrancy), then **M3.5** (cards as data files: a hand-rolled
+  JSON codec with the honesty round-trip, card data relocated out of the engine
+  library into the test suite's `Pawl.Cards`, and `data/cards/*.json` as the source
+  of truth — benchmark loads by `IO`, test suite by a temporary TH shim). **M4 is
+  next.** The **milestone completion log** — one distilled entry per milestone with
+  its gate card, the decision it proved, the opcodes/types it added, and every
+  elision and its named expiry — lives in `docs/progress.md`. The forward path
+  (M0–M7 and the M3a–M3g split) is in `docs/design.md` §3; each milestone's
+  authoritative detail is its spec and plan under `docs/superpowers/{specs,plans}/`.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
