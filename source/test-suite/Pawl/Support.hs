@@ -155,6 +155,7 @@ playLandAnswer p = case p of
           A.Play _ -> True
           A.Pass -> False
           A.Cast _ -> False
+          A.Activate _ _ -> False
      in case filter isPlay actions of
           h : _ -> h
           [] -> A.Pass

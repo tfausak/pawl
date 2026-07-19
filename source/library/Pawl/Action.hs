@@ -1,6 +1,7 @@
 module Pawl.Action where
 
 import qualified Data.Set as Set
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Game as Game
@@ -33,4 +34,8 @@ legalActions pid gs =
           && not (Set.member pid (GameState.landPlayed gs))
       lands = if canPlayLand then map Action.Play (playableLands pid gs) else []
       spells = map Action.Cast (Cast.castableSpells pid gs)
-   in Action.Pass : lands ++ spells
+      activations =
+        let forPermanent oid =
+              map (Action.Activate oid) (filter (\ab -> Activate.activatable pid oid ab gs) (Activate.abilitiesFor oid gs))
+         in concatMap forPermanent (Game.zoneMembers Zone.Battlefield pid gs)
+   in Action.Pass : lands ++ spells ++ activations

@@ -58,6 +58,7 @@ library
   exposed-modules:
     Pawl
     Pawl.Action
+    Pawl.Activate
     Pawl.Card
     Pawl.Cast
     Pawl.Combat
@@ -157,6 +158,7 @@ test-suite pawl-test-suite
   main-is: Main.hs
   -- cabal-gild: discover source/test-suite --exclude source/test-suite/Main.hs
   other-modules:
+    Pawl.ActivateSpec
     Pawl.CardSpec
     Pawl.CastSpec
     Pawl.CombatSpec

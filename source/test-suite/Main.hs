@@ -1,3 +1,4 @@
+import qualified Pawl.ActivateSpec as ActivateSpec
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.CombatSpec as CombatSpec
@@ -32,5 +33,6 @@ testTree =
       CastSpec.tests,
       CombatSpec.tests,
       ResolveSpec.tests,
-      ProjectionSpec.tests
+      ProjectionSpec.tests,
+      ActivateSpec.tests
     ]

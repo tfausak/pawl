@@ -1,10 +1,14 @@
 module Pawl.Type.Action where
 
+import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.ObjectId (ObjectId)
 
--- Grows: Activate, special actions beyond Play, …
+-- Grows: special actions beyond Play, …
 data Action
   = Pass
   | Play ObjectId
   | Cast ObjectId
+  | -- CR 602: activate the source permanent's ability. Carries the ability VALUE
+    -- (validated by membership in Projection.abilitiesOf), never an index.
+    Activate ObjectId ActivatedAbility
   deriving (Eq, Ord, Show)

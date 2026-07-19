@@ -696,7 +696,7 @@ git commit -m "Resolve an ability on the stack: OfAbility + resolveAbility cease
 - Consumes: `resolveAbility`/`OfAbility` (Task 4), `isManaAbility` (Task 1), the printings (Task 2).
 - Produces: `Action.Activate :: ObjectId -> ActivatedAbility -> Action`; `Activate.activatable :: PlayerId -> ObjectId -> ActivatedAbility -> GameState -> Bool` (controlled, non-mana, cost payable, `{T}` not sick-on-a-creature, has a legal target); `Activate.activateAbility :: PlayerId -> ObjectId -> ActivatedAbility -> Game ()` (mint the ability on the stack, prompt+stamp targets, pay costs, keep priority); `Action.legalActions` offers `Activate` for each controlled permanent's non-mana abilities.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `source/test-suite/Pawl/ActivateSpec.hs`:
 
@@ -771,12 +771,12 @@ isActivate a = case a of
 
 (Wire `Pawl.ActivateSpec.tests` into `Main.hs`'s `testTree` and add `Pawl.ActivateSpec` to the test-suite `other-modules` list.)
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal test --test-options='-p "puts an ability on the stack"'`
 Expected: FAIL to compile — `Action.Activate`, `Pawl.Activate` not in scope.
 
-- [ ] **Step 3: Add the `Activate` action**
+- [x] **Step 3: Add the `Activate` action**
 
 In `source/library/Pawl/Type/Action.hs`, add `import Pawl.Type.ActivatedAbility (ActivatedAbility)` and the constructor (update the header comment):
 
@@ -786,7 +786,7 @@ In `source/library/Pawl/Type/Action.hs`, add `import Pawl.Type.ActivatedAbility 
     Activate ObjectId ActivatedAbility
 ```
 
-- [ ] **Step 4: Create `Pawl.Activate`**
+- [x] **Step 4: Create `Pawl.Activate`**
 
 `source/library/Pawl/Activate.hs`:
 
@@ -914,7 +914,7 @@ payAdditional srcId gs c = case c of
 
 (The module needs `import qualified Data.List as List`. `Timestamp` may be unused — drop that import if the compiler warns.)
 
-- [ ] **Step 5: Offer activations in `legalActions`**
+- [x] **Step 5: Offer activations in `legalActions`**
 
 In `source/library/Pawl/Action.hs`, add `import qualified Pawl.Activate as Activate`. Extend `legalActions` to append an `Activate` per controlled permanent's activatable ability (reading `Activate.abilitiesFor`, which Task 9 flips to the projection):
 
@@ -934,7 +934,7 @@ legalActions pid gs =
    in Action.Pass : lands ++ spells ++ activations
 ```
 
-- [ ] **Step 6: Add the `Activate` arm to `priorityLoop`**
+- [x] **Step 6: Add the `Activate` arm to `priorityLoop`**
 
 In `source/library/Pawl/Engine.hs`, add `import qualified Pawl.Activate as Activate`. Add the arm beside `Cast` (CR 117.3c: activating keeps priority):
 
@@ -945,12 +945,12 @@ In `source/library/Pawl/Engine.hs`, add `import qualified Pawl.Activate as Activ
                 loop
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — activation puts an ability on the stack and taps the source; a sick creature's ability is not offered, a settled one's is; resolving deals 1 damage and the ability ceases.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

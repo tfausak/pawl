@@ -12,6 +12,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Action as Action
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
@@ -238,6 +239,10 @@ priorityLoop = do
               Action.Type.Cast oid -> do
                 Cast.castSpell p oid
                 -- CR 117.3c again: casting does not hand priority away.
+                State.modify' $ \g -> g {GameState.passes = 0, GameState.priority = Just p}
+                loop
+              Action.Type.Activate oid ability -> do
+                Activate.activateAbility p oid ability
                 State.modify' $ \g -> g {GameState.passes = 0, GameState.priority = Just p}
                 loop
   loop
