@@ -13,6 +13,7 @@ import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Decider as Decider
+import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
@@ -44,6 +45,16 @@ combatReplayTests =
           HU.testCase "ChooseX records and replays a Natural" $
             let p = Prompt.ChooseX decider S.alice oid
              in HU.assertEqual "round trip" (Just (4 :: Natural.Natural)) (Replay.decode p (Replay.encode p 4)),
+          -- CR 601.2b / 700.2a: a modal choice (Response.ChoseModes, a Set
+          -- ModeIndex) round-trips through the DecisionLog exactly like every
+          -- other response -- no JSON codec is involved: Response has never had
+          -- one (only Prompt/Response answers get serialized, via Replay's
+          -- encode/decode, not Pawl.Codec's JSON arms).
+          HU.testCase "ChooseModes records and replays a Set ModeIndex" $
+            let legal = Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 1]
+                p = Prompt.ChooseModes decider S.alice oid legal 1
+                answer = Set.singleton (ModeIndex.MkModeIndex 1)
+             in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
           HU.testCase "defaultAnswer attacks with nothing" $
             HU.assertEqual "no attacks" [] (Replay.defaultAnswer attackPrompt),
           HU.testCase "defaultAnswer blocks with nothing" $

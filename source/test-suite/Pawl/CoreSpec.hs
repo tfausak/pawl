@@ -6,6 +6,7 @@ module Pawl.CoreSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Quantity as Quantity
@@ -53,7 +54,7 @@ programTests =
 withBoundAmount :: Cards.Cards -> Maybe Integer -> (ObjectId.ObjectId, GameState.GameState)
 withBoundAmount cards mAmount =
   let (oid, gs0) = S.addCreature (Cards.mountainPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-      bindings = Binding.fromChoices Map.empty Map.empty (fmap fromInteger mAmount)
+      bindings = Binding.fromChoices Map.empty Map.empty (fmap fromInteger mAmount) Set.empty
       gs = gs0 {GameState.objects = Map.adjust (\o -> o {Object.bindings = bindings}) oid (GameState.objects gs0)}
    in (oid, gs)
 

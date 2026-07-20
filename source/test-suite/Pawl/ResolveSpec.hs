@@ -300,7 +300,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToObject targetLand)) Map.empty Nothing,
+                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToObject targetLand)) Map.empty Nothing Set.empty,
                   Object.counters = Map.empty,
                   Object.timestamp = Timestamp.MkTimestamp 0
                 }
@@ -359,7 +359,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing,
+                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing Set.empty,
                   Object.counters = Map.empty,
                   Object.timestamp = ts
                 }
@@ -453,7 +453,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing,
+                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing Set.empty,
                   Object.counters = Map.empty,
                   Object.timestamp = ts
                 }

@@ -7,6 +7,7 @@ import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
 import Pawl.Type.Decider (Decider)
+import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
@@ -58,3 +59,9 @@ data Prompt r where
   -- 601.2c), and only when the cost contains a Variable symbol -- a spell with no
   -- {X} is not asked (where the rules leave nothing to choose, don't prompt).
   ChooseX :: Decider -> PlayerId -> ObjectId -> Prompt Natural
+  -- CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
+  -- spell). The Set ModeIndex is the LEGAL modes -- the engine pre-filters to modes
+  -- whose targets are all fillable (CR 700.2a). The Natural is how many to choose.
+  -- The answer is the chosen subset. Prompted before X and targets, and ONLY when
+  -- #legal > count; a forced selection is not asked.
+  ChooseModes :: Decider -> PlayerId -> ObjectId -> Set ModeIndex -> Natural -> Prompt (Set ModeIndex)

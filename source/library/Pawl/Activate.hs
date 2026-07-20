@@ -108,7 +108,8 @@ activateAbility pid srcId ability = do
   if not (keysAgree && eachLegal)
     then State.put gs -- reject: the whole activation is a no-op
     else do
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing}) abilId (GameState.objects g)})
+      -- Activated abilities have no mode yet (a fast-follow per the M4g plan): Set.empty.
+      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing Set.empty}) abilId (GameState.objects g)})
       let additional = AbilityCost.additional (ActivatedAbility.cost ability)
           payAll g = List.foldl' (payAdditional srcId) g additional
       case AbilityCost.mana (ActivatedAbility.cost ability) of

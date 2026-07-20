@@ -186,7 +186,8 @@ castSpell pid oid = do
                       moved
                         { GameState.objects =
                             Map.adjust
-                              (\o -> o {Object.bindings = Binding.fromChoices chosen bound mAmount})
+                              -- Task 7 replaces Set.empty with the real chosen modes.
+                              (\o -> o {Object.bindings = Binding.fromChoices chosen bound mAmount Set.empty})
                               top
                               (GameState.objects moved)
                         }

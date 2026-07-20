@@ -32,6 +32,7 @@ encode p answer = case p of
   Prompt.SearchLibrary {} -> Response.Searched answer
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
   Prompt.ChooseX {} -> Response.ChoseX answer
+  Prompt.ChooseModes {} -> Response.ChoseModes answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -75,6 +76,9 @@ decode p response = case p of
   Prompt.ChooseX {} -> case response of
     Response.ChoseX n -> Just n
     _ -> Nothing
+  Prompt.ChooseModes {} -> case response of
+    Response.ChoseModes modes -> Just modes
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -116,6 +120,9 @@ defaultAnswer p = case p of
   -- CR 601.2b: X=0 is always payable and the least eventful fallback when a
   -- transcript runs short on a variable-cost cast.
   Prompt.ChooseX {} -> 0
+  -- The first `count` legal modes, deterministically -- the least eventful
+  -- fallback when a transcript runs short on a modal cast.
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

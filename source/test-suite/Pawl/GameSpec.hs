@@ -129,7 +129,7 @@ gameTests cards =
                   base
                     { GameState.objects =
                         Map.adjust
-                          (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.alice)) Map.empty Nothing})
+                          (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.alice)) Map.empty Nothing Set.empty})
                           (ObjectId.MkObjectId 0)
                           (GameState.objects base)
                     }
@@ -143,7 +143,7 @@ gameTests cards =
                   base
                     { GameState.objects =
                         Map.adjust
-                          (\o -> o {Object.bindings = Binding.fromChoices Map.empty (Map.singleton slot (Subtype.Mountain, Subtype.Island)) Nothing})
+                          (\o -> o {Object.bindings = Binding.fromChoices Map.empty (Map.singleton slot (Subtype.Mountain, Subtype.Island)) Nothing Set.empty})
                           (ObjectId.MkObjectId 0)
                           (GameState.objects base)
                     }
@@ -280,6 +280,7 @@ recordingAnswer p = case p of
   Prompt.SearchLibrary {} -> pure Nothing
   Prompt.CastWhileSearching {} -> pure Nothing
   Prompt.ChooseX {} -> pure 0
+  Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
@@ -413,6 +414,7 @@ slaveAnswer p = case p of
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of

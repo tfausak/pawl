@@ -1,8 +1,10 @@
 module Pawl.Type.Response where
 
 import Data.Map.Strict (Map)
+import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
+import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.SlotName (SlotName)
@@ -28,4 +30,7 @@ data Response
   | -- CR 601.2b: the value of X a caster chose, serialized so a DecisionLog
     -- replays a variable-cost spell deterministically.
     ChoseX Natural
+  | -- CR 601.2b: the mode(s) a caster chose for a modal spell, serialized so a
+    -- DecisionLog replays a modal cast deterministically.
+    ChoseModes (Set ModeIndex)
   deriving (Eq, Show)
