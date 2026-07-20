@@ -31,7 +31,6 @@ import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardCriterion as CardCriterion
-import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
@@ -54,7 +53,6 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
@@ -67,10 +65,8 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Timestamp as Timestamp
-import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -157,37 +153,11 @@ targetTests cards =
         let gs = Setup.emptyGame S.bothPlayers
             expected = Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]
          in HU.assertEqual "both players, no creatures" expected (Target.legalRecipients TargetSpec.PlayerTarget gs),
-      -- CR 115.4 / 700.2c: "target Wall" (Chaos Charm) restricts CreatureTarget to
-      -- creatures whose PROJECTED subtypes include Wall. Wall of Stone (Task 5) is
-      -- not landed yet, so this is a hand-built minimal Wall Card/Printing --
-      -- 0/8, Creature - Wall, an empty mode -- just enough to sit on the
-      -- battlefield and carry the subtype.
-      HU.testCase "CR 115.4 / 700.2c WallTarget offers a Wall creature but not a non-Wall creature" $
-        let wallCard =
-              Card.Type.MkCard
-                { Card.Type.name = Text.pack "Test Wall",
-                  Card.Type.manaCost = Nothing,
-                  Card.Type.typeLine =
-                    TypeLine.MkTypeLine
-                      { TypeLine.supertypes = Set.empty,
-                        TypeLine.types = Set.singleton CardType.Creature,
-                        TypeLine.subtypes = Set.singleton Subtype.Wall
-                      },
-                  Card.Type.power = Just (Power.MkPower (Quantity.Literal 0)),
-                  Card.Type.toughness = Just (Toughness.MkToughness (Quantity.Literal 8)),
-                  Card.Type.keywords = Set.empty,
-                  Card.Type.staticAbilities = [],
-                  Card.Type.spell =
-                    Modal.MkModal
-                      (Seq.singleton (Mode.MkMode Seq.empty Map.empty))
-                      (ModeSelection.ChooseExactly 1),
-                  Card.Type.activatedAbilities = [],
-                  Card.Type.replacementEffects = [],
-                  Card.Type.triggeredAbilities = [],
-                  Card.Type.castingPermissions = []
-                }
-            wallPrinting = Printing.MkPrinting wallCard
-            (wallId, base) = S.addCreature wallPrinting S.bob (Setup.emptyGame S.bothPlayers)
+      -- CR 115.1a / 700.2c: "target Wall" (Chaos Charm) restricts CreatureTarget to
+      -- creatures whose PROJECTED subtypes include Wall. Wall of Stone (a real 0/8
+      -- Creature - Wall, M4g) is the Wall; a Piker is the non-Wall control.
+      HU.testCase "CR 115.1a / 700.2c WallTarget offers a Wall creature but not a non-Wall creature" $
+        let (wallId, base) = S.addCreature (Cards.wallOfStonePrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             (pikerId, gs) = S.addPiker cards S.alice base
             slot = SlotName.MkSlotName (Text.pack "target")
             legal = Map.findWithDefault Set.empty slot (Target.legalSets (Map.singleton slot TargetSpec.WallTarget) gs)
