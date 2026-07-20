@@ -195,13 +195,17 @@ redDeck cards =
   Deck.MkDeck $
     Map.fromList
       [ (mountainPrinting cards, 36),
-        (pikerPrinting cards, 8),
+        (pikerPrinting cards, 4),
         (birdMaidenPrinting cards, 8),
         (lightningBoltPrinting cards, 4),
         -- Blaze swaps in for four Pikers to keep the deck at 60 (so the CR 400.7
         -- conservation counts stay 120); the variable red cost gives the random
         -- red matchup its X-payment coverage (M4a spec §6).
-        (blazePrinting cards, 4)
+        (blazePrinting cards, 4),
+        -- Dragon Fodder swaps in for four Pikers to keep the deck at 60 (so the
+        -- card-backed conservation count stays 120) and give random red games their
+        -- token-churn coverage: creation from nothing and CR 704.5d cease-to-exist.
+        (dragonFodderPrinting cards, 4)
       ]
 
 greenDeck :: Cards -> Deck.Deck

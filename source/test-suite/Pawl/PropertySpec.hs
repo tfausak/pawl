@@ -42,12 +42,25 @@ castsNamed cards name s =
       inGrave pid = any named (Game.zoneMembers Zone.Graveyard pid gs)
    in any inGrave [S.alice, S.bob]
 
+-- The card-backed objects (Source.OfCard) are conserved at 120 across a game
+-- (CR 400.7 mints a fresh id per zone change but never a new card). Tokens
+-- (Source.OfToken) legitimately come and go, so they are excluded -- a surviving
+-- token at game end must not read as a conservation break (M4c).
+cardBackedCount :: GameState.GameState -> Int
+cardBackedCount gs =
+  let fromCard obj = case Object.source obj of
+        Source.OfCard _ -> True
+        Source.OfToken _ -> False
+        Source.OfAbility _ _ -> False
+        Source.OfTrigger _ _ -> False
+   in length (filter fromCard (Map.elems (GameState.objects gs)))
+
 propertyTests :: Cards.Cards -> Tasty.TestTree
 propertyTests cards =
   Tasty.testGroup
     "Properties"
-    [ QC.testProperty "conservation: 120 objects at end" $ \s ->
-        QC.conjoin (map (\m -> Game.objectCount (S.runRandomGame m s) QC.=== 120) (S.matchups cards)),
+    [ QC.testProperty "conservation: 120 card-backed objects at end" $ \s ->
+        QC.conjoin (map (\m -> cardBackedCount (S.runRandomGame m s) QC.=== 120) (S.matchups cards)),
       -- The property that matters most now. Combat is the first thing that can
       -- end a game before the library runs out.
       QC.testProperty "every game terminates with a result" $ \s ->
