@@ -95,4 +95,10 @@ data Effect card
     -- shield fires later, at Event.destroy. A general "Regenerate target creature"
     -- is future (Regenerate SlotName). Executed by Resolve.applyEffect.
     RegenerateSelf
+  | -- CR 701.6: counter the slot's target spell -- remove it from the stack and
+    -- put it into its owner's graveyard (CR 701.6a) via the Event.counter funnel,
+    -- so it does not resolve. Distinct from MoveToZone slot Graveyard the way
+    -- Destroy is (M4b): Counter is a keyword action on rule 701's list, and this is
+    -- the future home of "can't be countered" and a distinct "was countered" event.
+    Counter SlotName
   deriving (Eq, Ord, Show)

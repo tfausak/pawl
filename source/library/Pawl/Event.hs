@@ -144,6 +144,17 @@ removeFromCombat oid gs =
           }
    in gs {GameState.combat = c1}
 
+-- The single counter funnel (CR 701.6). A countered spell is removed from the
+-- stack and put into its owner's graveyard (CR 701.6a) via changeZone -- so Rest
+-- in Peace's redirect (graveyard->exile) and CR 400.7's new incarnation still
+-- compose, exactly as they do for destroy. Ungated today: "can't be countered"
+-- (CR 701.6) and a distinct "was countered" event are deferred (spec section 7),
+-- as Event.destroy is ungated for CR 701.19c.
+counter :: ObjectId -> GameState -> GameState
+counter oid gs = case Game.lookupObject oid gs of
+  Nothing -> gs
+  Just _ -> changeZone oid Zone.Graveyard gs
+
 -- CR 111.2: create a token with the given effect-defined characteristics under
 -- `controller`'s control (its owner, CR 111.2), summoning-sick (CR 302.6). A token
 -- is created from nothing -- it has no prior object to move, so changeZone cannot

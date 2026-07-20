@@ -66,6 +66,20 @@ tests cards =
             onStack = g1 {GameState.stack = bolt : GameState.stack g1, GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Stack}) bolt (GameState.objects g1)}
             after = Event.changeZone bolt Zone.Graveyard onStack
          in HU.assertEqual "spell exiled, graveyard empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 701.6a Event.counter puts a countered spell into its owner's graveyard" $
+        let (spellId, onStack) = S.spellOnStack (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            after = Event.counter spellId onStack
+         in do
+              HU.assertEqual "off the stack" [] (GameState.stack after)
+              HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+              HU.assertEqual "not on the battlefield" 0 (S.creaturesInPlay S.bob after),
+      HU.testCase "CR 614 a countered spell is exiled under Rest in Peace" $
+        let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            (spellId, onStack) = S.spellOnStack (Cards.pikerPrinting cards) S.bob g0
+            after = Event.counter spellId onStack
+         in do
+              HU.assertEqual "not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+              HU.assertEqual "exiled instead" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
       HU.testCase "CR 603.6a: Rest in Peace entering yields its ETB trigger" $
         let (ripId, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             -- an event describing RiP having entered the battlefield

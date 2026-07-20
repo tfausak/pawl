@@ -73,6 +73,7 @@ slotsOf effect = case effect of
   Effect.Create _ _ -> Set.empty
   Effect.Prevent _ _ -> Set.empty
   Effect.RegenerateSelf -> Set.empty
+  Effect.Counter slot -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -98,6 +99,7 @@ readsX = any effectReadsX
       Effect.Create quantity _ -> quantity == Quantity.Type.X
       Effect.Prevent _ _ -> False
       Effect.RegenerateSelf -> False
+      Effect.Counter _ -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -119,6 +121,7 @@ manaProduced effect = case effect of
   Effect.Create {} -> Nothing
   Effect.Prevent _ _ -> Nothing
   Effect.RegenerateSelf -> Nothing
+  Effect.Counter _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -140,6 +143,7 @@ searchesLibrary effect = case effect of
   Effect.Create {} -> False
   Effect.Prevent _ _ -> False
   Effect.RegenerateSelf -> False
+  Effect.Counter _ -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -182,6 +186,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Create _ _ -> effect
   Effect.Prevent _ _ -> effect
   Effect.RegenerateSelf -> effect
+  -- No rewritable land-type word.
+  Effect.Counter _ -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -441,6 +447,15 @@ applyEffect source controller bound legality chosen effect = case effect of
     -- harmless (nothing will destroy it).
     State.modify' $ \gs ->
       gs {GameState.regenerationShields = Map.insertWith (+) source 1 (GameState.regenerationShields gs)}
+  Effect.Counter slot ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        -- CR 701.6a: the slot's target is a spell on the stack; counter it through
+        -- the single funnel. A player recipient / illegal slot (CR 608.2b): no-op.
+        (Just recipient, True) -> case recipientObject recipient of
+          Nothing -> gs
+          Just target -> Event.counter target gs
+        _ -> gs
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.
