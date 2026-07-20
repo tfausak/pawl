@@ -18,6 +18,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
@@ -397,5 +398,27 @@ tests cards =
               (Projection.replacementsOf rip gs),
       HU.testCase "a vanilla creature projects no replacements" $
         let (piker, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
-         in HU.assertEqual "none" [] (Projection.replacementsOf piker gs)
+         in HU.assertEqual "none" [] (Projection.replacementsOf piker gs),
+      HU.testCase "CR 122.1a a +1/+1 counter adds +1/+1 (layer 7c)" $
+        let base = S.landsInPlay (Cards.forestPrinting cards) 0
+            (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            gs = S.addCounter CounterKind.PlusOnePlusOne 1 oid gs0
+         in do
+              HU.assertEqual "power 2 + 1" (Just 3) (Projection.powerOf oid gs)
+              HU.assertEqual "toughness 1 + 1" (Just 2) (Projection.toughnessOf oid gs),
+      HU.testCase "CR 122.1a a -1/-1 counter subtracts 1/1" $
+        let base = S.landsInPlay (Cards.forestPrinting cards) 0
+            (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            gs = S.addCounter CounterKind.MinusOneMinusOne 1 oid gs0
+         in do
+              HU.assertEqual "power 2 - 1" (Just 1) (Projection.powerOf oid gs)
+              HU.assertEqual "toughness 1 - 1" (Just 0) (Projection.toughnessOf oid gs),
+      HU.testCase "CR 613.4c a +1/+1 counter and Giant Growth stack in layer 7c" $
+        let base = S.landsInPlay (Cards.forestPrinting cards) 0
+            (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            gs1 = S.addCounter CounterKind.PlusOnePlusOne 1 oid gs0
+            gs = withEffect oid (Timestamp.MkTimestamp 9) (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs1
+         in do
+              HU.assertEqual "power 2 + 1 + 3" (Just 6) (Projection.powerOf oid gs)
+              HU.assertEqual "toughness 1 + 1 + 3" (Just 5) (Projection.toughnessOf oid gs)
     ]

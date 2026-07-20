@@ -13,6 +13,7 @@ import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -26,6 +27,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Power as Power
 import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
+import qualified Pawl.Type.Quantity as Quantity.Type
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
@@ -296,7 +298,36 @@ gather gs =
                  in map gatherOne (Card.Type.staticAbilities card)
               else []
       static_ = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
-   in stored ++ static_
+   in stored ++ static_ ++ counterGathered gs
+
+-- CR 122.1a / 613.4c: a +1/+1 counter adds +1/+1 and a -1/-1 counter adds -1/-1,
+-- in layer 7c. Emit each battlefield object's counters as ONE synthetic 7c
+-- ModifyPowerToughness with net delta d = (#PlusOnePlusOne - #MinusOneMinusOne) on
+-- each axis, folded by the same path as Giant Growth. Constructed HERE (Projection
+-- is the sole home that may name a Modification constructor). Layer 7c is purely
+-- additive, so pre-combining the counters and the object's own timestamp are both
+-- unobservable (spec section 4). d == 0 emits nothing.
+counterGathered :: GameState -> [Gathered]
+counterGathered gs = Maybe.mapMaybe fromObject (Set.toList (GameState.battlefield gs))
+  where
+    fromObject oid = case Game.lookupObject oid gs of
+      Nothing -> Nothing
+      Just obj ->
+        let cs = Object.counters obj
+            plus = toInteger (Map.findWithDefault 0 CounterKind.PlusOnePlusOne cs)
+            minus = toInteger (Map.findWithDefault 0 CounterKind.MinusOneMinusOne cs)
+            d = plus - minus
+         in if d == 0
+              then Nothing
+              else
+                Just
+                  MkGathered
+                    { gSource = oid,
+                      gAffected = Affected.TheseObjects (Set.singleton oid),
+                      gLayer = Layer.ModifyPT,
+                      gTimestamp = Object.timestamp obj,
+                      gModification = Modification.ModifyPowerToughness (Quantity.Type.Literal d) (Quantity.Type.Literal d)
+                    }
 
 -- CR 613: apply continuous effects layer by layer (only the layers with effects,
 -- ascending). Within a layer, CR 613.7 timestamp order. An effect's affected set
