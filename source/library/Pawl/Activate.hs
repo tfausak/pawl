@@ -15,6 +15,7 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
+import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
@@ -32,7 +33,7 @@ import qualified Pawl.Type.Zone as Zone
 -- CR 302.6: a creature's {T}-cost ability can't be activated while summoning
 -- sick. Reads projected creature-ness -- a land (Evolving Wilds) is never sick-
 -- gated. Only {T} (TapSelf) is affected.
-tapSicknessOk :: ObjectId -> ActivatedAbility.ActivatedAbility -> GameState -> Bool
+tapSicknessOk :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 tapSicknessOk srcId ability gs =
   let needsTap = elem AdditionalCost.TapSelf (AbilityCost.additional (ActivatedAbility.cost ability))
       isCreature = Set.member CardType.Creature (Projection.cardTypesOf srcId gs)
@@ -52,14 +53,14 @@ canPayAdditional srcId gs c = case c of
 -- The abilities to consider activating. Task 5: the card's PRINTED abilities.
 -- Task 9 switches the body to `Projection.abilitiesOf srcId gs` so Humility
 -- (layer 6) strips them -- the single switch point, the keywordsOf pattern.
-abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility]
+abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
 abilitiesFor = Projection.abilitiesOf
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities (abilitiesFor),
 -- it is not a mana ability (mana abilities are handled at payment, not the
 -- stack), every additional cost is payable, the {T} sickness gate holds, and
 -- every target slot has a legal recipient (CR 602.2b).
-activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility -> GameState -> Bool
+activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatable pid srcId ability gs =
   Game.controllerOf srcId gs == Just pid
     && elem ability (abilitiesFor srcId gs)
@@ -73,7 +74,7 @@ activatable pid srcId ability gs =
 -- stamp targets (602.2b), pay the additional costs, keep priority (117.3c).
 -- Reject-not-repair on an illegal target answer; enumeration guarantees costs are
 -- payable, so payment cannot fail after the prompt.
-activateAbility :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility -> Game ()
+activateAbility :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> Game ()
 activateAbility pid srcId ability = do
   gs <- State.get
   let (abilId, gs1) = Game.freshObjectId gs

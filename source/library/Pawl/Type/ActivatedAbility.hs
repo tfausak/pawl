@@ -10,9 +10,12 @@ import Pawl.Type.TargetSpec (TargetSpec)
 -- machinery of a spell. An ability is VALUE-typed: two abilities with the same
 -- cost and effect are indistinguishable, so Action.Activate carries the value and
 -- validates by membership (Projection.abilitiesOf), never an index.
-data ActivatedAbility = MkActivatedAbility
+-- Parametric in `card` for the same reason as Effect: its effects are
+-- `[Effect card]`, so a concrete `Effect Card` would drag Card into this module
+-- and cycle with Card (which embeds [ActivatedAbility Card]). Card ties the knot.
+data ActivatedAbility card = MkActivatedAbility
   { cost :: AbilityCost,
-    effects :: [Effect],
+    effects :: [Effect card],
     targetSpecs :: Map SlotName TargetSpec
   }
   deriving (Eq, Ord, Show)

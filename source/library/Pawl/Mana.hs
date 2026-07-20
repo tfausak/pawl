@@ -10,6 +10,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import Pawl.Type.GameState (GameState)
@@ -73,7 +74,7 @@ manaTypesOf oid gs =
 -- doesn't target (the loyalty clause is vacuous -- no planeswalkers). The ABI
 -- predicate read at two sites: manaTypesOf includes a mana ability as a source
 -- (Task 6); Action.legalActions excludes it from the stack (Task 5).
-isManaAbility :: ActivatedAbility.ActivatedAbility -> Bool
+isManaAbility :: ActivatedAbility.ActivatedAbility Card.Card -> Bool
 isManaAbility ab =
   not (null (Maybe.mapMaybe Resolve.manaProduced (ActivatedAbility.effects ab)))
     && Map.null (ActivatedAbility.targetSpecs ab)

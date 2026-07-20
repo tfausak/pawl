@@ -38,12 +38,12 @@ data Card = MkCard
     staticAbilities :: [StaticAbility],
     -- The card's rules text as data. Ordered: CR 608.2c resolves instructions
     -- in the order written.
-    effects :: [Effect],
+    effects :: [Effect Card],
     -- CR 602: this card's printed activated abilities. Empty for all but the few
     -- printings that grant one. The closed half reads these through
     -- Pawl.Projection.abilitiesOf (Task 9), never directly: layer 6 (Humility)
     -- removes abilities.
-    activatedAbilities :: [ActivatedAbility],
+    activatedAbilities :: [ActivatedAbility Card],
     -- CR 614: this card's replacement effects, active while it is on the
     -- battlefield. Read through Pawl.Projection.replacementsOf (never directly)
     -- so layer 6 LoseAllAbilities strips them uniformly. Empty for all but Rest
@@ -51,7 +51,7 @@ data Card = MkCard
     replacementEffects :: [ReplacementEffect],
     -- CR 603: this card's triggered abilities, read through
     -- Pawl.Projection.triggeredAbilitiesOf. Empty for all but Rest in Peace.
-    triggeredAbilities :: [TriggeredAbility],
+    triggeredAbilities :: [TriggeredAbility Card],
     -- CR 601.3: this card's casting permissions -- zone/condition exceptions to
     -- normal timing. Read directly from the card (NOT the projection): the
     -- permission functions in the library (CR 113.6), where the CR 613 layer

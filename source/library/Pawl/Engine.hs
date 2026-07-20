@@ -27,6 +27,7 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.BeginningStep as BeginningStep
+import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -192,7 +193,7 @@ placePendingTriggers = do
   pure (not (null pending))
 
 -- Put one triggered ability on the stack as a fresh OfTrigger object.
-placeOne :: (ObjectId, PlayerId, TriggeredAbility.TriggeredAbility) -> Game ()
+placeOne :: (ObjectId, PlayerId, TriggeredAbility.TriggeredAbility Card.Card) -> Game ()
 placeOne (srcId, controller, ability) = do
   gs <- State.get
   let (abilId, gs1) = Game.freshObjectId gs

@@ -42,7 +42,7 @@ findFirst p = case p of
 -- The single ability of a printing (all M3e gates have exactly one). Total: the
 -- empty-ability fallback is unreachable in these fixtures, and honors the
 -- no-partial-functions rule (no `error`).
-theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [] Map.empty

@@ -445,7 +445,7 @@ jsonToAffected value = do
 
 -- Effect ---------------------------------------------------------------------
 
-effectToJson :: Effect.Effect -> Value
+effectToJson :: Effect.Effect CardT.Card -> Value
 effectToJson e = case e of
   Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.ModifyTarget d m s -> Json.tagged (Text.pack "ModifyTarget") (Just (Array [durationToJson d, modificationToJson m, slotNameToJson s]))
@@ -460,7 +460,7 @@ effectToJson e = case e of
   Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
 
-jsonToEffect :: Value -> Either Text Effect.Effect
+jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
 jsonToEffect value = do
   (t, mv) <- Json.tag value
   case Text.unpack t of
@@ -547,7 +547,7 @@ jsonToAbilityCost value = do
   add <- Json.field (Text.pack "additional") ps >>= listFrom jsonToAdditionalCost
   pure (AbilityCost.MkAbilityCost manaCost add)
 
-activatedAbilityToJson :: ActivatedAbility.ActivatedAbility -> Value
+activatedAbilityToJson :: ActivatedAbility.ActivatedAbility CardT.Card -> Value
 activatedAbilityToJson aa =
   Object
     [ (Text.pack "cost", abilityCostToJson (ActivatedAbility.cost aa)),
@@ -555,7 +555,7 @@ activatedAbilityToJson aa =
       (Text.pack "targetSpecs", targetSpecsToJson (ActivatedAbility.targetSpecs aa))
     ]
 
-jsonToActivatedAbility :: Value -> Either Text ActivatedAbility.ActivatedAbility
+jsonToActivatedAbility :: Value -> Either Text (ActivatedAbility.ActivatedAbility CardT.Card)
 jsonToActivatedAbility value = do
   ps <- Json.asObject value
   c <- Json.field (Text.pack "cost") ps >>= jsonToAbilityCost
@@ -574,7 +574,7 @@ jsonToReplacementEffect value = do
     ("RedirectZoneChange", Just (Array [w, d])) -> ReplacementEffect.RedirectZoneChange <$> jsonToZone w <*> jsonToZone d
     _ -> Left (Text.pack "unknown ReplacementEffect: " <> t)
 
-triggeredAbilityToJson :: TriggeredAbility.TriggeredAbility -> Value
+triggeredAbilityToJson :: TriggeredAbility.TriggeredAbility CardT.Card -> Value
 triggeredAbilityToJson ta =
   Object
     [ (Text.pack "condition", triggerConditionToJson (TriggeredAbility.condition ta)),
@@ -582,7 +582,7 @@ triggeredAbilityToJson ta =
       (Text.pack "targetSpecs", targetSpecsToJson (TriggeredAbility.targetSpecs ta))
     ]
 
-jsonToTriggeredAbility :: Value -> Either Text TriggeredAbility.TriggeredAbility
+jsonToTriggeredAbility :: Value -> Either Text (TriggeredAbility.TriggeredAbility CardT.Card)
 jsonToTriggeredAbility value = do
   ps <- Json.asObject value
   c <- Json.field (Text.pack "condition") ps >>= jsonToTriggerCondition

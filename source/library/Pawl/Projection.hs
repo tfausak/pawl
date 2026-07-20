@@ -343,7 +343,7 @@ keywordsOf oid gs = PC.keywords (project oid gs)
 
 -- CR 602 / 613.1f: an object's activated abilities after the layer system, the
 -- same projection posture as keywordsOf. A Humility'd creature has none.
-abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility]
+abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
 abilitiesOf oid gs = PC.activatedAbilities (project oid gs)
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
@@ -367,7 +367,7 @@ replacementsAffecting gs =
 
 -- CR 603 / 613 layer 6: an object's triggered abilities after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none.
-triggeredAbilitiesOf :: ObjectId -> GameState -> [TriggeredAbility]
+triggeredAbilitiesOf :: ObjectId -> GameState -> [TriggeredAbility Card.Type.Card]
 triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 
 subtypesOf :: ObjectId -> GameState -> Set Subtype.Subtype

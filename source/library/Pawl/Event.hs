@@ -124,7 +124,7 @@ matchesTrigger cond zc = case cond of
 -- Battlefield, the newcomer (`object`) is checked for triggered abilities whose
 -- condition matches; each becomes a pending trigger paired with its source id and
 -- controller (CR 603.3a).
-triggersFrom :: [ZoneChange] -> GameState -> [(ObjectId, PlayerId, TriggeredAbility)]
+triggersFrom :: [ZoneChange] -> GameState -> [(ObjectId, PlayerId, TriggeredAbility Card)]
 triggersFrom changes gs =
   let fromOne zc =
         let srcId = ZoneChange.object zc

@@ -8,10 +8,20 @@ import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Zone (Zone)
 
--- The ISA (design.md section 1): first-order, non-recursive, no functions in
--- any field. The ONLY module that may case on a constructor is Pawl.Resolve --
--- the rules core asks classifications, never identities.
-data Effect
+-- The ISA (design.md section 1): first-order, non-recursive (in CONTROL FLOW --
+-- no loops, branches, or recursive calls; design.md line 38), no functions in any
+-- field. The ONLY module that may case on a constructor is Pawl.Resolve -- the
+-- rules core asks classifications, never identities.
+--
+-- The `card` parameter lets an opcode embed a card's characteristics (a created
+-- token, a future copy) WITHOUT a module cycle: Card embeds [Effect Card], so a
+-- concrete `Effect Card` reference here would make Card and Effect mutually
+-- import each other. Parameterizing instead keeps this module Card-free; Card ties
+-- the knot by instantiating `Effect Card` (and likewise the two ability types).
+-- The resulting data nesting (a token-maker holds a card that could hold effects)
+-- is structural, not a recursive CALL -- resolving a maker never evaluates the
+-- embedded card's effects, so the control-flow non-recursion above still holds.
+data Effect card
   = DealDamage SlotName Quantity
   | -- CR 611: create a continuous effect on the slot's target for a duration.
     -- Giant Growth and Serpent's Gift are this one opcode, differing only in the

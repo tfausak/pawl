@@ -2,6 +2,7 @@ module Pawl.Type.ProjectedCharacteristics where
 
 import Data.Set (Set)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
+import Pawl.Type.Card (Card)
 import Pawl.Type.CardType (CardType)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
@@ -22,12 +23,12 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     rulesTextActive :: Bool,
     -- CR 602 / 613 layer 6: the object's activated abilities after the layer
     -- system. Seeded from the card; emptied by LoseAllAbilities (Humility).
-    activatedAbilities :: [ActivatedAbility],
+    activatedAbilities :: [ActivatedAbility Card],
     -- CR 614 layer 6: the object's replacement effects after the layer system,
     -- the same projection posture as activatedAbilities. Emptied by LoseAllAbilities.
     replacementEffects :: [ReplacementEffect],
     -- CR 603 layer 6: the object's triggered abilities after the layer system,
     -- the same projection posture as activatedAbilities. Emptied by LoseAllAbilities.
-    triggeredAbilities :: [TriggeredAbility]
+    triggeredAbilities :: [TriggeredAbility Card]
   }
   deriving (Eq, Show)
