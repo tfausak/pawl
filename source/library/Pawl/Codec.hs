@@ -6,8 +6,10 @@
 module Pawl.Codec where
 
 import qualified Data.Char as Char
+import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
@@ -31,6 +33,10 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeIndex as ModeIndex
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Power as Power
@@ -66,6 +72,12 @@ listTo f = Array . map f
 
 listFrom :: (Value -> Either Text a) -> Value -> Either Text [a]
 listFrom f value = Json.asArray value >>= mapM f
+
+seqTo :: (a -> Value) -> Seq.Seq a -> Value
+seqTo f = Array . map f . Foldable.toList
+
+seqFrom :: (Value -> Either Text a) -> Value -> Either Text (Seq.Seq a)
+seqFrom f value = Seq.fromList <$> listFrom f value
 
 setTo :: (a -> Value) -> Set a -> Value
 setTo f = listTo f . Set.toAscList
@@ -634,6 +646,56 @@ jsonToTriggeredAbility value = do
   es <- Json.field (Text.pack "effects") ps >>= listFrom jsonToEffect
   ts <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
   pure (TriggeredAbility.MkTriggeredAbility c es ts)
+
+-- Modal -----------------------------------------------------------------------
+
+modeIndexToJson :: ModeIndex.ModeIndex -> Value
+modeIndexToJson (ModeIndex.MkModeIndex n) = natTo n
+
+jsonToModeIndex :: Value -> Either Text ModeIndex.ModeIndex
+jsonToModeIndex value = ModeIndex.MkModeIndex <$> natFrom value
+
+modeSelectionToJson :: ModeSelection.ModeSelection -> Value
+modeSelectionToJson (ModeSelection.ChooseExactly n) =
+  Json.tagged (Text.pack "ChooseExactly") (Just (natTo n))
+
+jsonToModeSelection :: Value -> Either Text ModeSelection.ModeSelection
+jsonToModeSelection value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("ChooseExactly", Just n) -> ModeSelection.ChooseExactly <$> natFrom n
+    _ -> Left (Text.pack "unknown ModeSelection: " <> t)
+
+modeToJson :: Mode.Mode CardT.Card -> Value
+modeToJson m =
+  Object
+    [ (Text.pack "effects", seqTo effectToJson (Mode.effects m)),
+      (Text.pack "targetSpecs", targetSpecsToJson (Mode.targetSpecs m))
+    ]
+
+jsonToMode :: Value -> Either Text (Mode.Mode CardT.Card)
+jsonToMode value = do
+  ps <- Json.asObject value
+  es <- Json.field (Text.pack "effects") ps >>= seqFrom jsonToEffect
+  ts <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
+  pure (Mode.MkMode es ts)
+
+modalToJson :: Modal.Modal CardT.Card -> Value
+modalToJson m =
+  Object
+    [ (Text.pack "modes", seqTo modeToJson (Modal.modes m)),
+      (Text.pack "selection", modeSelectionToJson (Modal.selection m))
+    ]
+
+jsonToModal :: Value -> Either Text (Modal.Modal CardT.Card)
+jsonToModal value = do
+  ps <- Json.asObject value
+  ms <- Json.field (Text.pack "modes") ps >>= seqFrom jsonToMode
+  if Seq.null ms
+    then Left (Text.pack "modal has no modes")
+    else do
+      sel <- Json.field (Text.pack "selection") ps >>= jsonToModeSelection
+      pure (Modal.MkModal ms sel)
 
 -- Card & Printing ------------------------------------------------------------
 

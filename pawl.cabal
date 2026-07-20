@@ -120,6 +120,10 @@ library
     Pawl.Type.ManaSymbol
     Pawl.Type.ManaType
     Pawl.Type.ManaUnit
+    Pawl.Type.Modal
+    Pawl.Type.Mode
+    Pawl.Type.ModeIndex
+    Pawl.Type.ModeSelection
     Pawl.Type.Modification
     Pawl.Type.Object
     Pawl.Type.ObjectId

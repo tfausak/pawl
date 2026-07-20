@@ -2,6 +2,7 @@
 module Pawl.CodecSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -24,6 +25,10 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeIndex as ModeIndex
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Power as Power
@@ -140,6 +145,35 @@ tests cards =
               Codec.replacementEffectToJson
               Codec.jsonToReplacementEffect
               (ReplacementEffect.RedirectZoneChange Zone.Graveyard Zone.Exile)
+        ],
+      Tasty.testGroup
+        "modal"
+        [ HU.testCase "ModeIndex round-trips" $
+            roundTrip "mi" Codec.modeIndexToJson Codec.jsonToModeIndex (ModeIndex.MkModeIndex 2),
+          HU.testCase "ModeSelection round-trips" $
+            roundTrip "ms" Codec.modeSelectionToJson Codec.jsonToModeSelection (ModeSelection.ChooseExactly 1),
+          HU.testCase "Modal round-trips" $
+            roundTrip
+              "modal"
+              Codec.modalToJson
+              Codec.jsonToModal
+              ( Modal.MkModal
+                  ( Seq.fromList
+                      [ Mode.MkMode
+                          (Seq.fromList [Effect.DealDamage (SlotName.MkSlotName (Text.pack "creature")) (Quantity.Literal 1)])
+                          (Map.singleton (SlotName.MkSlotName (Text.pack "creature")) TargetSpec.CreatureTarget)
+                      ]
+                  )
+                  (ModeSelection.ChooseExactly 1)
+              ),
+          HU.testCase "empty modal is a decode error" $
+            HU.assertBool
+              "left"
+              ( either
+                  (const True)
+                  (const False)
+                  (Codec.jsonToModal (Json.Object [(Text.pack "modes", Json.Array []), (Text.pack "selection", Codec.modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
+              )
         ],
       Tasty.testGroup
         "honesty round-trip over allPrintings"
