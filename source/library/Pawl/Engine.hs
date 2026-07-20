@@ -23,6 +23,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -204,11 +205,13 @@ placePendingTriggers = do
 -- fillable modes are no more than the selection demands) -- then CR 603.3d --
 -- targets for the CHOSEN mode(s) are chosen now, at placement.
 --
--- The CR 603.3c "no legal mode -> remove from the stack" guard is deferred (M4h
--- task 6); Aether Channeler always has at least one legal mode (Create/Draw need
--- no target), so `Set.size legal >= count` holds here. The mode prompt is left
--- as the first thing after the object is on the stack, so that guard can be
--- inserted immediately before it.
+-- CR 603.3c/700.2b: "If no mode is chosen, the ability is removed from the
+-- stack." This is the trigger-only half of the rule -- a SPELL that can't
+-- choose a mode is simply never offered for casting in the first place (CR
+-- 601.2c, M4g); a TRIGGER is already placed on the stack (CR 603.3d puts it
+-- there before modes/targets are chosen), so an unfillable one must instead be
+-- taken back OFF the stack. The guard precedes the mode prompt: a removed
+-- trigger must never be asked to choose.
 placeOne :: (ObjectId, PlayerId, TriggeredAbility.TriggeredAbility Card.Card) -> Game ()
 placeOne (srcId, controller, ability) = do
   gs <- State.get
@@ -231,20 +234,25 @@ placeOne (srcId, controller, ability) = do
             Object.timestamp = ts
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
-  -- CR 700.2b: forced when there is nothing to choose (as many legal modes as
-  -- the selection demands, or fewer), prompted otherwise.
-  chosenModes <-
-    if Set.size legal <= fromIntegral count
-      then pure legal
-      else Trans.lift (Program.prompt (Prompt.ChooseModes decider controller abilId legal count))
-  -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability is
-  -- placed. A mode with no target slots (Create/Draw) asks nothing.
-  let sets = Target.legalSetsExcluding srcId (Modal.modesTargetSpecs chosenModes modal) gs
-  chosen <-
-    if Map.null sets
-      then pure Map.empty
-      else Trans.lift (Program.prompt (Prompt.ChooseTargets decider controller abilId sets))
-  State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
+  if Set.size legal < fromIntegral count
+    then -- CR 603.3c: fewer legal modes than the selection demands -- for
+    -- ChooseExactly 1, no legal mode at all -- removes the ability.
+      State.modify' (Resolve.cease abilId)
+    else do
+      -- CR 700.2b: forced when there is nothing to choose (as many legal modes
+      -- as the selection demands), prompted otherwise.
+      chosenModes <-
+        if Set.size legal <= fromIntegral count
+          then pure legal
+          else Trans.lift (Program.prompt (Prompt.ChooseModes decider controller abilId legal count))
+      -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability
+      -- is placed. A mode with no target slots (Create/Draw) asks nothing.
+      let sets = Target.legalSetsExcluding srcId (Modal.modesTargetSpecs chosenModes modal) gs
+      chosen <-
+        if Map.null sets
+          then pure Map.empty
+          else Trans.lift (Program.prompt (Prompt.ChooseTargets decider controller abilId sets))
+      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
 
 -- CR 603.3b: active player's triggers first, then the others. Stable within a
 -- controller (M3f never has two from one controller, so order within is moot).

@@ -38,6 +38,7 @@ import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.Zone as Zone
@@ -347,7 +348,42 @@ triggerModalTests cards =
                     HU.assertEqual
                       "with Aether Channeler the only nonland permanent, only modes 0 and 2 are fillable"
                       (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2])
-                      (Target.fillableModes acId modal gs)
+                      (Target.fillableModes acId modal gs),
+          -- CR 603.3c/700.2b: "If no mode is chosen, the ability is removed from
+          -- the stack." This is the trigger-only rule -- a SPELL that can't choose
+          -- is simply never offered (CR 601.2c elides the cast entirely, M4g), but
+          -- a TRIGGER is already placed on the stack before modes are chosen
+          -- (CR 603.3d), so an unfillable trigger must be taken back OFF the
+          -- stack. Gated by a new synthetic fixture: Synthetic Modal Trigger's ETB
+          -- is ChooseExactly 1 over two NonlandPermanentTarget (self-excluding,
+          -- CR "another") modes; with the fixture as the ONLY nonland permanent on
+          -- the board, both modes' legal target sets are empty, so NEITHER mode is
+          -- fillable and the trigger must be removed rather than forced or
+          -- prompted (CreatureTarget would be self-fillable here and could never
+          -- exercise this path -- spec sec 9).
+          HU.testCase "no legal mode removes the trigger from the stack (CR 603.3c)" $
+            let smtPrinting = Cards.syntheticModalTriggerPrinting cards
+                gs0 = S.mountainsInPlay cards 2
+                (smtId, gs1) = S.addCreature smtPrinting S.alice gs0
+                entered = ZoneChange.MkZoneChange smtId Zone.Stack Zone.Battlefield
+                gs2 = gs1 {GameState.zoneChanges = [entered]}
+                answer :: Prompt.Prompt r -> r
+                answer = S.identityAnswer
+                placed = snd (Engine.runGamePure answer gs2 Engine.placePendingTriggers)
+                stackHasTrigger =
+                  any
+                    ( \abilId -> case Game.lookupObject abilId placed of
+                        Just obj -> case Object.source obj of
+                          Source.OfTrigger _ _ -> True
+                          _ -> False
+                        Nothing -> False
+                    )
+                    (GameState.stack placed)
+             in do
+                  HU.assertBool "the trigger was removed from the stack, not left lingering" (not stackHasTrigger)
+                  HU.assertEqual "Synthetic Modal Trigger still on the battlefield (nothing bounced or exiled)" 1 (S.countOnBattlefieldByName (Text.pack "Synthetic Modal Trigger") S.alice placed)
+                  HU.assertEqual "alice's hand is still empty (nothing bounced)" 0 (length (Game.zoneMembers Zone.Hand S.alice placed))
+                  HU.assertEqual "nothing was exiled" 0 (length (Game.zoneMembers Zone.Exile S.alice placed))
         ]
 
 tests :: Cards.Cards -> Tasty.TestTree

@@ -61,7 +61,8 @@ data Cards = MkCards
     chaosCharmPrinting :: Printing.Printing,
     wallOfStonePrinting :: Printing.Printing,
     syntheticModalActivatedPrinting :: Printing.Printing,
-    aetherChannelerPrinting :: Printing.Printing
+    aetherChannelerPrinting :: Printing.Printing,
+    syntheticModalTriggerPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -122,6 +123,7 @@ loadCards = do
   wallOfStonePrinting_ <- loadPrinting "wall-of-stone"
   syntheticModalActivatedPrinting_ <- loadPrinting "synthetic-modal-activator"
   aetherChannelerPrinting_ <- loadPrinting "aether-channeler"
+  syntheticModalTriggerPrinting_ <- loadPrinting "synthetic-modal-trigger"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -171,7 +173,8 @@ loadCards = do
         chaosCharmPrinting = chaosCharmPrinting_,
         wallOfStonePrinting = wallOfStonePrinting_,
         syntheticModalActivatedPrinting = syntheticModalActivatedPrinting_,
-        aetherChannelerPrinting = aetherChannelerPrinting_
+        aetherChannelerPrinting = aetherChannelerPrinting_,
+        syntheticModalTriggerPrinting = syntheticModalTriggerPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -223,7 +226,8 @@ allPrintings cards =
     chaosCharmPrinting cards,
     wallOfStonePrinting cards,
     syntheticModalActivatedPrinting cards,
-    aetherChannelerPrinting cards
+    aetherChannelerPrinting cards,
+    syntheticModalTriggerPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck
