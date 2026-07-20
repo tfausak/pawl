@@ -66,9 +66,10 @@ legalRecipients spec gs =
                 Recipient.ToObject _ -> False
            in Set.fromList (filter isWallCreature creatures)
         TargetSpec.NonlandPermanentTarget ->
-          -- CR 305.1: a permanent is nonland if its PROJECTED card types (M3c)
-          -- do not include Land -- source-blind (the exclusion of the targeting
-          -- source, "another", is applied by legalSetsExcluding below).
+          -- CR 109.2 / 110.4: a battlefield permanent (CR 110.1) is nonland if its
+          -- PROJECTED card types (M3c) do not include Land -- source-blind (the
+          -- exclusion of the targeting source, "another", is applied by
+          -- legalSetsExcluding below).
           let notLand oid = not (Set.member CardType.Land (Projection.cardTypesOf oid gs))
               matches = filter notLand (Set.toList (GameState.battlefield gs))
            in Set.fromList (map Recipient.ToObject matches)

@@ -30,8 +30,11 @@ data TargetSpec
     -- subtypes (M3c) include Wall. A specific subtype-restricted spec (the LandTarget
     -- posture); a general "target <subtype>" is future.
     WallTarget
-  | -- CR 115 / 305.1: "target nonland permanent" -- a permanent on the battlefield
-    -- whose PROJECTED card types (M3c) do not include Land. Defined SELF-EXCLUDING
+  | -- CR 115.1a / 109.2 / 110.4: "target nonland permanent" -- a type description
+    -- without "card"/"spell" means a permanent of that type on the battlefield (CR
+    -- 109.2), and land is one of the permanent types (CR 110.4), so this is a
+    -- permanent (CR 110.1) whose PROJECTED card types (M3c) do not include Land.
+    -- Defined SELF-EXCLUDING
     -- ("another target nonland permanent", Aether Channeler): the exclusion is
     -- applied by Target.legalSetsExcluding, not here (this arm is source-blind). A
     -- non-excluding variant splits the spec when a card needs it (the WallTarget

@@ -171,7 +171,7 @@ nonlandPermanentTargetTests :: Cards.Cards -> Tasty.TestTree
 nonlandPermanentTargetTests cards =
   Tasty.testGroup
     "M4h NonlandPermanentTarget"
-    [ HU.testCase "NonlandPermanentTarget excludes lands (CR 305.1)" $
+    [ HU.testCase "NonlandPermanentTarget excludes lands (CR 109.2/110.4)" $
         let gs = S.boardWithCreatureArtifactLand cards
             got = Target.legalRecipients TargetSpec.NonlandPermanentTarget gs
          in HU.assertEqual
