@@ -19,4 +19,5 @@ data Subtype
   | Rat
   | Elephant
   | Myr
+  | Skeleton
   deriving (Eq, Ord, Show)
