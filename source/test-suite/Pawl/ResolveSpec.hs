@@ -33,6 +33,7 @@ import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
@@ -621,18 +622,20 @@ indestructibleTests cards =
          in HU.assertEqual "Myr survives deathtouch" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $
         let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-            -- A test-local -0/-1 drops Myr (0/1) to 0/0; 704.5f is a put-into-graveyard,
-            -- not a destroy, so indestructible does not apply (Myr's own reminder text).
-            zeroed = withEffect myrId (Timestamp.MkTimestamp 5) (Modification.ModifyPowerToughness (Quantity.Literal 0) (Quantity.Literal (-1))) gs
+            -- A real -1/-1 counter drops Myr (0/1) to 0/0 (CR 122.1a); 704.5f is a
+            -- put-into-graveyard, not a destroy, so indestructible does not apply
+            -- (Myr's own reminder text).
+            zeroed = S.addCounter CounterKind.MinusOneMinusOne 1 myrId gs
             after = Sba.checkStateBasedActions zeroed
          in do
               HU.assertEqual "Myr left the battlefield" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "Myr in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
       HU.testCase "CR 704.5f regeneration does NOT save a creature with toughness <= 0" $
         let (victim, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers) -- 2/1
-        -- A test-local -0/-1 drops the toughness to 0; 704.5f is a put-into-graveyard,
-        -- not a destruction, so a regeneration shield cannot save it.
-            zeroed = withEffect victim (Timestamp.MkTimestamp 5) (Modification.ModifyPowerToughness (Quantity.Literal 0) (Quantity.Literal (-1))) gs
+        -- A real -1/-1 counter drops the toughness to 0 (CR 122.1a); 704.5f is a
+        -- put-into-graveyard, not a destruction, so a regeneration shield cannot
+        -- save it.
+            zeroed = S.addCounter CounterKind.MinusOneMinusOne 1 victim gs
             shielded = S.addRegenShield victim zeroed
             after = Sba.checkStateBasedActions shielded
          in HU.assertEqual "died despite the shield (704.5f is not a destruction)" 0 (S.creaturesInPlay S.bob after)
@@ -812,5 +815,70 @@ drawCardTests cards =
          in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after))
     ]
 
+countersTests :: Cards.Cards -> Tasty.TestTree
+countersTests cards =
+  Tasty.testGroup
+    "Counters"
+    [ HU.testCase "CR 122.6 Battlegrowth puts a +1/+1 counter (gate)" $
+        -- alice casts Battlegrowth on bob's Piker (2/1). After resolution the Piker
+        -- is 3/2 and carries one +1/+1 counter.
+        let base = S.landsInPlay (Cards.forestPrinting cards) 1
+            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            (gs, spellId) = S.handOne (Cards.battlegrowthPrinting cards) withFoe
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "power 3" (Just 3) (Projection.powerOf victim after)
+              HU.assertEqual "toughness 2" (Just 2) (Projection.toughnessOf victim after),
+      HU.testCase "CR 122 counter persists through cleanup (vs Giant Growth wearing off)" $
+        -- After a cleanup step, the +1/+1 counter is still on the Piker.
+        let base = S.landsInPlay (Cards.forestPrinting cards) 1
+            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            (gs, spellId) = S.handOne (Cards.battlegrowthPrinting cards) withFoe
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            afterCleanup = Projection.dropEndOfTurnEffects resolved
+         in do
+              HU.assertEqual "still 3/2 after cleanup" (Just 3) (Projection.powerOf victim afterCleanup)
+              HU.assertEqual "still 3/2 after cleanup" (Just 2) (Projection.toughnessOf victim afterCleanup),
+      HU.testCase "CR 122.6 Instill Infection puts a -1/-1 counter and draws" $
+        -- alice casts Instill Infection on bob's Piker; Piker becomes 1/0 and dies
+        -- (704.5f); alice draws a card.
+        let base = S.landsInPlay (Cards.swampPrinting cards) 4
+            (_, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            -- Baseline before Instill Infection itself enters alice's hand: casting
+            -- moves that same card from hand to the stack, so measuring after it is
+            -- already there would net the draw against the spell's own departure.
+            handBefore = S.handSize S.alice withFoe
+            (gs0, spellId) = S.handOne (Cards.instillInfectionPrinting cards) withFoe
+            -- put a card in alice's library so the draw has something to find.
+            (_, gs) = S.addLibraryCard (Cards.forestPrinting cards) S.alice gs0
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = Sba.checkStateBasedActions (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+         in do
+              HU.assertEqual "Piker died to the -1/-1 counter (704.5f)" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "alice drew a card" (handBefore + 1) (S.handSize S.alice after),
+      HU.testCase "CR 704.5q both counter kinds on one creature annihilate; net 2/1 survives" $
+        -- Both counters on the same creature (placed directly); the SBA removes both.
+        let base = S.landsInPlay (Cards.forestPrinting cards) 5
+            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+            gs1 = S.addCounter CounterKind.PlusOnePlusOne 1 victim withFoe
+            gs2 = S.addCounter CounterKind.MinusOneMinusOne 1 victim gs1
+            after = Sba.checkStateBasedActions gs2
+         in do
+              HU.assertEqual "creature survives (net 2/1)" 1 (S.creaturesInPlay S.alice after)
+              HU.assertEqual "no counters remain" Map.empty (maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject victim after)),
+      HU.testCase "CR 122.2 Unsummon removes a counter-bearing creature's counters" $
+        let base = S.landsInPlay (Cards.islandPrinting cards) 1
+            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            withCounter = S.addCounter CounterKind.PlusOnePlusOne 1 victim withFoe
+            (gs, spellId) = S.handOne (Cards.unsummonPrinting cards) withCounter
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            -- Total (no `head`): expect exactly one bounced card in hand, empty counters.
+            handCounters = map (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h after)) (Game.zoneMembers Zone.Hand S.bob after)
+         in HU.assertEqual "the bounced incarnation in hand has no counters" [Map.empty] handCounters
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards]

@@ -55,7 +55,9 @@ data Cards = MkCards
     dragonFodderPrinting :: Printing.Printing,
     fogPrinting :: Printing.Printing,
     drudgeSkeletonsPrinting :: Printing.Printing,
-    cancelPrinting :: Printing.Printing
+    cancelPrinting :: Printing.Printing,
+    battlegrowthPrinting :: Printing.Printing,
+    instillInfectionPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -110,6 +112,8 @@ loadCards = do
   fogPrinting_ <- loadPrinting "fog"
   drudgeSkeletonsPrinting_ <- loadPrinting "drudge-skeletons"
   cancelPrinting_ <- loadPrinting "cancel"
+  battlegrowthPrinting_ <- loadPrinting "battlegrowth"
+  instillInfectionPrinting_ <- loadPrinting "instill-infection"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -153,7 +157,9 @@ loadCards = do
         dragonFodderPrinting = dragonFodderPrinting_,
         fogPrinting = fogPrinting_,
         drudgeSkeletonsPrinting = drudgeSkeletonsPrinting_,
-        cancelPrinting = cancelPrinting_
+        cancelPrinting = cancelPrinting_,
+        battlegrowthPrinting = battlegrowthPrinting_,
+        instillInfectionPrinting = instillInfectionPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -199,7 +205,9 @@ allPrintings cards =
     dragonFodderPrinting cards,
     fogPrinting cards,
     drudgeSkeletonsPrinting cards,
-    cancelPrinting cards
+    cancelPrinting cards,
+    battlegrowthPrinting cards,
+    instillInfectionPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck
@@ -225,13 +233,16 @@ greenDeck cards =
   Deck.MkDeck $
     Map.fromList
       [ (forestPrinting cards, 36),
-        (warMammothPrinting cards, 12),
+        (warMammothPrinting cards, 8),
         -- Fog swaps in for four War Mammoths to keep the deck at 60 (card-backed
         -- conservation stays 120) and give random green games combat-damage
         -- prevention coverage (CR 615).
         (fogPrinting cards, 4),
         (giantGrowthPrinting cards, 4),
-        (serpentsGiftPrinting cards, 4)
+        (serpentsGiftPrinting cards, 4),
+        -- Battlegrowth swaps in for four War Mammoths (deck stays 60; card-backed
+        -- conservation stays 120) so random green games exercise +1/+1 counters.
+        (battlegrowthPrinting cards, 4)
       ]
 
 -- Blue, no creatures: Divination accelerates its own deck-out, Unsummon bounces
@@ -252,11 +263,14 @@ blackDeck cards =
   Deck.MkDeck $
     Map.fromList
       [ (swampPrinting cards, 36),
-        (typhoidRatsPrinting cards, 12),
+        (typhoidRatsPrinting cards, 8),
         -- Drudge Skeletons swaps in for four Typhoid Rats (deck stays 60) so random
         -- black games exercise regeneration against Murder's destroy (CR 701.19a).
         (drudgeSkeletonsPrinting cards, 4),
         -- Murder and Mind Rot give Destroy and Discard random-play coverage.
         (murderPrinting cards, 4),
-        (mindRotPrinting cards, 4)
+        (mindRotPrinting cards, 4),
+        -- Instill Infection swaps in for four Typhoid Rats (deck stays 60) so random
+        -- black games exercise -1/-1 counters and the CR 704.5q annihilation SBA.
+        (instillInfectionPrinting cards, 4)
       ]
