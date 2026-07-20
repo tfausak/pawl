@@ -12,12 +12,14 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import Pawl.Type.Card (Card)
+import qualified Pawl.Type.Combat as Combat
 import Pawl.Type.DamageEvent (DamageEvent)
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
@@ -97,6 +99,50 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
         gs1 = Game.removeFromZones pid oid gs
         gs2 = gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
      in placeObject pid mkObj fromZone dest gs2
+
+-- The single destruction funnel (CR 701.7 / 700.4): every destruction -- the
+-- Destroy opcode and the CR 704.5g/h state-based actions -- flows through here.
+-- CR 700.4: an indestructible permanent can't be destroyed (the event never
+-- happens, so a shield is neither applied nor consumed, CR 614.7). CR 701.19a: a
+-- regeneration shield replaces the destruction. Otherwise the permanent is put
+-- into its owner's graveyard via changeZone (so Rest in Peace's redirect and a
+-- token's CR 704.5d cease-to-exist still compose). CR 701.19c "can't be
+-- regenerated" is deferred to Wrath (spec section 7): this funnel is ungated.
+destroy :: ObjectId -> GameState -> GameState
+destroy oid gs = case Game.lookupObject oid gs of
+  Nothing -> gs
+  Just _ ->
+    if Projection.hasKeyword Keyword.Indestructible oid gs
+      then gs
+      else case Map.lookup oid (GameState.regenerationShields gs) of
+        Just n | n > 0 -> regenerate oid gs
+        _ -> changeZone oid Zone.Graveyard gs
+
+-- CR 701.19a: consume one shield, remove all marked damage, tap the permanent,
+-- and remove it from combat. The permanent stays on the battlefield (same id).
+regenerate :: ObjectId -> GameState -> GameState
+regenerate oid gs =
+  let shields = Map.update (\n -> if n <= 1 then Nothing else Just (n - 1)) oid (GameState.regenerationShields gs)
+      healTap obj = obj {Object.damage = 0, Object.tapped = TapState.Tapped}
+      gs1 =
+        gs
+          { GameState.regenerationShields = shields,
+            GameState.objects = Map.adjust healTap oid (GameState.objects gs)
+          }
+   in removeFromCombat oid gs1
+
+-- CR 701.19a: if it is attacking or blocking, remove it from combat. Edits the
+-- GameState.combat maps directly (Event must not import Pawl.Combat -- that would
+-- cycle through Sba; see the plan's Global Constraints).
+removeFromCombat :: ObjectId -> GameState -> GameState
+removeFromCombat oid gs =
+  let c = GameState.combat gs
+      c1 =
+        c
+          { Combat.attackers = Map.delete oid (Combat.attackers c),
+            Combat.blockers = Map.map (Set.delete oid) (Map.delete oid (Combat.blockers c))
+          }
+   in gs {GameState.combat = c1}
 
 -- CR 111.2: create a token with the given effect-defined characteristics under
 -- `controller`'s control (its owner, CR 111.2), summoning-sick (CR 302.6). A token

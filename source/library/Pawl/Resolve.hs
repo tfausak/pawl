@@ -364,13 +364,9 @@ applyEffect source controller bound legality chosen effect = case effect of
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs
-          Just target ->
-            -- CR 700.4: an indestructible permanent can't be destroyed -- the
-            -- effect does nothing (no move). Read through the projection, so a
-            -- Humility'd permanent (keywords stripped) can be destroyed.
-            if Projection.hasKeyword Keyword.Indestructible target gs
-              then gs
-              else Event.changeZone target Zone.Graveyard gs
+          -- CR 701.7: destroy through the single funnel -- indestructible (CR
+          -- 700.4) and regeneration (CR 701.19a) are Event.destroy's to decide.
+          Just target -> Event.destroy target gs
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> gs
   Effect.MoveToZone slot zone ->

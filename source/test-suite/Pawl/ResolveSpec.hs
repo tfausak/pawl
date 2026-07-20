@@ -591,6 +591,14 @@ zoneChangeTests cards =
               HU.assertEqual "Myr still on the battlefield" 1 (S.creaturesInPlay S.bob after)
               HU.assertEqual "bob's graveyard empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
               HU.assertEqual "Murder in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 701.19a Murder is replaced by regeneration" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 3
+            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            shielded = S.addRegenShield victim withFoe
+            (gs, spellId) = S.handOne (Cards.murderPrinting cards) shielded
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = Sba.checkStateBasedActions (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+         in HU.assertEqual "the shielded creature survived Murder" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 400.7 Unsummon returns a creature to its owner's hand" $
         let base = S.landsInPlay (Cards.islandPrinting cards) 1
             (_, withPiker) = S.addPiker cards S.bob base

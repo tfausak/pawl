@@ -17,6 +17,7 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
@@ -136,5 +137,30 @@ tests cards =
         let base = Setup.emptyGame S.bothPlayers
             (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
             cleared = Event.clearRegenerationShields (S.addRegenShield oid gs0)
-         in HU.assertEqual "no shields remain" True (Map.null (GameState.regenerationShields cleared))
+         in HU.assertEqual "no shields remain" True (Map.null (GameState.regenerationShields cleared)),
+      HU.testCase "CR 701.19a Event.destroy consumes a shield and regenerates instead" $
+        let base = Setup.emptyGame S.bothPlayers
+            (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+            damaged = S.markDamage oid 1 gs0
+            shielded = S.addRegenShield oid damaged
+            after = Event.destroy oid shielded
+         in do
+              HU.assertEqual "still on the battlefield (regenerated, not destroyed)" True (Set.member oid (GameState.battlefield after))
+              HU.assertEqual "shield consumed" Nothing (Map.lookup oid (GameState.regenerationShields after))
+              case Game.lookupObject oid after of
+                Just obj -> do
+                  HU.assertEqual "tapped (CR 701.19a)" TapState.Tapped (Object.tapped obj)
+                  HU.assertEqual "damage removed (CR 701.19a)" 0 (Object.damage obj)
+                Nothing -> HU.assertFailure "the creature vanished",
+      HU.testCase "CR 701.19a a second destroy with no shield left kills it" $
+        let base = Setup.emptyGame S.bothPlayers
+            (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+            once = Event.destroy oid (S.addRegenShield oid gs0) -- regenerated
+            twice = Event.destroy oid once -- no shield -> dies
+         in HU.assertEqual "gone from the battlefield" False (Set.member oid (GameState.battlefield twice)),
+      HU.testCase "CR 700.4 Event.destroy no-ops on an indestructible permanent" $
+        let base = Setup.emptyGame S.bothPlayers
+            (oid, gs0) = S.addCreature (Cards.darksteelMyrPrinting cards) S.alice base
+            after = Event.destroy oid gs0
+         in HU.assertEqual "indestructible survives" True (Set.member oid (GameState.battlefield after))
     ]
