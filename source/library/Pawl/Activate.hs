@@ -73,10 +73,10 @@ activatable pid srcId ability gs =
       >= fromIntegral (Modal.selectionCount (ActivatedAbility.modal ability))
     && maybe True (\c -> Mana.canPay pid c gs) (AbilityCost.mana (ActivatedAbility.cost ability))
 
--- CR 602.2: put the ability on the stack (a fresh OfAbility object), choose and
--- stamp targets (602.2b), pay the additional costs, keep priority (117.3c).
--- Reject-not-repair on an illegal target answer; enumeration guarantees costs are
--- payable, so payment cannot fail after the prompt.
+-- CR 602.2: put the ability on the stack (a fresh OfAbility object), choose
+-- modes (602.2b) then stamp targets, pay the additional costs, keep priority
+-- (117.3c). Reject-not-repair on an illegal mode or target answer; enumeration
+-- guarantees costs are payable, so payment cannot fail after the prompt.
 activateAbility :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> Game ()
 activateAbility pid srcId ability = do
   gs <- State.get
@@ -100,35 +100,46 @@ activateAbility pid srcId ability = do
             GameState.stack = abilId : GameState.stack gs2
           }
       decider = Decide.deciderFor pid gs
-      -- CR 700.2a/M4h Task 3a: FORCED mode selection -- every existing chosen set
-      -- is `fillableModes`, unprompted (Task 4 adds the real ChooseModes prompt).
-      -- For every existing single-mode ability that is exactly {ModeIndex 0}, so
-      -- this stamp is behavior-identical to the pre-modal ability.
-      chosenModes = Target.fillableModes srcId (ActivatedAbility.modal ability) gs
-      sets = Target.legalSetsExcluding srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
+      -- CR 602.2b/700.2a, mirroring Cast.castSpell's mode block: as many legal
+      -- modes as the selection demands (or fewer) is FORCED, unprompted -- every
+      -- existing single-mode ability is exactly {ModeIndex 0}, so this stamp
+      -- stays behavior-identical to the pre-modal ability. A real choice (more
+      -- legal modes than the selection demands) issues ChooseModes (M4h Task 4).
+      legal = Target.fillableModes srcId (ActivatedAbility.modal ability) gs
+      count = Modal.selectionCount (ActivatedAbility.modal ability)
   State.put onStack
-  chosen <-
-    if Map.null sets
-      then pure Map.empty
-      else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid abilId sets))
-  let keysAgree = Map.keysSet chosen == Map.keysSet sets
-      eachLegal = and (Map.intersectionWith Set.member chosen sets)
-  if not (keysAgree && eachLegal)
-    then State.put gs -- reject: the whole activation is a no-op
+  chosenModes <-
+    if Set.size legal <= fromIntegral count
+      then pure legal
+      else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid abilId legal count))
+  -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
+  -- modes makes the whole activation a no-op, guarding every step below.
+  if not (Set.isSubsetOf chosenModes legal && Set.size chosenModes == fromIntegral count)
+    then State.put gs
     else do
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
-      let additional = AbilityCost.additional (ActivatedAbility.cost ability)
-          payAll g = List.foldl' (payAdditional srcId) g additional
-      case AbilityCost.mana (ActivatedAbility.cost ability) of
-        Nothing -> State.modify' payAll
-        Just cost -> do
-          g1 <- State.get
-          case Mana.payCost pid cost g1 of
-            -- activatable pre-checks canPay, so within the source elision this is
-            -- unreachable; reject-not-repair if a distinguishable source ever makes
-            -- payment fail (git-bug 65ce714).
-            Nothing -> State.put gs
-            Just paid -> State.put (payAll paid)
+      let sets = Target.legalSetsExcluding srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
+      chosen <-
+        if Map.null sets
+          then pure Map.empty
+          else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid abilId sets))
+      let keysAgree = Map.keysSet chosen == Map.keysSet sets
+          eachLegal = and (Map.intersectionWith Set.member chosen sets)
+      if not (keysAgree && eachLegal)
+        then State.put gs -- reject: the whole activation is a no-op
+        else do
+          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
+          let additional = AbilityCost.additional (ActivatedAbility.cost ability)
+              payAll g = List.foldl' (payAdditional srcId) g additional
+          case AbilityCost.mana (ActivatedAbility.cost ability) of
+            Nothing -> State.modify' payAll
+            Just cost -> do
+              g1 <- State.get
+              case Mana.payCost pid cost g1 of
+                -- activatable pre-checks canPay, so within the source elision this is
+                -- unreachable; reject-not-repair if a distinguishable source ever makes
+                -- payment fail (git-bug 65ce714).
+                Nothing -> State.put gs
+                Just paid -> State.put (payAll paid)
 
 -- Pay one additional cost against the source permanent.
 payAdditional :: ObjectId -> GameState -> AdditionalCost.AdditionalCost -> GameState

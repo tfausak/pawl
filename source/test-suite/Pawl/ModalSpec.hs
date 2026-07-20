@@ -8,6 +8,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
@@ -19,6 +20,7 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -220,6 +222,53 @@ modalReaderTests =
         HU.assertEqual "selectionCount is the ChooseExactly count" 1 (Modal.selectionCount m)
     ]
 
+-- M4h task 4: CR 602.2b -- the activation path prompts ChooseModes exactly like
+-- Cast.castSpell does, gated by a synthetic modal activated ability (no real one
+-- exists in the pool yet: data/cards/synthetic-modal-activated.json, a {2} 2/2
+-- whose lone {1} ability is ChooseExactly 1 over two CreatureTarget modes --
+-- deal 1 damage, or put a +1/+1 counter). Both modes' target sets are nonempty
+-- with just the activator and one victim on the battlefield (CreatureTarget
+-- does not self-exclude), so `legal = {0,1}` and `count = 1`: a real prompt,
+-- not the forced/single-mode path.
+activationModalTests :: Cards.Cards -> Tasty.TestTree
+activationModalTests cards =
+  Tasty.testGroup
+    "M4h activation modal (CR 602.2b)"
+    [ HU.testCase "activating a modal ability prompts the mode; only the chosen mode resolves" $
+        case Card.Type.activatedAbilities (Printing.card (Cards.syntheticModalActivatedPrinting cards)) of
+          [ability] ->
+            let gs0 = S.mountainsInPlay cards 1
+                (srcId, gs1) = S.addCreature (Cards.syntheticModalActivatedPrinting cards) S.alice gs0
+                (victimId, gs2) = S.addPiker cards S.bob gs1
+                answer :: Prompt.Prompt r -> r
+                answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToCreature victimId)
+                activated = snd (Engine.runGamePure answer gs2 (Activate.activateAbility S.alice srcId ability))
+                resolved = snd (Engine.runGamePure answer activated Stack.resolveTop)
+             in case Game.lookupObject victimId resolved of
+                  Nothing -> HU.assertFailure "the victim vanished"
+                  Just obj -> do
+                    HU.assertEqual "victim took 1 damage (mode 0 only)" (Just 1) (S.damageOf victimId resolved)
+                    HU.assertEqual "no +1/+1 counter (mode 1 never resolved)" Nothing (Map.lookup CounterKind.PlusOnePlusOne (Object.counters obj))
+          _ -> HU.assertFailure "the fixture must have exactly one activated ability",
+      HU.testCase "CR 608.2b the chosen mode fizzles when its only target leaves before resolution" $
+        case Card.Type.activatedAbilities (Printing.card (Cards.syntheticModalActivatedPrinting cards)) of
+          [ability] ->
+            let gs0 = S.mountainsInPlay cards 1
+                (srcId, gs1) = S.addCreature (Cards.syntheticModalActivatedPrinting cards) S.alice gs0
+                (victimId, gs2) = S.addPiker cards S.bob gs1
+                answer :: Prompt.Prompt r -> r
+                answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToCreature victimId)
+                activated = snd (Engine.runGamePure answer gs2 (Activate.activateAbility S.alice srcId ability))
+                -- CR 400.7: leaving the battlefield mints a new incarnation, so
+                -- victimId's chosen recipient no longer names a legal target.
+                gone = Event.changeZone victimId Zone.Graveyard activated
+                resolved = snd (Engine.runGamePure answer gone Stack.resolveTop)
+             in do
+                  HU.assertEqual "no damage was dealt" [] (GameState.damageEvents resolved)
+                  HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
+          _ -> HU.assertFailure "the fixture must have exactly one activated ability"
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
@@ -230,5 +279,6 @@ tests cards =
       fizzleTests cards,
       forcedTests cards,
       nonlandPermanentTargetTests cards,
-      modalReaderTests
+      modalReaderTests,
+      activationModalTests cards
     ]

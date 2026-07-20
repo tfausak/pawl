@@ -59,7 +59,8 @@ data Cards = MkCards
     battlegrowthPrinting :: Printing.Printing,
     instillInfectionPrinting :: Printing.Printing,
     chaosCharmPrinting :: Printing.Printing,
-    wallOfStonePrinting :: Printing.Printing
+    wallOfStonePrinting :: Printing.Printing,
+    syntheticModalActivatedPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -118,6 +119,7 @@ loadCards = do
   instillInfectionPrinting_ <- loadPrinting "instill-infection"
   chaosCharmPrinting_ <- loadPrinting "chaos-charm"
   wallOfStonePrinting_ <- loadPrinting "wall-of-stone"
+  syntheticModalActivatedPrinting_ <- loadPrinting "synthetic-modal-activator"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -165,7 +167,8 @@ loadCards = do
         battlegrowthPrinting = battlegrowthPrinting_,
         instillInfectionPrinting = instillInfectionPrinting_,
         chaosCharmPrinting = chaosCharmPrinting_,
-        wallOfStonePrinting = wallOfStonePrinting_
+        wallOfStonePrinting = wallOfStonePrinting_,
+        syntheticModalActivatedPrinting = syntheticModalActivatedPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -215,7 +218,8 @@ allPrintings cards =
     battlegrowthPrinting cards,
     instillInfectionPrinting cards,
     chaosCharmPrinting cards,
-    wallOfStonePrinting cards
+    wallOfStonePrinting cards,
+    syntheticModalActivatedPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck
