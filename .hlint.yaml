@@ -16,11 +16,3 @@
 # project is Haskell 2010 with only GADTs and RankNTypes permitted, so the
 # suggestion can never be applied. See the style section of CONTRIBUTING.md.
 - ignore: {name: "Use tuple-section"}
-
-# ModeSelection is a sum type with exactly one constructor today (CR 700.2:
-# only "choose exactly n" exists at M4g), but it is deliberately `data`, not
-# `newtype`: "choose one or more" (escalate), "worth of modes" (CR 700.2i), and
-# repeat-mode selection (CR 700.2d) are future sibling constructors, and a
-# multi-constructor sum can never be a newtype. HLint can't see the planned
-# growth, only the current single constructor.
-- ignore: {name: "Use newtype instead of data", within: [Pawl.Type.ModeSelection]}
