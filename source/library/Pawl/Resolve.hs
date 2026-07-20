@@ -79,6 +79,7 @@ slotsOf effect = case effect of
   Effect.RegenerateSelf -> Set.empty
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ _ slot -> Set.singleton slot
+  Effect.Untap slot -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -106,6 +107,7 @@ readsX = any effectReadsX
       Effect.RegenerateSelf -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
+      Effect.Untap _ -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -129,6 +131,7 @@ manaProduced effect = case effect of
   Effect.RegenerateSelf -> Nothing
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
+  Effect.Untap _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -152,6 +155,7 @@ searchesLibrary effect = case effect of
   Effect.RegenerateSelf -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
+  Effect.Untap _ -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -197,6 +201,7 @@ rewriteEffect pairs effect = case effect of
   -- No rewritable land-type word.
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
+  Effect.Untap _ -> effect
 
 -- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
 -- 608.2c/700.2 -- an unchosen mode's effects never resolve), with every
@@ -491,6 +496,14 @@ applyEffect source controller bound legality chosen effect = case effect of
           Just target -> case Quantity.evaluate gs source quantity of
             Nothing -> gs -- unevaluable quantity: no-op (the powerOf posture)
             Just n -> if n <= 0 then gs else putCounters target kind (fromInteger n) gs
+        _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
+  Effect.Untap slot ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        -- CR 701.26b: rotate the slot's target back to the upright position.
+        (Just recipient, True) -> case recipientObject recipient of
+          Nothing -> gs -- a player recipient cannot be untapped
+          Just target -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) target (GameState.objects gs)}
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
 
 -- CR 122.6: add `n` counters of a kind to a permanent's per-incarnation state.

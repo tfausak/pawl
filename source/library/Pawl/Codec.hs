@@ -527,6 +527,7 @@ effectToJson e = case e of
   Effect.Prevent d p -> Json.tagged (Text.pack "Prevent") (Just (Array [durationToJson d, preventionToJson p]))
   Effect.RegenerateSelf -> nullary (Text.pack "RegenerateSelf")
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
+  Effect.Untap s -> Json.tagged (Text.pack "Untap") (Just (slotNameToJson s))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
 jsonToEffect value = do
@@ -565,6 +566,7 @@ jsonToEffect value = do
     "PutCounters" -> case mv of
       Just (Array [k, q, s]) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s
       _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")
+    "Untap" -> withValue mv (fmap Effect.Untap . jsonToSlotName)
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------

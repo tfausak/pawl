@@ -905,5 +905,25 @@ countersTests cards =
          in HU.assertEqual "the bounced incarnation in hand has no counters" [Map.empty] handCounters
     ]
 
+untapTests :: Cards.Cards -> Tasty.TestTree
+untapTests cards =
+  Tasty.testGroup
+    "Untap"
+    [ HU.testCase "CR 701.26b Untap untaps the slot's target" $
+        let (oid, base0) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            base = S.tapObject oid base0
+            slot = SlotName.MkSlotName (Text.pack "target")
+            run =
+              Resolve.applyEffect
+                oid
+                S.alice
+                Map.empty
+                (Map.singleton slot True)
+                (Map.singleton slot (Recipient.ToCreature oid))
+                (Effect.Untap slot)
+            after = snd (Engine.runGamePure S.identityAnswer base run)
+         in HU.assertEqual "target is untapped" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject oid after))
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards]

@@ -110,4 +110,7 @@ data Effect card
     -- many (reused from M4a; a future X-counter card rides ChooseX). The counter's
     -- P/T effect is applied by the projection (CR 122.1a / 613.4c), not here.
     PutCounters CounterKind Quantity SlotName
+  | -- CR 701.26b: untap the slot's target permanent. Single-target (Act of
+    -- Treason's "untap that creature"); mass/conditional untap is future.
+    Untap SlotName
   deriving (Eq, Ord, Show)

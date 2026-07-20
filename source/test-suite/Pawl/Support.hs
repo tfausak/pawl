@@ -585,6 +585,12 @@ addRegenShield :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameStat
 addRegenShield oid gs =
   gs {GameState.regenerationShields = Map.insertWith (+) oid 1 (GameState.regenerationShields gs)}
 
+-- Set an object's tapped state to Tapped directly (bypasses a tap cost or
+-- combat), so a test can set up a tapped permanent for an Untap effect.
+tapObject :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+tapObject oid gs =
+  gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
+
 -- Put `n` counters of a kind directly onto an object's per-incarnation state,
 -- bypassing the PutCounters opcode -- so a projection or SBA test can set up
 -- counters without resolving a spell.
