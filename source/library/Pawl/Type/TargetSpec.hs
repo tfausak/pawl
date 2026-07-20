@@ -23,7 +23,7 @@ data TargetSpec
     -- admitting a non-creature permanent -- named as ToObject, like LandTarget.
     CreatureOrEnchantmentTarget
   | -- CR 115: "target spell" -- an object on the stack that is a spell (a card on
-    -- the stack, CR 111.1). Narrower than SpellOrPermanentTarget: Cancel cannot
+    -- the stack, CR 112.1). Narrower than SpellOrPermanentTarget: Cancel cannot
     -- target a permanent or an ability. The first spec that reaches ONLY the stack.
     SpellTarget
   deriving (Eq, Ord, Show)

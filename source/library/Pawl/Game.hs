@@ -78,17 +78,20 @@ cardOf oid gs = case lookupObject oid gs of
     Source.OfAbility _ _ -> Nothing
     Source.OfTrigger _ _ -> Nothing
 
--- CR 111.1: a spell is a card on the stack. This asks the object's KIND -- its
--- Source -- a classification like isPermanent (Stack.resolveTop), never the card's
--- identity. A token is never on the stack; abilities on the stack are not spells.
+-- CR 112.1: a spell is a card on the stack. This asks the object's zone AND its
+-- KIND (its Source) -- a classification like isPermanent (Stack.resolveTop), never
+-- the card's identity. Only a card (OfCard) currently on the stack is a spell: a
+-- token is never a spell, and a card off the stack (hand, a battlefield permanent,
+-- graveyard) is not one either.
 isSpell :: ObjectId -> GameState -> Bool
 isSpell oid gs = case lookupObject oid gs of
   Nothing -> False
-  Just obj -> case Object.source obj of
-    Source.OfCard _ -> True
-    Source.OfToken _ -> False
-    Source.OfAbility _ _ -> False
-    Source.OfTrigger _ _ -> False
+  Just obj ->
+    Object.zone obj == Zone.Stack && case Object.source obj of
+      Source.OfCard _ -> True
+      Source.OfToken _ -> False
+      Source.OfAbility _ _ -> False
+      Source.OfTrigger _ _ -> False
 
 -- Who controls an object (CR 108.4). Nothing when the id is unknown.
 --

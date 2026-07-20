@@ -50,7 +50,7 @@ legalRecipients spec gs =
               matches = filter ok (Set.toList (GameState.battlefield gs))
            in Set.fromList (map Recipient.ToObject matches)
         TargetSpec.SpellTarget ->
-          -- CR 111.1: only spells (Source.OfCard) on the stack; abilities and
+          -- CR 112.1: only spells (Source.OfCard) on the stack; abilities and
           -- permanents are excluded by Game.isSpell.
           Set.fromList (map Recipient.ToObject (filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)))
 

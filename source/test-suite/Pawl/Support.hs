@@ -633,10 +633,21 @@ pikerOf gs = case Game.zoneMembers Zone.Battlefield bob gs of
 spellOnStack :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 spellOnStack printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
-      obj = Object.MkObject pid (Source.OfCard printing) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty (Timestamp.MkTimestamp 0)
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.source = Source.OfCard printing,
+            Object.zone = Zone.Stack,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled,
+            Object.bindings = Map.empty,
+            Object.timestamp = ts
+          }
    in ( oid,
-        gs1
-          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
-            GameState.stack = oid : GameState.stack gs1
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.stack = oid : GameState.stack gs2
           }
       )
