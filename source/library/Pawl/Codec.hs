@@ -176,6 +176,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Elephant -> "Elephant"
   Subtype.Myr -> "Myr"
   Subtype.Skeleton -> "Skeleton"
+  Subtype.Wall -> "Wall"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -198,7 +199,8 @@ jsonToSubtype =
       (Text.pack "Rat", Subtype.Rat),
       (Text.pack "Elephant", Subtype.Elephant),
       (Text.pack "Myr", Subtype.Myr),
-      (Text.pack "Skeleton", Subtype.Skeleton)
+      (Text.pack "Skeleton", Subtype.Skeleton),
+      (Text.pack "Wall", Subtype.Wall)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -309,6 +311,7 @@ targetSpecToJson t = nullary . Text.pack $ case t of
   TargetSpec.PlayerTarget -> "PlayerTarget"
   TargetSpec.CreatureOrEnchantmentTarget -> "CreatureOrEnchantmentTarget"
   TargetSpec.SpellTarget -> "SpellTarget"
+  TargetSpec.WallTarget -> "WallTarget"
 
 jsonToTargetSpec :: Value -> Either Text TargetSpec.TargetSpec
 jsonToTargetSpec =
@@ -320,7 +323,8 @@ jsonToTargetSpec =
       (Text.pack "LandTarget", TargetSpec.LandTarget),
       (Text.pack "PlayerTarget", TargetSpec.PlayerTarget),
       (Text.pack "CreatureOrEnchantmentTarget", TargetSpec.CreatureOrEnchantmentTarget),
-      (Text.pack "SpellTarget", TargetSpec.SpellTarget)
+      (Text.pack "SpellTarget", TargetSpec.SpellTarget),
+      (Text.pack "WallTarget", TargetSpec.WallTarget)
     ]
 
 triggerConditionToJson :: TriggerCondition.TriggerCondition -> Value

@@ -13,6 +13,7 @@ import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.SlotName (SlotName)
+import qualified Pawl.Type.Subtype as Subtype
 import Pawl.Type.TargetSpec (TargetSpec)
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
@@ -53,6 +54,16 @@ legalRecipients spec gs =
           -- CR 112.1: only spells (Source.OfCard) on the stack; abilities and
           -- permanents are excluded by Game.isSpell.
           Set.fromList (map Recipient.ToObject (filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)))
+        TargetSpec.WallTarget ->
+          -- CR 115.4 / 700.2c: "target Wall" is CreatureTarget's set narrowed to
+          -- creatures whose PROJECTED subtypes (M3c) include Wall (CR 205.3m) --
+          -- a creature's subtypes can change under the layer system, so this reads
+          -- the projection, never Card.typeLine directly.
+          let isWallCreature recipient = case recipient of
+                Recipient.ToCreature oid -> Set.member Subtype.Wall (Projection.subtypesOf oid gs)
+                Recipient.ToPlayer _ -> False
+                Recipient.ToObject _ -> False
+           in Set.fromList (filter isWallCreature creatures)
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is

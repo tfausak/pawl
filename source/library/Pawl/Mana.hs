@@ -57,6 +57,7 @@ subtypeMana subtype = case subtype of
   Subtype.Elephant -> Nothing
   Subtype.Myr -> Nothing
   Subtype.Skeleton -> Nothing
+  Subtype.Wall -> Nothing
 
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
 -- PLUS every projected activated ability that is a mana ability (CR 605.1a),

@@ -26,4 +26,8 @@ data TargetSpec
     -- the stack, CR 112.1). Narrower than SpellOrPermanentTarget: Cancel cannot
     -- target a permanent or an ability. The first spec that reaches ONLY the stack.
     SpellTarget
+  | -- CR 115.4 / 700.2c: "target Wall" (Chaos Charm) -- a creature whose PROJECTED
+    -- subtypes (M3c) include Wall. A specific subtype-restricted spec (the LandTarget
+    -- posture); a general "target <subtype>" is future.
+    WallTarget
   deriving (Eq, Ord, Show)

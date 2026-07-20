@@ -20,4 +20,5 @@ data Subtype
   | Elephant
   | Myr
   | Skeleton
+  | Wall -- CR 205.3m (a creature type)
   deriving (Eq, Ord, Show)
