@@ -371,3 +371,48 @@ end of every entry.
   kept as reference:
   `docs/superpowers/specs/2026-07-19-m4b-zone-change-verbs-design.md` and
   `docs/superpowers/plans/2026-07-19-m4b-zone-change-verbs.md`.
+- **M4c is complete** (tokens — the first card-less game object. **Gate: Dragon
+  Fodder** (`{1}{R}` Sorcery, "Create two 1/1 red Goblin creature tokens"):
+  casting it puts two distinct 1/1 Goblin tokens on the battlefield, read through
+  the ordinary projection/combat/SBA pipeline. The decision it proves is that a
+  permanent whose characteristics come from an effect rather than a printing flows
+  through the whole engine with **no special case**: a token is a `Card` with no
+  `Printing`, carried by **`Source.OfToken Card`** and returned by the single
+  `Game.cardOf` chokepoint, so every downstream reader (projection, mana, combat,
+  state-based actions) is unchanged. Minting is **`Event.createToken`** — a
+  `changeZone` sibling that materializes an object from nothing (owner = creator,
+  CR 111.2; summoning-sick, CR 302.6) and emits its enters event through the same
+  path a resolved permanent uses; the shared materialize-and-emit tail was
+  extracted as `Event.placeObject`. The opcode is **`Effect.Create Quantity card`**,
+  executed only by `Resolve.applyEffect` (folding `createToken` per the count) with
+  its five classifications (`slotsOf`/`readsX`/`manaProduced`/`searchesLibrary`/
+  `rewriteEffect`) and a `Codec` arm serializing the nested token `Card` (the
+  `allPrintings` honesty round-trip now covers it). A new state-based action
+  (**CR 704.5d**) removes any `OfToken` object found off the battlefield — a direct
+  delete, not a zone change, keyed to "not on the battlefield" so exile is caught
+  too; a 1/1 token taking lethal combat damage is buried then ceases, never
+  lingering in the graveyard (the falsifier). **Rest in Peace composes for free**:
+  a dying token funnels through `changeZone`, gets redirected graveyard→exile by
+  M3f's existing replacement, and CR 704.5d finishes it there — zero new code.
+  **Architectural decision (supersedes the plan's Task 3):** a concrete
+  `Effect.Create Card` would make `Effect` and `Card` mutually import each other
+  (`Card` embeds `[Effect]`) — a module cycle. Rather than an `.hs-boot` or an
+  effect-free `TokenSpec` (which would fail the moment a copy-effect needs a card's
+  full characteristics, abilities included), **`Effect`, `ActivatedAbility`, and
+  `TriggeredAbility` were made parametric over the card type**, with `Card` tying
+  the knot at `Effect Card` / `ActivatedAbility Card` / `TriggeredAbility Card`.
+  None of the three import `Card`, so no cycle; the DSL stays first-order and
+  non-recursive in control flow (design.md §1 — the recursion is structural data
+  nesting, never a recursive call). This generalizes to the future copy-token
+  opcode. No `Subtype` change (Goblin already existed). One card (Dragon Fodder,
+  Scryfall-verified), swapped 4-for-4 into the red deck (stays 60) for random
+  token-churn coverage; the conservation property now counts **card-backed**
+  (`OfCard`) objects (still 120) since tokens legitimately create and destroy
+  objects. **Named elisions/expiries**: `createToken` does not consult replacements
+  on entry (Doubling Season is future); `rewriteEffect` is the identity on `Create`
+  (a text-changer does not reach a token's embedded card yet); `OfToken` carries no
+  physical-token metadata (`Maybe Printing`) until `Printing` grows any; copy-tokens
+  (CR 707) and predefined tokens (CR 111.10) are not modelled — the characteristics
+  are given, not derived. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-19-m4c-tokens-design.md` and
+  `docs/superpowers/plans/2026-07-19-m4c-tokens.md`.
