@@ -35,7 +35,7 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 
 ## Current work and tracking
 
-- **M0–M3g, M3.5, M4a, M4b, and M4c are complete** — a zero-card game, then casting, combat, the
+- **M0–M3g, M3.5, M4a, M4b, M4c, and M4d are complete** — a zero-card game, then casting, combat, the
   keyword seam, first/double strike, deathtouch/trample, and the M3 effect-DSL gate
   cards through the payoff pair (Mindslaver's CR 723 control + Panglacial Wurm's
   cast-during-search re-entrancy), then **M3.5** (cards as data files: a hand-rolled
@@ -56,8 +56,17 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   `Effect.Create Quantity card` minting via a new `Event.createToken`, and the
   CR 704.5d cease-to-exist SBA, gated by Dragon Fodder; `Effect`/`ActivatedAbility`/
   `TriggeredAbility` were made parametric over the card type — knot tied in `Card` —
-  to embed a token's characteristics without a module cycle). **M4d (prevention,
-  CR 615) is next.** The **milestone completion log** — one distilled entry per milestone with
+  to embed a token's characteristics without a module cycle), then **M4d** (the two
+  replacement-shield shapes: damage **prevention** — a cancel hooked into the head
+  of the damage funnel via `DamageKind`/`GameState.preventions`/`Event.applyPreventions`,
+  gated by Fog — and **regeneration** — a one-shot `GameState.regenerationShields`
+  count installed by `Effect.RegenerateSelf` and consumed by the unified
+  `Event.destroy` funnel that every destruction now flows through, with the
+  creature-death SBA split into `zeroToughness` (704.5f) and `destroyedBySba`
+  (704.5g/h), gated by Drudge Skeletons; `Event.destroy` edits combat through the
+  type module `Pawl.Type.Combat` to avoid the `Pawl.Combat`→`Sba`→`Event` cycle;
+  CR 701.19c "can't be regenerated" stays deferred to Wrath of God). **M4e
+  (counter target spell, per the design.md §3 M4 table) is next.** The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, the opcodes/types it added, and every
   elision and its named expiry — lives in `docs/progress.md`. The forward path
   (M0–M7 and the M3a–M3g split) is in `docs/design.md` §3; each milestone's

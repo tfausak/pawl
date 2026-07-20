@@ -416,3 +416,54 @@ end of every entry.
   are given, not derived. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-19-m4c-tokens-design.md` and
   `docs/superpowers/plans/2026-07-19-m4c-tokens.md`.
+- **M4d is complete** (the two remaining replacement-shield shapes: damage
+  **prevention** and **regeneration**. **Gates: Fog** (`{G}` instant, "Prevent all
+  combat damage this turn") for the cancel shape, and **Drudge Skeletons**
+  (`{1}{B}` 1/1, "`{B}`: Regenerate this creature") for the destruction-replace
+  shape. The decisions proved are two: (1) **prevention is a cancel hooked into the
+  head of the damage funnel** — a prevented event never happens (not marked, not
+  drained, never emitted), distinct from M3f's zone-change *redirect* shape; and
+  (2) **every destruction flows through one `Event.destroy` funnel** that a one-shot
+  regeneration shield can replace. **Phase 1 (prevention):** each `DamageEvent`
+  gains a **`DamageKind`** (`Combat`/`Noncombat`, a no-boolean-blindness tag set at
+  deal time — `Damage` tags Combat, `Resolve`'s `DealDamage` tags Noncombat); a
+  floating **`GameState.preventions :: [ActivePrevention]`** store (the event-pipeline
+  analog of `continuousEffects`) holds **`ActivePrevention {prevention, duration}`**
+  over a leaf **`Prevention`** family (`PreventAllCombatDamage`); **`Event.applyPreventions`**
+  — the sole caser on `Prevention` — drops each combat event a shield cancels at the
+  head of `Damage.applyDamage`, and **`dropEndOfTurnPreventions`** is the CR 514.2
+  wear-off wired into cleanup. The opcode is **`Effect.Prevent Duration Prevention`**
+  (targetless), with the five `Resolve` classifications, a `Codec` `Prevention`
+  arm, and Fog's honesty round-trip. The **`DamageKind` falsifier**: after Fog
+  resolves, a Combat event is cancelled while a Noncombat (spell) event still lands.
+  **Phase 2 (regeneration):** a per-object **`GameState.regenerationShields ::
+  Map ObjectId Natural`** (activating twice stacks two; each destruction consumes
+  one; cleared at cleanup) is installed by **`Effect.RegenerateSelf`** (targetless,
+  self-referential — the shield fires later, NOT the act of regenerating).
+  **`Event.destroy`** is the single destruction chokepoint: CR 700.4 indestructible
+  → no-op; CR 701.19a shield → consume one, heal damage, tap, remove from combat,
+  stay on the battlefield (same id); else `changeZone Graveyard` (so Rest in Peace's
+  redirect and CR 704.5d cease-to-exist still compose). The `Destroy` opcode is
+  rewired to it, and the creature-death SBA **splits**: `Sba.zeroToughness` (CR
+  704.5f, a put-into-graveyard, ungated and un-saveable) routes through `changeZone`,
+  while `Sba.destroyedBySba` (CR 704.5g/h, a destruction) routes through
+  `Event.destroy` — so a shield saves a creature from lethal combat damage but never
+  from toughness ≤ 0. **Module-cycle discipline:** `Event.destroy` removes a
+  permanent from combat by editing `GameState.combat` through the *type* module
+  `Pawl.Type.Combat` (never `Pawl.Combat`, which imports `Pawl.Sba` → `Pawl.Event`
+  and would cycle); `Pawl.Damage` importing `Pawl.Event` is acyclic. New subtype
+  **`Subtype.Skeleton`**. Two cards (Fog, Drudge Skeletons), Scryfall-verified,
+  swapped 4-for-4 into the green and black decks (each stays 60; card-backed
+  conservation stays 120 — regeneration keeps the same object, no mint). The
+  negative test: a shielded creature bounced by Unsummon still leaves (regeneration
+  intercepts destruction, not every leave-the-battlefield). **Named
+  elisions/expiries**: **CR 701.19c "can't be regenerated" is deferred to Wrath of
+  God** (`Event.destroy` is ungated — no `Regenerability` argument, no mass-destroy
+  opcode); CR 615.7 amount-shields and the multi-source choice, CR 615.10 static
+  prevention, retaining prevented events for CR 615.13/615.5, a general "Regenerate
+  target creature" (`Regenerate SlotName`), CR 701.19b static regeneration, and a
+  distinct "was destroyed" event are all deferred to the first card that needs them;
+  the 704.5f toughness-drop test still uses the synthetic `−0/−1` continuous effect
+  until the first real **−N/−N** ability. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-19-m4d-prevention-regeneration.md` and
+  `docs/superpowers/plans/2026-07-19-m4d-prevention-regeneration.md`.

@@ -74,7 +74,7 @@
 - Produces: `DamageKind.DamageKind = Combat | Noncombat`; `DamageEvent.kind :: DamageEvent -> DamageKind`; the `MkDamageEvent` record now takes a 5th positional field `kind`.
 - Consumes: nothing new.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ResolveSpec.hs` (its `tests` group; it already imports `Cards`, `Cast`, `Engine`, `Stack`, `Sba`, `S`, and uses the `landsInPlay`/`handOne` pattern). A resolved Lightning Bolt records a **Noncombat** damage event (read before any SBA drains it):
 
@@ -93,12 +93,12 @@ Add to `source/test-suite/Pawl/ResolveSpec.hs` (its `tests` group; it already im
 
 Add to `ResolveSpec.hs` imports (skip any already present): `import qualified Pawl.Type.DamageEvent as DamageEvent`, `import qualified Pawl.Type.DamageKind as DamageKind`, `import qualified Pawl.Type.GameState as GameState`. The Bolt must actually target `target`; if `S.handOne`/`castSpell` needs an explicit target and `S.identityAnswer` does not supply one, model this on the existing Lightning Bolt cast test already in `ResolveSpec` (reuse its exact target-plumbing).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `DamageKind` and `DamageEvent.kind` do not exist, and every `MkDamageEvent` construction is now missing its 5th argument.
 
-- [ ] **Step 3: Create the `DamageKind` type**
+- [x] **Step 3: Create the `DamageKind` type**
 
 Create `source/library/Pawl/Type/DamageKind.hs`:
 
@@ -113,7 +113,7 @@ data DamageKind = Combat | Noncombat
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the `kind` field to `DamageEvent`**
+- [x] **Step 4: Add the `kind` field to `DamageEvent`**
 
 In `source/library/Pawl/Type/DamageEvent.hs`, add `import Pawl.Type.DamageKind (DamageKind)` and the field (as the last field):
 
@@ -125,7 +125,7 @@ In `source/library/Pawl/Type/DamageEvent.hs`, add `import Pawl.Type.DamageKind (
   }
 ```
 
-- [ ] **Step 5: Tag every construction site**
+- [x] **Step 5: Tag every construction site**
 
 The four combat sites in `source/library/Pawl/Damage.hs` (lines 93, 99, 120, 135) each append `DamageKind.Combat`; the one resolving-spell site in `source/library/Pawl/Resolve.hs:266` appends `DamageKind.Noncombat`. Add `import qualified Pawl.Type.DamageKind as DamageKind` to both modules. Examples:
 
@@ -147,17 +147,17 @@ Apply the analogous edit to `Damage.hs:99` and `Damage.hs:135` (both `DamageKind
 ```
 Add `import qualified Pawl.Type.DamageKind as DamageKind` to each flagged test file.
 
-- [ ] **Step 6: Run the test to verify it passes**
+- [x] **Step 6: Run the test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "Noncombat"'`
 Expected: PASS.
 
-- [ ] **Step 7: Full suite green (behavior-preserving)**
+- [x] **Step 7: Full suite green (behavior-preserving)**
 
 Run: `cabal test`
 Expected: PASS — the field is recorded but not yet read anywhere, so behavior is unchanged.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
@@ -185,7 +185,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Produces: `Prevention.Prevention = PreventAllCombatDamage`; `ActivePrevention.ActivePrevention` (`MkActivePrevention { prevention, duration }`); `GameState.preventions :: [ActivePrevention]`; `Event.applyPreventions :: [ActivePrevention] -> [DamageEvent] -> [DamageEvent]`; `Event.dropEndOfTurnPreventions :: GameState -> GameState`; `S.addPrevention :: ActivePrevention.ActivePrevention -> GameState -> GameState`.
 - Consumes: `DamageEvent.kind` (Task 1), `Duration.Duration`, `Damage.applyDamage`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/DamageSpec.hs`. A seeded "prevent all combat damage" shield drops a combat event but not a Noncombat one; `dropEndOfTurnPreventions` removes an until-end-of-turn shield:
 
@@ -210,12 +210,12 @@ Add to `source/test-suite/Pawl/DamageSpec.hs`. A seeded "prevent all combat dama
 
 Add imports to `DamageSpec.hs` (skip any present): `Setup`, `Event`, `Prevention`, `ActivePrevention`, `Duration`, `GameState`. (`Damage`, `DamageEvent`, `DamageKind`, `Recipient`, `Cards`, `S` are present after Task 1.)
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `Prevention`, `ActivePrevention`, `GameState.preventions`, `Event.applyPreventions`/`dropEndOfTurnPreventions`, `S.addPrevention` do not exist.
 
-- [ ] **Step 3: Create the two leaf types**
+- [x] **Step 3: Create the two leaf types**
 
 `source/library/Pawl/Type/Prevention.hs`:
 ```haskell
@@ -250,7 +250,7 @@ data ActivePrevention = MkActivePrevention
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the `GameState.preventions` field and initialize it**
+- [x] **Step 4: Add the `GameState.preventions` field and initialize it**
 
 In `source/library/Pawl/Type/GameState.hs`, add `import Pawl.Type.ActivePrevention (ActivePrevention)` and the field (place it beside `continuousEffects`):
 ```haskell
@@ -264,7 +264,7 @@ In `source/library/Pawl/Setup.hs`, `emptyGame`'s record, add:
           GameState.preventions = [],
 ```
 
-- [ ] **Step 5: Add `applyPreventions` and `dropEndOfTurnPreventions` to `Event`**
+- [x] **Step 5: Add `applyPreventions` and `dropEndOfTurnPreventions` to `Event`**
 
 In `source/library/Pawl/Event.hs`, add imports `import qualified Pawl.Type.ActivePrevention as ActivePrevention`, `import Pawl.Type.DamageEvent (DamageEvent)`, `import qualified Pawl.Type.DamageEvent as DamageEvent`, `import qualified Pawl.Type.DamageKind as DamageKind`, `import Pawl.Type.Prevention (Prevention)`, `import qualified Pawl.Type.Prevention as Prevention`, `import qualified Pawl.Type.Duration as Duration`. Add:
 
@@ -291,7 +291,7 @@ dropEndOfTurnPreventions gs =
    in gs {GameState.preventions = filter keep (GameState.preventions gs)}
 ```
 
-- [ ] **Step 6: Hook the prevention step into `Damage.applyDamage`**
+- [x] **Step 6: Hook the prevention step into `Damage.applyDamage`**
 
 In `source/library/Pawl/Damage.hs`, add `import qualified Pawl.Event as Event`, and rewrite `applyDamage` to consult preventions at the head — only the surviving events are marked and recorded:
 
@@ -316,7 +316,7 @@ applyDamage events gs =
 
 (Only the `let` binding of `kept` and the two `events` → `kept` substitutions change; the `markOne` body is unchanged. `Pawl.Damage` importing `Pawl.Event` is acyclic per Global Constraints.)
 
-- [ ] **Step 7: Add the `S.addPrevention` fixture**
+- [x] **Step 7: Add the `S.addPrevention` fixture**
 
 In `source/test-suite/Pawl/Support.hs`, add (with `import qualified Pawl.Type.ActivePrevention as ActivePrevention` if absent):
 ```haskell
@@ -327,17 +327,17 @@ addPrevention shield gs =
   gs {GameState.preventions = shield : GameState.preventions gs}
 ```
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "prevention"'`
 Expected: PASS (both new cases).
 
-- [ ] **Step 9: Full suite green**
+- [x] **Step 9: Full suite green**
 
 Run: `cabal test`
 Expected: PASS — with no preventions in `GameState` anywhere else, `applyPreventions [] = id`, so every existing damage test is unchanged.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add -A
@@ -369,7 +369,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Produces: `Effect.Prevent :: Duration -> Prevention -> Effect card`; `Codec.preventionToJson`/`jsonToPrevention`; `Cards.fogPrinting :: Cards -> Printing`.
 - Consumes: `Event.dropEndOfTurnPreventions` (Task 2), `Cast.castSpell`, `Stack.resolveTop`.
 
-- [ ] **Step 1: Write the failing gate tests**
+- [x] **Step 1: Write the failing gate tests**
 
 Add to `source/test-suite/Pawl/ResolveSpec.hs`. alice casts Fog (a targetless `{G}` instant); after it resolves, a combat damage event is fully prevented while a Noncombat one still lands:
 
@@ -389,12 +389,12 @@ Add to `source/test-suite/Pawl/ResolveSpec.hs`. alice casts Fog (a targetless `{
               HU.assertEqual "spell damage untouched (Noncombat)" (Just 2) (S.damageOf victim spell),
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `Cards.fogPrinting` undefined, `Effect.Prevent` undefined, non-exhaustive `Effect` cases.
 
-- [ ] **Step 3: Add the `Prevent` opcode**
+- [x] **Step 3: Add the `Prevent` opcode**
 
 In `source/library/Pawl/Type/Effect.hs`, add `import Pawl.Type.Prevention (Prevention)` and the constructor:
 
@@ -406,7 +406,7 @@ In `source/library/Pawl/Type/Effect.hs`, add `import Pawl.Type.Prevention (Preve
     Prevent Duration Prevention
 ```
 
-- [ ] **Step 4: Add the five `Resolve` classification arms and the executor**
+- [x] **Step 4: Add the five `Resolve` classification arms and the executor**
 
 In `source/library/Pawl/Resolve.hs` (add `import qualified Pawl.Type.Prevention as Prevention` is NOT needed — Resolve never cases on the Prevention; it just carries it). Add the arms:
 
@@ -425,7 +425,7 @@ The `applyEffect` executor arm (targetless; append the shield). Add `import qual
       gs {GameState.preventions = ActivePrevention.MkActivePrevention prevention duration : GameState.preventions gs}
 ```
 
-- [ ] **Step 5: Add the codec arms**
+- [x] **Step 5: Add the codec arms**
 
 In `source/library/Pawl/Codec.hs`, add a `Prevention` codec (place near `durationToJson`) and add `import qualified Pawl.Type.Prevention as Prevention`:
 ```haskell
@@ -450,7 +450,7 @@ jsonToPrevention =
       _ -> Left (Text.pack "Prevent expects [Duration, Prevention]")
 ```
 
-- [ ] **Step 6: Wire cleanup to drop end-of-turn preventions**
+- [x] **Step 6: Wire cleanup to drop end-of-turn preventions**
 
 In `source/library/Pawl/Engine.hs`, the `Phase.Ending EndingStep.Cleanup` arm, add the drop beside the existing wear-offs:
 ```haskell
@@ -460,31 +460,31 @@ In `source/library/Pawl/Engine.hs`, the `Phase.Ending EndingStep.Cleanup` arm, a
 ```
 (Add `import qualified Pawl.Event as Event` to `Engine.hs` if absent — check the existing imports first.)
 
-- [ ] **Step 7: Create the Fog card data file**
+- [x] **Step 7: Create the Fog card data file**
 
 Create `data/cards/fog.json`:
 ```json
 {"name":"Fog","manaCost":[{"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Instant"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"effects":[{"type":"Prevent","value":[{"type":"UntilEndOfTurn"},{"type":"PreventAllCombatDamage"}]}],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"targetSpecs":[]}
 ```
 
-- [ ] **Step 8: Wire the printing into the pool**
+- [x] **Step 8: Wire the printing into the pool**
 
 In `source/test-suite/Pawl/Cards.hs`, add `fogPrinting` following the `mindRotPrinting`/`dragonFodderPrinting` pattern: the `MkCards` field, the `loadCards` binding (`fogPrinting_ <- loadPrinting "fog"`), the record entry, and the `allPrintings` list entry. Bump the count in `source/test-suite/Pawl/CardSpec.hs:170`:
 ```haskell
         HU.assertEqual "count" 40 (length (Cards.allPrintings cards)),
 ```
 
-- [ ] **Step 9: Run the tests to verify they pass**
+- [x] **Step 9: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "Fog"'` then `cabal test --test-options='-p "round-trip"'`
 Expected: PASS — the Fog gate, plus the `allPrintings` honesty round-trip now covering Fog's `Prevent`/`Prevention`/`Duration`.
 
-- [ ] **Step 10: Full suite green**
+- [x] **Step 10: Full suite green**
 
 Run: `cabal test`
 Expected: PASS.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add -A
@@ -516,7 +516,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Produces: `GameState.regenerationShields :: Map ObjectId Natural`; `Effect.RegenerateSelf :: Effect card`; `Event.clearRegenerationShields :: GameState -> GameState`; `S.addRegenShield :: ObjectId -> GameState -> GameState`; `Codec` handles `RegenerateSelf`.
 - Consumes: `Quantity`-free (no count); the shield map.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/EventSpec.hs`. The helper installs a shield; cleanup clears all shields:
 
@@ -535,12 +535,12 @@ Add to `source/test-suite/Pawl/EventSpec.hs`. The helper installs a shield; clea
 
 Add imports to `EventSpec.hs` as needed: `Setup`, `Map`, `GameState`, `Cards`, `S`.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `GameState.regenerationShields`, `Event.clearRegenerationShields`, `S.addRegenShield` undefined.
 
-- [ ] **Step 3: Add the store field and initialize it**
+- [x] **Step 3: Add the store field and initialize it**
 
 In `source/library/Pawl/Type/GameState.hs`, add `import Data.Map.Strict (Map)` (already imported) and, beside `preventions`:
 ```haskell
@@ -557,7 +557,7 @@ In `source/library/Pawl/Setup.hs`, `emptyGame`'s record:
           GameState.regenerationShields = Map.empty,
 ```
 
-- [ ] **Step 4: Add `Effect.RegenerateSelf`, its classifications, and the executor**
+- [x] **Step 4: Add `Effect.RegenerateSelf`, its classifications, and the executor**
 
 In `source/library/Pawl/Type/Effect.hs`:
 ```haskell
@@ -584,11 +584,11 @@ The `applyEffect` executor arm:
       gs {GameState.regenerationShields = Map.insertWith (+) source 1 (GameState.regenerationShields gs)}
 ```
 
-- [ ] **Step 5: Add the codec arm**
+- [x] **Step 5: Add the codec arm**
 
 In `source/library/Pawl/Codec.hs`, `effectToJson`: `Effect.RegenerateSelf -> nullary (Text.pack "RegenerateSelf")`; `jsonToEffect`: `"RegenerateSelf" -> Right Effect.RegenerateSelf`.
 
-- [ ] **Step 6: Add `clearRegenerationShields` and wire it to cleanup**
+- [x] **Step 6: Add `clearRegenerationShields` and wire it to cleanup**
 
 In `source/library/Pawl/Event.hs`:
 ```haskell
@@ -602,7 +602,7 @@ In `source/library/Pawl/Engine.hs`, the Cleanup arm:
       State.modify' Event.clearRegenerationShields
 ```
 
-- [ ] **Step 7: Add the `S.addRegenShield` fixture**
+- [x] **Step 7: Add the `S.addRegenShield` fixture**
 
 In `source/test-suite/Pawl/Support.hs`:
 ```haskell
@@ -613,17 +613,17 @@ addRegenShield oid gs =
   gs {GameState.regenerationShields = Map.insertWith (+) oid 1 (GameState.regenerationShields gs)}
 ```
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "regeneration shield"'`
 Expected: PASS (both cases).
 
-- [ ] **Step 9: Full suite green**
+- [x] **Step 9: Full suite green**
 
 Run: `cabal test`
 Expected: PASS — the shield store is written but not yet read by any destruction (Task 5 adds the reader).
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add -A
@@ -650,7 +650,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Produces: `Event.destroy :: ObjectId -> GameState -> GameState` (CR 700.4 indestructible → no-op; CR 701.19a shield → consume + regenerate; else → `changeZone Graveyard`).
 - Consumes: `Projection.hasKeyword` (Indestructible), `Event.changeZone`, `GameState.regenerationShields`, `GameState.combat`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/EventSpec.hs` (funnel-level) and `source/test-suite/Pawl/ResolveSpec.hs` (the Murder gameplay path).
 
@@ -697,12 +697,12 @@ ResolveSpec (the opcode path — Murder vs a shielded creature). This mirrors th
 
 Add imports as needed (EventSpec: `Set`, `Map`, `TapState`, `Object`, `Game`, `GameState`, `Setup`, `S`). `S.identityAnswer` (Support) answers `ChooseTargets` with `Map.mapMaybe Set.lookupMin sets` — the single legal creature — so with only `victim` on the board it targets it. (`ResolveSpec` already imports what this test needs.)
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "701.19a"'`
 Expected: FAIL — `Event.destroy` undefined (EventSpec), and Murder still buries the shielded creature (ResolveSpec).
 
-- [ ] **Step 3: Add `Event.destroy` and its helpers**
+- [x] **Step 3: Add `Event.destroy` and its helpers**
 
 In `source/library/Pawl/Event.hs`, add `import qualified Pawl.Type.Combat as Combat`, `import qualified Pawl.Type.Keyword as Keyword` (skip if present). Add:
 
@@ -752,7 +752,7 @@ removeFromCombat oid gs =
    in gs {GameState.combat = c1}
 ```
 
-- [ ] **Step 4: Rewire the `Destroy` opcode to the funnel**
+- [x] **Step 4: Rewire the `Destroy` opcode to the funnel**
 
 In `source/library/Pawl/Resolve.hs`, replace the `Effect.Destroy` arm's inline indestructible-check + changeZone with a call to `Event.destroy` (which now owns the CR 700.4 check):
 ```haskell
@@ -769,17 +769,17 @@ In `source/library/Pawl/Resolve.hs`, replace the `Effect.Destroy` arm's inline i
 ```
 (`Projection`/`Keyword` may now be unused in that arm but remain used elsewhere in `Resolve` — no import change.)
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "701.19a"'` then `cabal test --test-options='-p "700.4"'`
 Expected: PASS — regenerate/consume/second-death (EventSpec), indestructible no-op (EventSpec), and Murder replaced (ResolveSpec).
 
-- [ ] **Step 6: Full suite green (Destroy behavior preserved for the normal case)**
+- [x] **Step 6: Full suite green (Destroy behavior preserved for the normal case)**
 
 Run: `cabal test`
 Expected: PASS — with no shields and no indestructible, `Event.destroy = changeZone _ Graveyard`, identical to the pre-M4d Destroy; the Murder-vs-Darksteel-Myr (M4b) and every death test still pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -807,7 +807,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Produces: `Sba.performStateBasedActions` routes CR 704.5g/h through `Event.destroy` and CR 704.5f through `changeZone Graveyard`. No new exported symbol (internal predicate split).
 - Consumes: `Event.destroy` (Task 5), the existing `Projection.projectAll`, `woundedByDeathtouch`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Two tests, in the two specs that already own each idiom.
 
@@ -845,12 +845,12 @@ Two tests, in the two specs that already own each idiom.
 
 Add any missing imports (DamageSpec: `Setup`, `Object`, `TapState`, `Game`, `Set`, `GameState`; ResolveSpec's `withEffect` test already imports `Modification`, `Quantity`, `Timestamp`, `Setup`, `Sba`). No new Support helper is needed — `S.addRegenShield` (Task 4) and the local `withEffect` cover both.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "704.5"'`
 Expected: FAIL — the shielded creature is buried by the current merged SBA (which routes everything through `changeZone`, never `Event.destroy`).
 
-- [ ] **Step 3: Split the SBA classification and routing**
+- [x] **Step 3: Split the SBA classification and routing**
 
 In `source/library/Pawl/Sba.hs`, replace `creatureDies` with two predicates and rewrite the routing in `performStateBasedActions`. Add `import qualified Pawl.Type.Keyword as Keyword` (present) and rely on the existing `Event` import.
 
@@ -912,17 +912,17 @@ Then update the rest of the block to read from `departed` (unchanged from here o
 
 (Delete the now-unused `creatureDies`; a `git grep creatureDies` confirms it has no other caller.)
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cabal test --test-options='-p "704.5"'`
 Expected: PASS — regeneration saves the combat-lethal creature; toughness-≤-0 still dies.
 
-- [ ] **Step 5: Full suite green (existing deaths unchanged)**
+- [x] **Step 5: Full suite green (existing deaths unchanged)**
 
 Run: `cabal test`
 Expected: PASS — for creatures with no shield, `Event.destroy = changeZone Graveyard`, so every existing lethal-damage/deathtouch death (M1b/M2c) and the CR 704.5d token cease-to-exist (M4c) behave exactly as before; the settle loop still terminates.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -951,7 +951,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Produces: `Subtype.Skeleton`; `Cards.drudgeSkeletonsPrinting :: Cards -> Printing`.
 - Consumes: `Activate.activateAbility`, `Effect.RegenerateSelf` (Task 4), `Event.destroy` (Task 5).
 
-- [ ] **Step 1: Write the failing gate tests**
+- [x] **Step 1: Write the failing gate tests**
 
 Add to `source/test-suite/Pawl/ActivateSpec.hs` (activation path — mirror the existing Prodigal Sorcerer / Llanowar Elves activation tests for the exact `Activate.activateAbility` plumbing and how the ability value is obtained from `Projection.abilitiesOf`). alice's Drudge Skeletons, with a Swamp for `{B}`, activates its regenerate ability and gains a shield; then Murder (bob's) is replaced:
 
@@ -976,40 +976,40 @@ Add to `source/test-suite/Pawl/ActivateSpec.hs` (activation path — mirror the 
 
 Add imports to `ActivateSpec.hs` as needed: `Activate`, `Engine`, `Stack`, `Sba`, `Event`, `Map`, `Set`, `GameState`, `Cards`, `S` (skip any already present — `ActivateSpec` already imports most for the Prodigal/Llanowar tests).
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `Cards.drudgeSkeletonsPrinting` undefined; `Subtype.Skeleton` undefined (the card file references it, so `loadPrinting` would also fail).
 
-- [ ] **Step 3: Add the `Skeleton` subtype and its codec**
+- [x] **Step 3: Add the `Skeleton` subtype and its codec**
 
 In `source/library/Pawl/Type/Subtype.hs`, add `| Skeleton` to the sum (place after `Myr`). In `source/library/Pawl/Codec.hs`, add the arm to both `subtypeToJson` (`Subtype.Skeleton -> "Skeleton"`) and the `jsonToSubtype` table (`(Text.pack "Skeleton", Subtype.Skeleton)`).
 
-- [ ] **Step 4: Create the Drudge Skeletons card data file**
+- [x] **Step 4: Create the Drudge Skeletons card data file**
 
 Create `data/cards/drudge-skeletons.json` (cost `{1}{B}`, 1/1 Creature — Skeleton, a mana-only `{B}` regenerate ability with no additional cost, so a summoning-sick Skeleton can still regenerate — CR 302.6 gates only `{T}`):
 ```json
 {"name":"Drudge Skeletons","manaCost":[{"type":"Generic","value":1},{"type":"OfType","value":{"type":"Colored","value":{"type":"Black"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Creature"}],"subtypes":[{"type":"Skeleton"}]},"power":{"type":"Literal","value":1},"toughness":{"type":"Literal","value":1},"keywords":[],"staticAbilities":[],"effects":[],"activatedAbilities":[{"cost":{"mana":[{"type":"OfType","value":{"type":"Colored","value":{"type":"Black"}}}],"additional":[]},"effects":[{"type":"RegenerateSelf"}],"targetSpecs":[]}],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"targetSpecs":[]}
 ```
 
-- [ ] **Step 5: Wire the printing into the pool**
+- [x] **Step 5: Wire the printing into the pool**
 
 In `source/test-suite/Pawl/Cards.hs`, add `drudgeSkeletonsPrinting` following the `dragonFodderPrinting` pattern (field, `loadCards` binding `drudgeSkeletonsPrinting_ <- loadPrinting "drudge-skeletons"`, record entry, `allPrintings` entry). Bump `source/test-suite/Pawl/CardSpec.hs:170`:
 ```haskell
         HU.assertEqual "count" 41 (length (Cards.allPrintings cards)),
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "Drudge"'` then `cabal test --test-options='-p "round-trip"'`
 Expected: PASS — the end-to-end regenerate gate, plus the honesty round-trip now covering Drudge Skeletons (`RegenerateSelf`, the `{B}` ability cost, the `Skeleton` subtype).
 
-- [ ] **Step 7: Full suite green**
+- [x] **Step 7: Full suite green**
 
 Run: `cabal test`
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
@@ -1035,7 +1035,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `Cards.fogPrinting`, `Cards.drudgeSkeletonsPrinting`, `S.addRegenShield`, the existing conservation property.
 
-- [ ] **Step 1: Write the failing negative test**
+- [x] **Step 1: Write the failing negative test**
 
 Add to `source/test-suite/Pawl/ResolveSpec.hs` — regeneration intercepts destruction, not every leave-the-battlefield: a shielded creature bounced by Unsummon (M4b) still returns to hand:
 
@@ -1054,12 +1054,12 @@ Add to `source/test-suite/Pawl/ResolveSpec.hs` — regeneration intercepts destr
 
 (Mirrors the existing "CR 400.7 Unsummon returns a creature to its owner's hand" test in `ResolveSpec`, which uses `S.identityAnswer` — the only creature on the board is the target — with a shield seeded on the foe first.)
 
-- [ ] **Step 2: Run to verify it passes immediately**
+- [x] **Step 2: Run to verify it passes immediately**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "bounced"'`
 Expected: PASS — Unsummon uses `MoveToZone _ Hand` (not `Destroy`), so it never touches `Event.destroy` and the shield is irrelevant. This test guards that the funnel split did not over-reach.
 
-- [ ] **Step 3: Add Fog and Drudge Skeletons to the decks (keeping 60)**
+- [x] **Step 3: Add Fog and Drudge Skeletons to the decks (keeping 60)**
 
 In `source/test-suite/Pawl/Cards.hs`:
 
@@ -1088,17 +1088,17 @@ In `source/test-suite/Pawl/Cards.hs`:
       ]
 ```
 
-- [ ] **Step 4: Run the property suite with the new coverage**
+- [x] **Step 4: Run the property suite with the new coverage**
 
 Run: `cabal test --test-options='-p "Properties"'`
 Expected: PASS — the card-backed conservation property (M4c) still holds at 120 in every matchup: Fog and Drudge are `OfCard`, and regeneration keeps the same object on the battlefield (no new incarnation, no mint), so nothing about conservation changes; every game still terminates.
 
-- [ ] **Step 5: Full suite green**
+- [x] **Step 5: Full suite green**
 
 Run: `cabal test`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -1116,27 +1116,27 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ## Final verification (after all tasks)
 
-- [ ] **Definitive warning-clean build**
+- [x] **Definitive warning-clean build**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks`
 Expected: no warnings (the `pedantic` `-Werror` build succeeds).
 
-- [ ] **Whole suite**
+- [x] **Whole suite**
 
 Run: `cabal test`
 Expected: all green.
 
-- [ ] **Format and lint**
+- [x] **Format and lint**
 
 Run: `git add -A && hooky fix && git add -A && hooky run`
 Expected: passes (ormolu, hlint, cabal-gild — which regenerates `exposed-modules` for the three new `Pawl.Type.*` modules — cabal check, file hygiene). Apply any HLint suggestion or justify the exception.
 
-- [ ] **Progress check**
+- [x] **Progress check**
 
 Run: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-19-m4d-prevention-regeneration.md`
 Expected: `0`.
 
-- [ ] **Update the milestone log and status**
+- [x] **Update the milestone log and status**
 
 Add the M4d completion entry to `docs/progress.md` (one distilled entry: the two gate cards Fog and Drudge Skeletons; the decisions proved — the cancel replacement shape hooked into the damage funnel, and the unified `Event.destroy` funnel with a one-shot regeneration shield; the types/opcodes added — `DamageKind`, `Prevention`, `ActivePrevention`, `GameState.preventions`/`regenerationShields`, `Effect.Prevent`/`RegenerateSelf`, `Event.applyPreventions`/`destroy`, `Subtype.Skeleton`, the `Sba` destruction/put-into-graveyard split; and the named expiries from spec §7, foremost CR 701.19c deferred to Wrath). Update the "current work" note in `CLAUDE.md` (M4d complete; the next M4 letter — M4e counter-target-spell, per the design.md M4 table — is next). Commit:
 ```bash
