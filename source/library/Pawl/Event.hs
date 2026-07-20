@@ -10,12 +10,19 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import Pawl.Type.Card (Card)
+import Pawl.Type.DamageEvent (DamageEvent)
+import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
+import Pawl.Type.Prevention (Prevention)
+import qualified Pawl.Type.Prevention as Prevention
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
@@ -30,6 +37,27 @@ import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
+
+-- CR 615.6: apply active prevention shields to a batch of damage events, dropping
+-- each event a shield cancels -- a prevented event never happens (not marked, not
+-- drained, never emitted). The cancel shape, as applyReplacements is the redirect
+-- shape. This module is the sole home of casing on Prevention.
+applyPreventions :: [ActivePrevention.ActivePrevention] -> [DamageEvent] -> [DamageEvent]
+applyPreventions preventions = filter (not . prevented)
+  where
+    prevented ev = any (\p -> cancels (ActivePrevention.prevention p) ev) preventions
+
+-- Does this prevention cancel this event? The Prevention case lives here.
+cancels :: Prevention -> DamageEvent -> Bool
+cancels p ev = case p of
+  Prevention.PreventAllCombatDamage -> DamageEvent.kind ev == DamageKind.Combat
+
+-- CR 514.2: at cleanup, drop until-end-of-turn preventions (the prevention analog
+-- of Projection.dropEndOfTurnEffects). Indefinite preventions, if ever added, stay.
+dropEndOfTurnPreventions :: GameState -> GameState
+dropEndOfTurnPreventions gs =
+  let keep p = ActivePrevention.duration p /= Duration.UntilEndOfTurn
+   in gs {GameState.preventions = filter keep (GameState.preventions gs)}
 
 -- Insert a freshly-built object into `dest` under a new id and timestamp, and emit
 -- the enters event (origin -> dest). The common tail of changeZone (a moved

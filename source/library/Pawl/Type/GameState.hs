@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Data.Sequence (Seq)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
+import Pawl.Type.ActivePrevention (ActivePrevention)
 import Pawl.Type.Combat (Combat)
 import Pawl.Type.ContinuousEffect (ContinuousEffect)
 import Pawl.Type.DamageEvent (DamageEvent)
@@ -42,6 +43,10 @@ data GameState = MkGameState
     -- Serpent's Gift), each with a duration cleanup consults. Static-ability
     -- effects are NOT here -- the projection re-derives those live.
     continuousEffects :: [ContinuousEffect],
+    -- CR 615.3: floating prevention effects from resolutions (Fog), each with a
+    -- duration cleanup consults (CR 514.2). The event-pipeline analog of
+    -- continuousEffects. Event.applyPreventions reads it.
+    preventions :: [ActivePrevention],
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
     phase :: Phase,

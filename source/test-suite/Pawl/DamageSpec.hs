@@ -16,6 +16,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
@@ -29,6 +30,7 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.Prevention as Prevention
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
@@ -133,7 +135,23 @@ damageTests cards =
             after = Event.changeZone oid Zone.Graveyard marked
          in case Game.zoneMembers Zone.Graveyard S.alice after of
               [] -> HU.assertFailure "expected a card in the graveyard"
-              new : _ -> HU.assertEqual "fresh object, no damage" (Just 0) (S.damageOf new after)
+              new : _ -> HU.assertEqual "fresh object, no damage" (Just 0) (S.damageOf new after),
+      HU.testCase "CR 615 a prevention drops combat damage but spares Noncombat" $
+        let base = Setup.emptyGame S.bothPlayers
+            (victim, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+            shield = ActivePrevention.MkActivePrevention Prevention.PreventAllCombatDamage Duration.UntilEndOfTurn
+            withShield = S.addPrevention shield gs0
+            combat = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat] withShield
+            spell = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat] withShield
+         in do
+              HU.assertEqual "combat damage prevented -- none marked" (Just 0) (S.damageOf victim combat)
+              HU.assertEqual "combat damage prevented -- no event recorded" [] (GameState.damageEvents combat)
+              HU.assertEqual "noncombat damage still dealt" (Just 2) (S.damageOf victim spell),
+      HU.testCase "CR 514.2 an until-end-of-turn prevention wears off at cleanup" $
+        let base = Setup.emptyGame S.bothPlayers
+            shield = ActivePrevention.MkActivePrevention Prevention.PreventAllCombatDamage Duration.UntilEndOfTurn
+            dropped = Event.dropEndOfTurnPreventions (S.addPrevention shield base)
+         in HU.assertEqual "no preventions remain" [] (GameState.preventions dropped)
     ]
 
 sbaBase :: GameState.GameState

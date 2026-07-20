@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import Pawl.Type.AttackTarget (AttackTarget)
@@ -155,7 +156,11 @@ gatherCombatDamage assigns = do
 -- 614's replacement step will hook.
 applyDamage :: [DamageEvent.DamageEvent] -> GameState -> GameState
 applyDamage events gs =
-  let markOne g ev = case DamageEvent.target ev of
+  -- CR 615: prevention is the head of the funnel -- a prevented event never
+  -- happens, so it is neither marked/drained nor recorded (no deathtouch bit for
+  -- the CR 704.5h SBA to read).
+  let kept = Event.applyPreventions (GameState.preventions gs) events
+      markOne g ev = case DamageEvent.target ev of
         Recipient.ToCreature oid ->
           let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
            in g {GameState.objects = Map.adjust hurt oid (GameState.objects g)}
@@ -163,8 +168,8 @@ applyDamage events gs =
           let drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
            in g {GameState.players = Map.adjust drain pid (GameState.players g)}
         Recipient.ToObject _ -> g
-      marked = List.foldl' markOne gs events
-   in marked {GameState.damageEvents = GameState.damageEvents marked ++ events}
+      marked = List.foldl' markOne gs kept
+   in marked {GameState.damageEvents = GameState.damageEvents marked ++ kept}
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
 -- i.e. a second combat damage step must be spliced (CR 510.4).

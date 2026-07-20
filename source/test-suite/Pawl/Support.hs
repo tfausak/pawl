@@ -27,6 +27,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
+import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CombatStep as CombatStep
@@ -526,6 +527,12 @@ markDamage :: ObjectId.ObjectId -> Natural.Natural -> GameState.GameState -> Gam
 markDamage oid n gs =
   gs {GameState.objects = Map.adjust (\o -> o {Object.damage = n}) oid (GameState.objects gs)}
 
+-- Seed a floating prevention shield directly into GameState (bypasses casting a
+-- prevention spell; use when a test needs a shield active without resolving Fog).
+addPrevention :: ActivePrevention.ActivePrevention -> GameState.GameState -> GameState.GameState
+addPrevention shield gs =
+  gs {GameState.preventions = shield : GameState.preventions gs}
+
 tappedCount :: PlayerId.PlayerId -> GameState.GameState -> Int
 tappedCount pid gs =
   let isTapped oid = case Game.lookupObject oid gs of
@@ -578,6 +585,7 @@ oneMountainState cards ph =
           GameState.damageEvents = [],
           GameState.zoneChanges = [],
           GameState.continuousEffects = [],
+          GameState.preventions = [],
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,
           GameState.phase = ph,

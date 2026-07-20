@@ -85,6 +85,7 @@ library
     Pawl.Type.AbilityCost
     Pawl.Type.Action
     Pawl.Type.ActivatedAbility
+    Pawl.Type.ActivePrevention
     Pawl.Type.AdditionalCost
     Pawl.Type.Affected
     Pawl.Type.AttackTarget
@@ -125,6 +126,7 @@ library
     Pawl.Type.Player
     Pawl.Type.PlayerId
     Pawl.Type.Power
+    Pawl.Type.Prevention
     Pawl.Type.Printing
     Pawl.Type.Program
     Pawl.Type.ProjectedCharacteristics
