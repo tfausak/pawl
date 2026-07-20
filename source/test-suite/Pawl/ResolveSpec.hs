@@ -12,6 +12,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
@@ -40,6 +41,7 @@ import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
@@ -948,5 +950,27 @@ gainControlTests cards =
               HU.assertEqual "control reverts after cleanup" (Just S.bob) (Projection.controllerOf oid (Projection.dropEndOfTurnEffects after))
     ]
 
+-- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
+-- (GainKeyword Haste) together end to end -- cast, resolve, attack, revert.
+actOfTreasonTests :: Cards.Cards -> Tasty.TestTree
+actOfTreasonTests cards =
+  Tasty.testGroup
+    "Act of Treason"
+    [ HU.testCase "steal, untap, haste, attack, then revert" $
+        let base0 = S.landsInPlay (Cards.mountainPrinting cards) 3 -- alice: {R}{R}{R} for {2}{R}
+            (oid, base1) = S.addCreature (Cards.pikerPrinting cards) S.bob base0
+            base = S.tapObject oid base1 -- start it tapped to prove the untap rider
+            (gs1, spellId) = S.handOne (Cards.actOfTreasonPrinting cards) base
+            cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice spellId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "alice controls the Piker" (Just S.alice) (Projection.controllerOf oid resolved)
+              HU.assertEqual "the untap rider untapped it" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject oid resolved))
+              HU.assertBool "it has haste" (Projection.hasKeyword Keyword.Haste oid resolved)
+              HU.assertBool "alice may attack with it this turn" (oid `elem` Combat.legalAttackers S.alice resolved)
+              HU.assertBool "bob may not attack with it" (oid `notElem` Combat.legalAttackers S.bob resolved)
+              HU.assertEqual "control reverts at cleanup" (Just S.bob) (Projection.controllerOf oid (Projection.dropEndOfTurnEffects resolved))
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards, gainControlTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards, gainControlTests cards, actOfTreasonTests cards]
