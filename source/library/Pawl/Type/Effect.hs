@@ -74,4 +74,13 @@ data Effect card
     -- Decide.deciderFor. A hand smaller than the count discards all of it (CR
     -- 701.8b), forced -- so it is not prompted.
     Discard SlotName Quantity
+  | -- CR 111: create this many tokens with the given effect-defined characteristics
+    -- (CR 111.3). The `card` is the token's "text", embedded literally in the card
+    -- data (a nested card, tied to Card by Card's own instantiation; the codec and
+    -- round-trip cover it). Quantity is how many (reused from M4a as
+    -- Draw/Mill/Discard do); Create (Literal 2) mints two distinct objects.
+    -- Targetless and unprompted -- creating a token is never a choice. Executed by
+    -- Resolve.applyEffect via Event.createToken. NOT a copy-token (CR 707) and NOT a
+    -- predefined token (CR 111.10): given, not derived.
+    Create Quantity card
   deriving (Eq, Ord, Show)

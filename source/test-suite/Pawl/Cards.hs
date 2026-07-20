@@ -51,7 +51,8 @@ data Cards = MkCards
     angelicEdictPrinting :: Printing.Printing,
     divinationPrinting :: Printing.Printing,
     tomeScourPrinting :: Printing.Printing,
-    mindRotPrinting :: Printing.Printing
+    mindRotPrinting :: Printing.Printing,
+    dragonFodderPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -102,6 +103,7 @@ loadCards = do
   divinationPrinting_ <- loadPrinting "divination"
   tomeScourPrinting_ <- loadPrinting "tome-scour"
   mindRotPrinting_ <- loadPrinting "mind-rot"
+  dragonFodderPrinting_ <- loadPrinting "dragon-fodder"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -141,7 +143,8 @@ loadCards = do
         angelicEdictPrinting = angelicEdictPrinting_,
         divinationPrinting = divinationPrinting_,
         tomeScourPrinting = tomeScourPrinting_,
-        mindRotPrinting = mindRotPrinting_
+        mindRotPrinting = mindRotPrinting_,
+        dragonFodderPrinting = dragonFodderPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -183,7 +186,8 @@ allPrintings cards =
     angelicEdictPrinting cards,
     divinationPrinting cards,
     tomeScourPrinting cards,
-    mindRotPrinting cards
+    mindRotPrinting cards,
+    dragonFodderPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

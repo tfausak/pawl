@@ -393,7 +393,18 @@ resolveTests cards =
               HU.assertEqual "control pending for bob" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl resolved))
               HU.assertEqual "promoted on bob's turn" (Just (Decider.MkDecider S.alice)) (GameState.activeControl bobsTurn)
               HU.assertEqual "bob's decisions route to alice" (Decider.MkDecider S.alice) (Decide.deciderFor S.bob bobsTurn)
-              HU.assertEqual "control expired after bob's turn" (Decider.MkDecider S.bob) (Decide.deciderFor S.bob afterBob)
+              HU.assertEqual "control expired after bob's turn" (Decider.MkDecider S.bob) (Decide.deciderFor S.bob afterBob),
+      HU.testCase "CR 111 Dragon Fodder creates two 1/1 Goblin tokens" $
+        let base = S.landsInPlay (Cards.mountainPrinting cards) 2
+            (gs, spellId) = S.handOne (Cards.dragonFodderPrinting cards) base
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              -- Two Goblin tokens exist (count == 2 proves two distinct objects). The
+              -- battlefield also holds alice's 2 Mountains, so filter by name/creature.
+              HU.assertEqual "two Goblin tokens on the battlefield" 2 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after)
+              HU.assertEqual "alice controls two creatures (the tokens)" 2 (S.creaturesInPlay S.alice after)
+              HU.assertEqual "Dragon Fodder went to the graveyard (CR 608.2n)" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
     ]
 
 findFirst :: Prompt.Prompt r -> r

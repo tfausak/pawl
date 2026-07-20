@@ -68,6 +68,7 @@ slotsOf effect = case effect of
   Effect.Draw _ -> Set.empty
   Effect.Mill slot _ -> Set.singleton slot
   Effect.Discard slot _ -> Set.singleton slot
+  Effect.Create _ _ -> Set.empty
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -90,6 +91,7 @@ readsX = any effectReadsX
       Effect.Draw quantity -> quantity == Quantity.Type.X
       Effect.Mill _ quantity -> quantity == Quantity.Type.X
       Effect.Discard _ quantity -> quantity == Quantity.Type.X
+      Effect.Create quantity _ -> quantity == Quantity.Type.X
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -108,6 +110,7 @@ manaProduced effect = case effect of
   Effect.Draw _ -> Nothing
   Effect.Mill {} -> Nothing
   Effect.Discard {} -> Nothing
+  Effect.Create {} -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -126,6 +129,7 @@ searchesLibrary effect = case effect of
   Effect.Draw _ -> False
   Effect.Mill {} -> False
   Effect.Discard {} -> False
+  Effect.Create {} -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -164,6 +168,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Draw _ -> effect
   Effect.Mill {} -> effect
   Effect.Discard {} -> effect
+  -- A text-changer does not reach a token's embedded card here (spec section 8).
+  Effect.Create _ _ -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -406,6 +412,15 @@ applyEffect source controller bound legality chosen effect = case effect of
                     State.modify' (bury toDiscard)
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
+      _ -> pure ()
+  Effect.Create quantity card -> do
+    gs <- State.get
+    case Quantity.evaluate gs source quantity of
+      Just n
+        | n > 0 ->
+            -- CR 111: create n tokens with these characteristics under the effect's
+            -- controller (CR 111.2). Each createToken mints a distinct object.
+            State.modify' (\g -> List.foldl' (\g1 _ -> Event.createToken controller card g1) g [1 .. n])
       _ -> pure ()
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
