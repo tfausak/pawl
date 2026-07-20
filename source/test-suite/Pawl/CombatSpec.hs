@@ -14,6 +14,7 @@ import qualified Pawl.Combat as Combat
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -21,6 +22,8 @@ import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Combat as Combat.Type
+import qualified Pawl.Type.Duration as Duration
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
@@ -28,7 +31,9 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
@@ -250,6 +255,30 @@ hasteTests cards =
          in case mine of
               [chariot, _] -> HU.assertEqual "only the chariot" [chariot] (declaredAttackers after)
               _ -> HU.assertFailure "fixture should have two creatures"
+    ]
+
+controlChangeSicknessTests :: Cards.Cards -> Tasty.TestTree
+controlChangeSicknessTests cards =
+  Tasty.testGroup
+    "ControlChangeSickness"
+    [ -- SYNTHETIC (labeled crutch, spec §4): a "steal until end of turn, no haste"
+      -- effect. A real card would grant haste (masking CR 302.6) or be an Aura
+      -- (Attach, out of M4.5 scope). EXPIRES: Auras / Control Magic phase.
+      HU.testCase "CR 302.6 a creature that just changed control is summoning sick (no haste)" $
+        let (oid, base) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            slot = SlotName.MkSlotName (Text.pack "target")
+            steal =
+              Resolve.applyEffect
+                oid
+                S.alice
+                Map.empty
+                (Map.singleton slot True)
+                (Map.singleton slot (Recipient.ToCreature oid))
+                (Effect.GainControl Duration.UntilEndOfTurn slot)
+            after = snd (Engine.runGamePure S.identityAnswer base steal)
+         in do
+              HU.assertEqual "alice controls it" (Just S.alice) (Projection.controllerOf oid after)
+              HU.assertBool "but it is summoning sick, so it cannot attack this turn" (not (Combat.canAttack S.alice oid after))
     ]
 
 -- Declare attackers with everything, then hand back the state and the ids.
@@ -603,5 +632,6 @@ tests cards =
       defenderTests cards,
       vigilanceTests cards,
       hasteTests cards,
-      evasionTests cards
+      evasionTests cards,
+      controlChangeSicknessTests cards
     ]
