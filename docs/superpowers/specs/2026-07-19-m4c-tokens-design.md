@@ -160,9 +160,10 @@ that may `case` on `Effect`; the new arm is added to `slotsOf`, `readsX`,
     Create Quantity Card
 ```
 
-**`Pawl.Type.Subtype`** grows **`Goblin`** (Dragon Fodder's token subtype),
-following M4b's `Myr`. Only the subtype the gate needs; the creature-type catalog
-grows one entry per card.
+**`Pawl.Type.Subtype`** needs **no change** — `Goblin` already exists (Goblin
+Piker is "Goblin Warrior"), so Dragon Fodder's token subtype is already in the
+catalog. (Where a future token needs a novel creature type, the catalog grows one
+entry, following M4b's `Myr`.)
 
 No new `Prompt` and no new `Response` (creation is unprompted). No new `Zone`. No
 new `ZoneChange` field — the token's enters-the-battlefield event is an ordinary
