@@ -434,7 +434,7 @@ tests cards =
                         ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
                       }
                in g1 {GameState.continuousEffects = eff : GameState.continuousEffects g1}
-            gs = install S.alice (install S.alice base) -- two effects, both -> alice
+            gs = install S.alice (install S.bob base) -- bob first (earlier), then alice (later) -> alice wins
             owned = base
          in do
               HU.assertEqual "owner controls with no effect" (Just S.bob) (Projection.controllerOf oid owned)
