@@ -6,6 +6,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as J
@@ -189,10 +190,10 @@ tests cards =
                   HU.assertEqual
                     "effects"
                     [Effect.Counter (SlotName.MkSlotName (Text.pack "spell"))]
-                    (CardT.effects card)
+                    (Card.allEffects card)
                   HU.assertEqual
                     "target spec"
                     (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) TargetSpec.SpellTarget)
-                    (CardT.targetSpecs card)
+                    (Card.allTargetSpecs card)
         ]
     ]

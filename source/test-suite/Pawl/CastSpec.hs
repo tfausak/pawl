@@ -35,6 +35,8 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -321,7 +323,15 @@ blazishPrinting cards =
         bolt
           { Card.Type.name = Text.pack "Synthetic X Burn",
             Card.Type.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.Variable, red]),
-            Card.Type.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.X]
+            Card.Type.spell =
+              Modal.MkModal
+                ( Seq.singleton
+                    ( Mode.MkMode
+                        (Seq.singleton (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.X))
+                        (Card.allTargetSpecs bolt)
+                    )
+                )
+                (Modal.selection (Card.Type.spell bolt))
           }
 
 -- Chooses X=3 and aims every target slot at bob; other prompts take the identity

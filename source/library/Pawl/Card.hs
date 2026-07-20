@@ -4,10 +4,33 @@
 -- half never depends on a card's identity) is enforced by the module graph.
 module Pawl.Card where
 
+import qualified Data.Foldable as Foldable
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
+import Pawl.Type.Effect (Effect)
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import Pawl.Type.SlotName (SlotName)
+import Pawl.Type.TargetSpec (TargetSpec)
 import qualified Pawl.Type.TypeLine as TypeLine
+
+-- Every effect across all of a card's modes, in printed (mode, then written)
+-- order. CR 608.2c/700.2: the card's whole text spans its modes; the D4 lint
+-- and the text-change scan (M3d) range over all of them regardless of what is
+-- chosen.
+allEffects :: Card.Card -> [Effect Card.Card]
+allEffects card =
+  concatMap (Foldable.toList . Mode.effects) (Modal.modes (Card.spell card))
+
+-- The union of every mode's target specs (slot names are unique across a
+-- card's modes by authoring discipline; the D4 lint enforces per-mode
+-- resolution).
+allTargetSpecs :: Card.Card -> Map SlotName TargetSpec
+allTargetSpecs card =
+  Map.unions (map Mode.targetSpecs (Foldable.toList (Modal.modes (Card.spell card))))
 
 isLand :: Card.Card -> Bool
 isLand c = Set.member CardType.Land (TypeLine.types (Card.typeLine c))

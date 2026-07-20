@@ -43,6 +43,9 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -223,12 +226,14 @@ resolveTests cards =
                   Card.Type.toughness = Nothing,
                   Card.Type.keywords = Set.empty,
                   Card.Type.staticAbilities = [],
-                  Card.Type.effects = [Effect.ChangeText slot],
+                  Card.Type.spell =
+                    Modal.MkModal
+                      (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.ChangeText slot)) Map.empty))
+                      (ModeSelection.ChooseExactly 1),
                   Card.Type.activatedAbilities = [],
                   Card.Type.replacementEffects = [],
                   Card.Type.triggeredAbilities = [],
-                  Card.Type.castingPermissions = [],
-                  Card.Type.targetSpecs = Map.empty
+                  Card.Type.castingPermissions = []
                 }
          in do
               HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))

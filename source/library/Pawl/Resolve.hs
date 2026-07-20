@@ -11,6 +11,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
+import qualified Pawl.Card as Card
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
@@ -21,7 +22,7 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import qualified Pawl.Type.Affected as Affected
-import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
@@ -58,7 +59,7 @@ import qualified Pawl.Type.Zone as Zone
 -- semantics (design.md section 1). Everything else asks classifications. The
 -- executor itself arrives with resolution; slotsOf is the read half of the
 -- dataflow lint.
-slotsOf :: Effect Card.Card -> Set SlotName
+slotsOf :: Effect Card.Type.Card -> Set SlotName
 slotsOf effect = case effect of
   Effect.DealDamage slot _ -> Set.singleton slot
   Effect.ModifyTarget _ _ slot -> Set.singleton slot
@@ -83,7 +84,7 @@ slotsOf effect = case effect of
 -- slotsOf draws for target slots. Casing on Effect/Quantity is this module's
 -- charter. NOTE: when an opcode gains a Quantity field, add its arm here -- the
 -- compiler will not force it, since Quantity is compared by ==.
-readsX :: [Effect Card.Card] -> Bool
+readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
@@ -108,7 +109,7 @@ readsX = any effectReadsX
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
 -- mana abilities off the stack. Casing on Effect is Resolve's charter.
-manaProduced :: Effect Card.Card -> Maybe ManaType
+manaProduced :: Effect Card.Type.Card -> Maybe ManaType
 manaProduced effect = case effect of
   Effect.AddMana mt -> Just mt
   Effect.DealDamage _ _ -> Nothing
@@ -131,7 +132,7 @@ manaProduced effect = case effect of
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
 -- Search searches the controller's own library; every other effect does not.
-searchesLibrary :: Effect Card.Card -> Bool
+searchesLibrary :: Effect Card.Type.Card -> Bool
 searchesLibrary effect = case effect of
   Effect.Search _ -> True
   Effect.DealDamage _ _ -> False
@@ -153,27 +154,27 @@ searchesLibrary effect = case effect of
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
-matchesCriterion :: CardCriterion.CardCriterion -> Card.Card -> Bool
+matchesCriterion :: CardCriterion.CardCriterion -> Card.Type.Card -> Bool
 matchesCriterion crit card = case crit of
   CardCriterion.BasicLandCard ->
-    Set.member CardType.Land (TypeLine.types (Card.typeLine card))
-      && Set.member Supertype.Basic (TypeLine.supertypes (Card.typeLine card))
+    Set.member CardType.Land (TypeLine.types (Card.Type.typeLine card))
+      && Set.member Supertype.Basic (TypeLine.supertypes (Card.Type.typeLine card))
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
 -- this classification rather than casing on Effect itself.
-textChangeSlots :: Card.Card -> [SlotName]
+textChangeSlots :: Card.Type.Card -> [SlotName]
 textChangeSlots card =
   let slotOf effect = case effect of
         Effect.ChangeText slot -> Just slot
         _ -> Nothing
-   in Maybe.mapMaybe slotOf (Card.effects card)
+   in Maybe.mapMaybe slotOf (Card.allEffects card)
 
 -- Rewrite basic-land-type words in an effect's AST (CR 612). Cases on Effect
 -- (Resolve's charter); delegates the inner modification of ModifyTarget to
 -- Projection.rewriteModification, so neither module touches the other's
 -- constructors. DealDamage and ChangeText carry no rewritable land-type word.
-rewriteEffect :: [(Subtype, Subtype)] -> Effect Card.Card -> Effect Card.Card
+rewriteEffect :: [(Subtype, Subtype)] -> Effect Card.Type.Card -> Effect Card.Type.Card
 rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget duration modification slot ->
     Effect.ModifyTarget duration (Projection.rewriteModification pairs modification) slot
@@ -199,10 +200,10 @@ rewriteEffect pairs effect = case effect of
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
 -- rewritable AST -- the resolver honors a spell hacked on the stack.
-effectsOf :: ObjectId -> GameState -> [Effect Card.Card]
+effectsOf :: ObjectId -> GameState -> [Effect Card.Type.Card]
 effectsOf oid gs = case Game.cardOf oid gs of
   Nothing -> []
-  Just card -> map (rewriteEffect (Projection.textChangesAffecting oid gs)) (Card.effects card)
+  Just card -> map (rewriteEffect (Projection.textChangesAffecting oid gs)) (Card.allEffects card)
 
 -- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if
 -- the spell has slots and ALL are now illegal, it does not resolve -- it moves
@@ -218,7 +219,7 @@ resolveSpell oid = do
     Just obj -> case Game.cardOf oid gs of
       Nothing -> pure ()
       Just card ->
-        let specs = Card.targetSpecs card
+        let specs = Card.allTargetSpecs card
             chosen = Binding.targetsOf (Object.bindings obj)
             legalSlot slot recipient = case Map.lookup slot specs of
               Nothing -> False
@@ -236,7 +237,7 @@ resolveSpell oid = do
 -- applyEffect over the effects with `srcId` (the source permanent) as the effect
 -- source (CR 608.2g), then the ability ceases (CR 608.2n). `stackId` is the
 -- ability object's own id.
-resolveEffects :: ObjectId -> ObjectId -> [Effect Card.Card] -> Map.Map SlotName TargetSpec -> Game ()
+resolveEffects :: ObjectId -> ObjectId -> [Effect Card.Type.Card] -> Map.Map SlotName TargetSpec -> Game ()
 resolveEffects stackId srcId effects specs = do
   gs <- State.get
   case Game.lookupObject stackId gs of
@@ -258,7 +259,7 @@ resolveEffects stackId srcId effects specs = do
 -- (CR 608.2g). Reuses applyEffect with the same per-slot legality and CR 608.2b
 -- fizzle as a spell. CR 608.2n: the ability then ceases to exist -- removed from
 -- the stack and objects, NOT buried (an ability is not a card).
-resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> Game ()
+resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Game ()
 resolveAbility abilId srcId ability =
   resolveEffects abilId srcId (ActivatedAbility.effects ability) (ActivatedAbility.targetSpecs ability)
 
@@ -274,7 +275,7 @@ cease abilId gs =
 -- `controller` is the controller of the resolving spell/ability -- who searches
 -- their own library (CR 701.23), never the effect `source` (for an ability, the
 -- source permanent may already be sacrificed as a cost).
-applyEffect :: ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Card -> Game ()
+applyEffect :: ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffect source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity ->
     State.modify' $ \gs ->

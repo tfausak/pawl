@@ -2,7 +2,9 @@
 -- dataflow lint.
 module Pawl.CardSpec where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
@@ -21,6 +23,9 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity.Type
@@ -136,12 +141,11 @@ cardTests cards =
                   Card.Type.toughness = Nothing,
                   Card.Type.keywords = Set.empty,
                   Card.Type.staticAbilities = [],
-                  Card.Type.effects = [],
+                  Card.Type.spell = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
                   Card.Type.activatedAbilities = [],
                   Card.Type.replacementEffects = [],
                   Card.Type.triggeredAbilities = [],
-                  Card.Type.castingPermissions = [],
-                  Card.Type.targetSpecs = Map.empty
+                  Card.Type.castingPermissions = []
                 }
          in do
               HU.assertBool "not a permanent" (not (Card.isPermanent card))
@@ -158,12 +162,15 @@ lintTests :: Cards.Cards -> Tasty.TestTree
 lintTests cards =
   Tasty.testGroup
     "Lint"
-    [ HU.testCase "every printing's slot reads equal its declared slots" $
-        let reads_ card = Set.unions (map Resolve.slotsOf (Card.Type.effects card))
-            writes card = Map.keysSet (Card.Type.targetSpecs card)
+    [ HU.testCase "every mode's slot reads equal its declared slots" $
+        let modeOffends m =
+              Set.unions (map Resolve.slotsOf (Foldable.toList (Mode.effects m)))
+                /= Map.keysSet (Mode.targetSpecs m)
+            cardOffends card =
+              any modeOffends (Modal.modes (Card.Type.spell card))
             offenders =
               filter
-                (\p -> reads_ (Printing.card p) /= writes (Printing.card p))
+                (cardOffends . Printing.card)
                 (Cards.allPrintings cards)
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
       HU.testCase "the registry holds every printing (44 at M4f Task 5)" $
@@ -175,13 +182,13 @@ lintTests cards =
               HU.assertEqual "name" (Text.pack "Blaze") (Card.Type.name card)
               HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Variable, red])) (Card.Type.manaCost card)
               HU.assertBool "sorcery, not instant" (not (Card.isInstant card))
-              HU.assertEqual "one AnyTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget) (Card.Type.targetSpecs card)
-              HU.assertEqual "effect deals X" [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.Type.X] (Card.Type.effects card),
+              HU.assertEqual "one AnyTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget) (Card.allTargetSpecs card)
+              HU.assertEqual "effect deals X" [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.Type.X] (Card.allEffects card),
       HU.testCase "the lint itself catches a dangling reference" $
         let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
          in HU.assertBool "misauthored card detected" (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)),
       HU.testCase "every printing that reads X declares {X}, and vice versa" $
-        let readsX c = Resolve.readsX (Card.Type.effects c)
+        let readsX c = Resolve.readsX (Card.allEffects c)
             hasVariable c = case Card.Type.manaCost c of
               Nothing -> False
               Just (ManaCost.MkManaCost syms) -> elem ManaSymbol.Variable syms
@@ -193,14 +200,14 @@ lintTests cards =
       HU.testCase "the reserved X slot is never a declared target slot" $
         let offenders =
               filter
-                (Map.member Binding.variableX . Card.Type.targetSpecs . Printing.card)
+                (Map.member Binding.variableX . Card.allTargetSpecs . Printing.card)
                 (Cards.allPrintings cards)
          in HU.assertEqual "no card names the X slot" [] (map (Card.Type.name . Printing.card) offenders),
       HU.testCase "Lightning Bolt is in the red pool with one AnyTarget slot" $
         let card = Printing.card (Cards.lightningBoltPrinting cards)
          in do
               HU.assertBool "an instant" (Card.isInstant card)
-              HU.assertEqual "one slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget) (Card.Type.targetSpecs card)
+              HU.assertEqual "one slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget) (Card.allTargetSpecs card)
     ]
 
 m2bCardTests :: Cards.Cards -> Tasty.TestTree
@@ -301,7 +308,7 @@ m3cCardTests cards =
         let card = Printing.card (Cards.bloodMoonPrinting cards)
          in do
               HU.assertEqual "one static ability" 1 (length (Card.Type.staticAbilities card))
-              HU.assertBool "not a permanent target" (Map.null (Card.Type.targetSpecs card))
+              HU.assertBool "not a permanent target" (Map.null (Card.allTargetSpecs card))
     ]
 
 m3eCardTests :: Cards.Cards -> Tasty.TestTree
@@ -336,35 +343,35 @@ m4bCardTests cards =
          in do
               HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black, black])) (Card.Type.manaCost c)
               HU.assertBool "an instant" (Card.isInstant c)
-              HU.assertEqual "effect destroys the target slot" [Effect.Destroy (SlotName.MkSlotName (Text.pack "target"))] (Card.Type.effects c)
-              HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget) (Card.Type.targetSpecs c),
+              HU.assertEqual "effect destroys the target slot" [Effect.Destroy (SlotName.MkSlotName (Text.pack "target"))] (Card.allEffects c)
+              HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureTarget) (Card.allTargetSpecs c),
       HU.testCase "Unsummon is a {U} Instant that bounces a target creature to hand" $
         let c = Printing.card (Cards.unsummonPrinting cards)
             blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
          in do
               HU.assertEqual "cost" (Just (ManaCost.MkManaCost [blue])) (Card.Type.manaCost c)
-              HU.assertEqual "effect returns to hand" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand] (Card.Type.effects c),
+              HU.assertEqual "effect returns to hand" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand] (Card.allEffects c),
       HU.testCase "Angelic Edict is a {4}{W} Sorcery exiling a creature or enchantment" $
         let c = Printing.card (Cards.angelicEdictPrinting cards)
          in do
               HU.assertBool "not an instant" (not (Card.isInstant c))
-              HU.assertEqual "effect exiles" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile] (Card.Type.effects c)
-              HU.assertEqual "creature-or-enchantment slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureOrEnchantmentTarget) (Card.Type.targetSpecs c),
+              HU.assertEqual "effect exiles" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile] (Card.allEffects c)
+              HU.assertEqual "creature-or-enchantment slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.CreatureOrEnchantmentTarget) (Card.allTargetSpecs c),
       HU.testCase "Divination is a {2}{U} Sorcery that draws two cards with no target" $
         let c = Printing.card (Cards.divinationPrinting cards)
          in do
-              HU.assertEqual "effect draws two" [Effect.Draw (Quantity.Type.Literal 2)] (Card.Type.effects c)
-              HU.assertBool "no target slots" (Map.null (Card.Type.targetSpecs c)),
+              HU.assertEqual "effect draws two" [Effect.Draw (Quantity.Type.Literal 2)] (Card.allEffects c)
+              HU.assertBool "no target slots" (Map.null (Card.allTargetSpecs c)),
       HU.testCase "Tome Scour is a {U} Sorcery milling five from a target player" $
         let c = Printing.card (Cards.tomeScourPrinting cards)
          in do
-              HU.assertEqual "effect mills five" [Effect.Mill (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 5)] (Card.Type.effects c)
-              HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.PlayerTarget) (Card.Type.targetSpecs c),
+              HU.assertEqual "effect mills five" [Effect.Mill (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 5)] (Card.allEffects c)
+              HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.PlayerTarget) (Card.allTargetSpecs c),
       HU.testCase "Mind Rot is a {2}{B} Sorcery making a target player discard two" $
         let c = Printing.card (Cards.mindRotPrinting cards)
          in do
-              HU.assertEqual "effect discards two" [Effect.Discard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 2)] (Card.Type.effects c)
-              HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.PlayerTarget) (Card.Type.targetSpecs c)
+              HU.assertEqual "effect discards two" [Effect.Discard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 2)] (Card.allEffects c)
+              HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.PlayerTarget) (Card.allTargetSpecs c)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

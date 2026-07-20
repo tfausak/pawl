@@ -70,7 +70,7 @@ timingOk pid oid gs = case Game.cardOf oid gs of
 targetable :: ObjectId -> GameState -> Bool
 targetable oid gs = case Game.cardOf oid gs of
   Nothing -> False
-  Just card -> not (any Set.null (Map.elems (Target.legalSets (Card.Type.targetSpecs card) gs)))
+  Just card -> not (any Set.null (Map.elems (Target.legalSets (Card.allTargetSpecs card) gs)))
 
 -- Affordable and correctly timed, actually in this player's hand, and fillable.
 castable :: PlayerId -> ObjectId -> GameState -> Bool
@@ -148,7 +148,7 @@ castSpell pid oid = do
       Nothing -> pure ()
       Just card -> do
         let decider = Decide.deciderFor pid gs
-            sets = Target.legalSets (Card.Type.targetSpecs card) gs
+            sets = Target.legalSets (Card.allTargetSpecs card) gs
             -- CR 601.2b precedes 601.2c: choose X before targets, and only when
             -- the cost carries a Variable (a spell with no {X} is not asked).
             hasVariable = case cost of

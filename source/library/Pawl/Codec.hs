@@ -709,12 +709,11 @@ cardToJson c =
       (Text.pack "toughness", maybeTo toughnessToJson (CardT.toughness c)),
       (Text.pack "keywords", setTo keywordToJson (CardT.keywords c)),
       (Text.pack "staticAbilities", listTo staticAbilityToJson (CardT.staticAbilities c)),
-      (Text.pack "effects", listTo effectToJson (CardT.effects c)),
+      (Text.pack "spell", modalToJson (CardT.spell c)),
       (Text.pack "activatedAbilities", listTo activatedAbilityToJson (CardT.activatedAbilities c)),
       (Text.pack "replacementEffects", listTo replacementEffectToJson (CardT.replacementEffects c)),
       (Text.pack "triggeredAbilities", listTo triggeredAbilityToJson (CardT.triggeredAbilities c)),
-      (Text.pack "castingPermissions", listTo castingPermissionToJson (CardT.castingPermissions c)),
-      (Text.pack "targetSpecs", targetSpecsToJson (CardT.targetSpecs c))
+      (Text.pack "castingPermissions", listTo castingPermissionToJson (CardT.castingPermissions c))
     ]
 
 getOpt :: Text -> [(Text, Value)] -> Value
@@ -730,12 +729,11 @@ jsonToCard value = do
   toughness <- maybeFrom jsonToToughness (getOpt (Text.pack "toughness") ps)
   keywords <- Json.field (Text.pack "keywords") ps >>= setFrom jsonToKeyword
   statics <- Json.field (Text.pack "staticAbilities") ps >>= listFrom jsonToStaticAbility
-  effects <- Json.field (Text.pack "effects") ps >>= listFrom jsonToEffect
+  spell <- Json.field (Text.pack "spell") ps >>= jsonToModal
   activated <- Json.field (Text.pack "activatedAbilities") ps >>= listFrom jsonToActivatedAbility
   replacements <- Json.field (Text.pack "replacementEffects") ps >>= listFrom jsonToReplacementEffect
   triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= listFrom jsonToCastingPermission
-  targets <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
   pure
     CardT.MkCard
       { CardT.name = name,
@@ -745,12 +743,11 @@ jsonToCard value = do
         CardT.toughness = toughness,
         CardT.keywords = keywords,
         CardT.staticAbilities = statics,
-        CardT.effects = effects,
+        CardT.spell = spell,
         CardT.activatedAbilities = activated,
         CardT.replacementEffects = replacements,
         CardT.triggeredAbilities = triggered,
-        CardT.castingPermissions = permissions,
-        CardT.targetSpecs = targets
+        CardT.castingPermissions = permissions
       }
 
 printingToJson :: Printing.Printing -> Value
