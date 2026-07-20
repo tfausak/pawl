@@ -1,0 +1,174 @@
+{-# LANGUAGE GADTs #-}
+
+-- Covers modal casting: Pawl.Cast mode selection, Pawl.Resolve chosen-mode
+-- resolution.
+module Pawl.ModalSpec where
+
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified Pawl.Cards as Cards
+import qualified Pawl.Cast as Cast
+import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
+import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
+import qualified Pawl.Stack as Stack
+import qualified Pawl.Support as S
+import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.ModeIndex as ModeIndex
+import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.Zone as Zone
+import qualified Test.Tasty as Tasty
+import qualified Test.Tasty.HUnit as HU
+
+-- Chaos Charm's three modes, in printed order (CR 700.2 / data/cards/chaos-charm.json):
+--   0. destroy target Wall
+--   1. deal 1 damage to target creature
+--   2. target creature gains haste until end of turn
+-- An answerer that always chooses `idx` and, when asked for a target, aims
+-- every slot at `recipient` -- Chaos Charm's modes each have exactly one slot,
+-- so a single fixed recipient is unambiguous. Everything else defers to
+-- S.identityAnswer.
+chooseModeAt :: ModeIndex.ModeIndex -> Recipient.Recipient -> Prompt.Prompt r -> r
+chooseModeAt idx recipient p = case p of
+  Prompt.ChooseModes {} -> Set.singleton idx
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const recipient) sets
+  _ -> S.identityAnswer p
+
+-- Rejects a ChooseModes prompt outright -- used to prove a non-modal cast
+-- never issues one (CR 700.2a: a forced selection is not asked). `error` here
+-- is a deliberately unreachable branch, not library code.
+neverAskModes :: Prompt.Prompt r -> r
+neverAskModes p = case p of
+  Prompt.ChooseModes {} -> error "ChooseModes prompt issued for a non-modal spell"
+  _ -> S.identityAnswer p
+
+gateTests :: Cards.Cards -> Tasty.TestTree
+gateTests cards =
+  Tasty.testGroup
+    "Gate"
+    [ HU.testCase "CR 608.2c mode 1 (damage) deals 1 to the chosen creature, and no others" $
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
+            (pikerOid, gs1) = S.addPiker cards S.bob gs0
+            answer :: Prompt.Prompt r -> r
+            answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
+            cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
+            after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+         in HU.assertEqual "1 damage marked" (Just 1) (S.damageOf pikerOid after),
+      HU.testCase "CR 608.2c mode 2 (haste) grants haste to the chosen (summoning-sick) creature" $
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
+            (creatureId, gs1) = S.addPiker cards S.alice gs0
+            sick = gs1 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) creatureId (GameState.objects gs1)}
+            answer :: Prompt.Prompt r -> r
+            answer = chooseModeAt (ModeIndex.MkModeIndex 2) (Recipient.ToCreature creatureId)
+            cast = snd (Engine.runGamePure answer sick (Cast.castSpell S.alice oid))
+            after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+         in HU.assertBool "projected keywords include Haste" (Projection.hasKeyword Keyword.Haste creatureId after),
+      HU.testCase "CR 608.2c mode 0 (destroy Wall) destroys the chosen Wall" $
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
+            (wallId, gs1) = S.addCreature (Cards.wallOfStonePrinting cards) S.bob gs0
+            answer :: Prompt.Prompt r -> r
+            answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToCreature wallId)
+            cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
+            after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+         in do
+              HU.assertBool "no longer on the battlefield" (not (Set.member wallId (GameState.battlefield after)))
+              HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+    ]
+
+-- CR 700.2a: an illegal mode can't be chosen, so a mode with even one
+-- unfillable slot is excluded wholesale -- the falsifier for the M3a
+-- all-slots-fillable engine, which would have called Chaos Charm uncastable
+-- the moment ANY mode (here, the Wall mode with no Wall in play) had an
+-- unfillable slot.
+falsifierTests :: Cards.Cards -> Tasty.TestTree
+falsifierTests cards =
+  Tasty.testGroup
+    "Falsifier"
+    [ HU.testCase "CR 700.2c/601.2c castable via the damage/haste modes with no Wall on the board" $
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
+            (_, gs1) = S.addPiker cards S.bob gs0
+         in do
+              HU.assertBool "castable" (Cast.castable S.alice oid gs1)
+              HU.assertEqual
+                "the Wall mode (0) is absent from the fillable set"
+                (Set.fromList [ModeIndex.MkModeIndex 1, ModeIndex.MkModeIndex 2])
+                (Cast.fillableModes oid gs1)
+    ]
+
+-- CR 601.2c/700.2c: only the CHOSEN mode's slots are ever prompted or stamped
+-- on the stack object -- an unchosen mode's slot name never appears at all.
+onlyChosenModeTests :: Cards.Cards -> Tasty.TestTree
+onlyChosenModeTests cards =
+  Tasty.testGroup
+    "OnlyChosenModeTargets"
+    [ HU.testCase "casting the damage mode binds the 'creature' slot, never 'wall'" $
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
+            (pikerOid, gs1) = S.addPiker cards S.bob gs0
+            answer :: Prompt.Prompt r -> r
+            answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
+            cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
+         in case Game.zoneMembers Zone.Stack S.alice cast of
+              [] -> HU.assertFailure "Chaos Charm never reached the stack"
+              stackId : _ -> case Game.lookupObject stackId cast of
+                Nothing -> HU.assertFailure "the cast stack object vanished"
+                Just obj ->
+                  let keys = Map.keysSet (Object.bindings obj)
+                   in do
+                        HU.assertBool "has the 'creature' slot" (Set.member (SlotName.MkSlotName (Text.pack "creature")) keys)
+                        HU.assertBool "does not have the 'wall' slot" (not (Set.member (SlotName.MkSlotName (Text.pack "wall")) keys))
+    ]
+
+fizzleTests :: Cards.Cards -> Tasty.TestTree
+fizzleTests cards =
+  Tasty.testGroup
+    "Fizzle"
+    [ HU.testCase "CR 608.2b the damage mode fizzles when its only target leaves before resolution" $
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
+            (pikerOid, gs1) = S.addPiker cards S.bob gs0
+            answer :: Prompt.Prompt r -> r
+            answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
+            cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
+            -- CR 400.7: leaving the battlefield mints a new incarnation, so
+            -- pikerOid's chosen recipient no longer names a legal target.
+            gone = Event.changeZone pikerOid Zone.Graveyard cast
+            after = snd (Engine.runGamePure answer gone Stack.resolveTop)
+         in do
+              HU.assertEqual "Chaos Charm in alice's graveyard, unresolved" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+              HU.assertEqual "no damage was dealt" [] (GameState.damageEvents after)
+              HU.assertEqual "stack empty" 0 (length (GameState.stack after))
+    ]
+
+forcedTests :: Cards.Cards -> Tasty.TestTree
+forcedTests cards =
+  Tasty.testGroup
+    "ForcedNoPrompt"
+    [ HU.testCase "CR 700.2a casting a non-modal spell (Lightning Bolt) never issues ChooseModes" $
+        -- No creature on the battlefield, so neverAskModes's identityAnswer
+        -- fallback picks ToPlayer alice via Set.lookupMin (a self-Bolt, the same
+        -- shape as ResolveSpec's "CR 120.3a a Bolt at a player drains life
+        -- without marking"). The point of this test is that ChooseModes is never
+        -- reached at all -- if it were, neverAskModes's error would fire.
+        let (gs0, oid) = S.boltInHand cards 1 Phase.PrecombatMain
+            cast = snd (Engine.runGamePure neverAskModes gs0 (Cast.castSpell S.alice oid))
+            after = snd (Engine.runGamePure neverAskModes cast Stack.resolveTop)
+         in HU.assertEqual "alice at 17 (Bolt resolved, forced/unprompted mode selection)" (Just 17) (S.lifeOf S.alice after)
+    ]
+
+tests :: Cards.Cards -> Tasty.TestTree
+tests cards =
+  Tasty.testGroup
+    "Modal"
+    [ gateTests cards,
+      falsifierTests cards,
+      onlyChosenModeTests cards,
+      fizzleTests cards,
+      forcedTests cards
+    ]

@@ -40,6 +40,23 @@ modeTargetSpecs :: ModeIndex.ModeIndex -> Card.Card -> Maybe (Map SlotName Targe
 modeTargetSpecs (ModeIndex.MkModeIndex n) card =
   fmap Mode.targetSpecs (Seq.lookup (fromIntegral n) (Modal.modes (Card.spell card)))
 
+-- CR 608.2c/700.2: the effects of the CHOSEN modes only, in printed (mode
+-- index, then written) order -- the Set is already sorted by ModeIndex's Ord.
+-- Out-of-range indices contribute nothing (total via Seq.lookup).
+modesEffects :: Set.Set ModeIndex.ModeIndex -> Card.Card -> [Effect Card.Card]
+modesEffects chosen card =
+  let ms = Modal.modes (Card.spell card)
+      modeAt (ModeIndex.MkModeIndex n) = maybe [] (Foldable.toList . Mode.effects) (Seq.lookup (fromIntegral n) ms)
+   in concatMap modeAt (Set.toAscList chosen)
+
+-- CR 601.2c/700.2c: the target specs of the CHOSEN modes only (union). Only
+-- these slots are prompted at cast and re-validated at CR 608.2b.
+modesTargetSpecs :: Set.Set ModeIndex.ModeIndex -> Card.Card -> Map SlotName TargetSpec
+modesTargetSpecs chosen card =
+  let ms = Modal.modes (Card.spell card)
+      specsAt (ModeIndex.MkModeIndex n) = maybe Map.empty Mode.targetSpecs (Seq.lookup (fromIntegral n) ms)
+   in Map.unions (map specsAt (Set.toAscList chosen))
+
 isLand :: Card.Card -> Bool
 isLand c = Set.member CardType.Land (TypeLine.types (Card.typeLine c))
 

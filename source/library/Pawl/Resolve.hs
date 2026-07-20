@@ -197,13 +197,19 @@ rewriteEffect pairs effect = case effect of
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
 
--- A resolving spell's PROJECTED effects: its printed effects with every
+-- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
+-- 608.2c/700.2 -- an unchosen mode's effects never resolve), with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
--- rewritable AST -- the resolver honors a spell hacked on the stack.
+-- rewritable AST -- the resolver honors a spell hacked on the stack. A
+-- non-modal card has one mode, always chosen, so this is unchanged for it.
 effectsOf :: ObjectId -> GameState -> [Effect Card.Type.Card]
-effectsOf oid gs = case Game.cardOf oid gs of
+effectsOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []
-  Just card -> map (rewriteEffect (Projection.textChangesAffecting oid gs)) (Card.allEffects card)
+  Just obj -> case Game.cardOf oid gs of
+    Nothing -> []
+    Just card ->
+      let chosen = Binding.modesOf (Object.bindings obj)
+       in map (rewriteEffect (Projection.textChangesAffecting oid gs)) (Card.modesEffects chosen card)
 
 -- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if
 -- the spell has slots and ALL are now illegal, it does not resolve -- it moves
@@ -219,7 +225,10 @@ resolveSpell oid = do
     Just obj -> case Game.cardOf oid gs of
       Nothing -> pure ()
       Just card ->
-        let specs = Card.allTargetSpecs card
+        -- CR 608.2b/700.2c: re-validate only the CHOSEN modes' slots -- an
+        -- unchosen mode's slot was never filled and is not part of this
+        -- resolution's legality question.
+        let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) card
             chosen = Binding.targetsOf (Object.bindings obj)
             legalSlot slot recipient = case Map.lookup slot specs of
               Nothing -> False

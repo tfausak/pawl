@@ -46,6 +46,7 @@ import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
@@ -300,7 +301,11 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToObject targetLand)) Map.empty Nothing Set.empty,
+                  -- CR 700.2: Landform has one mode; a directly-built stack object
+                  -- (bypassing Cast.castSpell) must stamp it chosen (mode 0), or
+                  -- Resolve.effectsOf/resolveSpell -- now scoped to CHOSEN modes --
+                  -- would see no effects and no target specs at all.
+                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToObject targetLand)) Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
                   Object.counters = Map.empty,
                   Object.timestamp = Timestamp.MkTimestamp 0
                 }

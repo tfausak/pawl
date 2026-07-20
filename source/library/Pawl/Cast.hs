@@ -159,13 +159,14 @@ castWhileSearching pid = do
             castSpell pid oid
             castWhileSearching pid
 
--- CR 601: choose targets (601.2c), pay (601.2f-h), move to the stack (601.2a),
--- stamp the choices on the NEW stack incarnation (CR 400.7). Prompting before
--- payment is 601.2's own order; what stays elided is the rewind -- legalActions
--- only offers affordable, fully-fillable casts, so a legal answer cannot fail
--- after the prompt (expiry: mid-announcement failure, e.g. cast-during-search).
--- An illegal answer makes the whole cast a no-op: reject-not-repair, the
--- AssignCombatDamage posture. A spell with no slots asks nothing.
+-- CR 601.2b then 601.2c: choose modes, THEN targets (601.2c), pay (601.2f-h),
+-- move to the stack (601.2a), stamp the choices on the NEW stack incarnation
+-- (CR 400.7). Prompting before payment is 601.2's own order; what stays elided
+-- is the rewind -- legalActions only offers affordable, fully-fillable casts,
+-- so a legal answer cannot fail after the prompt (expiry: mid-announcement
+-- failure, e.g. cast-during-search). An illegal answer at ANY step makes the
+-- whole cast a no-op: reject-not-repair, the AssignCombatDamage posture. A
+-- spell with no slots (in its chosen modes) asks nothing.
 castSpell :: PlayerId -> ObjectId -> Game ()
 castSpell pid oid = do
   gs <- State.get
@@ -175,24 +176,35 @@ castSpell pid oid = do
       Nothing -> pure ()
       Just card -> do
         let decider = Decide.deciderFor pid gs
-            sets = Target.legalSets (Card.allTargetSpecs card) gs
-            -- CR 601.2b precedes 601.2c: choose X before targets, and only when
-            -- the cost carries a Variable (a spell with no {X} is not asked).
-            hasVariable = case cost of
-              ManaCost.MkManaCost symbols -> elem ManaSymbol.Variable symbols
-        mAmount <-
-          if hasVariable
-            then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid)))
-            else pure Nothing
-        chosen <-
-          if Map.null sets
-            then pure Map.empty
-            else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid oid sets))
-        let keysAgree = Map.keysSet chosen == Map.keysSet sets
-            eachLegal = and (Map.intersectionWith Set.member chosen sets)
-        if not (keysAgree && eachLegal)
-          then pure ()
-          else do
+            legal = fillableModes oid gs
+            ModeSelection.ChooseExactly count = Modal.selection (Card.Type.spell card)
+        -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
+        -- unprompted) exactly when there is nothing to choose -- as many legal
+        -- modes as the selection demands or fewer (a non-modal card's one mode,
+        -- or a modal card whose only-just-fillable modes leave no real choice).
+        chosenModes <-
+          if Set.size legal <= fromIntegral count
+            then pure legal
+            else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid oid legal count))
+        -- Reject-not-repair: an answer that is not a size-`count` subset of the
+        -- legal modes makes the whole cast a no-op, guarding every step below.
+        Monad.when (Set.isSubsetOf chosenModes legal && Set.size chosenModes == fromIntegral count) $ do
+          let sets = Target.legalSets (Card.modesTargetSpecs chosenModes card) gs
+              -- CR 601.2b precedes 601.2c: choose X before targets, and only when
+              -- the cost carries a Variable (a spell with no {X} is not asked).
+              hasVariable = case cost of
+                ManaCost.MkManaCost symbols -> elem ManaSymbol.Variable symbols
+          mAmount <-
+            if hasVariable
+              then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid)))
+              else pure Nothing
+          chosen <-
+            if Map.null sets
+              then pure Map.empty
+              else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid oid sets))
+          let keysAgree = Map.keysSet chosen == Map.keysSet sets
+              eachLegal = and (Map.intersectionWith Set.member chosen sets)
+          Monad.when (keysAgree && eachLegal) $ do
             -- CR 612 binding: choose the basic land types for each text-change
             -- slot. Always answerable (the five basics), so no castability gate.
             let textSlots = Resolve.textChangeSlots card
@@ -213,8 +225,7 @@ castSpell pid oid = do
                       moved
                         { GameState.objects =
                             Map.adjust
-                              -- Task 7 replaces Set.empty with the real chosen modes.
-                              (\o -> o {Object.bindings = Binding.fromChoices chosen bound mAmount Set.empty})
+                              (\o -> o {Object.bindings = Binding.fromChoices chosen bound mAmount chosenModes})
                               top
                               (GameState.objects moved)
                         }
