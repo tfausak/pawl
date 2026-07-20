@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import Pawl.Type.Card (Card)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
@@ -18,7 +19,9 @@ import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.Timestamp as Timestamp
 import Pawl.Type.TriggerCondition (TriggerCondition)
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import Pawl.Type.TriggeredAbility (TriggeredAbility)
@@ -27,6 +30,22 @@ import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
+
+-- Insert a freshly-built object into `dest` under a new id and timestamp, and emit
+-- the enters event (origin -> dest). The common tail of changeZone (a moved
+-- incarnation) and createToken (a token from nothing). `mkObj` receives the fresh
+-- timestamp so the object records when it entered (CR 613.7d).
+placeObject :: PlayerId -> (Timestamp.Timestamp -> Object.Object) -> Zone -> Zone -> GameState -> GameState
+placeObject pid mkObj origin dest gs =
+  let (newId, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj = mkObj ts
+      gs3 = gs2 {GameState.objects = Map.insert newId obj (GameState.objects gs2)}
+      placed = Game.insertIntoZone dest pid newId gs3
+      -- CR 603.2g: emit the RESOLVED event (post-replacement), carrying the new
+      -- object's id -- what an enters trigger scans.
+      emitted = ZoneChange.MkZoneChange newId origin dest
+   in placed {GameState.zoneChanges = GameState.zoneChanges placed ++ [emitted]}
 
 -- The single zone-change primitive (CR 400.7): the source object ceases; a NEW
 -- object with a fresh id is created in the destination, carrying owner and
@@ -42,16 +61,32 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
         proposed = ZoneChange.MkZoneChange oid fromZone requestedDest
         resolved = applyReplacements (Projection.replacementsAffecting gs) proposed
         dest = ZoneChange.to resolved
-        (newId, gs1) = Game.freshObjectId gs
-        (ts, gs1b) = Game.freshTimestamp gs1
-        newObj = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.timestamp = ts}
-        gs2 = Game.removeFromZones pid oid gs1b
-        gs3 = gs2 {GameState.objects = Map.insert newId newObj (Map.delete oid (GameState.objects gs2))}
-        moved = Game.insertIntoZone dest pid newId gs3
-        -- CR 603.2g: emit the RESOLVED event (post-replacement), carrying the new
-        -- object's id -- what an enters trigger scans.
-        emitted = ZoneChange.MkZoneChange newId fromZone dest
-     in moved {GameState.zoneChanges = GameState.zoneChanges moved ++ [emitted]}
+        mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.timestamp = ts}
+        gs1 = Game.removeFromZones pid oid gs
+        gs2 = gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
+     in placeObject pid mkObj fromZone dest gs2
+
+-- CR 111.2: create a token with the given effect-defined characteristics under
+-- `controller`'s control (its owner, CR 111.2), summoning-sick (CR 302.6). A token
+-- is created from nothing -- it has no prior object to move, so changeZone cannot
+-- mint it. Uses from = Battlefield (it appears there; to == from can never read as
+-- a leave). Emits the enters event so ETB triggers (CR 603.6a) fire on the same
+-- path a resolved permanent uses. Does NOT consult replacements (Doubling Season
+-- is future, spec section 8).
+createToken :: PlayerId -> Card -> GameState -> GameState
+createToken controller card gs =
+  let mkObj ts =
+        Object.MkObject
+          { Object.owner = controller,
+            Object.source = Source.OfToken card,
+            Object.zone = Zone.Battlefield,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Sick,
+            Object.bindings = Map.empty,
+            Object.timestamp = ts
+          }
+   in placeObject controller mkObj Zone.Battlefield Zone.Battlefield gs
 
 -- CR 121.2/121.3: the single-card draw. Move pid's top library card to their
 -- hand; an empty library records the failed draw (CR 704.5b makes it a loss at

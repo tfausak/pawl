@@ -13,7 +13,9 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
@@ -90,5 +92,26 @@ tests cards =
          in do
               HU.assertEqual "alice's graveyard exiled by the ETB" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
               HU.assertEqual "Rest in Peace is on the battlefield" 1 (S.countOnBattlefieldByName (Text.pack "Rest in Peace") S.alice settled)
-              HU.assertEqual "stack empty" [] (GameState.stack settled)
+              HU.assertEqual "stack empty" [] (GameState.stack settled),
+      HU.testCase "CR 111.2 createToken puts a token on the battlefield and emits an enters event" $
+        let base = Setup.emptyGame S.bothPlayers
+            goblinCard = Printing.card (Cards.pikerPrinting cards)
+            before = Game.objectCount base
+            after = Event.createToken S.alice goblinCard base
+            newIds = Set.toList (GameState.battlefield after)
+         in do
+              HU.assertEqual "one more object exists" (before + 1) (Game.objectCount after)
+              HU.assertEqual "exactly one battlefield object" 1 (length newIds)
+              case newIds of
+                [tokId] -> do
+                  HU.assertEqual "cardOf sees the token" (Just goblinCard) (Game.cardOf tokId after)
+                  HU.assertEqual "owned by its creator (CR 111.2)" (Just S.alice) (Game.controllerOf tokId after)
+                  case Game.lookupObject tokId after of
+                    Just obj -> HU.assertEqual "summoning sick (CR 302.6)" Sickness.Sick (Object.sickness obj)
+                    Nothing -> HU.assertFailure "token vanished"
+                  HU.assertEqual
+                    "one enters-battlefield event emitted"
+                    [Zone.Battlefield]
+                    (map ZoneChange.to (GameState.zoneChanges after))
+                _ -> HU.assertFailure "expected exactly one token"
     ]
