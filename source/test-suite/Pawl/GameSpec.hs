@@ -66,6 +66,14 @@ objectFactTests cards =
          in do
               HU.assertEqual "cardOf returns the token's embedded card" (Just goblinCard) (Game.cardOf tokId gs)
               HU.assertEqual "the token is on the battlefield" True (Set.member tokId (GameState.battlefield gs)),
+      HU.testCase "CR 111.1 isSpell is True for a card object, False for a token" $
+        let base = Setup.emptyGame S.bothPlayers
+            (cardId, gs1) = S.addPiker cards S.alice base
+            tokenCard = Printing.card (Cards.pikerPrinting cards)
+            (tokId, gs2) = S.addToken tokenCard S.bob gs1
+         in do
+              HU.assertBool "a card-backed object is a spell" (Game.isSpell cardId gs2)
+              HU.assertBool "a token is not a spell" (not (Game.isSpell tokId gs2)),
       HU.testCase "a Mountain has no power or toughness" $
         let gs = S.mountainsInPlay cards 1
          in case Game.zoneMembers Zone.Battlefield S.alice gs of

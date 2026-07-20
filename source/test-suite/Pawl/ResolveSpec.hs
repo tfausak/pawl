@@ -129,6 +129,13 @@ targetTests cards =
          in HU.assertBool
               "the permanent is a legal object target"
               (Set.member (Recipient.ToObject permId) (Target.legalRecipients TargetSpec.SpellOrPermanentTarget gs)),
+      HU.testCase "CR 115 SpellTarget offers a stack spell but not a battlefield permanent" $
+        let (permId, base) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+            (spellId, gs) = S.spellOnStack (Cards.lightningBoltPrinting cards) S.alice base
+            legal = Target.legalRecipients TargetSpec.SpellTarget gs
+         in do
+              HU.assertBool "the stack spell is a legal target" (Set.member (Recipient.ToObject spellId) legal)
+              HU.assertBool "the battlefield permanent is not a legal target" (not (Set.member (Recipient.ToObject permId) legal)),
       HU.testCase "LandTarget offers a land as an object target, not a creature or player" $
         let gs = S.mountainsInPlay cards 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs of

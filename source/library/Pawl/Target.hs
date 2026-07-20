@@ -49,6 +49,10 @@ legalRecipients spec gs =
                  in Set.member CardType.Creature ts || Set.member CardType.Enchantment ts
               matches = filter ok (Set.toList (GameState.battlefield gs))
            in Set.fromList (map Recipient.ToObject matches)
+        TargetSpec.SpellTarget ->
+          -- CR 111.1: only spells (Source.OfCard) on the stack; abilities and
+          -- permanents are excluded by Game.isSpell.
+          Set.fromList (map Recipient.ToObject (filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)))
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is

@@ -626,3 +626,17 @@ pikerOf :: GameState.GameState -> ObjectId.ObjectId
 pikerOf gs = case Game.zoneMembers Zone.Battlefield bob gs of
   oid : _ -> oid
   [] -> ObjectId.MkObjectId 999
+
+-- Put a fresh `printing` spell (owned by `pid`) onto the stack: a Stack-zone
+-- object added to GameState.stack (mirrors EventSpec's inline placement). Used to
+-- set up counter targets without paying to cast the victim.
+spellOnStack :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+spellOnStack printing pid gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      obj = Object.MkObject pid (Source.OfCard printing) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty (Timestamp.MkTimestamp 0)
+   in ( oid,
+        gs1
+          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
+            GameState.stack = oid : GameState.stack gs1
+          }
+      )
