@@ -925,5 +925,28 @@ untapTests cards =
          in HU.assertEqual "target is untapped" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject oid after))
     ]
 
+gainControlTests :: Cards.Cards -> Tasty.TestTree
+gainControlTests cards =
+  Tasty.testGroup
+    "GainControl"
+    [ HU.testCase "GainControl gives the source's controller control until end of turn and re-Sicks (CR 302.6)" $
+        let (oid, base) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            slot = SlotName.MkSlotName (Text.pack "target")
+            -- Apply as though a spell alice controls (controller = alice) resolved it.
+            run =
+              Resolve.applyEffect
+                oid
+                S.alice
+                Map.empty
+                (Map.singleton slot True)
+                (Map.singleton slot (Recipient.ToCreature oid))
+                (Effect.GainControl Duration.UntilEndOfTurn slot)
+            after = snd (Engine.runGamePure S.identityAnswer base run)
+         in do
+              HU.assertEqual "alice now controls it" (Just S.alice) (Projection.controllerOf oid after)
+              HU.assertEqual "it is summoning sick for the new controller" (Just Sickness.Sick) (fmap Object.sickness (Game.lookupObject oid after))
+              HU.assertEqual "control reverts after cleanup" (Just S.bob) (Projection.controllerOf oid (Projection.dropEndOfTurnEffects after))
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards, gainControlTests cards]

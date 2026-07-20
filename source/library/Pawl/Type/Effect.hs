@@ -113,4 +113,14 @@ data Effect card
   | -- CR 701.26b: untap the slot's target permanent. Single-target (Act of
     -- Treason's "untap that creature"); mass/conditional untap is future.
     Untap SlotName
+  | -- CR 613.1b / 611.2c: install a layer-2 control effect on the slot's target
+    -- for a duration. The new controller is THIS effect's source's controller
+    -- (the `controller` passed to applyEffect), baked into a stored
+    -- SetController continuous effect -- derived, never chosen. Also re-Sicks the
+    -- target (CR 302.6: the new controller has not controlled it continuously).
+    -- Act of Treason's control clause. NOT a reuse of ModifyTarget, whose
+    -- Modification is static card data and cannot carry a resolution-time
+    -- PlayerId. Permanent control (CR 613), distinct from Mindslaver's
+    -- player-control (CR 723, ControlPlayerNextTurn).
+    GainControl Duration SlotName
   deriving (Eq, Ord, Show)

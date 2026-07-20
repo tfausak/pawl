@@ -48,6 +48,7 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity.Type
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Sickness as Sickness
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Supertype as Supertype
@@ -80,6 +81,7 @@ slotsOf effect = case effect of
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ _ slot -> Set.singleton slot
   Effect.Untap slot -> Set.singleton slot
+  Effect.GainControl _ slot -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -108,6 +110,7 @@ readsX = any effectReadsX
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.Untap _ -> False
+      Effect.GainControl _ _ -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -132,6 +135,7 @@ manaProduced effect = case effect of
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.Untap _ -> Nothing
+  Effect.GainControl _ _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -156,6 +160,7 @@ searchesLibrary effect = case effect of
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.Untap _ -> False
+  Effect.GainControl _ _ -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -202,6 +207,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
   Effect.Untap _ -> effect
+  -- No rewritable land-type word.
+  Effect.GainControl _ _ -> effect
 
 -- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
 -- 608.2c/700.2 -- an unchosen mode's effects never resolve), with every
@@ -244,7 +251,12 @@ resolveSpell oid = do
          in if fizzles
               then State.modify' (Event.changeZone oid Zone.Graveyard)
               else do
-                Monad.mapM_ (applyEffect oid (Object.owner obj) (Binding.subtypesOf (Object.bindings obj)) legality chosen) (effectsOf oid gs)
+                -- CR 613 / 608.2g: the resolving spell's controller, projected --
+                -- a spell has no control effect, so this is Object.owner obj
+                -- unchanged, but a controlled permanent's later ability (below)
+                -- needs this same projection to resolve under the thief.
+                let effectController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+                Monad.mapM_ (applyEffect oid effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) (effectsOf oid gs)
                 State.modify' (Event.changeZone oid Zone.Graveyard)
 
 -- CR 608.2: the executor shared by an activated ability (M3e) and a triggered
@@ -264,9 +276,13 @@ resolveEffects stackId srcId effects specs = do
             Just spec -> Target.stillLegal recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           fizzles = not (Map.null specs) && not (or (Map.elems legality))
+          -- CR 613 / 608.2g: the source PERMANENT's controller, projected -- so a
+          -- controlled permanent's ability (e.g. a stolen creature's tap ability)
+          -- resolves under the thief, not the original owner.
+          effectController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf srcId gs)
        in do
             Monad.unless fizzles $
-              Monad.mapM_ (applyEffect srcId (Object.owner obj) (Binding.subtypesOf (Object.bindings obj)) legality chosen) effects
+              Monad.mapM_ (applyEffect srcId effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) effects
             State.modify' (cease stackId)
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
@@ -504,6 +520,31 @@ applyEffect source controller bound legality chosen effect = case effect of
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs -- a player recipient cannot be untapped
           Just target -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) target (GameState.objects gs)}
+        _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
+  Effect.GainControl duration slot ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just recipient, True) -> case recipientObject recipient of
+          Nothing -> gs -- a player recipient cannot be controlled
+          Just target ->
+            -- CR 613.1b / 611.2c: the new controller is `controller` (this
+            -- effect's source's controller), baked in now -- derived, never
+            -- chosen. CR 302.6: the new controller has not controlled the
+            -- permanent continuously, so it is re-Sicked.
+            let (ts, gs1) = Game.freshTimestamp gs
+                eff =
+                  ContinuousEffect.MkContinuousEffect
+                    { ContinuousEffect.source = source,
+                      ContinuousEffect.timestamp = ts,
+                      ContinuousEffect.duration = duration,
+                      ContinuousEffect.modification = Modification.SetController controller,
+                      ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+                    }
+                sicken o = o {Object.sickness = Sickness.Sick}
+             in gs1
+                  { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
+                    GameState.objects = Map.adjust sicken target (GameState.objects gs1)
+                  }
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
 
 -- CR 122.6: add `n` counters of a kind to a permanent's per-incarnation state.
