@@ -3,9 +3,7 @@ module Pawl.Cast where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
@@ -13,6 +11,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
@@ -24,10 +23,6 @@ import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.ManaCost (ManaCost)
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.Modal as Modal
-import qualified Pawl.Type.Mode as Mode
-import qualified Pawl.Type.ModeIndex as ModeIndex
-import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
@@ -70,20 +65,6 @@ timingOk pid oid gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card -> Card.isInstant card || sorcerySpeed pid gs
 
--- CR 700.2a: the indices of modes all of whose target slots have a legal
--- recipient (a mode with no slots is trivially fillable). An illegal mode
--- can't be chosen, so a mode with even one unfillable slot is excluded
--- wholesale, never partially chosen.
-fillableModes :: ObjectId -> GameState -> Set.Set ModeIndex.ModeIndex
-fillableModes oid gs = case Game.cardOf oid gs of
-  Nothing -> Set.empty
-  Just card ->
-    let ms = Foldable.toList (Modal.modes (Card.Type.spell card))
-        fillable i m =
-          let sets = Target.legalSets (Mode.targetSpecs m) gs
-           in if any Set.null (Map.elems sets) then Nothing else Just (ModeIndex.MkModeIndex (fromIntegral i))
-     in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Int ..] ms))
-
 -- CR 601.2c / 700.2a: castable when at least as many modes are fillable as the
 -- selection demands ("choose one" / ChooseExactly 1, the only selection so
 -- far). Unobservable for Bolt (AnyTarget always holds a living player); first
@@ -96,8 +77,8 @@ targetable :: ObjectId -> GameState -> Bool
 targetable oid gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card ->
-    let ModeSelection.ChooseExactly count = Modal.selection (Card.Type.spell card)
-     in Set.size (fillableModes oid gs) >= fromIntegral count
+    let count = Modal.selectionCount (Card.Type.spell card)
+     in Set.size (Target.fillableModes oid (Card.Type.spell card) gs) >= fromIntegral count
 
 -- Affordable and correctly timed, actually in this player's hand, and fillable.
 castable :: PlayerId -> ObjectId -> GameState -> Bool
@@ -176,8 +157,8 @@ castSpell pid oid = do
       Nothing -> pure ()
       Just card -> do
         let decider = Decide.deciderFor pid gs
-            legal = fillableModes oid gs
-            ModeSelection.ChooseExactly count = Modal.selection (Card.Type.spell card)
+            legal = Target.fillableModes oid (Card.Type.spell card) gs
+            count = Modal.selectionCount (Card.Type.spell card)
         -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
         -- unprompted) exactly when there is nothing to choose -- as many legal
         -- modes as the selection demands or fewer (a non-modal card's one mode,
@@ -189,7 +170,7 @@ castSpell pid oid = do
         -- Reject-not-repair: an answer that is not a size-`count` subset of the
         -- legal modes makes the whole cast a no-op, guarding every step below.
         Monad.when (Set.isSubsetOf chosenModes legal && Set.size chosenModes == fromIntegral count) $ do
-          let sets = Target.legalSets (Card.modesTargetSpecs chosenModes card) gs
+          let sets = Target.legalSetsExcluding oid (Card.modesTargetSpecs chosenModes card) gs
               -- CR 601.2b precedes 601.2c: choose X before targets, and only when
               -- the cost carries a Variable (a spell with no {X} is not asked).
               hasVariable = case cost of

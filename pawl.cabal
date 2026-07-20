@@ -73,6 +73,7 @@ library
     Pawl.Game
     Pawl.Json
     Pawl.Mana
+    Pawl.Modal
     Pawl.Projection
     Pawl.Quantity
     Pawl.Replay

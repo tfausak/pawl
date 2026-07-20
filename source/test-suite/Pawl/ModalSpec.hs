@@ -5,6 +5,7 @@
 module Pawl.ModalSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Cards as Cards
@@ -12,16 +13,24 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
+import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.Modal as ModalT
+import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeIndex as ModeIndex
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
@@ -102,7 +111,7 @@ falsifierTests cards =
               HU.assertEqual
                 "the Wall mode (0) is absent from the fillable set"
                 (Set.fromList [ModeIndex.MkModeIndex 1, ModeIndex.MkModeIndex 2])
-                (Cast.fillableModes oid gs1)
+                (Target.fillableModes oid (Card.Type.spell (Printing.card (Cards.chaosCharmPrinting cards))) gs1)
     ]
 
 -- CR 601.2c/700.2c: only the CHOSEN mode's slots are ever prompted or stamped
@@ -188,6 +197,29 @@ nonlandPermanentTargetTests cards =
               got
     ]
 
+-- M4h task 2: the mode-scoped reader folds, lifted off Pawl.Card onto
+-- Pawl.Modal (a card-free Modal card -> ... shape shared by the spell and,
+-- later, both ability types). Card.Type.Card just fixes the ambiguous `card`
+-- type parameter -- these two Modes never mention a card value.
+modalReaderTests :: Tasty.TestTree
+modalReaderTests =
+  Tasty.testGroup
+    "M4h Modal reader"
+    [ HU.testCase "modesEffects reads only chosen modes, ModeIndex order" $ do
+        let m =
+              ModalT.MkModal
+                ( Seq.fromList
+                    [ Mode.MkMode (Seq.singleton (Effect.Draw (Quantity.Literal 1))) Map.empty,
+                      Mode.MkMode (Seq.singleton Effect.RegenerateSelf) Map.empty
+                    ]
+                )
+                (ModeSelection.ChooseExactly 1) ::
+                ModalT.Modal Card.Type.Card
+            chosen = Set.singleton (ModeIndex.MkModeIndex 1)
+        HU.assertEqual "only mode 1's effect" [Effect.RegenerateSelf] (Modal.modesEffects chosen m)
+        HU.assertEqual "selectionCount is the ChooseExactly count" 1 (Modal.selectionCount m)
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
@@ -197,5 +229,6 @@ tests cards =
       onlyChosenModeTests cards,
       fizzleTests cards,
       forcedTests cards,
-      nonlandPermanentTargetTests cards
+      nonlandPermanentTargetTests cards,
+      modalReaderTests
     ]

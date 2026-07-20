@@ -1,15 +1,22 @@
 module Pawl.Target where
 
+import qualified Data.Foldable as Foldable
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
+import Pawl.Type.Card (Card)
 import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import Pawl.Type.ModeIndex (ModeIndex)
+import qualified Pawl.Type.ModeIndex as ModeIndex
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
@@ -108,3 +115,18 @@ legalSetsExcluding :: ObjectId -> Map SlotName TargetSpec -> GameState -> Map Sl
 legalSetsExcluding source specs gs =
   let drop1 spec s = if selfExcludes spec then Set.delete (Recipient.ToObject source) s else s
    in Map.map (\spec -> drop1 spec (legalRecipients spec gs)) specs
+
+-- CR 700.2a: the mode indices all of whose target slots have a legal recipient
+-- (a mode with no slots is trivially fillable). Self-exclusion ("another") is
+-- honored via legalSetsExcluding, so a mode whose only nonland-permanent target
+-- is the source itself is NOT fillable. Shared by spells (Cast) and abilities
+-- (Activate/Engine).
+fillableModes :: ObjectId -> Modal.Modal Card -> GameState -> Set ModeIndex
+fillableModes source modal gs =
+  let ms = Foldable.toList (Modal.modes modal)
+      fillable i m =
+        let sets = legalSetsExcluding source (Mode.targetSpecs m) gs
+         in if any Set.null (Map.elems sets)
+              then Nothing
+              else Just (ModeIndex.MkModeIndex (fromIntegral i))
+   in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Int ..] ms))

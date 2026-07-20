@@ -4,16 +4,12 @@
 -- half never depends on a card's identity) is enforced by the module graph.
 module Pawl.Card where
 
-import qualified Data.Foldable as Foldable
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.Effect (Effect)
-import qualified Pawl.Type.Modal as Modal
-import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.TargetSpec (TargetSpec)
@@ -24,38 +20,29 @@ import qualified Pawl.Type.TypeLine as TypeLine
 -- and the text-change scan (M3d) range over all of them regardless of what is
 -- chosen.
 allEffects :: Card.Card -> [Effect Card.Card]
-allEffects card =
-  concatMap (Foldable.toList . Mode.effects) (Modal.modes (Card.spell card))
+allEffects card = Modal.allEffects (Card.spell card)
 
 -- The union of every mode's target specs (slot names are unique across a
 -- card's modes by authoring discipline; the D4 lint enforces per-mode
 -- resolution).
 allTargetSpecs :: Card.Card -> Map SlotName TargetSpec
-allTargetSpecs card =
-  Map.unions (map Mode.targetSpecs (Foldable.toList (Modal.modes (Card.spell card))))
+allTargetSpecs card = Modal.allTargetSpecs (Card.spell card)
 
 -- The target specs of one mode by index (CR 700.2c: only the chosen mode's
 -- slots). Nothing if the index is out of range (total).
 modeTargetSpecs :: ModeIndex.ModeIndex -> Card.Card -> Maybe (Map SlotName TargetSpec)
-modeTargetSpecs (ModeIndex.MkModeIndex n) card =
-  fmap Mode.targetSpecs (Seq.lookup (fromIntegral n) (Modal.modes (Card.spell card)))
+modeTargetSpecs idx card = Modal.modeTargetSpecs idx (Card.spell card)
 
 -- CR 608.2c/700.2: the effects of the CHOSEN modes only, in printed (mode
 -- index, then written) order -- the Set is already sorted by ModeIndex's Ord.
 -- Out-of-range indices contribute nothing (total via Seq.lookup).
 modesEffects :: Set.Set ModeIndex.ModeIndex -> Card.Card -> [Effect Card.Card]
-modesEffects chosen card =
-  let ms = Modal.modes (Card.spell card)
-      modeAt (ModeIndex.MkModeIndex n) = maybe [] (Foldable.toList . Mode.effects) (Seq.lookup (fromIntegral n) ms)
-   in concatMap modeAt (Set.toAscList chosen)
+modesEffects chosen card = Modal.modesEffects chosen (Card.spell card)
 
 -- CR 601.2c/700.2c: the target specs of the CHOSEN modes only (union). Only
 -- these slots are prompted at cast and re-validated at CR 608.2b.
 modesTargetSpecs :: Set.Set ModeIndex.ModeIndex -> Card.Card -> Map SlotName TargetSpec
-modesTargetSpecs chosen card =
-  let ms = Modal.modes (Card.spell card)
-      specsAt (ModeIndex.MkModeIndex n) = maybe Map.empty Mode.targetSpecs (Seq.lookup (fromIntegral n) ms)
-   in Map.unions (map specsAt (Set.toAscList chosen))
+modesTargetSpecs chosen card = Modal.modesTargetSpecs chosen (Card.spell card)
 
 isLand :: Card.Card -> Bool
 isLand c = Set.member CardType.Land (TypeLine.types (Card.typeLine c))
