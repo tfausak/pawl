@@ -207,7 +207,6 @@ rewriteEffect pairs effect = case effect of
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
   Effect.Untap _ -> effect
-  -- No rewritable land-type word.
   Effect.GainControl _ _ -> effect
 
 -- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
@@ -251,7 +250,7 @@ resolveSpell oid = do
          in if fizzles
               then State.modify' (Event.changeZone oid Zone.Graveyard)
               else do
-                -- CR 613 / 608.2g: the resolving spell's controller, projected --
+                -- CR 613 / 608.2c: the resolving spell's controller, projected --
                 -- a spell has no control effect, so this is Object.owner obj
                 -- unchanged, but a controlled permanent's later ability (below)
                 -- needs this same projection to resolve under the thief.
@@ -276,7 +275,7 @@ resolveEffects stackId srcId effects specs = do
             Just spec -> Target.stillLegal recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           fizzles = not (Map.null specs) && not (or (Map.elems legality))
-          -- CR 613 / 608.2g: the source PERMANENT's controller, projected -- so a
+          -- CR 613 / 608.2c: the source PERMANENT's controller, projected -- so a
           -- controlled permanent's ability (e.g. a stolen creature's tap ability)
           -- resolves under the thief, not the original owner.
           effectController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf srcId gs)
