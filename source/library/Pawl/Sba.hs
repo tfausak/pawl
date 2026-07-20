@@ -3,11 +3,13 @@ module Pawl.Sba where
 import Control.Applicative ((<|>))
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Departure as Departure
 import Pawl.Type.GameState (GameState)
@@ -143,6 +145,24 @@ performStateBasedActions gs =
           let g1 = Game.removeFromZones (Object.owner obj) oid g
            in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
       vanished = List.foldl' ceaseToExist departed vanishing
+      -- CR 704.5q / 122.3: a permanent with both a +1/+1 and a -1/-1 counter has N
+      -- of each removed (N = min). A counter-count edit, not a bury or departure --
+      -- it feeds the `acted` flag (CR 704.4 repeats) but never re-fires once
+      -- balanced. Net P/T is preserved, so it can neither cause nor prevent a
+      -- death; ordering vs the bury/destroy step is immaterial.
+      annihilateOne oid = case Game.lookupObject oid gs of
+        Nothing -> Nothing
+        Just obj ->
+          let cs = Object.counters obj
+              plus = Map.findWithDefault 0 CounterKind.PlusOnePlusOne cs
+              minus = Map.findWithDefault 0 CounterKind.MinusOneMinusOne cs
+              n = min plus minus
+           in if n > 0 then Just (oid, n) else Nothing
+      annihilations = Maybe.mapMaybe annihilateOne onBattlefield
+      removeN n c = let c' = c - n in if c' == 0 then Nothing else Just c'
+      balance g (oid, n) =
+        let strip obj = obj {Object.counters = Map.update (removeN n) CounterKind.MinusOneMinusOne (Map.update (removeN n) CounterKind.PlusOnePlusOne (Object.counters obj))}
+         in g {GameState.objects = Map.adjust strip oid (GameState.objects g)}
       outcome = case remaining of
         [winner] -> Just (Result.Won winner)
         [] -> if null leaving then Nothing else Just Result.Drawn
@@ -155,5 +175,6 @@ performStateBasedActions gs =
       -- (a regenerated creature still counts, which the CR 704.4 settle loop
       -- re-checks and -- because the regen healed the damage -- terminates), a
       -- player left, or a token ceased to exist.
-      acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing)
-   in (acted, drained {GameState.result = outcome <|> GameState.result drained})
+      balanced = List.foldl' balance drained annihilations
+      acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations)
+   in (acted, balanced {GameState.result = outcome <|> GameState.result balanced})

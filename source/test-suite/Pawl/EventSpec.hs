@@ -8,6 +8,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -188,5 +189,24 @@ tests cards =
             handCounters = map (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h bounced)) (Game.zoneMembers Zone.Hand S.bob bounced)
          in do
               HU.assertEqual "counter present before the move" (Map.fromList [(CounterKind.PlusOnePlusOne, 2)]) (maybe Map.empty Object.counters (Game.lookupObject oid withCounter))
-              HU.assertEqual "the one new incarnation in hand has no counters" [Map.empty] handCounters
+              HU.assertEqual "the one new incarnation in hand has no counters" [Map.empty] handCounters,
+      HU.testCase "CR 704.5q both counter kinds annihilate to zero (symmetric)" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 0
+            (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            gs1 = S.addCounter CounterKind.PlusOnePlusOne 1 oid gs0
+            gs2 = S.addCounter CounterKind.MinusOneMinusOne 1 oid gs1
+            after = Sba.checkStateBasedActions gs2
+         in HU.assertEqual "no counters remain" Map.empty (maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject oid after)),
+      HU.testCase "CR 704.5q annihilation removes N = min (asymmetric)" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 0
+            (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            gs1 = S.addCounter CounterKind.PlusOnePlusOne 2 oid gs0
+            gs2 = S.addCounter CounterKind.MinusOneMinusOne 1 oid gs1
+            after = Sba.checkStateBasedActions gs2
+         in do
+              HU.assertEqual "one +1/+1 remains" (Just 1) (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid after))
+              HU.assertEqual "no -1/-1 remains" (Just 0) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject oid after))
+              -- Net P/T unchanged by annihilation: base 2/1 + net +1/+1 = 3/2.
+              HU.assertEqual "power still 3" (Just 3) (Projection.powerOf oid after)
+              HU.assertEqual "toughness still 2" (Just 2) (Projection.toughnessOf oid after)
     ]
