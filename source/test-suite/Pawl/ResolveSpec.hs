@@ -617,6 +617,16 @@ zoneChangeTests cards =
               HU.assertEqual "no creature on the battlefield" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "a card in bob's hand (its owner)" 1 (S.handSize S.bob after)
               HU.assertEqual "Unsummon in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 701.19a regeneration does not save a bounced creature" $
+        let base = S.landsInPlay (Cards.islandPrinting cards) 1
+            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            shielded = S.addRegenShield victim withFoe
+            (gs, spellId) = S.handOne (Cards.unsummonPrinting cards) shielded
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "the creature left the battlefield (bounce is not a destruction)" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "it is in bob's hand" 1 (length (Game.zoneMembers Zone.Hand S.bob after)),
       HU.testCase "CR 701.10 Angelic Edict exiles a target creature" $
         let base = S.landsInPlay (Cards.plainsPrinting cards) 5
             (_, withPiker) = S.addPiker cards S.bob base

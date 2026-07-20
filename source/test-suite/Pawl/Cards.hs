@@ -221,7 +221,11 @@ greenDeck cards =
   Deck.MkDeck $
     Map.fromList
       [ (forestPrinting cards, 36),
-        (warMammothPrinting cards, 16),
+        (warMammothPrinting cards, 12),
+        -- Fog swaps in for four War Mammoths to keep the deck at 60 (card-backed
+        -- conservation stays 120) and give random green games combat-damage
+        -- prevention coverage (CR 615).
+        (fogPrinting cards, 4),
         (giantGrowthPrinting cards, 4),
         (serpentsGiftPrinting cards, 4)
       ]
@@ -244,7 +248,10 @@ blackDeck cards =
   Deck.MkDeck $
     Map.fromList
       [ (swampPrinting cards, 36),
-        (typhoidRatsPrinting cards, 16),
+        (typhoidRatsPrinting cards, 12),
+        -- Drudge Skeletons swaps in for four Typhoid Rats (deck stays 60) so random
+        -- black games exercise regeneration against Murder's destroy (CR 701.19a).
+        (drudgeSkeletonsPrinting cards, 4),
         -- Murder and Mind Rot give Destroy and Discard random-play coverage.
         (murderPrinting cards, 4),
         (mindRotPrinting cards, 4)

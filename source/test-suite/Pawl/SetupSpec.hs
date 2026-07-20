@@ -40,14 +40,16 @@ deckTests cards =
         let Deck.MkDeck m = Cards.greenDeck cards
          in do
               HU.assertEqual "forests" (Just 36) (Map.lookup (Cards.forestPrinting cards) m)
-              HU.assertEqual "mammoths" (Just 16) (Map.lookup (Cards.warMammothPrinting cards) m)
+              HU.assertEqual "mammoths" (Just 12) (Map.lookup (Cards.warMammothPrinting cards) m)
+              HU.assertEqual "fogs" (Just 4) (Map.lookup (Cards.fogPrinting cards) m)
               HU.assertEqual "giant growths" (Just 4) (Map.lookup (Cards.giantGrowthPrinting cards) m)
               HU.assertEqual "serpent's gifts" (Just 4) (Map.lookup (Cards.serpentsGiftPrinting cards) m),
       HU.testCase "black deck composition" $
         let Deck.MkDeck m = Cards.blackDeck cards
          in do
               HU.assertEqual "swamps" (Just 36) (Map.lookup (Cards.swampPrinting cards) m)
-              HU.assertEqual "rats" (Just 16) (Map.lookup (Cards.typhoidRatsPrinting cards) m)
+              HU.assertEqual "rats" (Just 12) (Map.lookup (Cards.typhoidRatsPrinting cards) m)
+              HU.assertEqual "drudge skeletons" (Just 4) (Map.lookup (Cards.drudgeSkeletonsPrinting cards) m)
               HU.assertEqual "murders" (Just 4) (Map.lookup (Cards.murderPrinting cards) m)
               HU.assertEqual "mind rots" (Just 4) (Map.lookup (Cards.mindRotPrinting cards) m),
       HU.testCase "36 Mountains per player after a red-red setup" $
