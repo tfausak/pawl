@@ -57,7 +57,7 @@
 **Interfaces:**
 - Produces: `TargetSpec.NonlandPermanentTarget`; `Target.selfExcludes :: TargetSpec -> Bool`; `Target.legalSetsExcluding :: ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ModalSpec.hs` inside its `tests` tree (a new `Tasty.testGroup "M4h NonlandPermanentTarget"`). Use `Pawl.Support` (`as S`) fixtures the way the existing groups do; build a battlefield with two nonland permanents (a creature and an artifact) plus a land, then assert legality and self-exclusion:
 
@@ -78,12 +78,12 @@ Add to `source/test-suite/Pawl/ModalSpec.hs` inside its `tests` tree (a new `Tas
       got
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "NonlandPermanentTarget"'`
 Expected: FAIL to **compile** ("Data constructor not in scope: TargetSpec.NonlandPermanentTarget" / "Variable not in scope: Target.legalSetsExcluding").
 
-- [ ] **Step 3a: Add the constructor and legality arm**
+- [x] **Step 3a: Add the constructor and legality arm**
 
 In `source/library/Pawl/Type/TargetSpec.hs`, add before the final `deriving`:
 
@@ -137,11 +137,11 @@ legalSetsExcluding source specs gs =
 
 `Target.hs` already imports `CardType`, `GameState`, `Recipient`, `Set`, `Map`, `SlotName`, `ObjectId`? It imports `CardType`, `GameState`, `Recipient`, `Set`, `Map`, `Projection`. Add `import Pawl.Type.ObjectId (ObjectId)` if absent (it is used by `legalSetsExcluding`).
 
-- [ ] **Step 3b: Add the Support helper the test needs**
+- [x] **Step 3b: Add the Support helper the test needs**
 
 In `source/test-suite/Pawl/Support.hs`, add a fixture that places one creature, one artifact (use `Cards.darksteelMyrPrinting` — a `{3}` artifact creature; it is both, so instead use a genuinely non-creature artifact: `Cards.mindslaverPrinting`), and one land on the battlefield, plus accessors `creatureId`/`artifactId`. Follow the existing Support pattern for placing objects (`S.place`/`S.withBattlefield` — match whatever the file already exposes). Keep it minimal and named clearly. (If Support already has a general "place these printings on the battlefield" helper, use it and add only the accessors.)
 
-- [ ] **Step 3c: Add the Codec arm**
+- [x] **Step 3c: Add the Codec arm**
 
 In `source/library/Pawl/Codec.hs`, find `targetSpecToJson` and `jsonToTargetSpec` (they handle `WallTarget`); add the nullary tagged arm alongside it:
 
@@ -152,12 +152,12 @@ In `source/library/Pawl/Codec.hs`, find `targetSpecToJson` and `jsonToTargetSpec
     ("NonlandPermanentTarget", Nothing) -> Right TargetSpec.NonlandPermanentTarget
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cabal test --test-options='-p "NonlandPermanentTarget"'`
 Expected: PASS (both cases).
 
-- [ ] **Step 5: Build warning-clean and commit**
+- [x] **Step 5: Build warning-clean and commit**
 
 Run: `cabal build all --enable-tests --enable-benchmarks` → zero warnings.
 Then `git add -A && hooky fix && git add -A && hooky run`.
@@ -183,7 +183,7 @@ git commit -m "M4h: NonlandPermanentTarget + self-exclusion (CR 'another')"
 - Consumes: `TargetSpec.NonlandPermanentTarget`, `Target.legalSetsExcluding` (Task 1).
 - Produces: `Modal.allEffects`/`allTargetSpecs`/`modesEffects`/`modesTargetSpecs`/`selectionCount :: … Modal card → …`; `Target.fillableModes :: ObjectId -> Modal.Modal Card -> GameState -> Set ModeIndex`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `ModalSpec.hs` a `Tasty.testGroup "M4h Modal reader"`:
 
@@ -201,12 +201,12 @@ Add to `ModalSpec.hs` a `Tasty.testGroup "M4h Modal reader"`:
 
 (Adjust the qualified names to whatever `ModalSpec.hs` already imports; add `import qualified Pawl.Modal as Modal`, `Pawl.Type.Modal as Modal.Type`? — keep the *type* as `Modal.Type.MkModal` only if the logic alias collides. Simplest: `import qualified Pawl.Type.Modal as ModalT` for the constructor and `import qualified Pawl.Modal as Modal` for the functions.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test --test-options='-p "Modal reader"'`
 Expected: FAIL to compile ("Not in scope: Modal.modesEffects").
 
-- [ ] **Step 3a: Create `Pawl.Modal`**
+- [x] **Step 3a: Create `Pawl.Modal`**
 
 `source/library/Pawl/Modal.hs`. Lift the folds M4g put on `Pawl.Card` (they are card-agnostic over a `Modal card`):
 
@@ -261,7 +261,7 @@ selectionCount m = case Modal.selection m of
   ModeSelection.ChooseExactly n -> n
 ```
 
-- [ ] **Step 3b: Delegate `Pawl.Card`'s readers**
+- [x] **Step 3b: Delegate `Pawl.Card`'s readers**
 
 In `source/library/Pawl/Card.hs`, replace the bodies of `allEffects`/`allTargetSpecs`/`modesEffects`/`modesTargetSpecs`/`modeTargetSpecs` with delegations to `Pawl.Modal` over `Card.spell` (keep their signatures and comments). Example:
 
@@ -275,7 +275,7 @@ modesEffects chosen card = Modal.modesEffects chosen (Card.spell card)
 
 Add `import qualified Pawl.Modal as Modal`; remove any now-unused imports (`Foldable`, `Seq`) the deleted bodies used.
 
-- [ ] **Step 3c: Add `Target.fillableModes`**
+- [x] **Step 3c: Add `Target.fillableModes`**
 
 In `source/library/Pawl/Target.hs`, generalize what `Cast.fillableModes` did (now source-aware for self-exclusion):
 
@@ -298,7 +298,7 @@ fillableModes source modal gs =
 
 Add imports to `Target.hs`: `qualified Data.Foldable as Foldable`, `qualified Data.Maybe as Maybe`, `Pawl.Type.Card (Card)`, `qualified Pawl.Type.Modal as Modal`, `qualified Pawl.Type.Mode as Mode`, `Pawl.Type.ModeIndex (ModeIndex)`, `qualified Pawl.Type.ModeIndex as ModeIndex`.
 
-- [ ] **Step 3d: Route `Cast` through `Target`**
+- [x] **Step 3d: Route `Cast` through `Target`**
 
 In `source/library/Pawl/Cast.hs`:
 - Delete the local `fillableModes` function.
@@ -307,12 +307,12 @@ In `source/library/Pawl/Cast.hs`:
 - In `castableWhileSearching`, `targetable oid gs` already calls the updated `Target.fillableModes`; no direct `legalSets` call there to change (verify — if `targetable` is the only path, nothing else changes).
 - Remove now-unused imports (`Modal.Mode`, `ModeIndex`, `ModeSelection`, `Foldable`, `Maybe`) that only the deleted `fillableModes` used; keep what `castSpell` still needs.
 
-- [ ] **Step 4: Run the reader test and the full suite**
+- [x] **Step 4: Run the reader test and the full suite**
 
 Run: `cabal test --test-options='-p "Modal reader"'` → PASS.
 Run: `cabal test` → the **entire existing suite stays green** (this refactor is behavior-preserving: `Cast` routes through the same logic, spells never self-exclude).
 
-- [ ] **Step 5: Build warning-clean and commit**
+- [x] **Step 5: Build warning-clean and commit**
 
 Run: `cabal build all --enable-tests --enable-benchmarks` → zero warnings (run `cabal-gild` via `hooky fix` so `Pawl.Modal` joins `exposed-modules`).
 
@@ -335,7 +335,7 @@ git commit -m "M4h: Pawl.Modal reader + Target.fillableModes; Cast routes throug
 - Consumes: `Pawl.Modal` readers (Task 2), `Target.fillableModes`/`legalSetsExcluding` (Tasks 1–2).
 - Produces: `ActivatedAbility.MkActivatedAbility { cost :: AbilityCost, modal :: Modal card }`.
 
-- [ ] **Step 1: Reshape the type**
+- [x] **Step 1: Reshape the type**
 
 `source/library/Pawl/Type/ActivatedAbility.hs`:
 
@@ -358,12 +358,12 @@ data ActivatedAbility card = MkActivatedAbility
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 2: Run the build to see every break**
+- [x] **Step 2: Run the build to see every break**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `ActivatedAbility.effects`/`targetSpecs` gone; errors in `Mana`, `Activate`, `Resolve`, `Stack`, `Codec`.
 
-- [ ] **Step 3a: `Mana.hs`**
+- [x] **Step 3a: `Mana.hs`**
 
 Replace `ActivatedAbility.effects ab` with `Modal.allEffects (ActivatedAbility.modal ab)` and `ActivatedAbility.targetSpecs ab` with `Modal.allTargetSpecs (ActivatedAbility.modal ab)` (add `import qualified Pawl.Modal as Modal`):
 
@@ -375,7 +375,7 @@ Replace `ActivatedAbility.effects ab` with `Modal.allEffects (ActivatedAbility.m
     && Map.null (Modal.allTargetSpecs (ActivatedAbility.modal ab))
 ```
 
-- [ ] **Step 3b: `Resolve.hs` — `resolveAbility` reads chosen modes**
+- [x] **Step 3b: `Resolve.hs` — `resolveAbility` reads chosen modes**
 
 `resolveEffects` keeps its signature `ObjectId -> ObjectId -> [Effect Card] -> Map SlotName TargetSpec -> Game ()`. Rewrite `resolveAbility` to compute mode-scoped effects/specs from the object's chosen modes:
 
@@ -393,7 +393,7 @@ resolveAbility abilId srcId ability = do
 
 Add `import qualified Pawl.Modal as Modal`.
 
-- [ ] **Step 3c: `Stack.hs` — `OfAbility` arm's search scan**
+- [x] **Step 3c: `Stack.hs` — `OfAbility` arm's search scan**
 
 Replace `any Resolve.searchesLibrary (ActivatedAbility.effects ability)` with the chosen-modes effects (Evolving Wilds is single-mode, so `chosen = {0}` and behavior is unchanged):
 
@@ -407,7 +407,7 @@ Replace `any Resolve.searchesLibrary (ActivatedAbility.effects ability)` with th
 
 Add `import qualified Pawl.Binding as Binding` and `import qualified Pawl.Modal as Modal` to `Stack.hs`.
 
-- [ ] **Step 3d: `Activate.hs` — mode-aware `activatable`, forced-mode stamping**
+- [x] **Step 3d: `Activate.hs` — mode-aware `activatable`, forced-mode stamping**
 
 In `activatable`, replace the target line
 `&& not (any Set.null (Map.elems (Target.legalSets (ActivatedAbility.targetSpecs ability) gs)))`
@@ -439,7 +439,7 @@ In `activateAbility`, after putting the object on the stack, stamp the **forced*
 
 `chosenModes` for every existing single-mode ability is `{MkModeIndex 0}`, forced, unprompted — behavior identical. Add `import qualified Pawl.Modal as Modal` to `Activate.hs`; the old `decider`/`sets` bindings are replaced in place.
 
-- [ ] **Step 3e: `Codec.hs` — reshape the activated arm**
+- [x] **Step 3e: `Codec.hs` — reshape the activated arm**
 
 ```haskell
 activatedAbilityToJson aa =
@@ -457,7 +457,7 @@ jsonToActivatedAbility value = do
 
 Remove imports of `effectToJson`/`targetSpecsToJson` **only if** nothing else uses them (they are used by `modeToJson` and elsewhere — leave them).
 
-- [ ] **Step 3f: Migrate the five activated JSON files**
+- [x] **Step 3f: Migrate the five activated JSON files**
 
 For each of `prodigal-sorcerer`, `llanowar-elves`, `evolving-wilds`, `mindslaver`, `drudge-skeletons`, re-nest the single ability's `effects`/`targetSpecs` under a `modal` object with one mode. Example — `prodigal-sorcerer.json`'s `activatedAbilities` becomes:
 
@@ -467,12 +467,12 @@ For each of `prodigal-sorcerer`, `llanowar-elves`, `evolving-wilds`, `mindslaver
 
 Apply the identical transform to the other four (each has exactly one activated ability): wrap its `effects`+`targetSpecs` in `{"modal":{"modes":[{"effects":…,"targetSpecs":…}],"selection":{"type":"ChooseExactly","value":1}}}`, dropping the old flat `effects`/`targetSpecs` keys, keeping `cost` unchanged.
 
-- [ ] **Step 4: Build and run the full suite**
+- [x] **Step 4: Build and run the full suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks` → zero warnings.
 Run: `cabal test` → green. The `allPrintings` honesty round-trip (CodecSpec) re-parses/re-renders the five migrated files byte-stable; `loadCards` fails loudly in IO if any file is mis-nested. Prodigal Sorcerer still pings, Llanowar Elves is still a mana ability (off the stack), Evolving Wilds still offers cast-while-searching, Mindslaver/Drudge Skeletons unchanged.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -493,7 +493,7 @@ git commit -m "M4h: reshape ActivatedAbility to a Modal payload (behavior-preser
 - Consumes: `Pawl.Modal` readers, `Target.fillableModes`.
 - Produces: `TriggeredAbility.MkTriggeredAbility { condition :: TriggerCondition, modal :: Modal card }`.
 
-- [ ] **Step 1: Reshape the type**
+- [x] **Step 1: Reshape the type**
 
 `source/library/Pawl/Type/TriggeredAbility.hs`:
 
@@ -515,12 +515,12 @@ data TriggeredAbility card = MkTriggeredAbility
 
 `Event.triggersFrom`'s type `[(ObjectId, PlayerId, TriggeredAbility Card)]` is unchanged (the reshape is internal).
 
-- [ ] **Step 2: Run the build to see the breaks**
+- [x] **Step 2: Run the build to see the breaks**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — errors in `Stack` (`OfTrigger` arm), `Engine.placeOne`, `Codec`.
 
-- [ ] **Step 3a: `Stack.hs` — `OfTrigger` arm reads chosen modes**
+- [x] **Step 3a: `Stack.hs` — `OfTrigger` arm reads chosen modes**
 
 ```haskell
         Source.OfTrigger srcId ability ->
@@ -531,7 +531,7 @@ Expected: FAIL — errors in `Stack` (`OfTrigger` arm), `Engine.placeOne`, `Code
 
 (`Binding`/`Modal` imports were added to `Stack.hs` in Task 3a.)
 
-- [ ] **Step 3b: `Engine.placeOne` — stamp the forced mode**
+- [x] **Step 3b: `Engine.placeOne` — stamp the forced mode**
 
 `placeOne` must stamp the forced chosen modes so `resolveEffects` reads them (an empty `bindings` would make `modesOf` empty → no effects). Rest in Peace is a single empty-target mode, so this is `{MkModeIndex 0}`, forced, no target prompt:
 
@@ -559,7 +559,7 @@ placeOne (srcId, controller, ability) = do
 
 Add to `Engine.hs`: `import qualified Pawl.Binding as Binding`, `import qualified Pawl.Target as Target`, `import qualified Pawl.Type.TriggeredAbility as TriggeredAbility` (verify which are already present). Note: for Rest in Peace, `fillableModes` on its single empty-slot mode returns `{MkModeIndex 0}` (trivially fillable), so `chosenModes = {0}` and its ETB effects resolve exactly as before.
 
-- [ ] **Step 3c: `Codec.hs` — reshape the triggered arm**
+- [x] **Step 3c: `Codec.hs` — reshape the triggered arm**
 
 ```haskell
 triggeredAbilityToJson ta =
@@ -575,7 +575,7 @@ jsonToTriggeredAbility value = do
   pure (TriggeredAbility.MkTriggeredAbility c m)
 ```
 
-- [ ] **Step 3d: Migrate `rest-in-peace.json`**
+- [x] **Step 3d: Migrate `rest-in-peace.json`**
 
 Re-nest its one triggered ability's `effects`/`targetSpecs` under a one-mode `modal`:
 
@@ -585,12 +585,12 @@ Re-nest its one triggered ability's `effects`/`targetSpecs` under a one-mode `mo
 
 (Copy the exact `effects` array from the current file — the shape above is Rest in Peace's; confirm against the file before editing.)
 
-- [ ] **Step 4: Build and run the full suite**
+- [x] **Step 4: Build and run the full suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks` → zero warnings.
 Run: `cabal test` → green. Rest in Peace still exiles all graveyards on ETB and still redirects graveyard→exile; the round-trip re-renders `rest-in-peace.json` byte-stable.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -611,7 +611,7 @@ git commit -m "M4h: reshape TriggeredAbility to a Modal payload (behavior-preser
 - Consumes: `Target.fillableModes`, `Modal.selectionCount`/`modesTargetSpecs`, `Prompt.ChooseModes`, `Binding.fromChoices`.
 - Produces: `Cards.syntheticModalActivatedPrinting :: Cards -> Printing`.
 
-- [ ] **Step 1: Add the fixture card**
+- [x] **Step 1: Add the fixture card**
 
 `data/cards/synthetic-modal-activated.json` — a `{}` -costed 2/2 creature whose activated ability (`{1}`, no `{T}`, so no sickness gate to fight in the test) is `ChooseExactly 1` over two `CreatureTarget` modes (`DealDamage 1` / put a `+1/+1` counter). Name it clearly as a fixture:
 
@@ -621,11 +621,11 @@ git commit -m "M4h: reshape TriggeredAbility to a Modal payload (behavior-preser
 
 (Confirm the exact `PutCounters` JSON shape against `data/cards/battlegrowth.json` before writing — copy its tag order.)
 
-- [ ] **Step 2: Register it in the test pool**
+- [x] **Step 2: Register it in the test pool**
 
 In `source/test-suite/Pawl/Cards.hs`: add `syntheticModalActivatedPrinting :: Printing.Printing` to the `Cards` record, a `syntheticModalActivatedPrinting_ <- loadPrinting "synthetic-modal-activated"` line in `loadCards` (and the field in the returned record), and `syntheticModalActivatedPrinting cards` to `allPrintings`.
 
-- [ ] **Step 3: Write the failing test**
+- [x] **Step 3: Write the failing test**
 
 In `ModalSpec.hs`, a `Tasty.testGroup "M4h activation modal (CR 602.2b)"` with a gameplay test: put the Synthetic Modal Activator and a second target creature on the battlefield under a player, give the player `{1}`, activate the ability answering `ChooseModes` with mode 0, then a creature target; assert the target took 1 damage and **no** +1/+1 counter (only the chosen mode resolved). Model the prompt-answering on the existing `ModalSpec` cast tests (they already answer `ChooseModes`/`ChooseTargets` through the `Program` interpreter / `S` harness):
 
@@ -642,12 +642,12 @@ In `ModalSpec.hs`, a `Tasty.testGroup "M4h activation modal (CR 602.2b)"` with a
 
 Fill these in with the concrete `S`/`Program` harness the file already uses for the Chaos Charm activation-adjacent tests (match `ActivateSpec.hs`'s prompt-answering helper for activation).
 
-- [ ] **Step 4: Run to verify it fails**
+- [x] **Step 4: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "activation modal"'`
 Expected: FAIL — with the current forced-only `activateAbility` (Task 3a), a two-legal-mode ability is not prompted; `Target.fillableModes` returns `{0,1}`, `count = 1`, and the forced path takes `chosenModes = {0,1}` (size 2 ≠ 1), so stamping/targeting is wrong and the assertion fails (or the `ChooseModes` answer is never consumed).
 
-- [ ] **Step 5: Add the prompt branch**
+- [x] **Step 5: Add the prompt branch**
 
 In `Activate.activateAbility`, replace the forced `chosenModes = Target.fillableModes …` with a prompt-or-forced choice mirroring `Cast.castSpell`, and validate:
 
@@ -678,12 +678,12 @@ In `Activate.activateAbility`, replace the forced `chosenModes = Target.fillable
 
 For every existing single-mode ability, `Set.size legal (1) <= count (1)` → forced, unprompted — behavior unchanged (rerun full suite in Step 6).
 
-- [ ] **Step 6: Run the test and full suite**
+- [x] **Step 6: Run the test and full suite**
 
 Run: `cabal test --test-options='-p "activation modal"'` → PASS.
 Run: `cabal test` → green (single-mode abilities still unprompted).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -704,7 +704,7 @@ git commit -m "M4h: mode choice in the activation path (CR 602.2b) + fixture"
 - Consumes: `Target.fillableModes`/`legalSetsExcluding`, `Modal.selectionCount`/`modesTargetSpecs`, `Prompt.ChooseModes`/`ChooseTargets`, `Binding.fromChoices`.
 - Produces: `Cards.aetherChannelerPrinting :: Cards -> Printing`.
 
-- [ ] **Step 1: Add the gate card**
+- [x] **Step 1: Add the gate card**
 
 `data/cards/aether-channeler.json` — `{2}{U}` `Creature — Human Wizard` 3/3, no `spell` effects, one ETB `TriggeredAbility` (`SelfEnters`) with a three-mode `ChooseExactly 1` `Modal`: mode 0 `Create (Literal 1) <bird>` (no targets), mode 1 `MoveToZone "permanent" Hand` (`NonlandPermanentTarget`), mode 2 `Draw (Literal 1)` (no targets). The Bird token is a nested card (1/1 `Creature — Bird`, `Flying`, empty spell/abilities) — copy the exact token shape from `data/cards/dragon-fodder.json` and swap name/subtype/keywords:
 
@@ -714,11 +714,11 @@ git commit -m "M4h: mode choice in the activation path (CR 602.2b) + fixture"
 
 (Verify `Wizard` exists in `Pawl.Type.Subtype`; if not, either add it — a one-line enum addition with a Codec arm — or use only `Human`. Verify the `MoveToZone`/`Keyword.Flying`/`OfType Blue` JSON tags against `unsummon.json`/an existing flyer/`lightning-bolt.json` before writing.)
 
-- [ ] **Step 2: Register it in the test pool**
+- [x] **Step 2: Register it in the test pool**
 
 In `Cards.hs`: add `aetherChannelerPrinting` field, `loadPrinting "aether-channeler"`, and the `allPrintings` entry (as in Task 4 Step 2).
 
-- [ ] **Step 3: Write the failing tests**
+- [x] **Step 3: Write the failing tests**
 
 In `ModalSpec.hs`, `Tasty.testGroup "M4h trigger modal (CR 700.2b/603.3d)"` — put Aether Channeler onto the battlefield through `Event.createToken`? No: it enters as a resolved permanent, so cast/resolve it or place it via the existing "enters the battlefield" harness the RiP tests use, then run `Engine.placePendingTriggers` answering `ChooseModes` and (for mode 1) `ChooseTargets`:
 
@@ -736,12 +736,12 @@ In `ModalSpec.hs`, `Tasty.testGroup "M4h trigger modal (CR 700.2b/603.3d)"` — 
 
 Add a `ReplaySpec.hs` test: a `DecisionLog` that answers the Aether Channeler `ChooseModes` replays byte-identically (mirror the existing `ChoseModes`-for-a-spell replay test).
 
-- [ ] **Step 4: Run to verify they fail**
+- [x] **Step 4: Run to verify they fail**
 
 Run: `cabal test --test-options='-p "trigger modal"'`
 Expected: FAIL — `placeOne` (Task 3b) stamps forced modes but never prompts and never chooses targets, so multi-legal-mode Aether Channeler resolves the wrong/no mode and never bounces.
 
-- [ ] **Step 5: Add the prompt + targeting to `placeOne`**
+- [x] **Step 5: Add the prompt + targeting to `placeOne`**
 
 Make `placeOne` prompt the mode (when a real choice exists) and the chosen modes' targets (CR 603.3d), then stamp both. (The CR 603.3c *removal* guard is Task 6; here `size legal >= count` always holds for Aether Channeler.)
 
@@ -772,13 +772,13 @@ Add `import qualified Pawl.Decide as Decide`, `import qualified Pawl.Type.Progra
 
 Note on target validation: unlike `castSpell`/`activateAbility`, this reject path removes the ability (CR 603.3d). Keep it simple here (fillability guarantees a legal set exists) and let Task 6 own the removal branch; a malformed answer is out of scope of this task's tests. If a reviewer flags the missing reject-not-repair on an illegal `ChooseTargets` answer, add the same `if not (keysAgree && eachLegal) then <remove> ` guard Task 6 introduces.
 
-- [ ] **Step 6: Run the tests and full suite**
+- [x] **Step 6: Run the tests and full suite**
 
 Run: `cabal test --test-options='-p "trigger modal"'` → PASS.
 Run: `cabal test --test-options='-p "Replay"'` → PASS.
 Run: `cabal test` → green (Rest in Peace unchanged; round-trip covers `aether-channeler.json` and its Bird token).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -799,7 +799,7 @@ git commit -m "M4h: mode choice + targeting at trigger placement (CR 700.2b/603.
 - Consumes: `Target.fillableModes`, `Modal.selectionCount`.
 - Produces: `Cards.syntheticModalTriggerPrinting :: Cards -> Printing`.
 
-- [ ] **Step 1: Add the fixture card**
+- [x] **Step 1: Add the fixture card**
 
 `data/cards/synthetic-modal-trigger.json` — a 2/2 creature whose ETB `TriggeredAbility` is `ChooseExactly 1` over two **`NonlandPermanentTarget`** modes (self-excluding — `CreatureTarget` would be self-fillable, spec §9), each `MoveToZone` (to `Hand` / to `Exile`):
 
@@ -809,7 +809,7 @@ git commit -m "M4h: mode choice + targeting at trigger placement (CR 700.2b/603.
 
 Register it in `Cards.hs` (field + load + `allPrintings`).
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 In `ModalSpec.hs`, in the `"M4h trigger modal"` group:
 
@@ -824,12 +824,12 @@ In `ModalSpec.hs`, in the `"M4h trigger modal"` group:
 
 Build the board so the entering creature is the sole nonland permanent; drive the ETB trigger through `Engine.placePendingTriggers`; assert `GameState.stack` contains no `OfTrigger` object and no other permanent moved. (Follow the RiP ETB harness in `EventSpec.hs`/`ModalSpec.hs`.)
 
-- [ ] **Step 3: Run to verify it fails**
+- [x] **Step 3: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "603.3c"'`
 Expected: FAIL — Task 5's `placeOne` has no removal guard, so with `legal = {}` and `count = 1` it takes the forced path `chosenModes = {}` (size 0 ≤ 1), leaves the ability on the stack, and resolves nothing-scoped — the ability lingers instead of being removed.
 
-- [ ] **Step 4: Add the removal guard**
+- [x] **Step 4: Add the removal guard**
 
 In `placeOne`, immediately after computing `chosenModes` (Task 5's prompt line), insert the CR 603.3c guard:
 
@@ -852,12 +852,12 @@ removeFromStack abilId gs =
 
 Note the guard uses `legal` (fillable modes), so it fires when *fewer than `count`* modes are legal — for `ChooseExactly 1`, exactly "no legal mode." The prompt in Task 5 only runs when `size legal > count`, so a forced selection with `size legal == count` still stamps and resolves. Re-check the branch order: guard (`< count`) first, then the prompt-or-forced choice, then targets — restructure Task 5's body so the guard precedes the `ChooseModes` prompt (a removed trigger must never prompt).
 
-- [ ] **Step 5: Run the test and full suite**
+- [x] **Step 5: Run the test and full suite**
 
 Run: `cabal test --test-options='-p "603.3c"'` → PASS.
 Run: `cabal test` → green (Aether Channeler still never removed — it always has ≥1 legal mode; Rest in Peace's single mode is always fillable).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -875,19 +875,19 @@ git commit -m "M4h: CR 603.3c -- no legal mode removes the modal trigger + fixtu
 
 **Interfaces:** none (docs only).
 
-- [ ] **Step 1: Append the `progress.md` entry**
+- [x] **Step 1: Append the `progress.md` entry**
 
 Add one distilled entry after the M4g entry, in the house style: gate card (Aether Channeler), the decision proved (modality is payload-level, adopted by both ability types with no cycle; CR 603.3c removal is the trigger-only novelty), the types/opcodes (zero opcodes; `NonlandPermanentTarget` + self-exclusion; `Pawl.Modal` reader; `ActivatedAbility`/`TriggeredAbility` reshaped, retiring M4g's `[Effect]` divergence), the two synthetic fixtures with their expiries, and the named deferred expiries (spec §13). Cite the spec and this plan.
 
-- [ ] **Step 2: Update `docs/design.md`**
+- [x] **Step 2: Update `docs/design.md`**
 
 In §3, change the "M4g landed as the last letter, and it names its own fast-follow" paragraph to note the fast-follow **landed as M4h**: both ability types carry `Modal`, the mode choice is wired into activation (602.2b) and trigger placement (700.2b/603.3c), gated by Aether Channeler. Update the "Milestones M0 through M4g are complete" line to "through M4h."
 
-- [ ] **Step 3: Update `CLAUDE.md`**
+- [x] **Step 3: Update `CLAUDE.md`**
 
 Extend the "Current work and tracking" bullet: append M4h to the completed list ("… and **M4h** (modality on activated and triggered abilities — the M4g fast-follow, gate Aether Channeler)"), keeping the sentence's structure.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-20-m4h-modal-abilities.md` → must be `0` (all steps ticked).
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test` → green (docs-only change, sanity check).

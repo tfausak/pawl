@@ -629,3 +629,62 @@ end of every entry.
   when the first such card needs it. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-20-m4g-modal-design.md` and
   `docs/superpowers/plans/2026-07-20-m4g-modal.md`.
+- **M4h is complete** (the M4g fast-follow: modality on activated and triggered
+  abilities). **Gate: Aether Channeler** (`{2}{U}` Creature — Human Wizard, "When
+  this creature enters, choose one — Create a 1/1 white Bird creature token with
+  flying. / Return another target nonland permanent to its owner's hand. / Draw a
+  card."), a `ChooseExactly 1` `Modal` on its `SelfEnters` (M3f) trigger — the
+  first *targeted* triggered ability the engine has (no triggered ability targeted
+  before this). The decision proved is that **modality is a payload-level property,
+  and M4g built it Card-free and parametric precisely so both ability types could
+  adopt it with no new module cycle**: `ActivatedAbility`/`TriggeredAbility`
+  reshaped to `{cost | condition, modal :: Modal card}`, retiring M4g's documented
+  interim divergence (abilities' `effects :: [Effect card]`) now that `Mode.effects
+  :: Seq` is the one shape everywhere. **Zero opcodes** — Aether Channeler's three
+  modes are `Create` (M4c), `MoveToZone Hand` (M4b), and `Draw` (M4b), the same
+  "compose existing verbs under a modal wrapper" posture Chaos Charm set. The
+  trigger-only novelty a spell has no analog for is **CR 603.3c/700.2b**: a modal
+  triggered ability is *placed on the stack first*, and only removed after if no
+  mode can be legally chosen — where an uncastable modal spell is simply never
+  offered. New machinery: `Pawl.Modal`, a shared Card-free logic module lifting
+  M4g's mode-scoped readers (`allEffects`/`allTargetSpecs`/`modesEffects`/
+  `modesTargetSpecs`/`selectionCount`) off `Card.spell` so `Activate`/`Engine`/
+  `Resolve`/`Mana` read any `Modal card` directly, with `Pawl.Card` reduced to
+  one-line delegations; `TargetSpec.NonlandPermanentTarget` (CR 109.2/110.4 — a
+  battlefield permanent whose projected types exclude Land) plus
+  `Target.selfExcludes`/`legalSetsExcluding` (CR "another" — drops the targeting
+  source from a self-excluding spec's legal set at choice time only, re-validation
+  stays source-blind) and `Target.fillableModes` generalized out of `Cast` (now the
+  one home for mode-fillability shared by spells and abilities); `Subtype.Wizard`
+  (CR 205.3m) and a Bird token (1/1 Flying) for the gate card itself.
+  `Resolve.resolveEffects` is now payload-and-binding-aware — both
+  `resolveAbility` and `Stack`'s trigger arm read the ability object's chosen modes
+  via `Binding.modesOf` and resolve/re-validate (CR 608.2b/608.2c) only those.
+  Wired into **both** choice points: the activation path (CR 602.2b, mirroring
+  `Cast.castSpell`'s mode-then-target order) and trigger placement (CR
+  700.2b/603.3d, with the CR 603.3c removal check preceding the mode prompt so a
+  never-legal trigger is dropped from stack and objects before ever asking).
+  **Two labeled synthetic fixtures**, the `tests-prefer-real-cards` crutch
+  discipline: `synthetic-modal-activator` (a `{cost}: choose one — DealDamage /
+  PutCounters` ability) covers CR 602.2b activation-path mode choice and the
+  mode-scoped CR 608.2b fizzle, expiring when a real modal activated ability lands
+  in the opcode set (none surveyed clean — Goblin Cratermaker needs colour,
+  Umezawa's Jitte needs charge counters, Insidious Fungus/Cankerbloom carry
+  land-play/proliferate riders); `synthetic-modal-trigger` (two self-excluding
+  `NonlandPermanentTarget` bounce modes, source as the board's only nonland
+  permanent) covers CR 603.3c removal, expiring when a real all-targeted modal ETB
+  trigger lands (none found in the opcode set — every candidate needs a new
+  opcode or an unmodelled characteristic). **Named deferred expiries** (spec §13):
+  a real modal-activated-ability gate card; `X` in an activated-ability cost
+  (M3g's `AbilityCost.mana` + M4a's `ChooseX`, unwired — no `{X}`-cost ability
+  exists); text-change (M3d) reaching an ability's effects (`resolveEffects` still
+  doesn't rewrite); a non-self-excluding `NonlandPermanentTarget` (splits when a
+  card wants plain "target nonland permanent" without "another"); `ModeSelection`
+  beyond `ChooseExactly` on abilities (the M4g deferrals — choose-two/escalate CR
+  700.2h/pawprint CR 700.2i/same-mode-twice CR 700.2d/another-player-chooses CR
+  700.2e — apply equally here); multi-mode slot-name collision (unreachable until
+  a selection picks ≥2 modes); and modal triggers beyond `SelfEnters` (rides
+  `placeOne` unchanged when a non-ETB modal trigger condition lands). Spec and
+  plan kept as reference:
+  `docs/superpowers/specs/2026-07-20-m4h-modal-abilities-design.md` and
+  `docs/superpowers/plans/2026-07-20-m4h-modal-abilities.md`.

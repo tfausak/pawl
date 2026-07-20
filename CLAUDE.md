@@ -90,9 +90,11 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   mode-scoped `Resolve.effectsOf`/`resolveSpell` read only the chosen mode(s);
   gated by Chaos Charm with the CR 700.2c/601.2c Wall-target-namespace-isolation
   falsifier, `Subtype.Wall`/`TargetSpec.WallTarget` new for it, Wall of Stone a
-  deterministic fixture only). **M4 is now complete (M4a–M4g). The fast-follow is
-  modality on activated and triggered abilities** — the same `Mode`/`Modal`
-  payload, unwired until a real modal activated or triggered ability gates it.
+  deterministic fixture only). **M4 is complete (M4a–M4g), and so is its
+  fast-follow, M4h** (modality on activated and triggered abilities — the same
+  `Mode`/`Modal` payload wired into both ability types, gated by Aether Channeler,
+  with the CR 700.2b/603.3c "no legal mode → removed from the stack" rule as the
+  trigger-only novelty a spell has no analog for; zero new opcodes).
   The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, the opcodes/types it added, and every
   elision and its named expiry — lives in `docs/progress.md`. The forward path
