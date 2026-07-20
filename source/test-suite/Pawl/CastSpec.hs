@@ -151,6 +151,7 @@ stackTests cards =
                   case Object.source obj of
                     Source.OfCard printing ->
                       HU.assertBool "creature" (Card.isCreature (Printing.card printing))
+                    Source.OfToken _ -> HU.assertFailure "expected a card source"
                     Source.OfAbility _ _ -> HU.assertFailure "expected a card source"
                     Source.OfTrigger _ _ -> HU.assertFailure "expected a card source",
       HU.testCase "resolving conserves objects" $
@@ -238,6 +239,7 @@ castTests cards =
                   case Object.source obj of
                     Source.OfCard printing ->
                       HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name (Printing.card printing))
+                    Source.OfToken _ -> HU.assertFailure "expected a card source"
                     Source.OfAbility _ _ -> HU.assertFailure "expected a card source"
                     Source.OfTrigger _ _ -> HU.assertFailure "expected a card source",
       HU.testCase "CR 117.1a a Bolt is castable outside a main phase" $
@@ -514,6 +516,7 @@ nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
   Just o -> case Object.source o of
     Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
+    Source.OfToken card -> Card.Type.name card == wanted
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False
   Nothing -> False

@@ -36,6 +36,7 @@ castsNamed cards name s =
         Nothing -> False
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Card.Type.name (Printing.card printing) == name
+          Source.OfToken card -> Card.Type.name card == name
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
       inGrave pid = any named (Game.zoneMembers Zone.Graveyard pid gs)

@@ -39,6 +39,8 @@ resolveTop = do
           if Card.isPermanent (Printing.card printing)
             then State.modify' (Event.changeZone oid Zone.Battlefield)
             else Resolve.resolveSpell oid
+        -- A token is never on the stack (created onto the battlefield, never cast).
+        Source.OfToken _ -> State.put gs {GameState.stack = rest}
         Source.OfAbility srcId ability -> do
           -- CR 601.3 (Panglacial): before resolving an ability that searches a
           -- library, offer its controller the chance to cast a

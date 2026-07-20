@@ -22,6 +22,7 @@ playableLands pid gs =
   let isLandObject oid = case Game.lookupObject oid gs of
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Card.isLand (Printing.card printing)
+          Source.OfToken card -> Card.isLand card
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
         Nothing -> False

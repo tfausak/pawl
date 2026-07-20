@@ -37,6 +37,8 @@ costOf oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
   Just obj -> case Object.source obj of
     Source.OfCard printing -> Card.Type.manaCost (Printing.card printing)
+    -- A token is never cast: it is created onto the battlefield, never on the stack.
+    Source.OfToken _ -> Nothing
     -- An ability on the stack is not a spell; it has no mana cost to cast.
     Source.OfAbility _ _ -> Nothing
     Source.OfTrigger _ _ -> Nothing

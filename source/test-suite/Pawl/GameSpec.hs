@@ -59,6 +59,13 @@ objectFactTests cards =
          in do
               HU.assertEqual "power" (Just 2) (Projection.powerOf oid gs)
               HU.assertEqual "toughness" (Just 1) (Projection.toughnessOf oid gs),
+      HU.testCase "CR 111.3 a token's characteristics are read through cardOf" $
+        let base = Setup.emptyGame S.bothPlayers
+            goblinCard = Printing.card (Cards.pikerPrinting cards)
+            (tokId, gs) = S.addToken goblinCard S.alice base
+         in do
+              HU.assertEqual "cardOf returns the token's embedded card" (Just goblinCard) (Game.cardOf tokId gs)
+              HU.assertEqual "the token is on the battlefield" True (Set.member tokId (GameState.battlefield gs)),
       HU.testCase "a Mountain has no power or toughness" $
         let gs = S.mountainsInPlay cards 1
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
@@ -361,6 +368,7 @@ namedIs :: Text.Text -> Maybe Object.Object -> Bool
 namedIs wanted mo = case mo of
   Just o -> case Object.source o of
     Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
+    Source.OfToken card -> Card.Type.name card == wanted
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False
   Nothing -> False

@@ -281,6 +281,31 @@ addCreature printing pid gs =
 addPiker :: Cards.Cards -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addPiker cards = addCreature (Cards.pikerPrinting cards)
 
+-- A token built directly from effect-defined characteristics (Source.OfToken),
+-- Settled so combat fixtures can attack/block with it. Bypasses createToken; use
+-- when a test needs a token on the board without resolving a maker.
+addToken :: Card.Type.Card -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addToken card pid gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.source = Source.OfToken card,
+            Object.zone = Zone.Battlefield,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled,
+            Object.bindings = Map.empty,
+            Object.timestamp = ts
+          }
+   in ( oid,
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.battlefield = Set.insert oid (GameState.battlefield gs2)
+          }
+      )
+
 -- One card of a printing in pid's library.
 addLibraryCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addLibraryCard printing pid gs =
@@ -464,6 +489,7 @@ creaturesInPlay pid gs =
         Nothing -> False
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Card.isCreature (Printing.card printing)
+          Source.OfToken card -> Card.isCreature card
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
    in length (filter isCreatureObject (Game.zoneMembers Zone.Battlefield pid gs))
@@ -474,6 +500,7 @@ countByName wanted pid gs =
         Nothing -> False
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
+          Source.OfToken card -> Card.Type.name card == wanted
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
       inLibrary = filter named (Game.zoneMembers Zone.Library pid gs)
@@ -487,6 +514,7 @@ countOnBattlefieldByName wanted pid gs =
         Nothing -> False
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Card.Type.name (Printing.card printing) == wanted
+          Source.OfToken card -> Card.Type.name card == wanted
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
    in length (filter named (Game.zoneMembers Zone.Battlefield pid gs))

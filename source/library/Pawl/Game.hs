@@ -74,6 +74,7 @@ cardOf oid gs = case lookupObject oid gs of
   Nothing -> Nothing
   Just obj -> case Object.source obj of
     Source.OfCard printing -> Just (Printing.card printing)
+    Source.OfToken card -> Just card
     Source.OfAbility _ _ -> Nothing
     Source.OfTrigger _ _ -> Nothing
 

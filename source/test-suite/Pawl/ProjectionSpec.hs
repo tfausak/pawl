@@ -82,6 +82,7 @@ humilityTimestamp cards gs =
         Nothing -> False
         Just obj -> case Object.source obj of
           Source.OfCard p -> Printing.card p == Printing.card (Cards.humilityPrinting cards)
+          Source.OfToken _ -> False
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
       hums = filter isHum (Set.toList (GameState.battlefield gs))
