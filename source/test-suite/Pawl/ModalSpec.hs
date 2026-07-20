@@ -15,6 +15,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Target as Target
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ModeIndex as ModeIndex
@@ -24,6 +25,7 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -162,6 +164,30 @@ forcedTests cards =
          in HU.assertEqual "alice at 17 (Bolt resolved, forced/unprompted mode selection)" (Just 17) (S.lifeOf S.alice after)
     ]
 
+-- M4h task 1: TargetSpec.NonlandPermanentTarget + Target.selfExcludes /
+-- legalSetsExcluding. No consumer is wired yet (that's a later M4h task) --
+-- this proves the spec and the CR "another" exclusion helper in isolation.
+nonlandPermanentTargetTests :: Cards.Cards -> Tasty.TestTree
+nonlandPermanentTargetTests cards =
+  Tasty.testGroup
+    "M4h NonlandPermanentTarget"
+    [ HU.testCase "NonlandPermanentTarget excludes lands (CR 305.1)" $
+        let gs = S.boardWithCreatureArtifactLand cards
+            got = Target.legalRecipients TargetSpec.NonlandPermanentTarget gs
+         in HU.assertEqual
+              "two nonland permanents, no land"
+              (Set.fromList [Recipient.ToObject (S.creatureId gs), Recipient.ToObject (S.artifactId gs)])
+              got,
+      HU.testCase "legalSetsExcluding drops the source (CR \"another\")" $
+        let gs = S.boardWithCreatureArtifactLand cards
+            specs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.NonlandPermanentTarget
+            got = Target.legalSetsExcluding (S.creatureId gs) specs gs
+         in HU.assertEqual
+              "source excluded from its own set"
+              (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (Set.singleton (Recipient.ToObject (S.artifactId gs))))
+              got
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
@@ -170,5 +196,6 @@ tests cards =
       falsifierTests cards,
       onlyChosenModeTests cards,
       fizzleTests cards,
-      forcedTests cards
+      forcedTests cards,
+      nonlandPermanentTargetTests cards
     ]

@@ -10,6 +10,7 @@ import qualified Pawl.Sba as Sba
 import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.SlotName (SlotName)
@@ -64,6 +65,13 @@ legalRecipients spec gs =
                 Recipient.ToPlayer _ -> False
                 Recipient.ToObject _ -> False
            in Set.fromList (filter isWallCreature creatures)
+        TargetSpec.NonlandPermanentTarget ->
+          -- CR 305.1: a permanent is nonland if its PROJECTED card types (M3c)
+          -- do not include Land -- source-blind (the exclusion of the targeting
+          -- source, "another", is applied by legalSetsExcluding below).
+          let notLand oid = not (Set.member CardType.Land (Projection.cardTypesOf oid gs))
+              matches = filter notLand (Set.toList (GameState.battlefield gs))
+           in Set.fromList (map Recipient.ToObject matches)
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is
@@ -74,3 +82,28 @@ stillLegal recipient spec gs = Set.member recipient (legalRecipients spec gs)
 -- One legal set per named slot; casting prompts with exactly this map.
 legalSets :: Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
 legalSets specs gs = Map.map (\spec -> legalRecipients spec gs) specs
+
+-- CR "another": specs that exclude the targeting source from their legal set.
+-- Only NonlandPermanentTarget so far; a general per-slot "another" flag is future.
+selfExcludes :: TargetSpec -> Bool
+selfExcludes spec = case spec of
+  TargetSpec.NonlandPermanentTarget -> True
+  TargetSpec.AnyTarget -> False
+  TargetSpec.CreatureTarget -> False
+  TargetSpec.SpellOrPermanentTarget -> False
+  TargetSpec.LandTarget -> False
+  TargetSpec.PlayerTarget -> False
+  TargetSpec.CreatureOrEnchantmentTarget -> False
+  TargetSpec.SpellTarget -> False
+  TargetSpec.WallTarget -> False
+
+-- legalSets, then drop the source recipient from each self-excluding slot (CR
+-- "another"). `source` is the object the targeting is relative to -- the spell
+-- object at cast, the source permanent for an ability. A no-op for every non-self-
+-- excluding spec (the source recipient is not removed), so Prodigal Sorcerer may
+-- still target itself with AnyTarget (CR 115.4). stillLegal (re-validation) stays
+-- source-blind: the chosen target is never the source, so it needs no exclusion.
+legalSetsExcluding :: ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
+legalSetsExcluding source specs gs =
+  let drop1 spec s = if selfExcludes spec then Set.delete (Recipient.ToObject source) s else s
+   in Map.map (\spec -> drop1 spec (legalRecipients spec gs)) specs

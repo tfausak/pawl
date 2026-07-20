@@ -24,12 +24,14 @@ import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Deck as Deck
@@ -291,6 +293,35 @@ addCreature printing pid gs =
 
 addPiker :: Cards.Cards -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addPiker cards = addCreature (Cards.pikerPrinting cards)
+
+-- The M4h NonlandPermanentTarget fixture (CR 305.1): alice controls a Piker
+-- (creature), a Mindslaver (a Legendary Artifact -- nonland, non-creature),
+-- and a Mountain (land). Three permanents so a nonland-permanent legal set can
+-- be distinguished from both "all permanents" and "creatures only".
+boardWithCreatureArtifactLand :: Cards.Cards -> GameState.GameState
+boardWithCreatureArtifactLand cards =
+  let gs0 = Setup.emptyGame bothPlayers
+      (_, gs1) = addPiker cards alice gs0
+      (_, gs2) = addCreature (Cards.mindslaverPrinting cards) alice gs1
+      (_, gs3) = addCreature (Cards.mountainPrinting cards) alice gs2
+   in gs3
+
+-- The creature on a `boardWithCreatureArtifactLand` board.
+creatureId :: GameState.GameState -> ObjectId.ObjectId
+creatureId gs = case filter (\oid -> Projection.isCreatureOf oid gs) (Set.toList (GameState.battlefield gs)) of
+  oid : _ -> oid
+  [] -> ObjectId.MkObjectId 999
+
+-- The nonland, non-creature permanent (the artifact) on a
+-- `boardWithCreatureArtifactLand` board.
+artifactId :: GameState.GameState -> ObjectId.ObjectId
+artifactId gs =
+  let notLand oid = not (Set.member CardType.Land (Projection.cardTypesOf oid gs))
+      notCreature oid = not (Projection.isCreatureOf oid gs)
+      candidates = filter (\oid -> notLand oid && notCreature oid) (Set.toList (GameState.battlefield gs))
+   in case candidates of
+        oid : _ -> oid
+        [] -> ObjectId.MkObjectId 999
 
 -- A token built directly from effect-defined characteristics (Source.OfToken),
 -- Settled so combat fixtures can attack/block with it. Bypasses createToken; use
