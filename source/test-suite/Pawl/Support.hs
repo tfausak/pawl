@@ -294,7 +294,7 @@ addCreature printing pid gs =
 addPiker :: Cards.Cards -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addPiker cards = addCreature (Cards.pikerPrinting cards)
 
--- The M4h NonlandPermanentTarget fixture (CR 305.1): alice controls a Piker
+-- The M4h NonlandPermanentTarget fixture (CR 109.2/110.4): alice controls a Piker
 -- (creature), a Mindslaver (a Legendary Artifact -- nonland, non-creature),
 -- and a Mountain (land). Three permanents so a nonland-permanent legal set can
 -- be distinguished from both "all permanents" and "creatures only".
