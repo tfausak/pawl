@@ -472,6 +472,7 @@ effectToJson e = case e of
   Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.Create q c -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
   Effect.Prevent d p -> Json.tagged (Text.pack "Prevent") (Just (Array [durationToJson d, preventionToJson p]))
+  Effect.RegenerateSelf -> nullary (Text.pack "RegenerateSelf")
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
 jsonToEffect value = do
@@ -505,6 +506,7 @@ jsonToEffect value = do
     "Prevent" -> case mv of
       Just (Array [d, p]) -> Effect.Prevent <$> jsonToDuration d <*> jsonToPrevention p
       _ -> Left (Text.pack "Prevent expects [Duration, Prevention]")
+    "RegenerateSelf" -> Right Effect.RegenerateSelf
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------

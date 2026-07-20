@@ -69,6 +69,7 @@ emptyGame order =
           GameState.zoneChanges = [],
           GameState.continuousEffects = [],
           GameState.preventions = [],
+          GameState.regenerationShields = Map.empty,
           GameState.turnOrder = order_,
           GameState.activePlayer = NonEmpty.head order,
           GameState.phase = Turn.firstPhase,

@@ -72,6 +72,7 @@ slotsOf effect = case effect of
   Effect.Discard slot _ -> Set.singleton slot
   Effect.Create _ _ -> Set.empty
   Effect.Prevent _ _ -> Set.empty
+  Effect.RegenerateSelf -> Set.empty
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -96,6 +97,7 @@ readsX = any effectReadsX
       Effect.Discard _ quantity -> quantity == Quantity.Type.X
       Effect.Create quantity _ -> quantity == Quantity.Type.X
       Effect.Prevent _ _ -> False
+      Effect.RegenerateSelf -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -116,6 +118,7 @@ manaProduced effect = case effect of
   Effect.Discard {} -> Nothing
   Effect.Create {} -> Nothing
   Effect.Prevent _ _ -> Nothing
+  Effect.RegenerateSelf -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -136,6 +139,7 @@ searchesLibrary effect = case effect of
   Effect.Discard {} -> False
   Effect.Create {} -> False
   Effect.Prevent _ _ -> False
+  Effect.RegenerateSelf -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -177,6 +181,7 @@ rewriteEffect pairs effect = case effect of
   -- A text-changer does not reach a token's embedded card here (spec section 8).
   Effect.Create _ _ -> effect
   Effect.Prevent _ _ -> effect
+  Effect.RegenerateSelf -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -434,6 +439,12 @@ applyEffect source controller bound legality chosen effect = case effect of
     -- damage funnel until cleanup drops it (CR 514.2). Targetless and unprompted.
     State.modify' $ \gs ->
       gs {GameState.preventions = ActivePrevention.MkActivePrevention prevention duration : GameState.preventions gs}
+  Effect.RegenerateSelf ->
+    -- CR 701.19a: add one shield to the source permanent. Map.insertWith (+)
+    -- stacks a second activation. A shield on a gone/non-battlefield source is
+    -- harmless (nothing will destroy it).
+    State.modify' $ \gs ->
+      gs {GameState.regenerationShields = Map.insertWith (+) source 1 (GameState.regenerationShields gs)}
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

@@ -89,4 +89,10 @@ data Effect card
     -- class of events, not a chosen object). Resolve stores it into
     -- GameState.preventions; Event.applyPreventions applies it.
     Prevent Duration Prevention
+  | -- CR 701.19a/c: install a one-shot regeneration shield on THIS effect's source
+    -- permanent (CR 608.2g) -- targetless and self-referential (Drudge Skeletons'
+    -- "{B}: Regenerate this creature"). NOT the act of regenerating (701.19c): the
+    -- shield fires later, at Event.destroy. A general "Regenerate target creature"
+    -- is future (Regenerate SlotName). Executed by Resolve.applyEffect.
+    RegenerateSelf
   deriving (Eq, Ord, Show)

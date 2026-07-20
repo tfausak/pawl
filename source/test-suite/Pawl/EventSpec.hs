@@ -126,5 +126,15 @@ tests cards =
          in do
               HU.assertEqual "the token never entered a graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice dying))
               HU.assertEqual "it was redirected to exile" 1 (length (Game.zoneMembers Zone.Exile S.alice dying))
-              HU.assertEqual "after the SBA it has ceased to exist (gone from exile)" 0 (length (Game.zoneMembers Zone.Exile S.alice settled))
+              HU.assertEqual "after the SBA it has ceased to exist (gone from exile)" 0 (length (Game.zoneMembers Zone.Exile S.alice settled)),
+      HU.testCase "CR 701.19a a regeneration shield is stored per object" $
+        let base = Setup.emptyGame S.bothPlayers
+            (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+            shielded = S.addRegenShield oid gs0
+         in HU.assertEqual "one shield on the object" (Just 1) (Map.lookup oid (GameState.regenerationShields shielded)),
+      HU.testCase "CR 701.19a regeneration shields are cleared at cleanup (this turn)" $
+        let base = Setup.emptyGame S.bothPlayers
+            (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+            cleared = Event.clearRegenerationShields (S.addRegenShield oid gs0)
+         in HU.assertEqual "no shields remain" True (Map.null (GameState.regenerationShields cleared))
     ]

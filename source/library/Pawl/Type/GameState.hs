@@ -47,6 +47,11 @@ data GameState = MkGameState
     -- duration cleanup consults (CR 514.2). The event-pipeline analog of
     -- continuousEffects. Event.applyPreventions reads it.
     preventions :: [ActivePrevention],
+    -- CR 701.19a: one-shot regeneration shields, counted per object (activating
+    -- twice stacks two; each destruction consumes one). Keyed by the shielded
+    -- object's id -- stable across regeneration (the creature stays on the
+    -- battlefield). Cleared at cleanup ("this turn"). Event.destroy reads it.
+    regenerationShields :: Map ObjectId Natural,
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
     phase :: Phase,

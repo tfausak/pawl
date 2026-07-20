@@ -533,6 +533,12 @@ addPrevention :: ActivePrevention.ActivePrevention -> GameState.GameState -> Gam
 addPrevention shield gs =
   gs {GameState.preventions = shield : GameState.preventions gs}
 
+-- Seed a regeneration shield directly onto an object (bypasses activating a
+-- regenerate ability; use when a test needs a shield up without the activation).
+addRegenShield :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+addRegenShield oid gs =
+  gs {GameState.regenerationShields = Map.insertWith (+) oid 1 (GameState.regenerationShields gs)}
+
 tappedCount :: PlayerId.PlayerId -> GameState.GameState -> Int
 tappedCount pid gs =
   let isTapped oid = case Game.lookupObject oid gs of
@@ -586,6 +592,7 @@ oneMountainState cards ph =
           GameState.zoneChanges = [],
           GameState.continuousEffects = [],
           GameState.preventions = [],
+          GameState.regenerationShields = Map.empty,
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,
           GameState.phase = ph,

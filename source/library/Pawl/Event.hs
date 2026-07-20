@@ -59,6 +59,10 @@ dropEndOfTurnPreventions gs =
   let keep p = ActivePrevention.duration p /= Duration.UntilEndOfTurn
    in gs {GameState.preventions = filter keep (GameState.preventions gs)}
 
+-- CR 701.19a: regeneration shields last "this turn," so cleanup clears every one.
+clearRegenerationShields :: GameState -> GameState
+clearRegenerationShields gs = gs {GameState.regenerationShields = Map.empty}
+
 -- Insert a freshly-built object into `dest` under a new id and timestamp, and emit
 -- the enters event (origin -> dest). The common tail of changeZone (a moved
 -- incarnation) and createToken (a token from nothing). `mkObj` receives the fresh
