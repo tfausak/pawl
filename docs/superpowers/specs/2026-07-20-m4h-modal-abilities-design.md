@@ -400,11 +400,15 @@ Two labeled, expiring fixtures (the `tests-prefer-real-cards` crutch discipline 
 each retires when its real gate lands), reusing existing opcodes only:
 
 - **A modal ETB trigger, all-targeted (CR 603.3c removal).** A creature whose ETB
-  `TriggeredAbility` is `ChooseExactly 1` over two modes, both `CreatureTarget`:
-  `DealDamage "creature" (Literal 1)` and `PutCounters PlusOnePlusOne (Literal 1)
-  "creature"` (M3a + M4f). On a board with no other creature, **neither** mode is
-  fillable, so the placed trigger is removed (CR 603.3c). **Expiry:** a real
-  all-targeted modal ETB in the opcode set (none today).
+  `TriggeredAbility` is `ChooseExactly 1` over two modes, both **self-excluding**
+  `NonlandPermanentTarget`: `MoveToZone "x" Hand` and `MoveToZone "x" Exile` (M4b).
+  Self-exclusion is load-bearing here: `CreatureTarget` modes would be self-fillable
+  (the fixture creature is itself a creature, and "target creature" may pick the
+  source — the Prodigal-Sorcerer-pings-itself case), so the trigger would never be
+  removed. With `NonlandPermanentTarget` and the source as the **only** nonland
+  permanent on the board (lands aside), the source is excluded from both modes'
+  legal sets → **neither** mode is fillable → the placed trigger is removed (CR
+  603.3c). **Expiry:** a real all-targeted modal ETB in the opcode set (none today).
 - **A modal activated ability (CR 602.2b).** A creature with `{cost}: Choose one —
   DealDamage "creature" (Literal 1) / PutCounters PlusOnePlusOne (Literal 1)
   "creature"`, exercising the activation-path mode prompt, mode-scoped targeting, and
