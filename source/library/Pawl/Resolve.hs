@@ -16,6 +16,7 @@ import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Target as Target
@@ -265,12 +266,21 @@ resolveEffects stackId srcId effects specs = do
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
 -- (srcId), not the ability object -- so DealDamage comes from Prodigal Sorcerer
--- (CR 608.2g). Reuses applyEffect with the same per-slot legality and CR 608.2b
--- fizzle as a spell. CR 608.2n: the ability then ceases to exist -- removed from
--- the stack and objects, NOT buried (an ability is not a card).
+-- (CR 608.2g). CR 700.2c/M4g: reads only the ability's CHOSEN modes (stamped at
+-- activation, Activate.activateAbility) via Modal.modesEffects/modesTargetSpecs,
+-- the same mode-scoping resolveSpell already applies to a modal spell. Reuses
+-- applyEffect with the same per-slot legality and CR 608.2b fizzle as a spell.
+-- CR 608.2n: the ability then ceases to exist -- removed from the stack and
+-- objects, NOT buried (an ability is not a card).
 resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Game ()
-resolveAbility abilId srcId ability =
-  resolveEffects abilId srcId (ActivatedAbility.effects ability) (ActivatedAbility.targetSpecs ability)
+resolveAbility abilId srcId ability = do
+  gs <- State.get
+  case Game.lookupObject abilId gs of
+    Nothing -> pure ()
+    Just obj ->
+      let chosen = Binding.modesOf (Object.bindings obj)
+          modal = ActivatedAbility.modal ability
+       in resolveEffects abilId srcId (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)
 
 -- CR 608.2n: an ability leaves the stack and ceases to exist (no graveyard).
 cease :: ObjectId -> GameState -> GameState

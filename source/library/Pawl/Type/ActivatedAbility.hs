@@ -1,21 +1,16 @@
 module Pawl.Type.ActivatedAbility where
 
-import Data.Map.Strict (Map)
 import Pawl.Type.AbilityCost (AbilityCost)
-import Pawl.Type.Effect (Effect)
-import Pawl.Type.SlotName (SlotName)
-import Pawl.Type.TargetSpec (TargetSpec)
+import Pawl.Type.Modal (Modal)
 
--- CR 602.1: "[cost]: [effect]". Reuses the Effect vocabulary and the slot/target
--- machinery of a spell. An ability is VALUE-typed: two abilities with the same
--- cost and effect are indistinguishable, so Action.Activate carries the value and
--- validates by membership (Projection.abilitiesOf), never an index.
--- Parametric in `card` for the same reason as Effect: its effects are
--- `[Effect card]`, so a concrete `Effect Card` would drag Card into this module
--- and cycle with Card (which embeds [ActivatedAbility Card]). Card ties the knot.
+-- CR 602.1 / 700.2 / 602.2b: "[cost]: [effect]", now modal-capable. VALUE-typed:
+-- Action.Activate carries the value and validates by membership
+-- (Projection.abilitiesOf), never an index. Parametric in `card` (M4c): a concrete
+-- Modal Card would drag Card in and cycle; Card ties the knot at Modal Card. The
+-- effects now live in Mode.effects :: Seq (Effect card) -- M4g's interim [Effect]
+-- divergence, retired.
 data ActivatedAbility card = MkActivatedAbility
   { cost :: AbilityCost,
-    effects :: [Effect card],
-    targetSpecs :: Map SlotName TargetSpec
+    modal :: Modal card
   }
   deriving (Eq, Ord, Show)

@@ -352,7 +352,7 @@ resolveTests cards =
         let (srcId, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             ability = case Card.Type.activatedAbilities (Printing.card (Cards.prodigalSorcererPrinting cards)) of
               ab : _ -> ab
-              [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [] Map.empty
+              [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g1) = Game.freshObjectId g0
             (ts, g2) = Game.freshTimestamp g1
             slot = SlotName.MkSlotName (Text.pack "target")
@@ -364,7 +364,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing Set.empty,
+                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
                   Object.counters = Map.empty,
                   Object.timestamp = ts
                 }
@@ -386,12 +386,11 @@ resolveTests cards =
             ability =
               ActivatedAbility.MkActivatedAbility
                 (AbilityCost.MkAbilityCost Nothing [])
-                [Effect.Search CardCriterion.BasicLandCard]
-                Map.empty
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search CardCriterion.BasicLandCard]) Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj =
-              Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty Map.empty ts
+              Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty ts
             g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
             resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
          in do
@@ -401,10 +400,10 @@ resolveTests cards =
       HU.testCase "CR 701.23b Search may fail to find" $
         let base = Setup.emptyGame S.bothPlayers
             (_, g1) = S.addLibraryCard (Cards.mountainPrinting cards) S.alice base
-            ability = ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [Effect.Search CardCriterion.BasicLandCard] Map.empty
+            ability = ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search CardCriterion.BasicLandCard]) Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
-            abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty Map.empty ts
+            abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty ts
             g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
             resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
          in HU.assertEqual "nothing entered the battlefield" Set.empty (GameState.battlefield resolved),
@@ -445,8 +444,10 @@ resolveTests cards =
                       { AbilityCost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
                         AbilityCost.additional = [AdditionalCost.TapSelf, AdditionalCost.SacrificeSelf]
                       },
-                  ActivatedAbility.effects = [Effect.ControlPlayerNextTurn slot],
-                  ActivatedAbility.targetSpecs = Map.singleton slot TargetSpec.PlayerTarget
+                  ActivatedAbility.modal =
+                    Modal.MkModal
+                      (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot TargetSpec.PlayerTarget)))
+                      (ModeSelection.ChooseExactly 1)
                 }
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
@@ -458,7 +459,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing Set.empty,
+                  Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
                   Object.counters = Map.empty,
                   Object.timestamp = ts
                 }

@@ -2,6 +2,7 @@
 module Pawl.ManaSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
@@ -21,6 +22,9 @@ import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ManaUnit as ManaUnit
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
@@ -39,6 +43,13 @@ resolvedCreature land creature nLands =
   let (base, oid) = S.handOne creature (S.landsInPlay land nLands)
       afterCast = snd (Engine.runGamePure S.identityAnswer base (Cast.castSpell S.alice oid))
    in snd (Engine.runGamePure S.identityAnswer afterCast Stack.resolveTop)
+
+-- A single forced mode (ChooseExactly 1, M4g's non-modal shape) wrapping one
+-- ability's effects and target specs -- the fixture shape every pre-M4h
+-- single-mode ActivatedAbility now takes.
+singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Modal.Modal card
+singleModeAbility effects specs =
+  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs)) (ModeSelection.ChooseExactly 1)
 
 castabilityTests :: Cards.Cards -> Tasty.TestTree
 castabilityTests cards =
@@ -142,24 +153,27 @@ manaTests cards =
         let ab =
               ActivatedAbility.MkActivatedAbility
                 { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
-                  ActivatedAbility.effects = [Effect.AddMana (ManaType.Colored Color.Green)],
-                  ActivatedAbility.targetSpecs = Map.empty
+                  ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaType.Colored Color.Green)] Map.empty
                 }
          in HU.assertBool "mana ability" (Mana.isManaAbility ab),
       HU.testCase "CR 605.1a an ability that targets is NOT a mana ability" $
         let ab =
               ActivatedAbility.MkActivatedAbility
                 { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
-                  ActivatedAbility.effects = [Effect.AddMana (ManaType.Colored Color.Green)],
-                  ActivatedAbility.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.AnyTarget
+                  ActivatedAbility.modal =
+                    singleModeAbility
+                      [Effect.AddMana (ManaType.Colored Color.Green)]
+                      (Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.AnyTarget)
                 }
          in HU.assertBool "targets -> not mana" (not (Mana.isManaAbility ab)),
       HU.testCase "CR 605.1a a damage ability is NOT a mana ability" $
         let ab =
               ActivatedAbility.MkActivatedAbility
                 { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
-                  ActivatedAbility.effects = [Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1)],
-                  ActivatedAbility.targetSpecs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.AnyTarget
+                  ActivatedAbility.modal =
+                    singleModeAbility
+                      [Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1)]
+                      (Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.AnyTarget)
                 }
          in HU.assertBool "no mana produced -> not mana" (not (Mana.isManaAbility ab)),
       HU.testCase "CR 605 a settled Llanowar Elves is a green mana source" $

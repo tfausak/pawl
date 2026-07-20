@@ -2,10 +2,12 @@ module Pawl.Stack where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import Pawl.Type.Game (Game)
@@ -49,7 +51,10 @@ resolveTop = do
           -- Offered at resolution start, not per-Search-effect within a
           -- multi-effect ability -- exact intra-resolution interleaving is a named
           -- expiry (spec section 7); Evolving Wilds' only effect is the search.
-          Monad.when (any Resolve.searchesLibrary (ActivatedAbility.effects ability)) $
+          -- CR 700.2c/M4g: scanned over only the CHOSEN modes -- Evolving Wilds is
+          -- single-mode, so chosen = {ModeIndex 0} and behavior is unchanged.
+          let chosen = Binding.modesOf (Object.bindings obj)
+          Monad.when (any Resolve.searchesLibrary (Modal.modesEffects chosen (ActivatedAbility.modal ability))) $
             Cast.castWhileSearching (Object.owner obj)
           Resolve.resolveAbility oid srcId ability
         Source.OfTrigger srcId ability ->

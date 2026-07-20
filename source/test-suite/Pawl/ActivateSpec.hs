@@ -5,6 +5,7 @@
 module Pawl.ActivateSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
@@ -21,14 +22,20 @@ import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -47,7 +54,13 @@ findFirst p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) [] Map.empty
+  [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) (singleModeAbility [] Map.empty)
+
+-- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
+-- shape every pre-M4h single-mode ActivatedAbility now takes.
+singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Modal.Modal card
+singleModeAbility effects specs =
+  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs)) (ModeSelection.ChooseExactly 1)
 
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
@@ -114,8 +127,7 @@ tests cards =
                       { AbilityCost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
                         AbilityCost.additional = []
                       },
-                  ActivatedAbility.effects = [],
-                  ActivatedAbility.targetSpecs = Map.empty
+                  ActivatedAbility.modal = singleModeAbility [] Map.empty
                 }
          in HU.assertBool "one Mountain cannot pay {2}" (not (Activate.activatable S.alice srcId costlyAbility gs1)),
       HU.testCase "CR 701.19a Drudge Skeletons regenerates: activate, survive Murder, die to the next" $

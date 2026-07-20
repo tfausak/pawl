@@ -137,8 +137,15 @@ tests cards =
               Codec.jsonToActivatedAbility
               ( ActivatedAbility.MkActivatedAbility
                   (AbilityCost.MkAbilityCost Nothing [AdditionalCost.TapSelf])
-                  [Effect.AddMana (ManaType.Colored Color.Green)]
-                  (Map.fromList [(SlotName.MkSlotName (Text.pack "t"), TargetSpec.CreatureTarget)])
+                  ( Modal.MkModal
+                      ( Seq.singleton
+                          ( Mode.MkMode
+                              (Seq.fromList [Effect.AddMana (ManaType.Colored Color.Green)])
+                              (Map.fromList [(SlotName.MkSlotName (Text.pack "t"), TargetSpec.CreatureTarget)])
+                          )
+                      )
+                      (ModeSelection.ChooseExactly 1)
+                  )
               ),
           HU.testCase "ReplacementEffect" $
             roundTrip

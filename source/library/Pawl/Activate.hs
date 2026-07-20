@@ -10,6 +10,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.AbilityCost as AbilityCost
@@ -59,7 +60,8 @@ abilitiesFor = Projection.abilitiesOf
 -- CR 602.2/602.5: the ability is a member of the source's abilities (abilitiesFor),
 -- it is not a mana ability (mana abilities are handled at payment, not the
 -- stack), every additional cost is payable, the {T} sickness gate holds, and
--- every target slot has a legal recipient (CR 602.2b).
+-- enough modes are fillable to satisfy the selection (CR 700.2a/602.2b);
+-- single-mode abilities need exactly one fillable mode, identical to today.
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatable pid srcId ability gs =
   Game.controllerOf srcId gs == Just pid
@@ -67,7 +69,8 @@ activatable pid srcId ability gs =
     && not (Mana.isManaAbility ability)
     && all (canPayAdditional srcId gs) (AbilityCost.additional (ActivatedAbility.cost ability))
     && tapSicknessOk srcId ability gs
-    && not (any Set.null (Map.elems (Target.legalSets (ActivatedAbility.targetSpecs ability) gs)))
+    && Set.size (Target.fillableModes srcId (ActivatedAbility.modal ability) gs)
+      >= fromIntegral (Modal.selectionCount (ActivatedAbility.modal ability))
     && maybe True (\c -> Mana.canPay pid c gs) (AbilityCost.mana (ActivatedAbility.cost ability))
 
 -- CR 602.2: put the ability on the stack (a fresh OfAbility object), choose and
@@ -97,7 +100,12 @@ activateAbility pid srcId ability = do
             GameState.stack = abilId : GameState.stack gs2
           }
       decider = Decide.deciderFor pid gs
-      sets = Target.legalSets (ActivatedAbility.targetSpecs ability) gs
+      -- CR 700.2a/M4h Task 3a: FORCED mode selection -- every existing chosen set
+      -- is `fillableModes`, unprompted (Task 4 adds the real ChooseModes prompt).
+      -- For every existing single-mode ability that is exactly {ModeIndex 0}, so
+      -- this stamp is behavior-identical to the pre-modal ability.
+      chosenModes = Target.fillableModes srcId (ActivatedAbility.modal ability) gs
+      sets = Target.legalSetsExcluding srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
   State.put onStack
   chosen <-
     if Map.null sets
@@ -108,8 +116,7 @@ activateAbility pid srcId ability = do
   if not (keysAgree && eachLegal)
     then State.put gs -- reject: the whole activation is a no-op
     else do
-      -- Activated abilities have no mode yet (a fast-follow per the M4g plan): Set.empty.
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing Set.empty}) abilId (GameState.objects g)})
+      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
       let additional = AbilityCost.additional (ActivatedAbility.cost ability)
           payAll g = List.foldl' (payAdditional srcId) g additional
       case AbilityCost.mana (ActivatedAbility.cost ability) of

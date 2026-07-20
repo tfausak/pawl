@@ -7,6 +7,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Game as Game
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
@@ -68,7 +69,7 @@ manaTypesOf oid gs =
   let fromSubtypes = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesOf oid gs))
       fromAbilities =
         concatMap
-          (Maybe.mapMaybe Resolve.manaProduced . ActivatedAbility.effects)
+          (Maybe.mapMaybe Resolve.manaProduced . Modal.allEffects . ActivatedAbility.modal)
           (filter isManaAbility (Projection.abilitiesOf oid gs))
    in fromSubtypes ++ fromAbilities
 
@@ -78,8 +79,8 @@ manaTypesOf oid gs =
 -- (Task 6); Action.legalActions excludes it from the stack (Task 5).
 isManaAbility :: ActivatedAbility.ActivatedAbility Card.Card -> Bool
 isManaAbility ab =
-  not (null (Maybe.mapMaybe Resolve.manaProduced (ActivatedAbility.effects ab)))
-    && Map.null (ActivatedAbility.targetSpecs ab)
+  not (null (Maybe.mapMaybe Resolve.manaProduced (Modal.allEffects (ActivatedAbility.modal ab))))
+    && Map.null (Modal.allTargetSpecs (ActivatedAbility.modal ab))
 
 -- CR 106.4. Absent from the map means an empty pool.
 poolOf :: PlayerId -> GameState -> Mana

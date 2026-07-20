@@ -614,17 +614,15 @@ activatedAbilityToJson :: ActivatedAbility.ActivatedAbility CardT.Card -> Value
 activatedAbilityToJson aa =
   Object
     [ (Text.pack "cost", abilityCostToJson (ActivatedAbility.cost aa)),
-      (Text.pack "effects", listTo effectToJson (ActivatedAbility.effects aa)),
-      (Text.pack "targetSpecs", targetSpecsToJson (ActivatedAbility.targetSpecs aa))
+      (Text.pack "modal", modalToJson (ActivatedAbility.modal aa))
     ]
 
 jsonToActivatedAbility :: Value -> Either Text (ActivatedAbility.ActivatedAbility CardT.Card)
 jsonToActivatedAbility value = do
   ps <- Json.asObject value
   c <- Json.field (Text.pack "cost") ps >>= jsonToAbilityCost
-  es <- Json.field (Text.pack "effects") ps >>= listFrom jsonToEffect
-  ts <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
-  pure (ActivatedAbility.MkActivatedAbility c es ts)
+  m <- Json.field (Text.pack "modal") ps >>= jsonToModal
+  pure (ActivatedAbility.MkActivatedAbility c m)
 
 replacementEffectToJson :: ReplacementEffect.ReplacementEffect -> Value
 replacementEffectToJson (ReplacementEffect.RedirectZoneChange w t) =
