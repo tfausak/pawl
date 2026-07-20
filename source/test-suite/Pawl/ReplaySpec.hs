@@ -12,13 +12,17 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Target as Target
+import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -87,7 +91,24 @@ replayTests cards =
             let sets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.singleton (Recipient.ToPlayer S.bob))
                 p = Prompt.ChooseTargets (Decider.MkDecider S.alice) S.alice (ObjectId.MkObjectId 0) sets
                 answer = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToPlayer S.bob)
-             in HU.assertEqual "decode . encode = Just" (Just answer) (Replay.decode p (Replay.encode p answer))
+             in HU.assertEqual "decode . encode = Just" (Just answer) (Replay.decode p (Replay.encode p answer)),
+          -- CR 700.2b/603.3d: the mode chosen as Aether Channeler's ETB trigger is
+          -- placed (Engine.placeOne prompts ChooseModes) records/replays exactly
+          -- like a spell's ChooseModes -- a Response.ChoseModes round-trips through
+          -- the DecisionLog byte-identically.
+          HU.testCase "Aether Channeler's trigger ChooseModes records and replays a Set ModeIndex" $
+            let acPrinting = Cards.aetherChannelerPrinting cards
+                (acId, gs) = S.addCreature acPrinting S.alice (Setup.emptyGame S.bothPlayers)
+                decider = Decide.deciderFor S.alice gs
+             in case Card.Type.triggeredAbilities (Printing.card acPrinting) of
+                  [ability] ->
+                    let legal = Target.fillableModes acId (TriggeredAbility.modal ability) gs
+                        p = Prompt.ChooseModes decider S.alice acId legal 1
+                        answer = Set.singleton (ModeIndex.MkModeIndex 2)
+                     in do
+                          HU.assertEqual "legal modes are 0 and 2 (bounce self-excluded)" (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]) legal
+                          HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer))
+                  _ -> HU.assertFailure "Aether Channeler must have exactly one triggered ability"
         ]
 
 tests :: Cards.Cards -> Tasty.TestTree

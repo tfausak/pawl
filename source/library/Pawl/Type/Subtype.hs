@@ -21,4 +21,5 @@ data Subtype
   | Myr
   | Skeleton
   | Wall -- CR 205.3m (a creature type)
+  | Wizard -- CR 205.3m (a creature type)
   deriving (Eq, Ord, Show)

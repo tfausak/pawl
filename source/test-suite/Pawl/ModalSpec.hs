@@ -9,6 +9,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Activate as Activate
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
@@ -16,6 +17,7 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
@@ -37,7 +39,9 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.TargetSpec as TargetSpec
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -269,6 +273,83 @@ activationModalTests cards =
           _ -> HU.assertFailure "the fixture must have exactly one activated ability"
     ]
 
+-- M4h task 5: CR 700.2b/603.3d -- the TRIGGER-placement path (Engine.placeOne)
+-- prompts the mode and, for the chosen mode(s), the targets, exactly like
+-- Cast.castSpell does for a spell. Gated by Aether Channeler (a {2}{U} 3/3 Human
+-- Wizard whose ETB is ChooseExactly 1 over: create a 1/1 flying Bird, return
+-- ANOTHER nonland permanent to hand, or draw a card). Aether Channeler enters
+-- via S.addCreature and the SelfEnters trigger is fed to Engine.placePendingTriggers
+-- through a hand-built enters event (the same shape EventSpec uses), then the
+-- placed ability resolves off the stack.
+triggerModalTests :: Cards.Cards -> Tasty.TestTree
+triggerModalTests cards =
+  let acPrinting = Cards.aetherChannelerPrinting cards
+      -- Put Aether Channeler on the battlefield and craft its enters event, so
+      -- placePendingTriggers sees the SelfEnters trigger pending.
+      etb pid gs0 =
+        let (acId, gs1) = S.addCreature acPrinting pid gs0
+            entered = ZoneChange.MkZoneChange acId Zone.Stack Zone.Battlefield
+         in (acId, gs1 {GameState.zoneChanges = [entered]})
+      modalOf = case Card.Type.triggeredAbilities (Printing.card acPrinting) of
+        [ab] -> Just (TriggeredAbility.modal ab)
+        _ -> Nothing
+   in Tasty.testGroup
+        "M4h trigger modal (CR 700.2b/603.3d)"
+        [ HU.testCase "create mode ({0}) makes a 1/1 flying Bird; nothing bounced or drawn" $
+            let (acId, gs) = etb S.alice (Setup.emptyGame S.bothPlayers)
+                answer :: Prompt.Prompt r -> r
+                answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToObject acId)
+                placed = snd (Engine.runGamePure answer gs Engine.placePendingTriggers)
+                resolved = snd (Engine.runGamePure answer placed Stack.resolveTop)
+                newObjs = Set.toList (Set.delete acId (GameState.battlefield resolved))
+             in do
+                  HU.assertEqual "alice's hand is still empty (nothing drawn)" 0 (length (Game.zoneMembers Zone.Hand S.alice resolved))
+                  HU.assertEqual "Aether Channeler still on the battlefield (nothing bounced)" 1 (S.countOnBattlefieldByName (Text.pack "Aether Channeler") S.alice resolved)
+                  case newObjs of
+                    [tokId] -> do
+                      HU.assertEqual "the token is named Bird" (Just (Text.pack "Bird")) (fmap Card.Type.name (Game.cardOf tokId resolved))
+                      HU.assertBool "the Bird has flying (projected)" (Projection.hasKeyword Keyword.Flying tokId resolved)
+                    _ -> HU.assertFailure "expected exactly one new (Bird token) permanent",
+          HU.testCase "bounce mode ({1}) returns another nonland permanent to its owner's hand (CR 601.2c)" $
+            let (_, gs1) = etb S.alice (Setup.emptyGame S.bothPlayers)
+                (victimId, gs2) = S.addPiker cards S.bob gs1
+                answer :: Prompt.Prompt r -> r
+                answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToObject victimId)
+                placed = snd (Engine.runGamePure answer gs2 Engine.placePendingTriggers)
+                resolved = snd (Engine.runGamePure answer placed Stack.resolveTop)
+                boundSlots = case GameState.stack placed of
+                  abilId : _ -> case Game.lookupObject abilId placed of
+                    Just obj -> Just (Map.keysSet (Binding.targetsOf (Object.bindings obj)))
+                    Nothing -> Nothing
+                  [] -> Nothing
+             in do
+                  HU.assertEqual "victim is in bob's hand" 1 (length (Game.zoneMembers Zone.Hand S.bob resolved))
+                  HU.assertBool "victim no longer on the battlefield" (not (Set.member victimId (GameState.battlefield resolved)))
+                  HU.assertEqual
+                    "only the 'permanent' slot is bound"
+                    (Just (Set.singleton (SlotName.MkSlotName (Text.pack "permanent"))))
+                    boundSlots,
+          HU.testCase "draw mode ({2}) draws exactly one; no token made" $
+            let (acId, gs1) = etb S.alice (Setup.emptyGame S.bothPlayers)
+                (_, gs2) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice gs1
+                answer :: Prompt.Prompt r -> r
+                answer = chooseModeAt (ModeIndex.MkModeIndex 2) (Recipient.ToObject acId)
+                placed = snd (Engine.runGamePure answer gs2 Engine.placePendingTriggers)
+                resolved = snd (Engine.runGamePure answer placed Stack.resolveTop)
+             in do
+                  HU.assertEqual "alice drew one card" 1 (length (Game.zoneMembers Zone.Hand S.alice resolved))
+                  HU.assertEqual "no new permanent (mode 0 never resolved)" (Set.singleton acId) (GameState.battlefield resolved),
+          HU.testCase "bounce mode ({1}) excludes Aether Channeler itself (CR \"another\")" $
+            let (acId, gs) = etb S.alice (Setup.emptyGame S.bothPlayers)
+             in case modalOf of
+                  Nothing -> HU.assertFailure "Aether Channeler must have exactly one triggered ability"
+                  Just modal ->
+                    HU.assertEqual
+                      "with Aether Channeler the only nonland permanent, only modes 0 and 2 are fillable"
+                      (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2])
+                      (Target.fillableModes acId modal gs)
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
@@ -280,5 +361,6 @@ tests cards =
       forcedTests cards,
       nonlandPermanentTargetTests cards,
       modalReaderTests,
-      activationModalTests cards
+      activationModalTests cards,
+      triggerModalTests cards
     ]

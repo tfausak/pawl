@@ -60,7 +60,8 @@ data Cards = MkCards
     instillInfectionPrinting :: Printing.Printing,
     chaosCharmPrinting :: Printing.Printing,
     wallOfStonePrinting :: Printing.Printing,
-    syntheticModalActivatedPrinting :: Printing.Printing
+    syntheticModalActivatedPrinting :: Printing.Printing,
+    aetherChannelerPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -120,6 +121,7 @@ loadCards = do
   chaosCharmPrinting_ <- loadPrinting "chaos-charm"
   wallOfStonePrinting_ <- loadPrinting "wall-of-stone"
   syntheticModalActivatedPrinting_ <- loadPrinting "synthetic-modal-activator"
+  aetherChannelerPrinting_ <- loadPrinting "aether-channeler"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -168,7 +170,8 @@ loadCards = do
         instillInfectionPrinting = instillInfectionPrinting_,
         chaosCharmPrinting = chaosCharmPrinting_,
         wallOfStonePrinting = wallOfStonePrinting_,
-        syntheticModalActivatedPrinting = syntheticModalActivatedPrinting_
+        syntheticModalActivatedPrinting = syntheticModalActivatedPrinting_,
+        aetherChannelerPrinting = aetherChannelerPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -219,7 +222,8 @@ allPrintings cards =
     instillInfectionPrinting cards,
     chaosCharmPrinting cards,
     wallOfStonePrinting cards,
-    syntheticModalActivatedPrinting cards
+    syntheticModalActivatedPrinting cards,
+    aetherChannelerPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

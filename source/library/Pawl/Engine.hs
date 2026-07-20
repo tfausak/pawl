@@ -21,6 +21,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
@@ -196,13 +197,27 @@ placePendingTriggers = do
   Monad.mapM_ placeOne (apnapOrder gs pending)
   pure (not (null pending))
 
--- Put one triggered ability on the stack as a fresh OfTrigger object.
+-- Put one triggered ability on the stack as a fresh OfTrigger object, choosing
+-- its mode(s) and their targets as it is placed (CR 603.3d). This mirrors
+-- Cast.castSpell's cast-time flow: CR 700.2b -- the controller chooses the mode
+-- when the ability triggers (elided, forced and unprompted, exactly when the
+-- fillable modes are no more than the selection demands) -- then CR 603.3d --
+-- targets for the CHOSEN mode(s) are chosen now, at placement.
+--
+-- The CR 603.3c "no legal mode -> remove from the stack" guard is deferred (M4h
+-- task 6); Aether Channeler always has at least one legal mode (Create/Draw need
+-- no target), so `Set.size legal >= count` holds here. The mode prompt is left
+-- as the first thing after the object is on the stack, so that guard can be
+-- inserted immediately before it.
 placeOne :: (ObjectId, PlayerId, TriggeredAbility.TriggeredAbility Card.Card) -> Game ()
 placeOne (srcId, controller, ability) = do
   gs <- State.get
   let (abilId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      chosenModes = Target.fillableModes srcId (TriggeredAbility.modal ability) gs
+      decider = Decide.deciderFor controller gs
+      modal = TriggeredAbility.modal ability
+      legal = Target.fillableModes srcId modal gs
+      count = Modal.selectionCount modal
       obj =
         Object.MkObject
           { Object.owner = controller,
@@ -211,11 +226,25 @@ placeOne (srcId, controller, ability) = do
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing chosenModes,
+            Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.timestamp = ts
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
+  -- CR 700.2b: forced when there is nothing to choose (as many legal modes as
+  -- the selection demands, or fewer), prompted otherwise.
+  chosenModes <-
+    if Set.size legal <= fromIntegral count
+      then pure legal
+      else Trans.lift (Program.prompt (Prompt.ChooseModes decider controller abilId legal count))
+  -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability is
+  -- placed. A mode with no target slots (Create/Draw) asks nothing.
+  let sets = Target.legalSetsExcluding srcId (Modal.modesTargetSpecs chosenModes modal) gs
+  chosen <-
+    if Map.null sets
+      then pure Map.empty
+      else Trans.lift (Program.prompt (Prompt.ChooseTargets decider controller abilId sets))
+  State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
 
 -- CR 603.3b: active player's triggers first, then the others. Stable within a
 -- controller (M3f never has two from one controller, so order within is moot).
