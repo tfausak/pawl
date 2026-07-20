@@ -556,3 +556,76 @@ end of every entry.
   and plan kept as reference:
   `docs/superpowers/specs/2026-07-20-m4f-counters-design.md` and
   `docs/superpowers/plans/2026-07-20-m4f-counters.md`.
+- **M4g is complete** (modal — the seventh and final M4 letter: a choice at cast
+  binds which effects and targets apply. **Gate: Chaos Charm** (`{R}` Instant,
+  "Choose one — Destroy target Wall. / Chaos Charm deals 1 damage to target
+  creature. / Target creature gains haste until end of turn."), three modes under
+  a single `ChooseExactly 1` (CR 700.2). **Falsifier: CR 700.2c/601.2c** — the
+  Wall-destroy mode's target namespace must stay isolated from the other two
+  modes': with no Wall on the board Chaos Charm is still castable via its
+  damage/haste modes, and casting the damage mode must bind only the `creature`
+  slot, never `wall`. The decision proved is that **modality is a shared,
+  Card-free parametric payload** — four new types, `Pawl.Type.ModeIndex`
+  (a `Natural` ordinal; CR 608.2c resolution order and CR 700.2d/g's "chosen
+  twice"/copy semantics make the ordinal load-bearing, not incidental),
+  `Pawl.Type.ModeSelection` (`ChooseExactly Natural` today, a sum so `ChooseAtLeast`/
+  escalate/pawprint can join later without primitive blindness), `Pawl.Type.Mode`
+  (one option's own `effects :: Seq (Effect card)` and `targetSpecs :: Map SlotName
+  TargetSpec`), and `Pawl.Type.Modal` (`modes :: Seq (Mode card)` plus the
+  `selection`) — parametric in `card` exactly like `Effect`/`ActivatedAbility`
+  (M4c), so activated and triggered abilities can adopt the same payload as a
+  **named fast-follow** without a module cycle; only `Card.spell :: Modal Card`
+  was wired this milestone (a non-modal card, i.e. every card before M4g, is one
+  mode with `ChooseExactly 1`, forced and unprompted — the two-phase,
+  behavior-preserving reshape of `Card`'s flat `effects`/`targetSpecs` into
+  `spell`, verified against the existing suite before Chaos Charm's own tests were
+  added, plus a structural-then-canonical migration of the 44 pre-existing
+  `data/cards/*.json` files through the codec). New reader surface on
+  `Pawl.Card`: `allEffects`/`allTargetSpecs` (whole-card views, e.g. the
+  X-declaration lint) and the mode-scoped `modeTargetSpecs`/`modesEffects`/
+  `modesTargetSpecs`; the **D4 dataflow lint itself moved per-mode** (equality of
+  each mode's own read slots against its own declared slots, `Mode.effects`
+  against `Mode.targetSpecs`, not a flattened whole-card view). **One new binding slot**: `Binding.modes :: Maybe (Set
+  ModeIndex)`, stored only under the reserved `Pawl.Binding.chosenModes` slot and
+  read back by `modesOf` (CR 700.2/601.2b — a `Set` because CR 700.2d's "same mode
+  twice" is future work, not yet a multiset). **One new prompt/response pair**:
+  `Prompt.ChooseModes`/`Response.ChoseModes`, wired through `Replay` (deterministic
+  replay picks the lowest-indexed legal modes) and every test-suite prompt
+  answerer, including `randomAnswer` (so random games now exercise the modal
+  choice). **Castability**: `Pawl.Cast.fillableModes` (CR 700.2a — a mode is
+  fillable only if every one of its slots has a legal recipient; illegal targets
+  exclude the whole mode, never a partial choice) and `targetable` generalized to
+  "at least as many modes fillable as the selection demands" (identical to "every
+  slot fillable" for a non-modal card, so M3b's Giant Growth falsifier is
+  unchanged). **Resolution**: `Pawl.Resolve.effectsOf`/`resolveSpell` re-scoped to
+  read and re-validate only the *chosen* modes' effects and slots (an unchosen
+  mode's effects never resolve, CR 608.2c; its fizzle check per CR 608.2b is
+  likewise chosen-modes-only). **New Wall machinery**, the falsifier's own
+  prerequisite: `Subtype.Wall` (CR 205.3m, a creature type) and
+  `TargetSpec.WallTarget` (CR 115.4/700.2c — a creature whose *projected*
+  subtypes include Wall), with Wall of Stone (0/8 Defender) as a **deterministic
+  fixture only** (not in any random-game deck) giving `WallTarget` a legal
+  recipient to destroy. Chaos Charm swaps 4-for-4 into the red deck for four Bird
+  Maidens (deck stays 60; card-backed conservation stays 120), with Pikers and the
+  remaining Bird Maidens on board so its damage/haste modes have legal targets in
+  random games — `randomAnswer`'s `ChooseModes` arm now drives real modal choices
+  in the random `redRed` matchup (mode 0, "destroy target Wall," is never legal —
+  no Wall in any deck — so it offers `{1,2}`).
+  `Pawl.Resolve` stays the sole `case effect of` home; `Pawl.Cast` cases on
+  `ModeSelection` as an orchestration tag, the same posture it already has for
+  timing, never on a card's identity. **Named deferred expiries:** modality on
+  **activated and triggered abilities** is the design's own stated intent (§0 of
+  the spec) and the *immediate* next step, not merely deferred; `ModeSelection`
+  stays **`ChooseExactly`-only** until a card needs "choose two"/commands (CR
+  700.2d — the same-mode-twice case, which turns `Binding.modes` from a `Set` into
+  a multiset), escalate/additional-cost-per-mode (CR 700.2h), the pawprint "worth
+  of modes" count (CR 700.2i), or another-player-chooses (CR 700.2e); **copy
+  copies modes** (CR 700.2g — a future copy effect must carry the source's chosen
+  `Set ModeIndex` rather than re-prompt) is ungated, no copy effect exists yet;
+  **multi-mode slot-name collision** is unreachable until a selection picks ≥2
+  modes, mitigation (qualify a bound slot by its `ModeIndex`) due with that card;
+  and **a general subtype-restricted target** — `WallTarget` is specific to Wall,
+  generalizing to a subtype-parameterized spec ("target Goblin"/"target Zombie")
+  when the first such card needs it. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-20-m4g-modal-design.md` and
+  `docs/superpowers/plans/2026-07-20-m4g-modal.md`.

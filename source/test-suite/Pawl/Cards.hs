@@ -224,7 +224,7 @@ redDeck cards =
     Map.fromList
       [ (mountainPrinting cards, 36),
         (pikerPrinting cards, 4),
-        (birdMaidenPrinting cards, 8),
+        (birdMaidenPrinting cards, 4),
         (lightningBoltPrinting cards, 4),
         -- Blaze swaps in for four Pikers to keep the deck at 60 (so the CR 400.7
         -- conservation counts stay 120); the variable red cost gives the random
@@ -233,7 +233,12 @@ redDeck cards =
         -- Dragon Fodder swaps in for four Pikers to keep the deck at 60 (so the
         -- card-backed conservation count stays 120) and give random red games their
         -- token-churn coverage: creation from nothing and CR 704.5d cease-to-exist.
-        (dragonFodderPrinting cards, 4)
+        (dragonFodderPrinting cards, 4),
+        -- Chaos Charm swaps in for four Bird Maidens to keep the deck at 60 (so
+        -- the card-backed conservation count stays 120) and give random red games
+        -- modal-choice coverage; Pikers and the remaining Bird Maidens stay on
+        -- board so the damage/haste modes have legal targets.
+        (chaosCharmPrinting cards, 4)
       ]
 
 greenDeck :: Cards -> Deck.Deck

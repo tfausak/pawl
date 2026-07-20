@@ -79,9 +79,21 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   counter delta as one layer-**7c** `ModifyPowerToughness` (CR 613.4c — the same
   sublayer as Giant Growth, correcting the design.md table's stale "7d"; 7d is P/T
   switching), and the CR 704.5q/122.3 annihilation SBA; gated by Battlegrowth and
-  Instill Infection, retiring M4b/M4d's synthetic −0/−1 toughness-drop fixture).
-  **M4g (modal — a choice at cast binds which effects and targets apply, per the
-  design.md §3 M4 table) is next.** The **milestone completion log** — one distilled entry per milestone with
+  Instill Infection, retiring M4b/M4d's synthetic −0/−1 toughness-drop fixture),
+  then **M4g** (modal — the seventh and final M4 letter: a choice at cast binds
+  which effects and targets apply. `Mode`/`Modal`/`ModeSelection`/`ModeIndex` are
+  a shared, Card-free parametric payload — parametric in `card` like `Effect`, so
+  activated/triggered abilities can adopt it without a module cycle — but only
+  `Card.spell :: Modal Card` was wired this milestone; a new `Binding.modes`
+  slot (reserved `chosenModes`, read by `modesOf`) and `Prompt.ChooseModes`/
+  `Response.ChoseModes` carry the cast-time choice; `Cast.fillableModes` and
+  mode-scoped `Resolve.effectsOf`/`resolveSpell` read only the chosen mode(s);
+  gated by Chaos Charm with the CR 700.2c/601.2c Wall-target-namespace-isolation
+  falsifier, `Subtype.Wall`/`TargetSpec.WallTarget` new for it, Wall of Stone a
+  deterministic fixture only). **M4 is now complete (M4a–M4g). The fast-follow is
+  modality on activated and triggered abilities** — the same `Mode`/`Modal`
+  payload, unwired until a real modal activated or triggered ability gates it.
+  The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, the opcodes/types it added, and every
   elision and its named expiry — lives in `docs/progress.md`. The forward path
   (M0–M7 and the M3a–M3g split) is in `docs/design.md` §3; each milestone's

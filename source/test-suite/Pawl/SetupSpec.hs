@@ -32,10 +32,11 @@ deckTests cards =
          in do
               HU.assertEqual "mountains" (Just 36) (Map.lookup (Cards.mountainPrinting cards) m)
               HU.assertEqual "pikers" (Just 4) (Map.lookup (Cards.pikerPrinting cards) m)
-              HU.assertEqual "maidens" (Just 8) (Map.lookup (Cards.birdMaidenPrinting cards) m)
+              HU.assertEqual "maidens" (Just 4) (Map.lookup (Cards.birdMaidenPrinting cards) m)
               HU.assertEqual "bolts" (Just 4) (Map.lookup (Cards.lightningBoltPrinting cards) m)
               HU.assertEqual "blazes" (Just 4) (Map.lookup (Cards.blazePrinting cards) m)
-              HU.assertEqual "dragon fodders" (Just 4) (Map.lookup (Cards.dragonFodderPrinting cards) m),
+              HU.assertEqual "dragon fodders" (Just 4) (Map.lookup (Cards.dragonFodderPrinting cards) m)
+              HU.assertEqual "chaos charms" (Just 4) (Map.lookup (Cards.chaosCharmPrinting cards) m),
       HU.testCase "green deck composition" $
         let Deck.MkDeck m = Cards.greenDeck cards
          in do
@@ -56,8 +57,8 @@ deckTests cards =
               HU.assertEqual "instill infections" (Just 4) (Map.lookup (Cards.instillInfectionPrinting cards) m),
       HU.testCase "36 Mountains per player after a red-red setup" $
         HU.assertEqual "mountains" 36 (S.countByName (Text.pack "Mountain") S.alice (setupState cards)),
-      HU.testCase "8 Bird Maidens per player after a red-red setup" $
-        HU.assertEqual "maidens" 8 (S.countByName (Text.pack "Bird Maiden") S.alice (setupState cards)),
+      HU.testCase "4 Bird Maidens per player after a red-red setup" $
+        HU.assertEqual "maidens" 4 (S.countByName (Text.pack "Bird Maiden") S.alice (setupState cards)),
       HU.testCase "4 Pikers per player after a red-red setup" $
         HU.assertEqual "pikers" 4 (S.countByName (Text.pack "Goblin Piker") S.bob (setupState cards)),
       HU.testCase "4 Lightning Bolts per player after a red-red setup" $
@@ -65,7 +66,9 @@ deckTests cards =
       HU.testCase "4 Blazes per player after a red-red setup" $
         HU.assertEqual "blazes" 4 (S.countByName (Text.pack "Blaze") S.alice (setupState cards)),
       HU.testCase "4 Dragon Fodders per player after a red-red setup" $
-        HU.assertEqual "dragon fodders" 4 (S.countByName (Text.pack "Dragon Fodder") S.alice (setupState cards))
+        HU.assertEqual "dragon fodders" 4 (S.countByName (Text.pack "Dragon Fodder") S.alice (setupState cards)),
+      HU.testCase "4 Chaos Charms per player after a red-red setup" $
+        HU.assertEqual "chaos charms" 4 (S.countByName (Text.pack "Chaos Charm") S.alice (setupState cards))
     ]
 
 setupState :: Cards.Cards -> GameState.GameState

@@ -171,7 +171,7 @@ This is load-bearing, not a party trick. **Designing for Little Girl gets you Ta
 
 Sequenced to retire *architectural* risk first, not to maximize card count. The ABI is the thing you can't cheaply change later; Lightning Bolt will still be there in six months and will take an afternoon.
 
-This section is the **forward plan**. For what has actually landed — one distilled entry per completed milestone, with its gate card, the decision it proved, the opcodes/types it added, and every elision and its named expiry — see the completion log in `progress.md`. Milestones **M0 through M3g are complete**.
+This section is the **forward plan**. For what has actually landed — one distilled entry per completed milestone, with its gate card, the decision it proved, the opcodes/types it added, and every elision and its named expiry — see the completion log in `progress.md`. Milestones **M0 through M4g are complete** — the whole of M4 (M4a–M4g, §3's split table below).
 
 ### M0 — A complete game with zero cards
 
@@ -409,6 +409,15 @@ M3f pipeline, counter-spell adds stack targeting, counters is state on the
 existing projection, modal is choice-binding on existing infra. Each letter
 re-derives its exact gate from real cards and `rules.txt` when written; the later
 letters are a roadmap, not a contract.
+
+**M4g landed as the last letter, and it names its own fast-follow.** Modality's
+`Mode`/`Modal`/`ModeSelection`/`ModeIndex` types are parametric in `card`, exactly
+like `Effect`/`ActivatedAbility`/`TriggeredAbility` (M4c) — built so that
+activated and triggered abilities can adopt the same payload (CR 700.2b/603.3c's
+"if no mode is chosen, the ability is removed from the stack") without a module
+cycle. Only `Card.spell :: Modal Card` was wired at M4g; that adoption is the
+immediate next step, not a distant one. See `progress.md`'s M4g entry for the
+gate, falsifier, and every other named deferred expiry.
 
 **The volume line — after the seams.** Once the seams exist, the remaining CR 701
 keyword actions and the "obvious English verbs" §4 names (life gain/loss,
