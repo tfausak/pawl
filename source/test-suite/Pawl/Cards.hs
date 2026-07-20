@@ -57,7 +57,9 @@ data Cards = MkCards
     drudgeSkeletonsPrinting :: Printing.Printing,
     cancelPrinting :: Printing.Printing,
     battlegrowthPrinting :: Printing.Printing,
-    instillInfectionPrinting :: Printing.Printing
+    instillInfectionPrinting :: Printing.Printing,
+    chaosCharmPrinting :: Printing.Printing,
+    wallOfStonePrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -114,6 +116,8 @@ loadCards = do
   cancelPrinting_ <- loadPrinting "cancel"
   battlegrowthPrinting_ <- loadPrinting "battlegrowth"
   instillInfectionPrinting_ <- loadPrinting "instill-infection"
+  chaosCharmPrinting_ <- loadPrinting "chaos-charm"
+  wallOfStonePrinting_ <- loadPrinting "wall-of-stone"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -159,7 +163,9 @@ loadCards = do
         drudgeSkeletonsPrinting = drudgeSkeletonsPrinting_,
         cancelPrinting = cancelPrinting_,
         battlegrowthPrinting = battlegrowthPrinting_,
-        instillInfectionPrinting = instillInfectionPrinting_
+        instillInfectionPrinting = instillInfectionPrinting_,
+        chaosCharmPrinting = chaosCharmPrinting_,
+        wallOfStonePrinting = wallOfStonePrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -207,7 +213,9 @@ allPrintings cards =
     drudgeSkeletonsPrinting cards,
     cancelPrinting cards,
     battlegrowthPrinting cards,
-    instillInfectionPrinting cards
+    instillInfectionPrinting cards,
+    chaosCharmPrinting cards,
+    wallOfStonePrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck
