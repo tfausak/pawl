@@ -1,6 +1,7 @@
 module Pawl.Type.DamageEvent where
 
 import Numeric.Natural (Natural)
+import Pawl.Type.DamageKind (DamageKind)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Recipient (Recipient)
 
@@ -17,6 +18,9 @@ data DamageEvent = MkDamageEvent
     -- Captured from the projection at deal time (Projection.hasKeyword), not
     -- re-derived at SBA-check time -- last-known information. Read by the CR
     -- 704.5h SBA. See the M3b spec, section 4.
-    dealtByDeathtouch :: Bool
+    dealtByDeathtouch :: Bool,
+    -- CR 510 vs CR 608: combat damage or not. Set at deal time -- Damage tags
+    -- Combat, Resolve's DealDamage tags Noncombat. Read by Event.applyPreventions.
+    kind :: DamageKind
   }
   deriving (Eq, Ord, Show)

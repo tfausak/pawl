@@ -99,6 +99,7 @@ library
     Pawl.Type.CombatStep
     Pawl.Type.ContinuousEffect
     Pawl.Type.DamageEvent
+    Pawl.Type.DamageKind
     Pawl.Type.Decider
     Pawl.Type.Decimal
     Pawl.Type.DecisionLog

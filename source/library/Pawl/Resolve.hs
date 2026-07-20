@@ -24,6 +24,7 @@ import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Effect (Effect)
@@ -263,7 +264,7 @@ applyEffect source controller bound legality chosen effect = case effect of
               -- The applied effect IS the event (the M3a spec, section 4):
               -- constructing this DamageEvent and funneling it is the whole
               -- application. CR 120.3e / 120.3a live in applyDamage.
-              else Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n) (Projection.hasKeyword Keyword.Deathtouch source gs)] gs
+              else Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n) (Projection.hasKeyword Keyword.Deathtouch source gs) DamageKind.Noncombat] gs
         _ -> gs
   Effect.ModifyTarget duration modification slot ->
     State.modify' $ \gs ->

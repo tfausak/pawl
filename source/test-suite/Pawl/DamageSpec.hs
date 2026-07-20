@@ -19,6 +19,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -104,7 +105,7 @@ creatureSbaTests cards =
             -- A real 2/1 Piker (bob's) is the damage source; alice's 1/1 token takes 2.
             (srcId, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob base
             (tokId, gs2) = S.addToken goblinCard S.alice gs1
-            damaged = Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False] gs2
+            damaged = Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False DamageKind.Combat] gs2
             settled = Sba.checkStateBasedActions damaged
          in do
               HU.assertEqual "the token is gone from the battlefield" 0 (S.creaturesInPlay S.alice settled)
@@ -168,9 +169,9 @@ damageEventTests cards =
               (a : _, b : _) -> do
                 HU.assertEqual "two events" 2 (length events)
                 HU.assertBool "attacker hit blocker for 2" $
-                  elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2 False) events
+                  elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2 False DamageKind.Combat) events
                 HU.assertBool "blocker hit attacker for 2" $
-                  elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False) events
+                  elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False DamageKind.Combat) events
               _ -> HU.assertFailure "fixture should have one creature per side",
       HU.testCase "an unblocked 2/1 emits a ToPlayer event" $
         let (gs, mine, _) = S.combatBoard cards 1 0
@@ -179,7 +180,7 @@ damageEventTests cards =
               a : _ ->
                 HU.assertEqual
                   "one player event"
-                  [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False]
+                  [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False DamageKind.Combat]
                   (GameState.damageEvents after)
               _ -> HU.assertFailure "fixture should have an attacker"
     ]

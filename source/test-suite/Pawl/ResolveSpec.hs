@@ -33,6 +33,7 @@ import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
@@ -145,7 +146,18 @@ resolveTests :: Cards.Cards -> Tasty.TestTree
 resolveTests cards =
   Tasty.testGroup
     "Resolve"
-    [ HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $
+    [ HU.testCase "CR 608 a resolved spell's damage is Noncombat" $
+        let base = S.landsInPlay (Cards.mountainPrinting cards) 1
+            (_target, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            (gs1, spellId) = S.handOne (Cards.lightningBoltPrinting cards) gs0
+            cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice spellId))
+            -- resolveTop applies the damage but does NOT run SBAs, so the event persists.
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in HU.assertEqual
+              "the Bolt's damage event is Noncombat"
+              [DamageKind.Noncombat]
+              (map DamageEvent.kind (GameState.damageEvents resolved)),
+      HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $
         let (_, cast, _) = S.boltAtBobsPiker cards
             after = Sba.checkStateBasedActions (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
          in do
@@ -504,7 +516,7 @@ indestructibleTests cards =
         let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             -- Zero marked damage (so 704.5g is silent) plus a deathtouch event isolates
             -- the 704.5h path; indestructible must guard it too (CR 700.4).
-            wounded = gs {GameState.damageEvents = [DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True]}
+            wounded = gs {GameState.damageEvents = [DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True DamageKind.Combat]}
             after = Sba.checkStateBasedActions wounded
          in HU.assertEqual "Myr survives deathtouch" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $
