@@ -54,7 +54,8 @@ data Cards = MkCards
     mindRotPrinting :: Printing.Printing,
     dragonFodderPrinting :: Printing.Printing,
     fogPrinting :: Printing.Printing,
-    drudgeSkeletonsPrinting :: Printing.Printing
+    drudgeSkeletonsPrinting :: Printing.Printing,
+    cancelPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -108,6 +109,7 @@ loadCards = do
   dragonFodderPrinting_ <- loadPrinting "dragon-fodder"
   fogPrinting_ <- loadPrinting "fog"
   drudgeSkeletonsPrinting_ <- loadPrinting "drudge-skeletons"
+  cancelPrinting_ <- loadPrinting "cancel"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -150,7 +152,8 @@ loadCards = do
         mindRotPrinting = mindRotPrinting_,
         dragonFodderPrinting = dragonFodderPrinting_,
         fogPrinting = fogPrinting_,
-        drudgeSkeletonsPrinting = drudgeSkeletonsPrinting_
+        drudgeSkeletonsPrinting = drudgeSkeletonsPrinting_,
+        cancelPrinting = cancelPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -195,7 +198,8 @@ allPrintings cards =
     mindRotPrinting cards,
     dragonFodderPrinting cards,
     fogPrinting cards,
-    drudgeSkeletonsPrinting cards
+    drudgeSkeletonsPrinting cards,
+    cancelPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

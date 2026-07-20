@@ -141,6 +141,17 @@ tests cards =
           HU.testCase "P2: through text" $
             mapM_
               (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (J.parse (J.render (Codec.printingToJson p)) >>= Codec.jsonToPrinting))
-              (Cards.allPrintings cards)
+              (Cards.allPrintings cards),
+          HU.testCase "M4e Cancel loads as a single Counter effect targeting a spell" $
+            let card = Printing.card (Cards.cancelPrinting cards)
+             in do
+                  HU.assertEqual
+                    "effects"
+                    [Effect.Counter (SlotName.MkSlotName (Text.pack "spell"))]
+                    (CardT.effects card)
+                  HU.assertEqual
+                    "target spec"
+                    (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) TargetSpec.SpellTarget)
+                    (CardT.targetSpecs card)
         ]
     ]
