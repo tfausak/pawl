@@ -55,7 +55,7 @@
 **Interfaces:**
 - Produces: `CounterKind.CounterKind` = `PlusOnePlusOne | MinusOneMinusOne` (`Eq`, `Ord`, `Show`); `Object.counters :: Map CounterKind.CounterKind Natural`; `S.addCounter :: CounterKind.CounterKind -> Natural -> ObjectId -> GameState -> GameState`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/EventSpec.hs`. Add imports `import qualified Pawl.Type.CounterKind as CounterKind` and (if absent) `import qualified Data.Map.Strict as Map`. Add this test case into the existing `tests` tree's top-level list (mirror a neighboring `HU.testCase`):
 
@@ -75,12 +75,12 @@ Add to `source/test-suite/Pawl/EventSpec.hs`. Add imports `import qualified Pawl
 
 (If `EventSpec` lacks `Object`/`Zone`/`Game`/`Cards`/`S` imports, add the qualified imports it needs — check the module header; these mirror `ResolveSpec`.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Not in scope: type constructor CounterKind`, `addCounter`, and record field `counters`.
 
-- [ ] **Step 3a: Create the `CounterKind` module**
+- [x] **Step 3a: Create the `CounterKind` module**
 
 `source/library/Pawl/Type/CounterKind.hs`:
 
@@ -102,7 +102,7 @@ data CounterKind
 
 Run `cabal-gild` via `hooky fix` later so `exposed-modules` picks it up (the `-- cabal-gild: discover` directive).
 
-- [ ] **Step 3b: Add the `Object.counters` field**
+- [x] **Step 3b: Add the `Object.counters` field**
 
 In `source/library/Pawl/Type/Object.hs`, add the import `import Pawl.Type.CounterKind (CounterKind)` (alphabetical among the `Pawl.Type.*` imports) and the field immediately after `bindings`:
 
@@ -117,7 +117,7 @@ In `source/library/Pawl/Type/Object.hs`, add the import `import Pawl.Type.Counte
     counters :: Map CounterKind Natural,
 ```
 
-- [ ] **Step 3c: Fix every `MkObject` construction site**
+- [x] **Step 3c: Fix every `MkObject` construction site**
 
 Record-syntax sites — add `Object.counters = Map.empty,` after the `bindings` line:
 `Setup.hs:95`, `Engine.hs:204`, `Activate.hs:83`, `Event.hs:168` (createToken), `Support.hs:265,293,316,345,371,398,570,638`, `GameSpec.hs:110,365`, `CastSpec.hs:395`, `ResolveSpec.hs:249,277,306,366,398,478`. (Each already imports `Data.Map.Strict as Map`; if a test module does not, add it.)
@@ -136,7 +136,7 @@ Positional sites `ResolveSpec.hs:510` and `ResolveSpec.hs:659` — insert `Map.e
 
 The build's `-Wmissing-fields` under `-Werror` flags any record site you miss — recompile until clean.
 
-- [ ] **Step 3d: Add the `addCounter` test helper**
+- [x] **Step 3d: Add the `addCounter` test helper**
 
 In `source/test-suite/Pawl/Support.hs` add `import qualified Pawl.Type.CounterKind as CounterKind` and a helper (place near `markDamage`/`addRegenShield`):
 
@@ -150,12 +150,12 @@ addCounter kind n oid gs =
    in gs {GameState.objects = Map.adjust bump oid (GameState.objects gs)}
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "/CR 122.2 counters cease/"'`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -176,7 +176,7 @@ git commit -m "M4f: CounterKind type + Object.counters per-incarnation storage (
 - Consumes: `CounterKind.CounterKind` (Task 1).
 - Produces: `Effect.PutCounters CounterKind Quantity SlotName`; `Codec.counterKindToJson`/`Codec.jsonToCounterKind`; `Resolve.putCounters :: ObjectId -> CounterKind -> Natural -> GameState -> GameState`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/CodecSpec.hs`, add (imports `import qualified Pawl.Type.CounterKind as CounterKind`, and `Effect`/`Quantity`/`SlotName` if not present):
 
@@ -191,12 +191,12 @@ In `source/test-suite/Pawl/CodecSpec.hs`, add (imports `import qualified Pawl.Ty
 
 (Match the exact `SlotName` constructor to the codebase — confirm with `grep 'MkSlotName\|textToSlotName' source/library/Pawl/Type/SlotName.hs`; use whatever the existing tests use.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `PutCounters`, `counterKindToJson`, `jsonToCounterKind` not in scope.
 
-- [ ] **Step 3a: Add the opcode**
+- [x] **Step 3a: Add the opcode**
 
 In `source/library/Pawl/Type/Effect.hs`, add the import `import Pawl.Type.CounterKind (CounterKind)` and the constructor (place beside the other targeted verbs):
 
@@ -211,7 +211,7 @@ In `source/library/Pawl/Type/Effect.hs`, add the import `import Pawl.Type.Counte
     PutCounters CounterKind Quantity SlotName
 ```
 
-- [ ] **Step 3b: Add the five classification arms in `Resolve.hs`**
+- [x] **Step 3b: Add the five classification arms in `Resolve.hs`**
 
 Add `import qualified Pawl.Type.CounterKind as CounterKind` (if a qualified alias is needed anywhere; the arms below don't name it, so it may not be). Add each arm:
 
@@ -221,7 +221,7 @@ Add `import qualified Pawl.Type.CounterKind as CounterKind` (if a qualified alia
 - `searchesLibrary`: `Effect.PutCounters {} -> False`
 - `rewriteEffect` (the identity arm): `Effect.PutCounters {} -> effect`
 
-- [ ] **Step 3c: Add the `putCounters` helper and the `applyEffect` arm in `Resolve.hs`**
+- [x] **Step 3c: Add the `putCounters` helper and the `applyEffect` arm in `Resolve.hs`**
 
 Helper (place near other small state helpers; needs `Object`, `Game`, `Map`, `CounterKind`, `Natural`):
 
@@ -247,7 +247,7 @@ putCounters oid kind n gs =
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
 ```
 
-- [ ] **Step 3d: Add the Codec arms in `Codec.hs`**
+- [x] **Step 3d: Add the Codec arms in `Codec.hs`**
 
 Add `import qualified Pawl.Type.CounterKind as CounterKind`. Add the enum codec (model on `cardTypeToJson`/`jsonToCardType`):
 
@@ -282,12 +282,12 @@ Add the `jsonToEffect` arm:
       _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "/PutCounters/ || /CounterKind/"'`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -306,7 +306,7 @@ git commit -m "M4f: Effect.PutCounters opcode + Resolve wiring + codec (CR 122.6
 - Consumes: `Object.counters` (Task 1), `S.addCounter` (Task 1).
 - Produces: counters visible in `Projection.powerOf`/`toughnessOf` at layer 7c.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/ProjectionSpec.hs` (add `import qualified Pawl.Type.CounterKind as CounterKind` if absent), add to the `tests` tree:
 
@@ -337,12 +337,12 @@ In `source/test-suite/Pawl/ProjectionSpec.hs` (add `import qualified Pawl.Type.C
 
 (Confirm the `S.withEffect` helper name/signature used by the existing Giant-Growth projection tests — `grep 'withEffect' source/test-suite/Pawl/*.hs`; reuse it verbatim. Confirm `Cards.forestPrinting`/`pikerPrinting` are the right fixtures for a green creature.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "/counter/"'`
 Expected: FAIL — counters are stored but do not affect projected P/T yet (power/toughness unchanged from base).
 
-- [ ] **Step 3: Inject counters into `gather`**
+- [x] **Step 3: Inject counters into `gather`**
 
 In `source/library/Pawl/Projection.hs` add `import qualified Pawl.Type.CounterKind as CounterKind` and the producer:
 
@@ -385,12 +385,12 @@ Append it in `gather` — change the final line from `stored ++ static_` to:
 
 (`Object` is imported qualified; confirm `Object.counters`/`Object.timestamp` resolve. `Maybe` is imported as `Maybe`.)
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "/counter/ || /7c/"'`
 Expected: PASS (all three).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -409,7 +409,7 @@ git commit -m "M4f: project counters as layer-7c P/T (CR 122.1a / 613.4c)"
 - Consumes: `Object.counters` (Task 1), `S.addCounter` (Task 1), `Sba.checkStateBasedActions`.
 - Produces: a permanent with both counter kinds has `min` of each removed on an SBA check.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/EventSpec.hs` add:
 
@@ -437,12 +437,12 @@ In `source/test-suite/Pawl/EventSpec.hs` add:
 
 (Add `import qualified Pawl.Projection as Projection` to `EventSpec` if absent.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "/704.5q/"'`
 Expected: FAIL — counters are not annihilated (symmetric case still shows `{PlusOnePlusOne:1, MinusOneMinusOne:1}`).
 
-- [ ] **Step 3: Add the annihilation arm to `performStateBasedActions`**
+- [x] **Step 3: Add the annihilation arm to `performStateBasedActions`**
 
 In `source/library/Pawl/Sba.hs` add `import qualified Data.Maybe as Maybe` (if absent) and `import qualified Pawl.Type.CounterKind as CounterKind`. Inside the `let` block of `performStateBasedActions`, add (reading the *incoming* `gs` for CR 704.4 simultaneity):
 
@@ -484,12 +484,12 @@ to:
 
 (`Map` subtraction is safe: `n = min plus minus`, so both counts are `>= n`; `removeN` deletes the key at zero. `Natural` never goes negative here.)
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "/704.5q/"'`
 Expected: PASS (both).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -509,7 +509,7 @@ git commit -m "M4f: CR 704.5q / 122.3 counter annihilation state-based action"
 - Consumes: everything from Tasks 1–4; the M3.5 loader (`Cards.loadPrinting`), `S.handOne`, `Cast.castSpell`, `Stack.resolveTop`, `Sba.checkStateBasedActions`, `S.addCreature`, `S.landsInPlay`.
 - Produces: `Cards.battlegrowthPrinting`, `Cards.instillInfectionPrinting`; both cards in `allPrintings` (honesty round-trip) and in the green/black random decks.
 
-- [ ] **Step 1: Write the failing gate tests**
+- [x] **Step 1: Write the failing gate tests**
 
 In `source/test-suite/Pawl/ResolveSpec.hs`, add a `countersTests :: Cards.Cards -> Tasty.TestTree` group (model its scenario plumbing on `zoneChangeTests`' Murder/Unsummon cases — `S.handOne`, `Cast.castSpell S.alice`, `Stack.resolveTop`, `S.identityAnswer`; target with `S.identityAnswer` if it points a single-creature slot at the only legal creature, else use an answer that aims at the intended creature — inspect how the Murder test lands its target and reuse that path), and wire it into this spec's exported `tests` list.
 
@@ -581,12 +581,12 @@ countersTests cards =
 
 Add imports to `ResolveSpec` as needed: `Pawl.Type.CounterKind as CounterKind`, `Data.Map.Strict as Map` (present), `Pawl.Projection` (present). Verify `S.addLibraryCard`, `S.handSize`, `Game.zoneMembers`, `Zone.Hand` are the right names (all seen in Support/ResolveSpec).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Cards.battlegrowthPrinting`/`instillInfectionPrinting` not in scope (and, once wired, the loader will fail until the JSON files exist).
 
-- [ ] **Step 3a: Author the card JSON files**
+- [x] **Step 3a: Author the card JSON files**
 
 `data/cards/battlegrowth.json` (model on `tome-scour.json`/`murder.json`; `Instant`, single green pip, one `PutCounters`, one `CreatureTarget` slot):
 
@@ -602,7 +602,7 @@ Expected: FAIL — `Cards.battlegrowthPrinting`/`instillInfectionPrinting` not i
 
 Exact key names/shapes must match the codec — if the loader rejects a file (Step 4), diff against a known-good card (`murder.json` for cost/typeLine/targetSpecs, `tome-scour.json` for a `[slot, Literal]` effect value) and against `counterKindToJson`'s tag strings from Task 2. The `allPrintings` round-trip (Step 4) is the authority: it must render byte-identically.
 
-- [ ] **Step 3b: Wire the cards into `Cards.hs`**
+- [x] **Step 3b: Wire the cards into `Cards.hs`**
 
 Add two record fields to `data Cards`:
 
@@ -629,7 +629,7 @@ Add the two bindings in the `MkCards { … }` record and the two entries in `all
     instillInfectionPrinting cards,
 ```
 
-- [ ] **Step 3c: Deck swaps (4-for-4, keep 60)**
+- [x] **Step 3c: Deck swaps (4-for-4, keep 60)**
 
 In `greenDeck`, change `(warMammothPrinting cards, 12)` to `8` and add:
 
@@ -647,7 +647,7 @@ In `blackDeck`, change `(typhoidRatsPrinting cards, 12)` to `8` and add:
         (instillInfectionPrinting cards, 4),
 ```
 
-- [ ] **Step 3d: Retire the synthetic −0/−1 fixture**
+- [x] **Step 3d: Retire the synthetic −0/−1 fixture**
 
 In `source/test-suite/Pawl/ResolveSpec.hs` lines ~616–632, the two "CR 704.5f … does NOT save" tests use `withEffect … (Modification.ModifyPowerToughness (Quantity.Literal 0) (Quantity.Literal (-1)))`. Replace that synthetic continuous effect with a real −1/−1 counter, keeping each test's assertion intact:
 
@@ -656,14 +656,14 @@ In `source/test-suite/Pawl/ResolveSpec.hs` lines ~616–632, the two "CR 704.5f 
 
 Update the two code comments from "A test-local -0/-1 drops …" to "A real -1/-1 counter drops … (CR 122.1a); 704.5f is a put-into-graveyard, …". Leave every assertion unchanged — the outcome (dies despite indestructible / despite the shield) is identical.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the `Counters` group, the retired 704.5f tests, and the `allPrintings` honesty round-trip (`CardsSpec`/`PropertySpec`) including the two new cards. The card-backed conservation property stays 120.
 
 If the round-trip fails on a new card, fix its JSON to render byte-identically (Step 3a).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -681,19 +681,19 @@ git commit -m "M4f: Battlegrowth + Instill Infection gates, deck coverage, retir
 
 **Interfaces:** none (documentation only).
 
-- [ ] **Step 1: Correct the design.md M4f row**
+- [x] **Step 1: Correct the design.md M4f row**
 
 In `docs/design.md` §3's M4 split table, change the M4f row's "New machinery" cell from "+1/+1 as persistent permanent state, layer 7d (below Giant Growth's 7c)" to "+1/+1 as persistent permanent state, **layer 7c** (CR 613.4c — the same sublayer as Giant Growth; 7d is P/T switching)". Keep the gate/falsifier cell.
 
-- [ ] **Step 2: Add the milestone-completion entry to progress.md**
+- [x] **Step 2: Add the milestone-completion entry to progress.md**
 
 Append one entry to `docs/progress.md` in the established house style (model on the M4e entry): gate cards (Battlegrowth + Instill Infection); the decision proved (counters as persistent per-incarnation typed counts, projected at layer 7c — CR 613.4c corrected from design.md's 7d); the types/opcodes added (`CounterKind`; `Object.counters`; `Effect.PutCounters`; the `gather` 7c injection; the CR 704.5q / 122.3 annihilation SBA); the falsifier (704.5q forces typed counts over a net Integer; persistence vs. Giant Growth); the retirement (synthetic −0/−1 fixture, the M4b/M4d expiry, cashed); and the named deferred expiries verbatim from spec §9. Cite the spec and this plan at the end.
 
-- [ ] **Step 3: Update the CLAUDE.md current-work note**
+- [x] **Step 3: Update the CLAUDE.md current-work note**
 
 In `CLAUDE.md`'s "Current work and tracking" section, update the milestone list: mark M4f complete (a one-clause summary mirroring the M4e clause) and set **M4g (modal) as next** per the design.md M4 table.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

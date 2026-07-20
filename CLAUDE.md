@@ -71,9 +71,17 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   funnel (CR 701.6a: to its owner's graveyard via `changeZone`, so Rest in Peace's
   redirect composes), a narrower `TargetSpec.SpellTarget` read via the new
   `Game.isSpell` classification (on the stack *and* `Source.OfCard`, CR 112.1),
-  gated by Cancel with the CR 608.2b fizzle as falsifier). **M4f (counters —
-  +1/+1 as persistent permanent state, layer 7d, per the design.md §3 M4 table)
-  is next.** The **milestone completion log** — one distilled entry per milestone with
+  gated by Cancel with the CR 608.2b fizzle as falsifier), then **M4f** (counters —
+  +1/+1 and −1/−1 as persistent per-incarnation permanent state: a new
+  `Object.counters :: Map CounterKind Natural` (reset by `changeZone`, CR 122.2;
+  cleanup-exempt, unlike `damage`), an `Effect.PutCounters CounterKind Quantity
+  SlotName` opcode editing it in place, the projection injecting each object's net
+  counter delta as one layer-**7c** `ModifyPowerToughness` (CR 613.4c — the same
+  sublayer as Giant Growth, correcting the design.md table's stale "7d"; 7d is P/T
+  switching), and the CR 704.5q/122.3 annihilation SBA; gated by Battlegrowth and
+  Instill Infection, retiring M4b/M4d's synthetic −0/−1 toughness-drop fixture).
+  **M4g (modal — a choice at cast binds which effects and targets apply, per the
+  design.md §3 M4 table) is next.** The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, the opcodes/types it added, and every
   elision and its named expiry — lives in `docs/progress.md`. The forward path
   (M0–M7 and the M3a–M3g split) is in `docs/design.md` §3; each milestone's

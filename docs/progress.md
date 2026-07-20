@@ -500,3 +500,59 @@ end of every entry.
   deferred to the first card that needs them. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-19-m4e-counter-spell-design.md` and
   `docs/superpowers/plans/2026-07-19-m4e-counter-spell.md`.
+- **M4f is complete** (counters — +1/+1 and −1/−1 as **persistent permanent
+  state**, the first P/T source that is neither a printed value nor a durational
+  continuous effect. **Gates: Battlegrowth** (`{G}` Instant, "Put a +1/+1 counter
+  on target creature") and **Instill Infection** (`{3}{B}` Instant, "Put a −1/−1
+  counter on target creature. Draw a card"). The decision proved is that counters
+  live as **typed per-kind counts**, forced by the CR 704.5q / 122.3 falsifier: a
+  permanent with both a +1/+1 and a −1/−1 counter has N of each removed by a
+  state-based action, which a net-`Integer` P/T model cannot represent — so the
+  data model must keep counts per kind. **A rules correction:** design.md's M4f row
+  said "layer 7d"; **CR 613.4c** puts counters in **layer 7c** (the same sublayer
+  as Giant Growth — 7d is P/T *switching*), so **no new `Layer` constructor** was
+  added and, 7c being purely additive, pre-combining a permanent's counters into
+  one net delta and using the object's own timestamp are both unobservable (a
+  theorem, not an elision). New type **`Pawl.Type.CounterKind`** (`PlusOnePlusOne |
+  MinusOneMinusOne`, `Ord` load-bearing as a `Map` key); new **`Object.counters ::
+  Map CounterKind Natural`** field — per-incarnation state reset by `changeZone`
+  (CR 122.2: counters "cease to exist" on a zone change) and, unlike `damage`, NOT
+  cleared at cleanup (a counter is not "until end of turn"). One opcode
+  **`Effect.PutCounters CounterKind Quantity SlotName`** (CR 122.6), executed only
+  by `Resolve.applyEffect` as an in-place `Map.insertWith (+)` — NOT a zone change,
+  so it never routes through `Event.changeZone` — with its five `Resolve`
+  classifications (the `Quantity` evaluated against the resolving `source`, like
+  `DealDamage`, so a future `X`-counter card works unchanged) and a `Codec` arm.
+  The projection reads counters through a new **`Projection.counterGathered`** that
+  emits each battlefield object's net counter delta as one synthetic layer-7c
+  `ModifyPowerToughness`, appended as `gather`'s third source (`stored ++ static_ ++
+  counterGathered`) so it folds through the existing path alongside Giant Growth;
+  `addPT`'s `(Nothing, _) → Nothing` means counters on a non-creature yield no P/T
+  (CR 122.1a). The **CR 704.5q / 122.3 annihilation SBA** is a new arm in
+  `Sba.performStateBasedActions` (candidates read from the incoming state for CR
+  704.4 simultaneity, N = `min`, the edit folded onto the threaded final state;
+  `removeN` deletes a key at zero so a balanced permanent produces no candidate and
+  the CR 704.4 settle loop terminates; net P/T is preserved, so annihilation can
+  neither cause nor prevent a death). **The falsifiers land as gameplay tests:**
+  Battlegrowth's +1/+1 **persists through cleanup** where an equal Giant Growth
+  wears off (the counter/continuous-effect line); enough −1/−1 counters drop a
+  creature to toughness ≤ 0 and it dies via CR 704.5f — which **retires the
+  synthetic −0/−1 continuous-effect fixture** M4b/M4d used as a −1/−1 stand-in
+  (their named expiry, cashed); and both kinds on one creature annihilate to the
+  correct remainder. Battlegrowth (green) and Instill Infection (black) swap
+  4-for-4 into the green/black decks (each stays 60; card-backed conservation stays
+  120 — a counter mints no object), giving the `greenBlack` matchup random counter
+  coverage; both cards' JSON joins `allPrintings` for the honesty round-trip.
+  `Pawl.Resolve` stays the sole `case effect of` home; `Pawl.Projection` the sole
+  `case … Modification` home. **No new prompt/response** (both cards target through
+  the existing `ChooseTargets`; putting counters is unprompted, CR 122.6). **Named
+  deferred expiries:** non-P/T counter kinds (keyword/charge/loyalty/poison/shield/
+  stun, CR 122.1b–i); a "counter placed" event and its triggers (CR 122.7,
+  proliferate); replacements that alter counter placement (Doubling Season/Hardened
+  Scales); counters entering *with* a permanent (CR 122.6a, a replacement); "move a
+  counter" (CR 122.5); the "can't have more than N counters" SBA (CR 122.4 /
+  704.5r); and `Quantity.X`-many counters (rides M4a's `ChooseX` — `PutCounters`
+  already carries a `Quantity`) — each due with the first card that needs it. Spec
+  and plan kept as reference:
+  `docs/superpowers/specs/2026-07-20-m4f-counters-design.md` and
+  `docs/superpowers/plans/2026-07-20-m4f-counters.md`.

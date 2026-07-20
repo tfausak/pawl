@@ -399,7 +399,7 @@ card-count payoff, per §4).
 | **M4c** | Tokens | The first *card-less* object — breaks "every `Object` references a `Printing`" | A token leaving the battlefield **ceases to exist** (CR 704.5d); its characteristics come from the effect, not a printing |
 | **M4d** | Prevention (CR 615) | The *cancel* replacement shape (vs. M3f's *redirect*); regeneration's one-shot shield | **Fog** ("prevent all combat damage"): cancels an event the damage funnel would otherwise complete |
 | **M4e** | Counter target spell | The first effect that *targets the stack* | **Cancel**: must target the stack; fizzles if the spell has already left (CR 608.2b) |
-| **M4f** | Counters | +1/+1 as persistent permanent state, layer 7d (below Giant Growth's 7c) | A +1/+1 counter meeting a −1/−1 counter → CR 704.5q annihilation SBA |
+| **M4f** | Counters | +1/+1 as persistent permanent state, layer **7c** (CR 613.4c — the same sublayer as Giant Growth; 7d is P/T *switching*) | A +1/+1 counter meeting a −1/−1 counter → CR 704.5q annihilation SBA |
 | **M4g** | Modal | A choice at cast binds which effects and targets apply | A charm whose chosen mode determines its legal targets |
 
 **Ordering.** `a → b` are fixed (X is upstream of every quantity; zone-verbs is
