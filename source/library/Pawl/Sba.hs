@@ -55,8 +55,8 @@ woundedByDeathtouch gs oid =
           && DamageEvent.dealtByDeathtouch ev
    in any hits (GameState.damageEvents gs)
 
--- CR 704.5f (toughness 0 or less), CR 704.5g (damage marked >= toughness), and
--- CR 704.5h (wounded by a deathtouch source).
+-- CR 704.5f: toughness 0 or less -- a put-into-graveyard, NOT a destruction, so
+-- ungated by indestructible and NOT saved by regeneration (CR 701.19a).
 --
 -- The isCreature guard is not redundant. Only creatures have printed toughness
 -- today, so toughnessOf already implies it -- but a Vehicle (CR 301.7) has P/T
@@ -65,30 +65,31 @@ woundedByDeathtouch gs oid =
 -- Takes the object's already-projected characteristics (checkStateBasedActions
 -- projects the whole board once, per CR 704.4 simultaneity, rather than
 -- re-projecting per object).
-creatureDies :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool
-creatureDies gs pc oid =
+zeroToughness :: PC.ProjectedCharacteristics -> Bool
+zeroToughness pc =
+  Set.member CardType.Creature (PC.cardTypes pc)
+    && case PC.toughness pc of
+      Nothing -> False
+      Just t -> t <= 0
+
+-- CR 704.5g/h: a creature destroyed by lethal marked damage or by a deathtouch
+-- source. A DESTRUCTION -- indestructible-gated (CR 700.4) and regeneration-
+-- interceptable (CR 701.19a via Event.destroy). Excludes 704.5f (that is
+-- zeroToughness), so toughness here is > 0.
+destroyedBySba :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool
+destroyedBySba gs pc oid =
   let isCreature = Set.member CardType.Creature (PC.cardTypes pc)
-      -- CR 700.4 / 702.12b: indestructible stops "destroy" and lethal-damage/
-      -- deathtouch state-based actions (704.5g/704.5h) but NOT 704.5f (toughness
-      -- 0 or less is a put-into-graveyard, not a destruction). Read off the
-      -- already-projected keywords, so Humility (layer 6) strips it.
       indestructible = Set.member Keyword.Indestructible (PC.keywords pc)
-   in isCreature && case PC.toughness pc of
-        -- An unevaluable toughness means NO state-based action, not a crash.
-        -- Unreachable in M1b (every toughness is a Literal); reachable at M3.
+   in isCreature && not indestructible && case PC.toughness pc of
         Nothing -> False
         Just toughness ->
-          -- CR 704.5f: toughness 0 or less. Ungated by indestructible.
-          (toughness <= 0)
-            -- CR 704.5g: lethal marked damage. Guarded.
-            || ( not indestructible
-                   && ( case Game.lookupObject oid gs of
-                          Nothing -> False
-                          Just obj -> toInteger (Object.damage obj) >= toughness
-                      )
+          toughness > 0
+            && ( ( case Game.lookupObject oid gs of
+                     Nothing -> False
+                     Just obj -> toInteger (Object.damage obj) >= toughness
+                 )
+                   || woundedByDeathtouch gs oid
                )
-            -- CR 704.5h: wounded by a deathtouch source. Guarded.
-            || (not indestructible && woundedByDeathtouch gs oid)
 
 -- CR 704.3 says to repeat until no state-based action is performed. One pass is
 -- enough in M1b: a creature dying cannot cause another SBA, because nothing
@@ -107,14 +108,22 @@ performStateBasedActions gs =
       -- are simultaneous. Project the whole board once (one gather) and judge each
       -- object against it, rather than re-projecting per object.
       pcs = Projection.projectAll gs
-      dies oid = case Map.lookup oid pcs of
-        Nothing -> False
-        Just pc -> creatureDies gs pc oid
-      dying = filter dies (Set.toList (GameState.battlefield gs))
-      bury g oid = Event.changeZone oid Zone.Graveyard g
-      buried = List.foldl' bury gs dying
-      leaving = filter (losesNow buried) (stillPlaying buried)
-      departed = foldr depart buried leaving
+      classify oid = case Map.lookup oid pcs of
+        Nothing -> Nothing
+        Just pc
+          -- CR 704.5f wins when both apply: toughness <= 0 is a put-into-graveyard.
+          | zeroToughness pc -> Just False
+          | destroyedBySba gs pc oid -> Just True
+          | otherwise -> Nothing
+      onBattlefield = Set.toList (GameState.battlefield gs)
+      toGraveyard = filter (\oid -> classify oid == Just False) onBattlefield
+      toDestroy = filter (\oid -> classify oid == Just True) onBattlefield
+      -- CR 704.5f: a plain put-into-graveyard (regeneration cannot save it).
+      buried = List.foldl' (\g oid -> Event.changeZone oid Zone.Graveyard g) gs toGraveyard
+      -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
+      destroyed = List.foldl' (flip Event.destroy) buried toDestroy
+      leaving = filter (losesNow destroyed) (stillPlaying destroyed)
+      departed = foldr depart destroyed leaving
       remaining = stillPlaying departed
       -- CR 704.5d: a token in any zone other than the battlefield ceases to exist.
       -- Computed from the post-bury state so a token that just died (now in the
@@ -142,7 +151,9 @@ performStateBasedActions gs =
       -- drained here: dying/buried were computed from the pre-drain gs, so every
       -- 704.5h victim is found before its event is discarded.
       drained = vanished {GameState.damageEvents = []}
-      -- A state-based action was performed iff a creature was buried, a player left,
-      -- or a token ceased to exist.
-      acted = not (null dying) || not (null leaving) || not (null vanishing)
+      -- A state-based action was performed iff a creature was buried or destroyed
+      -- (a regenerated creature still counts, which the CR 704.4 settle loop
+      -- re-checks and -- because the regen healed the damage -- terminates), a
+      -- player left, or a token ceased to exist.
+      acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing)
    in (acted, drained {GameState.result = outcome <|> GameState.result drained})

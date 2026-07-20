@@ -541,7 +541,15 @@ indestructibleTests cards =
             after = Sba.checkStateBasedActions zeroed
          in do
               HU.assertEqual "Myr left the battlefield" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "Myr in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+              HU.assertEqual "Myr in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 704.5f regeneration does NOT save a creature with toughness <= 0" $
+        let (victim, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers) -- 2/1
+        -- A test-local -0/-1 drops the toughness to 0; 704.5f is a put-into-graveyard,
+        -- not a destruction, so a regeneration shield cannot save it.
+            zeroed = withEffect victim (Timestamp.MkTimestamp 5) (Modification.ModifyPowerToughness (Quantity.Literal 0) (Quantity.Literal (-1))) gs
+            shielded = S.addRegenShield victim zeroed
+            after = Sba.checkStateBasedActions shielded
+         in HU.assertEqual "died despite the shield (704.5f is not a destruction)" 0 (S.creaturesInPlay S.bob after)
     ]
 
 -- alice controls `n` Swamps and holds `printing` in a main phase with priority;

@@ -27,6 +27,7 @@ import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
@@ -36,6 +37,7 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Status as Status
+import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
@@ -111,7 +113,21 @@ creatureSbaTests cards =
             settled = Sba.checkStateBasedActions damaged
          in do
               HU.assertEqual "the token is gone from the battlefield" 0 (S.creaturesInPlay S.alice settled)
-              HU.assertEqual "and NOT sitting in a graveyard (the falsifier)" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
+              HU.assertEqual "and NOT sitting in a graveyard (the falsifier)" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled)),
+      HU.testCase "CR 704.5g regeneration saves a creature from lethal combat damage" $
+        let base = Setup.emptyGame S.bothPlayers
+            (victim, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base -- 2/1
+            shielded = S.addRegenShield victim gs0
+            -- 2 combat damage is lethal to a 2/1; the shield replaces the CR 704.5g destruction.
+            damaged = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat] shielded
+            settled = Sba.checkStateBasedActions damaged
+         in do
+              HU.assertEqual "survived (regenerated)" True (Set.member victim (GameState.battlefield settled))
+              case Game.lookupObject victim settled of
+                Just obj -> do
+                  HU.assertEqual "tapped" TapState.Tapped (Object.tapped obj)
+                  HU.assertEqual "damage healed" 0 (Object.damage obj)
+                Nothing -> HU.assertFailure "victim vanished"
     ]
 
 damageTests :: Cards.Cards -> Tasty.TestTree
