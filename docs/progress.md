@@ -688,3 +688,66 @@ end of every entry.
   plan kept as reference:
   `docs/superpowers/specs/2026-07-20-m4h-modal-abilities-design.md` and
   `docs/superpowers/plans/2026-07-20-m4h-modal-abilities.md`.
+
+## M4.5 (phased)
+
+M4 (M4a–M4h) closed the effect-DSL sequencing; M4.5 is a phased umbrella
+closing the remaining **closed-half** gaps the gap census turned up (a
+permanent's controller, layer-1 copy, color, and the rest) — each phase gets
+its own gate card and spec, landed as it completes. Umbrella:
+`docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
+
+- **M4.5 P1 is complete** (permanent control, GAP-L2). **Gate: Act of Treason**
+  (`{2}{R}` Sorcery — "Gain control of target creature until end of turn. Untap
+  that creature. It gains haste until end of turn."), chosen over Control Magic
+  because Control Magic is an Aura and would drag in the out-of-scope
+  Attach/Aura subsystem. The decision proved is that **a permanent's controller
+  is a projected layer-2 characteristic, not a base `Object` field**: control is
+  base `Object.owner` overridden by layer-2 `Modification.SetController`
+  continuous effects (CR 613.1b), timestamp last-wins (CR 613.7), folded by a
+  new `Projection.controllerOf :: ObjectId -> GameState -> Maybe PlayerId` and
+  enumerated by `Projection.controls :: PlayerId -> GameState -> [ObjectId]` —
+  the same "remove the effect and recompute" story as Giant Growth's P/T, so
+  `Object` grows no `controller` field and nothing new needs reverting at
+  cleanup. `Game.controllerOf` (the M1b owner stand-in) is deleted; every
+  caller now reads `Projection.controllerOf`. Two new opcodes: **`GainControl
+  Duration SlotName`** (`Resolve.applyEffect` bakes the *source's* controller —
+  CR 611.2c fixes the affected set at creation, never chosen — into a stored
+  `SetController` continuous effect, and re-Sicks the target, CR 302.6) and
+  **`Untap SlotName`** (CR 701.26b — corrected from the plan's draft citation
+  of 701.20, which is Reveal). Act of Treason's haste clause reuses the
+  existing `ModifyTarget UntilEndOfTurn (GainKeyword Haste)` path (M3b), no new
+  opcode. The "you control" call sites — `Combat.legalAttackers`/
+  `legalBlockers`, `Engine.untapAll`/`settleAll`, `Action`'s activation
+  enumeration — switched from the owner-based `Game.zoneMembers Battlefield` to
+  `Projection.controls`; `Resolve.resolveSpell`/`resolveAbility`'s effect
+  controller switched from raw `Object.owner` to `Projection.controllerOf`
+  (CR 613/608.2c — corrected from the plan's draft citation of 608.2g, which is
+  the resolution-time-cast-a-spell rule). A latent bug the earlier funnel
+  missed: `Mana.tapForMana` was routing produced mana to `Object.owner`
+  regardless of a control change; it now routes to `Projection.controllerOf`
+  (CR 109.4a — a mana ability's controller is determined as though it were on
+  the stack — and CR 110.2, the permanent's controller; corrected from the
+  plan's draft citation of 106.4/108.4, which only establish that mana lands in
+  *a* player's pool and the general owner-fallback, not which player). One
+  **labeled synthetic** (spec §4, the `tests-prefer-real-cards` crutch): a
+  "steal until end of turn, no haste" scenario isolating CR 302.6's
+  control-change re-sickening, since Act of Treason's own haste rider would
+  mask it; **documented expiry** — retires when Control Magic / the Auras phase
+  can test control-change sickness with a real indefinite-control card across
+  two turns. Act of Treason itself is a **red deterministic fixture** (the M3d
+  posture), not in any random-game deck, so CR 400.7 conservation counts are
+  undisturbed. **Named deferred expiries** (spec §7): Auras / indefinite
+  control (Control Magic) — the whole Attach subsystem, retiring the sickness
+  synthetic and adding the cross-turn settle path; instant-speed / mid-combat
+  control change (Ray of Command) — combat-membership edits when control moves
+  mid-step; **CR 613.8 control dependency** beyond timestamp last-wins
+  (multiple simultaneous control effects that depend on one another) — tracked
+  as open git-bug `f90e0c4`; multiplayer leaves-the-game reversion (CR 800.4);
+  mass/conditional untap (`Untap` stays single-target until a card needs
+  more); and control-at-base (a permanent entering under a non-owner's
+  control). Tracking: git-bug `83f1a55` (which also carries the still-open
+  GAP-L1/copy facet for P2) is annotated that its GAP-L2 facet is addressed by
+  this phase; `f90e0c4` stays open. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-20-p1-permanent-control-design.md` and
+  `docs/superpowers/plans/2026-07-20-p1-permanent-control.md`.

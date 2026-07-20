@@ -95,6 +95,12 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   `Mode`/`Modal` payload wired into both ability types, gated by Aether Channeler,
   with the CR 700.2b/603.3c "no legal mode → removed from the stack" rule as the
   trigger-only novelty a spell has no analog for; zero new opcodes).
+  **M4.5 (phased) has begun; its first phase, P1 (permanent control), is
+  complete** — a permanent's controller is now a projected layer-2
+  characteristic (`Projection.controllerOf`/`controls`, `Modification.SetController`),
+  gated by Act of Treason; see the umbrella spec
+  (`docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`) and the
+  progress log for the completion note and deferrals.
   The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, the opcodes/types it added, and every
   elision and its named expiry — lives in `docs/progress.md`. The forward path

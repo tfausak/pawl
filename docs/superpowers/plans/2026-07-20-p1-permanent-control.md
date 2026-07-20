@@ -54,12 +54,12 @@
 - Produces: `Modification.SetController :: PlayerId -> Modification`; `Projection.controllerOf :: ObjectId -> GameState -> Maybe PlayerId`; `Projection.controls :: PlayerId -> GameState -> [ObjectId]`.
 - Consumes: `GameState.continuousEffects :: [ContinuousEffect]`; `ContinuousEffect.{modification,affected,timestamp}`; `Affected.TheseObjects`; `Game.{lookupObject,freshTimestamp}`; `GameState.battlefield :: Set ObjectId`.
 
-- [ ] **Step 1: Confirm the exhaustive-match footprint of `Modification`**
+- [x] **Step 1: Confirm the exhaustive-match footprint of `Modification`**
 
 Run: `rg -n 'Modification\.GainKeyword|case .* of' source/library/Pawl/Projection.hs source/library/Pawl/Codec.hs`
 Expected: the functions that pattern-match every `Modification` constructor are `Projection.layer`, `Projection.isSet`, `Projection.rewriteModification`, `Codec.modificationToJson`, `Codec.jsonToModification`. Each needs a `SetController` arm (Steps 5–6, 8). Note their line numbers.
 
-- [ ] **Step 2: Write the failing test for `controllerOf` (last-write-wins over `owner`)**
+- [x] **Step 2: Write the failing test for `controllerOf` (last-write-wins over `owner`)**
 
 In `source/test-suite/Pawl/ProjectionSpec.hs`, add to the test group (mirror an existing `ProjectionSpec` case for helper style; `S.addPiker`, `Game.freshTimestamp`):
 
@@ -87,12 +87,12 @@ HU.testCase "CR 108.4 a SetController effect overrides owner; last timestamp win
 
 Add imports as needed: `Pawl.Type.ContinuousEffect`, `Pawl.Type.Affected`, `Pawl.Type.Duration`, `Pawl.Type.Modification`, `Data.Set`, `Pawl.Game`, `Pawl.Type.GameState`, `Pawl.Projection`.
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 Run: `cabal test --test-options='-p "SetController effect overrides owner"' 2>&1 | tail -20`
 Expected: FAIL — `Modification.SetController` and `Projection.controllerOf`/`controls` are not in scope.
 
-- [ ] **Step 4: Add the `SetController` constructor**
+- [x] **Step 4: Add the `SetController` constructor**
 
 In `source/library/Pawl/Type/Modification.hs`, add the import `import Pawl.Type.PlayerId (PlayerId)` and a constructor (with a CR-cited comment):
 
@@ -104,14 +104,14 @@ In `source/library/Pawl/Type/Modification.hs`, add the import `import Pawl.Type.
     SetController PlayerId
 ```
 
-- [ ] **Step 5: Add the `layer`, `isSet`, and `rewriteModification` arms in `Projection`**
+- [x] **Step 5: Add the `layer`, `isSet`, and `rewriteModification` arms in `Projection`**
 
 In `source/library/Pawl/Projection.hs`:
 - `layer` — add `Modification.SetController _ -> Layer.Control`.
 - `isSet` — add `Modification.SetController _ -> False` (it is not the land-subtype "set" that gates static-ability liveness; CR 305.7 is unrelated). Verify the existing `isSet` semantics at the line found in Step 1 and match them.
 - `rewriteModification` (text-change, M3d) — add `Modification.SetController _ -> m` (a control op has no subtype words for CR 612 to rewrite; identity).
 
-- [ ] **Step 6: Add `controllerOf` and `controls`, delete `Game.controllerOf`**
+- [x] **Step 6: Add `controllerOf` and `controls`, delete `Game.controllerOf`**
 
 In `source/library/Pawl/Projection.hs` add (note: no list comprehensions; `List.maximumBy` only on the non-empty branch, so it stays total):
 
@@ -147,7 +147,7 @@ controls pid gs = filter (\oid -> controllerOf oid gs == Just pid) (Set.toList (
 
 Add imports if absent: `qualified Data.List as List`, `qualified Data.Ord as Ord`, `qualified Data.Maybe as Maybe`, `qualified Pawl.Type.ContinuousEffect as ContinuousEffect`, `qualified Pawl.Type.Affected as Affected`, `qualified Pawl.Type.Object as Object`. Then **delete `controllerOf` from `source/library/Pawl/Game.hs`** (and its now-unused imports). The build will surface every caller; leave those for Task 4 except making Task 1 compile — temporarily, callers can qualify `Projection.controllerOf` where trivial, but the systematic switch is Task 4. (If deleting `Game.controllerOf` breaks too many modules to compile Task 1 in isolation, keep the delete and fix callers here as a mechanical rename `Game.controllerOf` → `Projection.controllerOf`; that rename is behavior-preserving because both return `owner` until an effect exists.)
 
-- [ ] **Step 7: Add the `SetController` codec arms**
+- [x] **Step 7: Add the `SetController` codec arms**
 
 In `source/library/Pawl/Codec.hs`, add `import qualified Pawl.Type.PlayerId as PlayerId` and a `PlayerId` codec pair (mirroring `quantityToJson`'s `Literal` arm — `Json.jInt` builds the number, `Json.asInteger` reads it):
 
@@ -161,12 +161,12 @@ jsonToPlayerId value = (PlayerId.MkPlayerId . fromInteger) <$> Json.asInteger va
 
 Then in `modificationToJson`: `Modification.SetController p -> Json.tagged (Text.pack "SetController") (Just (playerIdToJson p))`; in `jsonToModification`: `"SetController" -> withValue mv (fmap Modification.SetController . jsonToPlayerId)`. (These keep the codec total; `SetController` never appears in real card JSON, so the `allPrintings` round-trip never exercises them, but exhaustiveness requires the arms.)
 
-- [ ] **Step 8: Build and run the test to verify it passes**
+- [x] **Step 8: Build and run the test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test --test-options='-p "SetController effect overrides owner"' 2>&1 | tail -12`
 Expected: build warning-clean; test PASS.
 
-- [ ] **Step 9: Format, lint, commit**
+- [x] **Step 9: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -187,7 +187,7 @@ git commit -m "feat(m4.5-p1): SetController layer-2 modification + Projection.co
 - Produces: `Effect.Untap :: SlotName -> Effect card`.
 - Consumes: `Resolve.applyEffect`; `Recipient.ToCreature`/`recipientObject`; `TapState.Untapped`.
 
-- [ ] **Step 1: Write the failing test (applyEffect untaps a tapped target)**
+- [x] **Step 1: Write the failing test (applyEffect untaps a tapped target)**
 
 In `ResolveSpec.hs` (mirror the `applyEffect`-driving style; a tapped creature, then apply `Untap`):
 
@@ -206,12 +206,12 @@ HU.testCase "CR 701.20 Untap untaps the slot's target" $
 
 If `S.tapObject` does not exist, add it to `Support.hs`: `tapObject oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}`.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "Untap untaps"' 2>&1 | tail -15`
 Expected: FAIL — `Effect.Untap` not in scope.
 
-- [ ] **Step 3: Add the `Untap` constructor**
+- [x] **Step 3: Add the `Untap` constructor**
 
 In `source/library/Pawl/Type/Effect.hs`:
 
@@ -221,7 +221,7 @@ In `source/library/Pawl/Type/Effect.hs`:
     Untap SlotName
 ```
 
-- [ ] **Step 4: Add the `applyEffect` arm and the five classifications**
+- [x] **Step 4: Add the `applyEffect` arm and the five classifications**
 
 In `source/library/Pawl/Resolve.hs`, add to `applyEffect` (mirror the `Destroy`/`MoveToZone` slot-and-legality pattern):
 
@@ -237,16 +237,16 @@ In `source/library/Pawl/Resolve.hs`, add to `applyEffect` (mirror the `Destroy`/
 
 Add the classification arms alongside the other opcodes: `slotsOf` includes `Untap slot -> [slot]`; `readsX (Untap _) = False`; `manaProduced (Untap _) = []`; `searchesLibrary (Untap _) = False`; `rewriteEffect … (Untap s) = Untap s` (identity — no text to rewrite). Match each function's exact shape at its existing arms.
 
-- [ ] **Step 5: Add the codec arms**
+- [x] **Step 5: Add the codec arms**
 
 In `Codec.hs`: `effectToJson` → `Effect.Untap s -> Json.tagged (Text.pack "Untap") (Just (slotNameToJson s))`; `jsonToEffect` → `"Untap" -> withValue mv (fmap Effect.Untap . jsonToSlotName)`.
 
-- [ ] **Step 6: Build and run to verify it passes**
+- [x] **Step 6: Build and run to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test --test-options='-p "Untap untaps"' 2>&1 | tail -10`
 Expected: build clean; test PASS.
 
-- [ ] **Step 7: Format, lint, commit**
+- [x] **Step 7: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -267,7 +267,7 @@ git commit -m "feat(m4.5-p1): Untap opcode"
 - Produces: `Effect.GainControl :: Duration -> SlotName -> Effect card`.
 - Consumes: `applyEffect`'s `controller` argument (the source's controller — the new controller); `ContinuousEffect.MkContinuousEffect`; `Modification.SetController`; `Game.freshTimestamp`; `Object.sickness`; `Sickness.Sick`.
 
-- [ ] **Step 1: Write the failing test (GainControl installs control + re-Sicks)**
+- [x] **Step 1: Write the failing test (GainControl installs control + re-Sicks)**
 
 In `ResolveSpec.hs`:
 
@@ -287,12 +287,12 @@ HU.testCase "GainControl gives the source's controller control until end of turn
         HU.assertEqual "control reverts after cleanup" (Just S.bob) (Projection.controllerOf oid (Projection.dropEndOfTurnEffects after))
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cabal test --test-options='-p "GainControl gives"' 2>&1 | tail -15`
 Expected: FAIL — `Effect.GainControl` not in scope.
 
-- [ ] **Step 3: Add the `GainControl` constructor**
+- [x] **Step 3: Add the `GainControl` constructor**
 
 In `source/library/Pawl/Type/Effect.hs`:
 
@@ -309,7 +309,7 @@ In `source/library/Pawl/Type/Effect.hs`:
     GainControl Duration SlotName
 ```
 
-- [ ] **Step 4: Add the `applyEffect` arm and the five classifications**
+- [x] **Step 4: Add the `applyEffect` arm and the five classifications**
 
 In `applyEffect` (mirror the `ModifyTarget` arm's ContinuousEffect construction, but bake `controller` and set `Sick`):
 
@@ -338,7 +338,7 @@ In `applyEffect` (mirror the `ModifyTarget` arm's ContinuousEffect construction,
 
 Classifications: `slotsOf` → `GainControl _ slot -> [slot]`; `readsX (GainControl _ _) = False`; `manaProduced (GainControl _ _) = []`; `searchesLibrary (GainControl _ _) = False`; `rewriteEffect … (GainControl d s) = GainControl d s` (identity). Ensure `Sickness`/`Modification`/`Affected`/`ContinuousEffect` are imported in `Resolve` (some already are).
 
-- [ ] **Step 5: Route the source-controller reads through the projection**
+- [x] **Step 5: Route the source-controller reads through the projection**
 
 In `source/library/Pawl/Resolve.hs`, change the two sites that pass the effect's controller (found at `resolveSpell`/`resolveAbility`, ~lines 242 and 264) from `Object.owner obj` to the projected controller, so a **controlled** permanent's ability resolves under the thief (CR 613 / 608.2g):
 
@@ -349,16 +349,16 @@ Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)   -- resolve
 
 Apply the analogous change at the `resolveAbility` site (its source id). Behavior-preserving for spells (a spell has no controller effect), semantically required for a controlled permanent's ability. `Resolve` already imports `Projection` (it calls `Projection.hasKeyword`); add `qualified Data.Maybe as Maybe` if absent.
 
-- [ ] **Step 6: Add the codec arms**
+- [x] **Step 6: Add the codec arms**
 
 `effectToJson` → `Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array [durationToJson d, slotNameToJson s]))`; `jsonToEffect` → `"GainControl" -> case mv of { Just (Array [d, s]) -> Effect.GainControl <$> jsonToDuration d <*> jsonToSlotName s; _ -> Left (Text.pack "GainControl expects [duration, slot]") }` (match the module's existing two-field decode style, e.g. `ModifyTarget`).
 
-- [ ] **Step 7: Build and run to verify it passes**
+- [x] **Step 7: Build and run to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test --test-options='-p "GainControl gives"' 2>&1 | tail -12`
 Expected: build clean; test PASS.
 
-- [ ] **Step 8: Format, lint, commit**
+- [x] **Step 8: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -377,7 +377,7 @@ git commit -m "feat(m4.5-p1): GainControl opcode + projected source controller i
 - Consumes: `Projection.controls`, `Projection.controllerOf`.
 - Produces: control-based `Combat.legalAttackers`/`legalBlockers`, `Mana` sources + routing, `Engine.untapAll`/`settleAll`, `Action` permanent enumeration.
 
-- [ ] **Step 1: Write the failing tests (thief attacks/taps a controlled permanent)**
+- [x] **Step 1: Write the failing tests (thief attacks/taps a controlled permanent)**
 
 In `CombatSpec.hs`:
 
@@ -420,16 +420,16 @@ HU.testCase "mana from a controlled permanent goes to its controller, not owner"
 
 (`manaUnitsOf` unwraps `Mana.MkMana units`; use the existing accessor — check `Pawl.Type.Mana`.)
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `cabal test --test-options='-p "attack with a creature they control"' 2>&1 | tail -15`
 Expected: FAIL — `legalAttackers` builds its candidates from `Game.zoneMembers Battlefield` (owner-based), so a bob-owned creature is never offered to alice.
 
-- [ ] **Step 3: Switch `Combat`**
+- [x] **Step 3: Switch `Combat`**
 
 `legalAttackers pid gs = filter (\oid -> canAttack pid oid gs) (Projection.controls pid gs)` and the same for `legalBlockers` (using `canBlock`). `Combat` already imports `Projection`.
 
-- [ ] **Step 4: Switch `Mana`**
+- [x] **Step 4: Switch `Mana`**
 
 In the mana-source enumeration (`Mana.hs:115`): `filter isSource (Projection.controls pid gs)`. In `tapForMana` (`Mana.hs:~132`): route the produced mana to the controller —
 
@@ -439,16 +439,16 @@ In the mana-source enumeration (`Mana.hs:115`): `filter isSource (Projection.con
 
 `Mana` already imports `Projection`; add `qualified Data.Maybe as Maybe` if absent.
 
-- [ ] **Step 5: Switch `Engine` and `Action`**
+- [x] **Step 5: Switch `Engine` and `Action`**
 
 `Engine.untapAll`/`settleAll`: replace `Game.zoneMembers Zone.Battlefield pid gs` with `Projection.controls pid gs` (both already have `gs` in scope; `Engine` imports `Projection`). `Action` (`Action.hs:42`, the battlefield-permanent enumeration for activations): replace with `Projection.controls pid gs` and add `import qualified Pawl.Projection as Projection`. **Leave the `Zone.Hand` enumerations (`Action.hs:29`, `Engine.hs:126`) and `Target.hs:40` unchanged** — hand is owner-relative, and `Target` builds a union over players (owner vs control gives the same set).
 
-- [ ] **Step 6: Build and run all tests**
+- [x] **Step 6: Build and run all tests**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: build clean; the two new tests PASS and the **full existing suite stays green** (the switch is behavior-preserving until a control effect exists, which no existing fixture installs).
 
-- [ ] **Step 7: Format, lint, commit**
+- [x] **Step 7: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -468,16 +468,16 @@ git commit -m "feat(m4.5-p1): route you-control call sites through Projection.co
 - Consumes: the loader `Cards.loadPrinting`, `Cards.allPrintings`; `Cast.castSpell`, `Stack.resolveTop`, `Engine.runGamePure`, `S.handOne`, `S.landsInPlay`, `S.addCreature`, `Combat.legalAttackers`.
 - Produces: `Cards.actOfTreasonPrinting`.
 
-- [ ] **Step 1: Learn the card JSON schema from templates**
+- [x] **Step 1: Learn the card JSON schema from templates**
 
 Run: `cat data/cards/lightning-bolt.json data/cards/giant-growth.json data/cards/chaos-charm.json`
 Expected: `lightning-bolt` shows a single-target instant (name, mana cost, type line, the `spell` modal wrapper with one mode, `DealDamage` effect, `AnyTarget` spec); `giant-growth` shows the `ModifyTarget`/`GainKeyword` effect shape; `chaos-charm` shows the modal `spell` structure with `effects` and `targetSpecs`. Note the exact keys.
 
-- [ ] **Step 2: Scryfall-verify Act of Treason**
+- [x] **Step 2: Scryfall-verify Act of Treason**
 
 Confirm against Scryfall: **Act of Treason**, `{2}{R}`, Sorcery, oracle text "Gain control of target creature until end of turn. Untap that creature. It gains haste until end of turn." Record the verification date in the card task comment.
 
-- [ ] **Step 3: Author `data/cards/act-of-treason.json`**
+- [x] **Step 3: Author `data/cards/act-of-treason.json`**
 
 Match the template schema. The `spell` is one non-modal mode (`ChooseExactly 1`) whose `effects`, in order, are:
 1. `GainControl` `UntilEndOfTurn` at slot `"target"`
@@ -486,11 +486,11 @@ Match the template schema. The `spell` is one non-modal mode (`ChooseExactly 1`)
 
 and whose `targetSpecs` maps `"target"` → `CreatureTarget`. Mana cost `{2}{R}`, type line Sorcery. (Author the JSON by hand from the templates; the round-trip in Step 6 is the safety net for any schema mismatch.)
 
-- [ ] **Step 4: Wire it into `Cards.hs`**
+- [x] **Step 4: Wire it into `Cards.hs`**
 
 Add `actOfTreasonPrinting :: Printing.Printing` to the `MkCards` record; `actOfTreasonPrinting_ <- loadPrinting "act-of-treason"` in `loadCards`; the field assignment; and add `actOfTreasonPrinting cards` to `allPrintings`. **Do not** add it to any deck (red *deterministic fixture*, spec §4).
 
-- [ ] **Step 5: Write the gate scenario test**
+- [x] **Step 5: Write the gate scenario test**
 
 In `ResolveSpec.hs` (mirror the Lightning-Bolt cast/resolve harness — `S.landsInPlay`, `S.handOne`, `Cast.castSpell`, `Stack.resolveTop`; `identityAnswer` targets bob's only creature via `lookupMin`):
 
@@ -511,12 +511,12 @@ HU.testCase "Act of Treason: steal, untap, haste, attack, then revert" $
         HU.assertEqual "control reverts at cleanup" (Just S.bob) (Projection.controllerOf oid (Projection.dropEndOfTurnEffects resolved))
 ```
 
-- [ ] **Step 6: Build and run (gate + round-trip)**
+- [x] **Step 6: Build and run (gate + round-trip)**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: build clean; the gate test PASSES and the `allPrintings` honesty round-trip (`jsonToCard . cardToJson ≡ Right`, now covering `act-of-treason.json`) stays green. If the round-trip fails, fix the JSON to match the codec (do **not** weaken the round-trip).
 
-- [ ] **Step 7: Format, lint, commit**
+- [x] **Step 7: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -533,7 +533,7 @@ git commit -m "feat(m4.5-p1): Act of Treason card + gate scenario (steal, untap,
 **Interfaces:**
 - Consumes: `Resolve.applyEffect` with `GainControl` (no haste rider); `Combat.canAttack`.
 
-- [ ] **Step 1: Write the synthetic test** (it passes once Tasks 3–4 land; write it and watch it go green)
+- [x] **Step 1: Write the synthetic test** (it passes once Tasks 3–4 land; write it and watch it go green)
 
 This is the **labeled synthetic** for the sickness path (Act of Treason's haste masks it). Documented expiry in the test comment: retires when Control Magic / the Auras phase can test control-change sickness with a real indefinite-control card across two turns (spec §4, §7).
 
@@ -553,12 +553,12 @@ HU.testCase "CR 302.6 a creature that just changed control is summoning sick (no
         HU.assertBool  "but it is summoning sick, so it cannot attack this turn" (not (Combat.canAttack S.alice oid after))
 ```
 
-- [ ] **Step 2: Run to verify it passes** (Tasks 3–4 already implement the behavior)
+- [x] **Step 2: Run to verify it passes** (Tasks 3–4 already implement the behavior)
 
 Run: `cabal test --test-options='-p "just changed control is summoning sick"' 2>&1 | tail -12`
 Expected: PASS — `GainControl` set `Sick`, no haste, so `canAttack` is `False`.
 
-- [ ] **Step 3: Format, lint, commit**
+- [x] **Step 3: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -572,31 +572,31 @@ git commit -m "test(m4.5-p1): synthetic control-change summoning-sickness scenar
 **Files:**
 - Modify: `source/library/Pawl/Type/Sickness.hs`, `docs/progress.md`, `CLAUDE.md`
 
-- [ ] **Step 1: Retire the `Sickness` "EXPIRES at M3" comment**
+- [x] **Step 1: Retire the `Sickness` "EXPIRES at M3" comment**
 
 In `source/library/Pawl/Type/Sickness.hs`, update the comment: control-change sickness is now handled (P1) — `GainControl` re-Sicks the target (CR 302.6); the untap-step settle (`Engine.settleAll`, now controller-based) clears it. Note the remaining deferral: cross-turn settle under *indefinite* control is the Auras phase.
 
-- [ ] **Step 2: Add the P1 completion note to `docs/progress.md`**
+- [x] **Step 2: Add the P1 completion note to `docs/progress.md`**
 
 Add an entry (open an "M4.5 (phased)" subsection if none exists) recording: gate Act of Treason; control is a projected layer-2 characteristic (`Modification.SetController`, `Projection.controllerOf`/`controls`), not a base field; `Game.controllerOf` deleted; opcodes `GainControl`/`Untap`; the `you-control` call-site switch and the `Mana` owner→controller fix; the sickness synthetic and its expiry; and the deferrals (§7 of the spec: Auras/indefinite control, instant-speed/mid-combat steal, CR 613.8 control dependency → `f90e0c4`, multiplayer CR 800.4, mass untap, control-at-base). Cite the spec and this plan.
 
-- [ ] **Step 3: Update `CLAUDE.md` current-work note**
+- [x] **Step 3: Update `CLAUDE.md` current-work note**
 
 Add a one-line note that M4.5 has begun and P1 (permanent control) is complete, pointing at the umbrella and progress log. Keep it to working guidance.
 
-- [ ] **Step 4: Final full build + suite**
+- [x] **Step 4: Final full build + suite**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -5 && cabal test 2>&1 | tail -20`
 Expected: warning-clean; entire suite green.
 
-- [ ] **Step 5: Format, lint, commit**
+- [x] **Step 5: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
 git commit -m "docs(m4.5-p1): completion note, retire Sickness M3 expiry"
 ```
 
-- [ ] **Step 6: Update the git-bug** (per the user's "update the git bugs when we finish each part")
+- [x] **Step 6: Update the git-bug** (per the user's "update the git bugs when we finish each part")
 
 Re-point or annotate `83f1a55`'s GAP-L2 facet as addressed by P1 (control is now a projected layer-2 characteristic; `Object.controller`-less by design). Leave `f90e0c4` open (CR 613.8 control dependency, deferred).
 
