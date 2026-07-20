@@ -8,6 +8,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.GameState as GameState
@@ -113,5 +114,17 @@ tests cards =
                     "one enters-battlefield event emitted"
                     [Zone.Battlefield]
                     (map ZoneChange.to (GameState.zoneChanges after))
-                _ -> HU.assertFailure "expected exactly one token"
+                _ -> HU.assertFailure "expected exactly one token",
+      HU.testCase "CR 614 + 704.5d a token dies under Rest in Peace: exiled, then ceases" $
+        let base = Setup.emptyGame S.bothPlayers
+            goblinCard = Printing.card (Cards.pikerPrinting cards)
+            (_, withRip) = S.addCreature (Cards.restInPeacePrinting cards) S.bob base
+            (tokId, gs) = S.addToken goblinCard S.alice withRip
+            -- Kill the token: route it to the graveyard; RiP redirects to exile.
+            dying = Event.changeZone tokId Zone.Graveyard gs
+            settled = Sba.checkStateBasedActions dying
+         in do
+              HU.assertEqual "the token never entered a graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice dying))
+              HU.assertEqual "it was redirected to exile" 1 (length (Game.zoneMembers Zone.Exile S.alice dying))
+              HU.assertEqual "after the SBA it has ceased to exist (gone from exile)" 0 (length (Game.zoneMembers Zone.Exile S.alice settled))
     ]
