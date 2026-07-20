@@ -491,6 +491,79 @@ twoBoltState cards =
           GameState.hand = Map.adjust (oid2 Seq.<|) S.alice (GameState.hand gs2)
         }
 
+-- alice has 3 Islands and Cancel in hand; a `victim` spell (bob's) sits on the
+-- stack. Returns (victimId, state after alice casts Cancel at it and it resolves).
+cancelVictim :: Cards.Cards -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+cancelVictim cards victim =
+  let base = S.landsInPlay (Cards.islandPrinting cards) 3
+      (victimId, onStack) = S.spellOnStack victim S.bob base
+      (gs, cancelId) = S.handOne (Cards.cancelPrinting cards) onStack
+      cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice cancelId))
+      resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+   in (victimId, resolved)
+
+-- Append a second card of `printing` to `pid`'s hand (handOne overwrites the hand,
+-- so a second in-hand card must be appended, not re-inserted).
+handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+handAppend printing pid gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      obj = Object.MkObject pid (Source.OfCard printing) Zone.Hand TapState.Untapped 0 Sickness.Settled Map.empty (Timestamp.MkTimestamp 0)
+   in ( oid,
+        gs1
+          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
+            GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand gs1)
+          }
+      )
+
+-- alice has 6 Islands and TWO Cancels; a Piker (bob's) sits on the stack. alice
+-- casts Cancel A at the Piker, then Cancel B at the Piker (CR 117.3c keeps
+-- priority). Stack [B, A, Piker]; resolveTop LIFO: B counters the Piker, then A --
+-- its only target gone -- fizzles (CR 608.2b).
+racingCounters :: Cards.Cards -> GameState.GameState
+racingCounters cards =
+  let base = S.landsInPlay (Cards.islandPrinting cards) 6
+      (victimId, onStack) = S.spellOnStack (Cards.pikerPrinting cards) S.bob base
+      (gs1, cancelA) = S.handOne (Cards.cancelPrinting cards) onStack
+      (cancelB, gs2) = handAppend (Cards.cancelPrinting cards) S.alice gs1
+      atVictim :: Prompt.Prompt r -> r
+      atVictim p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToObject victimId)) sets
+        _ -> S.identityAnswer p
+      castA = snd (Engine.runGamePure atVictim gs2 (Cast.castSpell S.alice cancelA))
+      castB = snd (Engine.runGamePure atVictim castA (Cast.castSpell S.alice cancelB))
+      r1 = snd (Engine.runGamePure atVictim castB Stack.resolveTop) -- B counters the Piker
+      r2 = snd (Engine.runGamePure atVictim r1 Stack.resolveTop) -- A fizzles
+   in r2
+
+counterTests :: Cards.Cards -> Tasty.TestTree
+counterTests cards =
+  Tasty.testGroup
+    "Counter"
+    [ HU.testCase "CR 701.6 Cancel counters a spell into its owner's graveyard" $
+        let (_victimId, resolved) = cancelVictim cards (Cards.pikerPrinting cards)
+         in do
+              HU.assertEqual "victim countered into bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
+              HU.assertEqual "victim never resolved onto the battlefield" 0 (S.creaturesInPlay S.bob resolved)
+              HU.assertEqual "Cancel in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice resolved))
+              HU.assertEqual "stack empty" 0 (length (GameState.stack resolved)),
+      HU.testCase "CR 608.2b a Cancel whose target already left the stack fizzles" $
+        let after = racingCounters cards
+         in do
+              HU.assertEqual "the Piker moved exactly once, to bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+              HU.assertEqual "both Cancels in alice's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+              HU.assertEqual "the Piker never hit the battlefield" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "stack cleared" 0 (length (GameState.stack after)),
+      HU.testCase "CR 614 Cancel under Rest in Peace exiles the countered spell" $
+        let (_, ripOut) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (S.landsInPlay (Cards.islandPrinting cards) 3)
+            (_victimId, onStack) = S.spellOnStack (Cards.pikerPrinting cards) S.bob ripOut
+            (gs, cancelId) = S.handOne (Cards.cancelPrinting cards) onStack
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice cancelId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "the countered spell is not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
+              HU.assertEqual "the countered spell is exiled" 1 (length (Game.zoneMembers Zone.Exile S.bob resolved))
+    ]
+
 fizzleTests :: Cards.Cards -> Tasty.TestTree
 fizzleTests cards =
   Tasty.testGroup
@@ -734,4 +807,4 @@ drawCardTests cards =
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards]
