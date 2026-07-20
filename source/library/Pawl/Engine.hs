@@ -103,8 +103,14 @@ untapAll pid = do
 -- CR 302.6: permanents the active player has controlled since their turn began
 -- are no longer summoning sick. The untap step is where that becomes true.
 --
--- EXPIRES at M3: control held CONTINUOUSLY is the actual rule, so a control
--- change must reset this. Nothing in M1b can change control.
+-- Control-change re-sickening is handled (M4.5 P1): `GainControl` re-Sicks its
+-- target at resolution, and this settle now iterates `Projection.controls`, so
+-- it clears sickness for whoever currently controls the permanent, not its
+-- owner. A P1 control effect is until-end-of-turn, so it always wears off
+-- (CR 514.2) before the thief's own next untap step -- the creature is back
+-- under the owner's control by then, and settles normally there. Settling a
+-- permanent held under INDEFINITE control, across the thief's own untap step,
+-- is the Auras / Control Magic phase.
 settleAll :: PlayerId -> Game ()
 settleAll pid = do
   gs <- State.get

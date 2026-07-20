@@ -98,8 +98,9 @@ addMana pid units gs =
 emptyManaPools :: GameState -> GameState
 emptyManaPools gs = gs {GameState.manaPool = Map.empty}
 
--- Untapped permanents this player controls that can produce mana (CR 106.4:
--- a mana ability's controller receives the mana, not the object's owner).
+-- Untapped permanents this player controls that can produce mana (CR 109.4a:
+-- a mana ability's controller is determined as though it were on the stack --
+-- i.e. the permanent's controller, CR 110.2 -- not the object's owner).
 manaSources :: PlayerId -> GameState -> [ObjectId]
 manaSources pid gs =
   let notSickCreature oid = case Game.lookupObject oid gs of
@@ -128,9 +129,11 @@ tapForMana oid gs = case Game.lookupObject oid gs of
     produced : _ ->
       let tapped = obj {Object.tapped = TapState.Tapped}
           gs1 = gs {GameState.objects = Map.insert oid tapped (GameState.objects gs)}
-       in -- CR 106.4/108.4: mana goes to the ability's controller, which is the
-          -- object's controller. Falls back to owner in the impossible case
-          -- lookupObject just proved oid exists but controllerOf returns Nothing.
+       in -- CR 109.4a/110.2: mana goes to the mana ability's controller, which is
+          -- the permanent's controller (CR 106.4 only says it lands in "a
+          -- player's mana pool", not whose). Falls back to owner in the
+          -- impossible case lookupObject just proved oid exists but
+          -- controllerOf returns Nothing.
           addMana (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)) [ManaUnit.MkManaUnit {ManaUnit.manaType = produced}] gs1
 
 typedOf :: ManaSymbol -> Maybe ManaType

@@ -7,9 +7,15 @@ module Pawl.Type.Sickness where
 -- A sum type rather than a Bool: no boolean blindness.
 --
 -- Set to Sick by changeZone (a new object has been controlled for zero time) and
--- cleared to Settled at the untap step. EXPIRES at M3: CR 302.6 is about control
--- held CONTINUOUSLY, so a control change resets the clock and this must be
--- re-set when control moves.
+-- cleared to Settled at the untap step. Control-change re-sickening is handled
+-- (M4.5 P1): Resolve.applyEffect's GainControl arm re-sets Sick on the target
+-- when control moves (CR 302.6 is about control held CONTINUOUSLY), and the
+-- untap-step settle (Engine.settleAll, iterating Projection.controls) clears it
+-- for whichever player controls the permanent at that step. Remaining
+-- deferral: P1's control effects are all until-end-of-turn, so the thief never
+-- reaches their own untap step with the creature still theirs; settling a
+-- permanent held under INDEFINITE control across turns is the Auras / Control
+-- Magic phase.
 data Sickness
   = Sick
   | Settled
