@@ -5,7 +5,7 @@ Design for milestone **M4e**, the fifth letter of M4 (see the split table in
 from it.** M3d already let an effect *target* a spell on the stack (Magical Hack's
 `SpellOrPermanentTarget`), but only to rewrite its text; the spell still resolved.
 M4e proves the stack is a zone an effect can *remove an object from before it
-resolves* — CR 701.5, the keyword action **Counter** — and that the CR 608.2b
+resolves* — CR 701.6, the keyword action **Counter** — and that the CR 608.2b
 fizzle already built for M3a's targeting generalizes to a target that lives on the
 stack.
 
@@ -33,7 +33,7 @@ This is a types-and-architecture spec, not an implementation plan.
 ## 0. The core idea
 
 **Countering is the stack's zone change.** A spell on the stack is an object
-(`Source.OfCard`); countering it (CR 701.5a) puts it into its owner's graveyard
+(`Source.OfCard`); countering it (CR 701.6a) puts it into its owner's graveyard
 without resolving. The engine already has the one primitive that does this:
 `Event.changeZone oid Graveyard` removes the id from `GameState.stack`
 (`Game.removeFromZones`) and mints a fresh graveyard incarnation carrying the
@@ -46,13 +46,13 @@ Three moving parts, all small, all built on existing seams:
 1. **A narrower target spec.** `TargetSpec.SpellTarget` (CR 115, "target spell") —
    stack objects that are *spells*, distinct from M3d's `SpellOrPermanentTarget`
    because Cancel cannot target a permanent (nor an ability).
-2. **A distinct opcode.** `Effect.Counter SlotName` — Counter is CR 701.5, an entry
+2. **A distinct opcode.** `Effect.Counter SlotName` — Counter is CR 701.6, an entry
    on rule 701's opcode list, and gets its own opcode for the same reason M4b's
    `Destroy` did: the comprehensive rules treat it as a distinct keyword action
    even where its current mechanics coincide with a plain put-into-graveyard.
 3. **A named funnel.** `Event.counter :: ObjectId -> GameState -> GameState`,
-   mirroring `Event.destroy`: the sole home of the CR 701.5a move, the future home
-   of "can't be countered" (CR 701.5) and a distinct "was countered" event.
+   mirroring `Event.destroy`: the sole home of the CR 701.6a move, the future home
+   of "can't be countered" (CR 701.6) and a distinct "was countered" event.
    Ungated today, exactly as `Event.destroy` is ungated for CR 701.19c.
 
 The §1 invariant holds throughout: every new read is a **classification** —
@@ -65,7 +65,7 @@ list is `[Counter "spell"]` and whose `targetSpecs` is `{"spell" ↦ SpellTarget
 
 **Exit criterion.** Deterministic tests demonstrate all of:
 
-- **Cancel counters a spell (CR 701.5, the gate).** One player casts a spell; it
+- **Cancel counters a spell (CR 701.6, the gate).** One player casts a spell; it
   goes on the stack. The other player casts Cancel targeting it and it resolves
   first (LIFO). The targeted spell is put into **its owner's** graveyard, never
   resolves (a creature spell does **not** become a permanent on the battlefield),
@@ -104,7 +104,7 @@ restricted counters ("counter target spell with mana value N / of a color").
 
 ```
 | -- CR 115: "target spell" -- an object on the stack that is a spell (a card on
-  -- the stack, CR 111.1: Source.OfCard). Narrower than SpellOrPermanentTarget:
+  -- the stack, CR 112.1: Source.OfCard). Narrower than SpellOrPermanentTarget:
   -- Cancel cannot target a permanent or an ability. The first spec that reaches
   -- ONLY the stack.
   SpellTarget
@@ -121,10 +121,13 @@ TargetSpec.SpellTarget ->
 The recipient reuses `Recipient.ToObject` (a spell is an object, named generically
 — the same choice `SpellOrPermanentTarget` made). No `Recipient` change.
 
-**The `isSpell` classification.** "Is this stack object a spell?" reads
-`Object.source`: `OfCard _ → True`; `OfToken`/`OfAbility`/`OfTrigger → False`
-(a token is never on the stack; abilities are not spells, CR 111.1). This is a
-**classification, not an identity case** — structurally identical to
+**The `isSpell` classification.** "Is this object a spell?" reads
+`Object.zone` **and** `Object.source`: on the stack *and* `OfCard` → `True`;
+otherwise `False` (CR 112.1 — a spell is a card *on the stack*; a token is never a
+spell, abilities are not spells, and a card off the stack is not a spell). The zone
+check keeps the function honestly named and correct on its own, not merely correct
+because `Target`'s `SpellTarget` arm happens to pre-filter to `GameState.stack`.
+This is a **classification, not an identity case** — structurally identical to
 `Stack.resolveTop`'s `Card.isPermanent` read and `Mana.isManaAbility`. It lands as
 a small pure helper `Game.isSpell :: ObjectId -> GameState -> Bool` (home in
 `Pawl.Game`, beside `cardOf`; `Target` is the consumer). Casing on the `Source`
@@ -142,11 +145,11 @@ now-current stack; a target no longer present is not in the set.
 `Pawl.Type.Effect` gains one constructor:
 
 ```
-| -- CR 701.5: counter the slot's target spell -- remove it from the stack and put
-  -- it into its owner's graveyard (CR 701.5a) via the Event.counter funnel, so it
+| -- CR 701.6: counter the slot's target spell -- remove it from the stack and put
+  -- it into its owner's graveyard (CR 701.6a) via the Event.counter funnel, so it
   -- does not resolve. Distinct from MoveToZone slot Graveyard the way Destroy is
   -- (M4b): Counter is a keyword action on rule 701's list, and this is the future
-  -- home of "can't be countered" (CR 701.5) and a distinct "was countered" event.
+  -- home of "can't be countered" (CR 701.6) and a distinct "was countered" event.
   Counter SlotName
 ```
 
@@ -183,10 +186,10 @@ funnel does.
 `Pawl.Event` gains a funnel mirroring `Event.destroy`:
 
 ```
--- The single counter funnel (CR 701.5). A countered spell is removed from the
--- stack and put into its owner's graveyard (CR 701.5a) via changeZone -- so Rest
+-- The single counter funnel (CR 701.6). A countered spell is removed from the
+-- stack and put into its owner's graveyard (CR 701.6a) via changeZone -- so Rest
 -- in Peace's redirect (graveyard->exile) and CR 400.7 still compose. Ungated
--- today: "can't be countered" (CR 701.5) and a distinct "was countered" event are
+-- today: "can't be countered" (CR 701.6) and a distinct "was countered" event are
 -- deferred (spec section 7), exactly as Event.destroy is ungated for CR 701.19c.
 counter :: ObjectId -> GameState -> GameState
 counter oid gs = case Game.lookupObject oid gs of
@@ -201,7 +204,7 @@ The `lookupObject` guard makes a stale id a no-op (defensive, matching
 the CR 400.7 owner-relative graveyard placement for free.
 
 **Why a funnel and not an inlined `changeZone`.** Symmetry with `Event.destroy`
-(M4b), and a named home for the deferred CR 701.5 gates: "can't be countered"
+(M4b), and a named home for the deferred CR 701.6 gates: "can't be countered"
 becomes a guard here, and a "was countered" event (distinct from the plain
 stack→graveyard `ZoneChange`) becomes an emission here — neither expressible if
 `applyEffect` inlined the move.
@@ -233,7 +236,7 @@ their CR numbers.
   spell, an ability, and a permanent all present returns exactly the spell's
   `ToObject` (CR 115). `Game.isSpell` returns `True` for `OfCard`, `False` for
   `OfAbility`/`OfTrigger`/`OfToken`.
-- **Gate (CR 701.5):** scripted `DecisionLog` — P casts a creature spell; opponent
+- **Gate (CR 701.6):** scripted `DecisionLog` — P casts a creature spell; opponent
   casts Cancel targeting it; both pass; Cancel resolves and counters. Assert the
   creature is in P's graveyard, absent from the battlefield and the stack; Cancel
   in the opponent's graveyard; stack empty.
@@ -260,7 +263,7 @@ their CR numbers.
 
 Each is due with the first real card that needs it:
 
-- **"Can't be countered" (CR 701.5).** `Event.counter` is ungated — no
+- **"Can't be countered" (CR 701.6).** `Event.counter` is ungated — no
   `Counterability` argument, no protection-from-countering read. First card:
   e.g. an uncounterable spell, or Great Sable Stag.
 - **Conditional counters.** "Counter target spell unless its controller pays {N}"
@@ -272,11 +275,11 @@ Each is due with the first real card that needs it:
 - **Countering abilities (Stifle).** `SpellTarget` is spells-only. Targeting
   activated/triggered abilities on the stack needs an `AbilityTarget` (or
   `SpellOrAbilityTarget`) and an `Event.counter` that accepts an ability object
-  (which *ceases*, CR 701.5b, rather than moving to a graveyard — abilities are not
+  (which *ceases*, CR 701.6a, rather than moving to a graveyard — abilities are not
   cards). Deferred.
 - **Alternative counter destinations.** Counter-and-exile, counter-and-put-on-top-
   of-library (Remand, Memory Lapse) need a destination argument on the counter
-  action. Deferred; CR 701.5a's owner's-graveyard default is baked in.
+  action. Deferred; CR 701.6a's owner's-graveyard default is baked in.
 - **Restricted counters.** "Counter target spell with mana value N" / "of a chosen
   color" need a predicate over the target spell at cast/resolution. Deferred.
 

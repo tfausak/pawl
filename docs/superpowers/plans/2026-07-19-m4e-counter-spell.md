@@ -4,7 +4,7 @@
 
 **Goal:** Make Cancel (`{1}{U}{U}` Instant, "Counter target spell") work — the first effect that removes a spell from the stack — via a distinct `Counter` opcode, a `SpellTarget` spec, and an `Event.counter` funnel, all riding seams that already exist.
 
-**Architecture:** A spell on the stack is an object (`Source.OfCard`); countering it (CR 701.5a) puts it into its owner's graveyard without resolving — mechanically a stack→graveyard `changeZone`, which already removes the id from `GameState.stack` and mints the graveyard incarnation (CR 400.7). Three small pieces layer onto that: a narrower `TargetSpec.SpellTarget` (stack spells only), a distinct `Effect.Counter SlotName` opcode (the M4b `Destroy` precedent — a rule-701 keyword action gets its own opcode), and an `Event.counter` funnel mirroring `Event.destroy`. The CR 608.2b fizzle and Rest in Peace composition come free from existing machinery.
+**Architecture:** A spell on the stack is an object (`Source.OfCard`); countering it (CR 701.6a) puts it into its owner's graveyard without resolving — mechanically a stack→graveyard `changeZone`, which already removes the id from `GameState.stack` and mints the graveyard incarnation (CR 400.7). Three small pieces layer onto that: a narrower `TargetSpec.SpellTarget` (stack spells only), a distinct `Effect.Counter SlotName` opcode (the M4b `Destroy` precedent — a rule-701 keyword action gets its own opcode), and an `Event.counter` funnel mirroring `Event.destroy`. The CR 608.2b fizzle and Rest in Peace composition come free from existing machinery.
 
 **Tech Stack:** Haskell 2010 (GHC 9.14.1), tasty/tasty-hunit, hand-rolled JSON codec (`Pawl.Codec`), cards as `data/cards/*.json` loaded by the test suite.
 
@@ -64,15 +64,19 @@ No new library or test module, so **no `pawl.cabal` change** and no `other-modul
 Add to the `objectFactTests` list in `source/test-suite/Pawl/GameSpec.hs` (after the token test at line 68, before the Mountain test):
 
 ```haskell
-      HU.testCase "CR 111.1 isSpell is True for a card object, False for a token" $
+      HU.testCase "CR 112.1 isSpell is True for a spell on the stack, False off it" $
         let base = Setup.emptyGame S.bothPlayers
-            (cardId, gs1) = S.addPiker cards S.alice base
+            (spellId, gs1) = S.spellOnStack (Cards.pikerPrinting cards) S.alice base
+            (permId, gs2) = S.addPiker cards S.bob gs1
             tokenCard = Printing.card (Cards.pikerPrinting cards)
-            (tokId, gs2) = S.addToken tokenCard S.bob gs1
+            (tokId, gs3) = S.addToken tokenCard S.bob gs2
          in do
-              HU.assertBool "a card-backed object is a spell" (Game.isSpell cardId gs2)
-              HU.assertBool "a token is not a spell" (not (Game.isSpell tokId gs2)),
+              HU.assertBool "a card on the stack is a spell" (Game.isSpell spellId gs3)
+              HU.assertBool "a battlefield permanent is not a spell" (not (Game.isSpell permId gs3))
+              HU.assertBool "a token is not a spell" (not (Game.isSpell tokId gs3)),
 ```
+
+(This test consumes `S.spellOnStack` from Step 5 — add that fixture first, then both tests.)
 
 - [ ] **Step 2: Run it to verify it fails**
 
@@ -84,20 +88,23 @@ Expected: FAIL — `Variable not in scope: Game.isSpell`.
 In `source/library/Pawl/Game.hs`, after `controllerOf` (near line 90), add:
 
 ```haskell
--- CR 111.1: a spell is a card on the stack. This asks the object's KIND -- its
--- Source -- a classification like isPermanent (Stack.resolveTop), never the card's
--- identity. A token is never on the stack; abilities on the stack are not spells.
+-- CR 112.1: a spell is a card on the stack. This asks the object's zone AND its
+-- KIND (its Source) -- a classification like isPermanent (Stack.resolveTop), never
+-- the card's identity. Only a card (OfCard) currently on the stack is a spell: a
+-- token is never a spell, and a card off the stack (hand, a battlefield permanent,
+-- graveyard) is not one either.
 isSpell :: ObjectId -> GameState -> Bool
 isSpell oid gs = case lookupObject oid gs of
   Nothing -> False
-  Just obj -> case Object.source obj of
-    Source.OfCard _ -> True
-    Source.OfToken _ -> False
-    Source.OfAbility _ _ -> False
-    Source.OfTrigger _ _ -> False
+  Just obj ->
+    Object.zone obj == Zone.Stack && case Object.source obj of
+      Source.OfCard _ -> True
+      Source.OfToken _ -> False
+      Source.OfAbility _ _ -> False
+      Source.OfTrigger _ _ -> False
 ```
 
-(`Game.hs` already imports `Object`, `Source`, and defines `lookupObject` — no new imports.)
+(`Game.hs` already imports `Object`, `Source`, `Zone`, and defines `lookupObject` — no new imports.)
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -115,16 +122,27 @@ First add the shared fixture to `source/test-suite/Pawl/Support.hs` (near `handO
 spellOnStack :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 spellOnStack printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
-      obj = Object.MkObject pid (Source.OfCard printing) Zone.Stack TapState.Untapped 0 Sickness.Settled Map.empty (Timestamp.MkTimestamp 0)
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.source = Source.OfCard printing,
+            Object.zone = Zone.Stack,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled,
+            Object.bindings = Map.empty,
+            Object.timestamp = ts
+          }
    in ( oid,
-        gs1
-          { GameState.objects = Map.insert oid obj (GameState.objects gs1),
-            GameState.stack = oid : GameState.stack gs1
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.stack = oid : GameState.stack gs2
           }
       )
 ```
 
-(`Support.hs` already imports `Game`, `Object`, `Source`, `Zone`, `TapState`, `Sickness`, `Timestamp`, `Map`, `GameState`, `Printing`, `PlayerId`, `ObjectId` — verify and add any missing.)
+Thread `Game.freshTimestamp` (and use named-record syntax) exactly as every sibling helper (`addCreature`, `handOne`, `landsInPlay`) does — a hardcoded `Timestamp.MkTimestamp 0` would collide with objects the caller already placed and break the CR 613.7d layer-ordering invariant. (`Support.hs` already imports `Game`, `Object`, `Source`, `Zone`, `TapState`, `Sickness`, `Map`, `GameState`, `Printing`, `PlayerId`, `ObjectId` — verify and add any missing.)
 
 Then add to the `targetTests` list in `source/test-suite/Pawl/ResolveSpec.hs` (after the `SpellOrPermanentTarget` test at line 131):
 
@@ -149,7 +167,7 @@ In `source/library/Pawl/Type/TargetSpec.hs`, add before the closing `deriving`:
 
 ```haskell
   | -- CR 115: "target spell" -- an object on the stack that is a spell (a card on
-    -- the stack, CR 111.1). Narrower than SpellOrPermanentTarget: Cancel cannot
+    -- the stack, CR 112.1). Narrower than SpellOrPermanentTarget: Cancel cannot
     -- target a permanent or an ability. The first spec that reaches ONLY the stack.
     SpellTarget
 ```
@@ -160,7 +178,7 @@ In `source/library/Pawl/Target.hs`, add to the `case spec of` (after the `Creatu
 
 ```haskell
         TargetSpec.SpellTarget ->
-          -- CR 111.1: only spells (Source.OfCard) on the stack; abilities and
+          -- CR 112.1: only spells (Source.OfCard) on the stack; abilities and
           -- permanents are excluded by Game.isSpell.
           Set.fromList (map Recipient.ToObject (filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)))
 ```
@@ -218,7 +236,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 Add a new group to `source/test-suite/Pawl/EventSpec.hs`. First add the group's tests (place near the zone-change tests, e.g. after the `CR 608.2n ... resolving spell is exiled` test at line ~68):
 
 ```haskell
-      HU.testCase "CR 701.5a Event.counter puts a countered spell into its owner's graveyard" $
+      HU.testCase "CR 701.6a Event.counter puts a countered spell into its owner's graveyard" $
         let (spellId, onStack) = S.spellOnStack (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             after = Event.counter spellId onStack
          in do
@@ -246,11 +264,11 @@ Expected: FAIL — `Variable not in scope: Event.counter`.
 In `source/library/Pawl/Event.hs`, after `destroy`/`regenerate` (near line 132), add:
 
 ```haskell
--- The single counter funnel (CR 701.5). A countered spell is removed from the
--- stack and put into its owner's graveyard (CR 701.5a) via changeZone -- so Rest
+-- The single counter funnel (CR 701.6). A countered spell is removed from the
+-- stack and put into its owner's graveyard (CR 701.6a) via changeZone -- so Rest
 -- in Peace's redirect (graveyard->exile) and CR 400.7's new incarnation still
 -- compose, exactly as they do for destroy. Ungated today: "can't be countered"
--- (CR 701.5) and a distinct "was countered" event are deferred (spec section 7),
+-- (CR 701.6) and a distinct "was countered" event are deferred (spec section 7),
 -- as Event.destroy is ungated for CR 701.19c.
 counter :: ObjectId -> GameState -> GameState
 counter oid gs = case Game.lookupObject oid gs of
@@ -270,8 +288,8 @@ Expected: PASS (2 tests).
 There is no isolated unit test for the opcode plumbing (it is exercised end-to-end by the Task 4 gate); the compiler's exhaustiveness is the check. Add the constructor to `source/library/Pawl/Type/Effect.hs`, before the closing `deriving` (after `RegenerateSelf`, ~line 97):
 
 ```haskell
-  | -- CR 701.5: counter the slot's target spell -- remove it from the stack and
-    -- put it into its owner's graveyard (CR 701.5a) via the Event.counter funnel,
+  | -- CR 701.6: counter the slot's target spell -- remove it from the stack and
+    -- put it into its owner's graveyard (CR 701.6a) via the Event.counter funnel,
     -- so it does not resolve. Distinct from MoveToZone slot Graveyard the way
     -- Destroy is (M4b): Counter is a keyword action on rule 701's list, and this is
     -- the future home of "can't be countered" and a distinct "was countered" event.
@@ -318,7 +336,7 @@ In `source/library/Pawl/Resolve.hs`:
   Effect.Counter slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        -- CR 701.5a: the slot's target is a spell on the stack; counter it through
+        -- CR 701.6a: the slot's target is a spell on the stack; counter it through
         -- the single funnel. A player recipient / illegal slot (CR 608.2b): no-op.
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs
@@ -349,7 +367,7 @@ Expected: warning-clean build; 2 tests PASS.
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
-git commit -m "M4e: Effect.Counter opcode + Event.counter funnel (CR 701.5)
+git commit -m "M4e: Effect.Counter opcode + Event.counter funnel (CR 701.6)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -494,7 +512,7 @@ counterTests :: Cards.Cards -> Tasty.TestTree
 counterTests cards =
   Tasty.testGroup
     "Counter"
-    [ HU.testCase "CR 701.5 Cancel counters a spell into its owner's graveyard" $
+    [ HU.testCase "CR 701.6 Cancel counters a spell into its owner's graveyard" $
         let (_victimId, resolved) = cancelVictim cards (Cards.pikerPrinting cards)
          in do
               HU.assertEqual "victim countered into bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
@@ -619,7 +637,7 @@ Add a bullet after the M4d entry, matching the house style (gate card, decision 
   builds, so the milestone proves the seam rather than rebuilding it. One opcode
   `Effect.Counter SlotName` (a distinct keyword action, the M4b Destroy precedent),
   executed by `Resolve.applyEffect` through a new `Event.counter` funnel (CR
-  701.5a: remove from the stack, put into the owner's graveyard via `changeZone` --
+  701.6a: remove from the stack, put into the owner's graveyard via `changeZone` --
   so Rest in Peace's redirect and CR 400.7 compose for free). One target spec
   `TargetSpec.SpellTarget` (CR 115 "target spell" -- stack objects that are spells
   only), read via the new `Game.isSpell` classification (`Object.source` is
@@ -628,7 +646,7 @@ Add a bullet after the M4d entry, matching the house style (gate card, decision 
   random-game deck, the M3d posture); `cancel.json` joins `allPrintings` for the
   honesty round-trip. `Pawl.Resolve` stays the sole `case effect of` home; `Event`
   the sole funnel home. No new prompt/response. **Named elisions/expiries**:
-  `Event.counter` is ungated -- "can't be countered" (CR 701.5), conditional
+  `Event.counter` is ungated -- "can't be countered" (CR 701.6), conditional
   counters ("counter unless pay", Mana Leak/Daze), a distinct "was countered" event
   and its trigger, countering **abilities** (Stifle -- needs an `AbilityTarget`),
   alternative counter destinations (counter-and-exile, Remand), and restricted
