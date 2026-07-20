@@ -20,6 +20,7 @@ import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Result as Result
+import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Zone as Zone
 
@@ -115,6 +116,24 @@ performStateBasedActions gs =
       leaving = filter (losesNow buried) (stillPlaying buried)
       departed = foldr depart buried leaving
       remaining = stillPlaying departed
+      -- CR 704.5d: a token in any zone other than the battlefield ceases to exist.
+      -- Computed from the post-bury state so a token that just died (now in the
+      -- graveyard) or was redirected (Rest in Peace -> exile) is removed here; its
+      -- move already emitted a zone-change event, so a future dies-trigger still
+      -- sees it (CR 111.7's parenthetical). Keyed to "not on the battlefield", never
+      -- to a specific zone, so exile is caught too.
+      isVanishingToken oid = case Game.lookupObject oid departed of
+        Nothing -> False
+        Just obj -> case Object.source obj of
+          Source.OfToken _ -> Object.zone obj /= Zone.Battlefield
+          _ -> False
+      vanishing = filter isVanishingToken (Map.keys (GameState.objects departed))
+      ceaseToExist g oid = case Game.lookupObject oid g of
+        Nothing -> g
+        Just obj ->
+          let g1 = Game.removeFromZones (Object.owner obj) oid g
+           in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
+      vanished = List.foldl' ceaseToExist departed vanishing
       outcome = case remaining of
         [winner] -> Just (Result.Won winner)
         [] -> if null leaving then Nothing else Just Result.Drawn
@@ -122,8 +141,8 @@ performStateBasedActions gs =
       -- CR 704.5h's window is "since the last SBA check", so the events are
       -- drained here: dying/buried were computed from the pre-drain gs, so every
       -- 704.5h victim is found before its event is discarded.
-      drained = departed {GameState.damageEvents = []}
-      -- A state-based action was performed iff a creature was buried or a player
-      -- left. Draining damageEvents alone is not an SBA and does not force a repeat.
-      acted = not (null dying) || not (null leaving)
+      drained = vanished {GameState.damageEvents = []}
+      -- A state-based action was performed iff a creature was buried, a player left,
+      -- or a token ceased to exist.
+      acted = not (null dying) || not (null leaving) || not (null vanishing)
    in (acted, drained {GameState.result = outcome <|> GameState.result drained})

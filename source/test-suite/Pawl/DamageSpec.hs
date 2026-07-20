@@ -28,6 +28,7 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Result as Result
@@ -79,7 +80,35 @@ creatureSbaTests cards =
             after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "attacker died" 0 (S.creaturesInPlay S.alice after)
-              HU.assertEqual "blocker died" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "blocker died" 0 (S.creaturesInPlay S.bob after),
+      HU.testCase "CR 704.5d a token off the battlefield ceases to exist" $
+        let base = Setup.emptyGame S.bothPlayers
+            goblinCard = Printing.card (Cards.pikerPrinting cards)
+            (tokId, gs) = S.addToken goblinCard S.alice base
+            inGrave = Event.changeZone tokId Zone.Graveyard gs
+            -- The changeZone minted a new incarnation; find it in the graveyard.
+            settled = Sba.checkStateBasedActions inGrave
+         in do
+              HU.assertEqual "before the SBA, a token sits in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice inGrave))
+              HU.assertEqual "after the SBA, it has ceased to exist" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
+              HU.assertEqual "no token objects remain" 0 (Game.objectCount settled),
+      HU.testCase "CR 704.5d a token on the battlefield does NOT cease" $
+        let base = Setup.emptyGame S.bothPlayers
+            goblinCard = Printing.card (Cards.pikerPrinting cards)
+            (_, gs) = S.addToken goblinCard S.alice base
+            settled = Sba.checkStateBasedActions gs
+         in HU.assertEqual "the token survives on the battlefield" 1 (Game.objectCount settled),
+      HU.testCase "CR 704.5d/704.5g a 1/1 token dies to lethal damage and ceases to exist" $
+        let base = Setup.emptyGame S.bothPlayers
+            goblinCard = Printing.card (Cards.pikerPrinting cards)
+            -- A real 2/1 Piker (bob's) is the damage source; alice's 1/1 token takes 2.
+            (srcId, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            (tokId, gs2) = S.addToken goblinCard S.alice gs1
+            damaged = Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False] gs2
+            settled = Sba.checkStateBasedActions damaged
+         in do
+              HU.assertEqual "the token is gone from the battlefield" 0 (S.creaturesInPlay S.alice settled)
+              HU.assertEqual "and NOT sitting in a graveyard (the falsifier)" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
     ]
 
 damageTests :: Cards.Cards -> Tasty.TestTree
