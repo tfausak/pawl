@@ -498,11 +498,29 @@ blazeTests cards =
               HU.assertEqual "Bob unharmed" (Just 20) (S.lifeOf S.bob after)
     ]
 
+-- CR 700.2a: an illegal mode can't be chosen, so a modal spell is castable when
+-- at least `count` of its modes are fillable -- not when every mode's slots are.
+-- Chaos Charm has three modes (destroy target Wall / damage target creature /
+-- give target creature haste); the falsifier is castability via the damage or
+-- haste mode with no Wall on the board at all.
+modalCastTests :: Cards.Cards -> Tasty.TestTree
+modalCastTests cards =
+  Tasty.testGroup
+    "ModalCast"
+    [ HU.testCase "CR 700.2a Chaos Charm is castable off its non-Wall modes with no Wall in play" $
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
+            (_, gs1) = S.addPiker cards S.alice gs0
+         in HU.assertBool "castable via the damage/haste mode" (Cast.castable S.alice oid gs1),
+      HU.testCase "CR 700.2a Chaos Charm is not castable with no creature on the board at all" $
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
+         in HU.assertBool "no mode is fillable" (not (Cast.castable S.alice oid gs0))
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
     "Cast"
-    [castTests cards, castEngineTests cards, stackTests cards, discardTests cards, sicknessTests cards, magicalHackTests cards, blazeTests cards]
+    [castTests cards, castEngineTests cards, stackTests cards, discardTests cards, sicknessTests cards, magicalHackTests cards, blazeTests cards, modalCastTests cards]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

@@ -3,7 +3,9 @@ module Pawl.Cast where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
@@ -22,6 +24,10 @@ import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.ManaCost (ManaCost)
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeIndex as ModeIndex
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
@@ -64,13 +70,34 @@ timingOk pid oid gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card -> Card.isInstant card || sorcerySpeed pid gs
 
--- CR 601.2c: every target slot must have at least one legal recipient, or the
--- spell cannot be cast. Unobservable for Bolt (AnyTarget always holds a living
--- player); first falsified by Giant Growth at M3b.
+-- CR 700.2a: the indices of modes all of whose target slots have a legal
+-- recipient (a mode with no slots is trivially fillable). An illegal mode
+-- can't be chosen, so a mode with even one unfillable slot is excluded
+-- wholesale, never partially chosen.
+fillableModes :: ObjectId -> GameState -> Set.Set ModeIndex.ModeIndex
+fillableModes oid gs = case Game.cardOf oid gs of
+  Nothing -> Set.empty
+  Just card ->
+    let ms = Foldable.toList (Modal.modes (Card.Type.spell card))
+        fillable i m =
+          let sets = Target.legalSets (Mode.targetSpecs m) gs
+           in if any Set.null (Map.elems sets) then Nothing else Just (ModeIndex.MkModeIndex (fromIntegral i))
+     in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Int ..] ms))
+
+-- CR 601.2c / 700.2a: castable when at least as many modes are fillable as the
+-- selection demands ("choose one" / ChooseExactly 1, the only selection so
+-- far). Unobservable for Bolt (AnyTarget always holds a living player); first
+-- falsified for a single-mode card by Giant Growth at M3b, and for a modal
+-- card by Chaos Charm at M4g (castable via its damage/haste mode with no Wall
+-- in play). For a non-modal card (one mode, count 1) this is identical to
+-- "every slot fillable": the single mode fillable = all its slots fillable =
+-- the whole card's slots.
 targetable :: ObjectId -> GameState -> Bool
 targetable oid gs = case Game.cardOf oid gs of
   Nothing -> False
-  Just card -> not (any Set.null (Map.elems (Target.legalSets (Card.allTargetSpecs card) gs)))
+  Just card ->
+    let ModeSelection.ChooseExactly count = Modal.selection (Card.Type.spell card)
+     in Set.size (fillableModes oid gs) >= fromIntegral count
 
 -- Affordable and correctly timed, actually in this player's hand, and fillable.
 castable :: PlayerId -> ObjectId -> GameState -> Bool

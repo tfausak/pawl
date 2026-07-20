@@ -7,12 +7,14 @@ module Pawl.Card where
 import qualified Data.Foldable as Foldable
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeIndex as ModeIndex
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.TargetSpec (TargetSpec)
 import qualified Pawl.Type.TypeLine as TypeLine
@@ -31,6 +33,12 @@ allEffects card =
 allTargetSpecs :: Card.Card -> Map SlotName TargetSpec
 allTargetSpecs card =
   Map.unions (map Mode.targetSpecs (Foldable.toList (Modal.modes (Card.spell card))))
+
+-- The target specs of one mode by index (CR 700.2c: only the chosen mode's
+-- slots). Nothing if the index is out of range (total).
+modeTargetSpecs :: ModeIndex.ModeIndex -> Card.Card -> Maybe (Map SlotName TargetSpec)
+modeTargetSpecs (ModeIndex.MkModeIndex n) card =
+  fmap Mode.targetSpecs (Seq.lookup (fromIntegral n) (Modal.modes (Card.spell card)))
 
 isLand :: Card.Card -> Bool
 isLand c = Set.member CardType.Land (TypeLine.types (Card.typeLine c))
