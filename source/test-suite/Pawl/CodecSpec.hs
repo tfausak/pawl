@@ -15,6 +15,7 @@ import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Decimal as Decimal
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
@@ -107,7 +108,13 @@ tests cards =
           HU.testCase "AddMana" $
             roundTrip "e3" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana (ManaType.Colored Color.Green)),
           HU.testCase "ExileAllGraveyards" $
-            roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards
+            roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards,
+          HU.testCase "PutCounters effect round-trips through the codec" $
+            let effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "creature"))
+             in HU.assertEqual "round-trip" (Right effect) (Codec.jsonToEffect (Codec.effectToJson effect)),
+          HU.testCase "both CounterKinds round-trip" $ do
+            HU.assertEqual "plus" (Right CounterKind.PlusOnePlusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.PlusOnePlusOne))
+            HU.assertEqual "minus" (Right CounterKind.MinusOneMinusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.MinusOneMinusOne))
         ],
       Tasty.testGroup
         "records"

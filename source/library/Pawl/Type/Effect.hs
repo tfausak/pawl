@@ -1,6 +1,7 @@
 module Pawl.Type.Effect where
 
 import Pawl.Type.CardCriterion (CardCriterion)
+import Pawl.Type.CounterKind (CounterKind)
 import Pawl.Type.Duration (Duration)
 import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.Modification (Modification)
@@ -101,4 +102,12 @@ data Effect card
     -- Destroy is (M4b): Counter is a keyword action on rule 701's list, and this is
     -- the future home of "can't be countered" and a distinct "was countered" event.
     Counter SlotName
+  | -- CR 122.6: put this many counters of this kind on the slot's target permanent.
+    -- Battlegrowth = PutCounters PlusOnePlusOne (Literal 1) slot; Instill Infection
+    -- = PutCounters MinusOneMinusOne (Literal 1) slot. A counter is persistent
+    -- object state, NOT a zone change -- Resolve.applyEffect edits Object.counters
+    -- in place (Map.insertWith (+)), never through Event.changeZone. Quantity is how
+    -- many (reused from M4a; a future X-counter card rides ChooseX). The counter's
+    -- P/T effect is applied by the projection (CR 122.1a / 613.4c), not here.
+    PutCounters CounterKind Quantity SlotName
   deriving (Eq, Ord, Show)

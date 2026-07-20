@@ -23,6 +23,7 @@ import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import Pawl.Type.Json (Value (Array, Null, Object))
@@ -128,6 +129,19 @@ jsonToCardType =
       (Text.pack "Enchantment", CardType.Enchantment),
       (Text.pack "Artifact", CardType.Artifact),
       (Text.pack "Sorcery", CardType.Sorcery)
+    ]
+
+counterKindToJson :: CounterKind.CounterKind -> Value
+counterKindToJson k = nullary . Text.pack $ case k of
+  CounterKind.PlusOnePlusOne -> "PlusOnePlusOne"
+  CounterKind.MinusOneMinusOne -> "MinusOneMinusOne"
+
+jsonToCounterKind :: Value -> Either Text CounterKind.CounterKind
+jsonToCounterKind =
+  decodeNullary
+    (Text.pack "CounterKind")
+    [ (Text.pack "PlusOnePlusOne", CounterKind.PlusOnePlusOne),
+      (Text.pack "MinusOneMinusOne", CounterKind.MinusOneMinusOne)
     ]
 
 subtypeToJson :: Subtype.Subtype -> Value
@@ -478,6 +492,7 @@ effectToJson e = case e of
   Effect.Create q c -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
   Effect.Prevent d p -> Json.tagged (Text.pack "Prevent") (Just (Array [durationToJson d, preventionToJson p]))
   Effect.RegenerateSelf -> nullary (Text.pack "RegenerateSelf")
+  Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
 jsonToEffect value = do
@@ -513,6 +528,9 @@ jsonToEffect value = do
       Just (Array [d, p]) -> Effect.Prevent <$> jsonToDuration d <*> jsonToPrevention p
       _ -> Left (Text.pack "Prevent expects [Duration, Prevention]")
     "RegenerateSelf" -> Right Effect.RegenerateSelf
+    "PutCounters" -> case mv of
+      Just (Array [k, q, s]) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s
+      _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------

@@ -9,6 +9,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
@@ -24,6 +25,7 @@ import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
@@ -74,6 +76,7 @@ slotsOf effect = case effect of
   Effect.Prevent _ _ -> Set.empty
   Effect.RegenerateSelf -> Set.empty
   Effect.Counter slot -> Set.singleton slot
+  Effect.PutCounters _ _ slot -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -100,6 +103,7 @@ readsX = any effectReadsX
       Effect.Prevent _ _ -> False
       Effect.RegenerateSelf -> False
       Effect.Counter _ -> False
+      Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -122,6 +126,7 @@ manaProduced effect = case effect of
   Effect.Prevent _ _ -> Nothing
   Effect.RegenerateSelf -> Nothing
   Effect.Counter _ -> Nothing
+  Effect.PutCounters {} -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -144,6 +149,7 @@ searchesLibrary effect = case effect of
   Effect.Prevent _ _ -> False
   Effect.RegenerateSelf -> False
   Effect.Counter _ -> False
+  Effect.PutCounters {} -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -188,6 +194,7 @@ rewriteEffect pairs effect = case effect of
   Effect.RegenerateSelf -> effect
   -- No rewritable land-type word.
   Effect.Counter _ -> effect
+  Effect.PutCounters {} -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -456,6 +463,21 @@ applyEffect source controller bound legality chosen effect = case effect of
           Nothing -> gs
           Just target -> Event.counter target gs
         _ -> gs
+  Effect.PutCounters kind quantity slot ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just recipient, True) -> case recipientObject recipient of
+          Nothing -> gs -- a player recipient takes no counters
+          Just target -> case Quantity.evaluate gs source quantity of
+            Nothing -> gs -- unevaluable quantity: no-op (the powerOf posture)
+            Just n -> if n <= 0 then gs else putCounters target kind (fromInteger n) gs
+        _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
+
+-- CR 122.6: add `n` counters of a kind to a permanent's per-incarnation state.
+putCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> GameState -> GameState
+putCounters oid kind n gs =
+  let bump obj = obj {Object.counters = Map.insertWith (+) kind n (Object.counters obj)}
+   in gs {GameState.objects = Map.adjust bump oid (GameState.objects gs)}
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.
