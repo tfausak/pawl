@@ -31,6 +31,7 @@ import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
@@ -270,6 +271,7 @@ addCreature printing pid gs =
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = ts
           }
    in ( oid,
@@ -298,6 +300,7 @@ addToken card pid gs =
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = ts
           }
    in ( oid,
@@ -321,6 +324,7 @@ addLibraryCard printing pid gs =
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = ts
           }
    in ( oid,
@@ -350,6 +354,7 @@ landsInPlay land n =
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
                   Object.bindings = Map.empty,
+                  Object.counters = Map.empty,
                   Object.timestamp = ts
                 }
          in gs2
@@ -376,6 +381,7 @@ handOne printing base =
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = ts
           }
    in ( gs2
@@ -403,6 +409,7 @@ pikerInHand cards n ph =
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = ts
           }
       gs3 =
@@ -539,6 +546,14 @@ addRegenShield :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameStat
 addRegenShield oid gs =
   gs {GameState.regenerationShields = Map.insertWith (+) oid 1 (GameState.regenerationShields gs)}
 
+-- Put `n` counters of a kind directly onto an object's per-incarnation state,
+-- bypassing the PutCounters opcode -- so a projection or SBA test can set up
+-- counters without resolving a spell.
+addCounter :: CounterKind.CounterKind -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+addCounter kind n oid gs =
+  let bump obj = obj {Object.counters = Map.insertWith (+) kind n (Object.counters obj)}
+   in gs {GameState.objects = Map.adjust bump oid (GameState.objects gs)}
+
 tappedCount :: PlayerId.PlayerId -> GameState.GameState -> Int
 tappedCount pid gs =
   let isTapped oid = case Game.lookupObject oid gs of
@@ -575,6 +590,7 @@ oneMountainState cards ph =
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = Timestamp.MkTimestamp 0
           }
    in GameState.MkGameState
@@ -643,6 +659,7 @@ spellOnStack printing pid gs =
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = ts
           }
    in ( oid,

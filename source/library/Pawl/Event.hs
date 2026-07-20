@@ -95,7 +95,7 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
         proposed = ZoneChange.MkZoneChange oid fromZone requestedDest
         resolved = applyReplacements (Projection.replacementsAffecting gs) proposed
         dest = ZoneChange.to resolved
-        mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.timestamp = ts}
+        mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.timestamp = ts}
         gs1 = Game.removeFromZones pid oid gs
         gs2 = gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
      in placeObject pid mkObj fromZone dest gs2
@@ -173,6 +173,7 @@ createToken controller card gs =
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = ts
           }
    in placeObject controller mkObj Zone.Battlefield Zone.Battlefield gs

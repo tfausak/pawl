@@ -100,6 +100,7 @@ createCard pid printing = do
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = ts
           }
       gs3 =

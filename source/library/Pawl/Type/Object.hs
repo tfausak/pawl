@@ -3,6 +3,7 @@ module Pawl.Type.Object where
 import Data.Map.Strict (Map)
 import Numeric.Natural (Natural)
 import Pawl.Type.Binding (Binding)
+import Pawl.Type.CounterKind (CounterKind)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Sickness (Sickness)
 import Pawl.Type.SlotName (SlotName)
@@ -31,6 +32,14 @@ data Object = MkObject
     -- Replaces the M3a `targets` and M3d `chosenSubtypes` fields, unified as the
     -- risk-register's D4 named binding slots when X arrived (the second customer).
     bindings :: Map SlotName Binding,
+    -- CR 122.1: counters placed on this permanent, counted per kind. Persistent
+    -- permanent state -- unlike `damage`, cleanup does NOT clear it (a counter is
+    -- not an "until end of turn" effect). Per-incarnation: reset by changeZone,
+    -- because CR 122.2 says counters "simply cease to exist" when an object changes
+    -- zones (the CR 400.7 mechanism that also resets damage/sickness/bindings). A
+    -- +1/+1 or -1/-1 count feeds P/T via the projection (CR 122.1a / 613.4c); both
+    -- kinds present trigger the CR 704.5q annihilation SBA.
+    counters :: Map CounterKind Natural,
     -- CR 613.7d: when this object entered its current zone. A static ability's
     -- continuous effect shares this timestamp (CR 613.7a); stamped fresh on every
     -- zone change (CR 400.7 makes each a new object). Read by the projection when

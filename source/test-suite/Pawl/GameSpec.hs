@@ -115,6 +115,7 @@ gameTests cards =
                       Object.damage = 0,
                       Object.sickness = Sickness.Sick,
                       Object.bindings = Map.empty,
+                      Object.counters = Map.empty,
                       -- changeZone draws a fresh timestamp; oneMountainState's
                       -- nextTimestamp starts at 1 (object 0 already holds 0).
                       Object.timestamp = Timestamp.MkTimestamp 1
@@ -370,6 +371,7 @@ handBobBolt cards gs =
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = ts
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})

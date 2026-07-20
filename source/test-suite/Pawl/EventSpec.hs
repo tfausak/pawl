@@ -11,6 +11,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -176,5 +177,16 @@ tests cards =
         let base = Setup.emptyGame S.bothPlayers
             (oid, gs0) = S.addCreature (Cards.darksteelMyrPrinting cards) S.alice base
             after = Event.destroy oid gs0
-         in HU.assertEqual "indestructible survives" True (Set.member oid (GameState.battlefield after))
+         in HU.assertEqual "indestructible survives" True (Set.member oid (GameState.battlefield after)),
+      HU.testCase "CR 122.2 counters cease to exist when an object changes zones" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 0
+            (oid, withCreature) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            withCounter = S.addCounter CounterKind.PlusOnePlusOne 2 oid withCreature
+            -- Bounce to hand: changeZone mints a new incarnation (CR 400.7).
+            bounced = Event.changeZone oid Zone.Hand withCounter
+            -- Total (no `head`): map over the hand zone; expect exactly one card, empty.
+            handCounters = map (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h bounced)) (Game.zoneMembers Zone.Hand S.bob bounced)
+         in do
+              HU.assertEqual "counter present before the move" (Map.fromList [(CounterKind.PlusOnePlusOne, 2)]) (maybe Map.empty Object.counters (Game.lookupObject oid withCounter))
+              HU.assertEqual "the one new incarnation in hand has no counters" [Map.empty] handCounters
     ]

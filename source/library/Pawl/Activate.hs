@@ -88,6 +88,7 @@ activateAbility pid srcId ability = do
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
+            Object.counters = Map.empty,
             Object.timestamp = ts
           }
       onStack =
