@@ -33,7 +33,6 @@ import qualified Pawl.Type.Sickness as Sickness
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.Zone as Zone
 
 -- CR 305.6: a basic land's mana ability is granted intrinsically by its subtype,
 -- not printed in its text box. This is a classification of the type line -- it
@@ -99,8 +98,8 @@ addMana pid units gs =
 emptyManaPools :: GameState -> GameState
 emptyManaPools gs = gs {GameState.manaPool = Map.empty}
 
--- Untapped permanents this player owns that can produce mana. Owner rather than
--- controller: M0 has no controller field, and nothing in M1a can change control.
+-- Untapped permanents this player controls that can produce mana (CR 106.4:
+-- a mana ability's controller receives the mana, not the object's owner).
 manaSources :: PlayerId -> GameState -> [ObjectId]
 manaSources pid gs =
   let notSickCreature oid = case Game.lookupObject oid gs of
@@ -112,7 +111,7 @@ manaSources pid gs =
       isSource oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaTypesOf oid gs)) && notSickCreature oid
-   in filter isSource (Game.zoneMembers Zone.Battlefield pid gs)
+   in filter isSource (Projection.controls pid gs)
 
 -- Activate an object's intrinsic mana ability: tap it, add its mana. CR 605.3:
 -- a mana ability does not use the stack, so this is immediate.
@@ -129,7 +128,10 @@ tapForMana oid gs = case Game.lookupObject oid gs of
     produced : _ ->
       let tapped = obj {Object.tapped = TapState.Tapped}
           gs1 = gs {GameState.objects = Map.insert oid tapped (GameState.objects gs)}
-       in addMana (Object.owner obj) [ManaUnit.MkManaUnit {ManaUnit.manaType = produced}] gs1
+       in -- CR 106.4/108.4: mana goes to the ability's controller, which is the
+          -- object's controller. Falls back to owner in the impossible case
+          -- lookupObject just proved oid exists but controllerOf returns Nothing.
+          addMana (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)) [ManaUnit.MkManaUnit {ManaUnit.manaType = produced}] gs1
 
 typedOf :: ManaSymbol -> Maybe ManaType
 typedOf symbol = case symbol of

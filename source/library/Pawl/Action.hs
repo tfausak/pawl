@@ -5,6 +5,7 @@ import qualified Pawl.Activate as Activate
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Turn as Turn
 import Pawl.Type.Action (Action)
 import qualified Pawl.Type.Action as Action
@@ -39,5 +40,5 @@ legalActions pid gs =
       activations =
         let forPermanent oid =
               map (Action.Activate oid) (filter (\ab -> Activate.activatable pid oid ab gs) (Activate.abilitiesFor oid gs))
-         in concatMap forPermanent (Game.zoneMembers Zone.Battlefield pid gs)
+         in concatMap forPermanent (Projection.controls pid gs)
    in Action.Pass : lands ++ spells ++ activations

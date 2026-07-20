@@ -82,7 +82,7 @@ canAttack pid oid gs = case Game.lookupObject oid gs of
       && not (Projection.hasKeyword Keyword.Defender oid gs)
 
 legalAttackers :: PlayerId -> GameState -> [ObjectId]
-legalAttackers pid gs = filter (\oid -> canAttack pid oid gs) (Game.zoneMembers Zone.Battlefield pid gs)
+legalAttackers pid gs = filter (\oid -> canAttack pid oid gs) (Projection.controls pid gs)
 
 -- CR 509.1a: a blocking creature must be untapped and controlled by the
 -- defending player.
@@ -99,7 +99,7 @@ canBlock pid oid gs = case Game.lookupObject oid gs of
       && isCreatureObject oid gs
 
 legalBlockers :: PlayerId -> GameState -> [ObjectId]
-legalBlockers pid gs = filter (\oid -> canBlock pid oid gs) (Game.zoneMembers Zone.Battlefield pid gs)
+legalBlockers pid gs = filter (\oid -> canBlock pid oid gs) (Projection.controls pid gs)
 
 -- CR 702.9b: a creature with flying can't be blocked except by creatures with
 -- flying and/or reach (CR 702.17b).

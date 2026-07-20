@@ -97,7 +97,7 @@ untapAll :: PlayerId -> Game ()
 untapAll pid = do
   gs <- State.get
   let untap obj = obj {Object.tapped = TapState.Untapped}
-      ids = Game.zoneMembers Zone.Battlefield pid gs
+      ids = Projection.controls pid gs
   State.put gs {GameState.objects = foldr (Map.adjust untap) (GameState.objects gs) ids}
 
 -- CR 302.6: permanents the active player has controlled since their turn began
@@ -109,7 +109,7 @@ settleAll :: PlayerId -> Game ()
 settleAll pid = do
   gs <- State.get
   let settle obj = obj {Object.sickness = Sickness.Settled}
-      ids = Game.zoneMembers Zone.Battlefield pid gs
+      ids = Projection.controls pid gs
   State.put gs {GameState.objects = foldr (Map.adjust settle) (GameState.objects gs) ids}
 
 -- CR 514.2. Non-identical cards now share a hand (Mountains and Pikers), so

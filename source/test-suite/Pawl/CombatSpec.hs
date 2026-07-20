@@ -430,6 +430,12 @@ combatLegalityTests cards =
       HU.testCase "legalAttackers lists exactly the active player's creatures" $
         let (gs, mine, _) = S.combatBoard cards 2 3
          in HU.assertEqual "two" mine (Combat.legalAttackers S.alice gs),
+      HU.testCase "CR 508.1a a player can attack with a creature they control but do not own" $
+        let (oid, base) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            gs0 = S.giveControl oid S.alice base
+         in do
+              HU.assertBool "alice may attack with it" (elem oid (Combat.legalAttackers S.alice gs0))
+              HU.assertBool "bob may not (not the controller, not active)" (notElem oid (Combat.legalAttackers S.bob gs0)),
       HU.testCase "the defending player is the non-active player" $
         let (gs, _, _) = S.combatBoard cards 1 1
          in HU.assertEqual "bob defends" [S.bob] (Combat.defendingPlayers gs),

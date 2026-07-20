@@ -184,7 +184,16 @@ manaTests cards =
       HU.testCase "CR 302.6 a summoning-sick Llanowar Elves is NOT a mana source" $
         let (elfId, g0) = S.addCreature (Cards.llanowarElvesPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) elfId (GameState.objects g0)}
-         in HU.assertBool "sick elf excluded" (notElem elfId (Mana.manaSources S.alice sick))
+         in HU.assertBool "sick elf excluded" (notElem elfId (Mana.manaSources S.alice sick)),
+      HU.testCase "mana from a controlled permanent goes to its controller, not owner" $
+        let (oid, base) = S.addCreature (Cards.llanowarElvesPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            gs0 = S.giveControl oid S.alice base
+            after = Mana.tapForMana oid gs0
+            manaUnitsOf pool = case pool of
+              Mana.Type.MkMana units -> units
+         in do
+              HU.assertBool "alice received a mana unit" (not (null (manaUnitsOf (Mana.poolOf S.alice after))))
+              HU.assertBool "bob received none" (null (manaUnitsOf (Mana.poolOf S.bob after)))
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

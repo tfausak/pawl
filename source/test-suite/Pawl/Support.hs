@@ -29,16 +29,20 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivePrevention as ActivePrevention
+import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Deck as Deck
+import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -290,6 +294,26 @@ addCreature printing pid gs =
             GameState.battlefield = Set.insert oid (GameState.battlefield gs2)
           }
       )
+
+-- Install a SetController continuous effect (CR 108.4) making pid the
+-- controller of oid, and settle it (Sickness.Settled) so a test that exercises
+-- control isolates control from summoning sickness.
+giveControl :: ObjectId.ObjectId -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+giveControl oid pid gs =
+  let (ts, g1) = Game.freshTimestamp gs
+      eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = oid,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.modification = Modification.SetController pid,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+      settle o = o {Object.sickness = Sickness.Settled}
+   in g1
+        { GameState.continuousEffects = eff : GameState.continuousEffects g1,
+          GameState.objects = Map.adjust settle oid (GameState.objects g1)
+        }
 
 addPiker :: Cards.Cards -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addPiker cards = addCreature (Cards.pikerPrinting cards)
