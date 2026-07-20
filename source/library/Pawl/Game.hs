@@ -92,14 +92,3 @@ isSpell oid gs = case lookupObject oid gs of
       Source.OfToken _ -> False
       Source.OfAbility _ _ -> False
       Source.OfTrigger _ _ -> False
-
--- Who controls an object (CR 108.4). Nothing when the id is unknown.
---
--- Owner stands in for controller: nothing in M1b can change control, so the two
--- are provably identical, and a real field would be dead state that every
--- fixture must maintain and no card could observe drifting.
---
--- EXPIRES at M3 (Mindslaver). Everything that needs a controller calls this and
--- never Object.owner, so that change is one function rather than every call site.
-controllerOf :: ObjectId -> GameState -> Maybe PlayerId
-controllerOf oid gs = fmap Object.owner (lookupObject oid gs)

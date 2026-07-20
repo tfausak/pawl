@@ -218,7 +218,7 @@ triggersFrom :: [ZoneChange] -> GameState -> [(ObjectId, PlayerId, TriggeredAbil
 triggersFrom changes gs =
   let fromOne zc =
         let srcId = ZoneChange.object zc
-         in case Game.controllerOf srcId gs of
+         in case Projection.controllerOf srcId gs of
               Nothing -> []
               Just ctrl ->
                 map

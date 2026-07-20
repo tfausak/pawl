@@ -64,7 +64,7 @@ abilitiesFor = Projection.abilitiesOf
 -- single-mode abilities need exactly one fillable mode, identical to today.
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatable pid srcId ability gs =
-  Game.controllerOf srcId gs == Just pid
+  Projection.controllerOf srcId gs == Just pid
     && elem ability (abilitiesFor srcId gs)
     && not (Mana.isManaAbility ability)
     && all (canPayAdditional srcId gs) (AbilityCost.additional (ActivatedAbility.cost ability))

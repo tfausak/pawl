@@ -99,7 +99,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
           [blocker]
             | not trample || power <= blockerThreshold gs attacker blocker ->
                 pure [DamageEvent.MkDamageEvent attacker (Recipient.ToCreature blocker) power (Projection.hasKeyword Keyword.Deathtouch attacker gs) DamageKind.Combat]
-          blockers -> case Game.controllerOf attacker gs of
+          blockers -> case Projection.controllerOf attacker gs of
             Nothing -> pure []
             -- CR 702.19b: the excess is assigned "as its controller chooses," so the
             -- chooser is the attacker's controller. EXPIRES at M3: banding (702.22j,

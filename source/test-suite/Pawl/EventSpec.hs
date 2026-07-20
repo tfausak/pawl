@@ -123,7 +123,7 @@ tests cards =
               case newIds of
                 [tokId] -> do
                   HU.assertEqual "cardOf sees the token" (Just goblinCard) (Game.cardOf tokId after)
-                  HU.assertEqual "owned by its creator (CR 111.2)" (Just S.alice) (Game.controllerOf tokId after)
+                  HU.assertEqual "owned by its creator (CR 111.2)" (Just S.alice) (Projection.controllerOf tokId after)
                   case Game.lookupObject tokId after of
                     Just obj -> HU.assertEqual "summoning sick (CR 302.6)" Sickness.Sick (Object.sickness obj)
                     Nothing -> HU.assertFailure "token vanished"

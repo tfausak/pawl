@@ -39,6 +39,7 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Prevention as Prevention
 import qualified Pawl.Type.Printing as Printing
@@ -375,6 +376,17 @@ objectIdToJson (ObjectId.MkObjectId n) = natTo n
 jsonToObjectId :: Value -> Either Text ObjectId.ObjectId
 jsonToObjectId value = ObjectId.MkObjectId <$> natFrom value
 
+-- SetController's PlayerId is runtime-only (never in card JSON, since a
+-- SetController effect is baked at GainControl resolution, never authored on a
+-- card), but the codec must stay total. Mirrors ObjectId's Natural encoding
+-- (natTo/natFrom), not a bare Integer: PlayerId wraps a Natural (no partial
+-- fromInteger on a negative wire value).
+playerIdToJson :: PlayerId.PlayerId -> Value
+playerIdToJson (PlayerId.MkPlayerId n) = natTo n
+
+jsonToPlayerId :: Value -> Either Text PlayerId.PlayerId
+jsonToPlayerId value = PlayerId.MkPlayerId <$> natFrom value
+
 -- Mana, quantity, power/toughness --------------------------------------------
 
 manaTypeToJson :: ManaType.ManaType -> Value
@@ -450,6 +462,7 @@ modificationToJson m = case m of
   Modification.AddLandSubtype s -> Json.tagged (Text.pack "AddLandSubtype") (Just (subtypeToJson s))
   Modification.AddCardType c -> Json.tagged (Text.pack "AddCardType") (Just (cardTypeToJson c))
   Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array [subtypeToJson a, subtypeToJson b]))
+  Modification.SetController p -> Json.tagged (Text.pack "SetController") (Just (playerIdToJson p))
 
 jsonToModification :: Value -> Either Text Modification.Modification
 jsonToModification value = do
@@ -466,6 +479,7 @@ jsonToModification value = do
     "AddLandSubtype" -> withValue mv (fmap Modification.AddLandSubtype . jsonToSubtype)
     "AddCardType" -> withValue mv (fmap Modification.AddCardType . jsonToCardType)
     "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> jsonToSubtype x <*> jsonToSubtype y
+    "SetController" -> withValue mv (fmap Modification.SetController . jsonToPlayerId)
     _ -> Left (Text.pack "unknown Modification: " <> t)
 
 withValue :: Maybe Value -> (Value -> Either Text a) -> Either Text a

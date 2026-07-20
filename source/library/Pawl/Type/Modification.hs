@@ -2,6 +2,7 @@ module Pawl.Type.Modification where
 
 import Pawl.Type.CardType (CardType)
 import Pawl.Type.Keyword (Keyword)
+import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.Subtype (Subtype)
 
@@ -21,4 +22,9 @@ data Modification
   | AddLandSubtype Subtype -- layer 4, CR 305.7 add (Urborg -> Swamp)
   | AddCardType CardType -- layer 4 (Opalescence -> Creature)
   | ChangeSubtypeWord Subtype Subtype -- layer 3, CR 612 (Magical Hack: from -> to)
+  | -- layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
+    -- effect creation (CR 611.2c) by Resolve.applyEffect (GainControl) -- it is
+    -- the effect's source's controller, never chosen. Applied only by
+    -- Projection.controllerOf. Never appears in card JSON (runtime-only).
+    SetController PlayerId
   deriving (Eq, Ord, Show)

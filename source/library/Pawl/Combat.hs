@@ -68,7 +68,7 @@ canAttack :: PlayerId -> ObjectId -> GameState -> Bool
 canAttack pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
-    Game.controllerOf oid gs == Just pid
+    Projection.controllerOf oid gs == Just pid
       && GameState.activePlayer gs == pid
       && Object.zone obj == Zone.Battlefield
       && Object.tapped obj == TapState.Untapped
@@ -93,7 +93,7 @@ canBlock :: PlayerId -> ObjectId -> GameState -> Bool
 canBlock pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
-    Game.controllerOf oid gs == Just pid
+    Projection.controllerOf oid gs == Just pid
       && Object.zone obj == Zone.Battlefield
       && Object.tapped obj == TapState.Untapped
       && isCreatureObject oid gs

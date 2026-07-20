@@ -4,6 +4,7 @@ import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Ord as Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
@@ -24,6 +25,7 @@ import Pawl.Type.Modification (Modification)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Power as Power
 import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
@@ -50,6 +52,7 @@ layer m = case m of
   Modification.AddLandSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
   Modification.ChangeSubtypeWord _ _ -> Layer.Text
+  Modification.SetController _ -> Layer.Control
 
 -- Apply one modification to characteristics-in-progress. THE ONE applier
 -- (Resolve : Effect :: Projection : Modification). P/T quantities are evaluated
@@ -95,6 +98,12 @@ applyModification gs oid m pc = case m of
     if Set.member from (PC.subtypes pc)
       then pc {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc))}
       else pc
+  -- CR 613.1b layer 2: control-changing effects apply here, but
+  -- ProjectedCharacteristics carries no controller field -- controllerOf reads
+  -- GameState.continuousEffects directly (a lean fold, not the full layer pass;
+  -- see its comment). This arm is identity so gather/project's uniform walk over
+  -- every stored effect stays total once a SetController effect exists.
+  Modification.SetController _ -> pc
 
 -- CR 613.4b: layer 7b SETS base P/T to a specific value -- it ESTABLISHES P/T, so
 -- an object with no printed P/T that is set (an Opalescence-animated enchantment)
@@ -192,6 +201,10 @@ setLandSubtypeEffects :: GameState -> [(ObjectId, Affected.Affected)]
 setLandSubtypeEffects gs =
   let isSet m = case m of
         Modification.SetLandSubtype _ -> True
+        -- Not the CR 305.7 land-subtype "set" this predicate gates (a control
+        -- op, not a type change); the existing wildcard already covers it, but
+        -- named explicitly per Modification's exhaustiveness discipline.
+        Modification.SetController _ -> False
         _ -> False
       fromStored eff =
         if isSet (ContinuousEffect.modification eff)
@@ -254,6 +267,8 @@ rewriteModification pairs m =
       apply1 acc (from, to) = case acc of
         Modification.SetLandSubtype s -> Modification.SetLandSubtype (swap from to s)
         Modification.AddLandSubtype s -> Modification.AddLandSubtype (swap from to s)
+        -- A control op carries no subtype word for CR 612 to rewrite: identity.
+        Modification.SetController _ -> acc
         _ -> acc
    in List.foldl' apply1 m pairs
 
@@ -414,6 +429,34 @@ isCreatureOf oid gs = Set.member CardType.Creature (cardTypesOf oid gs)
 
 hasKeyword :: Keyword -> ObjectId -> GameState -> Bool
 hasKeyword keyword oid gs = Set.member keyword (keywordsOf oid gs)
+
+-- CR 108.4 / 613.1b: the controller of an object is its owner, overridden by
+-- layer-2 SetController continuous effects (last timestamp wins, CR 613.7). A
+-- lean fold, not the full ProjectedCharacteristics pass -- control feeds combat,
+-- mana and priority and is needed before P/T. Projection is the sole applier of
+-- SetController (the case-on-Modification invariant). Nothing when the id is
+-- unknown. Replaces Game.controllerOf (the M1b owner stand-in, now cashed).
+controllerOf :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
+controllerOf oid gs = case Game.lookupObject oid gs of
+  Nothing -> Nothing
+  Just obj ->
+    let names a = case a of
+          Affected.TheseObjects s -> Set.member oid s
+          _ -> False
+        setter eff = case ContinuousEffect.modification eff of
+          Modification.SetController pid
+            | names (ContinuousEffect.affected eff) -> Just (ContinuousEffect.timestamp eff, pid)
+          _ -> Nothing
+        setters = Maybe.mapMaybe setter (GameState.continuousEffects gs)
+     in case setters of
+          [] -> Just (Object.owner obj)
+          _ -> Just (snd (List.maximumBy (Ord.comparing fst) setters))
+
+-- The battlefield permanents a player controls (CR 108.4). The control-based
+-- "your permanents" enumerator; consumers use it wherever they mean "you
+-- control", replacing the owner-based Game.zoneMembers Battlefield.
+controls :: PlayerId.PlayerId -> GameState -> [ObjectId]
+controls pid gs = filter (\oid -> controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs))
 
 -- CR 514.2: during cleanup, "all 'until end of turn' and 'this turn' effects
 -- end". Delete-and-recompute (design.md §2.5): dropping the stored effect makes

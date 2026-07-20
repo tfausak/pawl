@@ -420,5 +420,25 @@ tests cards =
             gs = withEffect oid (Timestamp.MkTimestamp 9) (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs1
          in do
               HU.assertEqual "power 2 + 1 + 3" (Just 6) (Projection.powerOf oid gs)
-              HU.assertEqual "toughness 1 + 1 + 3" (Just 5) (Projection.toughnessOf oid gs)
+              HU.assertEqual "toughness 1 + 1 + 3" (Just 5) (Projection.toughnessOf oid gs),
+      HU.testCase "CR 108.4 a SetController effect overrides owner; last timestamp wins" $
+        let (oid, base) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+            install pid g =
+              let (ts, g1) = Game.freshTimestamp g
+                  eff =
+                    ContinuousEffect.MkContinuousEffect
+                      { ContinuousEffect.source = oid,
+                        ContinuousEffect.timestamp = ts,
+                        ContinuousEffect.duration = Duration.UntilEndOfTurn,
+                        ContinuousEffect.modification = Modification.SetController pid,
+                        ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+                      }
+               in g1 {GameState.continuousEffects = eff : GameState.continuousEffects g1}
+            gs = install S.alice (install S.alice base) -- two effects, both -> alice
+            owned = base
+         in do
+              HU.assertEqual "owner controls with no effect" (Just S.bob) (Projection.controllerOf oid owned)
+              HU.assertEqual "the effect grants control" (Just S.alice) (Projection.controllerOf oid gs)
+              HU.assertEqual "alice controls oid" [oid] (Projection.controls S.alice gs)
+              HU.assertEqual "bob controls nothing" [] (Projection.controls S.bob gs)
     ]

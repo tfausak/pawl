@@ -85,13 +85,13 @@ objectFactTests cards =
                 HU.assertEqual "toughness" Nothing (Projection.toughnessOf oid gs),
       HU.testCase "controllerOf is the owner while nothing can change control" $
         let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
-         in HU.assertEqual "controller" (Just S.bob) (Game.controllerOf oid gs),
+         in HU.assertEqual "controller" (Just S.bob) (Projection.controllerOf oid gs),
       HU.testCase "an unknown id has no facts" $
         let gs = Setup.emptyGame S.bothPlayers
             missing = ObjectId.MkObjectId 999
          in do
               HU.assertEqual "power" Nothing (Projection.powerOf missing gs)
-              HU.assertEqual "controller" Nothing (Game.controllerOf missing gs)
+              HU.assertEqual "controller" Nothing (Projection.controllerOf missing gs)
     ]
 
 gameTests :: Cards.Cards -> Tasty.TestTree
