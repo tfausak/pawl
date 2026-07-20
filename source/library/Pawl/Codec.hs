@@ -639,17 +639,15 @@ triggeredAbilityToJson :: TriggeredAbility.TriggeredAbility CardT.Card -> Value
 triggeredAbilityToJson ta =
   Object
     [ (Text.pack "condition", triggerConditionToJson (TriggeredAbility.condition ta)),
-      (Text.pack "effects", listTo effectToJson (TriggeredAbility.effects ta)),
-      (Text.pack "targetSpecs", targetSpecsToJson (TriggeredAbility.targetSpecs ta))
+      (Text.pack "modal", modalToJson (TriggeredAbility.modal ta))
     ]
 
 jsonToTriggeredAbility :: Value -> Either Text (TriggeredAbility.TriggeredAbility CardT.Card)
 jsonToTriggeredAbility value = do
   ps <- Json.asObject value
   c <- Json.field (Text.pack "condition") ps >>= jsonToTriggerCondition
-  es <- Json.field (Text.pack "effects") ps >>= listFrom jsonToEffect
-  ts <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
-  pure (TriggeredAbility.MkTriggeredAbility c es ts)
+  m <- Json.field (Text.pack "modal") ps >>= jsonToModal
+  pure (TriggeredAbility.MkTriggeredAbility c m)
 
 -- Modal -----------------------------------------------------------------------
 

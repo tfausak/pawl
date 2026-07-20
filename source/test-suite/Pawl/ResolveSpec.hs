@@ -413,7 +413,10 @@ resolveTests cards =
             (deadId, g2) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob g1
             -- move the Piker into bob's graveyard
             g3 = Event.changeZone deadId Zone.Graveyard g2
-            ability = TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters [Effect.ExileAllGraveyards] Map.empty
+            ability =
+              TriggeredAbility.MkTriggeredAbility
+                TriggerCondition.SelfEnters
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ExileAllGraveyards]) Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g4) = Game.freshObjectId g3
             (ts, g5) = Game.freshTimestamp g4
             abilObj =
@@ -424,7 +427,7 @@ resolveTests cards =
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled,
-                  Object.bindings = Map.empty,
+                  Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
                   Object.counters = Map.empty,
                   Object.timestamp = ts
                 }

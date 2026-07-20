@@ -58,4 +58,6 @@ resolveTop = do
             Cast.castWhileSearching (Object.owner obj)
           Resolve.resolveAbility oid srcId ability
         Source.OfTrigger srcId ability ->
-          Resolve.resolveEffects oid srcId (TriggeredAbility.effects ability) (TriggeredAbility.targetSpecs ability)
+          let chosen = Binding.modesOf (Object.bindings obj)
+              modal = TriggeredAbility.modal ability
+           in Resolve.resolveEffects oid srcId (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)

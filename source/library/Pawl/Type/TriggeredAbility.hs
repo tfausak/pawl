@@ -1,20 +1,13 @@
 module Pawl.Type.TriggeredAbility where
 
-import Data.Map.Strict (Map)
-import Pawl.Type.Effect (Effect)
-import Pawl.Type.SlotName (SlotName)
-import Pawl.Type.TargetSpec (TargetSpec)
+import Pawl.Type.Modal (Modal)
 import Pawl.Type.TriggerCondition (TriggerCondition)
 
--- CR 603.1: "[condition], [effect]". Reuses the Effect vocabulary and the
--- slot/target machinery of a spell. Differs from ActivatedAbility only in
--- carrying a trigger condition instead of a cost; on the stack the two share one
--- executor (Resolve.resolveEffects).
--- Parametric in `card` for the same reason as Effect/ActivatedAbility: its
--- effects are `[Effect card]`. Card ties the knot at `TriggeredAbility Card`.
+-- CR 603.1 / 700.2b / 603.3c: "[condition], [effect]", now modal-capable. Card-free/
+-- parametric (M4c). On the stack it shares Resolve's executor with an activated
+-- ability. Effects live in Mode.effects :: Seq (M4g's interim [Effect] retired).
 data TriggeredAbility card = MkTriggeredAbility
   { condition :: TriggerCondition,
-    effects :: [Effect card],
-    targetSpecs :: Map SlotName TargetSpec
+    modal :: Modal card
   }
   deriving (Eq, Ord, Show)

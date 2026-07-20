@@ -13,6 +13,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
@@ -24,6 +25,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
+import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.BeginningStep as BeginningStep
@@ -200,6 +202,7 @@ placeOne (srcId, controller, ability) = do
   gs <- State.get
   let (abilId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
+      chosenModes = Target.fillableModes srcId (TriggeredAbility.modal ability) gs
       obj =
         Object.MkObject
           { Object.owner = controller,
@@ -208,7 +211,7 @@ placeOne (srcId, controller, ability) = do
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
             Object.sickness = Sickness.Settled,
-            Object.bindings = Map.empty,
+            Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing chosenModes,
             Object.counters = Map.empty,
             Object.timestamp = ts
           }
