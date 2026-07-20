@@ -54,7 +54,7 @@ gateTests :: Cards.Cards -> Tasty.TestTree
 gateTests cards =
   Tasty.testGroup
     "Gate"
-    [ HU.testCase "CR 608.2c mode 1 (damage) deals 1 to the chosen creature, and no others" $
+    [ HU.testCase "CR 608.2c mode 1 (damage) deals 1 to the chosen creature" $
         let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
             (pikerOid, gs1) = S.addPiker cards S.bob gs0
             answer :: Prompt.Prompt r -> r

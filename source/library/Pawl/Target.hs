@@ -55,7 +55,7 @@ legalRecipients spec gs =
           -- permanents are excluded by Game.isSpell.
           Set.fromList (map Recipient.ToObject (filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)))
         TargetSpec.WallTarget ->
-          -- CR 115.4 / 700.2c: "target Wall" is CreatureTarget's set narrowed to
+          -- CR 115.1a / 700.2c: "target Wall" is CreatureTarget's set narrowed to
           -- creatures whose PROJECTED subtypes (M3c) include Wall (CR 205.3m) --
           -- a creature's subtypes can change under the layer system, so this reads
           -- the projection, never Card.typeLine directly.

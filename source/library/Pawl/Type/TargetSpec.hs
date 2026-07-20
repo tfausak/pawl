@@ -6,7 +6,7 @@ module Pawl.Type.TargetSpec where
 -- and battles grow this).
 data TargetSpec
   = AnyTarget
-  | -- CR 115.4: "target creature" -- a creature on the battlefield, no players.
+  | -- CR 115.1a: "target creature" -- a creature on the battlefield, no players.
     -- The first spec whose legal set can be EMPTY, which falsifies M3a's
     -- CR 601.2c targeting gate (Giant Growth with no creature is uncastable).
     CreatureTarget
@@ -26,7 +26,7 @@ data TargetSpec
     -- the stack, CR 112.1). Narrower than SpellOrPermanentTarget: Cancel cannot
     -- target a permanent or an ability. The first spec that reaches ONLY the stack.
     SpellTarget
-  | -- CR 115.4 / 700.2c: "target Wall" (Chaos Charm) -- a creature whose PROJECTED
+  | -- CR 115.1a / 700.2c: "target Wall" (Chaos Charm) -- a creature whose PROJECTED
     -- subtypes (M3c) include Wall. A specific subtype-restricted spec (the LandTarget
     -- posture); a general "target <subtype>" is future.
     WallTarget

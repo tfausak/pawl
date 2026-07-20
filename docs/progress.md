@@ -602,7 +602,7 @@ end of every entry.
   mode's effects never resolve, CR 608.2c; its fizzle check per CR 608.2b is
   likewise chosen-modes-only). **New Wall machinery**, the falsifier's own
   prerequisite: `Subtype.Wall` (CR 205.3m, a creature type) and
-  `TargetSpec.WallTarget` (CR 115.4/700.2c — a creature whose *projected*
+  `TargetSpec.WallTarget` (CR 115.1a/700.2c — a creature whose *projected*
   subtypes include Wall), with Wall of Stone (0/8 Defender) as a **deterministic
   fixture only** (not in any random-game deck) giving `WallTarget` a legal
   recipient to destroy. Chaos Charm swaps 4-for-4 into the red deck for four Bird
