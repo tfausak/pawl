@@ -18,6 +18,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardCriterion as CardCriterion
@@ -70,6 +71,7 @@ slotsOf effect = case effect of
   Effect.Mill slot _ -> Set.singleton slot
   Effect.Discard slot _ -> Set.singleton slot
   Effect.Create _ _ -> Set.empty
+  Effect.Prevent _ _ -> Set.empty
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -93,6 +95,7 @@ readsX = any effectReadsX
       Effect.Mill _ quantity -> quantity == Quantity.Type.X
       Effect.Discard _ quantity -> quantity == Quantity.Type.X
       Effect.Create quantity _ -> quantity == Quantity.Type.X
+      Effect.Prevent _ _ -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -112,6 +115,7 @@ manaProduced effect = case effect of
   Effect.Mill {} -> Nothing
   Effect.Discard {} -> Nothing
   Effect.Create {} -> Nothing
+  Effect.Prevent _ _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -131,6 +135,7 @@ searchesLibrary effect = case effect of
   Effect.Mill {} -> False
   Effect.Discard {} -> False
   Effect.Create {} -> False
+  Effect.Prevent _ _ -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -171,6 +176,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Discard {} -> effect
   -- A text-changer does not reach a token's embedded card here (spec section 8).
   Effect.Create _ _ -> effect
+  Effect.Prevent _ _ -> effect
 
 -- A resolving spell's PROJECTED effects: its printed effects with every
 -- text-change affecting it applied (CR 612). This is read-point 3 of the
@@ -423,6 +429,11 @@ applyEffect source controller bound legality chosen effect = case effect of
             -- controller (CR 111.2). Each createToken mints a distinct object.
             State.modify' (\g -> List.foldl' (\g1 _ -> Event.createToken controller card g1) g [1 .. n])
       _ -> pure ()
+  Effect.Prevent duration prevention ->
+    -- CR 615.3: install the shield; Event.applyPreventions consults it at each
+    -- damage funnel until cleanup drops it (CR 514.2). Targetless and unprompted.
+    State.modify' $ \gs ->
+      gs {GameState.preventions = ActivePrevention.MkActivePrevention prevention duration : GameState.preventions gs}
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

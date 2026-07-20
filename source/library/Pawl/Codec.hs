@@ -33,6 +33,7 @@ import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Power as Power
+import qualified Pawl.Type.Prevention as Prevention
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
@@ -248,6 +249,16 @@ jsonToDuration =
       (Text.pack "Indefinite", Duration.Indefinite)
     ]
 
+preventionToJson :: Prevention.Prevention -> Value
+preventionToJson p = nullary . Text.pack $ case p of
+  Prevention.PreventAllCombatDamage -> "PreventAllCombatDamage"
+
+jsonToPrevention :: Value -> Either Text Prevention.Prevention
+jsonToPrevention =
+  decodeNullary
+    (Text.pack "Prevention")
+    [(Text.pack "PreventAllCombatDamage", Prevention.PreventAllCombatDamage)]
+
 additionalCostToJson :: AdditionalCost.AdditionalCost -> Value
 additionalCostToJson a = nullary . Text.pack $ case a of
   AdditionalCost.TapSelf -> "TapSelf"
@@ -460,6 +471,7 @@ effectToJson e = case e of
   Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.Create q c -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
+  Effect.Prevent d p -> Json.tagged (Text.pack "Prevent") (Just (Array [durationToJson d, preventionToJson p]))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
 jsonToEffect value = do
@@ -490,6 +502,9 @@ jsonToEffect value = do
     "Create" -> case mv of
       Just (Array [q, c]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c
       _ -> Left (Text.pack "Create expects [Quantity, Card]")
+    "Prevent" -> case mv of
+      Just (Array [d, p]) -> Effect.Prevent <$> jsonToDuration d <*> jsonToPrevention p
+      _ -> Left (Text.pack "Prevent expects [Duration, Prevention]")
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------

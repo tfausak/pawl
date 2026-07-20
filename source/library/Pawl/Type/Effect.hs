@@ -4,6 +4,7 @@ import Pawl.Type.CardCriterion (CardCriterion)
 import Pawl.Type.Duration (Duration)
 import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.Modification (Modification)
+import Pawl.Type.Prevention (Prevention)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Zone (Zone)
@@ -83,4 +84,9 @@ data Effect card
     -- Resolve.applyEffect via Event.createToken. NOT a copy-token (CR 707) and NOT a
     -- predefined token (CR 111.10): given, not derived.
     Create Quantity card
+  | -- CR 615.3: install a floating prevention effect for a duration. Fog =
+    -- Prevent UntilEndOfTurn PreventAllCombatDamage. Targetless (Fog watches a
+    -- class of events, not a chosen object). Resolve stores it into
+    -- GameState.preventions; Event.applyPreventions applies it.
+    Prevent Duration Prevention
   deriving (Eq, Ord, Show)

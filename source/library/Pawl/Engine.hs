@@ -170,6 +170,7 @@ runTurnBasedActions phase = do
       -- simultaneously.
       State.modify' Damage.removeAllDamage
       State.modify' Projection.dropEndOfTurnEffects
+      State.modify' Event.dropEndOfTurnPreventions
     _ -> pure ()
 
 -- Ask the priority holder for an action until every still-playing player has

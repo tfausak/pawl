@@ -12,6 +12,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -416,7 +417,20 @@ resolveTests cards =
               -- battlefield also holds alice's 2 Mountains, so filter by name/creature.
               HU.assertEqual "two Goblin tokens on the battlefield" 2 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after)
               HU.assertEqual "alice controls two creatures (the tokens)" 2 (S.creaturesInPlay S.alice after)
-              HU.assertEqual "Dragon Fodder went to the graveyard (CR 608.2n)" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+              HU.assertEqual "Dragon Fodder went to the graveyard (CR 608.2n)" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 615 Fog prevents combat damage but not spell damage (the gate)" $
+        let base = S.landsInPlay (Cards.forestPrinting cards) 1
+            (victim, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+            (gs1, fogId) = S.handOne (Cards.fogPrinting cards) gs0
+            cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice fogId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            combat = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat] resolved
+            spell = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat] resolved
+         in do
+              HU.assertEqual "Fog installed one prevention" 1 (length (GameState.preventions resolved))
+              HU.assertEqual "combat damage prevented (the cancel shape)" (Just 0) (S.damageOf victim combat)
+              -- The falsifier: a tag-blind Fog would also blunt this spell damage.
+              HU.assertEqual "spell damage untouched (Noncombat)" (Just 2) (S.damageOf victim spell)
     ]
 
 findFirst :: Prompt.Prompt r -> r
