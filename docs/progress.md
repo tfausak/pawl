@@ -467,3 +467,36 @@ end of every entry.
   until the first real **−N/−N** ability. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-19-m4d-prevention-regeneration.md` and
   `docs/superpowers/plans/2026-07-19-m4d-prevention-regeneration.md`.
+- **M4e is complete** (counter target spell — the first effect that removes a spell
+  from the stack. **Gate: Cancel** (`{1}{U}{U}` Instant, "Counter target spell"):
+  the falsifier is a Cancel whose target left the stack before it resolves, which
+  must **fizzle** (CR 608.2b) — a path M3a's resolution-time re-validation already
+  builds, so the milestone proves the seam rather than rebuilding it. **One opcode**
+  `Effect.Counter SlotName` — a distinct keyword action (the M4b `Destroy`
+  precedent; **Counter is CR 701.6**, not 701.5 which is "Cast") — executed by
+  `Resolve.applyEffect` through a **new `Event.counter` funnel** (CR 701.6a: remove
+  from the stack, put into the owner's graveyard via `changeZone` — so Rest in
+  Peace's redirect and CR 400.7's new incarnation compose for free, verified by a
+  RiP-exile test; ungated, mirroring `Event.destroy`). **One target spec**
+  `TargetSpec.SpellTarget` (CR 115 "target spell" — stack objects that are spells
+  only), read via the new **`Game.isSpell`** classification: an object is a spell
+  iff it is **on the stack** (`Object.zone == Stack`) **and** `Source.OfCard`
+  (**CR 112.1**, not 111.1 which is Tokens) — a classification of the object's kind,
+  not a card's identity, like `Card.isPermanent`. The zone check keeps the function
+  honestly named rather than merely correct because `Target` pre-filters to the
+  stack (a review catch). Cancel is a **blue deterministic fixture** (no random-game
+  deck, the M3d posture); `cancel.json` joins `allPrintings` for the honesty
+  round-trip. Gate + falsifier are gameplay-level tests through the cast/resolve
+  pipeline (the racing-counters scenario proves a spell can target a spell and that
+  the second Cancel fizzles when its target is gone, moved exactly once).
+  `Pawl.Resolve` stays the sole `case effect of` home; `Event` the sole funnel home;
+  `Target` the sole targeting-legality home. **No new prompt/response** (Cancel
+  targets through the existing `ChooseTargets`; countering is unprompted). **Named
+  elisions/expiries**: `Event.counter` is ungated — "can't be countered" (CR 701.6),
+  conditional counters ("counter unless pay", Mana Leak/Daze), a distinct "was
+  countered" event and its trigger, countering **abilities** (Stifle — needs an
+  `AbilityTarget`), alternative counter destinations (counter-and-exile, Remand),
+  and restricted counters ("counter target spell with mana value N") are each
+  deferred to the first card that needs them. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-19-m4e-counter-spell-design.md` and
+  `docs/superpowers/plans/2026-07-19-m4e-counter-spell.md`.

@@ -59,7 +59,7 @@ No new library or test module, so **no `pawl.cabal` change** and no `other-modul
 **Interfaces:**
 - Produces: `TargetSpec.SpellTarget`; `Game.isSpell :: ObjectId -> GameState -> Bool`; `Target.legalRecipients` handles `SpellTarget` returning `Set (Recipient.ToObject oid)` for stack spells; `Support.spellOnStack :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)`.
 
-- [ ] **Step 1: Write the failing test (Game.isSpell in GameSpec)**
+- [x] **Step 1: Write the failing test (Game.isSpell in GameSpec)**
 
 Add to the `objectFactTests` list in `source/test-suite/Pawl/GameSpec.hs` (after the token test at line 68, before the Mountain test):
 
@@ -78,12 +78,12 @@ Add to the `objectFactTests` list in `source/test-suite/Pawl/GameSpec.hs` (after
 
 (This test consumes `S.spellOnStack` from Step 5 — add that fixture first, then both tests.)
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -i "isSpell\|not in scope"`
 Expected: FAIL — `Variable not in scope: Game.isSpell`.
 
-- [ ] **Step 3: Add `Game.isSpell`**
+- [x] **Step 3: Add `Game.isSpell`**
 
 In `source/library/Pawl/Game.hs`, after `controllerOf` (near line 90), add:
 
@@ -106,12 +106,12 @@ isSpell oid gs = case lookupObject oid gs of
 
 (`Game.hs` already imports `Object`, `Source`, `Zone`, and defines `lookupObject` — no new imports.)
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `cabal test --test-options='-p "isSpell"' 2>&1 | tail -5`
 Expected: PASS (1 test).
 
-- [ ] **Step 5: Write the failing test (SpellTarget legality in ResolveSpec)**
+- [x] **Step 5: Write the failing test (SpellTarget legality in ResolveSpec)**
 
 First add the shared fixture to `source/test-suite/Pawl/Support.hs` (near `handOne`), so both this test and later tasks can place a spell on the stack:
 
@@ -156,12 +156,12 @@ Then add to the `targetTests` list in `source/test-suite/Pawl/ResolveSpec.hs` (a
               HU.assertBool "the battlefield permanent is not a legal target" (not (Set.member (Recipient.ToObject permId) legal)),
 ```
 
-- [ ] **Step 6: Run it to verify it fails**
+- [x] **Step 6: Run it to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -i "SpellTarget\|not in scope"`
 Expected: FAIL — `Not in scope: data constructor 'TargetSpec.SpellTarget'`.
 
-- [ ] **Step 7: Add the `SpellTarget` constructor**
+- [x] **Step 7: Add the `SpellTarget` constructor**
 
 In `source/library/Pawl/Type/TargetSpec.hs`, add before the closing `deriving`:
 
@@ -172,7 +172,7 @@ In `source/library/Pawl/Type/TargetSpec.hs`, add before the closing `deriving`:
     SpellTarget
 ```
 
-- [ ] **Step 8: Add the `Target.legalRecipients` arm**
+- [x] **Step 8: Add the `Target.legalRecipients` arm**
 
 In `source/library/Pawl/Target.hs`, add to the `case spec of` (after the `CreatureOrEnchantmentTarget` arm, ~line 51):
 
@@ -183,7 +183,7 @@ In `source/library/Pawl/Target.hs`, add to the `case spec of` (after the `Creatu
           Set.fromList (map Recipient.ToObject (filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)))
 ```
 
-- [ ] **Step 9: Add the `Codec` arms for `SpellTarget`**
+- [x] **Step 9: Add the `Codec` arms for `SpellTarget`**
 
 In `source/library/Pawl/Codec.hs`, add to `targetSpecToJson` (after line 284):
 
@@ -197,17 +197,17 @@ and to the `jsonToTargetSpec` list (after line 294, keeping the trailing comma c
       (Text.pack "SpellTarget", TargetSpec.SpellTarget),
 ```
 
-- [ ] **Step 10: Run the tests to verify they pass**
+- [x] **Step 10: Run the tests to verify they pass**
 
 Run: `cabal test --test-options='-p "SpellTarget || isSpell"' 2>&1 | tail -5`
 Expected: PASS.
 
-- [ ] **Step 11: Full build + hooks**
+- [x] **Step 11: Full build + hooks**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && git add -A && hooky fix && git add -A && hooky run`
 Expected: warning-clean build, hooks pass.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add -A
@@ -231,7 +231,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Consumes: `Support.spellOnStack` (Task 1).
 - Produces: `Effect.Counter :: SlotName -> Effect card`; `Event.counter :: ObjectId -> GameState -> GameState`; `applyEffect` executes `Counter` via `Event.counter`.
 
-- [ ] **Step 1: Write the failing test (Event.counter funnel + RiP compose)**
+- [x] **Step 1: Write the failing test (Event.counter funnel + RiP compose)**
 
 Add a new group to `source/test-suite/Pawl/EventSpec.hs`. First add the group's tests (place near the zone-change tests, e.g. after the `CR 608.2n ... resolving spell is exiled` test at line ~68):
 
@@ -254,12 +254,12 @@ Add a new group to `source/test-suite/Pawl/EventSpec.hs`. First add the group's 
 
 (EventSpec already imports `Event`, `Game`, `Zone`, `GameState`, `Setup`, `S`, `Cards`. `S.creaturesInPlay` and `S.spellOnStack` are Support helpers.)
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -i "Event.counter\|not in scope"`
 Expected: FAIL — `Variable not in scope: Event.counter`.
 
-- [ ] **Step 3: Add `Event.counter`**
+- [x] **Step 3: Add `Event.counter`**
 
 In `source/library/Pawl/Event.hs`, after `destroy`/`regenerate` (near line 132), add:
 
@@ -278,12 +278,12 @@ counter oid gs = case Game.lookupObject oid gs of
 
 (`Event.hs` already imports `Game`, `Zone`, and defines `changeZone` — no new imports.)
 
-- [ ] **Step 4: Run the Event tests to verify they pass**
+- [x] **Step 4: Run the Event tests to verify they pass**
 
 Run: `cabal test --test-options='-p "Event.counter || countered spell"' 2>&1 | tail -5`
 Expected: PASS (2 tests).
 
-- [ ] **Step 5: Write the failing test's next half — add the `Counter` opcode (compiler-driven)**
+- [x] **Step 5: Write the failing test's next half — add the `Counter` opcode (compiler-driven)**
 
 There is no isolated unit test for the opcode plumbing (it is exercised end-to-end by the Task 4 gate); the compiler's exhaustiveness is the check. Add the constructor to `source/library/Pawl/Type/Effect.hs`, before the closing `deriving` (after `RegenerateSelf`, ~line 97):
 
@@ -296,12 +296,12 @@ There is no isolated unit test for the opcode plumbing (it is exercised end-to-e
     Counter SlotName
 ```
 
-- [ ] **Step 6: Run the build to see every exhaustive case that must gain a `Counter` arm**
+- [x] **Step 6: Run the build to see every exhaustive case that must gain a `Counter` arm**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -iE "Pattern match|non-exhaustive|Counter"`
 Expected: FAIL — non-exhaustive-pattern errors in `Resolve.slotsOf`, `Resolve.readsX` (`effectReadsX`), `Resolve.manaProduced`, `Resolve.searchesLibrary`, `Resolve.rewriteEffect`, `Resolve.applyEffect`, and `Codec.effectToJson`/`jsonToEffect`.
 
-- [ ] **Step 7: Add the five `Resolve` classifier arms + `applyEffect` arm**
+- [x] **Step 7: Add the five `Resolve` classifier arms + `applyEffect` arm**
 
 In `source/library/Pawl/Resolve.hs`:
 
@@ -346,7 +346,7 @@ In `source/library/Pawl/Resolve.hs`:
 
 (`Resolve.hs` already imports `Event`, `State`, `Map`, `Set`, and defines `recipientObject` — no new imports.)
 
-- [ ] **Step 8: Add the `Codec` effect arms for `Counter`**
+- [x] **Step 8: Add the `Codec` effect arms for `Counter`**
 
 In `source/library/Pawl/Codec.hs`, add to `effectToJson` (after the `Destroy` arm, line 470):
 ```haskell
@@ -358,12 +358,12 @@ and to `jsonToEffect`'s tag dispatch (after the `Destroy` arm, line 494):
     "Counter" -> withValue mv (fmap Effect.Counter . jsonToSlotName)
 ```
 
-- [ ] **Step 9: Run the build + Event tests to verify green**
+- [x] **Step 9: Run the build + Event tests to verify green**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "Event.counter || countered spell"' 2>&1 | tail -5`
 Expected: warning-clean build; 2 tests PASS.
 
-- [ ] **Step 10: Hooks + Commit**
+- [x] **Step 10: Hooks + Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -385,7 +385,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Consumes: `Effect.Counter` (Task 2), `TargetSpec.SpellTarget` (Task 1).
 - Produces: `Cards.cancelPrinting :: Cards -> Printing.Printing`; `cancel` present in `Cards.allPrintings`.
 
-- [ ] **Step 1: Write the failing test (Cancel parses to the right opcode)**
+- [x] **Step 1: Write the failing test (Cancel parses to the right opcode)**
 
 Add to `source/test-suite/Pawl/CodecSpec.hs` (in the appropriate `testGroup` list — match the file's existing structure; place beside other per-card assertions):
 
@@ -405,12 +405,12 @@ Add to `source/test-suite/Pawl/CodecSpec.hs` (in the appropriate `testGroup` lis
 
 Ensure `CodecSpec.hs` imports `Pawl.Type.Effect as Effect`, `Pawl.Type.SlotName as SlotName`, `Pawl.Type.TargetSpec as TargetSpec`, `Pawl.Type.Card as Card`, `Data.Map.Strict as Map`, `Data.Text as Text`, `Pawl.Type.Printing as Printing` — add any missing.
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -iE "cancelPrinting|not in scope"`
 Expected: FAIL — `cancelPrinting` is not a field of `Cards`.
 
-- [ ] **Step 3: Create `data/cards/cancel.json`**
+- [x] **Step 3: Create `data/cards/cancel.json`**
 
 Write this exact content to `data/cards/cancel.json` (Scryfall: `{1}{U}{U}` Instant, "Counter target spell." — verified 2026-07-19). The `manaCost` encoding matches `murder.json` (generic + two colored); `Blue` matches `magical-hack.json`:
 
@@ -418,7 +418,7 @@ Write this exact content to `data/cards/cancel.json` (Scryfall: `{1}{U}{U}` Inst
 {"name":"Cancel","manaCost":[{"type":"Generic","value":1},{"type":"OfType","value":{"type":"Colored","value":{"type":"Blue"}}},{"type":"OfType","value":{"type":"Colored","value":{"type":"Blue"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Instant"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"effects":[{"type":"Counter","value":"spell"}],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"targetSpecs":[{"slot":"spell","spec":{"type":"SpellTarget"}}]}
 ```
 
-- [ ] **Step 4: Wire `cancelPrinting` into `Cards.hs`**
+- [x] **Step 4: Wire `cancelPrinting` into `Cards.hs`**
 
 In `source/test-suite/Pawl/Cards.hs`, make four edits:
 
@@ -449,12 +449,12 @@ In `source/test-suite/Pawl/Cards.hs`, make four edits:
 
 Do **not** add Cancel to `blueDeck` or any matchup (fixture-only, per Global Constraints).
 
-- [ ] **Step 5: Run the test + round-trip to verify pass**
+- [x] **Step 5: Run the test + round-trip to verify pass**
 
 Run: `cabal test --test-options='-p "Cancel || round-trip || allPrintings"' 2>&1 | tail -8`
 Expected: PASS — the new assertion passes, and the existing `allPrintings` honesty round-trip (`jsonToCard . cardToJson`) now includes Cancel and stays green.
 
-- [ ] **Step 6: Full build + hooks + Commit**
+- [x] **Step 6: Full build + hooks + Commit**
 
 ```bash
 cabal build all --enable-tests --enable-benchmarks
@@ -475,7 +475,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Consumes: `Cards.cancelPrinting` (Task 3), `Support.spellOnStack` (Task 1), `Cast.castSpell`, `Stack.resolveTop`, `Engine.runGamePure`, `S.landsInPlay`, `S.handOne`, `Cards.islandPrinting`, `Cards.pikerPrinting`.
 - Produces: gate + falsifier coverage; no new library code.
 
-- [ ] **Step 1: Write the failing gate test**
+- [x] **Step 1: Write the failing gate test**
 
 Add a new `counterTests` group near `fizzleTests` in `source/test-suite/Pawl/ResolveSpec.hs`, with two local helpers and the gate case. First the helpers (top-level, near `twoBoltState`):
 
@@ -521,7 +521,7 @@ counterTests cards =
               HU.assertEqual "stack empty" 0 (length (GameState.stack resolved)),
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -iE "counterTests|not in scope"`
 Expected: FAIL until `counterTests` is wired into the module's `tests` aggregator (and — if Task 3 were skipped — `cancelPrinting`). After wiring, the case should compile; run it:
@@ -529,7 +529,7 @@ Expected: FAIL until `counterTests` is wired into the module's `tests` aggregato
 Run: `cabal test --test-options='-p "Cancel counters a spell"' 2>&1 | tail -5`
 Expected: PASS.
 
-- [ ] **Step 3: Add the falsifier (racing counters) case**
+- [x] **Step 3: Add the falsifier (racing counters) case**
 
 Add to the `counterTests` list (after the gate case), plus the `racingCounters` helper (top-level, near `cancelVictim`):
 
@@ -568,12 +568,12 @@ The case:
 
 (ResolveSpec already imports `Prompt`, `Recipient`, `Map`, `Seq`, `Source`, `Object`, `Zone`, `TapState`, `Sickness`, `Timestamp`, `Game`, `Cast`, `Stack`, `Engine`, `S`, `Cards`, `GameState`, `ObjectId`, `PlayerId`, `Printing` — verify.)
 
-- [ ] **Step 4: Run the falsifier to verify it passes**
+- [x] **Step 4: Run the falsifier to verify it passes**
 
 Run: `cabal test --test-options='-p "already left the stack fizzles"' 2>&1 | tail -5`
 Expected: PASS.
 
-- [ ] **Step 5: Add the RiP composition case (gate suite completeness)**
+- [x] **Step 5: Add the RiP composition case (gate suite completeness)**
 
 Add to the `counterTests` list:
 ```haskell
@@ -591,22 +591,22 @@ Add to the `counterTests` list:
 
 Note: `S.landsInPlay ... 3` seeds alice's board, and `S.addCreature (restInPeacePrinting)` puts Rest in Peace on the battlefield so its replacement is live (Rest in Peace's ETB exile of graveyards does not fire here because it is placed directly, not cast — its static replacement is what redirects the counter). Confirm `S.identityAnswer` needs no extra arms (Cancel targets the sole stack spell via `Set.lookupMin`).
 
-- [ ] **Step 6: Run the whole Counter group**
+- [x] **Step 6: Run the whole Counter group**
 
 Run: `cabal test --test-options='-p "/Counter/"' 2>&1 | tail -8`
 Expected: PASS (4 tests: gate, falsifier, RiP compose — adjust the pattern if it collides with other groups).
 
-- [ ] **Step 7: Run the full suite to confirm no regressions**
+- [x] **Step 7: Run the full suite to confirm no regressions**
 
 Run: `cabal test 2>&1 | tail -15`
 Expected: all suites PASS.
 
-- [ ] **Step 8: Full clean build + hooks**
+- [x] **Step 8: Full clean build + hooks**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks && git add -A && hooky fix && git add -A && hooky run`
 Expected: warning-clean (a clean build surfaces warnings incremental builds hide), hooks pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add -A
@@ -625,7 +625,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:** none (documentation).
 
-- [ ] **Step 1: Append the M4e entry to `docs/progress.md`**
+- [x] **Step 1: Append the M4e entry to `docs/progress.md`**
 
 Add a bullet after the M4d entry, matching the house style (gate card, decision proved, opcodes/types added, named elisions/expiries). Draft:
 
@@ -656,16 +656,16 @@ Add a bullet after the M4d entry, matching the house style (gate card, decision 
   `docs/superpowers/plans/2026-07-19-m4e-counter-spell.md`.
 ```
 
-- [ ] **Step 2: Update `CLAUDE.md`'s "Current work" paragraph**
+- [x] **Step 2: Update `CLAUDE.md`'s "Current work" paragraph**
 
 Change the milestone status line to record M4e complete and name **M4f (counters — +1/+1 as persistent permanent state, layer 7d) as next** (per the design.md §3 M4 table). Add a one-clause summary of M4e mirroring the existing M4a–M4d clauses (gate Cancel, `Effect.Counter`/`Event.counter`/`SpellTarget`/`Game.isSpell`).
 
-- [ ] **Step 3: Verify the progress-check grep is satisfiable**
+- [x] **Step 3: Verify the progress-check grep is satisfiable**
 
 Run: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-19-m4e-counter-spell.md`
 Expected: `0` once every step is ticked. (This is the plan's own done-check.)
 
-- [ ] **Step 4: Hooks + Commit**
+- [x] **Step 4: Hooks + Commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
