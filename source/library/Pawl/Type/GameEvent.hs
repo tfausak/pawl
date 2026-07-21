@@ -32,7 +32,8 @@ data GameEvent
     -- state-based action reads, watermarked rather than drained.
     DamageDealt DamageEvent
   | -- CR 603.2b: a phase or step began, on whose turn (the active player). What a
-    -- "at the beginning of each end step" trigger and a CR 603.7 delayed ability
-    -- both match against.
+    -- "at the beginning of each end step" trigger matches against (and, once P4
+    -- Task 6 adds delayed abilities, what a CR 603.7 delayed ability will match
+    -- against too -- that consumer does not exist yet).
     StepBegan Phase PlayerId
   deriving (Eq, Ord, Show)

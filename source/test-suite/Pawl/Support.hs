@@ -690,8 +690,8 @@ damageEventsOf gs = Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.ev
 zoneChangesOf :: GameState.GameState -> [ZoneChange.ZoneChange]
 zoneChangesOf gs = Maybe.mapMaybe Event.movedOf (Foldable.toList (GameState.events gs))
 
--- The characteristics of nothing: what Projection.baseCharacteristics yields for
--- an id with no card. The filler snapshot for a hand-built GameEvent.Moved whose
+-- The characteristics of nothing: Projection.project on an id with no card in
+-- Setup.emptyGame. The filler snapshot for a hand-built GameEvent.Moved whose
 -- payload no assertion reads.
 emptyCharacteristics :: PC.ProjectedCharacteristics
 emptyCharacteristics = Projection.project (ObjectId.MkObjectId 999) (Setup.emptyGame bothPlayers)
