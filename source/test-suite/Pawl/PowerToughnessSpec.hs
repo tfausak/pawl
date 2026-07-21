@@ -50,7 +50,7 @@ tests cards =
         -- THE FALSIFIER for evaluating a printed * once, at the seed or at entry:
         -- nothing touches the Goyf, and its P/T moves because a graveyard did.
         -- Empty graveyards -> 0 card types -> 0/1. Fog resolves and is put into
-        -- its owner's graveyard (CR 608.2m), adding the Instant type.
+        -- its owner's graveyard (CR 608.2n), adding the Instant type.
         --
         -- Fog, NOT Lightning Bolt: Bolt targets, S.identityAnswer would aim it at
         -- the only creature on the board, and 3 damage would kill the 0/1 Goyf

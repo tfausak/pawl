@@ -502,6 +502,15 @@ project oid gs = projectFrom (gather gs) oid gs
 --
 -- setPT (not a bare assignment) so an unevaluable quantity leaves the value
 -- alone, the powerOf posture used throughout this module.
+--
+-- NOTE: CR 208.2a has a stricter rule for that case -- "If the ability needs to
+-- use a number that can't be determined, including inside a calculation, use 0
+-- instead of that number" -- which neither setPT nor a bare assignment
+-- implements. Unreachable in the current pool: seedCharacteristicPT requires a
+-- printed P/T box, and after substituteStar every CDA quantity in the pool is
+-- total (a Count, or a Plus of a Literal and a Count). EXPIRES with the first
+-- CDA whose quantity can fail to evaluate; it is the sibling of the CR 208.5
+-- deferral already recorded in the P3b spec, section 8.
 applyCharacteristicPT :: GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyCharacteristicPT gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
