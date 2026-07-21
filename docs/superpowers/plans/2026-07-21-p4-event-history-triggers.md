@@ -986,7 +986,7 @@ import Pawl.Type.TriggeredAbility (TriggeredAbility)
 -- CR 603.3: an ability that has TRIGGERED but is not yet on the stack. Gathered
 -- by Pawl.Event at the CR 117.5 boundary, ordered and placed by Pawl.Engine.
 --
--- `source` is the object the ability belongs to (CR 608.2g's effect source);
+-- `source` is the object the ability belongs to (CR 113.7's source of the ability);
 -- `controller` is who controls the ability (CR 603.3a). `bindings` is the
 -- environment CAPTURED when a CR 603.7 delayed ability was armed -- how "it" and
 -- "that card" (CR 603.7c) are remembered. Empty for an event- or state-matched
@@ -1221,7 +1221,7 @@ CR 701.21's keyword action, plus the mechanism that makes "this creature" expres
 - Consumes: `PendingTrigger` and `Engine.placeOne` (Task 2).
 - Produces: `Effect.Sacrifice SlotName`; `Pawl.Binding.triggerSource :: SlotName` (the text `"self"`), `Pawl.Binding.setTriggerSource :: ObjectId -> Map SlotName Binding -> Map SlotName Binding`; `Pawl.Event.sacrifice :: ObjectId -> GameState -> GameState`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/TriggerSpec.hs` (and to the `tests` list):
 
@@ -1254,8 +1254,8 @@ sacrificeTests cards =
         let (card, gs) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             after = Event.sacrifice card gs
          in HU.assertEqual "the library card is untouched" gs after,
-      -- CR 608.2g / 603.7c: "this creature" is a slot read, filled at placement.
-      HU.testCase "CR 608.2g a placed trigger binds its source into the reserved self slot" $
+      -- CR 113.7 / 603.7c: "this creature" is a slot read, filled at placement.
+      HU.testCase "CR 113.7 a placed trigger binds its source into the reserved self slot" $
         let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
             gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
@@ -1289,19 +1289,19 @@ Add to `CodecSpec.hs`'s "effect" group:
             roundTrip "e5" Codec.effectToJson Codec.jsonToEffect (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "self"))),
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Event.sacrifice`, `Binding.triggerSource` and `Effect.Sacrifice` are not in scope.
 
-- [ ] **Step 3: Add the opcode, the funnel, and the reserved slot**
+- [x] **Step 3: Add the opcode, the funnel, and the reserved slot**
 
 In `source/library/Pawl/Type/Effect.hs`, add a constructor (after `Destroy`, whose comment it contrasts with):
 
 ```haskell
   | -- CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction: CR 701.21a
-    -- says so explicitly, so this consults neither indestructible (CR 700.4) nor a
+    -- says so explicitly, so this consults neither indestructible (CR 702.12b) nor a
     -- regeneration shield (CR 701.19a), and is therefore not a reuse of Destroy.
     --
     -- One opcode, not a targetless SacrificeSelf plus a slotted variant on
@@ -1315,7 +1315,7 @@ In `source/library/Pawl/Type/Effect.hs`, add a constructor (after `Destroy`, who
 In `source/library/Pawl/Binding.hs`, add next to `copySource`:
 
 ```haskell
--- CR 608.2g / 603.7c: the reserved slot under which a triggered ability's SOURCE
+-- CR 113.7 / 603.7c: the reserved slot under which a triggered ability's SOURCE
 -- object is bound as the ability is placed, so "this creature" / "this
 -- enchantment" is a slot read rather than a self-referential opcode. No card's
 -- targetSpecs may name it (the D4 lint enforces this): a source is not a target.
@@ -1338,7 +1338,7 @@ In `source/library/Pawl/Event.hs`, add beside `destroy` and `counter`:
 -- CR 701.21/701.21a: the single sacrifice funnel. The permanent is put into its
 -- OWNER's graveyard through changeZone (so Rest in Peace's redirect and a token's
 -- CR 704.5d cease-to-exist still compose), and -- unlike Event.destroy -- with no
--- indestructible gate (CR 700.4) and no regeneration shield consulted (CR
+-- indestructible gate (CR 702.12b) and no regeneration shield consulted (CR
 -- 701.19a): CR 701.21a says sacrificing is not destroying. CR 701.21a also
 -- restricts it to permanents on the battlefield, so anything else is a no-op.
 sacrifice :: ObjectId -> GameState -> GameState
@@ -1350,7 +1350,7 @@ sacrifice oid gs = case Game.lookupObject oid gs of
       else gs
 ```
 
-- [ ] **Step 4: Teach `Resolve` the opcode, and exempt reserved slots from CR 608.2b**
+- [x] **Step 4: Teach `Resolve` the opcode, and exempt reserved slots from CR 608.2b**
 
 In `source/library/Pawl/Resolve.hs`, add the `Sacrifice` arm to all five classification functions, in each case beside `Destroy`:
 
@@ -1393,18 +1393,18 @@ Then change the legality computation in **both** `resolveSpell` and `resolveEffe
 
 (In `resolveSpell` these are `let` bindings inside the existing `let … in if fizzles`; in `resolveEffects` they are inside the existing `let … in do`. Keep each in place, only replacing the three bindings.)
 
-- [ ] **Step 5: Stamp the reserved slot at placement**
+- [x] **Step 5: Stamp the reserved slot at placement**
 
 In `source/library/Pawl/Engine.hs`, change `placeOne`'s final `State.modify'` so the source binding rides alongside the chosen targets:
 
 ```haskell
-      -- CR 608.2g / 603.7c: the ability's SOURCE is bound under the reserved slot
+      -- CR 113.7 / 603.7c: the ability's SOURCE is bound under the reserved slot
       -- as it is placed, so "this creature" resolves as an ordinary slot read even
       -- after the source has left the battlefield.
       State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen Map.empty Nothing chosenModes)}) abilId (GameState.objects g)})
 ```
 
-- [ ] **Step 6: Add the codec arm**
+- [x] **Step 6: Add the codec arm**
 
 In `source/library/Pawl/Codec.hs`, add to `effectToJson` (beside `Destroy`):
 
@@ -1418,12 +1418,12 @@ and to `jsonToEffect`:
     "Sacrifice" -> withValue mv (fmap Effect.Sacrifice . jsonToSlotName)
 ```
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. The Rest in Peace whole-card test in `EventSpec.hs` is the regression for the CR 608.2b change: its ETB has no target specs and must still resolve.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add source/library/Pawl/Type/Effect.hs source/library/Pawl/Binding.hs source/library/Pawl/Event.hs source/library/Pawl/Resolve.hs source/library/Pawl/Engine.hs source/library/Pawl/Codec.hs source/test-suite/Pawl/TriggerSpec.hs source/test-suite/Pawl/CardSpec.hs source/test-suite/Pawl/CodecSpec.hs
