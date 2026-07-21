@@ -35,4 +35,9 @@ data Modification
     -- there is deliberately no AddColor constructor. SetColor with an empty set
     -- is "becomes colourless" (CR 105.2c).
     SetColor (Set Color)
+  | -- layer 7d, CR 613.4d: switch this object's power and toughness. Takes the
+    -- value of power and applies it to toughness, and vice versa -- so it acts on
+    -- whatever 7a, 7b and 7c already produced, not on the printed box. Carries no
+    -- payload: two applications return the object to normal for free.
+    SwitchPowerToughness
   deriving (Eq, Ord, Show)

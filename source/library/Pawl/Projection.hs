@@ -60,6 +60,7 @@ layer m = case m of
   Modification.ChangeSubtypeWord _ _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
   Modification.SetColor _ -> Layer.Color
+  Modification.SwitchPowerToughness -> Layer.SwitchPT
 
 -- Apply one modification to characteristics-in-progress. THE ONE applier
 -- (Resolve : Effect :: Projection : Modification). P/T quantities are evaluated
@@ -125,6 +126,10 @@ applyModification gs oid m pc = case m of
   Modification.SetColor cs ->
     -- CR 105.3: the new colours replace all previous ones.
     pc {PC.colors = cs}
+  -- CR 613.4d: "take the value of power and apply it to the creature's toughness,
+  -- and take the value of toughness and apply it to the creature's power."
+  Modification.SwitchPowerToughness ->
+    pc {PC.power = PC.toughness pc, PC.toughness = PC.power pc}
 
 -- CR 613.4b: layer 7b SETS base P/T to a specific value -- it ESTABLISHES P/T, so
 -- an object with no printed P/T that is set (an Opalescence-animated enchantment)
@@ -376,6 +381,7 @@ freezeQuantities gs oid you m =
         Modification.ChangeSubtypeWord _ _ -> m
         Modification.SetController _ -> m
         Modification.SetColor _ -> m
+        Modification.SwitchPowerToughness -> m
 
 -- Every SetLandSubtype effect in the game, each with its source and affected set
 -- (from stored effects and battlefield permanents' static abilities). This is a

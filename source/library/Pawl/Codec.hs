@@ -496,6 +496,7 @@ modificationToJson m = case m of
   Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array [subtypeToJson a, subtypeToJson b]))
   Modification.SetController p -> Json.tagged (Text.pack "SetController") (Just (playerIdToJson p))
   Modification.SetColor cs -> Json.tagged (Text.pack "SetColor") (Just (setTo colorToJson cs))
+  Modification.SwitchPowerToughness -> nullary (Text.pack "SwitchPowerToughness")
 
 jsonToModification :: Value -> Either Text Modification.Modification
 jsonToModification value = do
@@ -514,6 +515,7 @@ jsonToModification value = do
     "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> jsonToSubtype x <*> jsonToSubtype y
     "SetController" -> withValue mv (fmap Modification.SetController . jsonToPlayerId)
     "SetColor" -> withValue mv (fmap Modification.SetColor . setFrom jsonToColor)
+    "SwitchPowerToughness" -> Right Modification.SwitchPowerToughness
     _ -> Left (Text.pack "unknown Modification: " <> t)
 
 withValue :: Maybe Value -> (Value -> Either Text a) -> Either Text a

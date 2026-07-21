@@ -5,19 +5,42 @@
 -- the resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
 
+import qualified Data.Set as Set
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.Duration as Duration
+import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
+
+-- Append a stored continuous effect affecting exactly `oid`. Object id 996 is a
+-- stand-in source: nothing in these tests reads the source's own characteristics.
+withEffect :: ObjectId.ObjectId -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withEffect oid m gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = ObjectId.MkObjectId 996,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.modification = m,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
@@ -175,5 +198,100 @@ tests cards =
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in do
               HU.assertEqual "bob holds nothing" 0 (S.handSize S.bob after)
-              HU.assertEqual "the pump is alice's two, not bob's zero" (Just 4) (Projection.powerOf bobsPiker after)
+              HU.assertEqual "the pump is alice's two, not bob's zero" (Just 4) (Projection.powerOf bobsPiker after),
+      HU.testCase "CR 613.4d the switch takes the value AFTER layers 7a-7c" $
+        -- THE ORDERING FALSIFIER, and the reason Tarmogoyf and Twisted Image are in
+        -- the same phase: a symmetric fixture (a +1/+1 counter, Giant Growth)
+        -- COMMUTES with the switch and proves nothing. Tarmogoyf's N/N+1 is the
+        -- pool's only asymmetric P/T, so it is the only thing that can witness the
+        -- order. Two card types in graveyards -> a 2/3 -> switched, a 3/2.
+        -- Switching before 7a would switch Nothing/Nothing and the CDA would then
+        -- write 2/3 straight back over it.
+        let base = S.landsInPlay (Cards.islandPrinting cards) 1
+            (_, g1) = S.addGraveyardCard (Cards.lightningBoltPrinting cards) S.alice base
+            (_, g2) = S.addGraveyardCard (Cards.pikerPrinting cards) S.alice g1
+            (goyfId, board) = S.addCreature (Cards.tarmogoyfPrinting cards) S.alice g2
+            (gs, tiId) = S.handOne (Cards.twistedImagePrinting cards) board
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice tiId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "before: a 2/3" (Just 2) (Projection.powerOf goyfId board)
+              HU.assertEqual "before: toughness 3" (Just 3) (Projection.toughnessOf goyfId board)
+              HU.assertEqual "after: power is the old toughness" (Just 3) (Projection.powerOf goyfId after)
+              HU.assertEqual "after: toughness is the old power" (Just 2) (Projection.toughnessOf goyfId after),
+      HU.testCase "CR 613.4d a switched CDA still tracks the graveyards" $
+        -- After the switch, a THIRD distinct card type lands in a graveyard, and
+        -- the Goyf's CDA (still recomputed live every projection, CR 604.3) must
+        -- pick it up underneath the still-active switch. Divination (Sorcery), not
+        -- Giant Growth: Giant Growth is an Instant, the same type Lightning Bolt
+        -- already contributed, so it would add no NEW type and this fixture would
+        -- silently test nothing beyond the previous case.
+        let base = S.landsInPlay (Cards.islandPrinting cards) 1
+            (_, g1) = S.addGraveyardCard (Cards.lightningBoltPrinting cards) S.alice base
+            (_, g2) = S.addGraveyardCard (Cards.pikerPrinting cards) S.alice g1
+            (goyfId, board) = S.addCreature (Cards.tarmogoyfPrinting cards) S.alice g2
+            (gs, tiId) = S.handOne (Cards.twistedImagePrinting cards) board
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice tiId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            (_, later) = S.addGraveyardCard (Cards.divinationPrinting cards) S.bob after
+         in do
+              HU.assertEqual "a third card type: 3/4 switched is 4/3, power" (Just 4) (Projection.powerOf goyfId later)
+              HU.assertEqual "and toughness" (Just 3) (Projection.toughnessOf goyfId later),
+      HU.testCase "CR 613.4d 2021-03-19 the switch applies last regardless of WHEN it began" $
+        -- Gatherer ruling on Twisted Image (WotC, 2021-03-19): "Effects that switch
+        -- a creature's power and toughness apply after all other effects,
+        -- REGARDLESS OF WHEN THOSE EFFECTS BEGAN TO APPLY. For instance, if you
+        -- target a 1/2 creature then give it +2/+0 later in the turn, it's a 2/3
+        -- creature, not a 4/1 creature."
+        --
+        -- The switch is installed FIRST (earlier timestamp) and the pump SECOND, so
+        -- a timestamp-ordered implementation would switch then pump. Layer order
+        -- (CR 613.4c before 613.4d) must beat timestamp order. The pump is +2/+0 --
+        -- ASYMMETRIC, per the ruling's own example, because a symmetric one cannot
+        -- tell the two orders apart.
+        --
+        -- Goblin Piker is 2/1. Correct: 7c gives 4/1, 7d switches to 1/4.
+        -- Timestamp-ordered: switch gives 1/2, then the pump gives 3/2.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (pikerId, board) = S.addPiker cards S.alice gs0
+            switched = withEffect pikerId Modification.SwitchPowerToughness board
+            gs = withEffect pikerId (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 0)) switched
+         in do
+              HU.assertEqual "power is the pumped toughness" (Just 1) (Projection.powerOf pikerId gs)
+              HU.assertEqual "toughness is the pumped power" (Just 4) (Projection.toughnessOf pikerId gs),
+      HU.testCase "CR 613.4d 2021-03-19 two switches return the object to normal" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (pikerId, board) = S.addPiker cards S.alice gs0
+            once = withEffect pikerId Modification.SwitchPowerToughness board
+            twice = withEffect pikerId Modification.SwitchPowerToughness once
+         in do
+              HU.assertEqual "once: the 2/1 is a 1/2" (Just 1) (Projection.powerOf pikerId once)
+              HU.assertEqual "twice: back to 2" (Just 2) (Projection.powerOf pikerId twice)
+              HU.assertEqual "twice: back to 1 toughness" (Just 1) (Projection.toughnessOf pikerId twice),
+      HU.testCase "CR 704.5g 2021-03-19 nonlethal damage becomes lethal after a switch" $
+        -- Gatherer ruling on Twisted Image (WotC, 2021-03-19): "Because damage
+        -- remains marked on a creature until the damage is removed as the turn
+        -- ends, nonlethal damage dealt to a creature may become lethal if you
+        -- switch its power and toughness during that turn." Damage marking
+        -- (CR 514.2) and the CR 704.5g lethal-damage state-based action have both
+        -- existed since M1b; this is the ruling as a scenario.
+        --
+        -- A 2/3 Tarmogoyf with 2 damage marked survives. Switched to 3/2, the same
+        -- 2 damage is lethal.
+        let base = S.landsInPlay (Cards.islandPrinting cards) 1
+            (_, g1) = S.addGraveyardCard (Cards.lightningBoltPrinting cards) S.alice base
+            (_, g2) = S.addGraveyardCard (Cards.pikerPrinting cards) S.alice g1
+            (goyfId, g3) = S.addCreature (Cards.tarmogoyfPrinting cards) S.alice g2
+            -- Twisted Image draws a card, and this is the one test here that runs
+            -- settleForPriority (it needs the SBA sweep). Setup.emptyGame leaves
+            -- libraries EMPTY, so without this alice would lose to CR 704.5b
+            -- mid-assertion rather than the Goyf dying to CR 704.5g.
+            (_, g4) = S.addLibraryCard (Cards.forestPrinting cards) S.alice g3
+            board = S.markDamage goyfId 2 g4
+            (gs, tiId) = S.handOne (Cards.twistedImagePrinting cards) board
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice tiId))
+            after = snd (Engine.runGamePure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority))
+         in do
+              HU.assertBool "the 2/3 with 2 damage was alive" (Set.member goyfId (GameState.battlefield board))
+              HU.assertBool "the switched 3/2 with 2 damage is dead" (not (Set.member goyfId (GameState.battlefield after)))
     ]
