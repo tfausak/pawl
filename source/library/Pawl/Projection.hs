@@ -7,6 +7,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Game as Game
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
@@ -156,6 +157,20 @@ isBasic :: ObjectId -> GameState -> Bool
 isBasic oid gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card -> Set.member Supertype.Basic (TypeLine.supertypes (Card.Type.typeLine card))
+
+-- CR 707.2 / 613.1a: an object's layer-1 (copy) result -- the value the layer fold
+-- STARTS from. If the object carries a copy snapshot in its bindings (stamped as it
+-- entered, CR 707.9a, by Engine.drainAsEntersChoices), that snapshot IS its copiable
+-- value; otherwise it is the printed base. Only base-or-snapshot, so counters (7c),
+-- pumps (7c), control (2), and ability grants (6) -- all folded ABOVE this -- are
+-- never part of a copied object's own copiable value (the P2 falsifier, made
+-- structural). Not a recursion: a copy of a copy stores the underlying creature's
+-- values at entry, so the snapshot is already resolved.
+copiableCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
+copiableCharacteristics oid gs =
+  case Game.lookupObject oid gs >>= (Binding.copyOf . Object.bindings) of
+    Just snapshot -> snapshot
+    Nothing -> baseCharacteristics oid gs
 
 -- Printed characteristics before any effect (CR 613.2/613.4 starting point).
 baseCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
@@ -368,7 +383,7 @@ projectFrom cands oid gs =
             ordered = List.sortOn gTimestamp here
             step pc c = applyModification gs oid (gModification c) pc
          in List.foldl' step partial ordered
-   in List.foldl' applyLayer (baseCharacteristics oid gs) layers
+   in List.foldl' applyLayer (copiableCharacteristics oid gs) layers
 
 -- Project every battlefield object against ONE gather: O(gather + P*fold) instead
 -- of the O(P*(gather+fold)) of calling project per object. The hot path for SBA

@@ -4,8 +4,10 @@
 -- wiring; real-card behavior lands in later tasks and DamageSpec.
 module Pawl.ProjectionSpec where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
@@ -440,5 +442,21 @@ tests cards =
               HU.assertEqual "owner controls with no effect" (Just S.bob) (Projection.controllerOf oid owned)
               HU.assertEqual "the effect grants control" (Just S.alice) (Projection.controllerOf oid gs)
               HU.assertEqual "alice controls oid" [oid] (Projection.controls S.alice gs)
-              HU.assertEqual "bob controls nothing" [] (Projection.controls S.bob gs)
+              HU.assertEqual "bob controls nothing" [] (Projection.controls S.bob gs),
+      HU.testCase "a copy binding seeds the fold with the copied object's copiable P/T" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (pikerId, gs1) = S.addPiker cards S.alice gs0
+            -- The Piker's copiable value (base 2/1) computed via the new function.
+            snapshot = Projection.copiableCharacteristics pikerId gs1
+            -- A second, unrelated creature (another Piker) we turn into a "copy":
+            (cloneId, gs2) = S.addPiker cards S.alice gs1
+            stamped = gs2 {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}) cloneId (GameState.objects gs2)}
+         in do
+              HU.assertEqual "copy projects the snapshot power" (Just 2) (Projection.powerOf cloneId stamped)
+              HU.assertEqual "copy projects the snapshot toughness" (Just 1) (Projection.toughnessOf cloneId stamped)
+              HU.assertBool "copy is a creature" (Projection.isCreatureOf cloneId stamped),
+      HU.testCase "an object with no copy binding projects its own base P/T" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (pikerId, gs1) = S.addPiker cards S.alice gs0
+         in HU.assertEqual "base power" (Just 2) (Projection.powerOf pikerId gs1)
     ]
