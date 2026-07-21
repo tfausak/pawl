@@ -130,3 +130,11 @@ fillableModes source modal gs =
               then Nothing
               else Just (ModeIndex.MkModeIndex (fromIntegral i))
    in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Int ..] ms))
+
+-- CR 707.9a / 707.2: the legal "copy target" set for an object entering as a copy --
+-- the creatures on the battlefield (projected creature-ness) OTHER than the entering
+-- object itself. Ascending, so a prompt is deterministic. Excluding self removes any
+-- self-cycle question (a 0/0 Clone has nothing useful to copy of itself).
+legalCopyTargets :: ObjectId -> GameState -> [ObjectId]
+legalCopyTargets self gs =
+  filter (\oid -> oid /= self && Projection.isCreatureOf oid gs) (Set.toAscList (GameState.battlefield gs))

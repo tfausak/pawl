@@ -59,6 +59,10 @@ combatReplayTests =
                 p = Prompt.ChooseModes decider S.alice oid legal 1
                 answer = Set.singleton (ModeIndex.MkModeIndex 1)
              in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
+          HU.testCase "ChooseCopyTarget records and replays a Maybe ObjectId" $
+            let p = Prompt.ChooseCopyTarget decider S.alice oid [ObjectId.MkObjectId 7]
+                answer = Just (ObjectId.MkObjectId 7)
+             in HU.assertEqual "round-trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
           HU.testCase "defaultAnswer attacks with nothing" $
             HU.assertEqual "no attacks" [] (Replay.defaultAnswer attackPrompt),
           HU.testCase "defaultAnswer blocks with nothing" $

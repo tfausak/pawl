@@ -33,6 +33,7 @@ encode p answer = case p of
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
   Prompt.ChooseX {} -> Response.ChoseX answer
   Prompt.ChooseModes {} -> Response.ChoseModes answer
+  Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -79,6 +80,9 @@ decode p response = case p of
   Prompt.ChooseModes {} -> case response of
     Response.ChoseModes modes -> Just modes
     _ -> Nothing
+  Prompt.ChooseCopyTarget {} -> case response of
+    Response.ChoseCopyTarget m -> Just m
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -123,6 +127,10 @@ defaultAnswer p = case p of
   -- The first `count` legal modes, deterministically -- the least eventful
   -- fallback when a transcript runs short on a modal cast.
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  -- CR 707.9a: declining to copy is always legal, and is the least eventful
+  -- fallback -- Clone is a deterministic fixture, never in a random deck, so
+  -- this is never exercised in play.
+  Prompt.ChooseCopyTarget {} -> Nothing
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

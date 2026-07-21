@@ -17,6 +17,7 @@ import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Target as Target
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
@@ -458,5 +459,10 @@ tests cards =
       HU.testCase "an object with no copy binding projects its own base P/T" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (pikerId, gs1) = S.addPiker cards S.alice gs0
-         in HU.assertEqual "base power" (Just 2) (Projection.powerOf pikerId gs1)
+         in HU.assertEqual "base power" (Just 2) (Projection.powerOf pikerId gs1),
+      HU.testCase "legalCopyTargets is battlefield creatures excluding self" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (pikerId, gs1) = S.addPiker cards S.alice gs0
+            (cloneId, gs2) = S.addPiker cards S.alice gs1
+         in HU.assertEqual "excludes self, includes the other creature" [pikerId] (Target.legalCopyTargets cloneId gs2)
     ]

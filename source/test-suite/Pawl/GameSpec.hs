@@ -281,6 +281,7 @@ recordingAnswer p = case p of
   Prompt.CastWhileSearching {} -> pure Nothing
   Prompt.ChooseX {} -> pure 0
   Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
+  Prompt.ChooseCopyTarget {} -> pure Nothing
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
@@ -415,6 +416,7 @@ slaveAnswer p = case p of
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseCopyTarget {} -> Nothing
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of

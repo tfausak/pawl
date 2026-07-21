@@ -65,3 +65,10 @@ data Prompt r where
   -- The answer is the chosen subset. Prompted before X and targets, and ONLY when
   -- #legal > count; a forced selection is not asked.
   ChooseModes :: Decider -> PlayerId -> ObjectId -> Set ModeIndex -> Natural -> Prompt (Set ModeIndex)
+  -- CR 707.9a / 614.1c / 614.12a: as an object enters AS A COPY (Clone), its
+  -- controller chooses which permanent to copy. The ObjectId is the entering
+  -- object; the [ObjectId] is the legal copy targets (battlefield creatures other
+  -- than itself; the engine pre-filters). Nothing is the "may" decline (CR 707.9a
+  -- lets Clone enter as itself, a 0/0). Answered at the settle boundary (P2 drain),
+  -- not at cast -- the choice is made as the object enters.
+  ChooseCopyTarget :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Prompt (Maybe ObjectId)

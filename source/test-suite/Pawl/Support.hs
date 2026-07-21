@@ -108,6 +108,7 @@ identityAnswer p = case p of
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseCopyTarget {} -> Nothing
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -138,6 +139,7 @@ castAnswer p = case p of
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseCopyTarget {} -> Nothing
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -161,6 +163,7 @@ aggressiveAnswer p = case p of
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseCopyTarget {} -> Nothing
 
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
@@ -188,6 +191,7 @@ playLandAnswer p = case p of
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseCopyTarget {} -> Nothing
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -247,6 +251,7 @@ randomAnswer p = case p of
   -- brief permits this in place of a genuinely random size-`count` subset).
   Prompt.ChooseModes _ _ _ legal count ->
     pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
+  Prompt.ChooseCopyTarget {} -> pure Nothing
 
 -- Total index into a list; the engine always offers at least Pass, so the
 -- fallback is unreachable in practice but keeps this free of partial functions.
