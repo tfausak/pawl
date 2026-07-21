@@ -724,7 +724,7 @@ zoneChangeTests :: Cards.Cards -> Tasty.TestTree
 zoneChangeTests cards =
   Tasty.testGroup
     "ZoneChange"
-    [ HU.testCase "CR 701.7 Murder destroys a normal creature into its owner's graveyard" $
+    [ HU.testCase "CR 701.8 Murder destroys a normal creature into its owner's graveyard" $
         let (_, after) = castBlackRemovalAt cards (Cards.murderPrinting cards) (Cards.pikerPrinting cards)
          in do
               HU.assertEqual "no creature survives" 0 (S.creaturesInPlay S.bob after)
@@ -765,7 +765,7 @@ zoneChangeTests cards =
          in do
               HU.assertEqual "the creature left the battlefield (bounce is not a destruction)" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "it is in bob's hand" 1 (length (Game.zoneMembers Zone.Hand S.bob after)),
-      HU.testCase "CR 701.10 Angelic Edict exiles a target creature" $
+      HU.testCase "CR 701.13 Angelic Edict exiles a target creature" $
         let base = S.landsInPlay (Cards.plainsPrinting cards) 5
             (_, withPiker) = S.addPiker cards S.bob base
             (gs, spellId) = S.handOne (Cards.angelicEdictPrinting cards) withPiker
@@ -802,7 +802,7 @@ zoneChangeTests cards =
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after)),
-      HU.testCase "CR 701.13 Tome Scour mills five from a target player's library" $
+      HU.testCase "CR 701.17 Tome Scour mills five from a target player's library" $
         let base = S.landsInPlay (Cards.islandPrinting cards) 1
             withLib = List.foldl' (\g _ -> snd (S.addLibraryCard (Cards.pikerPrinting cards) S.bob g)) base [1 .. (6 :: Int)]
             (gs, spellId) = S.handOne (Cards.tomeScourPrinting cards) withLib
@@ -811,7 +811,7 @@ zoneChangeTests cards =
          in do
               HU.assertEqual "five milled to graveyard" 5 (length (Game.zoneMembers Zone.Graveyard S.bob after))
               HU.assertEqual "one card left in library" 1 (length (Game.zoneMembers Zone.Library S.bob after)),
-      HU.testCase "CR 701.13b milling a short library mills fewer with no loss" $
+      HU.testCase "CR 701.17b milling a short library mills fewer with no loss" $
         let base = S.landsInPlay (Cards.islandPrinting cards) 1
             (_, g1) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob base
             (_, g2) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob g1
@@ -821,7 +821,7 @@ zoneChangeTests cards =
          in do
               HU.assertEqual "two milled" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
               HU.assertBool "bob did not lose (milling is not drawing)" (not (Set.member S.bob (GameState.drewFromEmpty after))),
-      HU.testCase "CR 701.8 Mind Rot discards two chosen cards from a hand of three" $
+      HU.testCase "CR 701.9 Mind Rot discards two chosen cards from a hand of three" $
         let base = S.landsInPlay (Cards.swampPrinting cards) 3
             withHand = handCards (Cards.pikerPrinting cards) S.bob 3 base
             (gs, spellId) = S.handOne (Cards.mindRotPrinting cards) withHand
@@ -830,7 +830,7 @@ zoneChangeTests cards =
          in do
               HU.assertEqual "one card left in bob's hand" 1 (S.handSize S.bob after)
               HU.assertEqual "two cards in bob's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
-      HU.testCase "CR 701.8b a forced full-hand discard is not prompted" $
+      HU.testCase "CR 609.3 a forced full-hand discard is not prompted" $
         let base = S.landsInPlay (Cards.swampPrinting cards) 3
             withHand = handCards (Cards.pikerPrinting cards) S.bob 2 base
             (gs, spellId) = S.handOne (Cards.mindRotPrinting cards) withHand

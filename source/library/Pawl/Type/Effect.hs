@@ -44,7 +44,7 @@ data Effect card
     -- criterion, put it onto the battlefield tapped, then shuffle (Evolving
     -- Wilds' exact shape; destination/tapped are baked in for now).
     Search CardCriterion
-  | -- CR 701.10 / Rest in Peace: exile every card in every graveyard. Targetless
+  | -- CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk (Rest in Peace's exact shape); a general exile-from-zone is future.
     ExileAllGraveyards
   | -- CR 723.1: "you control target player during that player's next turn."
@@ -78,14 +78,14 @@ data Effect card
     -- controller draws, CR 120.2). Empty-library draw is a loss (CR 121.3),
     -- unlike Mill -- the semantic asymmetry that keeps Draw and Mill separate.
     Draw Quantity
-  | -- CR 701.13: the slot's target player mills this many (top N of their library
+  | -- CR 701.17: the slot's target player mills this many (top N of their library
     -- to their graveyard). Milling a short/empty library mills fewer, no penalty
-    -- (CR 701.13b) -- unlike Draw, which loses on empty.
+    -- (CR 701.17b) -- unlike Draw, which loses on empty.
     Mill SlotName Quantity
-  | -- CR 701.8: the slot's target player discards this many. The DISCARDING player
-    -- chooses which (CR 701.8a) via Prompt.ChooseDiscard, routed through
+  | -- CR 701.9: the slot's target player discards this many. The DISCARDING player
+    -- chooses which (CR 701.9b) via Prompt.ChooseDiscard, routed through
     -- Decide.deciderFor. A hand smaller than the count discards all of it (CR
-    -- 701.8b), forced -- so it is not prompted.
+    -- 609.3, "does only as much as possible"), forced -- so it is not prompted.
     Discard SlotName Quantity
   | -- CR 111: create this many tokens with the given effect-defined characteristics
     -- (CR 111.3). The `card` is the token's "text", embedded literally in the card

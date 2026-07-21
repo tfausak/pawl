@@ -478,7 +478,7 @@ applyEffect source controller bound legality chosen effect = case effect of
           case Quantity.evaluate gs source (Just controller) quantity of
             Just n
               | n > 0 ->
-                  -- CR 701.13/701.13b: top min(n, library) of the target's library to
+                  -- CR 701.17/701.17b: top min(n, library) of the target's library to
                   -- their graveyard, funnelled so each move mints a new incarnation.
                   let topN = take (fromInteger n) (Game.zoneMembers Zone.Library target gs)
                    in List.foldl' (\g c -> Event.changeZone c Zone.Graveyard g) gs topN
@@ -495,10 +495,11 @@ applyEffect source controller bound legality chosen effect = case effect of
                 let held = Game.zoneMembers Zone.Hand target gs
                     bury cs g = List.foldl' (\g1 c -> Event.changeZone c Zone.Graveyard g1) g cs
                 if fromInteger n >= length held
-                  -- CR 701.8b: the whole hand is forced -- no choice, so no prompt.
+                  -- CR 609.3: discarding the whole hand is "as much as possible," so
+                  -- it is forced -- no choice, so no prompt.
                   then State.modify' (bury held)
                   else do
-                    -- CR 701.8a: the discarding player chooses which cards.
+                    -- CR 701.9b: the discarding player chooses which cards.
                     let decider = Decide.deciderFor target gs
                     choices <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider target held (fromInteger n)))
                     let toDiscard = take (fromInteger n) (filter (\c -> elem c held) choices)
