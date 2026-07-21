@@ -322,6 +322,7 @@ targetSpecToJson t = nullary . Text.pack $ case t of
   TargetSpec.SpellTarget -> "SpellTarget"
   TargetSpec.WallTarget -> "WallTarget"
   TargetSpec.NonlandPermanentTarget -> "NonlandPermanentTarget"
+  TargetSpec.NonblackCreatureTarget -> "NonblackCreatureTarget"
 
 jsonToTargetSpec :: Value -> Either Text TargetSpec.TargetSpec
 jsonToTargetSpec =
@@ -335,7 +336,8 @@ jsonToTargetSpec =
       (Text.pack "CreatureOrEnchantmentTarget", TargetSpec.CreatureOrEnchantmentTarget),
       (Text.pack "SpellTarget", TargetSpec.SpellTarget),
       (Text.pack "WallTarget", TargetSpec.WallTarget),
-      (Text.pack "NonlandPermanentTarget", TargetSpec.NonlandPermanentTarget)
+      (Text.pack "NonlandPermanentTarget", TargetSpec.NonlandPermanentTarget),
+      (Text.pack "NonblackCreatureTarget", TargetSpec.NonblackCreatureTarget)
     ]
 
 triggerConditionToJson :: TriggerCondition.TriggerCondition -> Value

@@ -40,4 +40,14 @@ data TargetSpec
     -- non-excluding variant splits the spec when a card needs it (the WallTarget
     -- specific-then-general posture).
     NonlandPermanentTarget
+  | -- CR 115.1a: "target nonblack creature" (Doom Blade) -- a creature on the
+    -- battlefield whose PROJECTED colours (CR 613 layer 5) do not include black.
+    -- Reads the projection, never the mana cost: a devoid creature with {B} in
+    -- its cost is nonblack, and a creature made black by a colour-changing effect
+    -- is not.
+    --
+    -- The WallTarget posture: one hand-carved variant, specific before general.
+    -- EXPIRES at P9, whose criterion/filter language replaces the whole family of
+    -- colour- and type-restricted specs with data.
+    NonblackCreatureTarget
   deriving (Eq, Ord, Show)

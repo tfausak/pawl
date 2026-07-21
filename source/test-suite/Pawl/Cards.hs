@@ -66,7 +66,8 @@ data Cards = MkCards
     actOfTreasonPrinting :: Printing.Printing,
     clonePrinting :: Printing.Printing,
     devoidDronePrinting :: Printing.Printing,
-    badMoonPrinting :: Printing.Printing
+    badMoonPrinting :: Printing.Printing,
+    doomBladePrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -132,6 +133,7 @@ loadCards = do
   clonePrinting_ <- loadPrinting "clone"
   devoidDronePrinting_ <- loadPrinting "synthetic-devoid-drone"
   badMoonPrinting_ <- loadPrinting "bad-moon"
+  doomBladePrinting_ <- loadPrinting "doom-blade"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -186,7 +188,8 @@ loadCards = do
         actOfTreasonPrinting = actOfTreasonPrinting_,
         clonePrinting = clonePrinting_,
         devoidDronePrinting = devoidDronePrinting_,
-        badMoonPrinting = badMoonPrinting_
+        badMoonPrinting = badMoonPrinting_,
+        doomBladePrinting = doomBladePrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -243,7 +246,8 @@ allPrintings cards =
     actOfTreasonPrinting cards,
     clonePrinting cards,
     devoidDronePrinting cards,
-    badMoonPrinting cards
+    badMoonPrinting cards,
+    doomBladePrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

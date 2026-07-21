@@ -11,6 +11,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.Color as Color
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Modal as Modal
@@ -80,6 +81,15 @@ legalRecipients spec gs =
           let notLand oid = not (Set.member CardType.Land (Projection.cardTypesOf oid gs))
               matches = filter notLand (Set.toList (GameState.battlefield gs))
            in Set.fromList (map Recipient.ToObject matches)
+        TargetSpec.NonblackCreatureTarget ->
+          -- CR 115.1a / 105.2: CreatureTarget's set narrowed to creatures whose
+          -- PROJECTED colours omit black. Colourless counts as nonblack (CR
+          -- 105.2c: a colourless object has no colour).
+          let isNonblack recipient = case recipient of
+                Recipient.ToCreature oid -> not (Set.member Color.Black (Projection.colorsOf oid gs))
+                Recipient.ToPlayer _ -> False
+                Recipient.ToObject _ -> False
+           in Set.fromList (filter isNonblack creatures)
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is
@@ -104,6 +114,7 @@ selfExcludes spec = case spec of
   TargetSpec.CreatureOrEnchantmentTarget -> False
   TargetSpec.SpellTarget -> False
   TargetSpec.WallTarget -> False
+  TargetSpec.NonblackCreatureTarget -> False
 
 -- legalSets, then drop the source recipient from each self-excluding slot (CR
 -- "another"). `source` is the object the targeting is relative to -- the spell

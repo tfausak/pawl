@@ -13,6 +13,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Target as Target
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
@@ -21,7 +22,10 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.TargetSpec as TargetSpec
+import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -140,5 +144,26 @@ tests cards =
                   tokenIds
                 mapM_
                   (\oid -> HU.assertEqual "Bad Moon does not pump a red token" (Just 1) (Projection.powerOf oid after))
-                  tokenIds
+                  tokenIds,
+      HU.testCase "CR 115.1a a black creature is not a legal 'target nonblack creature'" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (ratsId, withRats) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice gs0
+            (pikerId, gs) = S.addPiker cards S.alice withRats
+            legal = Target.legalRecipients TargetSpec.NonblackCreatureTarget gs
+         in do
+              HU.assertBool "the red Piker is legal" (Set.member (Recipient.ToCreature pikerId) legal)
+              HU.assertBool "the black Rats are not" (not (Set.member (Recipient.ToCreature ratsId) legal)),
+      HU.testCase "CR 702.114a a devoid creature with a black cost IS a legal nonblack target" $
+        -- FALSIFIER, reader (a) half.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (droneId, gs) = S.addCreature (Cards.devoidDronePrinting cards) S.alice gs0
+            legal = Target.legalRecipients TargetSpec.NonblackCreatureTarget gs
+         in HU.assertBool "colourless is nonblack" (Set.member (Recipient.ToCreature droneId) legal),
+      HU.testCase "Doom Blade destroys a devoid creature whose mana cost is black" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 2
+            (_, board) = S.addCreature (Cards.devoidDronePrinting cards) S.bob base
+            (gs, dbId) = S.handOne (Cards.doomBladePrinting cards) board
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dbId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in HU.assertEqual "the Drone is gone" 0 (length (Game.zoneMembers Zone.Battlefield S.bob after))
     ]
