@@ -62,7 +62,9 @@ amountOf slot m = Binding.amount =<< Map.lookup slot m
 copyOf :: Map SlotName Binding -> Maybe ProjectedCharacteristics
 copyOf m = Binding.copy =<< Map.lookup copySource m
 
--- Store a copy snapshot under the reserved copySource slot (P2).
+-- Store a copy snapshot under the reserved copySource slot (P2). copySource is a
+-- dedicated single-purpose slot (no target/subtype/amount/mode binding is ever
+-- stored there), so overwriting it wholesale is lossless.
 setCopy :: ProjectedCharacteristics -> Map SlotName Binding -> Map SlotName Binding
 setCopy pc = Map.insert copySource (Binding.empty {Binding.copy = Just pc})
 
@@ -70,7 +72,8 @@ setCopy pc = Map.insert copySource (Binding.empty {Binding.copy = Just pc})
 pendingCopy :: Map SlotName Binding -> Bool
 pendingCopy = Map.member asEntersPending
 
--- Mark an as-enters copy choice pending (Event.placeObject).
+-- Mark an as-enters copy choice pending (Event.placeObject). asEntersPending is a
+-- dedicated single-purpose slot, so this insert never clobbers another binding.
 markPending :: Map SlotName Binding -> Map SlotName Binding
 markPending = Map.insert asEntersPending Binding.empty
 

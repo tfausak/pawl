@@ -287,6 +287,10 @@ drainOneCopy :: ObjectId -> Game ()
 drainOneCopy oid = do
   gs <- State.get
   case Projection.controllerOf oid gs of
+    -- Unreachable in practice: oid comes from GameState.battlefield, so
+    -- lookupObject succeeds and controllerOf defaults to the owner -- never
+    -- Nothing here. Defensive: clear the marker rather than leave it pending
+    -- forever, and make no unprompted copy choice (the engine chooses nothing).
     Nothing -> State.modify' (applyCopyChoice oid Nothing)
     Just controller -> do
       let decider = Decide.deciderFor controller gs

@@ -459,7 +459,9 @@ tests cards =
       HU.testCase "an object with no copy binding projects its own base P/T" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (pikerId, gs1) = S.addPiker cards S.alice gs0
-         in HU.assertEqual "base power" (Just 2) (Projection.powerOf pikerId gs1),
+         in do
+              HU.assertEqual "base power" (Just 2) (Projection.powerOf pikerId gs1)
+              HU.assertEqual "base toughness" (Just 1) (Projection.toughnessOf pikerId gs1),
       HU.testCase "legalCopyTargets is battlefield creatures excluding self" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (pikerId, gs1) = S.addPiker cards S.alice gs0
