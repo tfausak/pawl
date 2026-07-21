@@ -1,7 +1,9 @@
 module Pawl.Type.Card where
 
+import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Data.Text (Text)
+import Pawl.Type.AbilityName (AbilityName)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.CastingPermission (CastingPermission)
 import Pawl.Type.Color (Color)
@@ -69,6 +71,16 @@ data Card = MkCard
     -- CR 603: this card's triggered abilities, read through
     -- Pawl.Projection.triggeredAbilitiesOf. Empty for all but Rest in Peace.
     triggeredAbilities :: [TriggeredAbility Card],
+    -- CR 603.7: this card's DELAYED triggered abilities, keyed by name -- the
+    -- payloads an Effect.ArmDelayedTrigger in this card's own text arms. Card
+    -- DATA, not an opcode payload: Effect is first-order and non-recursive
+    -- (design.md section 1), and Effect -> TriggeredAbility -> Modal -> Mode ->
+    -- Effect is a genuine module cycle. Empty for all but Tidal Wave.
+    --
+    -- Read straight from the card, never through the projection: a delayed
+    -- ability is not ON the source object -- CR 603.7d gives it no source
+    -- permanent to lose, so layer 6 cannot strip it.
+    delayedAbilities :: Map AbilityName (TriggeredAbility Card),
     -- CR 601.3: this card's casting permissions -- zone/condition exceptions to
     -- normal timing. Read directly from the card (NOT the projection): the
     -- permission functions in the library (CR 113.6), where the CR 613 layer

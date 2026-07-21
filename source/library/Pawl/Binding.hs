@@ -60,12 +60,16 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 
+-- A binding that names one object and nothing else -- what a token bound by a
+-- Create (CR 603.7c) or a trigger's source slot holds.
+toObject :: ObjectId -> Binding
+toObject oid = Binding.empty {Binding.target = Just (Recipient.ToObject oid)}
+
 -- Bind an object under the reserved triggerSource slot. A dedicated
 -- single-purpose slot, so this insert never clobbers another binding (setCopy's
 -- posture).
 setTriggerSource :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
-setTriggerSource oid =
-  Map.insert triggerSource (Binding.empty {Binding.target = Just (Recipient.ToObject oid)})
+setTriggerSource oid = Map.insert triggerSource (toObject oid)
 
 -- CR 614.1c / 603.6d: the reserved slot marking that an object that entered as a
 -- copy has not yet made its as-enters choice (P2). Set by Event.placeObject,

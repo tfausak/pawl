@@ -1,5 +1,6 @@
 module Pawl.Type.Effect where
 
+import Pawl.Type.AbilityName (AbilityName)
 import Pawl.Type.CardCriterion (CardCriterion)
 import Pawl.Type.CounterKind (CounterKind)
 import Pawl.Type.Duration (Duration)
@@ -95,7 +96,14 @@ data Effect card
     -- Targetless and unprompted -- creating a token is never a choice. Executed by
     -- Resolve.applyEffect via Event.createToken. NOT a copy-token (CR 707) and NOT a
     -- predefined token (CR 111.10): given, not derived.
-    Create Quantity card
+    --
+    -- The Maybe SlotName BINDS the minted token so a later effect in the same
+    -- resolution -- or a delayed ability armed by it (CR 603.7c's "it") -- can name
+    -- it. A DEFINITION, not a read: it is not a target and never appears in
+    -- targetSpecs. Defined only for a single-token create; a Create that binds a
+    -- slot while making several tokens is a named deferral (the P4 spec, section
+    -- 8) that the Pawl.CardSpec lint family rejects rather than guessing at.
+    Create Quantity card (Maybe SlotName)
   | -- CR 615.3: install a floating prevention effect for a duration. Fog =
     -- Prevent UntilEndOfTurn PreventAllCombatDamage. Targetless (Fog watches a
     -- class of events, not a chosen object). Resolve stores it into
@@ -134,4 +142,11 @@ data Effect card
     -- PlayerId. Permanent control (CR 613), distinct from Mindslaver's
     -- player-control (CR 723, ControlPlayerNextTurn).
     GainControl Duration SlotName
+  | -- CR 603.7: create a delayed triggered ability -- the one this card declares
+    -- under this name (Card.delayedAbilities). First-order: the payload is card
+    -- data joined by a name, so this opcode carries no nested ability and adds no
+    -- type parameter. The resolving object's binding environment is captured as
+    -- the ability is armed, which is how "it" / "that card" (CR 603.7c) is
+    -- remembered after this resolution ends.
+    ArmDelayedTrigger AbilityName
   deriving (Eq, Ord, Show)

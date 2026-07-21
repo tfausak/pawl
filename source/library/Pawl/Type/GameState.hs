@@ -8,6 +8,7 @@ import Pawl.Type.ActivePrevention (ActivePrevention)
 import Pawl.Type.Combat (Combat)
 import Pawl.Type.ContinuousEffect (ContinuousEffect)
 import Pawl.Type.Decider (Decider)
+import Pawl.Type.DelayedTrigger (DelayedTrigger)
 import Pawl.Type.GameEvent (GameEvent)
 import Pawl.Type.Mana (Mana)
 import Pawl.Type.Object (Object)
@@ -43,6 +44,12 @@ data GameState = MkGameState
     -- CR 704.5h ("since the last state-based action check"): how far the
     -- state-based-action damage read has consumed.
     damageScannedThrough :: Natural,
+    -- CR 603.7: delayed triggered abilities awaiting their event, in creation
+    -- order. Appended by Resolve's ArmDelayedTrigger; an entry is removed as it
+    -- fires (CR 603.7b). NOT cleared at turn handoff -- "at the beginning of the
+    -- next end step" survives into the next turn if this turn's end step passed
+    -- before the ability was armed.
+    delayedTriggers :: Seq DelayedTrigger,
     -- CR 611.2: stored continuous effects from resolutions (Giant Growth,
     -- Serpent's Gift), each with a duration cleanup consults. Static-ability
     -- effects are NOT here -- the projection re-derives those live.

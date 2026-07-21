@@ -4,10 +4,10 @@
 -- turn-scoped clearing at handoff. Task 2 adds the CR 603.2b step-beginning
 -- event and the CR 603.6a widened scan (every battlefield permanent, not just
 -- an enters event's newcomer) -- `scanTests` below. Task 4 adds CR 603.8
--- state triggers -- `stateTriggerTests` below. Later P4 tasks still owe
--- coverage HERE for delayed triggers (CR 603.7), intervening "if" (CR 603.4 /
--- 608.2a), and the CR 603.3b ordering prompt -- none of that is implemented
--- yet.
+-- state triggers -- `stateTriggerTests` below. Task 6 adds CR 603.7 delayed
+-- triggered abilities -- `delayedTests` below. Later P4 tasks still owe
+-- coverage HERE for intervening "if" (CR 603.4 / 608.2a) and the CR 603.3b
+-- ordering prompt -- neither is implemented yet.
 module Pawl.TriggerSpec where
 
 import qualified Data.Foldable as Foldable
@@ -17,6 +17,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
+import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -31,6 +32,7 @@ import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -154,12 +156,12 @@ scanTests cards =
             (piker, gs1) = S.addPiker cards S.bob gs0
             entered = ZoneChange.MkZoneChange piker Zone.Stack Zone.Battlefield
             gs2 = S.withEvent (GameEvent.Moved entered (Projection.project piker gs1)) gs1
-         in HU.assertEqual "no trigger" 0 (length (Event.gatherTriggers (Event.unscannedEvents gs2) gs2)),
+         in HU.assertEqual "no trigger" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2))),
       HU.testCase "CR 603.6a a SelfEnters trigger still fires on its own entry" $
         let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
             gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
-         in case Event.gatherTriggers (Event.unscannedEvents gs1) gs1 of
+         in case fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1) of
               [pt] -> do
                 HU.assertEqual "source is RiP" ripId (PendingTrigger.source pt)
                 HU.assertEqual "controller is alice" S.alice (PendingTrigger.controller pt)
@@ -168,7 +170,7 @@ scanTests cards =
         let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             toGrave = ZoneChange.MkZoneChange ripId Zone.Battlefield Zone.Graveyard
             gs1 = S.withEvent (GameEvent.Moved toGrave (Projection.project ripId gs0)) gs0
-         in HU.assertEqual "no triggers" 0 (length (Event.gatherTriggers (Event.unscannedEvents gs1) gs1)),
+         in HU.assertEqual "no triggers" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1))),
       HU.testCase "SelfEnters matches only a battlefield destination" $
         let bearer = ObjectId.MkObjectId 1
             movedTo zone = GameEvent.Moved (ZoneChange.MkZoneChange bearer Zone.Stack zone) S.emptyCharacteristics
@@ -190,7 +192,7 @@ scanTests cards =
             entered2 = ZoneChange.MkZoneChange rip2 Zone.Stack Zone.Battlefield
             gs2 = S.withEvent (GameEvent.Moved entered1 (Projection.project rip1 gs1)) gs1
             gs3 = Event.recordEvent (GameEvent.Moved entered2 (Projection.project rip2 gs1)) gs2
-            triggers = Event.gatherTriggers (Event.unscannedEvents gs3) gs3
+            triggers = fst (Event.gatherTriggers (Event.unscannedEvents gs3) gs3)
          in do
               HU.assertBool "rip1 has the lower id" (rip1 < rip2)
               HU.assertEqual "both triggers fired" 2 (length triggers)
@@ -207,7 +209,7 @@ scanTests cards =
         let (ghoul1, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             (ghoul2, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice gs0
             event = GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice
-            triggers = Event.gatherTriggers [event] gs1
+            triggers = fst (Event.gatherTriggers [event] gs1)
          in do
               HU.assertBool "ghoul1 has the lower id" (ghoul1 < ghoul2)
               HU.assertEqual "both triggers fired" 2 (length triggers)
@@ -477,5 +479,65 @@ historyTests cards =
                   HU.assertEqual "one trigger once it did" 1 (length (filter isTrigger (GameState.stack fired)))
         ]
 
+-- Tidal Wave {2}{U} Instant: "Create a 5/5 blue Wall creature token with defender.
+-- Sacrifice it at the beginning of the next end step." CR 603.7c's object-bound
+-- delayed ability -- "it" must survive the resolution that armed it.
+delayedTests :: Cards.Cards -> Tasty.TestTree
+delayedTests cards =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- alice casts Tidal Wave off three Islands and lets it resolve.
+      castWave =
+        let (gs, oid) = S.handOne (Cards.tidalWavePrinting cards) (S.landsInPlay (Cards.islandPrinting cards) 3)
+         in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid)))
+      walls gs = filter (\oid -> Set.member Subtype.Wall (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
+   in Tasty.testGroup
+        "DelayedTrigger"
+        [ HU.testCase "CR 111.3 the spell mints a 5/5 Wall with defender and arms one delayed ability" $
+            let after = castWave
+             in case walls after of
+                  [wall] -> do
+                    HU.assertEqual "5 power" (Just 5) (Projection.powerOf wall after)
+                    HU.assertEqual "5 toughness" (Just 5) (Projection.toughnessOf wall after)
+                    HU.assertBool "defender" (Projection.hasKeyword Keyword.Defender wall after)
+                    HU.assertEqual "one delayed ability waiting" 1 (Seq.length (GameState.delayedTriggers after))
+                  other -> HU.assertFailure ("expected exactly one Wall token, got " <> show (length other)),
+          -- CR 603.7b: "only once, the next time its trigger event occurs".
+          HU.testCase "CR 603.7 the token is sacrificed at the beginning of the next end step" $
+            let after = resolveAll (settle (beginEndStep castWave))
+             in do
+                  HU.assertEqual "no Wall left" [] (walls after)
+                  HU.assertEqual "the store is empty" 0 (Seq.length (GameState.delayedTriggers after)),
+          HU.testCase "CR 603.7b a second end step does not re-fire it" $
+            let once = resolveAll (settle (beginEndStep castWave))
+                again = settle (beginEndStep once)
+             in HU.assertEqual "nothing on the stack" [] (GameState.stack again),
+          -- CR 603.7a: a delayed ability does not trigger on an event that
+          -- happened BEFORE it was created. Falls out of the watermark for free.
+          HU.testCase "CR 603.7a armed during an end step, it waits for the NEXT one" $
+            let (gs0, oid) = S.handOne (Cards.tidalWavePrinting cards) (S.landsInPlay (Cards.islandPrinting cards) 3)
+                inEndStep = settle (beginEndStep gs0)
+                cast = resolveAll (snd (Engine.runGamePure S.identityAnswer inEndStep (Cast.castSpell S.alice oid)))
+                sameStep = settle cast
+                nextStep = resolveAll (settle (beginEndStep sameStep))
+             in do
+                  HU.assertEqual "still alive during the step it was armed in" 1 (length (walls sameStep))
+                  HU.assertEqual "sacrificed at the next end step" [] (walls nextStep),
+          -- CR 603.7c: the ability still triggers and is still consumed even when
+          -- the object it remembers is gone.
+          HU.testCase "CR 603.7c with the token already gone the ability does nothing and is consumed" $
+            let armed = castWave
+                killed = case walls armed of
+                  wall : _ -> Sba.checkStateBasedActions (Event.destroy wall armed)
+                  [] -> armed
+                after = resolveAll (settle (beginEndStep killed))
+             in do
+                  HU.assertEqual "no Wall" [] (walls after)
+                  HU.assertEqual "the store is still emptied" 0 (Seq.length (GameState.delayedTriggers after))
+                  HU.assertEqual "nothing stuck on the stack" [] (GameState.stack after)
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards, stateTriggerTests cards, historyTests cards]
+tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards, stateTriggerTests cards, historyTests cards, delayedTests cards]

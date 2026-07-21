@@ -21,6 +21,8 @@ import qualified Pawl.Type.Combat as Combat
 import Pawl.Type.DamageEvent (DamageEvent)
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import Pawl.Type.DelayedTrigger (DelayedTrigger)
+import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.GameEvent (GameEvent)
 import qualified Pawl.Type.GameEvent as GameEvent
@@ -480,9 +482,30 @@ stateTriggers gs =
            in map pend (filter live (Projection.triggeredAbilitiesOf oid gs))
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))
 
--- Everything that has triggered and is not yet on the stack. One function, so
--- Pawl.Engine never needs to know how many sources there are. Now runs an event
--- pass (eventTriggers) and a state pass (CR 603.8, stateTriggers); a delayed
--- pass (CR 603.7) is still owed at Task 6.
-gatherTriggers :: [GameEvent] -> GameState -> [PendingTrigger]
-gatherTriggers events gs = eventTriggers events gs ++ stateTriggers gs
+-- CR 603.7: delayed abilities whose trigger event is among these events. Each one
+-- that fires is REMOVED from the store (CR 603.7b: "only once, the next time its
+-- trigger event occurs"); the survivors are returned so the caller can store them
+-- back. CR 603.7d-f: the controller travels with the entry, so a delayed ability
+-- resolves under the player who controlled the spell that created it even if that
+-- spell's source object is long gone.
+delayedPending :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
+delayedPending events gs =
+  let fires entry =
+        let cond = TriggeredAbility.condition (DelayedTrigger.ability entry)
+         in any (matchesTrigger (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
+      pend entry =
+        PendingTrigger.MkPendingTrigger
+          (DelayedTrigger.source entry)
+          (DelayedTrigger.controller entry)
+          (DelayedTrigger.ability entry)
+          (DelayedTrigger.bindings entry)
+      store = GameState.delayedTriggers gs
+   in (map pend (Foldable.toList (Seq.filter fires store)), Seq.filter (not . fires) store)
+
+-- Everything that has triggered and is not yet on the stack, from all three
+-- sources, plus the delayed store as it stands afterwards. One function, so
+-- Pawl.Engine never needs to know how many sources there are.
+gatherTriggers :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
+gatherTriggers events gs =
+  let (fromDelayed, surviving) = delayedPending events gs
+   in (eventTriggers events gs ++ stateTriggers gs ++ fromDelayed, surviving)

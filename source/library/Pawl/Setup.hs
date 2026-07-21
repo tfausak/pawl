@@ -68,6 +68,7 @@ emptyGame order =
           GameState.events = Seq.empty,
           GameState.scannedThrough = 0,
           GameState.damageScannedThrough = 0,
+          GameState.delayedTriggers = Seq.empty,
           GameState.continuousEffects = [],
           GameState.preventions = [],
           GameState.regenerationShields = Map.empty,

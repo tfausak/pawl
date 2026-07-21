@@ -6,6 +6,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Codec as Codec
@@ -14,6 +15,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.AbilityCost as AbilityCost
+import qualified Pawl.Type.AbilityName as AbilityName
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
@@ -27,6 +29,7 @@ import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decimal as Decimal
+import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -54,6 +57,7 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
@@ -273,6 +277,24 @@ tests cards =
               Codec.jsonToTriggerCondition
               (TriggerCondition.StateIs (StateCondition.YouControlNo Subtype.Swamp)),
           HU.testCase "CountSpec.CreaturesDiedThisTurn round-trips" $
-            roundTrip "count" Codec.countSpecToJson Codec.jsonToCountSpec CountSpec.CreaturesDiedThisTurn
+            roundTrip "count" Codec.countSpecToJson Codec.jsonToCountSpec CountSpec.CreaturesDiedThisTurn,
+          HU.testCase "AbilityName round-trips" $
+            roundTrip "name" Codec.abilityNameToJson Codec.jsonToAbilityName (AbilityName.MkAbilityName (Text.pack "sacrifice it")),
+          HU.testCase "ArmDelayedTrigger round-trips" $
+            roundTrip "arm" Codec.effectToJson Codec.jsonToEffect (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it"))),
+          HU.testCase "DelayedTrigger round-trips with its captured bindings" $
+            let ability =
+                  TriggeredAbility.MkTriggeredAbility
+                    { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn,
+                      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)
+                    }
+                entry =
+                  DelayedTrigger.MkDelayedTrigger
+                    { DelayedTrigger.ability = ability,
+                      DelayedTrigger.source = ObjectId.MkObjectId 4,
+                      DelayedTrigger.controller = S.alice,
+                      DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.toObject (ObjectId.MkObjectId 9))
+                    }
+             in roundTrip "delayed" Codec.delayedTriggerToJson Codec.jsonToDelayedTrigger entry
         ]
     ]

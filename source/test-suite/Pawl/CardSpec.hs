@@ -148,6 +148,7 @@ cardTests cards =
                   Card.Type.activatedAbilities = [],
                   Card.Type.replacementEffects = [],
                   Card.Type.triggeredAbilities = [],
+                  Card.Type.delayedAbilities = Map.empty,
                   Card.Type.castingPermissions = [],
                   Card.Type.copyOnEnter = False,
                   Card.Type.characteristicPT = Nothing
@@ -239,7 +240,33 @@ lintTests cards =
         let card = Printing.card (Cards.lightningBoltPrinting cards)
          in do
               HU.assertBool "an instant" (Card.isInstant card)
-              HU.assertEqual "one slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget) (Card.allTargetSpecs card)
+              HU.assertEqual "one slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.AnyTarget) (Card.allTargetSpecs card),
+      -- The AbilityName half of the D4 dataflow lint (CR 603.7): an
+      -- ArmDelayedTrigger naming an ability the card does not declare is a FAILING
+      -- TEST, never a trigger that silently never fires. Equality, not subset: a
+      -- declared ability nothing arms is dead card text.
+      HU.testCase "every armed delayed ability is declared, and every declared one is armed" $
+        let cardOffends card =
+              Resolve.armedAbilities (Card.allEffects card) /= Map.keysSet (Card.Type.delayedAbilities card)
+            offenders = filter (cardOffends . Printing.card) (Cards.allPrintings cards)
+         in HU.assertEqual "no dangling or unused delayed abilities" [] (map (Card.Type.name . Printing.card) offenders),
+      -- Every slot a delayed ability READS must be one the arming card DEFINES:
+      -- the reserved trigger-source slot, or a token bound by a Create.
+      HU.testCase "every slot a delayed ability reads is bound by its card" $
+        let cardOffends card =
+              let available = Set.insert Binding.triggerSource (Resolve.definedSlots (Card.allEffects card))
+                  wanted = Set.unions (map Resolve.slotsOf (Card.delayedEffects card))
+               in not (Set.isSubsetOf wanted available)
+            offenders = filter (cardOffends . Printing.card) (Cards.allPrintings cards)
+         in HU.assertEqual "no dangling delayed-ability slot" [] (map (Card.Type.name . Printing.card) offenders),
+      -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
+      -- of them. A named deferral (P4 spec section 8), rejected rather than guessed.
+      HU.testCase "no Create binds a slot while making more than one token" $
+        let offenders =
+              filter
+                (Resolve.bindsSeveralTokens . Card.allEffects . Printing.card)
+                (Cards.allPrintings cards)
+         in HU.assertEqual "no multi-token binding" [] (map (Card.Type.name . Printing.card) offenders)
     ]
 
 m2bCardTests :: Cards.Cards -> Tasty.TestTree

@@ -17,10 +17,12 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Json as Json
 import qualified Pawl.Type.AbilityCost as AbilityCost
+import qualified Pawl.Type.AbilityName as AbilityName
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.BeginningStep as BeginningStep
+import qualified Pawl.Type.Binding as Binding
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
@@ -31,6 +33,7 @@ import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -820,12 +823,14 @@ effectToJson e = case e of
   Effect.Draw q -> Json.tagged (Text.pack "Draw") (Just (quantityToJson q))
   Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
-  Effect.Create q c -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
+  Effect.Create q c Nothing -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
+  Effect.Create q c (Just s) -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c, slotNameToJson s]))
   Effect.Prevent d p -> Json.tagged (Text.pack "Prevent") (Just (Array [durationToJson d, preventionToJson p]))
   Effect.RegenerateSelf -> nullary (Text.pack "RegenerateSelf")
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
   Effect.Untap s -> Json.tagged (Text.pack "Untap") (Just (slotNameToJson s))
   Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array [durationToJson d, slotNameToJson s]))
+  Effect.ArmDelayedTrigger n -> Json.tagged (Text.pack "ArmDelayedTrigger") (Just (abilityNameToJson n))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
 jsonToEffect value = do
@@ -856,8 +861,10 @@ jsonToEffect value = do
       Just (Array [s, q]) -> Effect.Discard <$> jsonToSlotName s <*> jsonToQuantity q
       _ -> Left (Text.pack "Discard expects [slot, quantity]")
     "Create" -> case mv of
-      Just (Array [q, c]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c
-      _ -> Left (Text.pack "Create expects [Quantity, Card]")
+      Just (Array [q, c]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure Nothing
+      Just (Array [q, c, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> (Just <$> jsonToSlotName s)
+      _ -> Left (Text.pack "Create expects [Quantity, Card] or [Quantity, Card, slot]")
+    "ArmDelayedTrigger" -> withValue mv (fmap Effect.ArmDelayedTrigger . jsonToAbilityName)
     "Prevent" -> case mv of
       Just (Array [d, p]) -> Effect.Prevent <$> jsonToDuration d <*> jsonToPrevention p
       _ -> Left (Text.pack "Prevent expects [Duration, Prevention]")
@@ -969,6 +976,113 @@ jsonToTriggeredAbility value = do
   m <- Json.field (Text.pack "modal") ps >>= jsonToModal
   pure (TriggeredAbility.MkTriggeredAbility c m)
 
+abilityNameToJson :: AbilityName.AbilityName -> Value
+abilityNameToJson (AbilityName.MkAbilityName t) = Json.jText t
+
+jsonToAbilityName :: Value -> Either Text AbilityName.AbilityName
+jsonToAbilityName value = AbilityName.MkAbilityName <$> Json.asText value
+
+-- The targetSpecsToJson shape: a name-keyed map as a sorted array of entries, so
+-- the render is deterministic and the file byte-stable.
+delayedAbilitiesToJson :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility CardT.Card) -> Value
+delayedAbilitiesToJson m =
+  listTo
+    (\(k, v) -> Object [(Text.pack "name", abilityNameToJson k), (Text.pack "ability", triggeredAbilityToJson v)])
+    (Map.toAscList m)
+
+jsonToDelayedAbilities :: Value -> Either Text (Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility CardT.Card))
+jsonToDelayedAbilities value =
+  let decodeEntry v = do
+        ps <- Json.asObject v
+        k <- Json.field (Text.pack "name") ps >>= jsonToAbilityName
+        a <- Json.field (Text.pack "ability") ps >>= jsonToTriggeredAbility
+        pure (k, a)
+   in Map.fromList <$> listFrom decodeEntry value
+
+-- An omitted delayedAbilities field decodes to empty, so every card file that
+-- predates P4 stays byte-identical (the copyOnEnter precedent).
+mapFromDefault :: (Value -> Either Text (Map.Map k v)) -> Value -> Either Text (Map.Map k v)
+mapFromDefault f value = case value of
+  Null -> Right Map.empty
+  _ -> f value
+
+-- Runtime-only, never in card JSON -- covered for the same reason SetController's
+-- PlayerId is: the codec must stay total over the transitive closure of what the
+-- game state carries.
+bindingToJson :: Binding.Binding -> Value
+bindingToJson b =
+  Object
+    [ (Text.pack "target", maybeTo recipientToJson (Binding.target b)),
+      (Text.pack "subtypes", maybeTo (\(f, t) -> Array [subtypeToJson f, subtypeToJson t]) (Binding.subtypes b)),
+      (Text.pack "amount", maybeTo natTo (Binding.amount b)),
+      (Text.pack "modes", maybeTo (setTo modeIndexToJson) (Binding.modes b)),
+      (Text.pack "copy", maybeTo projectedCharacteristicsToJson (Binding.copy b))
+    ]
+
+jsonToBinding :: Value -> Either Text Binding.Binding
+jsonToBinding value = do
+  ps <- Json.asObject value
+  t <- maybeFrom jsonToRecipient (getOpt (Text.pack "target") ps)
+  s <- maybeFrom jsonToSubtypePair (getOpt (Text.pack "subtypes") ps)
+  a <- maybeFrom natFrom (getOpt (Text.pack "amount") ps)
+  m <- maybeFrom (setFrom jsonToModeIndex) (getOpt (Text.pack "modes") ps)
+  c <- maybeFrom jsonToProjectedCharacteristics (getOpt (Text.pack "copy") ps)
+  pure
+    Binding.MkBinding
+      { Binding.target = t,
+        Binding.subtypes = s,
+        Binding.amount = a,
+        Binding.modes = m,
+        Binding.copy = c
+      }
+
+jsonToSubtypePair :: Value -> Either Text (Subtype.Subtype, Subtype.Subtype)
+jsonToSubtypePair value = case value of
+  Array [f, t] -> do
+    f_ <- jsonToSubtype f
+    t_ <- jsonToSubtype t
+    pure (f_, t_)
+  _ -> Left (Text.pack "expected a [from, to] subtype pair")
+
+bindingsToJson :: Map.Map SlotName.SlotName Binding.Binding -> Value
+bindingsToJson m =
+  listTo
+    (\(k, v) -> Object [(Text.pack "slot", slotNameToJson k), (Text.pack "binding", bindingToJson v)])
+    (Map.toAscList m)
+
+jsonToBindings :: Value -> Either Text (Map.Map SlotName.SlotName Binding.Binding)
+jsonToBindings value =
+  let decodeEntry v = do
+        ps <- Json.asObject v
+        k <- Json.field (Text.pack "slot") ps >>= jsonToSlotName
+        b <- Json.field (Text.pack "binding") ps >>= jsonToBinding
+        pure (k, b)
+   in Map.fromList <$> listFrom decodeEntry value
+
+delayedTriggerToJson :: DelayedTrigger.DelayedTrigger -> Value
+delayedTriggerToJson d =
+  Object
+    [ (Text.pack "ability", triggeredAbilityToJson (DelayedTrigger.ability d)),
+      (Text.pack "source", objectIdToJson (DelayedTrigger.source d)),
+      (Text.pack "controller", playerIdToJson (DelayedTrigger.controller d)),
+      (Text.pack "bindings", bindingsToJson (DelayedTrigger.bindings d))
+    ]
+
+jsonToDelayedTrigger :: Value -> Either Text DelayedTrigger.DelayedTrigger
+jsonToDelayedTrigger value = do
+  ps <- Json.asObject value
+  a <- Json.field (Text.pack "ability") ps >>= jsonToTriggeredAbility
+  s <- Json.field (Text.pack "source") ps >>= jsonToObjectId
+  c <- Json.field (Text.pack "controller") ps >>= jsonToPlayerId
+  b <- Json.field (Text.pack "bindings") ps >>= jsonToBindings
+  pure
+    DelayedTrigger.MkDelayedTrigger
+      { DelayedTrigger.ability = a,
+        DelayedTrigger.source = s,
+        DelayedTrigger.controller = c,
+        DelayedTrigger.bindings = b
+      }
+
 -- Modal -----------------------------------------------------------------------
 
 modeIndexToJson :: ModeIndex.ModeIndex -> Value
@@ -1046,6 +1160,10 @@ cardToJson c =
                Nothing -> []
                Just q -> [(Text.pack "characteristicPT", quantityToJson q)]
            )
+        ++ ( if Map.null (CardT.delayedAbilities c)
+               then []
+               else [(Text.pack "delayedAbilities", delayedAbilitiesToJson (CardT.delayedAbilities c))]
+           )
     )
 
 getOpt :: Text -> [(Text, Value)] -> Value
@@ -1083,6 +1201,7 @@ jsonToCard value = do
   copyOnEnter <- jsonToBoolDefault False (getOpt (Text.pack "copyOnEnter") ps)
   colorIndicator <- setFromDefault jsonToColor (getOpt (Text.pack "colorIndicator") ps)
   characteristicPT <- maybeFrom jsonToQuantity (getOpt (Text.pack "characteristicPT") ps)
+  delayed <- mapFromDefault jsonToDelayedAbilities (getOpt (Text.pack "delayedAbilities") ps)
   pure
     CardT.MkCard
       { CardT.name = name,
@@ -1099,7 +1218,8 @@ jsonToCard value = do
         CardT.castingPermissions = permissions,
         CardT.copyOnEnter = copyOnEnter,
         CardT.colorIndicator = colorIndicator,
-        CardT.characteristicPT = characteristicPT
+        CardT.characteristicPT = characteristicPT,
+        CardT.delayedAbilities = delayed
       }
 
 printingToJson :: Printing.Printing -> Value

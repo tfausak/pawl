@@ -200,8 +200,12 @@ runTurnBasedActions phase = do
 placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
-  let pending = Event.gatherTriggers (Event.unscannedEvents gs) gs
-  State.modify' (\g -> g {GameState.scannedThrough = fromIntegral (Seq.length (GameState.events g))})
+  let (pending, surviving) = Event.gatherTriggers (Event.unscannedEvents gs) gs
+  State.put
+    gs
+      { GameState.scannedThrough = fromIntegral (Seq.length (GameState.events gs)),
+        GameState.delayedTriggers = surviving
+      }
   Monad.mapM_ placeOne (apnapOrder gs pending)
   pure (not (null pending))
 
@@ -265,7 +269,11 @@ placeOne pending = do
       -- CR 113.7: the ability's SOURCE is bound under the reserved slot as it is
       -- placed, so "this creature" resolves as an ordinary slot read even after
       -- the source has left the battlefield.
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen Map.empty Nothing chosenModes)}) abilId (GameState.objects g)})
+      --
+      -- CR 603.7c: a delayed ability's CAPTURED environment (its "it") rides
+      -- alongside the targets chosen now; the source slot is stamped over the top.
+      -- The two never collide -- a captured slot is a token name, never "self".
+      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Map.union (PendingTrigger.bindings pending) (Binding.fromChoices chosen Map.empty Nothing chosenModes))}) abilId (GameState.objects g)})
 
 -- CR 603.3b: active player's triggers first, then the others. Stable within a
 -- controller; the within-controller ORDER becomes that player's choice at Task 7.

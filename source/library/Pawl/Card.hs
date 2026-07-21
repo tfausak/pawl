@@ -5,6 +5,7 @@
 module Pawl.Card where
 
 import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Type.Card as Card
@@ -13,6 +14,7 @@ import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.TargetSpec (TargetSpec)
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TypeLine as TypeLine
 
 -- Every effect across all of a card's modes, in printed (mode, then written)
@@ -70,3 +72,8 @@ isPermanentType cardType = case cardType of
 -- reason the engine never needs to know WHICH card is resolving.
 isPermanent :: Card.Card -> Bool
 isPermanent c = any isPermanentType (Set.toList (TypeLine.types (Card.typeLine c)))
+
+-- CR 603.7: every effect across all of a card's DELAYED abilities' modes. The
+-- read half of the delayed-ability dataflow lint, as allEffects is for the spell.
+delayedEffects :: Card.Card -> [Effect Card.Card]
+delayedEffects card = concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Card.delayedAbilities card))

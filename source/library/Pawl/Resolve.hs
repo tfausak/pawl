@@ -20,6 +20,7 @@ import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Target as Target
+import Pawl.Type.AbilityName (AbilityName)
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import qualified Pawl.Type.Affected as Affected
@@ -31,6 +32,7 @@ import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
+import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Effect as Effect
@@ -76,13 +78,16 @@ slotsOf effect = case effect of
   Effect.Draw _ -> Set.empty
   Effect.Mill slot _ -> Set.singleton slot
   Effect.Discard slot _ -> Set.singleton slot
-  Effect.Create _ _ -> Set.empty
+  -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
+  -- lint must not see it here.
+  Effect.Create {} -> Set.empty
   Effect.Prevent _ _ -> Set.empty
   Effect.RegenerateSelf -> Set.empty
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ _ slot -> Set.singleton slot
   Effect.Untap slot -> Set.singleton slot
   Effect.GainControl _ slot -> Set.singleton slot
+  Effect.ArmDelayedTrigger _ -> Set.empty
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -106,13 +111,14 @@ readsX = any effectReadsX
       Effect.Draw quantity -> quantity == Quantity.Type.X
       Effect.Mill _ quantity -> quantity == Quantity.Type.X
       Effect.Discard _ quantity -> quantity == Quantity.Type.X
-      Effect.Create quantity _ -> quantity == Quantity.Type.X
+      Effect.Create quantity _ _ -> quantity == Quantity.Type.X
       Effect.Prevent _ _ -> False
       Effect.RegenerateSelf -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.Untap _ -> False
       Effect.GainControl _ _ -> False
+      Effect.ArmDelayedTrigger _ -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -139,6 +145,7 @@ manaProduced effect = case effect of
   Effect.PutCounters {} -> Nothing
   Effect.Untap _ -> Nothing
   Effect.GainControl _ _ -> Nothing
+  Effect.ArmDelayedTrigger _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -165,6 +172,7 @@ searchesLibrary effect = case effect of
   Effect.PutCounters {} -> False
   Effect.Untap _ -> False
   Effect.GainControl _ _ -> False
+  Effect.ArmDelayedTrigger _ -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -183,6 +191,35 @@ textChangeSlots card =
         Effect.ChangeText slot -> Just slot
         _ -> Nothing
    in Maybe.mapMaybe slotOf (Card.allEffects card)
+
+-- CR 603.7: the delayed abilities an effect list ARMS, by name. The read half of
+-- the AbilityName dataflow lint, exactly as slotsOf is for target slots.
+armedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
+armedAbilities effects =
+  let named effect = case effect of
+        Effect.ArmDelayedTrigger name -> Just name
+        _ -> Nothing
+   in Set.fromList (Maybe.mapMaybe named effects)
+
+-- The slots an effect list DEFINES rather than reads: a Create that names the
+-- token it mints (CR 603.7c's "it"). The write half of the same lint.
+definedSlots :: [Effect Card.Type.Card] -> Set SlotName
+definedSlots effects =
+  let bound effect = case effect of
+        Effect.Create _ _ mSlot -> mSlot
+        _ -> Nothing
+   in Set.fromList (Maybe.mapMaybe bound effects)
+
+-- Does any Create bind a slot while minting more than one token? CR 603.7c's "it"
+-- names ONE object; binding one of several would be the engine choosing. A named
+-- deferral (the P4 spec, section 8), rejected by the lint until a card needs
+-- "sacrifice THEM".
+bindsSeveralTokens :: [Effect Card.Type.Card] -> Bool
+bindsSeveralTokens effects =
+  let offends effect = case effect of
+        Effect.Create quantity _ (Just _) -> quantity /= Quantity.Type.Literal 1
+        _ -> False
+   in any offends effects
 
 -- Rewrite basic-land-type words in an effect's AST (CR 612). Cases on Effect
 -- (Resolve's charter); delegates the inner modification of ModifyTarget to
@@ -205,7 +242,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Mill {} -> effect
   Effect.Discard {} -> effect
   -- A text-changer does not reach a token's embedded card here (spec section 8).
-  Effect.Create _ _ -> effect
+  Effect.Create {} -> effect
   Effect.Prevent _ _ -> effect
   Effect.RegenerateSelf -> effect
   -- No rewritable land-type word.
@@ -213,6 +250,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PutCounters {} -> effect
   Effect.Untap _ -> effect
   Effect.GainControl _ _ -> effect
+  Effect.ArmDelayedTrigger _ -> effect
 
 -- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
 -- 608.2c/700.2 -- an unchosen mode's effects never resolve), with every
@@ -507,15 +545,48 @@ applyEffect source controller bound legality chosen effect = case effect of
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
-  Effect.Create quantity card -> do
+  Effect.Create quantity card mSlot -> do
     gs <- State.get
     case Quantity.evaluate gs source (Just controller) quantity of
       Just n
-        | n > 0 ->
-            -- CR 111: create n tokens with these characteristics under the effect's
-            -- controller (CR 111.2). Each createToken mints a distinct object.
+        | n > 0 -> do
+            -- CR 111: create n tokens with these characteristics under the
+            -- effect's controller (CR 111.2). Each createToken mints a distinct
+            -- object.
+            let before = GameState.battlefield gs
             State.modify' (\g -> List.foldl' (\g1 _ -> Event.createToken controller card g1) g [1 .. n])
+            case mSlot of
+              Nothing -> pure ()
+              Just slot -> do
+                -- CR 603.7c: bind the minted token so a later effect in this same
+                -- resolution -- or the delayed ability it arms -- can name it. The
+                -- lint guarantees n == 1 here, so the single new battlefield id is
+                -- unambiguous.
+                after <- State.gets GameState.battlefield
+                case Set.toList (Set.difference after before) of
+                  newId : _ -> State.modify' (bindSlot source slot newId)
+                  [] -> pure ()
       _ -> pure ()
+  Effect.ArmDelayedTrigger name -> do
+    gs <- State.get
+    case Game.cardOf source gs >>= (Map.lookup name . Card.Type.delayedAbilities) of
+      -- The dataflow lint makes a dangling name a failing test, never a silent
+      -- no-op; this arm only keeps the executor total.
+      Nothing -> pure ()
+      Just ability ->
+        -- CR 603.7d-f: the controller is the player who controlled the spell or
+        -- ability AS IT RESOLVED -- `controller`, baked in now. CR 603.7a: an
+        -- entry appended here can only ever match events at or after the current
+        -- watermark, so it never fires on an event that already happened.
+        let captured = maybe Map.empty Object.bindings (Game.lookupObject source gs)
+            entry =
+              DelayedTrigger.MkDelayedTrigger
+                { DelayedTrigger.ability = ability,
+                  DelayedTrigger.source = source,
+                  DelayedTrigger.controller = controller,
+                  DelayedTrigger.bindings = captured
+                }
+         in State.put gs {GameState.delayedTriggers = GameState.delayedTriggers gs Seq.|> entry}
   Effect.Prevent duration prevention ->
     -- CR 615.3: install the shield; Event.applyPreventions consults it at each
     -- damage funnel until cleanup drops it (CR 514.2). Targetless and unprompted.
@@ -578,6 +649,16 @@ applyEffect source controller bound legality chosen effect = case effect of
                     GameState.objects = Map.adjust sicken target (GameState.objects gs1)
                   }
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
+
+-- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
+-- later effect of the same resolution -- or a delayed ability armed by it -- can
+-- name the object. `holder` is the effect SOURCE, which is the resolving spell
+-- itself for a spell and the source permanent for an ability; the same object
+-- ArmDelayedTrigger captures from, so the two always agree.
+bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
+bindSlot holder slot target gs =
+  let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
+   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
 -- CR 122.6: add `n` counters of a kind to a permanent's per-incarnation state.
 putCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> GameState -> GameState
