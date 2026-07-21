@@ -1,13 +1,16 @@
 -- Covers M4.5 P4 Task 1: the turn-scoped event log (Pawl.Type.GameEvent,
 -- GameState's log and watermarks) -- append-only recording, watermark-based
 -- consumption per reader (trigger scan, SBA damage check), and the log's
--- turn-scoped clearing at handoff. Later P4 tasks add coverage HERE for the
--- widened CR 603.6a trigger scan, state triggers (CR 603.8), delayed triggers
--- (CR 603.7), intervening "if" (CR 603.4 / 608.2a), and the CR 603.3b ordering
--- prompt -- none of that is implemented yet.
+-- turn-scoped clearing at handoff. Task 2 adds the CR 603.2b step-beginning
+-- event and the CR 603.6a widened scan (every battlefield permanent, not just
+-- an enters event's newcomer) -- `scanTests` below. Later P4 tasks add
+-- coverage HERE for state triggers (CR 603.8), delayed triggers (CR 603.7),
+-- intervening "if" (CR 603.4 / 608.2a), and the CR 603.3b ordering prompt --
+-- none of that is implemented yet.
 module Pawl.TriggerSpec where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
@@ -17,10 +20,17 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.BeginningStep as BeginningStep
+import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.PendingTrigger as PendingTrigger
+import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
@@ -91,5 +101,71 @@ logTests cards =
               HU.assertEqual "the log was cleared afterwards" Seq.empty (GameState.events after)
     ]
 
+-- CR 603.2b / 603.6a: a step begins, and EVERY permanent is checked.
+scanTests :: Cards.Cards -> Tasty.TestTree
+scanTests cards =
+  Tasty.testGroup
+    "Scan"
+    [ HU.testCase "CR 603.2b running a step records that it began, on the active player's turn" $
+        let gs = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.Ending EndingStep.EndStep, GameState.activePlayer = S.alice}
+            after = snd (Engine.runGamePure S.identityAnswer gs Engine.runStep)
+            began ev = case ev of
+              GameEvent.StepBegan p pid -> Just (p, pid)
+              _ -> Nothing
+         in HU.assertEqual
+              "the end step's beginning is recorded"
+              [(Phase.Ending EndingStep.EndStep, S.alice)]
+              (take 1 (Maybe.mapMaybe began (Foldable.toList (GameState.events after)))),
+      HU.testCase "CR 603.2b StepBegins matches its own step and no other" $
+        let bearer = ObjectId.MkObjectId 1
+            cond = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn
+         in do
+              HU.assertBool "the end step matches" $
+                Event.matchesTrigger bearer S.alice cond (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
+              HU.assertBool "the upkeep does not" $
+                not (Event.matchesTrigger bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice)),
+      -- CR 603.3a: "your upkeep" is the ABILITY CONTROLLER's, so the scope is
+      -- read against the bearer's controller, not the card.
+      HU.testCase "CR 603.3a ControllersTurn matches only the bearer's controller's turn" $
+        let bearer = ObjectId.MkObjectId 1
+            cond = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn
+         in do
+              HU.assertBool "alice's upkeep matches for alice" $
+                Event.matchesTrigger bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice)
+              HU.assertBool "bob's upkeep does not" $
+                not (Event.matchesTrigger bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.bob)),
+      -- The widening falsifier: the scan now visits every battlefield permanent,
+      -- so SelfEnters must ask whether the event is about THIS permanent. Rest in
+      -- Peace is on the battlefield and a DIFFERENT object entered.
+      HU.testCase "CR 603.6a a SelfEnters trigger does not fire on another object's entry" $
+        let (_, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            (piker, gs1) = S.addPiker cards S.bob gs0
+            entered = ZoneChange.MkZoneChange piker Zone.Stack Zone.Battlefield
+            gs2 = S.withEvent (GameEvent.Moved entered (Projection.project piker gs1)) gs1
+         in HU.assertEqual "no trigger" 0 (length (Event.gatherTriggers (Event.unscannedEvents gs2) gs2)),
+      HU.testCase "CR 603.6a a SelfEnters trigger still fires on its own entry" $
+        let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
+            gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
+         in case Event.gatherTriggers (Event.unscannedEvents gs1) gs1 of
+              [pt] -> do
+                HU.assertEqual "source is RiP" ripId (PendingTrigger.source pt)
+                HU.assertEqual "controller is alice" S.alice (PendingTrigger.controller pt)
+              other -> HU.assertFailure ("expected exactly one pending trigger, got " <> show (length other)),
+      HU.testCase "a graveyard-bound event yields no enters trigger" $
+        let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            toGrave = ZoneChange.MkZoneChange ripId Zone.Battlefield Zone.Graveyard
+            gs1 = S.withEvent (GameEvent.Moved toGrave (Projection.project ripId gs0)) gs0
+         in HU.assertEqual "no triggers" 0 (length (Event.gatherTriggers (Event.unscannedEvents gs1) gs1)),
+      HU.testCase "SelfEnters matches only a battlefield destination" $
+        let bearer = ObjectId.MkObjectId 1
+            movedTo zone = GameEvent.Moved (ZoneChange.MkZoneChange bearer Zone.Stack zone) S.emptyCharacteristics
+         in do
+              HU.assertBool "enters battlefield matches" $
+                Event.matchesTrigger bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Battlefield)
+              HU.assertBool "enters graveyard does not" $
+                not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard))
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards]
+tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards]

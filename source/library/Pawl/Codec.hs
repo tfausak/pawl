@@ -63,6 +63,7 @@ import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
@@ -434,15 +435,31 @@ jsonToTargetSpec =
       (Text.pack "NonblackCreatureTarget", TargetSpec.NonblackCreatureTarget)
     ]
 
+turnScopeToJson :: TurnScope.TurnScope -> Value
+turnScopeToJson s = nullary . Text.pack $ case s of
+  TurnScope.EachTurn -> "EachTurn"
+  TurnScope.ControllersTurn -> "ControllersTurn"
+
+jsonToTurnScope :: Value -> Either Text TurnScope.TurnScope
+jsonToTurnScope =
+  decodeNullary
+    (Text.pack "TurnScope")
+    [ (Text.pack "EachTurn", TurnScope.EachTurn),
+      (Text.pack "ControllersTurn", TurnScope.ControllersTurn)
+    ]
+
 triggerConditionToJson :: TriggerCondition.TriggerCondition -> Value
-triggerConditionToJson t = nullary . Text.pack $ case t of
-  TriggerCondition.SelfEnters -> "SelfEnters"
+triggerConditionToJson c = case c of
+  TriggerCondition.SelfEnters -> nullary (Text.pack "SelfEnters")
+  TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array [phaseToJson p, turnScopeToJson s]))
 
 jsonToTriggerCondition :: Value -> Either Text TriggerCondition.TriggerCondition
-jsonToTriggerCondition =
-  decodeNullary
-    (Text.pack "TriggerCondition")
-    [(Text.pack "SelfEnters", TriggerCondition.SelfEnters)]
+jsonToTriggerCondition value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
+    ("StepBegins", Just (Array [p, s])) -> TriggerCondition.StepBegins <$> jsonToPhase p <*> jsonToTurnScope s
+    _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
 
 castingPermissionToJson :: CastingPermission.CastingPermission -> Value
 castingPermissionToJson c = nullary . Text.pack $ case c of

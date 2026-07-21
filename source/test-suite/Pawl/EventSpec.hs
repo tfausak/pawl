@@ -20,7 +20,6 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
@@ -82,22 +81,6 @@ tests cards =
          in do
               HU.assertEqual "not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
               HU.assertEqual "exiled instead" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
-      HU.testCase "CR 603.6a: Rest in Peace entering yields its ETB trigger" $
-        let (ripId, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            -- an event describing RiP having entered the battlefield
-            entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
-         in case Event.triggersFrom [entered] gs of
-              [(srcId, controller, _)] -> do
-                HU.assertEqual "source is RiP" ripId srcId
-                HU.assertEqual "controller is alice" S.alice controller
-              _ -> HU.assertFailure "expected exactly one pending trigger",
-      HU.testCase "a graveyard-bound event yields no enters trigger" $
-        let (ripId, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            toGrave = ZoneChange.MkZoneChange ripId Zone.Battlefield Zone.Graveyard
-         in HU.assertEqual "no triggers" 0 (length (Event.triggersFrom [toGrave] gs)),
-      HU.testCase "SelfEnters matches only a battlefield destination" $ do
-        HU.assertBool "enters battlefield matches" (Event.matchesTrigger TriggerCondition.SelfEnters (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) Zone.Stack Zone.Battlefield))
-        HU.assertBool "enters graveyard does not" (not (Event.matchesTrigger TriggerCondition.SelfEnters (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) Zone.Battlefield Zone.Graveyard))),
       HU.testCase "CR 603/614 whole card: cast Rest in Peace, ETB exiles graveyards, then deaths are exiled" $
         let base = S.landsInPlay (Cards.plainsPrinting cards) 2
             (deadId, withDead) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice base

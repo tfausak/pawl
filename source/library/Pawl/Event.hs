@@ -29,6 +29,8 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.PendingTrigger (PendingTrigger)
+import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Prevention (Prevention)
 import qualified Pawl.Type.Prevention as Prevention
@@ -41,8 +43,8 @@ import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import Pawl.Type.TriggerCondition (TriggerCondition)
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
-import Pawl.Type.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Type.TurnScope as TurnScope
 import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
 import Pawl.Type.ZoneChange (ZoneChange)
@@ -277,26 +279,51 @@ applyOne zc re = case re of
       then zc {ZoneChange.to = toDest}
       else zc
 
--- CR 603.6a: does this condition fire on this event? SelfEnters fires when the
--- bearer's object entered the battlefield -- so the event's destination is the
--- battlefield. This module is the sole home of casing on TriggerCondition.
-matchesTrigger :: TriggerCondition -> ZoneChange -> Bool
-matchesTrigger cond zc = case cond of
-  TriggerCondition.SelfEnters -> ZoneChange.to zc == Zone.Battlefield
+-- CR 603.2: does this condition fire on this event, for the permanent that bears
+-- it? `bearer` is the object whose ability this is and `you` is its controller
+-- (CR 603.3a) -- both are part of the match, because the scan below visits EVERY
+-- permanent, not only the one an event names. This module is the sole home of
+-- casing on TriggerCondition.
+matchesTrigger :: ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
+matchesTrigger bearer you cond event = case cond of
+  -- CR 603.6a: the bearer's own object entered the battlefield.
+  TriggerCondition.SelfEnters -> case event of
+    GameEvent.Moved zc _ -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+  -- CR 603.2b: this step began, on a turn the scope admits.
+  TriggerCondition.StepBegins wanted scope -> case event of
+    GameEvent.StepBegan began active ->
+      began == wanted && case scope of
+        TurnScope.EachTurn -> True
+        TurnScope.ControllersTurn -> active == you
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
 
--- The battlefield/enters pass of the three-pass trigger scan (leaves-the-
--- battlefield and phase-step passes are future). For each event with to =
--- Battlefield, the newcomer (`object`) is checked for triggered abilities whose
--- condition matches; each becomes a pending trigger paired with its source id and
--- controller (CR 603.3a).
-triggersFrom :: [ZoneChange] -> GameState -> [(ObjectId, PlayerId, TriggeredAbility Card)]
-triggersFrom changes gs =
-  let fromOne zc =
-        let srcId = ZoneChange.object zc
-         in case Projection.controllerOf srcId gs of
-              Nothing -> []
-              Just ctrl ->
-                map
-                  (\ab -> (srcId, ctrl, ab))
-                  (filter (\ab -> matchesTrigger (TriggeredAbility.condition ab) zc) (Projection.triggeredAbilitiesOf srcId gs))
-   in concatMap fromOne changes
+-- CR 603.6a: "all permanents on the battlefield (including the newcomers) are
+-- checked". This WIDENS M3f's scan, which only ever inspected the object an
+-- enters event named: a step trigger belongs to a permanent that has nothing to
+-- do with the event at all.
+--
+-- The battlefield is the ONLY scanned zone. An ability that functions from a
+-- graveyard, hand or exile is a named deferral (the P4 spec, section 8), expiring
+-- at the first such card.
+--
+-- Events outer, permanents inner (ascending by id): a deterministic canonical
+-- order, which is what the CR 603.3b ordering prompt indexes into.
+eventTriggers :: [GameEvent] -> GameState -> [PendingTrigger]
+eventTriggers events gs =
+  let permanents = Set.toAscList (GameState.battlefield gs)
+      forOne event oid = case Projection.controllerOf oid gs of
+        Nothing -> []
+        Just ctrl ->
+          let fires ab = matchesTrigger oid ctrl (TriggeredAbility.condition ab) event
+              pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab Map.empty
+           in map pend (filter fires (Projection.triggeredAbilitiesOf oid gs))
+   in concatMap (\event -> concatMap (forOne event) permanents) events
+
+-- Everything that has triggered and is not yet on the stack. One function, so
+-- Pawl.Engine never needs to know how many sources there are. Grows a state pass
+-- (CR 603.8) at Task 4 and a delayed pass (CR 603.7) at Task 6.
+gatherTriggers :: [GameEvent] -> GameState -> [PendingTrigger]
+gatherTriggers = eventTriggers

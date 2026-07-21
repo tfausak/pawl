@@ -31,15 +31,16 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.BeginningStep as BeginningStep
-import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.EndingStep as EndingStep
 import Pawl.Type.Game (Game)
+import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
@@ -199,8 +200,7 @@ runTurnBasedActions phase = do
 placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
-  let changes = Maybe.mapMaybe Event.movedOf (Event.unscannedEvents gs)
-      pending = Event.triggersFrom changes gs
+  let pending = Event.gatherTriggers (Event.unscannedEvents gs) gs
   State.modify' (\g -> g {GameState.scannedThrough = fromIntegral (Seq.length (GameState.events g))})
   Monad.mapM_ placeOne (apnapOrder gs pending)
   pure (not (null pending))
@@ -219,10 +219,13 @@ placePendingTriggers = do
 -- there before modes/targets are chosen), so an unfillable one must instead be
 -- taken back OFF the stack. The guard precedes the mode prompt: a removed
 -- trigger must never be asked to choose.
-placeOne :: (ObjectId, PlayerId, TriggeredAbility.TriggeredAbility Card.Card) -> Game ()
-placeOne (srcId, controller, ability) = do
+placeOne :: PendingTrigger.PendingTrigger -> Game ()
+placeOne pending = do
   gs <- State.get
-  let (abilId, gs1) = Game.freshObjectId gs
+  let srcId = PendingTrigger.source pending
+      controller = PendingTrigger.controller pending
+      ability = PendingTrigger.ability pending
+      (abilId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       decider = Decide.deciderFor controller gs
       modal = TriggeredAbility.modal ability
@@ -262,11 +265,11 @@ placeOne (srcId, controller, ability) = do
       State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
 
 -- CR 603.3b: active player's triggers first, then the others. Stable within a
--- controller (M3f never has two from one controller, so order within is moot).
-apnapOrder :: GameState -> [(a, PlayerId, b)] -> [(a, PlayerId, b)]
+-- controller; the within-controller ORDER becomes that player's choice at Task 7.
+apnapOrder :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
 apnapOrder gs pend =
   let active = GameState.activePlayer gs
-      mine (_, p, _) = p == active
+      mine pt = PendingTrigger.controller pt == active
    in filter mine pend ++ filter (not . mine) pend
 
 -- CR 614.1c / 603.6d / 614.12a: drain each object still carrying an as-enters copy
@@ -431,6 +434,11 @@ advance = do
 runStep :: Game ()
 runStep = do
   phase <- State.gets GameState.phase
+  -- CR 603.2b: the step began. Recorded BEFORE the step's turn-based actions, so
+  -- the first priority boundary of this step scans it. The untap step grants no
+  -- priority (CR 503.1), so its event waits until upkeep -- which is exactly what
+  -- CR 503.1 says happens to a trigger during untap.
+  State.modify' (\gs -> Event.recordEvent (GameEvent.StepBegan phase (GameState.activePlayer gs)) gs)
   runTurnBasedActions phase
   checkSba
   finished <- State.gets (Maybe.isJust . GameState.result)

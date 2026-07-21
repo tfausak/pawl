@@ -130,6 +130,7 @@ library
     Pawl.Type.Modification
     Pawl.Type.Object
     Pawl.Type.ObjectId
+    Pawl.Type.PendingTrigger
     Pawl.Type.Phase
     Pawl.Type.Player
     Pawl.Type.PlayerId
@@ -157,6 +158,7 @@ library
     Pawl.Type.Toughness
     Pawl.Type.TriggerCondition
     Pawl.Type.TriggeredAbility
+    Pawl.Type.TurnScope
     Pawl.Type.TypeLine
     Pawl.Type.Zone
     Pawl.Type.ZoneChange

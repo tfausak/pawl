@@ -53,6 +53,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
@@ -688,6 +689,12 @@ damageEventsOf gs = Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.ev
 -- The zone changes recorded so far this turn, in order.
 zoneChangesOf :: GameState.GameState -> [ZoneChange.ZoneChange]
 zoneChangesOf gs = Maybe.mapMaybe Event.movedOf (Foldable.toList (GameState.events gs))
+
+-- The characteristics of nothing: what Projection.baseCharacteristics yields for
+-- an id with no card. The filler snapshot for a hand-built GameEvent.Moved whose
+-- payload no assertion reads.
+emptyCharacteristics :: PC.ProjectedCharacteristics
+emptyCharacteristics = Projection.project (ObjectId.MkObjectId 999) (Setup.emptyGame bothPlayers)
 
 -- A state carrying exactly one UNSCANNED event -- the hand-built-event fixture
 -- shape a scan test needs (EventSpec and ModalSpec both build one).
