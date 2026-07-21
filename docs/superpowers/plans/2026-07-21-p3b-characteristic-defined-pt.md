@@ -1372,7 +1372,10 @@ Append to the `PowerToughness` list:
             (gs, tiId) = S.handOne (Cards.twistedImagePrinting cards) board
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice tiId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-            (_, later) = S.addGraveyardCard (Cards.giantGrowthPrinting cards) S.bob after
+            -- Divination is a SORCERY. Giant Growth would be wrong here: it is an
+            -- Instant, and Lightning Bolt already contributed Instant, so the count
+            -- would not move and the assertions below would fail against correct code.
+            (_, later) = S.addGraveyardCard (Cards.divinationPrinting cards) S.bob after
          in do
               HU.assertEqual "a third card type: 3/4 switched is 4/3, power" (Just 4) (Projection.powerOf goyfId later)
               HU.assertEqual "and toughness" (Just 3) (Projection.toughnessOf goyfId later),
@@ -1569,7 +1572,29 @@ grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-21-p3b-characterist
 
 Expected: a clean warning-free build, all tests passing, and the grep reporting only the steps remaining in this task. Do not proceed on a failing check — report it instead.
 
-- [ ] **Step 2: Update the umbrella spec**
+- [ ] **Step 2: Correct the now-stale `Layer` module comment**
+
+`source/library/Pawl/Type/Layer.hs`'s header says *"only Ability (6), SetPT (7b), and ModifyPT (7c) have producers at M3b."* That has been false since Task 3 (7a) and Task 7 (7d). Replace that clause with:
+
+```haskell
+-- sorts on. Complete for diffability against CR 613 (the Keyword posture).
+-- Producers as of M4.5 P3b: Control (2, P1), Text (3, M3d), Type (4, M3c),
+-- Color (5, P3a), Ability (6, M3b), CharacteristicPT (7a), SetPT (7b),
+-- ModifyPT (7c) and SwitchPT (7d). Copy (1) has no Modification producer -- a
+-- copy is seeded into the fold by Projection.copiableCharacteristics (P2), not
+-- applied as a continuous effect. No Enum/Bounded -- nothing enumerates layers
+-- or asks for bounds.
+```
+
+Preserve the first two lines of the comment (the CR 613.1 sentence and the derived-`Ord` sentence) exactly.
+
+Then rebuild and re-run the suite — this is a comment-only change, so nothing should move:
+
+```bash
+cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -5
+```
+
+- [ ] **Step 3: Update the umbrella spec**
 
 In `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`:
 
@@ -1579,15 +1604,15 @@ In `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`:
 - §6's tracking bullet on `c7a0077`: record the negative answer.
 - Add a line noting **Cluster 1 (layer-system completion) is done**: layers 1 (P2), 2 (P1), 3 (M3d), 4 (M3c), 5 (P3a), 6 (M3b) and 7a/7b/7c/7d all have producers.
 
-- [ ] **Step 3: Add the `progress.md` entry**
+- [ ] **Step 4: Add the `progress.md` entry**
 
 Append an **M4.5 P3b is complete** entry to `docs/progress.md`, in the established one-distilled-entry-per-milestone shape used by the P3a entry directly above it. It must record: the three gate cards and what each falsified; the thesis (one counting quantity, two re-read rules); the in-place 7a fold and its three reasons; the CR 611.2b→608.2h/611.2d citation fix and the wrong-object half of that bug; that P2's CDA-in-copiable-values bill is paid; that `LoseAllAbilities` clearing the CDA is **non-distinguishing today** with Dress Down / Soul Sculptor named as the expiry; and every deferral in the spec's §8 table. Note that no git-bug is closed and that `c7a0077` and `f90e0c4` both stay open.
 
-- [ ] **Step 4: Tick `CLAUDE.md`**
+- [ ] **Step 5: Tick `CLAUDE.md`**
 
 In the "Current work and tracking" section of `CLAUDE.md`, extend the M4.5 paragraph: P3b is complete, layer 7 is finished, and **P4 (event history + state/delayed triggers, which gates P6 and P7) is next**.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md docs/progress.md CLAUDE.md
