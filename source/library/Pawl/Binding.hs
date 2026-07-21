@@ -52,11 +52,22 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 -- this today because `cardOffends` walks only `Modal.modes (Card.Type.spell
 -- card)` -- a card's SPELL modes -- and every `Sacrifice Binding.triggerSource`
 -- in this phase lives in a TRIGGERED ability, whose modes the lint never
--- visits. Any future extension of the D4 lint to triggered/activated/delayed
--- ability modes MUST subtract the reserved slot names (this one, variableX,
+-- visits.
+--
+-- The delayed-ability lint that now exists (CardSpec.hs, "every slot a
+-- delayed ability reads is bound by its card") already covers a delayed
+-- ability's OWN reads of this slot, and it does NOT run into the equality
+-- trap above: it adds Binding.triggerSource to the AVAILABLE side (the slots
+-- a Create binds, plus this one) and checks the read slots are a SUBSET of
+-- that, never an equality. A subset check has no "declared but never read"
+-- half to retire, so reserved-slot subtraction is not needed there. This
+-- warning is about a DIFFERENT, still-hypothetical extension: an
+-- EQUALITY-style D4 lint (declared == read, the spell-mode lint's own shape)
+-- widened to run over a triggered/activated/delayed ability's modes. That
+-- extension MUST subtract the reserved slot names (this one, variableX,
 -- chosenModes, copySource) from the read-slots side before comparing --
--- loosening the equality to a subset would silently retire the lint's
--- "declared but never read" half instead.
+-- loosening the equality to a subset would silently retire its "declared but
+-- never read" half instead.
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 

@@ -558,13 +558,18 @@ applyEffect source controller bound legality chosen effect = case effect of
             case mSlot of
               Nothing -> pure ()
               Just slot -> do
-                -- CR 603.7c: bind the minted token so a later effect in this same
-                -- resolution -- or the delayed ability it arms -- can name it. The
-                -- lint guarantees n == 1 here, so the single new battlefield id is
-                -- unambiguous.
+                -- CR 603.7c: bind the minted token into live Object.bindings so a
+                -- delayed ability THIS SAME resolution arms can name it -- see
+                -- bindSlot's comment for why this reaches ArmDelayedTrigger but
+                -- not a later effect of the same fold. The lint guarantees n == 1
+                -- here, so the single new battlefield id is unambiguous.
                 after <- State.gets GameState.battlefield
                 case Set.toList (Set.difference after before) of
                   newId : _ -> State.modify' (bindSlot source slot newId)
+                  -- Unreachable: Event.createToken always places its token onto
+                  -- the battlefield (CR 111.2), so `after` strictly grows by n
+                  -- for n > 0. Total rather than partial: a no-op leaves nothing
+                  -- bound, matching "the token never named" instead of crashing.
                   [] -> pure ()
       _ -> pure ()
   Effect.ArmDelayedTrigger name -> do
@@ -651,10 +656,25 @@ applyEffect source controller bound legality chosen effect = case effect of
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
--- later effect of the same resolution -- or a delayed ability armed by it -- can
--- name the object. `holder` is the effect SOURCE, which is the resolving spell
--- itself for a spell and the source permanent for an ability; the same object
--- ArmDelayedTrigger captures from, so the two always agree.
+-- delayed ability armed later in the SAME resolution can name the object.
+-- `holder` is the effect SOURCE, which is the resolving spell itself for a
+-- spell and the source PERMANENT for an ability -- the same object
+-- ArmDelayedTrigger captures from (`Game.lookupObject source gs` there), so the
+-- two always agree. This does NOT make the slot visible to a later effect of
+-- the same fold: applyEffect's `chosen` parameter is a snapshot taken once
+-- before the fold starts, so a later Sacrifice/Destroy/etc. reading the same
+-- slot still sees the pre-Create value (Nothing). Only ArmDelayedTrigger sees
+-- it, because it re-reads Object.bindings from LIVE GameState rather than from
+-- `chosen`. A spell-mode effect that tried to read a dangling Create slot would
+-- be caught loudly by the D4 lint (declared slots == read slots) rather than
+-- silently no-op, so this gap is a documentation defect, not a latent one.
+--
+-- For an ABILITY, `holder`/`source` is the source PERMANENT, not the ability
+-- object on the stack -- so a delayed ability armed by a triggered or activated
+-- ability captures the PERMANENT's bindings (e.g. an earlier Create on that
+-- same permanent), never the arming ability's own chosen targets or its `self`
+-- slot. Unexercised today: only Tidal Wave, a spell (whose `source` IS the
+-- resolving stack object), arms anything.
 bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
 bindSlot holder slot target gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}

@@ -33,6 +33,10 @@ import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeIndex as ModeIndex
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -43,6 +47,7 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
@@ -536,7 +541,49 @@ delayedTests cards =
              in do
                   HU.assertEqual "no Wall" [] (walls after)
                   HU.assertEqual "the store is still emptied" 0 (Seq.length (GameState.delayedTriggers after))
-                  HU.assertEqual "nothing stuck on the stack" [] (GameState.stack after)
+                  HU.assertEqual "nothing stuck on the stack" [] (GameState.stack after),
+          -- IMPORTANT-1 (fix pass 1): Engine.placeOne merges a delayed ability's
+          -- OWN placement-time bindings (its chosen modes/targets, chosen just now)
+          -- with the environment CAPTURED when the ability was armed, under
+          -- Map.union -- left-biased, so the argument ORDER decides which side
+          -- wins a collision on a reserved slot such as Binding.chosenModes. The
+          -- two DO collide in practice: Pawl.Cast builds an arming spell's
+          -- bindings through the same Binding.fromChoices that stamps chosenModes
+          -- whenever the spell chooses a mode, so a modal arming spell's captured
+          -- environment carries a "modes" entry that belongs to the SPELL, not to
+          -- the delayed ability being placed.
+          --
+          -- Tidal Wave cannot exercise this: both it and its one delayed ability
+          -- have exactly one mode, so both always choose mode 0 and the two
+          -- possible union orders are indistinguishable through it (the earlier
+          -- Tidal Wave tests above pass under EITHER order). This test instead
+          -- calls Engine.placeOne directly with a hand-built PendingTrigger whose
+          -- CAPTURED bindings carry a chosenModes entry for a mode index (7) the
+          -- ability being placed does not even have -- standing in for "whatever
+          -- mode a modal arming spell happened to choose". The ability itself has
+          -- one legal mode (index 0, forced/unprompted), so a correct placement
+          -- can only ever stamp {0} for ITS OWN choice. Under the pre-fix
+          -- direction (`Map.union captured placementTime`) the captured {7} would
+          -- win instead, and this assertion would fail.
+          HU.testCase "CR 603.7c placement-time's own chosen mode wins a collision with the captured environment" $
+            let onlyMode = Mode.MkMode {Mode.effects = Seq.empty, Mode.targetSpecs = Map.empty}
+                ability =
+                  TriggeredAbility.MkTriggeredAbility
+                    { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+                      TriggeredAbility.modal = Modal.MkModal {Modal.modes = Seq.singleton onlyMode, Modal.selection = ModeSelection.ChooseExactly 1}
+                    }
+                -- Stands in for a modal arming spell's own captured chosenModes --
+                -- built with the SAME Binding.fromChoices Cast.castSpell uses, so
+                -- the collision is the real production shape, not a fabricated one.
+                captured = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 7))
+                pending = PendingTrigger.MkPendingTrigger (ObjectId.MkObjectId 0) S.alice ability captured
+                after = snd (Engine.runGamePure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Engine.placeOne pending))
+                placedModes = case GameState.stack after of
+                  placedId : _ -> case Game.lookupObject placedId after of
+                    Just obj -> Binding.modesOf (Object.bindings obj)
+                    Nothing -> Set.empty
+                  [] -> Set.empty
+             in HU.assertEqual "the ability's own mode (0), not the captured spell's mode (7)" (Set.singleton (ModeIndex.MkModeIndex 0)) placedModes
         ]
 
 tests :: Cards.Cards -> Tasty.TestTree

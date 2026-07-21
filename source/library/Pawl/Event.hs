@@ -488,6 +488,15 @@ stateTriggers gs =
 -- back. CR 603.7d-f: the controller travels with the entry, so a delayed ability
 -- resolves under the player who controlled the spell that created it even if that
 -- spell's source object is long gone.
+--
+-- `fires` matches only against EVENTS (`matchesTrigger`), never against live
+-- game state, so a stored entry whose condition is TriggerCondition.StateIs would
+-- never match here -- it would neither fire nor ever be evicted from the store.
+-- Not a live gap: TriggerCondition is a closed type (Pawl.Type.TriggerCondition)
+-- and no card in this pool arms a delayed ability with a StateIs condition (CR
+-- 603.7's few state-triggered delayed abilities, e.g. "at the beginning of the
+-- next end step" clauses, are all StepBegins in this pool). Noted because a later
+-- P4 task touches state conditions again and should see this before adding one.
 delayedPending :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 delayedPending events gs =
   let fires entry =

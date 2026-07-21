@@ -271,9 +271,21 @@ placeOne pending = do
       -- the source has left the battlefield.
       --
       -- CR 603.7c: a delayed ability's CAPTURED environment (its "it") rides
-      -- alongside the targets chosen now; the source slot is stamped over the top.
-      -- The two never collide -- a captured slot is a token name, never "self".
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Map.union (PendingTrigger.bindings pending) (Binding.fromChoices chosen Map.empty Nothing chosenModes))}) abilId (GameState.objects g)})
+      -- alongside the targets/modes chosen now for THIS placement; the source
+      -- slot is stamped over the top regardless. The two DO collide: the
+      -- captured environment is built by the same Binding.fromChoices the
+      -- arming spell used, so it carries that spell's OWN reserved slots
+      -- (chosenModes, variableX) whenever the spell used them (Tidal Wave's
+      -- arming mode is unconditional). Map.union is left-biased, so
+      -- placement-time bindings must be the LEFT argument -- they are this
+      -- ability's own choices, made just now for this ability; the captured
+      -- environment's only job is to carry forward object references (CR
+      -- 603.7c's "it") that placement-time can never supply. Getting the
+      -- order backwards silently substitutes the arming spell's chosen mode /
+      -- X for the delayed ability's own -- unobserved by any test to date only
+      -- because Tidal Wave and its one delayed ability both ever choose mode
+      -- 0.
+      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Map.union (Binding.fromChoices chosen Map.empty Nothing chosenModes) (PendingTrigger.bindings pending))}) abilId (GameState.objects g)})
 
 -- CR 603.3b: active player's triggers first, then the others. Stable within a
 -- controller; the within-controller ORDER becomes that player's choice at Task 7.

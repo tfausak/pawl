@@ -245,6 +245,19 @@ lintTests cards =
       -- ArmDelayedTrigger naming an ability the card does not declare is a FAILING
       -- TEST, never a trigger that silently never fires. Equality, not subset: a
       -- declared ability nothing arms is dead card text.
+      --
+      -- SCOPE, same posture as Pawl.Binding's D4-lint-scope comment: this and the
+      -- multi-token-binding lint below both walk `Card.allEffects`, which is
+      -- `Modal.allEffects (Card.spell card)` -- a card's SPELL modes ONLY, never
+      -- an activated or triggered ability's effects. An ArmDelayedTrigger placed
+      -- inside an activated/triggered ability is therefore invisible to THIS
+      -- lint's "every armed name is declared" half; if the card also declares no
+      -- matching entry, the dangling arm passes silently. The reverse direction --
+      -- a declared entry nothing arms, because the arm lives in an ability the
+      -- lint can't see -- still fails loudly, which is the safe way round. No card
+      -- in this pool arms from inside an ability today (only Tidal Wave arms
+      -- anything, and it arms from its spell mode); widening the lint to
+      -- non-spell modes is a separate, deliberately out-of-scope change.
       HU.testCase "every armed delayed ability is declared, and every declared one is armed" $
         let cardOffends card =
               Resolve.armedAbilities (Card.allEffects card) /= Map.keysSet (Card.Type.delayedAbilities card)

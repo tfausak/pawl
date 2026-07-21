@@ -97,12 +97,17 @@ data Effect card
     -- Resolve.applyEffect via Event.createToken. NOT a copy-token (CR 707) and NOT a
     -- predefined token (CR 111.10): given, not derived.
     --
-    -- The Maybe SlotName BINDS the minted token so a later effect in the same
-    -- resolution -- or a delayed ability armed by it (CR 603.7c's "it") -- can name
-    -- it. A DEFINITION, not a read: it is not a target and never appears in
-    -- targetSpecs. Defined only for a single-token create; a Create that binds a
-    -- slot while making several tokens is a named deferral (the P4 spec, section
-    -- 8) that the Pawl.CardSpec lint family rejects rather than guessing at.
+    -- The Maybe SlotName BINDS the minted token into the resolving object's LIVE
+    -- Object.bindings, so a delayed ability armed by this same resolution (CR
+    -- 603.7c's "it") -- which re-reads that live state when ArmDelayedTrigger
+    -- captures it -- can name the token. It does NOT make the token visible to a
+    -- LATER EFFECT in the same resolution: applyEffect's `chosen` map is computed
+    -- once before the effect fold begins, so a later Sacrifice/Destroy/etc. in the
+    -- same list still reads the pre-Create snapshot. A DEFINITION, not a read: it
+    -- is not a target and never appears in targetSpecs. Defined only for a
+    -- single-token create; a Create that binds a slot while making several tokens
+    -- is a named deferral (the P4 spec, section 8) that the Pawl.CardSpec lint
+    -- family rejects rather than guessing at.
     Create Quantity card (Maybe SlotName)
   | -- CR 615.3: install a floating prevention effect for a duration. Fog =
     -- Prevent UntilEndOfTurn PreventAllCombatDamage. Targetless (Fog watches a

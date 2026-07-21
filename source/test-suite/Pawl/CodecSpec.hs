@@ -20,6 +20,7 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.BeginningStep as BeginningStep
+import qualified Pawl.Type.Binding as Binding.Type
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
@@ -282,6 +283,24 @@ tests cards =
             roundTrip "name" Codec.abilityNameToJson Codec.jsonToAbilityName (AbilityName.MkAbilityName (Text.pack "sacrifice it")),
           HU.testCase "ArmDelayedTrigger round-trips" $
             roundTrip "arm" Codec.effectToJson Codec.jsonToEffect (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it"))),
+          -- M-5 (fix pass 1): the "DelayedTrigger round-trips" test below exercises
+          -- only a Binding's `target` field via Binding.toObject. The codec is
+          -- meant to be total over every Binding field -- subtypes, amount, modes,
+          -- and copy too -- so round-trip a Binding with all five populated at
+          -- once, exercising jsonToSubtypePair along the way. No real slot ever
+          -- carries all five together (copy lives only under the dedicated
+          -- copySource slot in practice); this is a codec totality check, not a
+          -- claim about a reachable game state.
+          HU.testCase "a Binding with every field populated round-trips" $
+            let binding =
+                  Binding.Type.MkBinding
+                    { Binding.Type.target = Just (Recipient.ToPlayer S.alice),
+                      Binding.Type.subtypes = Just (Subtype.Mountain, Subtype.Island),
+                      Binding.Type.amount = Just 3,
+                      Binding.Type.modes = Just (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]),
+                      Binding.Type.copy = Just S.emptyCharacteristics
+                    }
+             in roundTrip "binding" Codec.bindingToJson Codec.jsonToBinding binding,
           HU.testCase "DelayedTrigger round-trips with its captured bindings" $
             let ability =
                   TriggeredAbility.MkTriggeredAbility
