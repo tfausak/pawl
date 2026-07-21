@@ -502,6 +502,7 @@ affectedToJson a = case a of
   Affected.AllLands -> nullary (Text.pack "AllLands")
   Affected.AllNonbasicLands -> nullary (Text.pack "AllNonbasicLands")
   Affected.OtherNonAuraEnchantments -> nullary (Text.pack "OtherNonAuraEnchantments")
+  Affected.CreaturesOfColor c -> Json.tagged (Text.pack "CreaturesOfColor") (Just (colorToJson c))
 
 jsonToAffected :: Value -> Either Text Affected.Affected
 jsonToAffected value = do
@@ -512,6 +513,7 @@ jsonToAffected value = do
     "AllLands" -> Right Affected.AllLands
     "AllNonbasicLands" -> Right Affected.AllNonbasicLands
     "OtherNonAuraEnchantments" -> Right Affected.OtherNonAuraEnchantments
+    "CreaturesOfColor" -> withValue mv (fmap Affected.CreaturesOfColor . jsonToColor)
     _ -> Left (Text.pack "unknown Affected: " <> t)
 
 -- Effect ---------------------------------------------------------------------

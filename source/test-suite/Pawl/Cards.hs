@@ -65,7 +65,8 @@ data Cards = MkCards
     syntheticModalTriggerPrinting :: Printing.Printing,
     actOfTreasonPrinting :: Printing.Printing,
     clonePrinting :: Printing.Printing,
-    devoidDronePrinting :: Printing.Printing
+    devoidDronePrinting :: Printing.Printing,
+    badMoonPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -130,6 +131,7 @@ loadCards = do
   actOfTreasonPrinting_ <- loadPrinting "act-of-treason"
   clonePrinting_ <- loadPrinting "clone"
   devoidDronePrinting_ <- loadPrinting "synthetic-devoid-drone"
+  badMoonPrinting_ <- loadPrinting "bad-moon"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -183,7 +185,8 @@ loadCards = do
         syntheticModalTriggerPrinting = syntheticModalTriggerPrinting_,
         actOfTreasonPrinting = actOfTreasonPrinting_,
         clonePrinting = clonePrinting_,
-        devoidDronePrinting = devoidDronePrinting_
+        devoidDronePrinting = devoidDronePrinting_,
+        badMoonPrinting = badMoonPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -239,7 +242,8 @@ allPrintings cards =
     syntheticModalTriggerPrinting cards,
     actOfTreasonPrinting cards,
     clonePrinting cards,
-    devoidDronePrinting cards
+    devoidDronePrinting cards,
+    badMoonPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

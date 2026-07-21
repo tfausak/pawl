@@ -77,5 +77,29 @@ tests cards =
         let gs0 = Setup.emptyGame S.bothPlayers
             (droneId, board) = S.addCreature (Cards.devoidDronePrinting cards) S.alice gs0
             gs = withEffect droneId (Modification.SetColor (Set.singleton Color.Black)) board
-         in HU.assertEqual "black" (Set.singleton Color.Black) (Projection.colorsOf droneId gs)
+         in HU.assertEqual "black" (Set.singleton Color.Black) (Projection.colorsOf droneId gs),
+      HU.testCase "Bad Moon pumps a black creature but not a red one" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice gs0
+            (ratsId, withRats) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice withMoon
+            (pikerId, gs) = S.addPiker cards S.alice withRats
+         in do
+              HU.assertEqual "the black Rats are 2/2" (Just 2) (Projection.powerOf ratsId gs)
+              HU.assertEqual "the red Piker is unchanged at 2" (Just 2) (Projection.powerOf pikerId gs)
+              HU.assertEqual "the red Piker's toughness is unchanged at 1" (Just 1) (Projection.toughnessOf pikerId gs),
+      HU.testCase "CR 702.114a Bad Moon does not pump a devoid creature with a black mana cost" $
+        -- FALSIFIER, reader (b) half: a naive "colours are the mana cost's
+        -- symbols" implementation pumps this 2/2 to 3/3.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice gs0
+            (droneId, gs) = S.addCreature (Cards.devoidDronePrinting cards) S.alice withMoon
+         in do
+              HU.assertEqual "power unchanged" (Just 2) (Projection.powerOf droneId gs)
+              HU.assertEqual "toughness unchanged" (Just 2) (Projection.toughnessOf droneId gs),
+      HU.testCase "CR 613 a layer-5 colour change moves a creature INTO Bad Moon's set" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice gs0
+            (pikerId, board) = S.addPiker cards S.alice withMoon
+            gs = withEffect pikerId (Modification.SetColor (Set.singleton Color.Black)) board
+         in HU.assertEqual "the now-black Piker is 3/2" (Just 3) (Projection.powerOf pikerId gs)
     ]

@@ -159,6 +159,8 @@ affects source oid a partial gs =
         Affected.AllLands -> onBattlefield && hasType CardType.Land
         Affected.AllNonbasicLands -> onBattlefield && hasType CardType.Land && not (isBasic oid gs)
         Affected.OtherNonAuraEnchantments -> onBattlefield && oid /= source && hasType CardType.Enchantment
+        Affected.CreaturesOfColor c ->
+          onBattlefield && hasType CardType.Creature && Set.member c (PC.colors partial)
 
 -- CR 205.4a: a basic land is one with the Basic supertype. Read from the printed
 -- type line (supertypes are not projected at M3c).
