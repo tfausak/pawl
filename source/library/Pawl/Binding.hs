@@ -11,8 +11,10 @@ import Numeric.Natural (Natural)
 import Pawl.Type.Binding (Binding)
 import qualified Pawl.Type.Binding as Binding
 import Pawl.Type.ModeIndex (ModeIndex)
+import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
 import Pawl.Type.Recipient (Recipient)
+import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.SlotName (SlotName)
 import qualified Pawl.Type.SlotName as SlotName
 import Pawl.Type.Subtype (Subtype)
@@ -33,6 +35,21 @@ chosenModes = SlotName.MkSlotName (Text.pack "modes")
 -- (P2). No card's targetSpecs may name it: a copy source is not a target.
 copySource :: SlotName
 copySource = SlotName.MkSlotName (Text.pack "copySource")
+
+-- CR 113.7: the reserved slot under which a triggered ability's SOURCE object
+-- (the object whose ability triggered) is bound as the ability is placed, so
+-- "this creature" / "this enchantment" is a slot read rather than a
+-- self-referential opcode. No card's targetSpecs may name it (the D4 lint
+-- enforces this): a source is not a target.
+triggerSource :: SlotName
+triggerSource = SlotName.MkSlotName (Text.pack "self")
+
+-- Bind an object under the reserved triggerSource slot. A dedicated
+-- single-purpose slot, so this insert never clobbers another binding (setCopy's
+-- posture).
+setTriggerSource :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setTriggerSource oid =
+  Map.insert triggerSource (Binding.empty {Binding.target = Just (Recipient.ToObject oid)})
 
 -- CR 614.1c / 603.6d: the reserved slot marking that an object that entered as a
 -- copy has not yet made its as-enters choice (P2). Set by Event.placeObject,

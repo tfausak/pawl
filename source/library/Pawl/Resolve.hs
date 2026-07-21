@@ -71,6 +71,7 @@ slotsOf effect = case effect of
   Effect.ExileAllGraveyards -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
   Effect.Destroy slot -> Set.singleton slot
+  Effect.Sacrifice slot -> Set.singleton slot
   Effect.MoveToZone slot _ -> Set.singleton slot
   Effect.Draw _ -> Set.empty
   Effect.Mill slot _ -> Set.singleton slot
@@ -100,6 +101,7 @@ readsX = any effectReadsX
       Effect.ExileAllGraveyards -> False
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy _ -> False
+      Effect.Sacrifice _ -> False
       Effect.MoveToZone {} -> False
       Effect.Draw quantity -> quantity == Quantity.Type.X
       Effect.Mill _ quantity -> quantity == Quantity.Type.X
@@ -125,6 +127,7 @@ manaProduced effect = case effect of
   Effect.ExileAllGraveyards -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.Destroy _ -> Nothing
+  Effect.Sacrifice _ -> Nothing
   Effect.MoveToZone {} -> Nothing
   Effect.Draw _ -> Nothing
   Effect.Mill {} -> Nothing
@@ -150,6 +153,7 @@ searchesLibrary effect = case effect of
   Effect.ExileAllGraveyards -> False
   Effect.ControlPlayerNextTurn _ -> False
   Effect.Destroy _ -> False
+  Effect.Sacrifice _ -> False
   Effect.MoveToZone {} -> False
   Effect.Draw _ -> False
   Effect.Mill {} -> False
@@ -195,6 +199,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ExileAllGraveyards -> effect
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy _ -> effect
+  Effect.Sacrifice _ -> effect
   Effect.MoveToZone {} -> effect
   Effect.Draw _ -> effect
   Effect.Mill {} -> effect
@@ -243,10 +248,17 @@ resolveSpell oid = do
         let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) card
             chosen = Binding.targetsOf (Object.bindings obj)
             legalSlot slot recipient = case Map.lookup slot specs of
-              Nothing -> False
+              -- CR 608.2b is about TARGETS. A slot with no target spec is a
+              -- RESERVED binding -- the trigger's source (Pawl.Binding.triggerSource),
+              -- a token this resolution minted -- and was never targeted, so it can
+              -- never have become an illegal target.
+              Nothing -> True
               Just spec -> Target.stillLegal recipient spec gs
             legality = Map.mapWithKey legalSlot chosen
-            fizzles = not (Map.null specs) && not (or (Map.elems legality))
+            -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
+            -- reserved slots above cannot rescue a spell whose every target is gone.
+            targeted = Map.restrictKeys legality (Map.keysSet specs)
+            fizzles = not (Map.null specs) && not (or (Map.elems targeted))
          in if fizzles
               then State.modify' (Event.changeZone oid Zone.Graveyard)
               else do
@@ -271,10 +283,17 @@ resolveEffects stackId srcId effects specs = do
     Just obj ->
       let chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipient = case Map.lookup slot specs of
-            Nothing -> False
+            -- CR 608.2b is about TARGETS. A slot with no target spec is a
+            -- RESERVED binding -- the trigger's source (Pawl.Binding.triggerSource),
+            -- a token this resolution minted -- and was never targeted, so it can
+            -- never have become an illegal target.
+            Nothing -> True
             Just spec -> Target.stillLegal recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
-          fizzles = not (Map.null specs) && not (or (Map.elems legality))
+          -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
+          -- reserved slots above cannot rescue a spell whose every target is gone.
+          targeted = Map.restrictKeys legality (Map.keysSet specs)
+          fizzles = not (Map.null specs) && not (or (Map.elems targeted))
           -- CR 613 / 608.2c: the source PERMANENT's controller, projected -- so a
           -- controlled permanent's ability (e.g. a stolen creature's tap ability)
           -- resolves under the thief, not the original owner.
@@ -424,6 +443,15 @@ applyEffect source controller bound legality chosen effect = case effect of
           -- 700.4) and regeneration (CR 701.19a) are Event.destroy's to decide.
           Just target -> Event.destroy target gs
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
+        _ -> gs
+  Effect.Sacrifice slot ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just recipient, True) -> case recipientObject recipient of
+          Nothing -> gs -- a player recipient cannot be sacrificed
+          -- CR 701.21: through the single funnel, which is NOT Event.destroy --
+          -- CR 701.21a: sacrificing is not destroying.
+          Just target -> Event.sacrifice target gs
         _ -> gs
   Effect.MoveToZone slot zone ->
     State.modify' $ \gs ->

@@ -10,8 +10,10 @@
 module Pawl.TriggerSpec where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -28,6 +30,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TurnScope as TurnScope
@@ -186,5 +189,47 @@ scanTests cards =
               HU.assertEqual "sources in ascending ObjectId order" [rip1, rip2] (map PendingTrigger.source triggers)
     ]
 
+-- CR 701.21: sacrificing is its own keyword action -- NOT a destruction.
+sacrificeTests :: Cards.Cards -> Tasty.TestTree
+sacrificeTests cards =
+  Tasty.testGroup
+    "Sacrifice"
+    [ HU.testCase "CR 701.21a a sacrificed permanent goes to its owner's graveyard" $
+        let (piker, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+            after = Event.sacrifice piker gs
+         in do
+              HU.assertEqual "off the battlefield" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      -- CR 701.21a: "sacrificing a permanent doesn't destroy it", so neither CR
+      -- 702.12b's indestructible gate nor CR 701.19a's shield applies.
+      HU.testCase "CR 701.21a an indestructible permanent can still be sacrificed" $
+        let (myr, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            after = Event.sacrifice myr gs
+         in HU.assertEqual "gone from the battlefield" 0 (S.creaturesInPlay S.bob after),
+      HU.testCase "CR 701.21a sacrificing neither consults nor consumes a regeneration shield" $
+        let (piker, gs0) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+            gs = S.addRegenShield piker gs0
+            after = Event.sacrifice piker gs
+         in do
+              HU.assertEqual "still sacrificed" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "the shield is untouched" (Just 1) (Map.lookup piker (GameState.regenerationShields after)),
+      HU.testCase "only a battlefield permanent can be sacrificed (CR 701.21a)" $
+        let (card, gs) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+            after = Event.sacrifice card gs
+         in HU.assertEqual "the library card is untouched" gs after,
+      -- CR 113.7 / 603.7c: "this creature" is a slot read, filled at placement.
+      HU.testCase "CR 113.7 a placed trigger binds its source into the reserved self slot" $
+        let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
+            gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
+            placed = snd (Engine.runGamePure S.identityAnswer gs1 Engine.placePendingTriggers)
+            bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid placed)
+            selfOf oid = Map.lookup Binding.triggerSource (Binding.targetsOf (bindingsOn oid))
+         in HU.assertEqual
+              "the trigger names its source"
+              [Just (Recipient.ToObject ripId)]
+              (map selfOf (GameState.stack placed))
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards]
+tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards]

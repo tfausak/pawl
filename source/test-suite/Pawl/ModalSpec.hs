@@ -327,9 +327,15 @@ triggerModalTests cards =
              in do
                   HU.assertEqual "victim is in bob's hand" 1 (length (Game.zoneMembers Zone.Hand S.bob resolved))
                   HU.assertBool "victim no longer on the battlefield" (not (Set.member victimId (GameState.battlefield resolved)))
+                  -- M4.5 P4 Task 3 (CR 113.7): EVERY placed trigger now also carries
+                  -- its source under the reserved Binding.triggerSource ("self") slot
+                  -- -- Engine.placeOne stamps it unconditionally, not only for a
+                  -- Sacrifice-using card, and Binding.targetsOf projects it right
+                  -- alongside a real chosen target (the same field). So "permanent"
+                  -- (the real chosen target) is no longer the only bound slot.
                   HU.assertEqual
-                    "only the 'permanent' slot is bound"
-                    (Just (Set.singleton (SlotName.MkSlotName (Text.pack "permanent"))))
+                    "the 'permanent' slot and the reserved self slot are bound"
+                    (Just (Set.fromList [SlotName.MkSlotName (Text.pack "permanent"), Binding.triggerSource]))
                     boundSlots,
           HU.testCase "draw mode ({2}) draws exactly one; no token made" $
             let (acId, gs1) = etb S.alice (Setup.emptyGame S.bothPlayers)

@@ -57,6 +57,17 @@ data Effect card
     -- own opcode (Murder vs Darksteel Myr). A future interceptable "destroy event"
     -- (regeneration, CR 615) is M4d.
     Destroy SlotName
+  | -- CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
+    -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction: CR 701.21a
+    -- says so explicitly, so this consults neither indestructible (CR 702.12b) nor
+    -- a regeneration shield (CR 701.19a), and is therefore not a reuse of Destroy.
+    --
+    -- One opcode, not a targetless SacrificeSelf plus a slotted variant on
+    -- RegenerateSelf's precedent: "this creature" is expressible because
+    -- Engine.placeOne binds the trigger's SOURCE into the reserved
+    -- Pawl.Binding.triggerSource slot, and "this creature" recurs far too often to
+    -- pay for a second opcode.
+    Sacrifice SlotName
   | -- CR 400.7: move the slot's target object to a zone through the changeZone
     -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries
     -- Object.owner); targeted exile = MoveToZone slot Exile. The destination is

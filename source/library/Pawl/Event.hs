@@ -228,6 +228,20 @@ counter oid gs = case Game.lookupObject oid gs of
   Nothing -> gs
   Just _ -> changeZone oid Zone.Graveyard gs
 
+-- CR 701.21/701.21a: the single sacrifice funnel. The permanent is put into its
+-- OWNER's graveyard through changeZone (so Rest in Peace's redirect and a token's
+-- CR 704.5d cease-to-exist still compose), and -- unlike Event.destroy -- with no
+-- indestructible gate (CR 702.12b) and no regeneration shield consulted (CR
+-- 701.19a): CR 701.21a says sacrificing is not destroying. CR 701.21a also
+-- restricts it to permanents on the battlefield, so anything else is a no-op.
+sacrifice :: ObjectId -> GameState -> GameState
+sacrifice oid gs = case Game.lookupObject oid gs of
+  Nothing -> gs
+  Just obj ->
+    if Object.zone obj == Zone.Battlefield
+      then changeZone oid Zone.Graveyard gs
+      else gs
+
 -- CR 111.2: create a token with the given effect-defined characteristics under
 -- `controller`'s control (its owner, CR 111.2), summoning-sick (CR 302.6). A token
 -- is created from nothing -- it has no prior object to move, so changeZone cannot

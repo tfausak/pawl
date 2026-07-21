@@ -262,7 +262,10 @@ placeOne pending = do
         if Map.null sets
           then pure Map.empty
           else Trans.lift (Program.prompt (Prompt.ChooseTargets decider controller abilId sets))
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
+      -- CR 113.7: the ability's SOURCE is bound under the reserved slot as it is
+      -- placed, so "this creature" resolves as an ordinary slot read even after
+      -- the source has left the battlefield.
+      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen Map.empty Nothing chosenModes)}) abilId (GameState.objects g)})
 
 -- CR 603.3b: active player's triggers first, then the others. Stable within a
 -- controller; the within-controller ORDER becomes that player's choice at Task 7.
