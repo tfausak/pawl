@@ -63,7 +63,8 @@ data Cards = MkCards
     syntheticModalActivatedPrinting :: Printing.Printing,
     aetherChannelerPrinting :: Printing.Printing,
     syntheticModalTriggerPrinting :: Printing.Printing,
-    actOfTreasonPrinting :: Printing.Printing
+    actOfTreasonPrinting :: Printing.Printing,
+    clonePrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -126,6 +127,7 @@ loadCards = do
   aetherChannelerPrinting_ <- loadPrinting "aether-channeler"
   syntheticModalTriggerPrinting_ <- loadPrinting "synthetic-modal-trigger"
   actOfTreasonPrinting_ <- loadPrinting "act-of-treason"
+  clonePrinting_ <- loadPrinting "clone"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -177,7 +179,8 @@ loadCards = do
         syntheticModalActivatedPrinting = syntheticModalActivatedPrinting_,
         aetherChannelerPrinting = aetherChannelerPrinting_,
         syntheticModalTriggerPrinting = syntheticModalTriggerPrinting_,
-        actOfTreasonPrinting = actOfTreasonPrinting_
+        actOfTreasonPrinting = actOfTreasonPrinting_,
+        clonePrinting = clonePrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -231,7 +234,8 @@ allPrintings cards =
     syntheticModalActivatedPrinting cards,
     aetherChannelerPrinting cards,
     syntheticModalTriggerPrinting cards,
-    actOfTreasonPrinting cards
+    actOfTreasonPrinting cards,
+    clonePrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck
