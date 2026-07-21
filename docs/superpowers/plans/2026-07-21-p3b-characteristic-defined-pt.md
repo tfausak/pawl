@@ -49,11 +49,9 @@ Every task's requirements implicitly include all of these. They come from `CLAUD
 | `source/library/Pawl/Type/Card.hs` | gains `characteristicPT :: Maybe Quantity` |
 | `source/library/Pawl/Type/ProjectedCharacteristics.hs` | gains `characteristicPT :: Maybe (Quantity, Quantity)` |
 | `source/library/Pawl/Type/Modification.hs` | gains `SwitchPowerToughness` (layer 7d) |
-| `source/library/Pawl/Type/TargetSpec.hs` | gains `ArtifactOrCreatureTarget` |
 | `source/library/Pawl/Type/Subtype.hs` | gains `Lhurgoyf` (205.3m) and `Arcane` (205.3k) |
 | `source/library/Pawl/Projection.hs` | seeds `PC.characteristicPT`; folds layer 7a in place; `LoseAllAbilities` clears the CDA; `layer`/`applyModification` for the switch; new `freezeQuantities` |
 | `source/library/Pawl/Resolve.hs` | `ModifyTarget` freezes at store time against the source and its controller |
-| `source/library/Pawl/Target.hs` | `legalRecipients` / `selfExcludes` for `ArtifactOrCreatureTarget` |
 | `source/library/Pawl/Codec.hs` | JSON for every type above |
 
 **Data — new card files** under `data/cards/`: `tarmogoyf.json`, `inner-calm-outer-strength.json`, `twisted-image.json`. **No existing card file changes** — `characteristicPT` is omitted when `Nothing`, the `copyOnEnter`/`colorIndicator` precedent.
@@ -1089,11 +1087,16 @@ EOF
 - Consumes: Task 1's `Quantity.Count` and `evaluate`.
 - Produces: `Projection.freezeQuantities :: GameState -> ObjectId -> Maybe PlayerId -> Modification -> Modification`; `Subtype.Arcane`; `Cards.innerCalmPrinting`.
 
-- [ ] **Step 0: Pin Inner Calm, Outer Strength against Scryfall**
+- [ ] **Step 0: Read the verified card data (already pinned)**
 
-Confirm verbatim: mana cost, type line (expected `Instant — Arcane`, CR 205.3k), and oracle text ("Target creature gets +X/+X until end of turn, where X is the number of cards in your hand."). **The P3b spec deliberately records no mana cost for this card** — two dump extraction windows disagreed. Whatever Scryfall says is what goes in the JSON, and the test's land count in Step 1 must be enough to pay it **and** the Giant Growth cast that follows.
+**The controller verified this card against the Scryfall API on 2026-07-21. Do not re-fetch; use these values.**
 
-Also pull its Gatherer rulings; if one states that the count is determined on resolution, put its date in the freeze test's name (design.md §4: record the ruling's date, because rulings move).
+- Mana cost **`{2}{G}`**, type line **`Instant — Arcane`** (CR 205.3k), no printed P/T.
+- Oracle text: **"Target creature gets +X/+X until end of turn, where X is the number of cards in your hand."**
+
+The `{2}{G}` cost is what the Step 1 test's four Forests are sized for: three to cast this, one for the Giant Growth cast that follows.
+
+**It has zero Gatherer rulings** — so there is no ruling date to put in the freeze test's name, and nothing to transcribe. Do not go looking.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1299,9 +1302,7 @@ EOF
 
 **Files:**
 - Modify: `source/library/Pawl/Type/Modification.hs`
-- Modify: `source/library/Pawl/Type/TargetSpec.hs`
 - Modify: `source/library/Pawl/Projection.hs`
-- Modify: `source/library/Pawl/Target.hs`
 - Modify: `source/library/Pawl/Codec.hs`
 - Create: `data/cards/twisted-image.json`
 - Modify: `source/test-suite/Pawl/Cards.hs`
@@ -1309,16 +1310,26 @@ EOF
 
 **Interfaces:**
 - Consumes: Task 3's layer-7a fold (Tarmogoyf is the asymmetric fixture this task needs); Task 6's `freezeQuantities` (which gains one identity arm).
-- Produces: `Modification.SwitchPowerToughness`; `TargetSpec.ArtifactOrCreatureTarget`; `Cards.twistedImagePrinting`.
+- Produces: `Modification.SwitchPowerToughness`; `Cards.twistedImagePrinting`. **No new `TargetSpec`** — see Step 0.
 
-- [ ] **Step 0: Pin Twisted Image against Scryfall**
+- [ ] **Step 0: Read the verified card data (already pinned)**
 
-Confirm verbatim: mana cost (expected `{U}`), type line (`Instant`), and oracle text ("Switch target artifact or creature's power and toughness until end of turn. Draw a card.").
+**The controller verified this card against the Scryfall API on 2026-07-21. Do not re-fetch; use these values.**
 
-Also pull Twisted Image's Gatherer rulings. Two matter, and they are not equal:
+- Mana cost `{U}`, type line `Instant`, no printed P/T.
+- Oracle text: **"Switch target creature's power and toughness until end of turn.\nDraw a card."**
 
-- The **damage** ruling ("nonlethal damage dealt to a creature may become lethal if you switch its power and toughness during that turn") is transcribed in Step 1 and is a genuine falsifier.
-- The **counters-before-the-switch** ruling is worth reading but is **non-distinguishing** in this pool, for the same reason the ordering test needs Tarmogoyf: a `+1/+1` counter is symmetric, so `counter then switch` and `switch then counter` agree on every creature. Do **not** add it as a test pretending otherwise; the asymmetric Tarmogoyf case in Step 1 is the real proof that 7d follows 7c.
+**This is functional errata, and it removes work from this task.** The New Phyrexia *printed* wording was "target **artifact or** creature's"; WotC dropped the artifact clause, because CR 208.3 says a noncreature permanent has no power or toughness, so switching a noncreature artifact's P/T never did anything.
+
+**Consequence: do NOT add `TargetSpec.ArtifactOrCreatureTarget`.** Twisted Image uses the existing `TargetSpec.CreatureTarget`. Steps 4 and 5 below have been rewritten accordingly — there is no new `TargetSpec` constructor, no new `Pawl.Target` arm, and no new target-spec codec arm in this task.
+
+Twisted Image's three Gatherer rulings, all dated **2021-03-19**, verbatim:
+
+1. *"Effects that switch a creature's power and toughness apply after all other effects, regardless of when those effects began to apply. For instance, if you target a 1/2 creature then give it +2/+0 later in the turn, it's a 2/3 creature, not a 4/1 creature."*
+2. *"Because damage remains marked on a creature until the damage is removed as the turn ends, nonlethal damage dealt to a creature may become lethal if you switch its power and toughness during that turn."*
+3. *"Switching a creature's power and toughness twice (or any even number of times) effectively returns the creature to the power and toughness it had before any switches."*
+
+Rulings 2 and 3 are transcribed as tests in Step 1. Ruling 1's *"regardless of when those effects began to apply"* clause is the timestamp-independence claim, also transcribed in Step 1 — it is the one genuinely new assertion the rulings added to this task.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1357,7 +1368,29 @@ Append to the `PowerToughness` list:
          in do
               HU.assertEqual "a third card type: 3/4 switched is 4/3, power" (Just 4) (Projection.powerOf goyfId later)
               HU.assertEqual "and toughness" (Just 3) (Projection.toughnessOf goyfId later),
-      HU.testCase "CR 613.4d two switches return the object to normal" $
+      HU.testCase "CR 613.4d 2021-03-19 the switch applies last regardless of WHEN it began" $
+        -- Gatherer ruling on Twisted Image (WotC, 2021-03-19): "Effects that switch
+        -- a creature's power and toughness apply after all other effects,
+        -- REGARDLESS OF WHEN THOSE EFFECTS BEGAN TO APPLY. For instance, if you
+        -- target a 1/2 creature then give it +2/+0 later in the turn, it's a 2/3
+        -- creature, not a 4/1 creature."
+        --
+        -- The switch is installed FIRST (earlier timestamp) and the pump SECOND, so
+        -- a timestamp-ordered implementation would switch then pump. Layer order
+        -- (CR 613.4c before 613.4d) must beat timestamp order. The pump is +2/+0 --
+        -- ASYMMETRIC, per the ruling's own example, because a symmetric one cannot
+        -- tell the two orders apart.
+        --
+        -- Goblin Piker is 2/1. Correct: 7c gives 4/1, 7d switches to 1/4.
+        -- Timestamp-ordered: switch gives 1/2, then the pump gives 3/2.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (pikerId, board) = S.addPiker cards S.alice gs0
+            switched = withEffect pikerId Modification.SwitchPowerToughness board
+            gs = withEffect pikerId (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 0)) switched
+         in do
+              HU.assertEqual "power is the pumped toughness" (Just 1) (Projection.powerOf pikerId gs)
+              HU.assertEqual "toughness is the pumped power" (Just 4) (Projection.toughnessOf pikerId gs),
+      HU.testCase "CR 613.4d 2021-03-19 two switches return the object to normal" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (pikerId, board) = S.addPiker cards S.alice gs0
             once = withEffect pikerId Modification.SwitchPowerToughness board
@@ -1366,8 +1399,8 @@ Append to the `PowerToughness` list:
               HU.assertEqual "once: the 2/1 is a 1/2" (Just 1) (Projection.powerOf pikerId once)
               HU.assertEqual "twice: back to 2" (Just 2) (Projection.powerOf pikerId twice)
               HU.assertEqual "twice: back to 1 toughness" (Just 1) (Projection.toughnessOf pikerId twice),
-      HU.testCase "CR 704.5g 2011-01-01 nonlethal damage becomes lethal after a switch" $
-        -- Gatherer ruling on Twisted Image (WotC, 2011-01-01): "Because damage
+      HU.testCase "CR 704.5g 2021-03-19 nonlethal damage becomes lethal after a switch" $
+        -- Gatherer ruling on Twisted Image (WotC, 2021-03-19): "Because damage
         -- remains marked on a creature until the damage is removed as the turn
         -- ends, nonlethal damage dealt to a creature may become lethal if you
         -- switch its power and toughness during that turn." Damage marking
@@ -1457,45 +1490,18 @@ In `source/library/Pawl/Projection.hs`:
 
 `setLandSubtypeEffects`'s `isSet` and `rewriteModification`'s `apply1` both end in a wildcard, so they need no new arm.
 
-- [ ] **Step 4: Add the target spec**
+- [ ] **Step 4: Add the codec arms**
 
-In `source/library/Pawl/Type/TargetSpec.hs`, add after `NonblackCreatureTarget`:
+**No `TargetSpec` change in this task** (Step 0's errata note). `Pawl.Type.TargetSpec` and `Pawl.Target` are untouched.
 
-```haskell
-  | -- CR 115.1a: "target artifact or creature" (Twisted Image) -- a battlefield
-    -- permanent whose PROJECTED card types (M3c) include Artifact or Creature. The
-    -- CreatureOrEnchantmentTarget posture, and like it a ToObject spec rather than
-    -- a ToCreature one, since it admits non-creatures.
-    --
-    -- EXPIRES at P9, whose criterion/filter language replaces this whole family.
-    ArtifactOrCreatureTarget
-```
-
-In `source/library/Pawl/Target.hs`, add to `legalRecipients` (beside `CreatureOrEnchantmentTarget`, whose shape it copies):
-
-```haskell
-        TargetSpec.ArtifactOrCreatureTarget ->
-          let ok oid =
-                let ts = Projection.cardTypesOf oid gs
-                 in Set.member CardType.Artifact ts || Set.member CardType.Creature ts
-              matches = filter ok (Set.toList (GameState.battlefield gs))
-           in Set.fromList (map Recipient.ToObject matches)
-```
-
-and to `selfExcludes`:
-
-```haskell
-  TargetSpec.ArtifactOrCreatureTarget -> False
-```
-
-In `source/library/Pawl/Codec.hs`, add `Modification.SwitchPowerToughness -> nullary (Text.pack "SwitchPowerToughness")` to `modificationToJson`, `"SwitchPowerToughness" -> Right Modification.SwitchPowerToughness` to `jsonToModification`, `TargetSpec.ArtifactOrCreatureTarget -> "ArtifactOrCreatureTarget"` to `targetSpecToJson`, and `(Text.pack "ArtifactOrCreatureTarget", TargetSpec.ArtifactOrCreatureTarget)` to `jsonToTargetSpec`.
+In `source/library/Pawl/Codec.hs`, add `Modification.SwitchPowerToughness -> nullary (Text.pack "SwitchPowerToughness")` to `modificationToJson` and `"SwitchPowerToughness" -> Right Modification.SwitchPowerToughness` to `jsonToModification`. That is the whole codec change.
 
 - [ ] **Step 5: Add the card**
 
 Create `data/cards/twisted-image.json` as a single line (**mana cost per Step 0**):
 
 ```json
-{"name":"Twisted Image","manaCost":[{"type":"OfType","value":{"type":"Colored","value":{"type":"Blue"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Instant"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[{"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"SwitchPowerToughness"},"target"]},{"type":"Draw","value":{"type":"Literal","value":1}}],"targetSpecs":[{"slot":"target","spec":{"type":"ArtifactOrCreatureTarget"}}]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[]}
+{"name":"Twisted Image","manaCost":[{"type":"OfType","value":{"type":"Colored","value":{"type":"Blue"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Instant"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[{"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"SwitchPowerToughness"},"target"]},{"type":"Draw","value":{"type":"Literal","value":1}}],"targetSpecs":[{"slot":"target","spec":{"type":"CreatureTarget"}}]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[]}
 ```
 
 In `source/test-suite/Pawl/Cards.hs`, add `twistedImagePrinting` to the record, to `loadCards` (`loadPrinting "twisted-image"`), to the returned record, and to `allPrintings`. Deterministic fixture; no deck.
@@ -1508,9 +1514,9 @@ Expected: PASS, warning-free.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add source/library/Pawl/Type/Modification.hs source/library/Pawl/Type/TargetSpec.hs source/library/Pawl/Projection.hs source/library/Pawl/Target.hs source/library/Pawl/Codec.hs data/cards/twisted-image.json source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/PowerToughnessSpec.hs pawl.cabal
+git add source/library/Pawl/Type/Modification.hs source/library/Pawl/Projection.hs source/library/Pawl/Codec.hs data/cards/twisted-image.json source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/PowerToughnessSpec.hs pawl.cabal
 hooky fix
-git add source/library/Pawl/Type/Modification.hs source/library/Pawl/Type/TargetSpec.hs source/library/Pawl/Projection.hs source/library/Pawl/Target.hs source/library/Pawl/Codec.hs data/cards/twisted-image.json source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/PowerToughnessSpec.hs pawl.cabal
+git add source/library/Pawl/Type/Modification.hs source/library/Pawl/Projection.hs source/library/Pawl/Codec.hs data/cards/twisted-image.json source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/PowerToughnessSpec.hs pawl.cabal
 hooky run
 git commit -m "$(cat <<'EOF'
 feat(m4.5-p3b): layer 7d P/T switching, gated by Twisted Image (CR 613.4d)
@@ -1559,7 +1565,7 @@ Expected: a clean warning-free build, all tests passing, and the grep reporting 
 
 In `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`:
 
-- §3's **P3b** row: mark it *landed*, point at `docs/superpowers/specs/2026-07-21-p3b-characteristic-defined-pt-design.md`, and widen its scope column from "layer 7a" to "the rest of layer 7 (7a + the CR 608.2h freeze 7b owed + 7d)". Gates: **Tarmogoyf**, **Inner Calm, Outer Strength**, **Twisted Image**. New types: `Quantity.Star`/`Plus`/`Count`, `CountSpec`, `Card.characteristicPT`, `PC.characteristicPT`, `Modification.SwitchPowerToughness`, `TargetSpec.ArtifactOrCreatureTarget`, `Subtype.Lhurgoyf`/`Arcane`.
+- §3's **P3b** row: mark it *landed*, point at `docs/superpowers/specs/2026-07-21-p3b-characteristic-defined-pt-design.md`, and widen its scope column from "layer 7a" to "the rest of layer 7 (7a + the CR 608.2h freeze 7b owed + 7d)". Gates: **Tarmogoyf**, **Inner Calm, Outer Strength**, **Twisted Image**. New types: `Quantity.Star`/`Plus`/`Count`, `CountSpec`, `Card.characteristicPT`, `PC.characteristicPT`, `Modification.SwitchPowerToughness`, `Subtype.Lhurgoyf`/`Arcane`. Note the phase adds **no** new `TargetSpec` — Twisted Image's Oracle errata (artifact clause dropped, CR 208.3) meant `CreatureTarget` sufficed.
 - §3's note "**P3b revives M4a's deferred numeric tower**": add that `c7a0077` (`Quantity.Bound SlotName`) was **not** retired — no count in the phase needed a binding slot.
 - §4's ordering paragraph: P3a and P3b are both landed; **P4** is next.
 - §6's tracking bullet on `c7a0077`: record the negative answer.

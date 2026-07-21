@@ -42,7 +42,7 @@ behave in opposite ways depending on where it lives:
 | | CR | Gate card | Behaviour proved |
 |---|---|---|---|
 | **7a** | 613.4a / 604.3 / 208.2a | **Tarmogoyf** `*`/`1+*` | **recomputed** on every projection |
-| **7b** | 608.2h / 611.2d | **Inner Calm, Outer Strength** `{1}{G}` | **frozen** once, at resolution |
+| **7b** | 608.2h / 611.2d | **Inner Calm, Outer Strength** `{2}{G}` | **frozen** once, at resolution |
 | **7d** | 613.4d | **Twisted Image** `{U}` | applied **after** 7a/7b/7c |
 
 **The decision it proves:** a characteristic-defining ability is an *ability*,
@@ -77,21 +77,37 @@ by freezing at store time against the source (§3).
 
 ### Gate cards
 
-Candidates found by searching the vendored MTGJSON dump; **all three must be
-re-verified against Scryfall** before they are written to `data/cards/` (§7 step 1).
+Found by searching the vendored MTGJSON dump, then **verified against the Scryfall
+API on 2026-07-21** — mana cost, type line, printed P/T box and Oracle text for all
+three. One of the three turned out to carry functional errata; see below.
 
 | Card | Text | What it gates |
 |---|---|---|
 | **Tarmogoyf** — Creature — Lhurgoyf `*/1+*` | "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is equal to that number plus 1." | layer **7a**: a dynamic CDA, recomputed and copiable |
 | **Inner Calm, Outer Strength** — Instant — Arcane | "Target creature gets +X/+X until end of turn, where X is the number of cards in your hand." | layer **7b**: CR 608.2h freeze at resolution |
-| **Twisted Image** — Instant | "Switch target artifact or creature's power and toughness until end of turn. Draw a card." | layer **7d**: the switch, applied last |
+| **Twisted Image** — Instant | "Switch target creature's power and toughness until end of turn. Draw a card." | layer **7d**: the switch, applied last |
 
-**Mana costs are deliberately absent from this table.** The dump sweep that found
-these cards produced two different costs for Inner Calm, Outer Strength across two
-extraction windows — MTGJSON card objects put `rulings` *before* `text`
-alphabetically, and a fixed-width window bleeds across object boundaries. Costs,
-exact wording and type lines are pinned at §7 step 1 against Scryfall, and a wrong
-number quoted here would be worse than no number.
+**Twisted Image carries functional errata, and it shrinks this phase.** Scryfall
+(verified 2026-07-21) gives the Oracle text above; the *printed* New Phyrexia
+wording was **"target artifact or creature's"**. WotC dropped the artifact clause,
+and CR 208.3 says why — *"a noncreature permanent has no power or toughness"* — so
+switching a noncreature artifact's P/T never did anything. This is precisely the
+functional-errata case design.md §4 says to expect (*"a round-trip failure after a
+data refresh may be an errata event, not a regression"*), caught before it reached
+code. **Consequence: this phase adds no new `TargetSpec` at all** — Twisted Image
+uses the existing `CreatureTarget`.
+
+**Verified costs and type lines:** Tarmogoyf `{1}{G}` `Creature — Lhurgoyf` `*`/`1+*`;
+Inner Calm, Outer Strength `{2}{G}` `Instant — Arcane`; Twisted Image `{U}` `Instant`.
+The dump sweep had produced two conflicting costs for Inner Calm across two extraction
+windows — MTGJSON card objects order `rulings` *before* `text`, so a fixed-width
+window bleeds across object boundaries. The API settles it.
+
+**Rulings yield** (Scryfall, 2026-07-21): Tarmogoyf 1 relevant (the all-zones /
+counts-itself ruling, 2007-10-01); **Twisted Image 3, all dated 2021-03-19** (switch
+applies after all other effects *regardless of when they began*; nonlethal damage may
+become lethal; an even number of switches is a no-op); **Inner Calm, Outer Strength
+has none**.
 
 The three interlock deliberately. Tarmogoyf is the only **asymmetric** P/T source
 in the pool (`N`/`N+1`), which is what makes it the ordering falsifier for
@@ -113,8 +129,7 @@ counting quantity both 7a and 7b need.
 one-axis 7b set, and `Quantity.Half`/`Infinite`.
 
 **Not in this milestone by construction.** The general filter/criterion language
-that would retire `CountSpec` and `TargetSpec.ArtifactOrCreatureTarget` is
-**P9**'s, unchanged. P3b builds the counting axis P9 will generalize; it does not
+that would retire `CountSpec` is **P9**'s, unchanged. P3b builds the counting axis P9 will generalize; it does not
 build P9.
 
 ## 2. Architecture
@@ -312,8 +327,8 @@ of power and apply it to the creature's toughness, and take the value of toughne
 and apply it to the creature's power."* Two switches return the object to normal,
 for free, because each is a separate application.
 
-`TargetSpec.ArtifactOrCreatureTarget` (CR 115.1a) reads **projected** card types,
-the `CreatureOrEnchantmentTarget` posture. Expiry → **P9**.
+Twisted Image needs **no new `TargetSpec`**: its Oracle text targets a creature,
+so the existing `CreatureTarget` (CR 115.1a) serves. See the errata note in §0.
 
 Twisted Image is `ModifyTarget UntilEndOfTurn SwitchPowerToughness slot` +
 `Draw (Literal 1)` — **zero new opcodes**, all existing machinery (M3b, M4b).
@@ -322,7 +337,7 @@ Twisted Image is `ModifyTarget UntilEndOfTurn SwitchPowerToughness slot` +
 
 `Card.characteristicPT` is omitted when `Nothing`, so no existing card file
 changes. `CountSpec`, the three new `Quantity` arms, `SwitchPowerToughness`,
-`ArtifactOrCreatureTarget` and the two new `Subtype` arms all round-trip
+and the two new `Subtype` arms all round-trip
 through `Pawl.Codec`, and M3.5's honesty property
 (`jsonToCard . cardToJson ≡ Right`) covers them the moment a card populates them.
 
@@ -330,8 +345,7 @@ through `Pawl.Codec`, and M3.5's honesty property
 
 1. **Classification, never identity.** `SwitchPowerToughness` is open-half
    vocabulary cased on solely by `Pawl.Projection`;
-   `Count`/`CountSpec` is a classification evaluated by `Pawl.Quantity`;
-   `ArtifactOrCreatureTarget` is a classification consulted by `Pawl.Target`.
+   `Count`/`CountSpec` is a classification evaluated by `Pawl.Quantity`.
    `freezeQuantities` pattern-matches `Modification` **inside `Pawl.Projection`**,
    preserving the sole-casing home, and `Resolve` delegates to it exactly as it
    already delegates `rewriteModification`. No module learns what card it is
@@ -457,12 +471,10 @@ Inner Calm, Outer Strength's determined-on-resolution ruling.
 | `Pawl.Type.Card` | `+ characteristicPT :: Maybe Quantity` (serialized only when `Just`) |
 | `Pawl.Type.ProjectedCharacteristics` | `+ characteristicPT :: Maybe (Quantity, Quantity)` |
 | `Pawl.Type.Modification` | `+ SwitchPowerToughness` — layer 7d |
-| `Pawl.Type.TargetSpec` | `+ ArtifactOrCreatureTarget` |
 | `Pawl.Type.Subtype` | `+ Arcane` (CR 205.3k spell type, Inner Calm's type line); `+ Lhurgoyf` (CR 205.3m creature type, Tarmogoyf's) |
 | `Pawl.Projection` | 7a in-place fold in `projectFrom`; seed of `PC.characteristicPT`; `LoseAllAbilities` clears it; `layer`/`applyModification` for `SwitchPowerToughness`; `+ freezeQuantities` |
 | `Pawl.Resolve` | `ModifyTarget` freezes at store time against the source and its controller; the `611.2b` citation becomes `611.2d`/`608.2h` |
-| `Pawl.Target` | `legalRecipients` / `isSelfExcluding` for `ArtifactOrCreatureTarget` |
-| `Pawl.Codec` | the new `Quantity` arms, `CountSpec`, `characteristicPT`, `SwitchPowerToughness`, the target spec, `Arcane` |
+| `Pawl.Codec` | the new `Quantity` arms, `CountSpec`, `characteristicPT`, `SwitchPowerToughness`, the two `Subtype` arms |
 | `data/cards/` | 3 new files; no existing file changes |
 
 No new opcode. No new prompt. No change to `Object`, `GameState`, or the event
@@ -488,8 +500,8 @@ first (CLAUDE.md: TDD is not optional).
 6. Clone of Tarmogoyf → **falsifier 2** (P2's deferred bill).
 7. `Projection.freezeQuantities` + `Resolve`'s store-time freeze +
    `inner-calm-outer-strength.json` → **falsifiers 3, 4 and 7**.
-8. `Modification.SwitchPowerToughness` + `TargetSpec.ArtifactOrCreatureTarget` +
-   `twisted-image.json` → **falsifiers 5 and 6**.
+8. `Modification.SwitchPowerToughness` + `twisted-image.json` (reusing
+   `CreatureTarget`) → **falsifiers 5 and 6**.
 9. Rulings transcription for all three cards, dated in the test names.
 10. Umbrella §3/§4 update, `progress.md` entry, `CLAUDE.md` current-work tick.
 
@@ -502,7 +514,6 @@ first (CLAUDE.md: TDD is not optional).
 | `Count` over **projected** state ("lands you control", "Elves on the battlefield") | **Strength of Cedars** / **Wirewood Pride** — either forces quantity evaluation to move into `Pawl.Projection` (a cycle from `Pawl.Quantity` today) |
 | Counting **projected** card types of graveyard cards (§2.1 reads printed types) | the first effect that changes a graveyard card's types |
 | `CountSpec` as a whole | **P9**'s criterion / filter language |
-| `TargetSpec.ArtifactOrCreatureTarget` | **P9** |
 | CR 208.2b "as this creature enters …" P/T choice (a replacement effect that sets copiable values) | **P5**, the replacement-engine phase |
 | CR 208.5 "no value → 0" at the read points | the first creature with no P/T value that a reader observes |
 | A one-axis 7b set ("its toughness becomes 4") — `SetBasePowerToughness` takes two `Quantity`s, not two `Maybe`s | the first such card |
