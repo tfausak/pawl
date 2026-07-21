@@ -59,6 +59,7 @@ layer m = case m of
   Modification.AddCardType _ -> Layer.Type
   Modification.ChangeSubtypeWord _ _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
+  Modification.SetColor _ -> Layer.Color
 
 -- Apply one modification to characteristics-in-progress. THE ONE applier
 -- (Resolve : Effect :: Projection : Modification). P/T quantities are evaluated
@@ -110,6 +111,9 @@ applyModification gs oid m pc = case m of
   -- see its comment). This arm is identity so gather/project's uniform walk over
   -- every stored effect stays total once a SetController effect exists.
   Modification.SetController _ -> pc
+  Modification.SetColor cs ->
+    -- CR 105.3: the new colours replace all previous ones.
+    pc {PC.colors = cs}
 
 -- CR 613.4b: layer 7b SETS base P/T to a specific value -- it ESTABLISHES P/T, so
 -- an object with no printed P/T that is set (an Opalescence-animated enchantment)

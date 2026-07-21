@@ -1,6 +1,8 @@
 module Pawl.Type.Modification where
 
+import Data.Set (Set)
 import Pawl.Type.CardType (CardType)
+import Pawl.Type.Color (Color)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Quantity (Quantity)
@@ -27,4 +29,10 @@ data Modification
     -- the effect's source's controller, never chosen. Applied only by
     -- Projection.controllerOf. Never appears in card JSON (runtime-only).
     SetController PlayerId
+  | -- layer 5, CR 613.1e / 105.3: this object becomes exactly these colours. A
+    -- SET, not an add: CR 105.3 says a new colour REPLACES all previous colours
+    -- unless the effect says "in addition" -- and no card in the pool does, so
+    -- there is deliberately no AddColor constructor. SetColor with an empty set
+    -- is "becomes colourless" (CR 105.2c).
+    SetColor (Set Color)
   deriving (Eq, Ord, Show)
