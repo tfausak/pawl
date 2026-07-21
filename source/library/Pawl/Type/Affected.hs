@@ -16,8 +16,14 @@ data Affected
   | AllNonbasicLands -- Blood Moon
   | OtherNonAuraEnchantments -- Opalescence ("each other"); self excluded by the effect's source at fold time
   | -- Bad Moon: "Black creatures get +1/+1". A DYNAMIC set, re-derived every
-    -- projection like AllCreatures -- and evaluated against the partial
-    -- projection, so a CR 613.1e layer-5 colour change is visible to this
-    -- layer-7c effect (CR 613: layers apply in order).
+    -- projection like AllCreatures -- and evaluated against the PARTIAL
+    -- projection accumulated so far, so it sees colour as of whichever layers
+    -- have already applied (CR 613: layers apply in order). For a layer-7c
+    -- modification (Bad Moon) that partial projection already includes layer 5,
+    -- so a CR 613.1e colour change is visible to it -- but this is the general
+    -- rule, not something specific to layer 7c: pairing this affected set with a
+    -- modification BELOW layer 5 (a layer-2/3/4 op) is the untested case that
+    -- Projection.baseColorsOf's devoid-seed comment names as the shortcut's
+    -- named expiry.
     CreaturesOfColor Color
   deriving (Eq, Ord, Show)

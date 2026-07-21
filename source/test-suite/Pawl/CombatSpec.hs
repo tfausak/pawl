@@ -411,6 +411,17 @@ evasionTests cards =
               (a : _, b : _) ->
                 HU.assertBool "legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0))
               _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.36b a devoid creature with a black mana cost may not block a creature with fear" $
+        -- THE FALSIFIER for reading the blocker's PRINTED colour: the Devoid
+        -- Drone's mana cost is {1}{B}, but CR 702.114a makes it colourless (not
+        -- black), so it is not a legal blocker of a fear attacker. Fails against
+        -- any implementation that reads the blocker's printed colour rather than
+        -- its projected colour.
+        let (gs0, mine, theirs) = attacking [Cards.pikerPrinting cards] [Cards.devoidDronePrinting cards]
+         in case (mine, theirs) of
+              (a : _, b : _) ->
+                HU.assertBool "illegal" (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0)))
+              _ -> HU.assertFailure "fixture should have an attacker and a blocker",
       HU.testCase "CR 702.36b fear restricts being blocked, never blocking" $
         -- The 702.9b asymmetry, restated for fear: a fear creature blocking a
         -- plain attacker is legal.

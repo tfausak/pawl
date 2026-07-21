@@ -840,11 +840,25 @@ its own gate card and spec, landed as it completes. Umbrella:
   Humility's `LoseAllAbilities` is layer 6, after layer 5, and CR 613.8a
   scopes dependency to same-layer effects, so a Humility'd devoid object
   stays colourless either way; and CR 604.3 ("CDAs function in all zones")
-  comes free from a card-derived, zone-independent seed. **Named expiry:**
+  comes free from a card-derived, zone-independent seed. **A fifth case names
+  the channel the first four don't cover:** all four reason about what
+  *writes* colour, none about what *reads* it — seeding devoid also moves it
+  earlier than CR 613.3's "start of layer 5" relative to a colour *reader*, so
+  a layer-2/3/4 effect whose affected set is colour-keyed (expressible today
+  via `Affected.CreaturesOfColor`, though no card in the pool pairs it that
+  way) would see the wrong answer. So the honest claim is indistinguishable
+  **for the pool**, not for everything the engine can reach. **Named expiry:**
   the first card needing a genuine CDA-vs-timestamp interleave within
-  layers 2–6 (which would build the `Gathered` precedence key) — and **P3b
-  reopens the identical question one sublayer up, at layer 7a**, for
-  characteristic-defining P/T. **Three readers span three closed-half
+  layers 2–6 (which would build the `Gathered` precedence key), **or** the
+  first layer-2/3/4 effect whose affected set is colour-keyed, whichever comes
+  first. **P3b does *not* reopen this question**: devoid is a *constant* CDA
+  (safe to seed, since a copy snapshot recomputes the same constant), but
+  Tarmogoyf's characteristic-defining P/T is a *dynamic* one — seeding it would
+  freeze a Clone's P/T into `Binding.copy` at entry instead of recomputing (CR
+  707.2 violation) — so **P3b must fold in-place at the existing
+  `Layer.CharacteristicPT` (7a)**, not at the seed; the `*`-P/T seed precedent
+  is harmless only because no card in the pool has one, not a licence to seed
+  a dynamic CDA. **Three readers span three closed-half
   subsystems, and two of the three expire**: `TargetSpec
   .NonblackCreatureTarget` (CR 115.1a, Doom Blade — the `WallTarget`
   hand-carved-variant posture) and `Affected.CreaturesOfColor Color` (Bad

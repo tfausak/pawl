@@ -229,7 +229,9 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 -- 613.3 says that within layers 2-6 characteristic-defining abilities apply first
 -- and only then other effects in timestamp order, which would mean a precedence
 -- key on Gathered. That machinery is not built because the two orderings are
--- observably indistinguishable for everything this engine can reach:
+-- observably indistinguishable for everything IN THE CARD POOL TODAY (not
+-- "everything this engine can reach" -- see the fifth bullet, which names the
+-- gap the first four don't cover):
 --
 --   * every layer-5 effect in the vocabulary is SetColor, which REPLACES (CR
 --     105.3), so "CDA first, then the replacers" and "CDA before layer 5, then the
@@ -242,10 +244,39 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 --     stays colourless under either ordering;
 --   * CR 604.3: a CDA functions in ALL zones. The seed is computed from the card
 --     and is zone-independent; a battlefield-only gather pass would not be.
+--   * the four bullets above all reason about what WRITES colour. None covers
+--     what READS it. Seeding devoid also moves it earlier relative to colour
+--     READERS: under CR 613.3, devoid applies at the START of layer 5, so at
+--     layers 2, 3 and 4 the CR says a devoid object with {B} in its mana cost is
+--     still black, while this seed-based implementation already says colourless.
+--     Affected.CreaturesOfColor (this phase) makes that gap expressible open-half
+--     data TODAY: a card pairing {"affected": {"CreaturesOfColor": ...}} with a
+--     layer-4 AddCardType, a layer-3 ChangeSubtypeWord, or a layer-2 SetController
+--     would have its affected set evaluated against PC.colors with devoid already
+--     applied, which is the wrong answer per 613.3. No card in the pool does
+--     this, so it stays unobserved -- but it is the case that retires this
+--     shortcut, not a hypothetical.
 --
 -- EXPIRES with the first card needing a genuine CDA-vs-timestamp interleave
--- WITHIN layers 2-6, which is what builds the Gathered precedence key. P3a's spec
--- section 2.2 carries the full argument; P3b re-opens it one sublayer up at 7a.
+-- WITHIN layers 2-6, which is what builds the Gathered precedence key -- OR the
+-- first layer-2/3/4 effect whose affected set is colour-keyed (the fifth bullet
+-- above), whichever comes first. P3a's spec section 2.2 carries the full
+-- argument.
+--
+-- P3b does NOT reopen this question. Devoid is a CONSTANT CDA (its value doesn't
+-- depend on game state), so seeding it is sound: a copy snapshot recomputes the
+-- same constant. Tarmogoyf's characteristic-defining P/T (P3b, layer 7a) is a
+-- DYNAMIC CDA -- it reads the graveyards' card types, which change over time.
+-- Seeding a dynamic CDA would freeze it into Binding.copy at entry (see
+-- Engine.hs's as-enters drain, which snapshots Projection.copiableCharacteristics)
+-- -- a Clone of a Tarmogoyf would keep whatever P/T the graveyards held at the
+-- moment it entered, instead of recomputing, which violates CR 707.2 (a copy
+-- acquires the ABILITY, not its computed value). So P3b must fold Tarmogoyf's
+-- CDA in-place at Layer.CharacteristicPT (7a, which already exists in
+-- Pawl.Type.Layer as the CR's own dedicated sublayer for this), not at the seed.
+-- The precedent below (baseCharacteristics already evaluating a printed `*` P/T
+-- at the seed via Quantity.evaluate) is harmless ONLY because no card in the pool
+-- has `*` P/T and is therefore not a licence to seed a dynamic CDA -- see above.
 baseColorsOf :: Card.Type.Card -> Set Color.Color
 baseColorsOf card =
   if Set.member Keyword.Devoid (Card.Type.keywords card)
@@ -261,7 +292,8 @@ manaCostColors mc = case mc of
   Nothing -> Set.empty
   Just (ManaCost.MkManaCost symbols) -> Set.fromList (Maybe.mapMaybe symbolColor symbols)
 
--- CR 202.2a: only a coloured mana symbol carries a colour. Generic ({2}), {X},
+-- CR 202.2b: only a coloured mana symbol carries a colour ("Objects with no
+-- colored mana symbols in their mana costs are colorless"). Generic ({2}), {X},
 -- and the colourless symbol ({C}) carry none -- {C} is colourless mana, and
 -- CR 105.2c says colourless is not a colour.
 symbolColor :: ManaSymbol.ManaSymbol -> Maybe Color.Color

@@ -116,8 +116,9 @@ deliberate, argued equivalence, not an oversight.** CR 702.114a makes devoid a
 *characteristic-defining ability*, and CR 613.3 says that within layers 2–6, CDAs
 are applied **first**, then all other effects in timestamp order. pawl's fold
 sorts on `(layer, timestamp)` only; honouring 613.3 literally would mean a
-precedence key on `Gathered`. It is not needed, because for **every** case this
-engine can reach the two orderings are observably indistinguishable:
+precedence key on `Gathered`. It is not needed, because for every case
+**exercised by the current card pool** the two orderings are observably
+indistinguishable:
 
 - Every layer-5 effect in the vocabulary is `SetColor`, which **replaces** (CR
   105.3). "CDA first, then the replacers" and "CDA before layer 5, then the
@@ -130,13 +131,43 @@ engine can reach the two orderings are observably indistinguishable:
   stays colourless under both orderings, which is the real ruling.
 - **CR 604.3**: CDAs function in all zones. The seed is computed from the card and
   is therefore zone-independent; a battlefield-only `gather` pass would not be.
+- **The gap these four bullets don't cover: colour READERS below layer 5.** All
+  four bullets reason about what *writes* colour. Seeding devoid also moves it
+  earlier relative to a colour *reader*: under CR 613.3, devoid applies at the
+  **start of layer 5**, so at layers 2, 3 and 4 the CR's answer is that a devoid
+  object with `{B}` in its mana cost is still **black**, while the seed
+  implementation already says colourless. `Affected.CreaturesOfColor` (this
+  phase) makes that gap expressible open-half data *today*: a card pairing
+  `{"affected": {"CreaturesOfColor": ...}}` with a layer-4 `AddCardType`, a
+  layer-3 `ChangeSubtypeWord`, or a layer-2 `SetController` would have its
+  affected set evaluated against `PC.colors` with devoid already applied — the
+  wrong answer per 613.3. No card in the pool does this today, so it stays
+  unobserved for now, but it is the case that retires this shortcut, not a
+  hypothetical.
 
-This is the same posture `baseCharacteristics` already takes toward a printed `*`
-P/T, which it evaluates at the seed rather than in layer 7a. **Named expiry:** the
+So the honest claim is: the two orderings are indistinguishable for everything
+**in the pool**, not for everything the engine can reach. **Named expiry:** the
 first card requiring a genuine CDA-vs-timestamp interleave *within* layers 2–6
-builds the `Gathered` precedence key, and P3b re-opens the identical question one
-sublayer up. The code comment carries this argument with its CR numbers so the
-next reader can check it (CLAUDE.md's rules-claim rule).
+(building the `Gathered` precedence key), **or** the first layer-2/3/4 effect
+whose affected set is colour-keyed (the fifth bullet above), whichever comes
+first. The code comment carries this argument with its CR numbers so the next
+reader can check it (CLAUDE.md's rules-claim rule).
+
+**P3b does *not* reopen this question.** Devoid is a **constant** CDA — its value
+doesn't depend on game state — so seeding it is sound: a copy snapshot recomputes
+the same constant. Tarmogoyf's characteristic-defining P/T (P3b, layer 7a) is a
+**dynamic** CDA: it reads the graveyards' card types, which change over time.
+Seeding a dynamic CDA would freeze it into `Binding.copy` at entry (`Engine.hs`'s
+as-enters drain, which snapshots `Projection.copiableCharacteristics`) — a Clone
+of a Tarmogoyf would keep whatever P/T the graveyards held at the moment it
+entered, instead of recomputing, which violates CR 707.2 (a copy acquires the
+*ability*, not its computed value). So **P3b must fold Tarmogoyf's CDA in-place
+at `Layer.CharacteristicPT`** (7a — which already exists in `Pawl.Type.Layer` as
+the CR's own dedicated sublayer for exactly this), not at the seed; it needs no
+CR 613.3 precedence key at all. `baseCharacteristics` already evaluating a
+printed `*` P/T at the seed via `Quantity.evaluate` is harmless *only* because no
+card in the pool has `*` P/T — that precedent is not a general licence to seed a
+dynamic CDA, only a currently-unexercised one.
 
 *(`observable-equivalence-is-the-bar`: internal structure may differ from the CR's
 own decomposition where the difference is provably unobservable. The proof is the
@@ -183,12 +214,17 @@ out of the existing fold. **Expiry → P9.**
 **(c) Combat — `Keyword.Fear`.** CR 702.36b: "A creature with fear can't be
 blocked except by artifact creatures and/or black creatures." One arm on `Keyword`
 (a rulebook citation — casing on it is not an invariant violation, per the M2a
-spec §1) and one clause in `Combat.canBlock`, beside the existing flying/reach
-pair. Unlike (a) and (b), **this reader does not expire** — it is permanent
-closed-half machinery, and it reads projected colour *and* projected card type
-(artifact) together. Fear is on design.md §3's own M2 punchlist ("indestructible,
-intimidate, landwalk, lifelink — same axes, no new machinery"), so this is scoped
-work being cashed, not scope creep.
+spec §1) and one clause — `fearAllows` — in `Combat.legalBlockDeclaration`,
+beside the existing `evasionAllows` (flying/reach) conjunct. It belongs there and
+not in `Combat.canBlock`: `canBlock` is a per-creature predicate ("can this
+creature block at all"), whereas fear is a per-*pair* restriction on a specific
+blocker/attacker combination — folding it into `canBlock` would silently
+disqualify a fearless-attacker-legal blocker from blocking anything at all, a
+genuine rules bug. Unlike (a) and (b), **this reader does not expire** — it is
+permanent closed-half machinery, and it reads projected colour *and* projected
+card type (artifact) together. Fear is on design.md §3's own M2 punchlist
+("indestructible, intimidate, landwalk, lifelink — same axes, no new machinery"),
+so this is scoped work being cashed, not scope creep.
 
 ### 2.5 Token colour (CR 111.3)
 
@@ -299,7 +335,7 @@ yield.
 | `Pawl.Type.TargetSpec` | `+ NonblackCreatureTarget` |
 | `Pawl.Type.Affected` | `+ CreaturesOfColor Color` |
 | `Pawl.Projection` | base colours in `baseCharacteristics`; `layer`/`applyModification` for `SetColor`; `affects` for `CreaturesOfColor`; `+ colorsOf` |
-| `Pawl.Combat` | `canBlock` gains the CR 702.36b fear clause |
+| `Pawl.Combat` | `legalBlockDeclaration` gains the CR 702.36b fear clause via a new `fearAllows` (per-pair, not per-creature — not `canBlock`) |
 | `Pawl.Target` | `legalRecipients` / `isSelfExcluding` for `NonblackCreatureTarget` |
 | `Pawl.Codec` | `colorIndicator` (omitted when empty), `SetColor`, the two keywords, the target spec, the affected set |
 | `data/cards/` | 5 new files; `dragon-fodder.json`'s token gains `colorIndicator` |
@@ -335,10 +371,10 @@ Substrate before consumers, and each step's test written and watched to fail fir
 |---|---|
 | `AddColor` (CR 105.3 "in addition to its other colors") | the first card with that wording |
 | Hybrid / Phyrexian mana symbols (CR 202.2d) | `ManaSymbol` has no hybrid arm; the first hybrid-cost card |
-| CR 613.3 CDA-vs-timestamp precedence within layers 2–6 | the first card needing a genuine interleave; **P3b re-opens the same question at layer 7a** |
+| CR 613.3 CDA-vs-timestamp precedence within layers 2–6 | the first card needing a genuine interleave **within layers 2–6, OR the first layer-2/3/4 effect whose affected set is colour-keyed** (§2.2's fifth bullet — the reader-channel gap the seed shortcut doesn't cover) |
 | Layer 7d P/T switching (Twisted Image) | **P3b** — it is a P/T op, not a colour one |
 | Colour of an object **outside** the battlefield read by an effect | **P9** (a graveyard/exile filter that names a colour) |
-| The general filter language retiring `NonblackCreatureTarget` and `CreaturesOfColor` | **P9** |
+| The general filter language retiring `NonblackCreatureTarget` and `CreaturesOfColor` | **P9** — note `CreaturesOfColor` is already **parameterized by colour** while `NonblackCreatureTarget` is **hardcoded to black**; both are exercised only for black today, and the next colour-keyed target spec (Terror, Swords to Plowshares) will want the parameterized shape |
 | Colour indicator on real no-mana-cost cards (Ancestral Vision et al.) | the field exists; the cards need **suspend** |
 | Devoid acquired by copy or text-change (CR 604.3a(2)) | the first card that grants a CDA that way |
 | **The synthetic Devoid Drone** | a `ModifySelf` opcode (or a self slot) makes **Slaughter Drone** encodable; a new `TriggerCondition` makes **Culling Drone** or **Silent Skimmer** encodable. Either retires the crutch. |
@@ -353,8 +389,11 @@ Substrate before consumers, and each step's test written and watched to fail fir
   P3b (characteristic-defined P/T)**, and §4's ordering note follows. The umbrella
   §7 explicitly authorizes a phase spec that departs from the map to update the
   map; this is that.
-- **P3b inherits** two things named here: the CR 613.3 precedence question (one
-  sublayer up, at 7a) and layer 7d switching.
+- **P3b does not inherit the CR 613.3 precedence question** — devoid is a
+  constant CDA (safe to seed) but Tarmogoyf's characteristic-defining P/T is
+  dynamic, so P3b must fold in-place at the existing `Layer.CharacteristicPT`
+  (7a) rather than seed it; see §2.2. **P3b does inherit** layer 7d P/T
+  switching (Twisted Image), which is its neighbourhood, not colour's.
 - **No git-bug is closed by this phase.** `f90e0c4` (topological CR 613.8b
   applies-to reorder) is untouched — every layer-5 effect here replaces, so
   within-layer ordering is last-wins by timestamp and no same-layer dependency
