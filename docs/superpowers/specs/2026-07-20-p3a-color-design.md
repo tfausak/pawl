@@ -43,7 +43,9 @@ it expressible.
 
 ### Gate cards
 
-All six verified on Scryfall 2026-07-20.
+The four real spells and Dragon Fodder verified on Scryfall 2026-07-20; the
+devoid creature is a labeled synthetic, and §4 records the search that justifies
+it.
 
 | Card | Text | What it gates |
 |---|---|---|
@@ -51,7 +53,7 @@ All six verified on Scryfall 2026-07-20.
 | **Crimson Wisps** `{R}` Instant | "Target creature becomes red and gains haste until end of turn. Draw a card." | layer 5, the **set** direction (a black creature stops being black) |
 | **Aphotic Wisps** `{B}` Instant | "Target creature becomes black and gains fear until end of turn. Draw a card." | layer 5, the **mirror** direction; CR 608.2b; and `Fear` |
 | **Bad Moon** `{1}{B}` Enchantment | "Black creatures get +1/+1." | the **in-fold reader**: a colour-restricted affected set |
-| **Slaughter Drone** `{1}{B}` Creature — Eldrazi Drone 2/2 | "Devoid. `{C}`: This creature gains deathtouch until end of turn." | base colour: the cost says black, devoid says **colourless** |
+| **Devoid Drone** *(labeled synthetic, §4)* `{1}{B}` Creature 2/2 | Devoid, no other text | base colour: the cost says black, devoid says **colourless** |
 | **Dragon Fodder** *(already in the pool)* | "Create two 1/1 red Goblin creature tokens." | token colour (CR 111.3) — a live correctness hole today |
 
 ## 1. Scope
@@ -230,23 +232,37 @@ Darksteel Myr (artifact creature — the fear-legal blocker), Dragon Fodder,
 Lightning Bolt, and the green/red creature pool.
 
 **New card files:** `doom-blade.json`, `crimson-wisps.json`, `aphotic-wisps.json`,
-`bad-moon.json`, `slaughter-drone.json`. All are **deterministic fixtures** in
-`allPrintings` (for the round-trip) and in **no random-game deck** — the M3d/P1/P2
-posture, so CR 400.7 conservation counts stay undisturbed.
+`bad-moon.json`, `synthetic-devoid-drone.json`. All are **deterministic fixtures**
+in `allPrintings` (for the round-trip) and in **no random-game deck** — the
+M3d/P1/P2 posture, so CR 400.7 conservation counts stay undisturbed.
 
-**Why Slaughter Drone, and no synthetic.** A search of every devoid creature with
-`{B}` in its cost (Scryfall, 26 results) turns up **no vanilla one** — devoid is an
-Eldrazi mechanic and every printing carries a rider. Slaughter Drone is the
-cheapest rider in the set: **one activated ability**, `{C}: This creature gains
-deathtouch until end of turn`, and every piece of it already exists — activated
-abilities (M3e), `GainKeyword` (M3b), deathtouch (M2c), and
-`ManaType.Colorless` on `ManaSymbol`. Nothing in the pool *produces* `{C}`, so the
-ability is faithful card data that is simply never activated — the same
-"supported by doing nothing" posture design.md §6 records for Steamflogger Boss's
-Contraption clause. **No synthetic crutch is needed for this phase.**
+### The devoid creature is a labeled synthetic, and here is the search
 
-Scryfall's own data corroborates falsifier 1 before a line is written: Slaughter
-Drone's `colors` is `[]` while its `color_identity` is `["B"]`.
+The falsifier needs a creature whose **mana cost is black** and whose **actual
+colour is colourless** — a red-costed devoid creature proves nothing, because
+"nonblack" and "not black" agree on it under both the correct and the naive
+implementation. Every devoid creature with `{B}` in its cost (Scryfall: 26) was
+checked, and **all 26 carry a rider pawl cannot yet express**:
+
+- a **self-effect** — `{C}: This creature gains deathtouch` (Slaughter Drone),
+  `{1}{C}: This creature gets +2/+1` (Havoc Sower). pawl has no self *slot*; its
+  established pattern for "this creature" is a dedicated `…Self` opcode
+  (`Effect.RegenerateSelf`, M4d), so this needs a new `ModifySelf` opcode — open-half
+  vocabulary belonging to no part of the colour axis;
+- an **unbuilt trigger condition** — `TriggerCondition` has exactly one inhabitant
+  (`SelfEnters`), so ingest, attack triggers, cast triggers and upkeep triggers
+  (Culling Drone, Silent Skimmer, Sky Scourer, Reaver Drone) are all out;
+- an **unbuilt keyword** — menace (Kozilek's Shrieker, Bismuth Mindrender).
+
+The one **french-vanilla** devoid creature in the game, **Vestige of Emrakul**
+(`{3}{R}` 3/4, Devoid + Trample), needs nothing pawl lacks — but its cost is red,
+so the colour conflict it carries is unobservable through this phase's readers.
+
+This is the exact condition design.md §4 sanctions a crutch under: *"a real card
+would drag in something not yet built."* So `synthetic-devoid-drone.json` — `{1}{B}`
+2/2 Creature, `keywords: [Devoid]`, no other text — with the **documented expiry**
+in §7. Scryfall corroborates the semantics being modelled: Slaughter Drone's
+`colors` is `[]` while its `color_identity` is `["B"]`.
 
 ### The falsifiers
 
@@ -254,7 +270,7 @@ Each kills one specific naive implementation:
 
 | # | Naive implementation | Scenario that kills it |
 |---|---|---|
-| 1 | `colors = mana-cost symbols` | Slaughter Drone's cost contains `{B}`, but it is **colourless**: Doom Blade destroys it, and Bad Moon does **not** pump it (it stays 2/2). One card, two readers. |
+| 1 | `colors = mana-cost symbols` | The Devoid Drone's cost contains `{B}`, but it is **colourless**: Doom Blade destroys it, and Bad Moon does **not** pump it (it stays 2/2). One card, two readers. |
 | 2 | "becomes red" **adds** red | Typhoid Rats is 2/2 under Bad Moon and an illegal Doom Blade target. After Crimson Wisps it is a **1/1 red**: out of Bad Moon's affected set *and* a legal Doom Blade target. An `AddColor` implementation fails both assertions. |
 | 3 | colour read from the printed card | Same scenario, either direction — the mirror is Aphotic Wisps putting a nonblack creature **into** Bad Moon's set and **out of** Doom Blade's legal set. |
 | 4 | a token's colour comes from its mana cost | Dragon Fodder's Goblins are **red**. The load-bearing assertion is Bad Moon **not** pumping them (colourless would also read as nonblack, so the Doom Blade direction proves nothing here). |
@@ -280,7 +296,6 @@ yield.
 | `Pawl.Type.Card` | `+ colorIndicator :: Set Color` |
 | `Pawl.Type.Modification` | `+ SetColor (Set Color)` — layer 5 |
 | `Pawl.Type.Keyword` | `+ Devoid` (702.114), `+ Fear` (702.36) |
-| `Pawl.Type.Subtype` | `+ Eldrazi`, `+ Drone` (Slaughter Drone's type line), `+ Goblin` if absent |
 | `Pawl.Type.TargetSpec` | `+ NonblackCreatureTarget` |
 | `Pawl.Type.Affected` | `+ CreaturesOfColor Color` |
 | `Pawl.Projection` | base colours in `baseCharacteristics`; `layer`/`applyModification` for `SetColor`; `affects` for `CreaturesOfColor`; `+ colorsOf` |
@@ -307,7 +322,7 @@ Substrate before consumers, and each step's test written and watched to fail fir
    colour assertion, and the only reader that needs no new target spec.
 6. Dragon Fodder's token colour → falsifier 4 (needs step 5's reader to be
    observable).
-7. Reader (a): `TargetSpec.NonblackCreatureTarget` + Doom Blade + Slaughter Drone
+7. Reader (a): `TargetSpec.NonblackCreatureTarget` + Doom Blade + the Devoid Drone
    → falsifier 1.
 8. Crimson Wisps → falsifiers 2 and 3.
 9. Aphotic Wisps + `Keyword.Fear` → falsifiers 3 (mirror), 5 and 6.
@@ -326,6 +341,8 @@ Substrate before consumers, and each step's test written and watched to fail fir
 | The general filter language retiring `NonblackCreatureTarget` and `CreaturesOfColor` | **P9** |
 | Colour indicator on real no-mana-cost cards (Ancestral Vision et al.) | the field exists; the cards need **suspend** |
 | Devoid acquired by copy or text-change (CR 604.3a(2)) | the first card that grants a CDA that way |
+| **The synthetic Devoid Drone** | a `ModifySelf` opcode (or a self slot) makes **Slaughter Drone** encodable; a new `TriggerCondition` makes **Culling Drone** or **Silent Skimmer** encodable. Either retires the crutch. |
+| **Vestige of Emrakul** (`{3}{R}`, the one french-vanilla devoid creature) | a reader keyed on **red** — it needs nothing pawl lacks, only an observation |
 | "Choose a color" as a prompt (CR 105.4 — Painter's Servant, Iona) | the first colour-choosing card |
 | Protection (CR 702.16), the largest colour reader | unchanged from M2: the Attach/Aura subsystem plus CR 615 breadth |
 | Colour as a copiable value under a *layer-5* CDA other than devoid | the first such card |
