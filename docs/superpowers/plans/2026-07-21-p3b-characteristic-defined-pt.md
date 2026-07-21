@@ -1561,7 +1561,7 @@ EOF
 - Consumes: everything above.
 - Produces: no code.
 
-- [ ] **Step 1: Verify the phase is actually complete**
+- [x] **Step 1: Verify the phase is actually complete**
 
 Run:
 
@@ -1572,7 +1572,7 @@ grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-21-p3b-characterist
 
 Expected: a clean warning-free build, all tests passing, and the grep reporting only the steps remaining in this task. Do not proceed on a failing check — report it instead.
 
-- [ ] **Step 2: Correct the now-stale `Layer` module comment**
+- [x] **Step 2: Correct the now-stale `Layer` module comment**
 
 `source/library/Pawl/Type/Layer.hs`'s header says *"only Ability (6), SetPT (7b), and ModifyPT (7c) have producers at M3b."* That has been false since Task 3 (7a) and Task 7 (7d). Replace that clause with:
 
@@ -1594,7 +1594,7 @@ Then rebuild and re-run the suite — this is a comment-only change, so nothing 
 cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -5
 ```
 
-- [ ] **Step 3: Update the umbrella spec**
+- [x] **Step 3: Update the umbrella spec**
 
 In `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`:
 
@@ -1604,15 +1604,15 @@ In `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`:
 - §6's tracking bullet on `c7a0077`: record the negative answer.
 - Add a line noting **Cluster 1 (layer-system completion) is done**: layers 1 (P2), 2 (P1), 3 (M3d), 4 (M3c), 5 (P3a), 6 (M3b) and 7a/7b/7c/7d all have producers.
 
-- [ ] **Step 4: Add the `progress.md` entry**
+- [x] **Step 4: Add the `progress.md` entry**
 
 Append an **M4.5 P3b is complete** entry to `docs/progress.md`, in the established one-distilled-entry-per-milestone shape used by the P3a entry directly above it. It must record: the three gate cards and what each falsified; the thesis (one counting quantity, two re-read rules); the in-place 7a fold and its three reasons; the CR 611.2b→608.2h/611.2d citation fix and the wrong-object half of that bug; that P2's CDA-in-copiable-values bill is paid; that `LoseAllAbilities` clearing the CDA is **non-distinguishing today** with Dress Down / Soul Sculptor named as the expiry; and every deferral in the spec's §8 table. Note that no git-bug is closed and that `c7a0077` and `f90e0c4` both stay open.
 
-- [ ] **Step 5: Tick `CLAUDE.md`**
+- [x] **Step 5: Tick `CLAUDE.md`**
 
 In the "Current work and tracking" section of `CLAUDE.md`, extend the M4.5 paragraph: P3b is complete, layer 7 is finished, and **P4 (event history + state/delayed triggers, which gates P6 and P7) is next**.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md docs/progress.md CLAUDE.md

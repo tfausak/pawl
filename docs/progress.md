@@ -941,3 +941,158 @@ its own gate card and spec, landed as it completes. Umbrella:
   and plan kept as reference:
   `docs/superpowers/specs/2026-07-20-p3a-color-design.md` and
   `docs/superpowers/plans/2026-07-20-p3a-color.md`.
+- **M4.5 P3b is complete** (characteristic-defined P/T, GAP-L7cda — layer 7's
+  last blank sublayer). The umbrella scoped P3b to layer 7a alone; the phase
+  spec widened it to **the rest of layer 7**: 7a, the CR 608.2h/611.2d freeze
+  7b owed, and 7d. **Gates: Tarmogoyf** (`{1}{G}` Creature — Lhurgoyf `*`/`1+*`,
+  "Tarmogoyf's power is equal to the number of card types among cards in all
+  graveyards and its toughness is equal to that number plus 1") falsifies
+  "evaluate `*` once, at entry" — empty graveyards make it 0/1, a Lightning
+  Bolt resolving into a graveyard makes it 1/2 with no re-entry and no effect
+  touching it — and falsifies "a copy snapshots the number" — a Clone of
+  Tarmogoyf must keep recomputing, not freeze at 2/3. **Inner Calm, Outer
+  Strength** (`{2}{G}` Instant — Arcane, "Target creature gets +X/+X until end
+  of turn, where X is the number of cards in your hand") falsifies "a stored
+  continuous effect re-evaluates its quantity" — the pump must not shrink when
+  the caster's hand does (CR 608.2h) — and falsifies "the frozen value reads
+  the target" — it must read the **caster's** hand, not the target
+  controller's. **Twisted Image** (`{U}` Instant, "Switch target creature's
+  power and toughness until end of turn. Draw a card.") falsifies "7d switches
+  the printed/base box" — a 2/3 Tarmogoyf must become 3/2 via the *projected*
+  values, not 0/0 printed ones — and, via its own three 2021-03-19 Gatherer
+  rulings, falsifies "the switch is a display concern": a creature at 2/3 that
+  survived 2 marked damage dies after becoming 3/2 (CR 704.5g), because damage
+  stays marked while toughness moves. **The phase thesis, in one line**: one
+  counting quantity, and the two rules that say when it is re-read — CR 613.4a
+  says a characteristic-defining ability is **recomputed on every projection**
+  (7a, Tarmogoyf), CR 608.2h says a resolution-created continuous effect's
+  quantity is **frozen once**, at resolution (7b, Inner Calm). The *same*
+  `Quantity.Count` machinery answers both, pointed at opposite re-read rules.
+  New numeric-tower arms: `Quantity.Star` (CR 208.2's printed `*`, evaluates to
+  `Nothing` — notation, not a value), `Quantity.Plus Quantity Quantity`
+  (composes `1+*`), `Quantity.Count CountSpec` (new sibling module
+  `Pawl.Type.CountSpec`: `CardTypesInAllGraveyards`, `CardsInYourHand` —
+  quarantined, **expires at P9**'s criterion language, same posture as
+  `WallTarget`); `Quantity.evaluate` gained a "you" `PlayerId` for
+  player-scoped counts; a new `substituteStar` helper replaces `Star` with the
+  card's own CDA (`Card.characteristicPT :: Maybe Quantity`), recursing through
+  `Plus` — Tarmogoyf's printed `1+*` toughness becomes
+  `Plus (Literal 1) (Count CardTypesInAllGraveyards)`. **Layer 7a folds in
+  place in `projectFrom`, not through a synthesized `Gathered` the way
+  layer-7c counters do — three reasons, recorded in the code comment**: (1)
+  Humility's `LoseAllAbilities` must be able to strip the CDA at layer 6, but
+  `gather` runs *before* the fold and has no partial projection to strip from;
+  (2) CR 604.3 says a CDA "functions in all zones" (CR 208.2a repeats it for
+  P/T specifically), and `gather` is battlefield-only, while `projectFrom` is
+  not zone-scoped — proved by Tarmogoyf's own ruling that it counts itself in
+  a graveyard; (3) a CDA has no source object and no timestamp, so it has
+  nothing to sort on under CR 613.7 and doesn't belong in the candidate list
+  at all. `PC.characteristicPT :: Maybe (Quantity, Quantity)` seeds via
+  `substituteStar` — **unevaluated quantities, not numbers** — riding
+  `Projection.copiableCharacteristics` (P2's layer-1 seed), so a Clone
+  acquires the *ability* and keeps recomputing (CR 707.2a) rather than
+  freezing the number (CR 707.2b's converse). **This pays P2's deferred
+  bill**, named there verbatim: *"7b/CDA P/T-setting in copiable values (rides
+  P3b, Tarmogoyf)."* **A latent bug closed, and its citation corrected**:
+  `Pawl.Resolve`'s `ModifyTarget` arm had carried a comment since M4a citing
+  **CR 611.2b** for a freeze it never performed, claiming it was a no-op
+  "until X exists" — but 611.2b is the *"for as long as"* duration rule, not
+  the freeze rule, and X had existed since M4a, so the stated precondition had
+  already expired; the right rules are **CR 608.2h** (an effect needing
+  outside information is determined only once, when applied) and **CR
+  611.2d** (variables such as X). The bug had a second, wrong-object half:
+  `Projection.applyModification` evaluates a stored quantity against the
+  **affected object**, so a stored X would have read the target's bindings
+  and a stored "cards in your hand" would have counted the wrong player's
+  hand. New `Projection.freezeQuantities` fixes both halves at once: `Resolve`
+  calls it at store time, against the **source spell and the source's
+  controller** — never the target. Static abilities are deliberately exempt
+  (CR 611.2 scopes the whole freeze family to *"a continuous effect generated
+  by the resolution of a spell or ability"*; a static ability's continuous
+  effect, CR 604.2, is regenerated from the permanent every projection), so
+  Opalescence's `ManaValue` still recomputes per affected object — the
+  existing M3c Humility+Opalescence gate is the regression guard, unchanged.
+  **What the freeze does NOT close**: `freezeQuantities`'s `Nothing` fallback
+  (an unevaluable quantity) leaves the quantity un-frozen in the store, and
+  `Projection.applyModification` still evaluates it against the affected
+  object on every projection read — the same wrong-object shape the fix was
+  meant to retire, just unreachable, since no card in today's pool stores an
+  unevaluable quantity in a continuous effect. Recorded in the code as a named
+  expiry rather than overstated as fixed. **Twisted Image carries functional
+  errata that shrank the phase**: the printed New Phyrexia wording was "target
+  **artifact or** creature's power and toughness," but Scryfall's Oracle text
+  (verified 2026-07-21) drops the artifact clause — CR 208.3 says why, *"a
+  noncreature permanent has no power or toughness,"* so switching a
+  noncreature artifact's P/T never did anything. WotC's silent errata deleted
+  a whole `TargetSpec` this phase would otherwise have added; the existing
+  `CreatureTarget` (CR 115.1a) sufficed instead. This is design.md §4's
+  functional-errata category (*"a round-trip failure after a data refresh may
+  be an errata event, not a regression"*) actually biting for the first time,
+  caught before it reached code. `Modification.SwitchPowerToughness` (layer
+  7d, CR 613.4d) swaps `PC.power`/`PC.toughness` outright; two switches return
+  to normal for free, since each is a separate fold application. **One honest
+  non-distinguishing test, labeled as such**: clearing `PC.characteristicPT`
+  on `Modification.LoseAllAbilities` is required by CR 604.3 (a CDA is a
+  static ability; Humility removes abilities) but is **unobservable in the
+  current pool** — every `LoseAllAbilities` source, Humility included, also
+  sets base P/T at layer 7b, which overwrites layer 7a's result regardless of
+  whether the clear is correct; a Humility'd Tarmogoyf is 1/1 either way. The
+  clearing and its test are implemented anyway (the CR says so; "Humility'd
+  Tarmogoyf is 1/1" is a genuine ruling worth transcribing), but both are
+  labeled non-distinguishing with a concrete **named expiry**: **Dress Down**
+  (an enchantment whose "Creatures lose all abilities" clause sets no P/T, but
+  needs Flash, a beginning-of-end-step trigger (**P4**), and a Sacrifice
+  effect) or **Soul Sculptor** (needs layer-4 card-type *replacement* —
+  becoming an enchantment and ceasing to be a creature — which `Modification`
+  doesn't have yet), whichever lands first; the Aura family (Darksteel
+  Mutation and kin) is the bulk of the category but is blocked on Attach,
+  outside M4.5 entirely. **Every deferral from the phase spec's §8 table, with
+  its expiry**: power and toughness counting *different* things (one `Star`
+  per axis) — the first card whose two axes count different things; `Count`
+  over **projected** state ("lands you control", "Elves on the battlefield")
+  — Strength of Cedars / Wirewood Pride, either forces quantity evaluation to
+  move into `Pawl.Projection` (a cycle from `Pawl.Quantity` today); counting
+  **projected** card types of graveyard cards (§2.1 reads only printed types
+  through `Game.cardOf`) — the first effect that changes a graveyard card's
+  types; `CountSpec` as a whole — **P9**'s criterion/filter language; CR
+  208.2b's "as this creature enters…" P/T choice (a replacement effect setting
+  copiable values) — **P5**, the replacement-engine phase; CR 208.5's "no
+  value → 0" at read points — the first creature with no P/T value that a
+  reader observes; a one-axis 7b set ("its toughness becomes 4" —
+  `SetBasePowerToughness` takes two `Quantity`s, not two `Maybe`s) — the first
+  such card; CR 208.4b "base power/toughness" readers — the first card that
+  checks base P/T; a **dynamic** CDA defining colour or subtype (CR
+  604.3a(1)) — P3a seeded devoid as a *constant* CDA, so the first dynamic one
+  builds the general path; CR 613.3 CDA-vs-timestamp precedence within layers
+  2–6 — unchanged from P3a, since this phase adds no layer-2–6 CDA;
+  `Quantity.Half` (Little Girl) and `Infinite` (Mox Lotus) — design.md §6's
+  silver-border canaries, still unbuilt; copying a permanent's **static**
+  abilities (a Clone of Humility) — unchanged from P2, since a CDA is not a
+  `StaticAbility` in this model, so this phase neither fixes nor worsens it.
+  **Tracking**: no git-bug is closed by this phase. `c7a0077`
+  (`Quantity.Bound SlotName`) was related to P3b by the umbrella and is
+  answered **in the negative**: neither `Count CardTypesInAllGraveyards` nor
+  `Count CardsInYourHand` needed a binding slot, so it stays open, unretired.
+  `f90e0c4` (topological CR 613.8b applies-to reorder) is untouched: 7a
+  applies at most one CDA per object with nothing to order against it, and
+  7d's switches order last-wins by timestamp with no same-layer dependency.
+  **Rulings yield honestly** (Scryfall, 2026-07-21): Tarmogoyf carries one
+  relevant ruling (2007-10-01, the all-zones/counts-itself ruling, transcribed
+  as a test and cited above as the reason for the in-place fold); Twisted
+  Image carries three, all dated 2021-03-19 (switch applies after all other
+  effects regardless of when they began; nonlethal damage may become lethal;
+  an even number of switches is a no-op); **Inner Calm, Outer Strength has
+  zero Gatherer rulings**. New subtypes: `Subtype.Lhurgoyf` (CR 205.3m,
+  Tarmogoyf's creature type) and `Subtype.Arcane` (CR 205.3k, Inner Calm's
+  spell type). Three new deterministic fixtures (`tarmogoyf.json`,
+  `inner-calm-outer-strength.json`, `twisted-image.json`), in `allPrintings`
+  for the round-trip and in no random-game deck, so CR 400.7 conservation
+  counts stay undisturbed. Zero new opcodes, zero new prompts, no change to
+  `Object`, `GameState`, or the event pipeline. **After P3b, Cluster 1
+  (layer-system completion) is done**: layers 1 (P2), 2 (P1), 3 (M3d), 4
+  (M3c), 5 (P3a), 6 (M3b) and 7a/7b/7c/7d (P3b) all have producers — every
+  layer CR 613 names now has a producer in every sublayer. The umbrella's
+  next phase is **P4** (event history + state/delayed triggers, gating P6 and
+  P7). Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-21-p3b-characteristic-defined-pt-design.md`
+  and `docs/superpowers/plans/2026-07-21-p3b-characteristic-defined-pt.md`.

@@ -95,9 +95,10 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   `Mode`/`Modal` payload wired into both ability types, gated by Aether Channeler,
   with the CR 700.2b/603.3c "no legal mode → removed from the stack" rule as the
   trigger-only novelty a spell has no analog for; zero new opcodes).
-  **M4.5 (phased) has begun; its first three phases are complete — P1
-  (permanent control), P2 (copy / layer 1, the milestone's go/no-go), and P3a
-  (color / layer 5).** P1 made a permanent's controller a projected layer-2
+  **M4.5 (phased) has begun; its first four phases are complete — P1
+  (permanent control), P2 (copy / layer 1, the milestone's go/no-go), P3a
+  (color / layer 5), and P3b (characteristic-defined P/T, the rest of
+  layer 7).** P1 made a permanent's controller a projected layer-2
   characteristic (`Projection.controllerOf`/`controls`, `Modification
   .SetController`), gated by Act of Treason. P2 made **copy a projected
   layer-1 characteristic**, gated by Clone: a permanent that enters as a copy
@@ -114,8 +115,16 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   observable-equivalence, not an oversight — and `Keyword.Fear` (CR 702.36b)
   as the one reader of the three that does not expire into P9's future filter
   language. It also closed a live bug: Dragon Fodder's tokens had projected
-  colourless against their own oracle text since M4c. **P3b
-  (characteristic-defined P/T, gated by Tarmogoyf) is next.** See the
+  colourless against their own oracle text since M4c. **P3b finished layer 7**
+  (gated by Tarmogoyf, Inner Calm Outer Strength, and Twisted Image): layer 7a
+  characteristic-defined P/T folds in place at the projection (a recomputed,
+  copiable CDA, CR 613.4a/707.2a), the CR 608.2h/611.2d freeze that stored
+  continuous effects owe now runs at `Resolve`'s store time against the
+  source, and layer 7d P/T switching applies last. **Every sublayer of layer 7
+  now has a producer, which closes M4.5's Cluster 1 (layer-system
+  completion)**: layers 1 (P2), 2 (P1), 3 (M3d), 4 (M3c), 5 (P3a), 6 (M3b) and
+  7a/7b/7c/7d (P3b) all have producers. **P4 (event history + state/delayed
+  triggers, which gates P6 and P7) is next.** See the
   umbrella spec (`docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`)
   and the progress log for the completion notes and deferrals.
   The **milestone completion log** — one distilled entry per milestone with
