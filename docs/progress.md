@@ -811,3 +811,117 @@ its own gate card and spec, landed as it completes. Umbrella:
   and plan kept as reference:
   `docs/superpowers/specs/2026-07-20-p2-copy-layer-1-design.md` and
   `docs/superpowers/plans/2026-07-20-p2-copy-layer-1.md`.
+- **M4.5 P3a is complete** (color — layer 5, GAP-L5). **Gates: Doom Blade**
+  (`{1}{B}` Instant — "Destroy target nonblack creature."), **Crimson Wisps**
+  (`{R}` Instant — "Target creature becomes red and gains haste until end of
+  turn. Draw a card."), **Aphotic Wisps** (`{B}` Instant, the mirror — "...black
+  and gains fear...") and **Bad Moon** (`{1}{B}` Enchantment — "Black creatures
+  get +1/+1."). The decision proved: **an object's colour is a projected CR 613
+  layer-5 characteristic, folded like `keywordsOf`/`controllerOf`/
+  `copiableCharacteristics` before it, and never read off a printed card** —
+  `ProjectedCharacteristics.colors :: Set Color` (a `Set`, not a sixth
+  `Colorless` constructor: CR 105.2c says a colourless object has no colour at
+  all), seeded from CR 202.2's coloured mana-cost symbols union CR 204.2's
+  colour indicator (`Card.colorIndicator`, new, serialized only when
+  non-empty so every pre-existing `data/cards/*.json` stayed byte-identical),
+  and overwritten by one layer-5 `Modification.SetColor (Set Color)` applied
+  as a **replace** per CR 105.3 ("a new colour replaces all previous
+  colours") — deliberately no `AddColor` constructor, since no card in the
+  pool says "in addition to its other colors" (a named deferral, below).
+  `Projection.colorsOf` is the sole read point. **CR 702.114a devoid is
+  applied at the projection seed, not as a layer-5 CDA pass**:
+  `Keyword.Devoid` empties the colour set in `baseColorsOf` instead of
+  installing a CR 613.3 CDA-first precedence key on `Gathered`. The code
+  comment argues the equivalence from four cases rather than asserting it:
+  every layer-5 effect in the vocabulary is `SetColor`, which replaces, so
+  "CDA first, then replacers" and "CDA at the seed, then replacers" agree on
+  the final set always; a copy of a devoid object snapshots the printed
+  keyword (CR 613.2c, P2) and recomputes colourless from its own seed;
+  Humility's `LoseAllAbilities` is layer 6, after layer 5, and CR 613.8a
+  scopes dependency to same-layer effects, so a Humility'd devoid object
+  stays colourless either way; and CR 604.3 ("CDAs function in all zones")
+  comes free from a card-derived, zone-independent seed. **Named expiry:**
+  the first card needing a genuine CDA-vs-timestamp interleave within
+  layers 2–6 (which would build the `Gathered` precedence key) — and **P3b
+  reopens the identical question one sublayer up, at layer 7a**, for
+  characteristic-defining P/T. **Three readers span three closed-half
+  subsystems, and two of the three expire**: `TargetSpec
+  .NonblackCreatureTarget` (CR 115.1a, Doom Blade — the `WallTarget`
+  hand-carved-variant posture) and `Affected.CreaturesOfColor Color` (Bad
+  Moon — `affects` already receives the partial projection, so a layer-7c
+  effect's affected set reads the layer-5 result for free, a genuine
+  cross-layer read with no new machinery) both **expire into P9's
+  criterion/filter language**; `Keyword.Fear` (CR 702.36b, Aphotic Wisps)
+  **does not expire** — it is permanent closed-half machinery, conjoined
+  with `evasionAllows` (CR 509.1b: evasion restrictions are cumulative) and
+  asymmetric like flying (asked of the attacker first, CR 702.9b), reading
+  projected colour *and* projected card type together, so Darksteel Myr
+  blocks as an artifact and Typhoid Rats as black. **A live correctness bug
+  closed as a data fix**: Dragon Fodder's Goblin tokens had projected
+  colourless against their own oracle text ("two 1/1 red Goblin tokens")
+  since M4c introduced tokens, because a token carries a `Card` with no mana
+  cost; CR 111.3 makes a token's effect-defined characteristics equivalent
+  to printed ones, so `colorIndicator` on the nested token card is the fix —
+  data only, zero library changes, made observable by Bad Moon (colourless
+  would also read as nonblack, so only red proves it). **The gate card that
+  is a labeled synthetic**: `synthetic-devoid-drone.json` (`{1}{B}` 2/2,
+  Devoid, no other text) — all 26 black-costed devoid creatures on Scryfall
+  carry a rider pawl cannot express (a self-effect such as Slaughter Drone's
+  `{C}: gains deathtouch`, needing a `ModifySelf` opcode pawl has no self
+  slot for; an unbuilt `TriggerCondition` beyond `SelfEnters`, needed by
+  Culling Drone/Silent Skimmer/Sky Scourer/Reaver Drone; or menace), and the
+  one french-vanilla devoid creature, **Vestige of Emrakul** (`{3}{R}` 3/4,
+  Devoid + Trample), needs nothing pawl lacks but is red-costed, so its
+  colour conflict is unobservable through this phase's black-keyed readers.
+  **Expiry:** a `ModifySelf` opcode (or a self slot) makes Slaughter Drone
+  encodable, a new `TriggerCondition` makes Culling Drone or Silent Skimmer
+  encodable — either retires the crutch — and a red-keyed reader would make
+  Vestige of Emrakul usable with nothing new. **Rulings discipline** (design.md
+  §4): Doom Blade and Bad Moon carry **no Gatherer rulings at all** —
+  confirmed empty against Scryfall's `rulings_uri`, an empty yield rather
+  than a skipped step. Crimson Wisps and Aphotic Wisps each carry the same
+  three templating rulings (WotC, 2008-05-01): "colourless is not a colour"
+  restates CR 105.4, already exercised by the devoid/Bad Moon tests; "changing
+  colour won't change text" needs a card whose own ability text is keyed to
+  its printed colour (Wilt-Leaf Liege), which the pool has none of, so it is
+  not exercisable; the one Q&A-shaped ruling — a colour change overwrites
+  *all* previous colours, "even if... blue and black" — is transcribed as
+  `ColorSpec`'s "2008-05-01 a colour change overwrites ALL previous colours,
+  even a multicoloured one" (two stacked `SetColor` effects rather than a
+  card, since no card in the pool is printed multicoloured), and passes
+  against the already-landed replace semantics. **A plan bug found and
+  fixed in its own task's execution** (design.md's "a test failing against
+  correct code is a plan bug" discipline): the token-colour task's draft
+  fixture used `S.spellOnStack` + `Stack.resolveTop`, which can never resolve
+  a **modal** spell — `spellOnStack` leaves `Object.bindings` empty, so
+  `Binding.modesOf` is empty and `Modal.modesEffects` returns `[]`, and every
+  spell has been modal since M4g; the fix substitutes a real cast (mirroring
+  `ResolveSpec`'s own Dragon Fodder test) and preserves every assertion — a
+  fixture caveat worth recording for future test authors reusing
+  `spellOnStack` against a card with effects. **Named deferred expiries**
+  (spec §7): `AddColor` (CR 105.3's "in addition to its other colors") —
+  first card with that wording; hybrid/Phyrexian mana symbols (CR 202.2d,
+  `ManaSymbol` has no hybrid arm) — first hybrid-cost card; the CR 613.3
+  CDA-precedence question, above; layer 7d P/T switching (Twisted Image) —
+  **P3b**, not colour's neighbourhood; colour of an object outside the
+  battlefield read by an effect — **P9** (a graveyard/exile filter naming a
+  colour); the general filter language retiring `NonblackCreatureTarget`/
+  `CreaturesOfColor` — **P9**; colour indicator on real no-mana-cost cards
+  (Ancestral Vision, the suspend cycle) — the field exists, the cards need
+  **suspend**; devoid acquired by copy or text-change (CR 604.3a(2)) — the
+  first card that grants a CDA that way; the synthetic Devoid Drone and
+  Vestige of Emrakul, above; "choose a colour" as a prompt (CR 105.4 —
+  Painter's Servant, Iona) — the first colour-choosing card; protection
+  (CR 702.16, the largest colour reader) — unchanged from M2, blocked on the
+  Attach/Aura subsystem and CR 615 prevention breadth; colour as a copiable
+  value under a layer-5 CDA other than devoid — the first such card.
+  **Tracking:** no git-bug is closed by this phase; `f90e0c4` (topological CR
+  613.8b applies-to reorder) stays untouched, since every layer-5 effect this
+  phase adds replaces rather than depends, so within-layer ordering is
+  last-wins by timestamp; `c7a0077` (`Quantity.Bound`) belongs to **P3b**.
+  The umbrella's §3 table splits its single P3 row into **P3a** (this phase)
+  and **P3b** (characteristic-defined P/T, next), per the umbrella's own §7
+  authorization for a phase spec to depart from the map and update it. Spec
+  and plan kept as reference:
+  `docs/superpowers/specs/2026-07-20-p3a-color-design.md` and
+  `docs/superpowers/plans/2026-07-20-p3a-color.md`.
