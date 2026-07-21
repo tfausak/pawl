@@ -14,6 +14,8 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.AttackTarget as AttackTarget
+import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.Color as Color
 import Pawl.Type.Combat (Combat)
 import qualified Pawl.Type.Combat as Combat
 import Pawl.Type.Game (Game)
@@ -114,6 +116,19 @@ evasionAllows blocker attacker gs =
     || Projection.hasKeyword Keyword.Flying blocker gs
     || Projection.hasKeyword Keyword.Reach blocker gs
 
+-- CR 702.36b: a creature with fear can't be blocked except by artifact creatures
+-- and/or black creatures.
+--
+-- The same asymmetry as flying (see evasionAllows): fear restricts being BLOCKED,
+-- never blocking, so the question is asked of the ATTACKER first. Both halves of
+-- the exception read the PROJECTION -- a creature made black by a CR 613 layer-5
+-- effect blocks legally, and a devoid creature with a black mana cost does not.
+fearAllows :: ObjectId -> ObjectId -> GameState -> Bool
+fearAllows blocker attacker gs =
+  not (Projection.hasKeyword Keyword.Fear attacker gs)
+    || Set.member CardType.Artifact (Projection.cardTypesOf blocker gs)
+    || Set.member Color.Black (Projection.colorsOf blocker gs)
+
 -- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
 -- any are disobeyed the DECLARATION is illegal.
 --
@@ -142,7 +157,10 @@ legalBlockDeclaration pid declaration gs =
       -- CR 509.1a: the blocker must be one this player could block with at all,
       -- and the attacker must actually be attacking.
       wellFormed blocker attacker = List.elem blocker candidates && List.elem attacker attackers
-      ok (blocker, attacker) = wellFormed blocker attacker && evasionAllows blocker attacker gs
+      ok (blocker, attacker) =
+        wellFormed blocker attacker
+          && evasionAllows blocker attacker gs
+          && fearAllows blocker attacker gs
    in all ok (Map.toList declaration)
 
 blockersOf :: ObjectId -> GameState -> Set ObjectId

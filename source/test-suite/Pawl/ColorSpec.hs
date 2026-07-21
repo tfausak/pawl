@@ -1,7 +1,9 @@
--- Covers: Pawl.Projection (an object's CR 613 layer-5 colour), Pawl.Target
--- (NonblackCreatureTarget) and the P3a colour gates (Doom Blade, Crimson Wisps,
--- Aphotic Wisps, Bad Moon). Gameplay-level: each card is cast or resolved through
--- the stack and the resulting game state is asserted on.
+-- Covers: Pawl.Projection (an object's CR 613 layer-5 colour, including CR
+-- 702.114a devoid and CR 111.3 token colour), Pawl.Target (NonblackCreatureTarget)
+-- and the P3a colour gates (Doom Blade, Crimson Wisps, Aphotic Wisps, Bad Moon,
+-- Dragon Fodder), plus the CR 608.2b colour-change fizzle. Gameplay-level: each
+-- card is cast or resolved through the stack and the resulting game state is
+-- asserted on.
 module Pawl.ColorSpec where
 
 import qualified Data.Set as Set
@@ -19,6 +21,7 @@ import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -183,5 +186,35 @@ tests cards =
               HU.assertEqual "after: out of Bad Moon's set, back to 1 power" (Just 1) (Projection.powerOf ratsId after)
               HU.assertBool
                 "after: a legal Doom Blade target"
-                (Set.member (Recipient.ToCreature ratsId) (Target.legalRecipients TargetSpec.NonblackCreatureTarget after))
+                (Set.member (Recipient.ToCreature ratsId) (Target.legalRecipients TargetSpec.NonblackCreatureTarget after)),
+      HU.testCase "Aphotic Wisps makes a creature black, the mirror of Crimson Wisps" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 1
+            (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice base
+            (pikerId, board) = S.addPiker cards S.alice withMoon
+            (gs, awId) = S.handOne (Cards.aphoticWispsPrinting cards) board
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice awId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "black only, not red and black" (Set.singleton Color.Black) (Projection.colorsOf pikerId after)
+              HU.assertEqual "INTO Bad Moon's set, now 3 power" (Just 3) (Projection.powerOf pikerId after)
+              HU.assertBool "gained fear" (Projection.hasKeyword Keyword.Fear pikerId after)
+              HU.assertBool
+                "no longer a legal Doom Blade target"
+                (not (Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients TargetSpec.NonblackCreatureTarget after))),
+      HU.testCase "CR 608.2b Doom Blade fizzles when its target becomes black in response" $
+        -- The fizzle is only reachable through a colour change, and Aphotic Wisps
+        -- is the one card in the pool that makes something BLACK.
+        let base = S.landsInPlay (Cards.swampPrinting cards) 3
+            (elvesId, board) = S.addCreature (Cards.llanowarElvesPrinting cards) S.bob base
+            (gs1, dbId) = S.handOne (Cards.doomBladePrinting cards) board
+            (gs2, awId) = S.handOne (Cards.aphoticWispsPrinting cards) gs1
+            castDb = snd (Engine.runGamePure S.identityAnswer gs2 (Cast.castSpell S.alice dbId))
+            castAw = snd (Engine.runGamePure S.identityAnswer castDb (Cast.castSpell S.alice awId))
+            -- Aphotic Wisps is on top, so it resolves first and turns the green
+            -- Elves black; Doom Blade then re-checks its target (CR 608.2b).
+            after = snd (Engine.runGamePure S.identityAnswer castAw (Stack.resolveTop >> Stack.resolveTop))
+         in do
+              HU.assertEqual "the Elves are black" (Set.singleton Color.Black) (Projection.colorsOf elvesId after)
+              HU.assertBool "the Elves survive" (Set.member elvesId (GameState.battlefield after))
+              HU.assertEqual "both spells are in alice's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after))
     ]

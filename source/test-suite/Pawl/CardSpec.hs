@@ -175,8 +175,8 @@ lintTests cards =
                 (cardOffends . Printing.card)
                 (Cards.allPrintings cards)
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (55 at M4.5 P3a Task 7)" $
-        HU.assertEqual "count" 55 (length (Cards.allPrintings cards)),
+      HU.testCase "the registry holds every printing (56 at M4.5 P3a Task 8)" $
+        HU.assertEqual "count" 56 (length (Cards.allPrintings cards)),
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $
         let card = Printing.card (Cards.blazePrinting cards)
             red = ManaSymbol.OfType (ManaType.Colored Color.Red)

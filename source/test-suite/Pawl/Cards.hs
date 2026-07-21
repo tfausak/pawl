@@ -68,7 +68,8 @@ data Cards = MkCards
     devoidDronePrinting :: Printing.Printing,
     badMoonPrinting :: Printing.Printing,
     doomBladePrinting :: Printing.Printing,
-    crimsonWispsPrinting :: Printing.Printing
+    crimsonWispsPrinting :: Printing.Printing,
+    aphoticWispsPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -136,6 +137,7 @@ loadCards = do
   badMoonPrinting_ <- loadPrinting "bad-moon"
   doomBladePrinting_ <- loadPrinting "doom-blade"
   crimsonWispsPrinting_ <- loadPrinting "crimson-wisps"
+  aphoticWispsPrinting_ <- loadPrinting "aphotic-wisps"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -192,7 +194,8 @@ loadCards = do
         devoidDronePrinting = devoidDronePrinting_,
         badMoonPrinting = badMoonPrinting_,
         doomBladePrinting = doomBladePrinting_,
-        crimsonWispsPrinting = crimsonWispsPrinting_
+        crimsonWispsPrinting = crimsonWispsPrinting_,
+        aphoticWispsPrinting = aphoticWispsPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -251,7 +254,8 @@ allPrintings cards =
     devoidDronePrinting cards,
     badMoonPrinting cards,
     doomBladePrinting cards,
-    crimsonWispsPrinting cards
+    crimsonWispsPrinting cards,
+    aphoticWispsPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

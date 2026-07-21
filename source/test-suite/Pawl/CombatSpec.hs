@@ -18,14 +18,17 @@ import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Combat as Combat.Type
+import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -288,6 +291,22 @@ attacking mine theirs =
       after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
    in (after, ours, yours)
 
+-- CR 702.36: grant fear to `oid` with a stored continuous effect. No card in the
+-- pool has PRINTED fear (Aphotic Wisps grants it at instant speed, which combat
+-- fixtures cannot reach mid-step), so this is the M2c granted-keyword posture.
+withFear :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+withFear oid gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = oid,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.modification = Modification.GainKeyword Keyword.Fear,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+
 evasionTests :: Cards.Cards -> Tasty.TestTree
 evasionTests cards =
   Tasty.testGroup
@@ -371,7 +390,35 @@ evasionTests cards =
          in do
               HU.assertEqual "bob took 1" (Just 19) (S.lifeOf S.bob after)
               HU.assertEqual "the flier lives" 1 (S.creaturesInPlay S.alice after)
-              HU.assertEqual "the would-be blocker lives" 1 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "the would-be blocker lives" 1 (S.creaturesInPlay S.bob after),
+      HU.testCase "CR 702.36b a red creature may not block a creature with fear" $
+        let (gs0, mine, theirs) = attacking [Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
+         in case (mine, theirs) of
+              (a : _, b : _) ->
+                HU.assertBool "illegal" (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0)))
+              _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.36b a black creature may block a creature with fear" $
+        let (gs0, mine, theirs) = attacking [Cards.pikerPrinting cards] [Cards.typhoidRatsPrinting cards]
+         in case (mine, theirs) of
+              (a : _, b : _) ->
+                HU.assertBool "legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0))
+              _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.36b an ARTIFACT creature may block a creature with fear" $
+        -- THE FALSIFIER for reading 702.36b as a colour test alone: Darksteel Myr
+        -- is a colourless artifact creature and blocks legally.
+        let (gs0, mine, theirs) = attacking [Cards.pikerPrinting cards] [Cards.darksteelMyrPrinting cards]
+         in case (mine, theirs) of
+              (a : _, b : _) ->
+                HU.assertBool "legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0))
+              _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 702.36b fear restricts being blocked, never blocking" $
+        -- The 702.9b asymmetry, restated for fear: a fear creature blocking a
+        -- plain attacker is legal.
+        let (gs0, mine, theirs) = attacking [Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
+         in case (mine, theirs) of
+              (a : _, b : _) ->
+                HU.assertBool "legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear b gs0))
+              _ -> HU.assertFailure "fixture should have an attacker and a blocker"
     ]
 
 vigilanceTests :: Cards.Cards -> Tasty.TestTree
