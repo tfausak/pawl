@@ -111,5 +111,69 @@ tests cards =
         let gs0 = Setup.emptyGame S.bothPlayers
             (goyfId, board) = S.addCreature (Cards.tarmogoyfPrinting cards) S.alice gs0
             gs = S.withHumility cards board
-         in HU.assertEqual "no CDA survives layer 6" Nothing (PC.characteristicPT (Projection.project goyfId gs))
+         in HU.assertEqual "no CDA survives layer 6" Nothing (PC.characteristicPT (Projection.project goyfId gs)),
+      HU.testCase "CR 608.2h a resolved pump is FROZEN and does not shrink with the hand" $
+        -- THE FALSIFIER for re-evaluating a stored quantity: CR 608.2h says the
+        -- answer is determined only once, when the effect is applied. Alice
+        -- resolves the pump with two cards left in hand (+2/+2), then casts one of
+        -- them -- her hand is now one card, and the pump must NOT follow it down.
+        let base = S.landsInPlay (Cards.forestPrinting cards) 4
+            (pikerId, board) = S.addPiker cards S.alice base
+            -- handOne FIRST (it replaces the hand and sets up the phase), then
+            -- addHandCard for the extras.
+            (h1, icId) = S.handOne (Cards.innerCalmPrinting cards) board
+            (ggId, h2) = S.addHandCard (Cards.giantGrowthPrinting cards) S.alice h1
+            (_, gs) = S.addHandCard (Cards.forestPrinting cards) S.alice h2
+            -- Casting Inner Calm moves it from hand to the stack, leaving two.
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice icId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            -- Now the hand shrinks. Giant Growth is only CAST, not resolved, so it
+            -- contributes no pump of its own -- the only thing that changed is the
+            -- number Inner Calm counted.
+            shrunk = snd (Engine.runGamePure S.identityAnswer after (Cast.castSpell S.alice ggId))
+         in do
+              HU.assertEqual "two cards left in hand at resolution" 2 (S.handSize S.alice after)
+              HU.assertEqual "the 2/1 Piker is pumped to 4" (Just 4) (Projection.powerOf pikerId after)
+              HU.assertEqual "and to 3 toughness" (Just 3) (Projection.toughnessOf pikerId after)
+              HU.assertEqual "the hand is down to one card" 1 (S.handSize S.alice shrunk)
+              HU.assertEqual "THE FREEZE: still +2, not +1" (Just 4) (Projection.powerOf pikerId shrunk)
+              HU.assertEqual "and still +2 toughness" (Just 3) (Projection.toughnessOf pikerId shrunk),
+      HU.testCase "CR 611.2 the freeze does NOT reach a static ability's continuous effect" $
+        -- Opalescence's SetBasePowerToughness carries ManaValue, and CR 611.2 scopes
+        -- the freeze to effects created by a spell's RESOLUTION. A static ability's
+        -- effect is regenerated from the permanent every projection and evaluated
+        -- per AFFECTED object. Were ManaValue frozen against the wrong object, this
+        -- would evaluate against Opalescence itself (mana value 4, from {2}{W}{W}),
+        -- not Bad Moon's own (mana value 2, from {1}{B}).
+        --
+        -- The expected 3/3, not the naively-expected 2/2: Opalescence's layer 7b
+        -- sets Bad Moon's base to 2/2 (its own mana value), but layer 4 also makes
+        -- Bad Moon itself a black creature -- and Bad Moon's own oracle text,
+        -- "Black creatures get +1/+1", carries no "other" exclusion (unlike a lord
+        -- effect), so its layer 7c ModifyPowerToughness applies to ITSELF too.
+        -- Verified directly (not from recall): docs/rules.txt has no CR 613 clause
+        -- excluding a source from its own static ability. 3/3 is still nowhere
+        -- near the 5/5 a ManaValue-against-Opalescence leak would produce (4/4
+        -- base + Bad Moon's own +1/+1), so the falsifier still distinguishes.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, withOpal) = S.addCreature (Cards.opalescencePrinting cards) S.alice gs0
+            (moonId, gs) = S.addCreature (Cards.badMoonPrinting cards) S.alice withOpal
+         in do
+              HU.assertEqual "Bad Moon's own mana value (2) plus its own +1/+1, not Opalescence's mana value (4)" (Just 3) (Projection.powerOf moonId gs)
+              HU.assertEqual "and its toughness is 3" (Just 3) (Projection.toughnessOf moonId gs),
+      HU.testCase "CR 608.2h the count is the CASTER's hand, not the target's controller's" $
+        -- The second half of the same bug: applyModification used to evaluate a
+        -- stored quantity against the AFFECTED object, so a player-scoped count
+        -- would read the wrong player. Alice holds two cards after casting; bob
+        -- holds none, and it is bob's creature being pumped.
+        let base = S.landsInPlay (Cards.forestPrinting cards) 4
+            (bobsPiker, board) = S.addPiker cards S.bob base
+            (h1, icId) = S.handOne (Cards.innerCalmPrinting cards) board
+            (_, h2) = S.addHandCard (Cards.giantGrowthPrinting cards) S.alice h1
+            (_, gs) = S.addHandCard (Cards.forestPrinting cards) S.alice h2
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice icId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "bob holds nothing" 0 (S.handSize S.bob after)
+              HU.assertEqual "the pump is alice's two, not bob's zero" (Just 4) (Projection.powerOf bobsPiker after)
     ]

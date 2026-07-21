@@ -16,3 +16,9 @@
 # project is Haskell 2010 with only GADTs and RankNTypes permitted, so the
 # suggestion can never be applied. See the style section of CONTRIBUTING.md.
 - ignore: {name: "Use tuple-section"}
+
+# HLint rewrites a two-branch Nothing/Just case into the `maybe` combinator.
+# The project style rule is the opposite: prefer case over clever combinators
+# (freezeQuantities in Pawl.Projection is the first to trip this one). See the
+# style section of CONTRIBUTING.md.
+- ignore: {name: "Replace case with maybe"}

@@ -70,7 +70,8 @@ data Cards = MkCards
     doomBladePrinting :: Printing.Printing,
     crimsonWispsPrinting :: Printing.Printing,
     aphoticWispsPrinting :: Printing.Printing,
-    tarmogoyfPrinting :: Printing.Printing
+    tarmogoyfPrinting :: Printing.Printing,
+    innerCalmPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -140,6 +141,7 @@ loadCards = do
   crimsonWispsPrinting_ <- loadPrinting "crimson-wisps"
   aphoticWispsPrinting_ <- loadPrinting "aphotic-wisps"
   tarmogoyfPrinting_ <- loadPrinting "tarmogoyf"
+  innerCalmPrinting_ <- loadPrinting "inner-calm-outer-strength"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -198,7 +200,8 @@ loadCards = do
         doomBladePrinting = doomBladePrinting_,
         crimsonWispsPrinting = crimsonWispsPrinting_,
         aphoticWispsPrinting = aphoticWispsPrinting_,
-        tarmogoyfPrinting = tarmogoyfPrinting_
+        tarmogoyfPrinting = tarmogoyfPrinting_,
+        innerCalmPrinting = innerCalmPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -259,7 +262,8 @@ allPrintings cards =
     doomBladePrinting cards,
     crimsonWispsPrinting cards,
     aphoticWispsPrinting cards,
-    tarmogoyfPrinting cards
+    tarmogoyfPrinting cards,
+    innerCalmPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

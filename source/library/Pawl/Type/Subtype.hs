@@ -24,4 +24,5 @@ data Subtype
   | Wizard -- CR 205.3m (a creature type)
   | Shapeshifter -- CR 205.3m (a creature type; Clone's printed type)
   | Lhurgoyf -- CR 205.3m (a creature type; Tarmogoyf's printed type)
+  | Arcane -- CR 205.3k (a spell type; Inner Calm, Outer Strength's)
   deriving (Eq, Ord, Show)

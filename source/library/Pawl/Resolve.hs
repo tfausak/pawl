@@ -336,17 +336,20 @@ applyEffect source controller bound legality chosen effect = case effect of
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs
           Just target ->
-            -- CR 611.2c: the affected set is locked to this one object now. The
-            -- Modification's quantities are stored as-is (Literals); CR 611.2b's
-            -- freeze is a no-op until X exists, at which point evaluate-and-freeze
-            -- here. See the M3b spec, section 3.
+            -- CR 611.2c: the affected set is locked to this one object now.
+            -- CR 608.2h / 611.2d: and so is the VALUE -- "the answer is determined
+            -- only once, when the effect is applied". The quantities are frozen to
+            -- Literals against the SOURCE (which holds a chosen X) and the source's
+            -- CONTROLLER (whose hand a player-scoped count counts), never against
+            -- the target. See the P3b spec, section 2.4.
             let (ts, gs1) = Game.freshTimestamp gs
+                frozen = Projection.freezeQuantities gs source (Just controller) modification
                 eff =
                   ContinuousEffect.MkContinuousEffect
                     { ContinuousEffect.source = source,
                       ContinuousEffect.timestamp = ts,
                       ContinuousEffect.duration = duration,
-                      ContinuousEffect.modification = modification,
+                      ContinuousEffect.modification = frozen,
                       ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
                     }
              in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
