@@ -302,43 +302,39 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
 
--- CR 603.6a: "all permanents on the battlefield (including the newcomers) are
--- checked". This WIDENS M3f's scan, which only ever inspected the object an
--- enters event named: a step trigger belongs to a permanent that has nothing to
--- do with the event at all.
+-- CR 603.6a: "Each time an event puts one or more permanents onto the
+-- battlefield, all permanents on the battlefield (including the newcomers)
+-- are checked for any enters-the-battlefield triggers that match the event."
+-- This WIDENS M3f's scan, which only ever inspected the object an enters
+-- event named: a step trigger belongs to a permanent that has nothing to do
+-- with the event at all, so every event is checked against every permanent
+-- currently on the battlefield.
 --
--- The candidate set is built PER EVENT, not globally unioned, and for two
--- distinct reasons:
---
---   * CR 603.6a's newcomer inclusion is keyed to "each time an event puts one
---     or more permanents onto the battlefield" -- it names a specific event, not
---     the whole batch. A newcomer that has since left the battlefield (e.g. to
---     CR 704.5f, zero toughness) must still get its OWN enters trigger checked
---     against the event that put it there: CR 603.10's opening paragraph is
---     "objects that exist immediately after AN EVENT are checked", not after
---     whatever state-based actions run before the scan reaches it --
---     Engine.settleForPriority runs Sba.performStateBasedActions before
---     placePendingTriggers, so a permanent dying in the same settle it entered
---     must not silently lose the trigger.
---   * Globally unioning that departed newcomer into every event's candidates
---     would be a NEW bug: its unrelated triggers (e.g. a StepBegins ability)
---     would then fire against events it was never present for.
---
--- So: every event's candidates are the current battlefield permanents; a Moved
--- event whose destination is the battlefield additionally, and ONLY for that
--- event, adds its own newcomer (ZoneChange.object zc) when that id is not
--- already on the battlefield (i.e. it already left).
---
--- The battlefield permanents are projected ONCE via Projection.projectAll,
--- before the event loop, not once per (event, permanent) pair --
--- Projection.triggeredAbilitiesOf runs project/gather, a whole-board fold, so
--- the naive per-pair call made settleForPriority's trigger scan quadratic in
--- board size. Only a departed newcomer (rare, and at most one per event) needs
--- its own extra projection.
+-- The candidate set -- the current battlefield permanents -- is the same for
+-- every event; it is projected ONCE via Projection.projectAll, before the
+-- event loop, not once per (event, permanent) pair. Projection.projectAll
+-- (via triggeredAbilitiesOf's callers) runs a whole-board fold, so the naive
+-- per-pair call made settleForPriority's trigger scan quadratic in board
+-- size.
 --
 -- The battlefield is the ONLY scanned zone. An ability that functions from a
 -- graveyard, hand or exile is a named deferral (the P4 spec, section 8), expiring
 -- at the first such card.
+--
+-- A permanent that enters and then dies to a state-based action within the
+-- same settle (Engine.settleForPriority runs Sba.performStateBasedActions
+-- before placePendingTriggers) DOES currently lose its enters trigger:
+-- Event.changeZone retires the id from GameState.objects on the move that
+-- kills it (CR 400.7's "becomes a new object with no memory of... its
+-- previous existence"), so by the time this scan runs, no candidate carries
+-- that id. Closing this is CR 603.10's "look back in time" mechanism --
+-- 603.10 lists enters-the-battlefield triggers among the *non*-exceptions
+-- (603.10a-g name leaves-the-battlefield, sacrifice, phase-out, and similar
+-- triggers, not enters), so the gap is real and not just missing coverage of
+-- an existing look-back rule. It is a named deferral of this phase (P4 spec
+-- section 8, git-bug b998924); closing it needs the ProjectedCharacteristics
+-- snapshot GameEvent.Moved already carries, not an id lookup against current
+-- state, since by scan time the id itself may be gone.
 --
 -- Events outer, permanents inner (ascending by id): a deterministic canonical
 -- order, which is what the CR 603.3b ordering prompt indexes into.
@@ -352,25 +348,11 @@ eventTriggers events gs =
               Just pc -> fmap (\ctrl -> (oid, ctrl, PC.triggeredAbilities pc)) (Projection.controllerOf oid gs)
           )
           (Set.toAscList (GameState.battlefield gs))
-      -- CR 603.6a's newcomer, for a Moved-to-battlefield event only, and only
-      -- when it is not already covered by onBattlefield -- the departed-by-
-      -- scan-time case this restores. This is the only extra board projection
-      -- eventTriggers ever does.
-      extraFor event = case event of
-        GameEvent.Moved zc _
-          | ZoneChange.to zc == Zone.Battlefield,
-            not (Set.member (ZoneChange.object zc) (GameState.battlefield gs)) ->
-              let oid = ZoneChange.object zc
-               in fmap (\ctrl -> (oid, ctrl, Projection.triggeredAbilitiesOf oid gs)) (Projection.controllerOf oid gs)
-        _ -> Nothing
-      candidatesFor event = case extraFor event of
-        Nothing -> onBattlefield
-        Just extra -> List.sortOn (\(oid, _, _) -> oid) (extra : onBattlefield)
       forOne event (oid, ctrl, abilities) =
         let fires ab = matchesTrigger oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab Map.empty
          in map pend (filter fires abilities)
-   in concatMap (\event -> concatMap (forOne event) (candidatesFor event)) events
+   in concatMap (\event -> concatMap (forOne event) onBattlefield) events
 
 -- Everything that has triggered and is not yet on the stack. One function, so
 -- Pawl.Engine never needs to know how many sources there are. Grows a state pass

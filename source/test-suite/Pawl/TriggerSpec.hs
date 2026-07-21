@@ -12,7 +12,6 @@ module Pawl.TriggerSpec where
 import qualified Data.Foldable as Foldable
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
-import qualified Data.Set as Set
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -166,42 +165,7 @@ scanTests cards =
               HU.assertBool "enters battlefield matches" $
                 Event.matchesTrigger bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Battlefield)
               HU.assertBool "enters graveyard does not" $
-                not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard)),
-      -- IMPORTANT-1 (Task 2 review): CR 603.10's opening paragraph is "objects
-      -- that exist immediately after AN EVENT are checked" -- not after whatever
-      -- runs before the scan reaches them. Reachable by construction:
-      -- Engine.settleForPriority runs Sba.performStateBasedActions BEFORE
-      -- placePendingTriggers, so a permanent that enters and is put into a
-      -- graveyard by CR 704.5f in that SAME settle must still get the
-      -- SelfEnters trigger its entry caused.
-      --
-      -- Built by deleting the id from GameState.battlefield directly, NOT by
-      -- calling Event.changeZone: changeZone is CR 400.7-faithful -- it deletes
-      -- the OLD id from GameState.objects outright and mints a brand new
-      -- incarnation, so an id that has actually been through changeZone can
-      -- NEVER again be found by Game.lookupObject, by ANY scan implementation.
-      -- (Verified empirically against this fixture before writing this test.)
-      -- "Zone-agnostic" (Projection.controllerOf / triggeredAbilitiesOf resolve
-      -- through Game.lookupObject, which does not consult GameState.battlefield
-      -- at all) means "doesn't care WHICH zone the id is in", not "survives the
-      -- id itself being retired" -- so this direct-battlefield-removal shape is
-      -- the faithful stand-in for "left the battlefield, still resolvable by
-      -- id", matching the mechanism the fix restores.
-      HU.testCase "CR 603.6a / 603.10 a SelfEnters trigger survives its source leaving the battlefield before scan time" $
-        let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
-            gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
-            -- The since-departed newcomer: still a live id in GameState.objects,
-            -- just no longer a GameState.battlefield member by scan time.
-            gs2 = gs1 {GameState.battlefield = Set.delete ripId (GameState.battlefield gs1)}
-         in case Event.gatherTriggers (Event.unscannedEvents gs2) gs2 of
-              [pt] -> HU.assertEqual "source is RiP, despite having left the battlefield" ripId (PendingTrigger.source pt)
-              other -> HU.assertFailure ("expected exactly one pending trigger, got " <> show (length other))
-              -- The per-event scoping falsifier (a departed newcomer must NOT pick up
-              -- an UNRELATED event's trigger) is not constructible against today's card
-              -- pool: it needs one bearer with both a SelfEnters ability and a
-              -- StepBegins ability, and no card in Pawl.Cards has both. See the Task 2
-              -- fix-pass report.
+                not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard))
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
