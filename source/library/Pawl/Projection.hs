@@ -351,6 +351,15 @@ affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) 
 -- standing rewriteModification has. An unevaluable quantity is left alone.
 freezeQuantities :: GameState -> ObjectId -> Maybe PlayerId.PlayerId -> Modification -> Modification
 freezeQuantities gs oid you m =
+  -- The Nothing fallback leaves the quantity in the store rather than dropping
+  -- the effect. That is deliberate, but it leaves a RESIDUAL: an unevaluable
+  -- quantity (an X with no binding on the source, or a bare Star) survives into
+  -- the stored effect, where applyModification later evaluates it against the
+  -- AFFECTED object and that object's controller -- the very mis-evaluation this
+  -- freeze exists to prevent. Unreachable today: no card in the pool puts an X or
+  -- a Star inside a ModifyTarget's Modification. EXPIRES with the first card that
+  -- does, which is also the point at which the freeze should move into a shared
+  -- continuous-effect store helper rather than staying per-call-site.
   let freeze q = case Quantity.evaluate gs oid you q of
         Nothing -> q
         Just n -> Quantity.Type.Literal n
