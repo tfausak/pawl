@@ -483,21 +483,59 @@ counterGathered gs = Maybe.mapMaybe fromObject (Set.toList (GameState.battlefiel
 project :: ObjectId -> GameState -> ProjectedCharacteristics
 project oid gs = projectFrom (gather gs) oid gs
 
+-- CR 613.4a layer 7a: apply the object's own characteristic-defining P/T ability.
+-- Read from the PARTIAL projection (post-layer-6), so LoseAllAbilities can strip
+-- it first; evaluated against the CURRENT state, so it recomputes on every
+-- projection.
+--
+-- Folded IN PLACE rather than emitted as a synthetic Gathered the way
+-- counterGathered emits layer-7c counters, for three reasons:
+--
+--   * gather runs BEFORE the fold and has no partial to read, so a pre-gathered
+--     CDA could never be removed by Humility at layer 6;
+--   * CR 604.3 (and CR 208.2a for P/T specifically) says a CDA functions in ALL
+--     zones. gather walks the battlefield only; projectFrom is not zone-scoped, so
+--     in-place gets all-zones behaviour for free -- a Tarmogoyf in a graveyard has
+--     a power, and counts itself;
+--   * a CDA has no source object and no timestamp, so it has nothing to sort on
+--     under CR 613.7 and does not belong in the candidate list at all.
+--
+-- setPT (not a bare assignment) so an unevaluable quantity leaves the value
+-- alone, the powerOf posture used throughout this module.
+applyCharacteristicPT :: GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
+applyCharacteristicPT gs oid pc = case PC.characteristicPT pc of
+  Nothing -> pc
+  Just (p, t) ->
+    let you = controllerOf oid gs
+     in pc
+          { PC.power = setPT (PC.power pc) (Quantity.evaluate gs oid you p),
+            PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate gs oid you t)
+          }
+
 -- Project one object against a PRECOMPUTED candidate list. gather is
 -- oid-independent, so a whole-board sweep gathers once and folds each object
 -- (projectAll) instead of re-gathering per object.
+--
+-- Layer 7a is ALWAYS in the layer list, even when no gathered effect lives there:
+-- an object's own characteristic-defining ability is not a gathered candidate
+-- (see applyCharacteristicPT). For an object with no CDA the extra pass is an
+-- identity function over an empty candidate filter.
 projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectFrom cands oid gs =
-  let layers = Set.toAscList (Set.fromList (map gLayer cands))
+  let layers = Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (map gLayer cands)))
       applyLayer partial lyr =
-        let here = filter (\c -> gLayer c == lyr && affects (gSource c) oid (gAffected c) partial gs) cands
+        let seeded =
+              if lyr == Layer.CharacteristicPT
+                then applyCharacteristicPT gs oid partial
+                else partial
+            here = filter (\c -> gLayer c == lyr && affects (gSource c) oid (gAffected c) seeded gs) cands
             -- CR 613.7 timestamp order within a layer. EXPIRES: CR 613.8b dependency
             -- (a same-layer effect that changes which objects another applies to)
             -- would override this. Deferred -- no M3c card falsifies it; existence
             -- dependencies are handled by staticAbilitiesLive. git-bug f90e0c4.
             ordered = List.sortOn gTimestamp here
             step pc c = applyModification gs oid (gModification c) pc
-         in List.foldl' step partial ordered
+         in List.foldl' step seeded ordered
    in List.foldl' applyLayer (copiableCharacteristics oid gs) layers
 
 -- Project every battlefield object against ONE gather: O(gather + P*fold) instead
