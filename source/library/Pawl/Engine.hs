@@ -385,10 +385,15 @@ handoffTurn = State.modify' $ \gs ->
    in gs
         { GameState.activePlayer = newActive,
           GameState.turnNumber = GameState.turnNumber gs + 1,
-          -- CR 608.2i: the log's scope is ONE turn. Cleared here, with both
-          -- watermarks, and never at cleanup -- cleanup is still part of this turn
-          -- and CR 514.1's discard is itself an event of it. Engine.advance settles
-          -- immediately before calling this, so nothing unscanned is discarded.
+          -- CR 608.2i is why a log exists at all -- "some effects look back in
+          -- time and require information about previous game states and
+          -- actions." It does not itself say how far back; the ONE-turn scope is
+          -- this engine's choice, made because every history-reading card in the
+          -- pool asks "this turn" (Khabál Ghoul: "creatures that died this
+          -- turn"). Cleared here, with both watermarks, and never at cleanup --
+          -- cleanup is still part of this turn and CR 514.1's discard is itself
+          -- an event of it. Engine.advance settles immediately before calling
+          -- this, so nothing unscanned is discarded.
           GameState.events = Seq.empty,
           GameState.scannedThrough = 0,
           GameState.damageScannedThrough = 0,
@@ -412,9 +417,11 @@ advance = do
     -- CR 514.3 (partial) / 117.5: the turn is over. Settle once more so every
     -- event the cleanup step's turn-based actions emitted is scanned BEFORE
     -- handoffTurn clears the log -- an unscanned event discarded at handoff is a
-    -- lost trigger. EXPIRES with the full CR 514.3: the extra cleanup step and the
-    -- priority round it grants are not implemented, so a trigger placed here
-    -- resolves at the next turn's first priority rather than during this cleanup.
+    -- lost trigger. EXPIRES at the first card whose triggered ability fires on a
+    -- cleanup-step event and must resolve during that cleanup -- that is what
+    -- forces CR 514.3a's extra cleanup step and its priority round to be built.
+    -- Until then, a trigger placed here resolves at the next turn's first
+    -- priority rather than during this cleanup.
     Seq.EmptyL -> do
       settleForPriority
       handoffTurn

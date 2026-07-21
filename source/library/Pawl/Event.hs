@@ -48,8 +48,9 @@ import qualified Pawl.Type.Zone as Zone
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
 
--- CR 608.2i: append one entry to the turn-scoped log. The single write point;
--- nothing else touches GameState.events.
+-- CR 608.2i: append one entry to the turn-scoped log. The single APPEND point --
+-- Engine.handoffTurn clears the log at turn end, Setup.emptyGame seeds it empty,
+-- and the test helper Support.withEvent sets it directly; none of those append.
 recordEvent :: GameEvent -> GameState -> GameState
 recordEvent event gs = gs {GameState.events = GameState.events gs Seq.|> event}
 
@@ -145,9 +146,16 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
     let pid = Object.owner obj
         fromZone = Object.zone obj
         -- CR 608.2h: last known information -- the object as it exists in the zone
-        -- it is LEAVING, projected against the PRE-MOVE state. Costs one board
-        -- projection per zone change; that is the price of an honest history (a
-        -- token has no printed card to re-derive from, CR 111.3).
+        -- it is LEAVING, projected against the PRE-MOVE state. One board
+        -- projection per zone change, forced eagerly (GameEvent.Moved's snapshot
+        -- field is strict) rather than left as a thunk retaining the whole
+        -- pre-move GameState for a turn. Measured on the tasty-bench suite,
+        -- pre-log baseline (3cc3ecd) vs. this log with the strict field (goldfish
+        -- /casting/fighting, 2p): 10.1/9.30/9.31 ms -> 10.6/9.73/9.72 ms -- a ~4-5%
+        -- move, within the benchmark's own run-to-run noise (~800 us stddev on a
+        -- ~10 ms mean), not the large regression a captured pre-move GameState
+        -- would cause. That is the price of an honest history (a token has no
+        -- printed card to re-derive from, CR 111.3).
         snapshot = Projection.project oid gs
         -- CR 614.4: replacements exist before the event; read them from the
         -- pre-move state. CR 614.6: the modified event is what actually happens.
@@ -238,12 +246,12 @@ createToken controller card gs =
             Object.counters = Map.empty,
             Object.timestamp = ts
           }
-   in let (newId, placed) = placeObject controller mkObj Zone.Battlefield gs
-          -- A token is created from nothing, so there is no prior incarnation to
-          -- snapshot: its last known information IS what it is now (CR 111.3 makes
-          -- the creating effect's stated values functionally printed values).
-          snapshot = Projection.project newId placed
-       in recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId Zone.Battlefield Zone.Battlefield) snapshot) placed
+      (newId, placed) = placeObject controller mkObj Zone.Battlefield gs
+      -- A token is created from nothing, so there is no prior incarnation to
+      -- snapshot: its last known information IS what it is now (CR 111.3 makes
+      -- the creating effect's stated values functionally printed values).
+      snapshot = Projection.project newId placed
+   in recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId Zone.Battlefield Zone.Battlefield) snapshot) placed
 
 -- CR 121.2/121.3: the single-card draw. Move pid's top library card to their
 -- hand; an empty library records the failed draw (CR 704.5b makes it a loss at

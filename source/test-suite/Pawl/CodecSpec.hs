@@ -230,9 +230,15 @@ tests cards =
                 Phase.PostcombatMain,
                 Phase.Ending EndingStep.EndStep
               ],
+          -- A real permanent, not a projection of a nonexistent object: Typhoid
+          -- Rats (1/1 deathtouch) populates keywords, colors, power, toughness,
+          -- cardTypes and subtypes all at once, so a swapped field or a wrong
+          -- JSON key would fail this round-trip instead of surviving it on an
+          -- all-Nothing/all-empty value.
           HU.testCase "GameEvent.Moved round-trips with its snapshot" $
-            let zc = ZoneChange.MkZoneChange (ObjectId.MkObjectId 3) Zone.Battlefield Zone.Graveyard
-                snapshot = Projection.project (ObjectId.MkObjectId 3) (Setup.emptyGame S.bothPlayers)
+            let (ratId, gs) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+                zc = ZoneChange.MkZoneChange ratId Zone.Battlefield Zone.Graveyard
+                snapshot = Projection.project ratId gs
              in roundTrip "moved" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Moved zc snapshot),
           HU.testCase "GameEvent.DamageDealt round-trips" $
             roundTrip

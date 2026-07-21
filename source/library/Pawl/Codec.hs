@@ -712,9 +712,13 @@ jsonToProjectedCharacteristics value = do
   ps <- Json.asObject value
   kws <- Json.field (Text.pack "keywords") ps >>= setFrom jsonToKeyword
   cols <- Json.field (Text.pack "colors") ps >>= setFrom jsonToColor
-  pow <- maybeFrom Json.asInteger (getOpt (Text.pack "power") ps)
-  tou <- maybeFrom Json.asInteger (getOpt (Text.pack "toughness") ps)
-  cda <- maybeFrom jsonToQuantityPair (getOpt (Text.pack "characteristicPT") ps)
+  -- power/toughness/characteristicPT are encoded as required keys (maybeTo
+  -- writes JSON null for Nothing, never omits the key), so decoding them is
+  -- Json.field (required) >>= maybeFrom (Null -> Nothing), exactly like every
+  -- other field here -- not the optional getOpt a truly-omittable key would need.
+  pow <- Json.field (Text.pack "power") ps >>= maybeFrom Json.asInteger
+  tou <- Json.field (Text.pack "toughness") ps >>= maybeFrom Json.asInteger
+  cda <- Json.field (Text.pack "characteristicPT") ps >>= maybeFrom jsonToQuantityPair
   cts <- Json.field (Text.pack "cardTypes") ps >>= setFrom jsonToCardType
   subs <- Json.field (Text.pack "subtypes") ps >>= setFrom jsonToSubtype
   live <- Json.field (Text.pack "rulesTextActive") ps >>= jsonToBoolDefault True

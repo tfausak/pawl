@@ -1,7 +1,10 @@
--- Covers M4.5 P4: the turn-scoped event log (Pawl.Type.GameEvent, GameState's
--- log and watermarks), the widened CR 603.6a trigger scan, state triggers (CR
--- 603.8), delayed triggers (CR 603.7), intervening "if" (CR 603.4 / 608.2a) and
--- the CR 603.3b ordering prompt.
+-- Covers M4.5 P4 Task 1: the turn-scoped event log (Pawl.Type.GameEvent,
+-- GameState's log and watermarks) -- append-only recording, watermark-based
+-- consumption per reader (trigger scan, SBA damage check), and the log's
+-- turn-scoped clearing at handoff. Later P4 tasks add coverage HERE for the
+-- widened CR 603.6a trigger scan, state triggers (CR 603.8), delayed triggers
+-- (CR 603.7), intervening "if" (CR 603.4 / 608.2a), and the CR 603.3b ordering
+-- prompt -- none of that is implemented yet.
 module Pawl.TriggerSpec where
 
 import qualified Data.Foldable as Foldable
@@ -28,12 +31,11 @@ logTests :: Cards.Cards -> Tasty.TestTree
 logTests cards =
   Tasty.testGroup
     "EventLog"
-    [ HU.testCase "CR 400.7 a zone change appends a Moved event carrying the destination" $
-        let (piker, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
-            after = Event.changeZone piker Zone.Graveyard gs
-         in case S.zoneChangesOf after of
-              zc : _ -> HU.assertEqual "event says graveyard" Zone.Graveyard (ZoneChange.to zc)
-              [] -> HU.assertFailure "expected an emitted zone change",
+    [ -- CR 400.7 / 603.2g: a zone change appends a Moved event carrying the
+      -- RESOLVED destination. Pawl.EventSpec's "CR 603.2g: the emitted event
+      -- records the RESOLVED destination (exile)" covers this same accessor
+      -- (S.zoneChangesOf / ZoneChange.to) more strongly, through a Rest in
+      -- Peace redirect -- no separate case needed here.
       -- CR 608.2h: the snapshot is the object as it last existed in the zone it
       -- LEFT. Re-deriving from the printed card would be wrong for an animated
       -- land and impossible for a token (CR 111.3).

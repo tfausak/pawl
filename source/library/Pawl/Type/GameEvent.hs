@@ -21,7 +21,13 @@ data GameEvent
     -- the object's last known information"). A snapshot, never a re-derivation
     -- from the printed card: a land animated into a creature DIED as a creature,
     -- and a token has no printed card at all (CR 111.3).
-    Moved ZoneChange ProjectedCharacteristics
+    --
+    -- Strict (!): the snapshot is taken as of THIS zone change, not as of
+    -- whenever a reader eventually forces it. An unforced field would be a thunk
+    -- closing over the entire pre-move GameState, appended to a log that lives
+    -- for a whole turn -- retaining a turn's worth of superseded states instead
+    -- of the one small value this constructor is meant to carry.
+    Moved ZoneChange !ProjectedCharacteristics
   | -- CR 120 / 510: damage was dealt. The record the CR 704.5h deathtouch
     -- state-based action reads, watermarked rather than drained.
     DamageDealt DamageEvent
