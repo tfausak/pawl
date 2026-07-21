@@ -21,6 +21,7 @@ import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Keyword (Keyword)
+import qualified Pawl.Type.Keyword as Keyword
 import Pawl.Type.Layer (Layer)
 import qualified Pawl.Type.Layer as Layer
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -214,13 +215,41 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 -- mana symbols in its mana cost, together with the colours its colour indicator
 -- denotes. CR 202.2b: an object with no coloured mana symbols and no indicator is
 -- colourless.
+--
+-- CR 702.114a: devoid is a CHARACTERISTIC-DEFINING ability meaning "this object is
+-- colourless", and it wins over both sources above.
+--
+-- Devoid is applied HERE, at the seed, rather than as a CDA inside layer 5. CR
+-- 613.3 says that within layers 2-6 characteristic-defining abilities apply first
+-- and only then other effects in timestamp order, which would mean a precedence
+-- key on Gathered. That machinery is not built because the two orderings are
+-- observably indistinguishable for everything this engine can reach:
+--
+--   * every layer-5 effect in the vocabulary is SetColor, which REPLACES (CR
+--     105.3), so "CDA first, then the replacers" and "CDA before layer 5, then the
+--     replacers" agree on the final set, always;
+--   * a copy of a devoid object snapshots the printed Devoid keyword among its
+--     copiable values (CR 613.2c), so the copy recomputes colourless from its own
+--     seed;
+--   * Humility's LoseAllAbilities is layer 6, AFTER layer 5, and CR 613.8a scopes
+--     dependency to effects in the same layer -- so a Humility'd devoid object
+--     stays colourless under either ordering;
+--   * CR 604.3: a CDA functions in ALL zones. The seed is computed from the card
+--     and is zone-independent; a battlefield-only gather pass would not be.
+--
+-- EXPIRES with the first card needing a genuine CDA-vs-timestamp interleave
+-- WITHIN layers 2-6, which is what builds the Gathered precedence key. P3a's spec
+-- section 2.2 carries the full argument; P3b re-opens it one sublayer up at 7a.
 baseColorsOf :: Card.Type.Card -> Set Color.Color
 baseColorsOf card =
-  Set.union
-    (Card.Type.colorIndicator card)
-    (manaCostColors (Card.Type.manaCost card))
+  if Set.member Keyword.Devoid (Card.Type.keywords card)
+    then Set.empty
+    else
+      Set.union
+        (Card.Type.colorIndicator card)
+        (manaCostColors (Card.Type.manaCost card))
 
--- CR 202.1: a land has no mana cost at all, so it contributes no colours.
+-- CR 202.1b: a land has no mana cost at all, so it contributes no colours.
 manaCostColors :: Maybe ManaCost.ManaCost -> Set Color.Color
 manaCostColors mc = case mc of
   Nothing -> Set.empty

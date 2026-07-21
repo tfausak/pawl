@@ -233,6 +233,8 @@ keywordToJson k = nullary . Text.pack $ case k of
   Keyword.Reach -> "Reach"
   Keyword.Trample -> "Trample"
   Keyword.Vigilance -> "Vigilance"
+  Keyword.Fear -> "Fear"
+  Keyword.Devoid -> "Devoid"
 
 jsonToKeyword :: Value -> Either Text Keyword.Keyword
 jsonToKeyword =
@@ -247,7 +249,9 @@ jsonToKeyword =
       (Text.pack "Indestructible", Keyword.Indestructible),
       (Text.pack "Reach", Keyword.Reach),
       (Text.pack "Trample", Keyword.Trample),
-      (Text.pack "Vigilance", Keyword.Vigilance)
+      (Text.pack "Vigilance", Keyword.Vigilance),
+      (Text.pack "Fear", Keyword.Fear),
+      (Text.pack "Devoid", Keyword.Devoid)
     ]
 
 zoneToJson :: Zone.Zone -> Value

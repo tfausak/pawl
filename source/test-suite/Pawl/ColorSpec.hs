@@ -32,5 +32,11 @@ tests cards =
       HU.testCase "CR 202.1 a land has no mana cost, so it is colourless" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (mtnId, gs) = S.addCreature (Cards.mountainPrinting cards) S.alice gs0
-         in HU.assertEqual "colourless" Set.empty (Projection.colorsOf mtnId gs)
+         in HU.assertEqual "colourless" Set.empty (Projection.colorsOf mtnId gs),
+      HU.testCase "CR 702.114a devoid makes an object colourless despite a black mana cost" $
+        -- THE FALSIFIER for "an object's colours are the coloured symbols in its
+        -- mana cost": this card's cost is {1}{B} and it is colourless.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (droneId, gs) = S.addCreature (Cards.devoidDronePrinting cards) S.alice gs0
+         in HU.assertEqual "colourless" Set.empty (Projection.colorsOf droneId gs)
     ]
