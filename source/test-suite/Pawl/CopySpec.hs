@@ -141,5 +141,26 @@ tests cards =
               Just cloneId -> do
                 HU.assertEqual "the source is gone" False (Set.member pikerId (GameState.battlefield afterKill))
                 HU.assertEqual "the Clone is still a 2/1" (Just 2) (Projection.powerOf cloneId afterKill)
-                HU.assertEqual "the Clone is still 1 toughness" (Just 1) (Projection.toughnessOf cloneId afterKill)
+                HU.assertEqual "the Clone is still 1 toughness" (Just 1) (Projection.toughnessOf cloneId afterKill),
+      HU.testCase "Clone of Tarmogoyf copies the ABILITY, so both recompute (CR 707.2a)" $
+        -- THE FALSIFIER for snapshotting the NUMBER: CR 707.2a says a copy
+        -- acquires the abilities of the object it copies, because those values are
+        -- derived from its rules text. Seeding the CDA as an evaluated integer
+        -- would freeze the Clone at the graveyards' contents at the moment it
+        -- entered -- P2's deferred bill, paid here.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, withBolt) = S.addGraveyardCard (Cards.lightningBoltPrinting cards) S.alice gs0
+            (goyfId, board) = S.addCreature (Cards.tarmogoyfPrinting cards) S.alice withBolt
+            (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
+            resolved = resolveAndSettle copyNewest staged
+            -- A second card type reaches a graveyard AFTER the Clone entered.
+            (_, later) = S.addGraveyardCard (Cards.pikerPrinting cards) S.bob resolved
+         in case cloneOnBattlefield resolved of
+              Nothing -> HU.assertFailure "Clone did not reach the battlefield"
+              Just cloneId -> do
+                HU.assertEqual "at entry the Clone is the Goyf's 1/2" (Just 1) (Projection.powerOf cloneId resolved)
+                HU.assertEqual "at entry, toughness 1+1" (Just 2) (Projection.toughnessOf cloneId resolved)
+                HU.assertEqual "the source moves to 2" (Just 2) (Projection.powerOf goyfId later)
+                HU.assertEqual "and so does the COPY" (Just 2) (Projection.powerOf cloneId later)
+                HU.assertEqual "the copy's toughness moves too" (Just 3) (Projection.toughnessOf cloneId later)
     ]
