@@ -8,10 +8,12 @@ module Pawl.Event where
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import Pawl.Type.Card (Card)
+import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.Combat as Combat
 import Pawl.Type.DamageEvent (DamageEvent)
 import qualified Pawl.Type.DamageEvent as DamageEvent
@@ -25,6 +27,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Prevention (Prevention)
 import qualified Pawl.Type.Prevention as Prevention
+import qualified Pawl.Type.Printing as Printing
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
@@ -73,13 +76,33 @@ placeObject :: PlayerId -> (Timestamp.Timestamp -> Object.Object) -> Zone -> Zon
 placeObject pid mkObj origin dest gs =
   let (newId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj = mkObj ts
+      obj = markCopyOnEnter dest (mkObj ts)
       gs3 = gs2 {GameState.objects = Map.insert newId obj (GameState.objects gs2)}
       placed = Game.insertIntoZone dest pid newId gs3
       -- CR 603.2g: emit the RESOLVED event (post-replacement), carrying the new
       -- object's id -- what an enters trigger scans.
       emitted = ZoneChange.MkZoneChange newId origin dest
    in placed {GameState.zoneChanges = GameState.zoneChanges placed ++ [emitted]}
+
+-- CR 614.1c / 603.6d / 113.6h: an object with a "enters as a copy" ability is
+-- marked as-enters-pending as it enters the battlefield, on ANY entry path. The
+-- choice itself is a prompt, so it is drained at the CR 117.5 boundary
+-- (Engine.drainAsEntersChoices), not here -- placeObject stays pure. Non-copyOnEnter
+-- entries and non-battlefield destinations are untouched.
+markCopyOnEnter :: Zone -> Object.Object -> Object.Object
+markCopyOnEnter dest obj =
+  if dest == Zone.Battlefield && maybe False Card.copyOnEnter (cardOfObject obj)
+    then obj {Object.bindings = Binding.markPending (Object.bindings obj)}
+    else obj
+
+-- The card an object is built from, read from its source (P2; a card-less object --
+-- an ability or trigger -- has none, and is never copyOnEnter).
+cardOfObject :: Object.Object -> Maybe Card.Card
+cardOfObject obj = case Object.source obj of
+  Source.OfCard printing -> Just (Printing.card printing)
+  Source.OfToken card -> Just card
+  Source.OfAbility _ _ -> Nothing
+  Source.OfTrigger _ _ -> Nothing
 
 -- The single zone-change primitive (CR 400.7): the source object ceases; a NEW
 -- object with a fresh id is created in the destination, carrying owner and

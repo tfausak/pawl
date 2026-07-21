@@ -190,6 +190,7 @@ test-suite pawl-test-suite
     Pawl.CastSpec
     Pawl.CodecSpec
     Pawl.CombatSpec
+    Pawl.CopySpec
     Pawl.CoreSpec
     Pawl.DamageSpec
     Pawl.DecideSpec
