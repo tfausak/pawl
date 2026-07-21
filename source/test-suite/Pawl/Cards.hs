@@ -72,7 +72,8 @@ data Cards = MkCards
     aphoticWispsPrinting :: Printing.Printing,
     tarmogoyfPrinting :: Printing.Printing,
     innerCalmPrinting :: Printing.Printing,
-    twistedImagePrinting :: Printing.Printing
+    twistedImagePrinting :: Printing.Printing,
+    barbarianOutcastPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -144,6 +145,7 @@ loadCards = do
   tarmogoyfPrinting_ <- loadPrinting "tarmogoyf"
   innerCalmPrinting_ <- loadPrinting "inner-calm-outer-strength"
   twistedImagePrinting_ <- loadPrinting "twisted-image"
+  barbarianOutcastPrinting_ <- loadPrinting "barbarian-outcast"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -204,7 +206,8 @@ loadCards = do
         aphoticWispsPrinting = aphoticWispsPrinting_,
         tarmogoyfPrinting = tarmogoyfPrinting_,
         innerCalmPrinting = innerCalmPrinting_,
-        twistedImagePrinting = twistedImagePrinting_
+        twistedImagePrinting = twistedImagePrinting_,
+        barbarianOutcastPrinting = barbarianOutcastPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -267,7 +270,8 @@ allPrintings cards =
     aphoticWispsPrinting cards,
     tarmogoyfPrinting cards,
     innerCalmPrinting cards,
-    twistedImagePrinting cards
+    twistedImagePrinting cards,
+    barbarianOutcastPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

@@ -62,6 +62,7 @@ subtypeMana subtype = case subtype of
   Subtype.Shapeshifter -> Nothing
   Subtype.Lhurgoyf -> Nothing
   Subtype.Arcane -> Nothing
+  Subtype.Barbarian -> Nothing
 
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
 -- PLUS every projected activated ability that is a mana ability (CR 605.1a),

@@ -56,6 +56,7 @@ import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
@@ -207,6 +208,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Shapeshifter -> "Shapeshifter"
   Subtype.Lhurgoyf -> "Lhurgoyf"
   Subtype.Arcane -> "Arcane"
+  Subtype.Barbarian -> "Barbarian"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -234,7 +236,8 @@ jsonToSubtype =
       (Text.pack "Wizard", Subtype.Wizard),
       (Text.pack "Shapeshifter", Subtype.Shapeshifter),
       (Text.pack "Lhurgoyf", Subtype.Lhurgoyf),
-      (Text.pack "Arcane", Subtype.Arcane)
+      (Text.pack "Arcane", Subtype.Arcane),
+      (Text.pack "Barbarian", Subtype.Barbarian)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -452,6 +455,7 @@ triggerConditionToJson :: TriggerCondition.TriggerCondition -> Value
 triggerConditionToJson c = case c of
   TriggerCondition.SelfEnters -> nullary (Text.pack "SelfEnters")
   TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array [phaseToJson p, turnScopeToJson s]))
+  TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (stateConditionToJson c2))
 
 jsonToTriggerCondition :: Value -> Either Text TriggerCondition.TriggerCondition
 jsonToTriggerCondition value = do
@@ -459,7 +463,21 @@ jsonToTriggerCondition value = do
   case (Text.unpack t, mv) of
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
     ("StepBegins", Just (Array [p, s])) -> TriggerCondition.StepBegins <$> jsonToPhase p <*> jsonToTurnScope s
+    ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToStateCondition v
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
+
+stateConditionToJson :: StateCondition.StateCondition -> Value
+stateConditionToJson c = case c of
+  StateCondition.YouControlNo s -> Json.tagged (Text.pack "YouControlNo") (Just (subtypeToJson s))
+  StateCondition.NoPermanentsOfSubtype s -> Json.tagged (Text.pack "NoPermanentsOfSubtype") (Just (subtypeToJson s))
+
+jsonToStateCondition :: Value -> Either Text StateCondition.StateCondition
+jsonToStateCondition value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("YouControlNo", Just v) -> StateCondition.YouControlNo <$> jsonToSubtype v
+    ("NoPermanentsOfSubtype", Just v) -> StateCondition.NoPermanentsOfSubtype <$> jsonToSubtype v
+    _ -> Left (Text.pack "unknown StateCondition: " <> t)
 
 castingPermissionToJson :: CastingPermission.CastingPermission -> Value
 castingPermissionToJson c = nullary . Text.pack $ case c of

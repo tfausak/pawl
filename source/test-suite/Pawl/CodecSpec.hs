@@ -48,6 +48,7 @@ import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
@@ -259,6 +260,16 @@ tests cards =
               "cond"
               Codec.triggerConditionToJson
               Codec.jsonToTriggerCondition
-              (TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn)
+              (TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn),
+          HU.testCase "StateCondition round-trips" $
+            mapM_
+              (roundTrip "state" Codec.stateConditionToJson Codec.jsonToStateCondition)
+              [StateCondition.YouControlNo Subtype.Swamp, StateCondition.NoPermanentsOfSubtype Subtype.Swamp],
+          HU.testCase "TriggerCondition.StateIs round-trips" $
+            roundTrip
+              "cond"
+              Codec.triggerConditionToJson
+              Codec.jsonToTriggerCondition
+              (TriggerCondition.StateIs (StateCondition.YouControlNo Subtype.Swamp))
         ]
     ]

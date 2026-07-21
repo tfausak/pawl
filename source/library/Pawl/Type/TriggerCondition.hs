@@ -1,6 +1,7 @@
 module Pawl.Type.TriggerCondition where
 
 import Pawl.Type.Phase (Phase)
+import Pawl.Type.StateCondition (StateCondition)
 import Pawl.Type.TurnScope (TurnScope)
 
 -- CR 603.2: the pattern that fires a triggered ability. Only Pawl.Event may case
@@ -16,4 +17,9 @@ data TriggerCondition
   | -- CR 603.2b: "at the beginning of [each|your] <step>". Matched against a
     -- GameEvent.StepBegan; the TurnScope decides whose turn qualifies.
     StepBegins Phase TurnScope
+  | -- CR 603.8: a STATE trigger -- it fires whenever its condition is true, not
+    -- when an event occurs. "It doesn't trigger again until the ability has
+    -- resolved, has been countered, or has otherwise left the stack", which is why
+    -- Pawl.Event derives armedness from the stack rather than storing it.
+    StateIs StateCondition
   deriving (Eq, Ord, Show)

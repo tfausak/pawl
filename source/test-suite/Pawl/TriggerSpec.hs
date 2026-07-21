@@ -13,14 +13,17 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
+import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -32,6 +35,7 @@ import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.Zone as Zone
@@ -244,5 +248,68 @@ sacrificeTests cards =
               (map selfOf (GameState.stack placed))
     ]
 
+-- Barbarian Outcast {1}{R} Creature -- Human Barbarian Beast 2/2:
+-- "When you control no Swamps, sacrifice this creature." CR 603.8's own example
+-- shape ("a player controlling no permanents of a particular card type"), chosen
+-- by the rulebook to illustrate the rule.
+stateTriggerTests :: Cards.Cards -> Tasty.TestTree
+stateTriggerTests cards =
+  let outcastBoard swamps =
+        let (oid, gs) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice (S.landsInPlay (Cards.swampPrinting cards) swamps)
+         in (oid, gs)
+      triggerIds gs = filter (isTriggerObject gs) (GameState.stack gs)
+      isTriggerObject gs oid = case Game.lookupObject oid gs of
+        Just obj -> case Object.source obj of
+          Source.OfTrigger _ _ -> True
+          _ -> False
+        Nothing -> False
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+   in Tasty.testGroup
+        "StateTrigger"
+        [ -- THE flooding falsifier. CR 603.8's second sentence exists to prevent
+          -- exactly this: a state trigger that re-fires at every boundary.
+          HU.testCase "CR 603.8 a true state condition puts EXACTLY ONE instance on the stack" $
+            let (_, gs) = outcastBoard 0
+                settled = settle gs
+             in HU.assertEqual "one trigger, not one per boundary" 1 (length (triggerIds settled)),
+          HU.testCase "CR 603.8 re-settling while the instance is on the stack adds no second copy" $
+            let (_, gs) = outcastBoard 0
+                twice = settle (settle gs)
+             in HU.assertEqual "still exactly one" 1 (length (triggerIds twice)),
+          HU.testCase "CR 603.8 the condition being FALSE means no trigger at all" $
+            let (_, gs) = outcastBoard 1
+                settled = settle gs
+             in HU.assertEqual "no trigger while a Swamp is out" 0 (length (triggerIds settled)),
+          HU.testCase "CR 603.8 losing the last Swamp makes the condition true and fires it" $
+            let (_, gs) = outcastBoard 1
+                quiet = settle gs
+                swamp = case Game.zoneMembers Zone.Battlefield S.alice quiet of
+                  ids -> case filter (\oid -> Set.member Subtype.Swamp (Projection.subtypesOf oid quiet)) ids of
+                    s : _ -> s
+                    [] -> ObjectId.MkObjectId 999
+                gone = settle (Event.destroy swamp quiet)
+             in HU.assertEqual "the Swamp's death arms it" 1 (length (triggerIds gone)),
+          -- CR 603.8: "doesn't trigger again until the ability has resolved, has
+          -- been countered, or has otherwise left the stack" -- all three are
+          -- "no longer on the stack", which is why armedness is derived.
+          HU.testCase "CR 603.8 an instance leaving the stack re-arms the trigger" $
+            let (_, gs) = outcastBoard 0
+                settled = settle gs
+                removed = case triggerIds settled of
+                  abilId : _ -> Resolve.cease abilId settled
+                  [] -> settled
+                again = settle removed
+             in HU.assertEqual "a fresh instance" 1 (length (triggerIds again)),
+          -- The whole card, at gameplay level: the trigger resolves and the
+          -- Outcast sacrifices itself (CR 701.21a, through Event.sacrifice).
+          HU.testCase "CR 701.21 the resolved trigger sacrifices the Outcast into its owner's graveyard" $
+            let (outcast, gs) = outcastBoard 0
+                settled = settle gs
+                resolved = snd (Engine.runGamePure S.identityAnswer settled Stack.resolveTop)
+             in do
+                  HU.assertBool "the Outcast is off the battlefield" (not (Set.member outcast (GameState.battlefield resolved)))
+                  HU.assertEqual "and in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice resolved))
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards]
+tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards, stateTriggerTests cards]

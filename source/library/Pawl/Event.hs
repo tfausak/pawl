@@ -40,6 +40,8 @@ import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
+import Pawl.Type.StateCondition (StateCondition)
+import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import Pawl.Type.TriggerCondition (TriggerCondition)
@@ -329,6 +331,9 @@ matchesTrigger bearer you cond event = case cond of
         TurnScope.ControllersTurn -> active == you
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
+  -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
+  -- in the log; stateTriggers below is its whole story.
+  TriggerCondition.StateIs _ -> False
 
 -- CR 603.6a: "Each time an event puts one or more permanents onto the
 -- battlefield, all permanents on the battlefield (including the newcomers)
@@ -401,8 +406,55 @@ eventTriggers events gs =
          in map pend (filter fires abilities)
    in concatMap (\event -> concatMap (forOne event) onBattlefield) events
 
+-- CR 603.8 / 603.4: is this state condition currently true, for an ability whose
+-- controller is `you`? Reads the PROJECTION -- a subtype is CR 613 layer 4 and
+-- control is layer 2, so Blood Moon and Act of Treason both change the answer.
+-- This module is the sole home of casing on StateCondition.
+stateHolds :: PlayerId -> StateCondition -> GameState -> Bool
+stateHolds you cond gs =
+  let hasSubtype subtype oid = Set.member subtype (Projection.subtypesOf oid gs)
+   in case cond of
+        -- CR 108.4: "you control" is the projected controller's permanents.
+        StateCondition.YouControlNo subtype -> not (any (hasSubtype subtype) (Projection.controls you gs))
+        -- Any player's -- the whole battlefield.
+        StateCondition.NoPermanentsOfSubtype subtype -> not (any (hasSubtype subtype) (Set.toList (GameState.battlefield gs)))
+
+-- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
+-- is currently TRUE and which has no instance already on the stack.
+--
+-- Armedness is DERIVED, never stored. CR 603.8's second sentence -- "doesn't
+-- trigger again until the ability has resolved, has been countered, or has
+-- otherwise left the stack" -- names three outcomes that are all "no longer on
+-- the stack", so an instance sitting there is the whole suppression rule and
+-- there is no bookkeeping field to leak. There is no triggered-but-not-yet-placed
+-- window to worry about: Engine.placePendingTriggers puts them on the stack
+-- within the same settle step.
+--
+-- A trigger whose modes are all unfillable would be removed from the stack (CR
+-- 603.3c) and re-trigger on the next settle pass while its condition held, which
+-- would not terminate. No card in the pool can do that -- Barbarian Outcast's
+-- single mode has no target slots and is always fillable -- and the first card
+-- that could is the one that must revisit this.
+stateTriggers :: GameState -> [PendingTrigger]
+stateTriggers gs =
+  let alreadyOnStack srcId ab =
+        let isInstance sid = case Game.lookupObject sid gs of
+              Nothing -> False
+              Just obj -> Object.source obj == Source.OfTrigger srcId ab
+         in any isInstance (GameState.stack gs)
+      forOne oid = case Projection.controllerOf oid gs of
+        Nothing -> []
+        Just ctrl ->
+          let live ab = case TriggeredAbility.condition ab of
+                TriggerCondition.StateIs cond -> stateHolds ctrl cond gs && not (alreadyOnStack oid ab)
+                TriggerCondition.SelfEnters -> False
+                TriggerCondition.StepBegins _ _ -> False
+              pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab Map.empty
+           in map pend (filter live (Projection.triggeredAbilitiesOf oid gs))
+   in concatMap forOne (Set.toAscList (GameState.battlefield gs))
+
 -- Everything that has triggered and is not yet on the stack. One function, so
 -- Pawl.Engine never needs to know how many sources there are. Grows a state pass
 -- (CR 603.8) at Task 4 and a delayed pass (CR 603.7) at Task 6.
 gatherTriggers :: [GameEvent] -> GameState -> [PendingTrigger]
-gatherTriggers = eventTriggers
+gatherTriggers events gs = eventTriggers events gs ++ stateTriggers gs
