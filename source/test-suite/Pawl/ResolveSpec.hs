@@ -38,6 +38,7 @@ import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -166,7 +167,7 @@ resolveTests cards =
          in HU.assertEqual
               "the Bolt's damage event is Noncombat"
               [DamageKind.Noncombat]
-              (map DamageEvent.kind (GameState.damageEvents resolved)),
+              (map DamageEvent.kind (S.damageEventsOf resolved)),
       HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $
         let (_, cast, _) = S.boltAtBobsPiker cards
             after = Sba.checkStateBasedActions (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
@@ -188,7 +189,7 @@ resolveTests cards =
       HU.testCase "the resolved damage flows through the event funnel" $
         let (_, cast, _) = S.boltAtBobsPiker cards
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in HU.assertEqual "one event of amount 3" [3] (map DamageEvent.amount (GameState.damageEvents after)),
+         in HU.assertEqual "one event of amount 3" [3] (map DamageEvent.amount (S.damageEventsOf after)),
       HU.testCase "resolving a Bolt conserves objects" $
         let (_, cast, _) = S.boltAtBobsPiker cards
          in HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))),
@@ -200,7 +201,7 @@ resolveTests cards =
             after = snd (Engine.runGamePure S.identityAnswer dead Stack.resolveTop)
          in do
               HU.assertEqual "Bolt in the graveyard, unresolved" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
-              HU.assertEqual "no damage was dealt" [] (GameState.damageEvents after)
+              HU.assertEqual "no damage was dealt" [] (S.damageEventsOf after)
               HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after),
       HU.testCase "CR 608.2b a fizzled spell applies none of its effects" $
         let (base, cast, _) = S.boltAtBobsPiker cards
@@ -631,7 +632,7 @@ indestructibleTests cards =
         let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             -- Zero marked damage (so 704.5g is silent) plus a deathtouch event isolates
             -- the 704.5h path; indestructible must guard it too (CR 700.4).
-            wounded = gs {GameState.damageEvents = [DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True DamageKind.Combat]}
+            wounded = S.withEvent (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True DamageKind.Combat)) gs
             after = Sba.checkStateBasedActions wounded
          in HU.assertEqual "Myr survives deathtouch" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $

@@ -22,6 +22,7 @@ import qualified Pawl.PropertySpec as PropertySpec
 import qualified Pawl.ReplaySpec as ReplaySpec
 import qualified Pawl.ResolveSpec as ResolveSpec
 import qualified Pawl.SetupSpec as SetupSpec
+import qualified Pawl.TriggerSpec as TriggerSpec
 import qualified Pawl.TurnSpec as TurnSpec
 import qualified Test.Tasty as Tasty
 
@@ -57,5 +58,6 @@ testTree cards =
       ActivateSpec.tests cards,
       ModalSpec.tests cards,
       CopySpec.tests cards,
-      ColorSpec.tests cards
+      ColorSpec.tests cards,
+      TriggerSpec.tests cards
     ]

@@ -20,15 +20,21 @@ import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.Json (Value (Array, Boolean, Null, Object))
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -40,11 +46,14 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Prevention as Prevention
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.StaticAbility as StaticAbility
@@ -56,6 +65,7 @@ import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChange as ZoneChange
 
 -- Helpers --------------------------------------------------------------------
 
@@ -292,6 +302,72 @@ jsonToZone =
       (Text.pack "Stack", Zone.Stack),
       (Text.pack "Exile", Zone.Exile)
     ]
+
+beginningStepToJson :: BeginningStep.BeginningStep -> Value
+beginningStepToJson s = nullary . Text.pack $ case s of
+  BeginningStep.Untap -> "Untap"
+  BeginningStep.Upkeep -> "Upkeep"
+  BeginningStep.DrawStep -> "DrawStep"
+
+jsonToBeginningStep :: Value -> Either Text BeginningStep.BeginningStep
+jsonToBeginningStep =
+  decodeNullary
+    (Text.pack "BeginningStep")
+    [ (Text.pack "Untap", BeginningStep.Untap),
+      (Text.pack "Upkeep", BeginningStep.Upkeep),
+      (Text.pack "DrawStep", BeginningStep.DrawStep)
+    ]
+
+combatStepToJson :: CombatStep.CombatStep -> Value
+combatStepToJson s = nullary . Text.pack $ case s of
+  CombatStep.BeginningOfCombat -> "BeginningOfCombat"
+  CombatStep.DeclareAttackers -> "DeclareAttackers"
+  CombatStep.DeclareBlockers -> "DeclareBlockers"
+  CombatStep.CombatDamage -> "CombatDamage"
+  CombatStep.EndOfCombat -> "EndOfCombat"
+
+jsonToCombatStep :: Value -> Either Text CombatStep.CombatStep
+jsonToCombatStep =
+  decodeNullary
+    (Text.pack "CombatStep")
+    [ (Text.pack "BeginningOfCombat", CombatStep.BeginningOfCombat),
+      (Text.pack "DeclareAttackers", CombatStep.DeclareAttackers),
+      (Text.pack "DeclareBlockers", CombatStep.DeclareBlockers),
+      (Text.pack "CombatDamage", CombatStep.CombatDamage),
+      (Text.pack "EndOfCombat", CombatStep.EndOfCombat)
+    ]
+
+endingStepToJson :: EndingStep.EndingStep -> Value
+endingStepToJson s = nullary . Text.pack $ case s of
+  EndingStep.EndStep -> "EndStep"
+  EndingStep.Cleanup -> "Cleanup"
+
+jsonToEndingStep :: Value -> Either Text EndingStep.EndingStep
+jsonToEndingStep =
+  decodeNullary
+    (Text.pack "EndingStep")
+    [ (Text.pack "EndStep", EndingStep.EndStep),
+      (Text.pack "Cleanup", EndingStep.Cleanup)
+    ]
+
+phaseToJson :: Phase.Phase -> Value
+phaseToJson p = case p of
+  Phase.Beginning s -> Json.tagged (Text.pack "Beginning") (Just (beginningStepToJson s))
+  Phase.PrecombatMain -> nullary (Text.pack "PrecombatMain")
+  Phase.Combat s -> Json.tagged (Text.pack "Combat") (Just (combatStepToJson s))
+  Phase.PostcombatMain -> nullary (Text.pack "PostcombatMain")
+  Phase.Ending s -> Json.tagged (Text.pack "Ending") (Just (endingStepToJson s))
+
+jsonToPhase :: Value -> Either Text Phase.Phase
+jsonToPhase value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Beginning", Just v) -> Phase.Beginning <$> jsonToBeginningStep v
+    ("PrecombatMain", _) -> Right Phase.PrecombatMain
+    ("Combat", Just v) -> Phase.Combat <$> jsonToCombatStep v
+    ("PostcombatMain", _) -> Right Phase.PostcombatMain
+    ("Ending", Just v) -> Phase.Ending <$> jsonToEndingStep v
+    _ -> Left (Text.pack "unknown Phase: " <> t)
 
 durationToJson :: Duration.Duration -> Value
 durationToJson d = nullary . Text.pack $ case d of
@@ -543,6 +619,145 @@ jsonToAffected value = do
     "OtherNonAuraEnchantments" -> Right Affected.OtherNonAuraEnchantments
     "CreaturesOfColor" -> withValue mv (fmap Affected.CreaturesOfColor . jsonToColor)
     _ -> Left (Text.pack "unknown Affected: " <> t)
+
+recipientToJson :: Recipient.Recipient -> Value
+recipientToJson r = case r of
+  Recipient.ToCreature oid -> Json.tagged (Text.pack "ToCreature") (Just (objectIdToJson oid))
+  Recipient.ToPlayer pid -> Json.tagged (Text.pack "ToPlayer") (Just (playerIdToJson pid))
+  Recipient.ToObject oid -> Json.tagged (Text.pack "ToObject") (Just (objectIdToJson oid))
+
+jsonToRecipient :: Value -> Either Text Recipient.Recipient
+jsonToRecipient value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("ToCreature", Just v) -> Recipient.ToCreature <$> jsonToObjectId v
+    ("ToPlayer", Just v) -> Recipient.ToPlayer <$> jsonToPlayerId v
+    ("ToObject", Just v) -> Recipient.ToObject <$> jsonToObjectId v
+    _ -> Left (Text.pack "unknown Recipient: " <> t)
+
+damageKindToJson :: DamageKind.DamageKind -> Value
+damageKindToJson k = nullary . Text.pack $ case k of
+  DamageKind.Combat -> "Combat"
+  DamageKind.Noncombat -> "Noncombat"
+
+jsonToDamageKind :: Value -> Either Text DamageKind.DamageKind
+jsonToDamageKind =
+  decodeNullary
+    (Text.pack "DamageKind")
+    [ (Text.pack "Combat", DamageKind.Combat),
+      (Text.pack "Noncombat", DamageKind.Noncombat)
+    ]
+
+damageEventToJson :: DamageEvent.DamageEvent -> Value
+damageEventToJson ev =
+  Object
+    [ (Text.pack "source", objectIdToJson (DamageEvent.source ev)),
+      (Text.pack "target", recipientToJson (DamageEvent.target ev)),
+      (Text.pack "amount", natTo (DamageEvent.amount ev)),
+      (Text.pack "dealtByDeathtouch", Json.jBool (DamageEvent.dealtByDeathtouch ev)),
+      (Text.pack "kind", damageKindToJson (DamageEvent.kind ev))
+    ]
+
+jsonToDamageEvent :: Value -> Either Text DamageEvent.DamageEvent
+jsonToDamageEvent value = do
+  ps <- Json.asObject value
+  s <- Json.field (Text.pack "source") ps >>= jsonToObjectId
+  t <- Json.field (Text.pack "target") ps >>= jsonToRecipient
+  a <- Json.field (Text.pack "amount") ps >>= natFrom
+  d <- Json.field (Text.pack "dealtByDeathtouch") ps >>= jsonToBoolDefault False
+  k <- Json.field (Text.pack "kind") ps >>= jsonToDamageKind
+  pure
+    DamageEvent.MkDamageEvent
+      { DamageEvent.source = s,
+        DamageEvent.target = t,
+        DamageEvent.amount = a,
+        DamageEvent.dealtByDeathtouch = d,
+        DamageEvent.kind = k
+      }
+
+zoneChangeToJson :: ZoneChange.ZoneChange -> Value
+zoneChangeToJson zc =
+  Object
+    [ (Text.pack "object", objectIdToJson (ZoneChange.object zc)),
+      (Text.pack "from", zoneToJson (ZoneChange.from zc)),
+      (Text.pack "to", zoneToJson (ZoneChange.to zc))
+    ]
+
+jsonToZoneChange :: Value -> Either Text ZoneChange.ZoneChange
+jsonToZoneChange value = do
+  ps <- Json.asObject value
+  o <- Json.field (Text.pack "object") ps >>= jsonToObjectId
+  f <- Json.field (Text.pack "from") ps >>= jsonToZone
+  t <- Json.field (Text.pack "to") ps >>= jsonToZone
+  pure (ZoneChange.MkZoneChange o f t)
+
+projectedCharacteristicsToJson :: PC.ProjectedCharacteristics -> Value
+projectedCharacteristicsToJson pc =
+  Object
+    [ (Text.pack "keywords", setTo keywordToJson (PC.keywords pc)),
+      (Text.pack "colors", setTo colorToJson (PC.colors pc)),
+      (Text.pack "power", maybeTo Json.jInt (PC.power pc)),
+      (Text.pack "toughness", maybeTo Json.jInt (PC.toughness pc)),
+      (Text.pack "characteristicPT", maybeTo (\(p, t) -> Array [quantityToJson p, quantityToJson t]) (PC.characteristicPT pc)),
+      (Text.pack "cardTypes", setTo cardTypeToJson (PC.cardTypes pc)),
+      (Text.pack "subtypes", setTo subtypeToJson (PC.subtypes pc)),
+      (Text.pack "rulesTextActive", Json.jBool (PC.rulesTextActive pc)),
+      (Text.pack "activatedAbilities", listTo activatedAbilityToJson (PC.activatedAbilities pc)),
+      (Text.pack "replacementEffects", listTo replacementEffectToJson (PC.replacementEffects pc)),
+      (Text.pack "triggeredAbilities", listTo triggeredAbilityToJson (PC.triggeredAbilities pc))
+    ]
+
+jsonToProjectedCharacteristics :: Value -> Either Text PC.ProjectedCharacteristics
+jsonToProjectedCharacteristics value = do
+  ps <- Json.asObject value
+  kws <- Json.field (Text.pack "keywords") ps >>= setFrom jsonToKeyword
+  cols <- Json.field (Text.pack "colors") ps >>= setFrom jsonToColor
+  pow <- maybeFrom Json.asInteger (getOpt (Text.pack "power") ps)
+  tou <- maybeFrom Json.asInteger (getOpt (Text.pack "toughness") ps)
+  cda <- maybeFrom jsonToQuantityPair (getOpt (Text.pack "characteristicPT") ps)
+  cts <- Json.field (Text.pack "cardTypes") ps >>= setFrom jsonToCardType
+  subs <- Json.field (Text.pack "subtypes") ps >>= setFrom jsonToSubtype
+  live <- Json.field (Text.pack "rulesTextActive") ps >>= jsonToBoolDefault True
+  acts <- Json.field (Text.pack "activatedAbilities") ps >>= listFrom jsonToActivatedAbility
+  reps <- Json.field (Text.pack "replacementEffects") ps >>= listFrom jsonToReplacementEffect
+  trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
+  pure
+    PC.MkProjectedCharacteristics
+      { PC.keywords = kws,
+        PC.colors = cols,
+        PC.power = pow,
+        PC.toughness = tou,
+        PC.characteristicPT = cda,
+        PC.cardTypes = cts,
+        PC.subtypes = subs,
+        PC.rulesTextActive = live,
+        PC.activatedAbilities = acts,
+        PC.replacementEffects = reps,
+        PC.triggeredAbilities = trigs
+      }
+
+jsonToQuantityPair :: Value -> Either Text (Quantity.Quantity, Quantity.Quantity)
+jsonToQuantityPair value = case value of
+  Array [p, t] -> do
+    p_ <- jsonToQuantity p
+    t_ <- jsonToQuantity t
+    pure (p_, t_)
+  _ -> Left (Text.pack "expected a [power, toughness] quantity pair")
+
+gameEventToJson :: GameEvent.GameEvent -> Value
+gameEventToJson e = case e of
+  GameEvent.Moved zc pc -> Json.tagged (Text.pack "Moved") (Just (Array [zoneChangeToJson zc, projectedCharacteristicsToJson pc]))
+  GameEvent.DamageDealt ev -> Json.tagged (Text.pack "DamageDealt") (Just (damageEventToJson ev))
+  GameEvent.StepBegan p pid -> Json.tagged (Text.pack "StepBegan") (Just (Array [phaseToJson p, playerIdToJson pid]))
+
+jsonToGameEvent :: Value -> Either Text GameEvent.GameEvent
+jsonToGameEvent value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Moved", Just (Array [zc, pc])) -> GameEvent.Moved <$> jsonToZoneChange zc <*> jsonToProjectedCharacteristics pc
+    ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> jsonToDamageEvent v
+    ("StepBegan", Just (Array [p, pid])) -> GameEvent.StepBegan <$> jsonToPhase p <*> jsonToPlayerId pid
+    _ -> Left (Text.pack "unknown GameEvent: " <> t)
 
 -- Effect ---------------------------------------------------------------------
 

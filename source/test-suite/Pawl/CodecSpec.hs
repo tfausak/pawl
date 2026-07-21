@@ -10,17 +10,26 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as J
+import qualified Pawl.Projection as Projection
+import qualified Pawl.Setup as Setup
+import qualified Pawl.Support as S
 import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decimal as Decimal
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.Json as Json
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -32,9 +41,11 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
@@ -42,6 +53,7 @@ import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -206,5 +218,29 @@ tests cards =
             let base = Printing.card (Cards.pikerPrinting cards)
                 cloney = base {CardT.copyOnEnter = True}
              in HU.assertEqual "copyOnEnter preserved" (Right cloney) (Codec.jsonToCard (Codec.cardToJson cloney))
+        ],
+      Tasty.testGroup
+        "P4 runtime types"
+        [ HU.testCase "Phase round-trips" $
+            mapM_
+              (roundTrip "phase" Codec.phaseToJson Codec.jsonToPhase)
+              [ Phase.Beginning BeginningStep.Upkeep,
+                Phase.PrecombatMain,
+                Phase.Combat CombatStep.DeclareBlockers,
+                Phase.PostcombatMain,
+                Phase.Ending EndingStep.EndStep
+              ],
+          HU.testCase "GameEvent.Moved round-trips with its snapshot" $
+            let zc = ZoneChange.MkZoneChange (ObjectId.MkObjectId 3) Zone.Battlefield Zone.Graveyard
+                snapshot = Projection.project (ObjectId.MkObjectId 3) (Setup.emptyGame S.bothPlayers)
+             in roundTrip "moved" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Moved zc snapshot),
+          HU.testCase "GameEvent.DamageDealt round-trips" $
+            roundTrip
+              "damage"
+              Codec.gameEventToJson
+              Codec.jsonToGameEvent
+              (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True DamageKind.Combat)),
+          HU.testCase "GameEvent.StepBegan round-trips" $
+            roundTrip "step" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
         ]
     ]

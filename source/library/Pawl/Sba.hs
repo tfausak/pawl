@@ -4,6 +4,7 @@ import Control.Applicative ((<|>))
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -48,14 +49,15 @@ depart pid gs =
 -- since the last SBA check is destroyed. "Deathtouch source" is read from the
 -- event's deal-time bit (CR 702.2e last-known information), NOT re-derived now --
 -- so a source that lost deathtouch (Humility) or left after dealing damage is
--- still judged by what it was. See the M3b spec, section 4.
+-- still judged by what it was. See the M3b spec, section 4. Now read from the
+-- WATERMARKED slice of the turn log, not a drained queue.
 woundedByDeathtouch :: GameState -> ObjectId -> Bool
 woundedByDeathtouch gs oid =
   let hits ev =
         DamageEvent.target ev == Recipient.ToCreature oid
           && DamageEvent.amount ev > 0
           && DamageEvent.dealtByDeathtouch ev
-   in any hits (GameState.damageEvents gs)
+   in any hits (Event.unscannedDamage gs)
 
 -- CR 704.5f: toughness 0 or less -- a put-into-graveyard, NOT a destruction, so
 -- ungated by indestructible and NOT saved by regeneration (CR 701.19a).
@@ -167,10 +169,11 @@ performStateBasedActions gs =
         [winner] -> Just (Result.Won winner)
         [] -> if null leaving then Nothing else Just Result.Drawn
         _ -> Nothing
-      -- CR 704.5h's window is "since the last SBA check", so the events are
-      -- drained here: dying/buried were computed from the pre-drain gs, so every
-      -- 704.5h victim is found before its event is discarded.
-      drained = vanished {GameState.damageEvents = []}
+      -- CR 704.5h's window is "since the last SBA check", so the watermark is
+      -- advanced to the log length AS THIS PASS BEGAN: every 704.5h victim was
+      -- computed from that same pre-pass state, and the Moved events this pass
+      -- itself appends carry no damage. The record is never removed.
+      drained = vanished {GameState.damageScannedThrough = fromIntegral (Seq.length (GameState.events gs))}
       -- A state-based action was performed iff a creature was buried or destroyed
       -- (a regenerated creature still counts, which the CR 704.4 settle loop
       -- re-checks and -- because the regen healed the damage -- terminates), a

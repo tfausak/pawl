@@ -7,8 +7,8 @@ import Numeric.Natural (Natural)
 import Pawl.Type.ActivePrevention (ActivePrevention)
 import Pawl.Type.Combat (Combat)
 import Pawl.Type.ContinuousEffect (ContinuousEffect)
-import Pawl.Type.DamageEvent (DamageEvent)
 import Pawl.Type.Decider (Decider)
+import Pawl.Type.GameEvent (GameEvent)
 import Pawl.Type.Mana (Mana)
 import Pawl.Type.Object (Object)
 import Pawl.Type.ObjectId (ObjectId)
@@ -17,7 +17,6 @@ import Pawl.Type.Player (Player)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Result (Result)
 import Pawl.Type.Timestamp (Timestamp)
-import Pawl.Type.ZoneChange (ZoneChange)
 
 data GameState = MkGameState
   { objects :: Map ObjectId Object,
@@ -32,13 +31,18 @@ data GameState = MkGameState
     manaPool :: Map PlayerId Mana,
     -- CR 508/509. Lives for one combat phase; cleared at CR 511.
     combat :: Combat,
-    -- CR 510: combat damage dealt this step, as events, for the SBA to read.
-    -- The change-and-emit funnel's log; drained at each SBA check (Sba). See spec §2.
-    damageEvents :: [DamageEvent],
-    -- CR 603 / 117.5: zone-change events emitted since triggers were last placed.
-    -- changeZone appends the RESOLVED (post-replacement) event; the 117.5 boundary
-    -- scans and drains it. The zone-change analog of damageEvents.
-    zoneChanges :: [ZoneChange],
+    -- CR 608.2i: what happened this turn, in order. Appended by the
+    -- change-and-emit funnels (Event.changeZone, Event.createToken,
+    -- Damage.applyDamage) and by Engine.runStep's step-begin emission; NEVER
+    -- cleared by a reader. Cleared with both watermarks at turn handoff
+    -- (Engine.handoffTurn) -- not at cleanup, which is still part of this turn.
+    events :: Seq GameEvent,
+    -- CR 117.5: how far the trigger scan has consumed. Everything at or after
+    -- this index is unscanned. Consumption is an index bump; the record stays.
+    scannedThrough :: Natural,
+    -- CR 704.5h ("since the last state-based action check"): how far the
+    -- state-based-action damage read has consumed.
+    damageScannedThrough :: Natural,
     -- CR 611.2: stored continuous effects from resolutions (Giant Growth,
     -- Serpent's Gift), each with a duration cleanup consults. Static-ability
     -- effects are NOT here -- the projection re-derives those live.

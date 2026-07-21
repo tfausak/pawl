@@ -5,8 +5,11 @@
 -- be an import cycle. See the plan's module dependency note.
 module Pawl.Event where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Game as Game
@@ -19,6 +22,8 @@ import Pawl.Type.DamageEvent (DamageEvent)
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Duration as Duration
+import Pawl.Type.GameEvent (GameEvent)
+import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -42,6 +47,35 @@ import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
+
+-- CR 608.2i: append one entry to the turn-scoped log. The single write point;
+-- nothing else touches GameState.events.
+recordEvent :: GameEvent -> GameState -> GameState
+recordEvent event gs = gs {GameState.events = GameState.events gs Seq.|> event}
+
+-- The zone change an event describes, if it is one.
+movedOf :: GameEvent -> Maybe ZoneChange
+movedOf event = case event of
+  GameEvent.Moved zc _ -> Just zc
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.StepBegan _ _ -> Nothing
+
+-- The damage an event describes, if it is any.
+damageOf :: GameEvent -> Maybe DamageEvent
+damageOf event = case event of
+  GameEvent.DamageDealt ev -> Just ev
+  GameEvent.Moved _ _ -> Nothing
+  GameEvent.StepBegan _ _ -> Nothing
+
+-- CR 117.5: the events the trigger scan has not yet consumed.
+unscannedEvents :: GameState -> [GameEvent]
+unscannedEvents gs =
+  Foldable.toList (Seq.drop (fromIntegral (GameState.scannedThrough gs)) (GameState.events gs))
+
+-- CR 704.5h: the damage the state-based-action check has not yet consumed.
+unscannedDamage :: GameState -> [DamageEvent]
+unscannedDamage gs =
+  Maybe.mapMaybe damageOf (Foldable.toList (Seq.drop (fromIntegral (GameState.damageScannedThrough gs)) (GameState.events gs)))
 
 -- CR 615.6: apply active prevention shields to a batch of damage events, dropping
 -- each event a shield cancels -- a prevented event never happens (not marked, not
@@ -68,21 +102,18 @@ dropEndOfTurnPreventions gs =
 clearRegenerationShields :: GameState -> GameState
 clearRegenerationShields gs = gs {GameState.regenerationShields = Map.empty}
 
--- Insert a freshly-built object into `dest` under a new id and timestamp, and emit
--- the enters event (origin -> dest). The common tail of changeZone (a moved
--- incarnation) and createToken (a token from nothing). `mkObj` receives the fresh
--- timestamp so the object records when it entered (CR 613.7d).
-placeObject :: PlayerId -> (Timestamp.Timestamp -> Object.Object) -> Zone -> Zone -> GameState -> GameState
-placeObject pid mkObj origin dest gs =
+-- Insert a freshly-built object into `dest` under a new id and timestamp, and
+-- return that id. The common tail of changeZone (a moved incarnation) and
+-- createToken (a token from nothing). `mkObj` receives the fresh timestamp so the
+-- object records when it entered (CR 613.7d). The Moved event is emitted by the
+-- CALLER: only it knows which state the CR 608.2h snapshot must be taken against.
+placeObject :: PlayerId -> (Timestamp.Timestamp -> Object.Object) -> Zone -> GameState -> (ObjectId, GameState)
+placeObject pid mkObj dest gs =
   let (newId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       obj = markCopyOnEnter dest (mkObj ts)
       gs3 = gs2 {GameState.objects = Map.insert newId obj (GameState.objects gs2)}
-      placed = Game.insertIntoZone dest pid newId gs3
-      -- CR 603.2g: emit the RESOLVED event (post-replacement), carrying the new
-      -- object's id -- what an enters trigger scans.
-      emitted = ZoneChange.MkZoneChange newId origin dest
-   in placed {GameState.zoneChanges = GameState.zoneChanges placed ++ [emitted]}
+   in (newId, Game.insertIntoZone dest pid newId gs3)
 
 -- CR 614.1c / 603.6d / 113.6h: an object with a "enters as a copy" ability is
 -- marked as-enters-pending as it enters the battlefield, on ANY entry path. The
@@ -113,6 +144,11 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
   Just obj ->
     let pid = Object.owner obj
         fromZone = Object.zone obj
+        -- CR 608.2h: last known information -- the object as it exists in the zone
+        -- it is LEAVING, projected against the PRE-MOVE state. Costs one board
+        -- projection per zone change; that is the price of an honest history (a
+        -- token has no printed card to re-derive from, CR 111.3).
+        snapshot = Projection.project oid gs
         -- CR 614.4: replacements exist before the event; read them from the
         -- pre-move state. CR 614.6: the modified event is what actually happens.
         proposed = ZoneChange.MkZoneChange oid fromZone requestedDest
@@ -121,7 +157,10 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
         mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.timestamp = ts}
         gs1 = Game.removeFromZones pid oid gs
         gs2 = gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
-     in placeObject pid mkObj fromZone dest gs2
+        (newId, placed) = placeObject pid mkObj dest gs2
+     in -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
+        -- what an enters trigger scans.
+        recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId fromZone dest) snapshot) placed
 
 -- The single destruction funnel (CR 701.7 / 700.4): every destruction -- the
 -- Destroy opcode and the CR 704.5g/h state-based actions -- flows through here.
@@ -199,7 +238,12 @@ createToken controller card gs =
             Object.counters = Map.empty,
             Object.timestamp = ts
           }
-   in placeObject controller mkObj Zone.Battlefield Zone.Battlefield gs
+   in let (newId, placed) = placeObject controller mkObj Zone.Battlefield gs
+          -- A token is created from nothing, so there is no prior incarnation to
+          -- snapshot: its last known information IS what it is now (CR 111.3 makes
+          -- the creating effect's stated values functionally printed values).
+          snapshot = Projection.project newId placed
+       in recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId Zone.Battlefield Zone.Battlefield) snapshot) placed
 
 -- CR 121.2/121.3: the single-card draw. Move pid's top library card to their
 -- hand; an empty library records the failed draw (CR 704.5b makes it a loss at

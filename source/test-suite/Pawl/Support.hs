@@ -9,6 +9,7 @@
 module Pawl.Support where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -23,6 +24,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
@@ -36,10 +38,12 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
+import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
@@ -57,6 +61,7 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified System.Random as Random
 
 alice, bob :: PlayerId.PlayerId
@@ -675,6 +680,25 @@ markDamage :: ObjectId.ObjectId -> Natural.Natural -> GameState.GameState -> Gam
 markDamage oid n gs =
   gs {GameState.objects = Map.adjust (\o -> o {Object.damage = n}) oid (GameState.objects gs)}
 
+-- The damage events recorded so far this turn, in order. Replaces the
+-- GameState.damageEvents list P4 folded into the one turn-scoped log.
+damageEventsOf :: GameState.GameState -> [DamageEvent.DamageEvent]
+damageEventsOf gs = Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events gs))
+
+-- The zone changes recorded so far this turn, in order.
+zoneChangesOf :: GameState.GameState -> [ZoneChange.ZoneChange]
+zoneChangesOf gs = Maybe.mapMaybe Event.movedOf (Foldable.toList (GameState.events gs))
+
+-- A state carrying exactly one UNSCANNED event -- the hand-built-event fixture
+-- shape a scan test needs (EventSpec and ModalSpec both build one).
+withEvent :: GameEvent.GameEvent -> GameState.GameState -> GameState.GameState
+withEvent event gs =
+  gs
+    { GameState.events = Seq.singleton event,
+      GameState.scannedThrough = 0,
+      GameState.damageScannedThrough = 0
+    }
+
 -- Seed a floating prevention shield directly into GameState (bypasses casting a
 -- prevention spell; use when a test needs a shield active without resolving Fog).
 addPrevention :: ActivePrevention.ActivePrevention -> GameState.GameState -> GameState.GameState
@@ -751,8 +775,9 @@ oneMountainState cards ph =
           GameState.players = Map.empty,
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
-          GameState.damageEvents = [],
-          GameState.zoneChanges = [],
+          GameState.events = Seq.empty,
+          GameState.scannedThrough = 0,
+          GameState.damageScannedThrough = 0,
           GameState.continuousEffects = [],
           GameState.preventions = [],
           GameState.regenerationShields = Map.empty,

@@ -192,15 +192,16 @@ runTurnBasedActions phase = do
 -- CR 603.3: put each triggered ability that fired since the last placement on the
 -- stack, in APNAP order (CR 603.3b). M3f has at most one trigger controlled by one
 -- player, so the ordering is trivial and the own-order/two-part choice (CR 603.3b)
--- is elided until a second simultaneous trigger exists. Draining zoneChanges makes
--- an event fire its triggers once (CR 603.2c). Targets are chosen as the ability is
--- placed (CR 603.3d); no M3f trigger targets. Returns whether any were placed.
+-- is elided until a second simultaneous trigger exists. Advancing scannedThrough
+-- makes an event fire its triggers once (CR 603.2c) WITHOUT discarding the record.
+-- Targets are chosen as the ability is placed (CR 603.3d). Returns whether any
+-- were placed.
 placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
-  let changes = GameState.zoneChanges gs
+  let changes = Maybe.mapMaybe Event.movedOf (Event.unscannedEvents gs)
       pending = Event.triggersFrom changes gs
-  State.modify' (\g -> g {GameState.zoneChanges = []})
+  State.modify' (\g -> g {GameState.scannedThrough = fromIntegral (Seq.length (GameState.events g))})
   Monad.mapM_ placeOne (apnapOrder gs pending)
   pure (not (null pending))
 
@@ -384,6 +385,13 @@ handoffTurn = State.modify' $ \gs ->
    in gs
         { GameState.activePlayer = newActive,
           GameState.turnNumber = GameState.turnNumber gs + 1,
+          -- CR 608.2i: the log's scope is ONE turn. Cleared here, with both
+          -- watermarks, and never at cleanup -- cleanup is still part of this turn
+          -- and CR 514.1's discard is itself an event of it. Engine.advance settles
+          -- immediately before calling this, so nothing unscanned is discarded.
+          GameState.events = Seq.empty,
+          GameState.scannedThrough = 0,
+          GameState.damageScannedThrough = 0,
           GameState.phase = Turn.firstPhase,
           GameState.remaining = Turn.laterPhases,
           -- CR 723.1/723.1b: the new active player's pending control (if any)
@@ -401,7 +409,15 @@ advance = do
   gs <- State.get
   case Seq.viewl (GameState.remaining gs) of
     p Seq.:< rest -> State.put gs {GameState.phase = p, GameState.remaining = rest}
-    Seq.EmptyL -> handoffTurn
+    -- CR 514.3 (partial) / 117.5: the turn is over. Settle once more so every
+    -- event the cleanup step's turn-based actions emitted is scanned BEFORE
+    -- handoffTurn clears the log -- an unscanned event discarded at handoff is a
+    -- lost trigger. EXPIRES with the full CR 514.3: the extra cleanup step and the
+    -- priority round it grants are not implemented, so a trigger placed here
+    -- resolves at the next turn's first priority rather than during this cleanup.
+    Seq.EmptyL -> do
+      settleForPriority
+      handoffTurn
 
 -- One step: turn-based actions, then priority (if the step grants it), then
 -- state-based actions, then move on. Bails out as soon as the game has a result.

@@ -24,6 +24,7 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modal as ModalT
@@ -160,7 +161,7 @@ fizzleTests cards =
             after = snd (Engine.runGamePure answer gone Stack.resolveTop)
          in do
               HU.assertEqual "Chaos Charm in alice's graveyard, unresolved" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
-              HU.assertEqual "no damage was dealt" [] (GameState.damageEvents after)
+              HU.assertEqual "no damage was dealt" [] (S.damageEventsOf after)
               HU.assertEqual "stack empty" 0 (length (GameState.stack after))
     ]
 
@@ -269,7 +270,7 @@ activationModalTests cards =
                 gone = Event.changeZone victimId Zone.Graveyard activated
                 resolved = snd (Engine.runGamePure answer gone Stack.resolveTop)
              in do
-                  HU.assertEqual "no damage was dealt" [] (GameState.damageEvents resolved)
+                  HU.assertEqual "no damage was dealt" [] (S.damageEventsOf resolved)
                   HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
           _ -> HU.assertFailure "the fixture must have exactly one activated ability"
     ]
@@ -290,7 +291,7 @@ triggerModalTests cards =
       etb pid gs0 =
         let (acId, gs1) = S.addCreature acPrinting pid gs0
             entered = ZoneChange.MkZoneChange acId Zone.Stack Zone.Battlefield
-         in (acId, gs1 {GameState.zoneChanges = [entered]})
+         in (acId, S.withEvent (GameEvent.Moved entered (Projection.project acId gs1)) gs1)
       modalOf = case Card.Type.triggeredAbilities (Printing.card acPrinting) of
         [ab] -> Just (TriggeredAbility.modal ab)
         _ -> Nothing
@@ -366,7 +367,7 @@ triggerModalTests cards =
                 gs0 = S.mountainsInPlay cards 2
                 (smtId, gs1) = S.addCreature smtPrinting S.alice gs0
                 entered = ZoneChange.MkZoneChange smtId Zone.Stack Zone.Battlefield
-                gs2 = gs1 {GameState.zoneChanges = [entered]}
+                gs2 = S.withEvent (GameEvent.Moved entered (Projection.project smtId gs1)) gs1
                 answer :: Prompt.Prompt r -> r
                 answer = S.identityAnswer
                 placed = snd (Engine.runGamePure answer gs2 Engine.placePendingTriggers)

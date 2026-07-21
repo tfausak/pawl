@@ -161,7 +161,7 @@ damageTests cards =
             spell = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat] withShield
          in do
               HU.assertEqual "combat damage prevented -- none marked" (Just 0) (S.damageOf victim combat)
-              HU.assertEqual "combat damage prevented -- no event recorded" [] (GameState.damageEvents combat)
+              HU.assertEqual "combat damage prevented -- no event recorded" [] (S.damageEventsOf combat)
               HU.assertEqual "noncombat damage still dealt" (Just 2) (S.damageOf victim spell),
       HU.testCase "CR 514.2 an until-end-of-turn prevention wears off at cleanup" $
         let base = Setup.emptyGame S.bothPlayers
@@ -198,7 +198,7 @@ damageEventTests cards =
     [ HU.testCase "a blocked 2/1 trade emits both damage events" $
         let (gs, mine, theirs) = S.combatBoard cards 1 1
             after = S.fightWith S.aggressiveAnswer gs
-            events = GameState.damageEvents after
+            events = S.damageEventsOf after
          in case (mine, theirs) of
               (a : _, b : _) -> do
                 HU.assertEqual "two events" 2 (length events)
@@ -215,7 +215,7 @@ damageEventTests cards =
                 HU.assertEqual
                   "one player event"
                   [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False DamageKind.Combat]
-                  (GameState.damageEvents after)
+                  (S.damageEventsOf after)
               _ -> HU.assertFailure "fixture should have an attacker"
     ]
 
@@ -235,19 +235,21 @@ deathtouchTests cards =
         let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting cards] [Cards.ogreSentryPrinting cards]
             after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
          in HU.assertEqual "the Ogre survives" 1 (S.creaturesInPlay S.bob after),
-      HU.testCase "the SBA check drains the damage events" $
+      HU.testCase "the SBA check consumes the damage events by watermark, not by draining" $
         let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
             after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
-         in HU.assertEqual "events drained" [] (GameState.damageEvents after),
+         in do
+              HU.assertEqual "nothing left unscanned" [] (Event.unscannedDamage after)
+              HU.assertBool "the record survives (CR 608.2i)" (not (null (S.damageEventsOf after))),
       HU.testCase "CR 702.2e the deal-time bit is true for a real deathtoucher, false for a plain source" $
         -- Typhoid Rats (deathtouch) and Ogre Sentry trade combat damage under
         -- aggressiveAnswer (which DOES declare attackers). fightWith runs no SBAs,
-        -- so the wave is still in damageEvents.
+        -- so the wave is still unscanned in the turn log.
         let (gs, rats, ogres) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
             fought = S.fightWith S.aggressiveAnswer gs
             ratId = case rats of r : _ -> r; [] -> ObjectId.MkObjectId 999
             ogreId = case ogres of o : _ -> o; [] -> ObjectId.MkObjectId 999
-            bitFor src = any (\ev -> DamageEvent.source ev == src && DamageEvent.dealtByDeathtouch ev) (GameState.damageEvents fought)
+            bitFor src = any (\ev -> DamageEvent.source ev == src && DamageEvent.dealtByDeathtouch ev) (S.damageEventsOf fought)
          in do
               HU.assertBool "Rat's damage is flagged deathtouch" (bitFor ratId)
               HU.assertBool "Ogre's damage is not" (not (bitFor ogreId)),
@@ -258,7 +260,7 @@ deathtouchTests cards =
             gs = S.withHumility cards gs0
             fought = S.fightWith S.aggressiveAnswer gs
             ratId = case rats of r : _ -> r; [] -> ObjectId.MkObjectId 999
-            ratBit = any (\ev -> DamageEvent.source ev == ratId && DamageEvent.dealtByDeathtouch ev) (GameState.damageEvents fought)
+            ratBit = any (\ev -> DamageEvent.source ev == ratId && DamageEvent.dealtByDeathtouch ev) (S.damageEventsOf fought)
          in HU.assertBool "no deathtouch at deal time under Humility" (not ratBit)
     ]
 

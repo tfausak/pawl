@@ -55,7 +55,7 @@ tests cards =
         let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             (piker, g1) = S.addPiker cards S.bob g0
             after = Event.changeZone piker Zone.Graveyard g1
-         in case GameState.zoneChanges after of
+         in case S.zoneChangesOf after of
               zc : _ -> HU.assertEqual "event says exile" Zone.Exile (ZoneChange.to zc)
               [] -> HU.assertFailure "expected an emitted zone change",
       HU.testCase "without Rest in Peace, a creature goes to the graveyard" $
@@ -130,7 +130,7 @@ tests cards =
                   HU.assertEqual
                     "one enters-battlefield event emitted"
                     [Zone.Battlefield]
-                    (map ZoneChange.to (GameState.zoneChanges after))
+                    (map ZoneChange.to (S.zoneChangesOf after))
                 _ -> HU.assertFailure "expected exactly one token",
       HU.testCase "CR 614 + 704.5d a token dies under Rest in Peace: exiled, then ceases" $
         let base = Setup.emptyGame S.bothPlayers
