@@ -217,7 +217,7 @@ tests cards =
               HU.assertEqual "the Elves are black" (Set.singleton Color.Black) (Projection.colorsOf elvesId after)
               HU.assertBool "the Elves survive" (Set.member elvesId (GameState.battlefield after))
               HU.assertEqual "both spells are in alice's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
-      HU.testCase "2008-05-01 a colour change overwrites ALL previous colours, even a multicoloured one" $
+      HU.testCase "CR 105.3 2008-05-01 a colour change overwrites ALL previous colours, even a multicoloured one" $
         -- Gatherer ruling on Crimson Wisps / Aphotic Wisps (WotC, 2008-05-01):
         -- "An effect that changes a permanent's colors overwrites all its old
         -- colors unless it specifically says 'in addition to its other

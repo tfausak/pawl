@@ -800,8 +800,8 @@ its own gate card and spec, landed as it completes. Umbrella:
   §7): copying a permanent's **static abilities** (a Clone of Humility/Opalescence —
   `gather` reads static abilities from the printed card, not copiable values; the
   activated/triggered/replacement abilities ARE copied); **name/mana cost/color/
-  supertypes** (not projected — color rides P3); **7b/CDA P/T-setting** in copiable
-  values (rides P3, Tarmogoyf); **ongoing "becomes a copy"** (Vesuvan Doppelganger,
+  supertypes** (not projected — color rides P3a); **7b/CDA P/T-setting** in copiable
+  values (rides P3b, Tarmogoyf); **ongoing "becomes a copy"** (Vesuvan Doppelganger,
   re-reads the source); **copy-spell** (CR 707.10) and **copy-token** effects;
   **simultaneous entry** of multiple copy-choosers (CR 614.12b/616); the **general
   monadic as-enters replacement engine** (CR 614.12/616 — the drain folds into it at
