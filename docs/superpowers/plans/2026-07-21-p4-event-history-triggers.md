@@ -1448,7 +1448,7 @@ CR 603.8's trigger that is not an event: a condition over game *state*, checked 
 - Consumes: `Event.gatherTriggers`, `PendingTrigger` (Task 2); `Effect.Sacrifice`, `Binding.triggerSource` (Task 3).
 - Produces: `Pawl.Type.StateCondition.StateCondition = YouControlNo Subtype | NoPermanentsOfSubtype Subtype`; `TriggerCondition.StateIs StateCondition`; `Pawl.Event.stateHolds :: PlayerId -> StateCondition -> GameState -> Bool`; `Pawl.Event.stateTriggers :: GameState -> [PendingTrigger]`; `Subtype.Barbarian`; `Pawl.Cards.barbarianOutcastPrinting`; `Pawl.Codec.stateConditionToJson` / `jsonToStateCondition`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/TriggerSpec.hs` (and to the `tests` list):
 
@@ -1536,12 +1536,12 @@ Add to `CodecSpec.hs`'s "P4 runtime types" group:
 
 with `Pawl.Type.StateCondition` imported. (`Subtype.Zombie` lands in Task 5; for this task use `Subtype.Swamp` in both entries and switch the second to `Zombie` when Task 5 adds it.)
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Pawl.Type.StateCondition` does not exist; `Cards.barbarianOutcastPrinting`, `Event.stateTriggers`, `Codec.stateConditionToJson` are not in scope.
 
-- [ ] **Step 3: Add the state-condition classification**
+- [x] **Step 3: Add the state-condition classification**
 
 Create `source/library/Pawl/Type/StateCondition.hs`:
 
@@ -1587,7 +1587,7 @@ In `source/library/Pawl/Type/Subtype.hs`, append after `Arcane` (appending keeps
   | Barbarian -- CR 205.3m (a creature type; Barbarian Outcast's)
 ```
 
-- [ ] **Step 4: Evaluate the condition and gather state triggers**
+- [x] **Step 4: Evaluate the condition and gather state triggers**
 
 In `source/library/Pawl/Event.hs`, add the `StateIs` arm to `matchesTrigger`:
 
@@ -1608,7 +1608,8 @@ stateHolds :: PlayerId -> StateCondition -> GameState -> Bool
 stateHolds you cond gs =
   let hasSubtype subtype oid = Set.member subtype (Projection.subtypesOf oid gs)
    in case cond of
-        -- CR 108.4: "you control" is the projected controller's permanents.
+        -- CR 109.5: "you" on a triggered ability is the controller of the object
+        -- when the ability triggered; CR 110.2 gives every permanent a controller.
         StateCondition.YouControlNo subtype -> not (any (hasSubtype subtype) (Projection.controls you gs))
         -- Any player's -- the whole battlefield.
         StateCondition.NoPermanentsOfSubtype subtype -> not (any (hasSubtype subtype) (Set.toList (GameState.battlefield gs)))
@@ -1657,7 +1658,7 @@ gatherTriggers events gs = eventTriggers events gs ++ stateTriggers gs
 
 Add `import Pawl.Type.StateCondition (StateCondition)` and `import qualified Pawl.Type.StateCondition as StateCondition` to `Event.hs`. `Pawl.Type.Source` is already imported.
 
-- [ ] **Step 5: Add the codec arms and the card**
+- [x] **Step 5: Add the codec arms and the card**
 
 In `source/library/Pawl/Codec.hs`:
 
@@ -1697,12 +1698,12 @@ The subtype array order is `Set.toAscList` order, i.e. the `Pawl.Type.Subtype` d
 
 In `source/test-suite/Pawl/Cards.hs`, add `barbarianOutcastPrinting :: Printing.Printing` to the record, `barbarianOutcastPrinting_ <- loadPrinting "barbarian-outcast"` to `loadCards`, the field to the returned `MkCards`, and `barbarianOutcastPrinting cards,` to `allPrintings`.
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, including `Pawl.CardsSpec`'s per-file re-parse and byte-stability assertions and `Pawl.CardSpec`'s directory/registry lint.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl/Type/StateCondition.hs source/library/Pawl/Type/TriggerCondition.hs source/library/Pawl/Type/Subtype.hs source/library/Pawl/Event.hs source/library/Pawl/Codec.hs data/cards/barbarian-outcast.json source/test-suite/Pawl/TriggerSpec.hs source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/CodecSpec.hs
