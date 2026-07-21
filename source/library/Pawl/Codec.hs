@@ -174,13 +174,15 @@ countSpecToJson :: CountSpec.CountSpec -> Value
 countSpecToJson s = nullary . Text.pack $ case s of
   CountSpec.CardTypesInAllGraveyards -> "CardTypesInAllGraveyards"
   CountSpec.CardsInYourHand -> "CardsInYourHand"
+  CountSpec.CreaturesDiedThisTurn -> "CreaturesDiedThisTurn"
 
 jsonToCountSpec :: Value -> Either Text CountSpec.CountSpec
 jsonToCountSpec =
   decodeNullary
     (Text.pack "CountSpec")
     [ (Text.pack "CardTypesInAllGraveyards", CountSpec.CardTypesInAllGraveyards),
-      (Text.pack "CardsInYourHand", CountSpec.CardsInYourHand)
+      (Text.pack "CardsInYourHand", CountSpec.CardsInYourHand),
+      (Text.pack "CreaturesDiedThisTurn", CountSpec.CreaturesDiedThisTurn)
     ]
 
 subtypeToJson :: Subtype.Subtype -> Value
@@ -209,6 +211,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Lhurgoyf -> "Lhurgoyf"
   Subtype.Arcane -> "Arcane"
   Subtype.Barbarian -> "Barbarian"
+  Subtype.Zombie -> "Zombie"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -237,7 +240,8 @@ jsonToSubtype =
       (Text.pack "Shapeshifter", Subtype.Shapeshifter),
       (Text.pack "Lhurgoyf", Subtype.Lhurgoyf),
       (Text.pack "Arcane", Subtype.Arcane),
-      (Text.pack "Barbarian", Subtype.Barbarian)
+      (Text.pack "Barbarian", Subtype.Barbarian),
+      (Text.pack "Zombie", Subtype.Zombie)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value

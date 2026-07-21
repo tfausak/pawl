@@ -27,6 +27,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.BeginningStep as BeginningStep
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
@@ -35,6 +36,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
@@ -192,7 +194,24 @@ scanTests cards =
          in do
               HU.assertBool "rip1 has the lower id" (rip1 < rip2)
               HU.assertEqual "both triggers fired" 2 (length triggers)
-              HU.assertEqual "sources in ascending ObjectId order" [rip1, rip2] (map PendingTrigger.source triggers)
+              HU.assertEqual "sources in ascending ObjectId order" [rip1, rip2] (map PendingTrigger.source triggers),
+      -- The PERMANENTS-INNER half of that same order guarantee. Every SelfEnters
+      -- test above has exactly one bearer matching each event, so inner order
+      -- can never affect the output -- SelfEnters alone cannot discriminate
+      -- events-outer-permanents-inner from any other traversal. A StepBegins
+      -- bearer can: ONE StepBegan event matches MANY permanents at once. Two
+      -- Khabál Ghouls (CR 603.2b, "at the beginning of each end step") on the
+      -- battlefield, one end-step event -- the PendingTrigger.source list must
+      -- come out in ascending ObjectId order.
+      HU.testCase "CR 603.2b two StepBegins triggers from one event emit in ascending ObjectId order" $
+        let (ghoul1, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            (ghoul2, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice gs0
+            event = GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice
+            triggers = Event.gatherTriggers [event] gs1
+         in do
+              HU.assertBool "ghoul1 has the lower id" (ghoul1 < ghoul2)
+              HU.assertEqual "both triggers fired" 2 (length triggers)
+              HU.assertEqual "sources in ascending ObjectId order" [ghoul1, ghoul2] (map PendingTrigger.source triggers)
     ]
 
 -- CR 701.21: sacrificing is its own keyword action -- NOT a destruction.
@@ -377,5 +396,71 @@ stateTriggerTests cards =
                   HU.assertEqual "and in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice resolved))
         ]
 
+-- Khabál Ghoul {2}{B} Creature -- Zombie 1/1: "At the beginning of each end step,
+-- put a +1/+1 counter on this creature for each creature that died this turn."
+-- Scryfall's only ruling on the card is the design in one sentence: the count
+-- "includes creature tokens ... as well as creatures put into a graveyard before
+-- Khabál Ghoul entered the battlefield."
+historyTests :: Cards.Cards -> Tasty.TestTree
+historyTests cards =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs =
+        Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      countersOn oid gs = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+   in Tasty.testGroup
+        "TurnHistory"
+        [ -- The drained-queue falsifier: the deaths are SCANNED past before the end
+          -- step's trigger ever exists, and must still be counted.
+          HU.testCase "CR 608.2i deaths the trigger scan already passed are still counted" $
+            let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+                (p1, gs1) = S.addPiker cards S.bob gs0
+                (p2, gs2) = S.addPiker cards S.bob gs1
+                dead = Event.destroy p2 (Event.destroy p1 gs2)
+                scanned = settle dead
+                atEnd = resolveAll (settle (beginEndStep scanned))
+             in do
+                  HU.assertEqual "two +1/+1 counters" 2 (countersOn ghoul atEnd)
+                  HU.assertEqual "a 3/3" (Just 3) (Projection.powerOf ghoul atEnd),
+          -- CR 111.3 / 608.2h: a token has NO printed card, so an implementation
+          -- that re-derived card types from print instead of from the event's
+          -- snapshot would read zero here.
+          HU.testCase "CR 111.3 a token creature that died counts, though it has no printed card" $
+            let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+                (tok, gs1) = S.addToken (Printing.card (Cards.pikerPrinting cards)) S.bob gs0
+                dead = Sba.checkStateBasedActions (Event.destroy tok gs1)
+                atEnd = resolveAll (settle (beginEndStep dead))
+             in HU.assertEqual "the token is counted" 1 (countersOn ghoul atEnd),
+          HU.testCase "a creature that left the battlefield for HAND did not die (CR 700.4)" $
+            let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+                (p1, gs1) = S.addPiker cards S.bob gs0
+                bounced = Event.changeZone p1 Zone.Hand gs1
+                atEnd = resolveAll (settle (beginEndStep bounced))
+             in HU.assertEqual "a bounce is not a death" 0 (countersOn ghoul atEnd),
+          -- CR 608.2i: the history's scope is ONE turn.
+          HU.testCase "the count resets at turn handoff, not at the trigger scan" $
+            let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+                (p1, gs1) = S.addPiker cards S.bob gs0
+                dead = Event.destroy p1 gs1
+                nextTurn = snd (Engine.runGamePure S.identityAnswer dead Engine.handoffTurn)
+                atEnd = resolveAll (settle (beginEndStep nextTurn))
+             in HU.assertEqual "last turn's death does not count" 0 (countersOn ghoul atEnd),
+          -- CR 603.2b: the step trigger belongs to a permanent with nothing to do
+          -- with the event -- Task 2's widened scan, at gameplay level.
+          HU.testCase "CR 603.2b the end step's beginning is what fires it" $
+            let (_, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+                quiet = settle gs0
+                fired = settle (beginEndStep quiet)
+                isTrigger oid = case Game.lookupObject oid fired of
+                  Just obj -> case Object.source obj of
+                    Source.OfTrigger _ _ -> True
+                    _ -> False
+                  Nothing -> False
+             in do
+                  HU.assertEqual "nothing before the step began" [] (GameState.stack quiet)
+                  HU.assertEqual "one trigger once it did" 1 (length (filter isTrigger (GameState.stack fired)))
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards, stateTriggerTests cards]
+tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards, stateTriggerTests cards, historyTests cards]

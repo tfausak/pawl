@@ -8,7 +8,9 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Game as Game
 import qualified Pawl.Type.Card as Card
 import Pawl.Type.CardType (CardType)
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CountSpec as CountSpec
+import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -16,10 +18,12 @@ import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import Pawl.Type.Quantity (Quantity)
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChange as ZoneChange
 
 -- Nothing when the value cannot be determined.
 --
@@ -55,6 +59,9 @@ countOf gs you spec = case spec of
   CountSpec.CardsInYourHand -> case you of
     Nothing -> Nothing
     Just pid -> Just (toInteger (length (Game.zoneMembers Zone.Hand pid gs)))
+  -- CR 700.4: "dies" means put into a graveyard FROM THE BATTLEFIELD.
+  CountSpec.CreaturesDiedThisTurn ->
+    Just (toInteger (length (filter died (Foldable.toList (GameState.events gs)))))
 
 -- The distinct card types among the cards in every player's graveyard. Reads the
 -- PRINTED type line (Game.cardOf), never the projection: nothing projects a
@@ -67,6 +74,19 @@ typesInAllGraveyards gs =
         Nothing -> Set.empty
         Just card -> TypeLine.types (Card.typeLine card)
    in Set.unions (map typesOf ids)
+
+-- CR 700.4 / 608.2h: did this event record a creature dying? Creature-ness comes
+-- from the event's own snapshot -- the object as it last existed on the
+-- battlefield -- so a land animated into a creature counts, and so does a token
+-- (which has no printed card to consult, CR 111.3).
+died :: GameEvent.GameEvent -> Bool
+died event = case event of
+  GameEvent.Moved zc snapshot ->
+    ZoneChange.from zc == Zone.Battlefield
+      && ZoneChange.to zc == Zone.Graveyard
+      && Set.member CardType.Creature (PC.cardTypes snapshot)
+  GameEvent.DamageDealt _ -> False
+  GameEvent.StepBegan _ _ -> False
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
 -- ability supplies, recursing through Plus so 1+* becomes 1+<the count>.

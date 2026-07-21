@@ -22,6 +22,7 @@ import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -264,12 +265,14 @@ tests cards =
           HU.testCase "StateCondition round-trips" $
             mapM_
               (roundTrip "state" Codec.stateConditionToJson Codec.jsonToStateCondition)
-              [StateCondition.YouControlNo Subtype.Swamp, StateCondition.NoPermanentsOfSubtype Subtype.Swamp],
+              [StateCondition.YouControlNo Subtype.Swamp, StateCondition.NoPermanentsOfSubtype Subtype.Zombie],
           HU.testCase "TriggerCondition.StateIs round-trips" $
             roundTrip
               "cond"
               Codec.triggerConditionToJson
               Codec.jsonToTriggerCondition
-              (TriggerCondition.StateIs (StateCondition.YouControlNo Subtype.Swamp))
+              (TriggerCondition.StateIs (StateCondition.YouControlNo Subtype.Swamp)),
+          HU.testCase "CountSpec.CreaturesDiedThisTurn round-trips" $
+            roundTrip "count" Codec.countSpecToJson Codec.jsonToCountSpec CountSpec.CreaturesDiedThisTurn
         ]
     ]
