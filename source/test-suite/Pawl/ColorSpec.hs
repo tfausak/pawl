@@ -230,5 +230,25 @@ tests cards =
             (ratsId, board) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice gs0
             multi = withEffect ratsId (Modification.SetColor (Set.fromList [Color.Blue, Color.Black])) board
             gs = withEffect ratsId (Modification.SetColor (Set.singleton Color.Red)) multi
-         in HU.assertEqual "red only, no residue of blue or black" (Set.singleton Color.Red) (Projection.colorsOf ratsId gs)
+         in HU.assertEqual "red only, no residue of blue or black" (Set.singleton Color.Red) (Projection.colorsOf ratsId gs),
+      HU.testCase "CR 613.1c/613.1e 2008-05-01 changing a permanent's colour doesn't change its text" $
+        -- Gatherer ruling on Crimson Wisps / Aphotic Wisps (WotC, 2008-05-01):
+        -- "Changing a permanent's color won't change its text. If you turn
+        -- Wilt-Leaf Liege blue, it will still affect green creatures and
+        -- white creatures." Transcribed with Bad Moon, whose own text
+        -- ("Black creatures get +1/+1") is keyed to its OWN printed colour:
+        -- turn Bad Moon itself red with a stored SetColor effect (withEffect
+        -- reaches non-creature permanents, which no card in the pool
+        -- targets) and its ability still reads Typhoid Rats as black. This
+        -- guards CR 613.1e/613.1c's layer separation -- colour is layer 5,
+        -- text-changing is layer 3 -- and must never be implemented as a
+        -- colour change rewriting the object's own text.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (moonId, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice gs0
+            (ratsId, board) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice withMoon
+            gs = withEffect moonId (Modification.SetColor (Set.singleton Color.Red)) board
+         in do
+              HU.assertEqual "Bad Moon itself is now red" (Set.singleton Color.Red) (Projection.colorsOf moonId gs)
+              HU.assertEqual "the black Rats are still pumped to 2 power" (Just 2) (Projection.powerOf ratsId gs)
+              HU.assertEqual "the black Rats are still pumped to 2 toughness" (Just 2) (Projection.toughnessOf ratsId gs)
     ]

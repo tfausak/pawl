@@ -882,9 +882,11 @@ its own gate card and spec, landed as it completes. Umbrella:
   than a skipped step. Crimson Wisps and Aphotic Wisps each carry the same
   three templating rulings (WotC, 2008-05-01): "colourless is not a colour"
   restates CR 105.4, already exercised by the devoid/Bad Moon tests; "changing
-  colour won't change text" needs a card whose own ability text is keyed to
-  its printed colour (Wilt-Leaf Liege), which the pool has none of, so it is
-  not exercisable; the one Q&A-shaped ruling — a colour change overwrites
+  colour won't change text" **is exercisable after all**: Bad Moon is itself
+  a card whose own text is keyed to its printed colour ("Black creatures get
+  +1/+1"), and is now transcribed as `ColorSpec`'s "CR 613.1c/613.1e
+  2008-05-01 changing a permanent's colour doesn't change its text"; the one
+  Q&A-shaped ruling — a colour change overwrites
   *all* previous colours, "even if... blue and black" — is transcribed as
   `ColorSpec`'s "2008-05-01 a colour change overwrites ALL previous colours,
   even a multicoloured one" (two stacked `SetColor` effects rather than a
