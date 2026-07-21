@@ -319,7 +319,7 @@ applyEffect source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case Quantity.evaluate gs source quantity of
+        (Just recipient, True) -> case Quantity.evaluate gs source (Just controller) quantity of
           -- An unevaluable quantity is a no-op, the powerOf posture.
           Nothing -> gs
           Just n ->
@@ -432,7 +432,7 @@ applyEffect source controller bound legality chosen effect = case effect of
         _ -> gs
   Effect.Draw quantity -> do
     gs <- State.get
-    case Quantity.evaluate gs source quantity of
+    case Quantity.evaluate gs source (Just controller) quantity of
       Just n
         | n > 0 ->
             -- CR 120: draw n, folding the shared primitive so each draw re-reads the
@@ -443,7 +443,7 @@ applyEffect source controller bound legality chosen effect = case effect of
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
         (Just (Recipient.ToPlayer target), True) ->
-          case Quantity.evaluate gs source quantity of
+          case Quantity.evaluate gs source (Just controller) quantity of
             Just n
               | n > 0 ->
                   -- CR 701.13/701.13b: top min(n, library) of the target's library to
@@ -457,7 +457,7 @@ applyEffect source controller bound legality chosen effect = case effect of
     gs <- State.get
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
-        case Quantity.evaluate gs source quantity of
+        case Quantity.evaluate gs source (Just controller) quantity of
           Just n
             | n > 0 -> do
                 let held = Game.zoneMembers Zone.Hand target gs
@@ -476,7 +476,7 @@ applyEffect source controller bound legality chosen effect = case effect of
       _ -> pure ()
   Effect.Create quantity card -> do
     gs <- State.get
-    case Quantity.evaluate gs source quantity of
+    case Quantity.evaluate gs source (Just controller) quantity of
       Just n
         | n > 0 ->
             -- CR 111: create n tokens with these characteristics under the effect's
@@ -508,7 +508,7 @@ applyEffect source controller bound legality chosen effect = case effect of
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs -- a player recipient takes no counters
-          Just target -> case Quantity.evaluate gs source quantity of
+          Just target -> case Quantity.evaluate gs source (Just controller) quantity of
             Nothing -> gs -- unevaluable quantity: no-op (the powerOf posture)
             Just n -> if n <= 0 then gs else putCounters target kind (fromInteger n) gs
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op

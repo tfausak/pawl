@@ -402,6 +402,55 @@ addLibraryCard printing pid gs =
           }
       )
 
+-- One card of a printing in pid's graveyard.
+addGraveyardCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addGraveyardCard printing pid gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.source = Source.OfCard printing,
+            Object.zone = Zone.Graveyard,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Sick,
+            Object.bindings = Map.empty,
+            Object.counters = Map.empty,
+            Object.timestamp = ts
+          }
+   in ( oid,
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.graveyard = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.graveyard gs2)
+          }
+      )
+
+-- One more card of a printing in pid's hand, APPENDED (contrast handOne, which
+-- replaces the hand and sets up the phase for a cast).
+addHandCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addHandCard printing pid gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.source = Source.OfCard printing,
+            Object.zone = Zone.Hand,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled,
+            Object.bindings = Map.empty,
+            Object.counters = Map.empty,
+            Object.timestamp = ts
+          }
+   in ( oid,
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand gs2)
+          }
+      )
+
 -- Humility on the battlefield under bob's control (it is not a creature, so
 -- AllCreatures does not touch it). Returns the updated state.
 withHumility :: Cards.Cards -> GameState.GameState -> GameState.GameState

@@ -1,0 +1,26 @@
+module Pawl.Type.CountSpec where
+
+-- What a Quantity.Count counts. A first-order, analyzable classification, never
+-- a predicate function -- the TargetSpec.WallTarget posture: one hand-carved
+-- variant per card, specific before general.
+--
+-- Deliberately its own type rather than flat arms on Quantity: Quantity is a
+-- small, closed numeric-tower type (CR 107.3, 208.2), and card-shaped growth
+-- belongs somewhere P9's criterion/filter language can retire WHOLESALE.
+--
+-- EXPIRES at P9.
+--
+-- Both inhabitants read only zone membership and PRINTED card types, never the
+-- projection -- Pawl.Quantity cannot import Pawl.Projection (Projection imports
+-- Quantity), and a count evaluated inside the layer fold would recurse into the
+-- fold that called it. A count over projected state ("lands you control") is a
+-- named deferral in the P3b spec, section 8.
+data CountSpec
+  = -- CR 208.2a: Tarmogoyf. The number of DISTINCT card types among the cards in
+    -- every graveyard -- a count of types, not of objects.
+    CardTypesInAllGraveyards
+  | -- CR 608.2h: Inner Calm, Outer Strength. The size of the "you" player's hand,
+    -- where "you" is supplied by the caller (the resolving spell's controller, or
+    -- the object's own controller for a characteristic-defining ability).
+    CardsInYourHand
+  deriving (Eq, Ord, Show)

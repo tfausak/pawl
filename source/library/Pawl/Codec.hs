@@ -25,6 +25,7 @@ import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
@@ -155,6 +156,19 @@ jsonToCounterKind =
     (Text.pack "CounterKind")
     [ (Text.pack "PlusOnePlusOne", CounterKind.PlusOnePlusOne),
       (Text.pack "MinusOneMinusOne", CounterKind.MinusOneMinusOne)
+    ]
+
+countSpecToJson :: CountSpec.CountSpec -> Value
+countSpecToJson s = nullary . Text.pack $ case s of
+  CountSpec.CardTypesInAllGraveyards -> "CardTypesInAllGraveyards"
+  CountSpec.CardsInYourHand -> "CardsInYourHand"
+
+jsonToCountSpec :: Value -> Either Text CountSpec.CountSpec
+jsonToCountSpec =
+  decodeNullary
+    (Text.pack "CountSpec")
+    [ (Text.pack "CardTypesInAllGraveyards", CountSpec.CardTypesInAllGraveyards),
+      (Text.pack "CardsInYourHand", CountSpec.CardsInYourHand)
     ]
 
 subtypeToJson :: Subtype.Subtype -> Value
@@ -436,6 +450,9 @@ quantityToJson q = case q of
   Quantity.Literal n -> Json.tagged (Text.pack "Literal") (Just (Json.jInt n))
   Quantity.ManaValue -> nullary (Text.pack "ManaValue")
   Quantity.X -> nullary (Text.pack "X")
+  Quantity.Star -> nullary (Text.pack "Star")
+  Quantity.Plus a b -> Json.tagged (Text.pack "Plus") (Just (Array [quantityToJson a, quantityToJson b]))
+  Quantity.Count s -> Json.tagged (Text.pack "Count") (Just (countSpecToJson s))
 
 jsonToQuantity :: Value -> Either Text Quantity.Quantity
 jsonToQuantity value = do
@@ -444,6 +461,9 @@ jsonToQuantity value = do
     ("Literal", Just v) -> Quantity.Literal <$> Json.asInteger v
     ("ManaValue", _) -> Right Quantity.ManaValue
     ("X", _) -> Right Quantity.X
+    ("Star", _) -> Right Quantity.Star
+    ("Plus", Just (Array [x, y])) -> Quantity.Plus <$> jsonToQuantity x <*> jsonToQuantity y
+    ("Count", Just v) -> Quantity.Count <$> jsonToCountSpec v
     _ -> Left (Text.pack "unknown Quantity: " <> t)
 
 powerToJson :: Power.Power -> Value

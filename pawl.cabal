@@ -101,6 +101,7 @@ library
     Pawl.Type.CombatStep
     Pawl.Type.ContinuousEffect
     Pawl.Type.CounterKind
+    Pawl.Type.CountSpec
     Pawl.Type.DamageEvent
     Pawl.Type.DamageKind
     Pawl.Type.Decider

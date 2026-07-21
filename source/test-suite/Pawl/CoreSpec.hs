@@ -12,6 +12,7 @@ import qualified Pawl.Cards as Cards
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -66,18 +67,81 @@ quantityTests cards =
         HU.assertEqual
           "literal"
           (Just 2)
-          (Quantity.evaluate (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal 2)),
+          (Quantity.evaluate (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) Nothing (Quantity.Type.Literal 2)),
       HU.testCase "a literal may be negative" $
         HU.assertEqual
           "negative"
           (Just (-1))
-          (Quantity.evaluate (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) (Quantity.Type.Literal (-1))),
+          (Quantity.evaluate (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) Nothing (Quantity.Type.Literal (-1))),
       HU.testCase "evaluate reads X from the object's binding environment" $
         let (oid, gs) = withBoundAmount cards (Just 5)
-         in HU.assertEqual "X = 5" (Just 5) (Quantity.evaluate gs oid Quantity.Type.X),
+         in HU.assertEqual "X = 5" (Just 5) (Quantity.evaluate gs oid Nothing Quantity.Type.X),
       HU.testCase "evaluate X is Nothing when no amount was bound" $
         let (oid, gs) = withBoundAmount cards Nothing
-         in HU.assertEqual "unbound X" Nothing (Quantity.evaluate gs oid Quantity.Type.X)
+         in HU.assertEqual "unbound X" Nothing (Quantity.evaluate gs oid Nothing Quantity.Type.X),
+      HU.testCase "CR 208.2 Star alone is not evaluable -- it is notation, resolved at the seed" $
+        HU.assertEqual
+          "Star"
+          Nothing
+          (Quantity.evaluate (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) Nothing Quantity.Type.Star),
+      HU.testCase "CR 208.2 Plus adds, so 1+* composes without a new case" $
+        HU.assertEqual
+          "1 + 2"
+          (Just 3)
+          ( Quantity.evaluate
+              (Setup.emptyGame S.bothPlayers)
+              (ObjectId.MkObjectId 0)
+              Nothing
+              (Quantity.Type.Plus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2))
+          ),
+      HU.testCase "Plus is Nothing when either side is unevaluable" $
+        HU.assertEqual
+          "1 + Star"
+          Nothing
+          ( Quantity.evaluate
+              (Setup.emptyGame S.bothPlayers)
+              (ObjectId.MkObjectId 0)
+              Nothing
+              (Quantity.Type.Plus (Quantity.Type.Literal 1) Quantity.Type.Star)
+          ),
+      HU.testCase "substituteStar replaces Star everywhere, including inside Plus" $
+        HU.assertEqual
+          "1 + Literal 7"
+          (Quantity.Type.Plus (Quantity.Type.Literal 1) (Quantity.Type.Literal 7))
+          ( Quantity.substituteStar
+              (Quantity.Type.Literal 7)
+              (Quantity.Type.Plus (Quantity.Type.Literal 1) Quantity.Type.Star)
+          ),
+      HU.testCase "Count CardsInYourHand is Nothing with no 'you'" $
+        HU.assertEqual
+          "no player"
+          Nothing
+          ( Quantity.evaluate
+              (Setup.emptyGame S.bothPlayers)
+              (ObjectId.MkObjectId 0)
+              Nothing
+              (Quantity.Type.Count CountSpec.CardsInYourHand)
+          ),
+      HU.testCase "Count CardsInYourHand counts that player's hand" $
+        let (gs, _) = S.handOne (Cards.pikerPrinting cards) (Setup.emptyGame S.bothPlayers)
+         in HU.assertEqual
+              "one card"
+              (Just 1)
+              (Quantity.evaluate gs (ObjectId.MkObjectId 0) (Just S.alice) (Quantity.Type.Count CountSpec.CardsInYourHand)),
+      HU.testCase "Count CardTypesInAllGraveyards counts DISTINCT card types, not cards" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, one) = S.addGraveyardCard (Cards.pikerPrinting cards) S.alice gs0
+            (_, two) = S.addGraveyardCard (Cards.warMammothPrinting cards) S.bob one
+            (_, three) = S.addGraveyardCard (Cards.lightningBoltPrinting cards) S.alice two
+         in do
+              HU.assertEqual
+                "two creatures in two graveyards is one type"
+                (Just 1)
+                (Quantity.evaluate two (ObjectId.MkObjectId 0) Nothing (Quantity.Type.Count CountSpec.CardTypesInAllGraveyards))
+              HU.assertEqual
+                "adding an instant makes two"
+                (Just 2)
+                (Quantity.evaluate three (ObjectId.MkObjectId 0) Nothing (Quantity.Type.Count CountSpec.CardTypesInAllGraveyards))
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

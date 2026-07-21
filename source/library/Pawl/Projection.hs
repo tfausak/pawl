@@ -63,9 +63,11 @@ layer m = case m of
 
 -- Apply one modification to characteristics-in-progress. THE ONE applier
 -- (Resolve : Effect :: Projection : Modification). P/T quantities are evaluated
--- here against the state; CR 611.2b's freeze-at-creation is a no-op while every
--- Quantity is a Literal (identical value either way). When X lands, Resolve must
--- freeze the value into the stored effect and this reads the frozen Literal.
+-- here against the CURRENT state, which is correct for a static ability's
+-- continuous effect (CR 604.2 -- Opalescence's mana value is re-read per affected
+-- object every projection). A continuous effect created by a spell's RESOLUTION
+-- must not be re-read (CR 608.2h / 611.2d); it is frozen to Literals at store
+-- time by Resolve, via freezeQuantities.
 applyModification :: GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification gs oid m pc = case m of
   Modification.GainKeyword k ->
@@ -74,13 +76,13 @@ applyModification gs oid m pc = case m of
     pc {PC.keywords = Set.empty, PC.activatedAbilities = [], PC.replacementEffects = [], PC.triggeredAbilities = []}
   Modification.SetBasePowerToughness p t ->
     pc
-      { PC.power = setPT (PC.power pc) (Quantity.evaluate gs oid p),
-        PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate gs oid t)
+      { PC.power = setPT (PC.power pc) (Quantity.evaluate gs oid (controllerOf oid gs) p),
+        PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate gs oid (controllerOf oid gs) t)
       }
   Modification.ModifyPowerToughness p t ->
     pc
-      { PC.power = addPT (PC.power pc) (Quantity.evaluate gs oid p),
-        PC.toughness = addPT (PC.toughness pc) (Quantity.evaluate gs oid t)
+      { PC.power = addPT (PC.power pc) (Quantity.evaluate gs oid (controllerOf oid gs) p),
+        PC.toughness = addPT (PC.toughness pc) (Quantity.evaluate gs oid (controllerOf oid gs) t)
       }
   Modification.AddLandSubtype s ->
     pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
@@ -205,10 +207,10 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.colors = baseColorsOf card,
         PC.power = case Card.Type.power card of
           Nothing -> Nothing
-          Just (Power.MkPower q) -> Quantity.evaluate gs oid q,
+          Just (Power.MkPower q) -> Quantity.evaluate gs oid (controllerOf oid gs) q,
         PC.toughness = case Card.Type.toughness card of
           Nothing -> Nothing
-          Just (Toughness.MkToughness q) -> Quantity.evaluate gs oid q,
+          Just (Toughness.MkToughness q) -> Quantity.evaluate gs oid (controllerOf oid gs) q,
         PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
         PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
         PC.rulesTextActive = True,
