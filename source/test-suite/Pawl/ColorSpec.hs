@@ -165,5 +165,23 @@ tests cards =
             (gs, dbId) = S.handOne (Cards.doomBladePrinting cards) board
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice dbId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in HU.assertEqual "the Drone is gone" 0 (length (Game.zoneMembers Zone.Battlefield S.bob after))
+         in HU.assertEqual "the Drone is gone" 0 (length (Game.zoneMembers Zone.Battlefield S.bob after)),
+      HU.testCase "Crimson Wisps makes a black creature red, and it stops being black" $
+        -- THE SET-NOT-ADD FALSIFIER, end to end: under Bad Moon the Rats are 2/2
+        -- and no legal Doom Blade target; after Crimson Wisps they are a 1/1 red
+        -- creature that Doom Blade may target. An AddColor implementation fails
+        -- every one of these assertions.
+        let base = S.landsInPlay (Cards.mountainPrinting cards) 1
+            (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice base
+            (ratsId, board) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice withMoon
+            (gs, cwId) = S.handOne (Cards.crimsonWispsPrinting cards) board
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice cwId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in do
+              HU.assertEqual "before: the black Rats are 2/2 under Bad Moon" (Just 2) (Projection.powerOf ratsId board)
+              HU.assertEqual "after: red only, not black and red" (Set.singleton Color.Red) (Projection.colorsOf ratsId after)
+              HU.assertEqual "after: out of Bad Moon's set, back to 1 power" (Just 1) (Projection.powerOf ratsId after)
+              HU.assertBool
+                "after: a legal Doom Blade target"
+                (Set.member (Recipient.ToCreature ratsId) (Target.legalRecipients TargetSpec.NonblackCreatureTarget after))
     ]
