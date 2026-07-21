@@ -6,9 +6,12 @@ module Pawl.ColorSpec where
 
 import qualified Data.Set as Set
 import qualified Pawl.Cards as Cards
+import qualified Pawl.Cast as Cast
+import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
+import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Color as Color
@@ -16,7 +19,9 @@ import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Source as Source
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -34,6 +39,14 @@ withEffect oid m gs =
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+
+-- The battlefield objects that are tokens (CR 111.1) rather than cards.
+tokensOf :: GameState.GameState -> [ObjectId.ObjectId]
+tokensOf gs = filter isToken (Set.toList (GameState.battlefield gs))
+  where
+    isToken oid = case fmap Object.source (Game.lookupObject oid gs) of
+      Just (Source.OfToken _) -> True
+      _ -> False
 
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
@@ -101,5 +114,31 @@ tests cards =
             (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice gs0
             (pikerId, board) = S.addPiker cards S.alice withMoon
             gs = withEffect pikerId (Modification.SetColor (Set.singleton Color.Black)) board
-         in HU.assertEqual "the now-black Piker is 3/2" (Just 3) (Projection.powerOf pikerId gs)
+         in HU.assertEqual "the now-black Piker is 3/2" (Just 3) (Projection.powerOf pikerId gs),
+      HU.testCase "CR 111.3 a token's colour comes from the effect that created it" $
+        -- FALSIFIER: a token has no mana cost, so an implementation that derives
+        -- colour from the mana cost alone makes Dragon Fodder's Goblins
+        -- COLOURLESS -- and Bad Moon is what makes that observable, since
+        -- colourless reads as "nonblack" exactly as red does.
+        -- S.spellOnStack places the object directly in the Stack zone, bypassing
+        -- Cast.castSpell's mode-selection prompt; with an empty bindings map,
+        -- Binding.modesOf is empty and Dragon Fodder's Create effect never fires
+        -- (proven: even after Step 3's data fix, the empty-binding path still
+        -- makes zero tokens). This needs a real cast, mirroring ResolveSpec's
+        -- "CR 111 Dragon Fodder creates two 1/1 Goblin tokens".
+        let base = S.mountainsInPlay cards 2
+            (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice base
+            (gs, spellId) = S.handOne (Cards.dragonFodderPrinting cards) withMoon
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+         in case tokensOf after of
+              [] -> HU.assertFailure "Dragon Fodder made no tokens"
+              tokenIds -> do
+                HU.assertEqual "two Goblins" 2 (length tokenIds)
+                mapM_
+                  (\oid -> HU.assertEqual "red" (Set.singleton Color.Red) (Projection.colorsOf oid after))
+                  tokenIds
+                mapM_
+                  (\oid -> HU.assertEqual "Bad Moon does not pump a red token" (Just 1) (Projection.powerOf oid after))
+                  tokenIds
     ]
