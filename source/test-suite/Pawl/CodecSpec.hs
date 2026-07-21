@@ -201,6 +201,10 @@ tests cards =
                   HU.assertEqual
                     "target spec"
                     (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) TargetSpec.SpellTarget)
-                    (Card.allTargetSpecs card)
+                    (Card.allTargetSpecs card),
+          HU.testCase "copyOnEnter True round-trips through the card codec" $
+            let base = Printing.card (Cards.pikerPrinting cards)
+                cloney = base {CardT.copyOnEnter = True}
+             in HU.assertEqual "copyOnEnter preserved" (Right cloney) (Codec.jsonToCard (Codec.cardToJson cloney))
         ]
     ]

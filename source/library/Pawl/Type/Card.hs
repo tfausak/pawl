@@ -56,6 +56,11 @@ data Card = MkCard
     -- normal timing. Read directly from the card (NOT the projection): the
     -- permission functions in the library (CR 113.6), where the CR 613 layer
     -- system does not reach. Empty for all but Panglacial Wurm.
-    castingPermissions :: [CastingPermission]
+    castingPermissions :: [CastingPermission],
+    -- CR 707.9a / 614.1c: True iff this card enters the battlefield AS A COPY of
+    -- another permanent by its controller's choice (Clone). A closed-half
+    -- classification (like a keyword citation), read by Event.placeObject and the
+    -- as-enters drain -- never the card's identity. False for every card but Clone.
+    copyOnEnter :: Bool
   }
   deriving (Eq, Ord, Show)

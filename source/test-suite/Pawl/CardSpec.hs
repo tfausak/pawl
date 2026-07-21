@@ -145,7 +145,8 @@ cardTests cards =
                   Card.Type.activatedAbilities = [],
                   Card.Type.replacementEffects = [],
                   Card.Type.triggeredAbilities = [],
-                  Card.Type.castingPermissions = []
+                  Card.Type.castingPermissions = [],
+                  Card.Type.copyOnEnter = False
                 }
          in do
               HU.assertBool "not a permanent" (not (Card.isPermanent card))

@@ -22,4 +22,5 @@ data Subtype
   | Skeleton
   | Wall -- CR 205.3m (a creature type)
   | Wizard -- CR 205.3m (a creature type)
+  | Shapeshifter -- CR 205.3m (a creature type; Clone's printed type)
   deriving (Eq, Ord, Show)

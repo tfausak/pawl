@@ -28,7 +28,7 @@ import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
-import Pawl.Type.Json (Value (Array, Null, Object))
+import Pawl.Type.Json (Value (Array, Boolean, Null, Object))
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
@@ -179,6 +179,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Skeleton -> "Skeleton"
   Subtype.Wall -> "Wall"
   Subtype.Wizard -> "Wizard"
+  Subtype.Shapeshifter -> "Shapeshifter"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -203,7 +204,8 @@ jsonToSubtype =
       (Text.pack "Myr", Subtype.Myr),
       (Text.pack "Skeleton", Subtype.Skeleton),
       (Text.pack "Wall", Subtype.Wall),
-      (Text.pack "Wizard", Subtype.Wizard)
+      (Text.pack "Wizard", Subtype.Wizard),
+      (Text.pack "Shapeshifter", Subtype.Shapeshifter)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -726,22 +728,30 @@ jsonToModal value = do
 cardToJson :: CardT.Card -> Value
 cardToJson c =
   Object
-    [ (Text.pack "name", Json.jText (CardT.name c)),
-      (Text.pack "manaCost", maybeTo manaCostToJson (CardT.manaCost c)),
-      (Text.pack "typeLine", typeLineToJson (CardT.typeLine c)),
-      (Text.pack "power", maybeTo powerToJson (CardT.power c)),
-      (Text.pack "toughness", maybeTo toughnessToJson (CardT.toughness c)),
-      (Text.pack "keywords", setTo keywordToJson (CardT.keywords c)),
-      (Text.pack "staticAbilities", listTo staticAbilityToJson (CardT.staticAbilities c)),
-      (Text.pack "spell", modalToJson (CardT.spell c)),
-      (Text.pack "activatedAbilities", listTo activatedAbilityToJson (CardT.activatedAbilities c)),
-      (Text.pack "replacementEffects", listTo replacementEffectToJson (CardT.replacementEffects c)),
-      (Text.pack "triggeredAbilities", listTo triggeredAbilityToJson (CardT.triggeredAbilities c)),
-      (Text.pack "castingPermissions", listTo castingPermissionToJson (CardT.castingPermissions c))
-    ]
+    ( [ (Text.pack "name", Json.jText (CardT.name c)),
+        (Text.pack "manaCost", maybeTo manaCostToJson (CardT.manaCost c)),
+        (Text.pack "typeLine", typeLineToJson (CardT.typeLine c)),
+        (Text.pack "power", maybeTo powerToJson (CardT.power c)),
+        (Text.pack "toughness", maybeTo toughnessToJson (CardT.toughness c)),
+        (Text.pack "keywords", setTo keywordToJson (CardT.keywords c)),
+        (Text.pack "staticAbilities", listTo staticAbilityToJson (CardT.staticAbilities c)),
+        (Text.pack "spell", modalToJson (CardT.spell c)),
+        (Text.pack "activatedAbilities", listTo activatedAbilityToJson (CardT.activatedAbilities c)),
+        (Text.pack "replacementEffects", listTo replacementEffectToJson (CardT.replacementEffects c)),
+        (Text.pack "triggeredAbilities", listTo triggeredAbilityToJson (CardT.triggeredAbilities c)),
+        (Text.pack "castingPermissions", listTo castingPermissionToJson (CardT.castingPermissions c))
+      ]
+        ++ (if CardT.copyOnEnter c then [(Text.pack "copyOnEnter", Json.jBool True)] else [])
+    )
 
 getOpt :: Text -> [(Text, Value)] -> Value
 getOpt k ps = Maybe.fromMaybe Null (Json.optField k ps)
+
+jsonToBoolDefault :: Bool -> Value -> Either Text Bool
+jsonToBoolDefault d value = case value of
+  Null -> Right d
+  Boolean b -> Right b
+  _ -> Left (Text.pack "expected a boolean")
 
 jsonToCard :: Value -> Either Text CardT.Card
 jsonToCard value = do
@@ -758,6 +768,7 @@ jsonToCard value = do
   replacements <- Json.field (Text.pack "replacementEffects") ps >>= listFrom jsonToReplacementEffect
   triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= listFrom jsonToCastingPermission
+  copyOnEnter <- jsonToBoolDefault False (getOpt (Text.pack "copyOnEnter") ps)
   pure
     CardT.MkCard
       { CardT.name = name,
@@ -771,7 +782,8 @@ jsonToCard value = do
         CardT.activatedAbilities = activated,
         CardT.replacementEffects = replacements,
         CardT.triggeredAbilities = triggered,
-        CardT.castingPermissions = permissions
+        CardT.castingPermissions = permissions,
+        CardT.copyOnEnter = copyOnEnter
       }
 
 printingToJson :: Printing.Printing -> Value
