@@ -87,7 +87,7 @@ New `Pawl.*Spec` files must be added to the test-suite `other-modules` list in `
 **Interfaces:**
 - Produces: `Pawl.Type.CountSpec.CountSpec` = `CardTypesInAllGraveyards | CardsInYourHand`; `Pawl.Type.Quantity.Quantity` gains `Star`, `Plus Quantity Quantity`, `Count CountSpec`; `Pawl.Quantity.evaluate :: GameState -> ObjectId -> Maybe PlayerId -> Quantity -> Maybe Integer`; `Pawl.Quantity.substituteStar :: Quantity -> Quantity -> Quantity`; `Pawl.Codec.countSpecToJson` / `jsonToCountSpec`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/CoreSpec.hs`, replace the whole `quantityTests` list with this (the four existing cases gain the new `Nothing` argument; five cases are new):
 
@@ -239,12 +239,12 @@ addHandCard printing pid gs =
       )
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal test 2>&1 | tail -40`
 Expected: FAIL — compilation errors, `Data constructor not in scope: Quantity.Type.Star`, `Module 'Pawl.Type.CountSpec' does not exist`, and `evaluate` applied to too many arguments.
 
-- [ ] **Step 3: Create `Pawl.Type.CountSpec`**
+- [x] **Step 3: Create `Pawl.Type.CountSpec`**
 
 Create `source/library/Pawl/Type/CountSpec.hs`:
 
@@ -277,7 +277,7 @@ data CountSpec
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Grow `Quantity`**
+- [x] **Step 4: Grow `Quantity`**
 
 In `source/library/Pawl/Type/Quantity.hs`, add the import and the three constructors. The module comment's "Grows:" paragraph is now partly cashed — update it to say so:
 
@@ -311,7 +311,7 @@ and add these arms after the `X` arm:
     Count CountSpec
 ```
 
-- [ ] **Step 5: Teach `Pawl.Quantity` the new arms and the "you" player**
+- [x] **Step 5: Teach `Pawl.Quantity` the new arms and the "you" player**
 
 Replace `source/library/Pawl/Quantity.hs` in full:
 
@@ -413,7 +413,7 @@ symbolValue symbol = case symbol of
   ManaSymbol.Variable -> 0
 ```
 
-- [ ] **Step 6: Update the six library call sites**
+- [x] **Step 6: Update the six library call sites**
 
 In `source/library/Pawl/Resolve.hs`, every `Quantity.evaluate gs source quantity` becomes `Quantity.evaluate gs source (Just controller) quantity`. There are six, at lines 322, 435, 446, 460, 479 and 511. Run this to find them all and confirm the count:
 
@@ -463,7 +463,7 @@ Also replace the stale note above `applyModification` — the `-- When X lands, 
 -- time by Resolve, via freezeQuantities.
 ```
 
-- [ ] **Step 7: Add the codec arms**
+- [x] **Step 7: Add the codec arms**
 
 In `source/library/Pawl/Codec.hs`, add a `CountSpec` codec beside the other nullary codecs (put it immediately after the `CounterKind` pair, around line 158):
 
@@ -509,12 +509,12 @@ jsonToQuantity value = do
 
 Add the import `import qualified Pawl.Type.CountSpec as CountSpec` in alphabetical position.
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -20`
 Expected: PASS, warning-free.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add source/library/Pawl/Type/CountSpec.hs source/library/Pawl/Type/Quantity.hs source/library/Pawl/Quantity.hs source/library/Pawl/Codec.hs source/library/Pawl/Projection.hs source/library/Pawl/Resolve.hs source/test-suite/Pawl/CoreSpec.hs source/test-suite/Pawl/Support.hs pawl.cabal
@@ -557,11 +557,11 @@ The card gains the ability; the projection seeds it as a pair of **unevaluated**
 - Consumes: Task 1's `Quantity.Star` / `Plus` / `Count`, `Quantity.substituteStar`, `Codec.quantityToJson` / `jsonToQuantity`.
 - Produces: `Card.characteristicPT :: Maybe Quantity`; `ProjectedCharacteristics.characteristicPT :: Maybe (Quantity, Quantity)`; `Projection.seedCharacteristicPT :: Card -> Maybe (Quantity, Quantity)`; `Subtype.Lhurgoyf`; `Cards.tarmogoyfPrinting`; `PowerToughnessSpec.tests :: Cards.Cards -> Tasty.TestTree`.
 
-- [ ] **Step 0: Pin Tarmogoyf against Scryfall**
+- [x] **Step 0: Pin Tarmogoyf against Scryfall**
 
 Look up Tarmogoyf on Scryfall and confirm, verbatim: its mana cost, its type line, its printed power and toughness box, and its oracle text. The vendored MTGJSON dump is a candidate source only (`card-data-source`), and the P3b spec deliberately omits mana costs because two extraction windows disagreed on another card's. Write the confirmed values into the JSON in Step 4. Expected (confirm, do not assume): `{1}{G}`, `Creature — Lhurgoyf`, `*/1+*`, "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is equal to that number plus 1."
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `source/test-suite/Pawl/PowerToughnessSpec.hs`:
 
@@ -615,12 +615,12 @@ tests cards =
 
 Wire it into `source/test-suite/Main.hs`: add `import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec` in alphabetical position, and add `PowerToughnessSpec.tests cards,` to `testTree` immediately after `ProjectionSpec.tests cards,`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cabal test 2>&1 | tail -30`
 Expected: FAIL — `Cards.tarmogoyfPrinting` is not in scope, and `PC.characteristicPT` does not exist.
 
-- [ ] **Step 3: Add the two fields and the subtype**
+- [x] **Step 3: Add the two fields and the subtype**
 
 In `source/library/Pawl/Type/Subtype.hs`, add after `Shapeshifter`:
 
@@ -651,7 +651,7 @@ In `source/library/Pawl/Type/ProjectedCharacteristics.hs`, add the import `impor
     characteristicPT :: Maybe (Quantity, Quantity),
 ```
 
-- [ ] **Step 4: Seed it in the projection, and write the card**
+- [x] **Step 4: Seed it in the projection, and write the card**
 
 In `source/library/Pawl/Projection.hs`, add this function immediately above `baseCharacteristics`:
 
@@ -698,7 +698,7 @@ Create `data/cards/tarmogoyf.json` as a single line (match Step 0's confirmed va
 
 In `source/test-suite/Pawl/Cards.hs`, add `tarmogoyfPrinting :: Printing.Printing,` to the record (after `aphoticWispsPrinting`, which needs a trailing comma added), `tarmogoyfPrinting_ <- loadPrinting "tarmogoyf"` to `loadCards`, `tarmogoyfPrinting = tarmogoyfPrinting_` to the returned record, and `tarmogoyfPrinting cards` to `allPrintings`. It is a **deterministic fixture**: in `allPrintings` for the M3.5 honesty round-trip, in **no** deck.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -20`
 Expected: PASS. The `Cards` round-trip test proves `tarmogoyf.json` decodes and re-encodes byte-identically; every other card file is unchanged.
@@ -711,7 +711,7 @@ git status --short data/cards/
 
 Expected: only `?? data/cards/tarmogoyf.json`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add source/library/Pawl/Type/Subtype.hs source/library/Pawl/Type/Card.hs source/library/Pawl/Type/ProjectedCharacteristics.hs source/library/Pawl/Projection.hs source/library/Pawl/Codec.hs data/cards/tarmogoyf.json source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/PowerToughnessSpec.hs source/test-suite/Main.hs pawl.cabal
@@ -746,7 +746,7 @@ EOF
 - Consumes: Task 2's `PC.characteristicPT`; Task 1's `Quantity.evaluate`.
 - Produces: `Projection.applyCharacteristicPT :: GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics`; Tarmogoyf now projects a real P/T through `Projection.powerOf` / `toughnessOf`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append these three cases to the `PowerToughness` list in `source/test-suite/Pawl/PowerToughnessSpec.hs` (add a comma after the last existing case):
 
@@ -755,7 +755,7 @@ Append these three cases to the `PowerToughness` list in `source/test-suite/Pawl
         -- THE FALSIFIER for evaluating a printed * once, at the seed or at entry:
         -- nothing touches the Goyf, and its P/T moves because a graveyard did.
         -- Empty graveyards -> 0 card types -> 0/1. Fog resolves and is put into
-        -- its owner's graveyard (CR 608.2m), adding the Instant type.
+        -- its owner's graveyard (CR 608.2n), adding the Instant type.
         --
         -- Fog, NOT Lightning Bolt: Bolt targets, S.identityAnswer would aim it at
         -- the only creature on the board, and 3 damage would kill the 0/1 Goyf
@@ -801,12 +801,12 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Type.CounterKind as CounterKind
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal test --test-options='-p "$0~/PowerToughness/"' 2>&1 | tail -30`
 Expected: FAIL — `Just 0 /= Nothing` (and the same for toughness). Layer 7a is not applied, so the Goyf still projects nothing.
 
-- [ ] **Step 3: Apply the CDA at layer 7a**
+- [x] **Step 3: Apply the CDA at layer 7a**
 
 In `source/library/Pawl/Projection.hs`, add this function immediately above `projectFrom`:
 
@@ -871,12 +871,12 @@ projectFrom cands oid gs =
    in List.foldl' applyLayer (copiableCharacteristics oid gs) layers
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -20`
 Expected: PASS, warning-free, with no regressions in `ProjectionSpec` or `CopySpec`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Projection.hs source/test-suite/Pawl/PowerToughnessSpec.hs
@@ -914,7 +914,7 @@ CR 604.3 makes a characteristic-defining ability an ability, so `LoseAllAbilitie
 - Consumes: Task 3's layer-7a fold.
 - Produces: no new names; `Modification.LoseAllAbilities` now clears `PC.characteristicPT`.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Append to the `PowerToughness` list:
 
@@ -948,12 +948,12 @@ Append to the `PowerToughness` list:
          in HU.assertEqual "no CDA survives layer 6" Nothing (PC.characteristicPT (Projection.project goyfId gs))
 ```
 
-- [ ] **Step 2: Run the tests to verify the second one fails**
+- [x] **Step 2: Run the tests to verify the second one fails**
 
 Run: `cabal test --test-options='-p "$0~/PowerToughness/"' 2>&1 | tail -30`
 Expected: the "1/1" case PASSES (it is non-distinguishing, as documented); the "clears the CDA" case FAILS with `Just (...) /= Nothing`.
 
-- [ ] **Step 3: Clear it**
+- [x] **Step 3: Clear it**
 
 In `source/library/Pawl/Projection.hs`, replace the `LoseAllAbilities` arm of `applyModification`:
 
@@ -971,12 +971,12 @@ In `source/library/Pawl/Projection.hs`, replace the `LoseAllAbilities` arm of `a
       }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -20`
 Expected: PASS, warning-free.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/library/Pawl/Projection.hs source/test-suite/Pawl/PowerToughnessSpec.hs
@@ -1012,7 +1012,7 @@ This pays the bill P2 deferred by name: *"7b/CDA P/T-setting in copiable values 
 - Consumes: Task 3's layer-7a fold; `Cards.tarmogoyfPrinting`; `CopySpec.copyNewest`, `CopySpec.resolveAndSettle`, `CopySpec.cloneOnBattlefield`.
 - Produces: no new names. **No library change is expected** — if this task needs one, the seed in Task 2 is wrong; stop and say so.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Append to the `Copy` list in `source/test-suite/Pawl/CopySpec.hs` (add a comma after the last existing case):
 
@@ -1040,14 +1040,14 @@ Append to the `Copy` list in `source/test-suite/Pawl/CopySpec.hs` (add a comma a
                 HU.assertEqual "the copy's toughness moves too" (Just 3) (Projection.toughnessOf cloneId later)
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 Run: `cabal test --test-options='-p "$0~/Copy/"' 2>&1 | tail -30`
 Expected: PASS on the first run — the seed in Task 2 was built for exactly this, and `copiableCharacteristics` carries `PC.characteristicPT` for free.
 
 This is the one task in this plan whose test is expected to pass without a preceding implementation step. That is the point: it is a **regression gate** on a decision already made, not new behaviour. If it fails, do not patch it here — the seed is wrong and Task 2 must be revisited.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add source/test-suite/Pawl/CopySpec.hs
@@ -1087,7 +1087,7 @@ EOF
 - Consumes: Task 1's `Quantity.Count` and `evaluate`.
 - Produces: `Projection.freezeQuantities :: GameState -> ObjectId -> Maybe PlayerId -> Modification -> Modification`; `Subtype.Arcane`; `Cards.innerCalmPrinting`.
 
-- [ ] **Step 0: Read the verified card data (already pinned)**
+- [x] **Step 0: Read the verified card data (already pinned)**
 
 **The controller verified this card against the Scryfall API on 2026-07-21. Do not re-fetch; use these values.**
 
@@ -1098,7 +1098,7 @@ The `{2}{G}` cost is what the Step 1 test's four Forests are sized for: three to
 
 **It has zero Gatherer rulings** — so there is no ruling date to put in the freeze test's name, and nothing to transcribe. Do not go looking.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to the `PowerToughness` list. The `landsInPlay` count below assumes a `{2}{G}` cost — **adjust it to whatever Step 0 confirmed**:
 
@@ -1134,21 +1134,29 @@ Append to the `PowerToughness` list. The `landsInPlay` count below assumes a `{2
         -- the freeze to effects created by a spell's RESOLUTION. A static ability's
         -- effect is regenerated from the permanent every projection and evaluated
         -- per AFFECTED object. Freezing it would evaluate ManaValue against
-        -- Opalescence itself, making Bad Moon a 4/4 instead of a 2/2.
+        -- Opalescence itself, making Bad Moon's BASE 4/4 instead of 2/2 -- and so
+        -- 5/5 instead of 3/3 after its own pump.
+        --
+        -- Bad Moon ends at 3/3, not 2/2: Opalescence makes it a creature (layer 4)
+        -- with base P/T equal to its own mana value of 2 (layer 7b), and Bad Moon's
+        -- OWN "Black creatures get +1/+1" then applies to it at layer 7c, because
+        -- its affected set is CreaturesOfColor Black with NO self-exclusion (only
+        -- Opalescence's OtherNonAuraEnchantments excludes self). Verified against
+        -- data/cards/bad-moon.json.
         let gs0 = Setup.emptyGame S.bothPlayers
             (_, withOpal) = S.addCreature (Cards.opalescencePrinting cards) S.alice gs0
             (moonId, gs) = S.addCreature (Cards.badMoonPrinting cards) S.alice withOpal
          in do
-              HU.assertEqual "Bad Moon's own mana value is 2, not Opalescence's 4" (Just 2) (Projection.powerOf moonId gs)
-              HU.assertEqual "and its toughness is 2" (Just 2) (Projection.toughnessOf moonId gs)
+              HU.assertEqual "base 2 from its own mana value, +1 from its own ability" (Just 3) (Projection.powerOf moonId gs)
+              HU.assertEqual "and its toughness likewise" (Just 3) (Projection.toughnessOf moonId gs)
 ```
 
-- [ ] **Step 2: Run the tests to verify the first fails**
+- [x] **Step 2: Run the tests to verify the first fails**
 
 Run: `cabal test --test-options='-p "$0~/PowerToughness/"' 2>&1 | tail -30`
 Expected: the Opalescence case PASSES (it is a regression guard on existing behaviour); the freeze case FAILS — `Cards.innerCalmPrinting` is not in scope.
 
-- [ ] **Step 3: Add `freezeQuantities`**
+- [x] **Step 3: Add `freezeQuantities`**
 
 In `source/library/Pawl/Projection.hs`, add this beside `rewriteModification` (which `Resolve` already delegates to for CR 612):
 
@@ -1189,7 +1197,7 @@ freezeQuantities gs oid you m =
         Modification.SetColor _ -> m
 ```
 
-- [ ] **Step 4: Call it from `Resolve`**
+- [x] **Step 4: Call it from `Resolve`**
 
 In `source/library/Pawl/Resolve.hs`, replace the `ModifyTarget` arm's body (lines 338–352) with:
 
@@ -1214,7 +1222,7 @@ In `source/library/Pawl/Resolve.hs`, replace the `ModifyTarget` arm's body (line
              in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 ```
 
-- [ ] **Step 5: Add the subtype, the codec arm and the card**
+- [x] **Step 5: Add the subtype, the codec arm and the card**
 
 In `source/library/Pawl/Type/Subtype.hs`, add after `Lhurgoyf`:
 
@@ -1232,12 +1240,12 @@ Create `data/cards/inner-calm-outer-strength.json` as a single line (**mana cost
 
 In `source/test-suite/Pawl/Cards.hs`, add `innerCalmPrinting` to the record, to `loadCards` (`loadPrinting "inner-calm-outer-strength"`), to the returned record, and to `allPrintings`. Deterministic fixture; no deck.
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -20`
 Expected: PASS, warning-free. `ProjectionSpec`'s Giant Growth and Humility/Opalescence groups must be unaffected — every quantity they store is already a `Literal`, so freezing them is the identity.
 
-- [ ] **Step 7: Add the wrong-object falsifier**
+- [x] **Step 7: Add the wrong-object falsifier**
 
 Append one more case to the `PowerToughness` list:
 
@@ -1264,7 +1272,7 @@ Expected: PASS.
 
 `S.handOne` puts a card in **alice's** hand and `Cast.castSpell S.alice` casts it, so alice is the caster throughout; only the creature belongs to bob. If `S.handOne`'s owner is not alice, read its definition in `source/test-suite/Pawl/Support.hs:439` and adjust the assertion's player, not the test's intent.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add source/library/Pawl/Type/Subtype.hs source/library/Pawl/Projection.hs source/library/Pawl/Resolve.hs source/library/Pawl/Codec.hs data/cards/inner-calm-outer-strength.json source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/PowerToughnessSpec.hs pawl.cabal
