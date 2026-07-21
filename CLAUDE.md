@@ -95,12 +95,18 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   `Mode`/`Modal` payload wired into both ability types, gated by Aether Channeler,
   with the CR 700.2b/603.3c "no legal mode → removed from the stack" rule as the
   trigger-only novelty a spell has no analog for; zero new opcodes).
-  **M4.5 (phased) has begun; its first phase, P1 (permanent control), is
-  complete** — a permanent's controller is now a projected layer-2
-  characteristic (`Projection.controllerOf`/`controls`, `Modification.SetController`),
-  gated by Act of Treason; see the umbrella spec
-  (`docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`) and the
-  progress log for the completion note and deferrals.
+  **M4.5 (phased) has begun; its first two phases are complete — P1
+  (permanent control) and P2 (copy / layer 1, the milestone's go/no-go).** P1
+  made a permanent's controller a projected layer-2 characteristic
+  (`Projection.controllerOf`/`controls`, `Modification.SetController`), gated by
+  Act of Treason. P2 made **copy a projected layer-1 characteristic**, gated by
+  Clone: a permanent that enters as a copy snapshots the copied object's
+  *copiable* values as it enters (`Binding.copy`, `Projection.copiableCharacteristics`
+  seeding the layer fold — no new opcode, no `Modification`), with the as-enters
+  choice a pure mark in `Event.placeObject` plus a monadic drain at the CR 117.5
+  boundary (`Engine.drainAsEntersChoices`, before SBAs/triggers). See the umbrella
+  spec (`docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`) and the
+  progress log for the completion notes and deferrals.
   The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, the opcodes/types it added, and every
   elision and its named expiry — lives in `docs/progress.md`. The forward path

@@ -751,3 +751,63 @@ its own gate card and spec, landed as it completes. Umbrella:
   this phase; `f90e0c4` stays open. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-20-p1-permanent-control-design.md` and
   `docs/superpowers/plans/2026-07-20-p1-permanent-control.md`.
+- **M4.5 P2 is complete** (copy — layer 1, GAP-L1; the **M4.5 go/no-go**, a genuine
+  GO. design.md §5 names the layer system as the architecture's canary, and layer 1
+  (copy) was the one blank layer left after P1. **Gate: Clone** (`{3}{U}` Creature —
+  Shapeshifter, 0/0, "You may have Clone enter the battlefield as a copy of any
+  creature on the battlefield"). The decision it proves: **a permanent's copy is a
+  projected layer-1 characteristic — the copied object's *copiable* values (CR
+  707.2), snapshotted as the object enters (CR 707.9a) and used to SEED the layer
+  fold**, so layers 2–7 (control, ability grants, counters, pumps) fold on top and
+  are excluded from a copied object's own copiable value. **The falsifier is
+  structural, not a special case**: `Projection.copiableCharacteristics` returns
+  base-or-snapshot only, so a +1/+1 counter (layer 7c) on the copied creature makes
+  it project 3/2 while the Clone copies the base 2/1 (asserted both-sides). Copy is
+  the **fold seed, not a `Modification`** — a deliberate refinement over the spec's
+  first draft (a synthesized `Modification.BecomeCopy` would have forced a dead
+  `ProjectedCharacteristics` JSON codec, since it never appears in a card): layer 1
+  is the fold's starting value, so `projectFrom` seeds from `copiableCharacteristics`
+  instead of `baseCharacteristics` (one line; `affectsBase`/source-liveness still
+  reads base, so nothing recurses). **Zero new opcodes.** The snapshot rides
+  `Object.bindings` (`Binding.copy :: Maybe ProjectedCharacteristics`, forgotten on
+  a zone change for free), so it is per-incarnation and locked at entry — a copy
+  **survives its source leaving the battlefield** (Murder the copied creature, the
+  Clone stays a 2/1), which a live-ObjectId model gets wrong. **The as-enters choice
+  is CR-faithful, not a resolution-time stopgap**: "enters as a copy" is a static
+  ability whose effect happens as part of the entering event on ANY path (CR
+  614.1c/603.6d/113.6h), with the choice made before the object enters (CR 614.12a).
+  So it is a **pure mark** on the universal battlefield-entry funnel
+  (`Event.placeObject` stamps a `copyOnEnter` object `asEntersPending`) plus a
+  **monadic drain** at the CR 117.5 settle boundary (`Engine.drainAsEntersChoices`,
+  run **before** state-based actions and triggers — observably equivalent to "before
+  it enters": no player, trigger, or SBA sees the interim 0/0; a copied 0/0 becomes
+  its real P/T before any SBA, a declined 0/0 dies to that same sweep, CR 704.5f).
+  The drain is the **narrow single-choice first version of P5's monadic replacement
+  engine**, not throwaway — the `copyOnEnter` classification and entry-funnel hook
+  are reused, the bespoke settle pass folds into CR 614.12/616 at P5. New
+  types/fields: `Binding.copy`; `Pawl.Binding` reserved slots `copySource`/
+  `asEntersPending` + `copyOf`/`setCopy`/`pendingCopy`/`markPending`/`clearPending`;
+  `Card.copyOnEnter :: Bool` (a classification, read by the funnel/drain, never a
+  card identity); `Subtype.Shapeshifter`; `Prompt.ChooseCopyTarget` /
+  `Response.ChoseCopyTarget (Maybe ObjectId)` (replay-serialized); `Target
+  .legalCopyTargets`; `Projection.copiableCharacteristics`; `ProjectedCharacteristics`
+  gained `Ord` (to ride a `Binding`). `Card.copyOnEnter` serializes **only when
+  True**, so the 44 pre-existing `data/cards/*.json` stay byte-identical; Clone is a
+  **blue deterministic fixture** (`data/cards/clone.json`, in `allPrintings` for the
+  honesty round-trip, no random-game deck). `Pawl.Resolve` stays the sole
+  `case`-on-`Effect` home; `Pawl.Projection` the sole `case`-on-`Modification` home;
+  the copy target is a genuine prompt, never elided. **Named deferred expiries** (spec
+  §7): copying a permanent's **static abilities** (a Clone of Humility/Opalescence —
+  `gather` reads static abilities from the printed card, not copiable values; the
+  activated/triggered/replacement abilities ARE copied); **name/mana cost/color/
+  supertypes** (not projected — color rides P3); **7b/CDA P/T-setting** in copiable
+  values (rides P3, Tarmogoyf); **ongoing "becomes a copy"** (Vesuvan Doppelganger,
+  re-reads the source); **copy-spell** (CR 707.10) and **copy-token** effects;
+  **simultaneous entry** of multiple copy-choosers (CR 614.12b/616); the **general
+  monadic as-enters replacement engine** (CR 614.12/616 — the drain folds into it at
+  **P5**); **face-down** (backlog). git-bug `83f1a55` (GAP-L1) is closed by this
+  phase (its GAP-L2 sibling was addressed by P1); `f90e0c4` stays open (P2 adds no
+  within-layer dependency — a copy's affected set is always the object itself). Spec
+  and plan kept as reference:
+  `docs/superpowers/specs/2026-07-20-p2-copy-layer-1-design.md` and
+  `docs/superpowers/plans/2026-07-20-p2-copy-layer-1.md`.
