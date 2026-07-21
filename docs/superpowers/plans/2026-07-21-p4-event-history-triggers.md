@@ -1924,7 +1924,7 @@ CR 603.7's trigger that belongs to no object on the battlefield. `Effect` is fir
 - Consumes: `PendingTrigger` (Task 2), `Effect.Sacrifice` + `Binding.triggerSource` (Task 3), `TriggerCondition.StepBegins` (Task 2).
 - Produces: `Pawl.Type.AbilityName.AbilityName = MkAbilityName Text`; `Pawl.Type.DelayedTrigger.DelayedTrigger` with fields `ability`, `source`, `controller`, `bindings`; `Card.delayedAbilities :: Map AbilityName (TriggeredAbility Card)`; `Effect.ArmDelayedTrigger AbilityName`; `Effect.Create Quantity card (Maybe SlotName)`; `GameState.delayedTriggers :: Seq DelayedTrigger`; `Pawl.Event.gatherTriggers :: [GameEvent] -> GameState -> ([PendingTrigger], Seq DelayedTrigger)`; `Pawl.Card.delayedEffects`; `Pawl.Resolve.armedAbilities`, `definedSlots`, `bindsSeveralTokens`, `bindSlot`; `Pawl.Cards.tidalWavePrinting`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/TriggerSpec.hs` (and to the `tests` list):
 
@@ -2050,12 +2050,12 @@ Add to `CodecSpec.hs`'s "P4 runtime types" group:
 
 with `Pawl.Type.AbilityName`, `Pawl.Type.DelayedTrigger`, `Pawl.Type.TriggeredAbility` and `Pawl.Binding` imported. Also change the existing Create round-trip, if `CodecSpec` has one, to pass `Nothing` as the third argument. The `TriggeredAbility.intervening` field lands in Task 8; until then omit it from this literal, and add it when Task 8 introduces it.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Pawl.Type.AbilityName` and `Pawl.Type.DelayedTrigger` do not exist; `Card.Type.delayedAbilities`, `GameState.delayedTriggers`, `Cards.tidalWavePrinting`, `Resolve.armedAbilities` are not in scope; `Effect.Create` has the wrong arity.
 
-- [ ] **Step 3: Add the two new types and the two data fields**
+- [x] **Step 3: Add the two new types and the two data fields**
 
 Create `source/library/Pawl/Type/AbilityName.hs`:
 
@@ -2142,9 +2142,12 @@ In `source/library/Pawl/Type/Effect.hs`, add the arm and grow `Create`:
 and change `Create`'s signature to `Create Quantity card (Maybe SlotName)`, appending to its comment:
 
 ```haskell
-    -- The Maybe SlotName BINDS the minted token so a later effect in the same
-    -- resolution -- or a delayed ability armed by it (CR 603.7c's "it") -- can name
-    -- it. A DEFINITION, not a read: it is not a target and never appears in
+    -- The Maybe SlotName BINDS the minted token into LIVE object state so the
+    -- ArmDelayedTrigger in the same resolution -- which re-reads Object.bindings --
+    -- can capture it as CR 603.7c's "it". NOT visible to a later effect of the same
+    -- resolution: applyEffect's `chosen` map is computed once before the fold, so a
+    -- sibling effect still reads the pre-Create snapshot (the D4 declared-equals-read
+    -- lint catches a spell mode that tries, so this fails loudly, never silently). A DEFINITION, not a read: it is not a target and never appears in
     -- targetSpecs. Defined only for a single-token create; a Create that binds a
     -- slot while making several tokens is a named deferral (the P4 spec, section
     -- 8) that the Pawl.CardSpec lint family rejects rather than guessing at.
@@ -2176,7 +2179,7 @@ delayedEffects card = concatMap (Modal.allEffects . TriggeredAbility.modal) (Map
 
 with `import qualified Data.Map.Strict as Map` and `import qualified Pawl.Type.TriggeredAbility as TriggeredAbility`.
 
-- [ ] **Step 4: Arm, bind, and fire**
+- [x] **Step 4: Arm, bind, and fire**
 
 In `source/library/Pawl/Resolve.hs`, update the five classification functions for `Create`'s new arity and add the two new arms:
 
@@ -2271,9 +2274,9 @@ Replace `applyEffect`'s `Create` arm and add `ArmDelayedTrigger`:
 and add the helper:
 
 ```haskell
--- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
--- later effect of the same resolution -- or a delayed ability armed by it -- can
--- name the object. `holder` is the effect SOURCE, which is the resolving spell
+-- CR 603.7c: bind `target` into `slot` of `holder`'s LIVE binding environment, so
+-- the ArmDelayedTrigger of this same resolution can capture it. A sibling effect
+-- cannot see it: applyEffect's `chosen` is fixed before the fold begins. `holder` is the effect SOURCE, which is the resolving spell
 -- itself for a spell and the source permanent for an ability; the same object
 -- ArmDelayedTrigger captures from, so the two always agree.
 bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
@@ -2346,11 +2349,15 @@ placePendingTriggers = do
 ```haskell
       -- CR 603.7c: a delayed ability's CAPTURED environment (its "it") rides
       -- alongside the targets chosen now; the source slot is stamped over the top.
-      -- The two never collide -- a captured slot is a token name, never "self".
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Map.union (PendingTrigger.bindings pending) (Binding.fromChoices chosen Map.empty Nothing chosenModes))}) abilId (GameState.objects g)})
+      -- Map.union is LEFT-biased and the placement-time bindings are on the left, so
+      -- THIS ability's own reserved slots win: the captured environment belongs to
+      -- whatever armed the ability and carries a spell's own `modes` and X, which
+      -- must not override the delayed ability's mode selection. The captured token
+      -- slot has no placement-time counterpart, so it still rides along.
+      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Map.union (Binding.fromChoices chosen Map.empty Nothing chosenModes) (PendingTrigger.bindings pending))}) abilId (GameState.objects g)})
 ```
 
-- [ ] **Step 5: Add the codec arms and the card**
+- [x] **Step 5: Add the codec arms and the card**
 
 In `source/library/Pawl/Codec.hs`:
 
@@ -2502,12 +2509,12 @@ Create `data/cards/tidal-wave.json` (one line, plus the trailing newline):
 
 In `source/test-suite/Pawl/Cards.hs`, register `tidalWavePrinting` (load `"tidal-wave"`), and add it to `allPrintings`.
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. `Pawl.CardsSpec`'s byte-stability assertion over every *existing* card file is the check that adding `delayedAbilities` and `Create`'s slot left them untouched.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl/Type/AbilityName.hs source/library/Pawl/Type/DelayedTrigger.hs source/library/Pawl/Type/Effect.hs source/library/Pawl/Type/Card.hs source/library/Pawl/Type/GameState.hs source/library/Pawl/Card.hs source/library/Pawl/Binding.hs source/library/Pawl/Event.hs source/library/Pawl/Engine.hs source/library/Pawl/Resolve.hs source/library/Pawl/Setup.hs source/library/Pawl/Codec.hs data/cards/tidal-wave.json source/test-suite/Pawl/TriggerSpec.hs source/test-suite/Pawl/Support.hs source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/CardSpec.hs source/test-suite/Pawl/CodecSpec.hs
