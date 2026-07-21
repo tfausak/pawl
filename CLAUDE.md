@@ -35,103 +35,26 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 
 ## Current work and tracking
 
-- **M0–M3g, M3.5, M4a, M4b, M4c, and M4d are complete** — a zero-card game, then casting, combat, the
-  keyword seam, first/double strike, deathtouch/trample, and the M3 effect-DSL gate
-  cards through the payoff pair (Mindslaver's CR 723 control + Panglacial Wurm's
-  cast-during-search re-entrancy), then **M3.5** (cards as data files: a hand-rolled
-  JSON codec with the honesty round-trip, card data relocated out of the engine
-  library into the test suite's `Pawl.Cards`, and `data/cards/*.json` as the source
-  of truth — both the benchmark and the test suite load the cards by `IO`; the
-  interim TH shim's named expiry was cashed before M4, so no `TemplateHaskell` or
-  `Lift` remains in the library), then **M4a** (the numeric tower's `X` — Blaze —
-  on a unified `Object.bindings :: Map SlotName Binding` environment that replaced
-  the parallel `targets`/`chosenSubtypes` maps; X is chosen at cast via `ChooseX`,
-  stored under the reserved `Binding.variableX` slot, and re-read at resolution by
-  `Quantity.evaluate`), then **M4b** (the targeted zone-change verbs —
-  `Destroy`/`MoveToZone`/`Draw`/`Mill`/`Discard` plus the `Indestructible`
-  keyword — each executed only by `Resolve.applyEffect` through M3f's
-  `Event.changeZone` funnel, gated by Murder vs. Darksteel Myr proving
-  destroy ≠ move-to-graveyard), then **M4c** (tokens — the first card-less object:
-  `Source.OfToken Card` read through the single `Game.cardOf` chokepoint,
-  `Effect.Create Quantity card` minting via a new `Event.createToken`, and the
-  CR 704.5d cease-to-exist SBA, gated by Dragon Fodder; `Effect`/`ActivatedAbility`/
-  `TriggeredAbility` were made parametric over the card type — knot tied in `Card` —
-  to embed a token's characteristics without a module cycle), then **M4d** (the two
-  replacement-shield shapes: damage **prevention** — a cancel hooked into the head
-  of the damage funnel via `DamageKind`/`GameState.preventions`/`Event.applyPreventions`,
-  gated by Fog — and **regeneration** — a one-shot `GameState.regenerationShields`
-  count installed by `Effect.RegenerateSelf` and consumed by the unified
-  `Event.destroy` funnel that every destruction now flows through, with the
-  creature-death SBA split into `zeroToughness` (704.5f) and `destroyedBySba`
-  (704.5g/h), gated by Drudge Skeletons; `Event.destroy` edits combat through the
-  type module `Pawl.Type.Combat` to avoid the `Pawl.Combat`→`Sba`→`Event` cycle;
-  CR 701.19c "can't be regenerated" stays deferred to Wrath of God), then **M4e**
-  (counter target spell — the first effect that removes a spell from the stack:
-  a distinct `Effect.Counter SlotName` opcode routing through a new `Event.counter`
-  funnel (CR 701.6a: to its owner's graveyard via `changeZone`, so Rest in Peace's
-  redirect composes), a narrower `TargetSpec.SpellTarget` read via the new
-  `Game.isSpell` classification (on the stack *and* `Source.OfCard`, CR 112.1),
-  gated by Cancel with the CR 608.2b fizzle as falsifier), then **M4f** (counters —
-  +1/+1 and −1/−1 as persistent per-incarnation permanent state: a new
-  `Object.counters :: Map CounterKind Natural` (reset by `changeZone`, CR 122.2;
-  cleanup-exempt, unlike `damage`), an `Effect.PutCounters CounterKind Quantity
-  SlotName` opcode editing it in place, the projection injecting each object's net
-  counter delta as one layer-**7c** `ModifyPowerToughness` (CR 613.4c — the same
-  sublayer as Giant Growth, correcting the design.md table's stale "7d"; 7d is P/T
-  switching), and the CR 704.5q/122.3 annihilation SBA; gated by Battlegrowth and
-  Instill Infection, retiring M4b/M4d's synthetic −0/−1 toughness-drop fixture),
-  then **M4g** (modal — the seventh and final M4 letter: a choice at cast binds
-  which effects and targets apply. `Mode`/`Modal`/`ModeSelection`/`ModeIndex` are
-  a shared, Card-free parametric payload — parametric in `card` like `Effect`, so
-  activated/triggered abilities can adopt it without a module cycle — but only
-  `Card.spell :: Modal Card` was wired this milestone; a new `Binding.modes`
-  slot (reserved `chosenModes`, read by `modesOf`) and `Prompt.ChooseModes`/
-  `Response.ChoseModes` carry the cast-time choice; `Cast.fillableModes` and
-  mode-scoped `Resolve.effectsOf`/`resolveSpell` read only the chosen mode(s);
-  gated by Chaos Charm with the CR 700.2c/601.2c Wall-target-namespace-isolation
-  falsifier, `Subtype.Wall`/`TargetSpec.WallTarget` new for it, Wall of Stone a
-  deterministic fixture only). **M4 is complete (M4a–M4g), and so is its
-  fast-follow, M4h** (modality on activated and triggered abilities — the same
-  `Mode`/`Modal` payload wired into both ability types, gated by Aether Channeler,
-  with the CR 700.2b/603.3c "no legal mode → removed from the stack" rule as the
-  trigger-only novelty a spell has no analog for; zero new opcodes).
-  **M4.5 (phased) has begun; its first four phases are complete — P1
-  (permanent control), P2 (copy / layer 1, the milestone's go/no-go), P3a
-  (color / layer 5), and P3b (characteristic-defined P/T, the rest of
-  layer 7).** P1 made a permanent's controller a projected layer-2
-  characteristic (`Projection.controllerOf`/`controls`, `Modification
-  .SetController`), gated by Act of Treason. P2 made **copy a projected
-  layer-1 characteristic**, gated by Clone: a permanent that enters as a copy
-  snapshots the copied object's *copiable* values as it enters (`Binding.copy`,
-  `Projection.copiableCharacteristics` seeding the layer fold — no new opcode,
-  no `Modification`), with the as-enters choice a pure mark in
-  `Event.placeObject` plus a monadic drain at the CR 117.5 boundary
-  (`Engine.drainAsEntersChoices`, before SBAs/triggers). P3a made **color a
-  projected layer-5 characteristic** (`ProjectedCharacteristics.colors ::
-  Set Color`, `Card.colorIndicator`, one layer-5 `Modification.SetColor`
-  applied as a replace per CR 105.3), gated by Doom Blade, Crimson/Aphotic
-  Wisps, and Bad Moon, with `Keyword.Devoid` (CR 702.114a) applied at the
-  projection seed rather than as a layer-5 CDA pass — an argued CR 613.3
-  observable-equivalence, not an oversight — and `Keyword.Fear` (CR 702.36b)
-  as the one reader of the three that does not expire into P9's future filter
-  language. It also closed a live bug: Dragon Fodder's tokens had projected
-  colourless against their own oracle text since M4c. **P3b finished layer 7**
-  (gated by Tarmogoyf, Inner Calm Outer Strength, and Twisted Image): layer 7a
-  characteristic-defined P/T folds in place at the projection (a recomputed,
-  copiable CDA, CR 613.4a/707.2a), the CR 608.2h/611.2d freeze that stored
-  continuous effects owe now runs at `Resolve`'s store time against the
-  source, and layer 7d P/T switching applies last. **Every sublayer of layer 7
-  now has a producer, which closes M4.5's Cluster 1 (layer-system
-  completion)**: layers 1 (P2), 2 (P1), 3 (M3d), 4 (M3c), 5 (P3a), 6 (M3b) and
-  7a/7b/7c/7d (P3b) all have producers. **P4 (event history + state/delayed
-  triggers, which gates P6 and P7) is next.** See the
-  umbrella spec (`docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`)
-  and the progress log for the completion notes and deferrals.
-  The **milestone completion log** — one distilled entry per milestone with
-  its gate card, the decision it proved, the opcodes/types it added, and every
-  elision and its named expiry — lives in `docs/progress.md`. The forward path
-  (M0–M7 and the M3a–M3g split) is in `docs/design.md` §3; each milestone's
-  authoritative detail is its spec and plan under `docs/superpowers/{specs,plans}/`.
+- **Status: M0–M4h are complete** — the closed-half milestones M0–M3g, the
+  M3.5 cards-as-data interstitial, and the whole of M4 (M4a–M4g plus the
+  M4h fast-follow). **M4.5 (phased) is in progress: P1 (permanent control),
+  P2 (copy / layer 1, the milestone's go/no-go), P3a (color / layer 5), and
+  P3b (characteristic-defined P/T) are complete — every sublayer of the
+  layer system now has a producer, closing Cluster 1 (layer-system
+  completion). P4 (event history + state/delayed triggers, which gates P6
+  and P7) is next.** The umbrella spec is
+  `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
+- The **milestone completion log** — one distilled entry per milestone with
+  its gate card, the decision it proved, the opcodes/types it added, and
+  every elision and its named expiry — lives in `docs/progress.md`. The
+  forward path (M0–M7 and the letter/phase splits) is `docs/design.md` §3;
+  each milestone's authoritative detail is its spec and plan under
+  `docs/superpowers/{specs,plans}/`. **Maintain the status bullet above by
+  replacing it, never appending** — milestone history goes in
+  `progress.md`, not here.
+- The **milestone workflow** — the session-per-phase loop, model tiering,
+  and context discipline — is `docs/workflow.md`. Follow it for all
+  milestone work.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
@@ -212,6 +135,10 @@ These are the project's rules and several differ from common Haskell practice �
 follow them without being asked. Full rationale in the style section of
 `CONTRIBUTING.md`.
 
+- **No API stability obligations.** The project has no consumers. Rename
+  functions and modules, split or merge them, change signatures freely —
+  never add deprecation shims, compat re-exports, or keep an old name "just
+  in case."
 - **Haskell 2010, no language extensions** unless there's genuinely no
   alternative. No `LambdaCase`, `OverloadedStrings`, etc. by default.
   `NamedFieldPuns` is permitted where it improves clarity on record-heavy code;
