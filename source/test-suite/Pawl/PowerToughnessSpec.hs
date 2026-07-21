@@ -84,5 +84,32 @@ tests cards =
             gs = S.addCounter CounterKind.PlusOnePlusOne 1 goyfId board
          in do
               HU.assertEqual "1 card type + 1 counter" (Just 2) (Projection.powerOf goyfId gs)
-              HU.assertEqual "1+1 toughness + 1 counter" (Just 3) (Projection.toughnessOf goyfId gs)
+              HU.assertEqual "1+1 toughness + 1 counter" (Just 3) (Projection.toughnessOf goyfId gs),
+      HU.testCase "CR 604.3 Humility removes the CDA, and a Humility'd Tarmogoyf is 1/1" $
+        -- NON-DISTINGUISHING BY CONSTRUCTION, and deliberately kept anyway.
+        -- Humility is layer 6 (LoseAllAbilities) AND layer 7b (base P/T 1/1), and
+        -- 7b overwrites 7a either way -- so this test passes whether or not
+        -- LoseAllAbilities clears characteristicPT. It is here because "a
+        -- Humility'd Tarmogoyf is 1/1" is a real ruling worth pinning, not because
+        -- it proves the clearing.
+        --
+        -- What WOULD distinguish: a "loses all abilities" card that does not also
+        -- set P/T. The Aura family (Darksteel Mutation and kin) is blocked on
+        -- Attach; Soul Sculptor needs layer-4 card-type REPLACEMENT; Dress Down
+        -- needs Flash, a beginning-of-end-step trigger (P4) and Sacrifice. See the
+        -- P3b spec, section 8.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, withBolt) = S.addGraveyardCard (Cards.lightningBoltPrinting cards) S.alice gs0
+            (goyfId, board) = S.addCreature (Cards.tarmogoyfPrinting cards) S.alice withBolt
+            gs = S.withHumility cards board
+         in do
+              HU.assertEqual "1 power" (Just 1) (Projection.powerOf goyfId gs)
+              HU.assertEqual "1 toughness" (Just 1) (Projection.toughnessOf goyfId gs),
+      HU.testCase "CR 604.3 LoseAllAbilities clears the CDA from the projected characteristics" $
+        -- The clearing itself, asserted directly on the projection rather than
+        -- through P/T -- the only channel through which it IS observable today.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (goyfId, board) = S.addCreature (Cards.tarmogoyfPrinting cards) S.alice gs0
+            gs = S.withHumility cards board
+         in HU.assertEqual "no CDA survives layer 6" Nothing (PC.characteristicPT (Projection.project goyfId gs))
     ]

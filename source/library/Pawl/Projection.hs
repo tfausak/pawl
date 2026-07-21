@@ -72,8 +72,17 @@ applyModification :: GameState -> ObjectId -> Modification -> ProjectedCharacter
 applyModification gs oid m pc = case m of
   Modification.GainKeyword k ->
     pc {PC.keywords = Set.insert k (PC.keywords pc)}
+  -- CR 604.3: a characteristic-defining ability IS a static ability, so losing
+  -- all abilities loses it too. Layer 6, which is BEFORE 7a -- the reason the CDA
+  -- is folded in place from the partial rather than gathered up front.
   Modification.LoseAllAbilities ->
-    pc {PC.keywords = Set.empty, PC.activatedAbilities = [], PC.replacementEffects = [], PC.triggeredAbilities = []}
+    pc
+      { PC.keywords = Set.empty,
+        PC.characteristicPT = Nothing,
+        PC.activatedAbilities = [],
+        PC.replacementEffects = [],
+        PC.triggeredAbilities = []
+      }
   Modification.SetBasePowerToughness p t ->
     pc
       { PC.power = setPT (PC.power pc) (Quantity.evaluate gs oid (controllerOf oid gs) p),
