@@ -268,19 +268,57 @@ apnapOrder gs pend =
       mine (_, p, _) = p == active
    in filter mine pend ++ filter (not . mine) pend
 
+-- CR 614.1c / 603.6d / 614.12a: drain each object still carrying an as-enters copy
+-- marker, resolving its choice AT the CR 117.5 boundary but BEFORE state-based
+-- actions and triggers (settleForPriority calls this first). This is observably
+-- equivalent to "the choice is made before it enters" (spec section 2.4): no player,
+-- trigger, or SBA sees the interim 0/0. The narrow first version of P5's monadic
+-- replacement engine. Returns whether anything was drained (so settle re-loops).
+drainAsEntersChoices :: Game Bool
+drainAsEntersChoices = do
+  gs <- State.get
+  let pending = filter (isPending gs) (Set.toList (GameState.battlefield gs))
+  Monad.mapM_ drainOneCopy pending
+  pure (not (null pending))
+  where
+    isPending gs oid = maybe False (Binding.pendingCopy . Object.bindings) (Game.lookupObject oid gs)
+
+drainOneCopy :: ObjectId -> Game ()
+drainOneCopy oid = do
+  gs <- State.get
+  case Projection.controllerOf oid gs of
+    Nothing -> State.modify' (applyCopyChoice oid Nothing)
+    Just controller -> do
+      let decider = Decide.deciderFor controller gs
+          legal = Target.legalCopyTargets oid gs
+      chosen <- Trans.lift (Program.prompt (Prompt.ChooseCopyTarget decider controller oid legal))
+      State.modify' (applyCopyChoice oid chosen)
+
+-- Clear the pending marker; if a source was chosen, stamp its copiable
+-- characteristics as this object's copy snapshot (CR 707.2, locked at entry).
+applyCopyChoice :: ObjectId -> Maybe ObjectId -> GameState -> GameState
+applyCopyChoice oid chosen gs =
+  let stamp bs = case chosen of
+        Nothing -> Binding.clearPending bs
+        Just src -> Binding.setCopy (Projection.copiableCharacteristics src gs) (Binding.clearPending bs)
+   in gs {GameState.objects = Map.adjust (\o -> o {Object.bindings = stamp (Object.bindings o)}) oid (GameState.objects gs)}
+
 -- CR 117.5: each time a player would receive priority, perform state-based
 -- actions, then put triggered abilities on the stack, repeating until neither
 -- does anything. Then priority is granted (by the caller). The repeat is gated on
--- two cheap booleans -- whether an SBA fired and whether a trigger was placed --
--- so a settle that changes nothing (the common case) costs one board projection,
--- NOT a deep GameState equality check.
+-- three cheap booleans -- whether an as-enters copy choice was drained, whether an
+-- SBA fired, and whether a trigger was placed -- so a settle that changes nothing
+-- (the common case) costs one board projection, NOT a deep GameState equality
+-- check. The drain runs FIRST: a copied permanent's characteristics must be
+-- locked in before any SBA or trigger observes it (CR 614.12a).
 settleForPriority :: Game ()
 settleForPriority = do
+  drained <- drainAsEntersChoices
   gs <- State.get
   let (acted, gs') = Sba.performStateBasedActions gs
   State.put gs'
   placed <- placePendingTriggers
-  Monad.when (acted || placed) settleForPriority
+  Monad.when (drained || acted || placed) settleForPriority
 
 priorityLoop :: Game ()
 priorityLoop = do
