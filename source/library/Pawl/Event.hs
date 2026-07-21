@@ -414,7 +414,9 @@ stateHolds :: PlayerId -> StateCondition -> GameState -> Bool
 stateHolds you cond gs =
   let hasSubtype subtype oid = Set.member subtype (Projection.subtypesOf oid gs)
    in case cond of
-        -- CR 108.4: "you control" is the projected controller's permanents.
+        -- CR 109.5: "you" on a triggered ability's condition means the
+        -- ability's controller (at the time it triggered) -- so "you control"
+        -- is that player's projected-controlled permanents.
         StateCondition.YouControlNo subtype -> not (any (hasSubtype subtype) (Projection.controls you gs))
         -- Any player's -- the whole battlefield.
         StateCondition.NoPermanentsOfSubtype subtype -> not (any (hasSubtype subtype) (Set.toList (GameState.battlefield gs)))
@@ -437,13 +439,38 @@ stateHolds you cond gs =
 -- that could is the one that must revisit this.
 stateTriggers :: GameState -> [PendingTrigger]
 stateTriggers gs =
-  let alreadyOnStack srcId ab =
+  let -- Suppression is scoped to (source, ability): `Object.source obj ==
+      -- Source.OfTrigger srcId ab` compares BOTH the source object's id and
+      -- the ability, so two permanents bearing the identical triggered
+      -- ability (e.g. two Barbarian Outcasts) suppress independently -- one
+      -- instance per source, not one for the whole board. A weaker
+      -- comparison (ability only, dropping srcId) would wrongly suppress a
+      -- second source's identical trigger.
+      --
+      -- Unreachable caveat: if a SINGLE source ever carried two textually
+      -- identical StateIs abilities, this same comparison (Source equality)
+      -- would conflate them into one Source.OfTrigger value and suppress the
+      -- second as though it were an instance of the first. No card in the
+      -- pool has two identical state triggers on one source today; the first
+      -- that does must revisit this.
+      alreadyOnStack srcId ab =
         let isInstance sid = case Game.lookupObject sid gs of
-              Nothing -> False
+              -- A stack id whose object can't be found: fail CLOSED (treat
+              -- as suppressing), not open. This runs inside the
+              -- Engine.settleForPriority fixpoint, so a lost suppression
+              -- (failing open) loops forever -- a hang, not a wrong answer --
+              -- while failing closed costs at most one settle pass' worth of
+              -- a legitimate new instance. Unreachable today: Resolve.cease
+              -- removes the stack entry and its object together, so a stack
+              -- id is never left dangling.
+              Nothing -> True
               Just obj -> Object.source obj == Source.OfTrigger srcId ab
          in any isInstance (GameState.stack gs)
       forOne oid = case Projection.controllerOf oid gs of
         Nothing -> []
+        -- CR 603.3a: a triggered ability is controlled by whoever controls
+        -- its source; CR 109.5 is what makes "you" in the condition (e.g.
+        -- YouControlNo's "you control no Swamps") mean that same controller.
         Just ctrl ->
           let live ab = case TriggeredAbility.condition ab of
                 TriggerCondition.StateIs cond -> stateHolds ctrl cond gs && not (alreadyOnStack oid ab)
@@ -454,7 +481,8 @@ stateTriggers gs =
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))
 
 -- Everything that has triggered and is not yet on the stack. One function, so
--- Pawl.Engine never needs to know how many sources there are. Grows a state pass
--- (CR 603.8) at Task 4 and a delayed pass (CR 603.7) at Task 6.
+-- Pawl.Engine never needs to know how many sources there are. Now runs an event
+-- pass (eventTriggers) and a state pass (CR 603.8, stateTriggers); a delayed
+-- pass (CR 603.7) is still owed at Task 6.
 gatherTriggers :: [GameEvent] -> GameState -> [PendingTrigger]
 gatherTriggers events gs = eventTriggers events gs ++ stateTriggers gs

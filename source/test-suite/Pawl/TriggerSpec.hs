@@ -3,10 +3,11 @@
 -- consumption per reader (trigger scan, SBA damage check), and the log's
 -- turn-scoped clearing at handoff. Task 2 adds the CR 603.2b step-beginning
 -- event and the CR 603.6a widened scan (every battlefield permanent, not just
--- an enters event's newcomer) -- `scanTests` below. Later P4 tasks add
--- coverage HERE for state triggers (CR 603.8), delayed triggers (CR 603.7),
--- intervening "if" (CR 603.4 / 608.2a), and the CR 603.3b ordering prompt --
--- none of that is implemented yet.
+-- an enters event's newcomer) -- `scanTests` below. Task 4 adds CR 603.8
+-- state triggers -- `stateTriggerTests` below. Later P4 tasks still owe
+-- coverage HERE for delayed triggers (CR 603.7), intervening "if" (CR 603.4 /
+-- 608.2a), and the CR 603.3b ordering prompt -- none of that is implemented
+-- yet.
 module Pawl.TriggerSpec where
 
 import qualified Data.Foldable as Foldable
@@ -29,6 +30,7 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
@@ -268,6 +270,20 @@ stateTriggerTests cards =
         "StateTrigger"
         [ -- THE flooding falsifier. CR 603.8's second sentence exists to prevent
           -- exactly this: a state trigger that re-fires at every boundary.
+          --
+          -- What this test can and can't observe: it can only ever see 0 or 1
+          -- here, never 2+. If suppression were absent, placePendingTriggers
+          -- would keep reporting the same source as newly-triggered on every
+          -- iteration, and Engine.settleForPriority (which loops until
+          -- nothing new triggers) would recurse without terminating -- a
+          -- broken suppression HANGS the test suite rather than failing this
+          -- assertion with some higher count. This test still earns its keep
+          -- by discriminating 0 (no trigger at all) from 1 (correctly armed
+          -- once); it does not, and cannot, discriminate "one instance" from
+          -- "flooding". The two-source test below is a separate discriminator,
+          -- pinning that suppression is scoped per SOURCE rather than per
+          -- ability (a bug that would wrongly suppress a second source, not
+          -- flood -- so it fails this same 0/1 shape rather than hanging).
           HU.testCase "CR 603.8 a true state condition puts EXACTLY ONE instance on the stack" $
             let (_, gs) = outcastBoard 0
                 settled = settle gs
@@ -300,6 +316,56 @@ stateTriggerTests cards =
                   [] -> settled
                 again = settle removed
              in HU.assertEqual "a fresh instance" 1 (length (triggerIds again)),
+          -- IMPORTANT-2 (review): the suppression check in Event.stateTriggers
+          -- compares BOTH the source object's id and the ability (`Object.source
+          -- obj == Source.OfTrigger srcId ab`). Every test above uses exactly one
+          -- Barbarian Outcast, so all of them would still pass a weaker
+          -- implementation that compared only the TriggeredAbility and ignored
+          -- srcId -- and that weaker version would wrongly suppress a second,
+          -- otherwise-independent source. This is the one that catches it: put
+          -- one Outcast's instance on the stack first, THEN let a second,
+          -- identical Outcast (same controller, same 0-Swamp board) get its own
+          -- chance to trigger. Under a source-scoped comparison the second fires;
+          -- under an ability-only comparison it is (wrongly) suppressed by the
+          -- first's presence on the stack.
+          HU.testCase "CR 603.8 a second identical source still triggers -- suppression is per-source, not per-ability" $
+            let (_, gs0) = outcastBoard 0
+                settledFirst = settle gs0
+                (_, gs1) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice settledFirst
+                settledBoth = settle gs1
+             in HU.assertEqual "two instances, one per source" 2 (length (triggerIds settledBoth)),
+          -- M-4 (review): stateHolds reads the PROJECTION -- CR 613 layer 4 for a
+          -- subtype -- not Card.typeLine. Pin it with no real Swamp card
+          -- anywhere: alice controls only a Mountain, so the Outcast triggers;
+          -- adding an AddLandSubtype Swamp modification (the Urborg shape) to
+          -- that same Mountain must turn the trigger off.
+          HU.testCase "CR 613 layer 4: an added Swamp subtype (no real Swamp card) suppresses the trigger" $
+            let gs0 = S.mountainsInPlay cards 1
+                mountainId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+                  i : _ -> i
+                  [] -> ObjectId.MkObjectId 999
+                (_, gs1) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice gs0
+                before = settle gs1
+                withUrborg = S.withEffect mountainId (Modification.AddLandSubtype Subtype.Swamp) gs1
+                after = settle withUrborg
+             in do
+                  HU.assertEqual "no real Swamp yet: triggers" 1 (length (triggerIds before))
+                  HU.assertEqual "projected Swamp subtype (still a Mountain card): stops triggering" 0 (length (triggerIds after)),
+          -- M-4 (review): stateHolds reads projected CONTROL -- CR 613 layer 2 --
+          -- not Object.owner. Pin it: bob owns and controls the only Swamp, so
+          -- alice's Outcast triggers; giving alice control of bob's Swamp (a
+          -- layer-2 SetController effect, S.giveControl) must turn it off even
+          -- though bob still OWNS that Swamp.
+          HU.testCase "CR 110.2/613 layer 2: gaining control of the opponent's Swamp suppresses the trigger" $
+            let gs0 = Setup.emptyGame S.bothPlayers
+                (swampId, gs1) = S.addCreature (Cards.swampPrinting cards) S.bob gs0
+                (_, gs2) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice gs1
+                before = settle gs2
+                gs3 = S.giveControl swampId S.alice gs2
+                after = settle gs3
+             in do
+                  HU.assertEqual "alice controls no Swamps yet: triggers" 1 (length (triggerIds before))
+                  HU.assertEqual "alice now controls the Swamp: stops triggering" 0 (length (triggerIds after)),
           -- The whole card, at gameplay level: the trigger resolves and the
           -- Outcast sacrifices itself (CR 701.21a, through Event.sacrifice).
           HU.testCase "CR 701.21 the resolved trigger sacrifices the Outcast into its owner's graveyard" $
