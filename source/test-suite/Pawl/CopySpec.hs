@@ -14,12 +14,14 @@ import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
@@ -89,5 +91,55 @@ tests cards =
         let gs0 = Setup.emptyGame S.bothPlayers
             (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice gs0
             resolved = resolveAndSettle copyNewest staged
-         in HU.assertEqual "the 0/0 Clone is gone (state-based action)" Nothing (cloneOnBattlefield resolved)
+         in HU.assertEqual "the 0/0 Clone is gone (state-based action)" Nothing (cloneOnBattlefield resolved),
+      HU.testCase "Clone copies base P/T, not a counter-boosted P/T (CR 707.2 falsifier)" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (pikerId, board0) = S.addPiker cards S.alice gs0
+            -- Put a +1/+1 counter on the Piker: projected 3/2, base 2/1.
+            board = S.addCounter CounterKind.PlusOnePlusOne 1 pikerId board0
+            (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
+            resolved = resolveAndSettle copyNewest staged
+         in case cloneOnBattlefield resolved of
+              Nothing -> HU.assertFailure "Clone left the battlefield unexpectedly"
+              Just cloneId -> do
+                HU.assertEqual "source is boosted to 3/2" (Just 3) (Projection.powerOf pikerId resolved)
+                HU.assertEqual "Clone copies the base 2, not 3" (Just 2) (Projection.powerOf cloneId resolved)
+                HU.assertEqual "Clone copies the base 1, not 2" (Just 1) (Projection.toughnessOf cloneId resolved),
+      HU.testCase "Clone copies a creature's activated abilities (CR 707.2)" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, board) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice gs0
+            (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
+            resolved = resolveAndSettle copyNewest staged
+         in case cloneOnBattlefield resolved of
+              Nothing -> HU.assertFailure "Clone left the battlefield unexpectedly"
+              Just cloneId ->
+                HU.assertBool
+                  "Clone has the copied activated ability"
+                  (not (null (Projection.abilitiesOf cloneId resolved))),
+      HU.testCase "a copy of a copy resolves to the underlying creature (self-reference)" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, board) = S.addPiker cards S.alice gs0
+            (_, stagedA) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
+            afterA = resolveAndSettle copyNewest stagedA
+            (_, stagedB) = S.spellOnStack (Cards.clonePrinting cards) S.alice afterA
+            afterB = resolveAndSettle copyNewest stagedB
+            -- Both Clones now name "Clone"; the newest (highest id) is B.
+            afterBId = newest (clonesOnBattlefield afterB)
+         in case afterBId of
+              Nothing -> HU.assertFailure "no Clones on the battlefield"
+              Just bId -> do
+                HU.assertEqual "the copy-of-a-copy is a 2/1" (Just 2) (Projection.powerOf bId afterB)
+                HU.assertBool "the copy-of-a-copy is a creature" (Projection.isCreatureOf bId afterB),
+      HU.testCase "a copy survives its source leaving the battlefield (CR 707.9a lock)" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (pikerId, board) = S.addPiker cards S.alice gs0
+            (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
+            resolved = resolveAndSettle copyNewest staged
+            afterKill = Event.destroy pikerId resolved
+         in case cloneOnBattlefield afterKill of
+              Nothing -> HU.assertFailure "Clone should survive the source's death"
+              Just cloneId -> do
+                HU.assertEqual "the source is gone" False (Set.member pikerId (GameState.battlefield afterKill))
+                HU.assertEqual "the Clone is still a 2/1" (Just 2) (Projection.powerOf cloneId afterKill)
+                HU.assertEqual "the Clone is still 1 toughness" (Just 1) (Projection.toughnessOf cloneId afterKill)
     ]
