@@ -7,11 +7,26 @@ import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ModeIndex as ModeIndex
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
+
+sampleSnapshot :: PC.ProjectedCharacteristics
+sampleSnapshot =
+  PC.MkProjectedCharacteristics
+    { PC.keywords = Set.empty,
+      PC.power = Just 2,
+      PC.toughness = Just 1,
+      PC.cardTypes = Set.empty,
+      PC.subtypes = Set.empty,
+      PC.rulesTextActive = True,
+      PC.activatedAbilities = [],
+      PC.replacementEffects = [],
+      PC.triggeredAbilities = []
+    }
 
 tests :: Tasty.TestTree
 tests =
@@ -35,5 +50,15 @@ tests =
             m = Binding.fromChoices Map.empty Map.empty Nothing chosen
          in HU.assertEqual "modes readable" chosen (Binding.modesOf m),
       HU.testCase "modesOf is empty for an absent slot" $
-        HU.assertEqual "no modes" Set.empty (Binding.modesOf Map.empty)
+        HU.assertEqual "no modes" Set.empty (Binding.modesOf Map.empty),
+      HU.testCase "setCopy then copyOf round-trips the snapshot" $
+        HU.assertEqual "copy snapshot" (Just sampleSnapshot) (Binding.copyOf (Binding.setCopy sampleSnapshot Map.empty)),
+      HU.testCase "no copy binding means copyOf is Nothing" $
+        HU.assertEqual "absent" Nothing (Binding.copyOf Map.empty),
+      HU.testCase "markPending sets pendingCopy" $
+        HU.assertBool "marked" (Binding.pendingCopy (Binding.markPending Map.empty)),
+      HU.testCase "clearPending removes the marker" $
+        HU.assertBool "cleared" (not (Binding.pendingCopy (Binding.clearPending (Binding.markPending Map.empty)))),
+      HU.testCase "empty bindings are not pending" $
+        HU.assertBool "empty" (not (Binding.pendingCopy Map.empty))
     ]

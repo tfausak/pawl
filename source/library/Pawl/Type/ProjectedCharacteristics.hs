@@ -13,7 +13,7 @@ import Pawl.Type.TriggeredAbility (TriggeredAbility)
 -- P/T because a land has none. cardTypes/subtypes are the projected type line
 -- (CR 613 layer 4). rulesTextActive is CR 305.7: False once an effect SETS this
 -- object's land subtype to a basic type, stripping its rules-text abilities.
--- No Ord: never sorted, never a key.
+-- Ord derived so a copy snapshot can ride a Binding (CR 707.2, P2).
 data ProjectedCharacteristics = MkProjectedCharacteristics
   { keywords :: Set Keyword,
     power :: Maybe Integer,
@@ -31,4 +31,4 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- the same projection posture as activatedAbilities. Emptied by LoseAllAbilities.
     triggeredAbilities :: [TriggeredAbility Card]
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

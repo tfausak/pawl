@@ -11,6 +11,7 @@ import Numeric.Natural (Natural)
 import Pawl.Type.Binding (Binding)
 import qualified Pawl.Type.Binding as Binding
 import Pawl.Type.ModeIndex (ModeIndex)
+import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
 import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.SlotName (SlotName)
 import qualified Pawl.Type.SlotName as SlotName
@@ -27,6 +28,17 @@ variableX = SlotName.MkSlotName (Text.pack "X")
 -- is not a target. Distinct from variableX.
 chosenModes :: SlotName
 chosenModes = SlotName.MkSlotName (Text.pack "modes")
+
+-- CR 707.9a: the reserved slot under which an object's copy snapshot is stored
+-- (P2). No card's targetSpecs may name it: a copy source is not a target.
+copySource :: SlotName
+copySource = SlotName.MkSlotName (Text.pack "copySource")
+
+-- CR 614.1c / 603.6d: the reserved slot marking that an object that entered as a
+-- copy has not yet made its as-enters choice (P2). Set by Event.placeObject,
+-- drained at the CR 117.5 boundary by Engine.drainAsEntersChoices.
+asEntersPending :: SlotName
+asEntersPending = SlotName.MkSlotName (Text.pack "asEntersPending")
 
 -- The modes chosen for a spell, read from its binding environment. Empty when
 -- absent (defensive; cast always stamps it, forced or prompted).
@@ -45,6 +57,26 @@ subtypesOf = Map.mapMaybe Binding.subtypes
 -- The amount (X) bound at a slot, if any.
 amountOf :: SlotName -> Map SlotName Binding -> Maybe Natural
 amountOf slot m = Binding.amount =<< Map.lookup slot m
+
+-- The copy snapshot stored on an object, if any (CR 707.2).
+copyOf :: Map SlotName Binding -> Maybe ProjectedCharacteristics
+copyOf m = Binding.copy =<< Map.lookup copySource m
+
+-- Store a copy snapshot under the reserved copySource slot (P2).
+setCopy :: ProjectedCharacteristics -> Map SlotName Binding -> Map SlotName Binding
+setCopy pc = Map.insert copySource (Binding.empty {Binding.copy = Just pc})
+
+-- Is an as-enters copy choice still pending for this object?
+pendingCopy :: Map SlotName Binding -> Bool
+pendingCopy = Map.member asEntersPending
+
+-- Mark an as-enters copy choice pending (Event.placeObject).
+markPending :: Map SlotName Binding -> Map SlotName Binding
+markPending = Map.insert asEntersPending Binding.empty
+
+-- Clear the as-enters-pending marker (once the choice is made or declined).
+clearPending :: Map SlotName Binding -> Map SlotName Binding
+clearPending = Map.delete asEntersPending
 
 -- Build the binding environment stamped on a stack object at cast: the chosen
 -- targets, the chosen land-type pairs, (Just x) the chosen X under variableX,
@@ -77,5 +109,6 @@ mergeBinding a b =
     { Binding.target = Binding.target a <|> Binding.target b,
       Binding.subtypes = Binding.subtypes a <|> Binding.subtypes b,
       Binding.amount = Binding.amount a <|> Binding.amount b,
-      Binding.modes = Binding.modes a <|> Binding.modes b
+      Binding.modes = Binding.modes a <|> Binding.modes b,
+      Binding.copy = Binding.copy a <|> Binding.copy b
     }
