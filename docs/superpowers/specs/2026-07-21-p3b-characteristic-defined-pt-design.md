@@ -82,9 +82,16 @@ re-verified against Scryfall** before they are written to `data/cards/` (§7 ste
 
 | Card | Text | What it gates |
 |---|---|---|
-| **Tarmogoyf** `{1}{G}` Creature — Lhurgoyf `*/1+*` | "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is equal to that number plus 1." | layer **7a**: a dynamic CDA, recomputed and copiable |
-| **Inner Calm, Outer Strength** `{1}{G}` Instant — Arcane | "Target creature gets +X/+X until end of turn, where X is the number of cards in your hand." | layer **7b**: CR 608.2h freeze at resolution |
-| **Twisted Image** `{U}` Instant | "Switch target artifact or creature's power and toughness until end of turn. Draw a card." | layer **7d**: the switch, applied last |
+| **Tarmogoyf** — Creature — Lhurgoyf `*/1+*` | "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is equal to that number plus 1." | layer **7a**: a dynamic CDA, recomputed and copiable |
+| **Inner Calm, Outer Strength** — Instant — Arcane | "Target creature gets +X/+X until end of turn, where X is the number of cards in your hand." | layer **7b**: CR 608.2h freeze at resolution |
+| **Twisted Image** — Instant | "Switch target artifact or creature's power and toughness until end of turn. Draw a card." | layer **7d**: the switch, applied last |
+
+**Mana costs are deliberately absent from this table.** The dump sweep that found
+these cards produced two different costs for Inner Calm, Outer Strength across two
+extraction windows — MTGJSON card objects put `rulings` *before* `text`
+alphabetically, and a fixed-width window bleeds across object boundaries. Costs,
+exact wording and type lines are pinned at §7 step 1 against Scryfall, and a wrong
+number quoted here would be worse than no number.
 
 The three interlock deliberately. Tarmogoyf is the only **asymmetric** P/T source
 in the pool (`N`/`N+1`), which is what makes it the ordering falsifier for
@@ -374,6 +381,8 @@ Each kills one specific naive implementation.
 | 5 | 7d switches the **printed / base** box | Twisted Image on a 2/3 Tarmogoyf → **3/2**. Switching before 7a switches `Nothing`/`Nothing`, and the CDA then writes 2/3 back over it. A symmetric fixture proves nothing here — a `+1/+1` counter commutes with the switch — so Tarmogoyf's asymmetric `N`/`N+1` is the only asymmetric source in the pool and the two gate cards falsify each other. |
 | 6 | the switch is permanent state rather than a layer op | Two Twisted Images on the same creature → back to normal (CR 613.4d, two applications). And a switched Tarmogoyf still tracks the graveyards: 3/2 becomes 4/3 when a fourth card type arrives. |
 | 7 | a stored quantity is evaluated against the **target** | Inner Calm, Outer Strength counts the **caster's** hand, not the target's controller's. Cast it at an opponent's creature with differing hand sizes. |
+| 8 | the switch is a display concern rather than a real characteristic | **Twisted Image's own ruling** (§5, rulings): a creature that survived 2 damage at 2/3 is at 3/**2** after the switch, and CR 704.5g kills it at the next SBA check — because damage stays marked (CR 514.2) while toughness moves. Machinery pawl has had since M1b. |
+| 9 | a CDA is a battlefield-only effect | **Tarmogoyf's own ruling** (§5): its P/T is defined in *every* zone, and a Tarmogoyf **in a graveyard counts itself**. `projectFrom` is not zone-scoped, so the in-place fold (§2.3) answers this; a `gather`-based implementation cannot. |
 
 ### One honest negative result
 
@@ -388,16 +397,55 @@ The clearing is implemented anyway, because the CR says so and because the code
 would otherwise be wrong for a reason no future reader could reconstruct. The test
 is written anyway, because "Humility'd Tarmogoyf is 1/1" is a genuine ruling worth
 transcribing. But it is **labeled in the test and the code comment as
-non-distinguishing**, with the expiry named: **the first "loses all abilities"
-card that does not also set power and toughness**.
+non-distinguishing**, with the expiry named concretely rather than as "the first
+card that…" — a search of the corpus says the retiring card is a long way off:
+
+- **The Aura family is the bulk of the category and is blocked on Attach**, which
+  is not in M4.5 at all: Darksteel Mutation, Duskmourn's Domination, Azure
+  Beastbinder, Kasmina's Transmutation and their kin.
+- **Soul Sculptor** *would* distinguish — its ruling reads *"The creature stops
+  being a creature (or any other permanent type) and is just an enchantment with
+  no abilities"*, and a noncreature permanent has **no P/T at all** (CR 208.3). But
+  it needs layer-4 type **replacement** (become an enchantment, *stop* being a
+  creature) plus creature-subtype removal, and `Modification` has only
+  `AddCardType`. Two new layer-4 operations for one observation.
+- **Dress Down** is the closest *shape*: an enchantment whose middle clause,
+  "Creatures lose all abilities", is exactly the Humility-shaped static pawl
+  already encodes (`AllCreatures` → `LoseAllAbilities`) with **no P/T set**. It
+  drags in Flash (CR 702.8 **(verify)**), a beginning-of-end-step trigger
+  (**P4**), and a Sacrifice effect.
+- **Blood Sun** ("All lands lose all abilities except mana abilities") does *not*
+  help: lands have no P/T either way, and "except mana abilities" is a different
+  modification.
+
+**Named expiry: Dress Down** (once P4 supplies the end-step trigger and Flash and
+Sacrifice exist), **or Soul Sculptor** (once layer 4 can replace a card type),
+whichever arrives first.
 
 ### Rulings discipline (design.md §4)
 
 When the plan lands each card, pull its Gatherer rulings and transcribe the
-Q&A-shaped ones, recording the ruling's date in the test name. The likely yield:
-Tarmogoyf's all-zones and "the number changes as cards are put into graveyards"
-rulings; Twisted Image's counters-are-applied-before-the-switch ruling; Inner
-Calm, Outer Strength's determined-on-resolution ruling.
+Q&A-shaped ones, recording the ruling's date in the test name.
+
+Two are already in hand, quoted from the vendored dump's `rulings` arrays during
+this design pass (**re-verify against Gatherer at §7 step 1** — rulings move, per
+design.md §4). Both are load-bearing enough to have earned falsifiers of their
+own (§5, falsifiers 8 and 9), not just transcriptions:
+
+- **Tarmogoyf** — *"The ability that defines Tarmogoyf's power and toughness works
+  in all zones, not just the battlefield. If Tarmogoyf is in your graveyard, it
+  will count itself."* This is CR 604.3 / 208.2a stated as a scenario, and it is
+  the single sharpest argument for the in-place fold over a `gather` pass (§2.3,
+  reason 2). Note the self-counting corollary: a Tarmogoyf in a graveyard
+  contributes `Creature` to its own count.
+- **Twisted Image** — *"Because damage remains marked on a creature until the
+  damage is removed as the turn ends, nonlethal damage dealt to a creature may
+  become lethal if you switch its power and toughness during that turn."* A
+  gameplay-level 7d falsifier that needs nothing pawl lacks: damage marking and
+  the CR 704.5g lethal-damage SBA have both existed since M1b.
+
+Still to pull: Twisted Image's counters-are-applied-before-the-switch ruling, and
+Inner Calm, Outer Strength's determined-on-resolution ruling.
 
 ## 6. Module & type changes (summary)
 
@@ -450,7 +498,7 @@ first (CLAUDE.md: TDD is not optional).
 | Deferred | Expiry — what retires it |
 |---|---|
 | Power and toughness counting **different** things (one `Star` per card) | the first card whose two axes count different things |
-| `LoseAllAbilities` clearing the CDA is **unobservable** (§5) | the first "loses all abilities" card that does not also set P/T |
+| `LoseAllAbilities` clearing the CDA is **unobservable** (§5) | **Dress Down** (needs Flash + P4's end-step trigger + Sacrifice) or **Soul Sculptor** (needs layer-4 card-type *replacement*), whichever lands first. The Aura family — Darksteel Mutation and kin — is blocked on Attach and is not in M4.5 |
 | `Count` over **projected** state ("lands you control", "Elves on the battlefield") | **Strength of Cedars** / **Wirewood Pride** — either forces quantity evaluation to move into `Pawl.Projection` (a cycle from `Pawl.Quantity` today) |
 | Counting **projected** card types of graveyard cards (§2.1 reads printed types) | the first effect that changes a graveyard card's types |
 | `CountSpec` as a whole | **P9**'s criterion / filter language |
