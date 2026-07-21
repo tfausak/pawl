@@ -438,6 +438,21 @@ historyTests cards =
                 bounced = Event.changeZone p1 Zone.Hand gs1
                 atEnd = resolveAll (settle (beginEndStep bounced))
              in HU.assertEqual "a bounce is not a death" 0 (countersOn ghoul atEnd),
+          -- CR 608.2i: "look back in time" effects don't require the counted
+          -- objects to currently exist, or the counting object to have existed
+          -- at the time. Scryfall's ruling says this explicitly: the count
+          -- "includes ... creatures put into a graveyard before Khabál Ghoul
+          -- entered the battlefield." This test cannot fail against today's
+          -- `Pawl.Quantity.countOf`, which takes no `ObjectId` at all and so
+          -- has no way to scope the fold to the Ghoul's own lifetime -- it is
+          -- a regression gate on the ruling, pinned ahead of that signature
+          -- ever gaining one.
+          HU.testCase "CR 608.2i a creature that died before the Ghoul entered is still counted" $
+            let (p1, gs0) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+                dead = Event.destroy p1 gs0
+                (ghoul, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (settle dead)
+                atEnd = resolveAll (settle (beginEndStep gs1))
+             in HU.assertEqual "one +1/+1 counter" 1 (countersOn ghoul atEnd),
           -- CR 608.2i: the history's scope is ONE turn.
           HU.testCase "the count resets at turn handoff, not at the trigger scan" $
             let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
