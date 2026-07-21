@@ -200,6 +200,19 @@ sacrificeTests cards =
          in do
               HU.assertEqual "off the battlefield" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      -- The test above sacrifices a permanent the same player owns and
+      -- controls, so it never exercises owner-relativity: CR 701.21a says
+      -- "its CONTROLLER moves it... to its OWNER's graveyard." Here bob owns
+      -- and alice controls (S.giveControl installs the layer-2 SetController
+      -- effect), so the result must land in bob's graveyard, not alice's.
+      HU.testCase "CR 701.21a a sacrifice lands in the OWNER's graveyard even when a different player controls it" $
+        let (piker, gs0) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+            gs = S.giveControl piker S.alice gs0
+            after = Event.sacrifice piker gs
+         in do
+              HU.assertEqual "off bob's battlefield" 0 (S.creaturesInPlay S.bob after)
+              HU.assertEqual "in bob's (owner's) graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+              HU.assertEqual "not in alice's graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       -- CR 701.21a: "sacrificing a permanent doesn't destroy it", so neither CR
       -- 702.12b's indestructible gate nor CR 701.19a's shield applies.
       HU.testCase "CR 701.21a an indestructible permanent can still be sacrificed" $
@@ -217,7 +230,7 @@ sacrificeTests cards =
         let (card, gs) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             after = Event.sacrifice card gs
          in HU.assertEqual "the library card is untouched" gs after,
-      -- CR 113.7 / 603.7c: "this creature" is a slot read, filled at placement.
+      -- CR 113.7: "this creature" is a slot read, filled at placement.
       HU.testCase "CR 113.7 a placed trigger binds its source into the reserved self slot" $
         let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield

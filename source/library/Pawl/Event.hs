@@ -173,9 +173,9 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
         -- what an enters trigger scans.
         recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId fromZone dest) snapshot) placed
 
--- The single destruction funnel (CR 701.7 / 700.4): every destruction -- the
+-- The single destruction funnel (CR 701.8 / 702.12b): every destruction -- the
 -- Destroy opcode and the CR 704.5g/h state-based actions -- flows through here.
--- CR 700.4: an indestructible permanent can't be destroyed (the event never
+-- CR 702.12b: an indestructible permanent can't be destroyed (the event never
 -- happens, so a shield is neither applied nor consumed, CR 614.7). CR 701.19a: a
 -- regeneration shield replaces the destruction. Otherwise the permanent is put
 -- into its owner's graveyard via changeZone (so Rest in Peace's redirect and a
@@ -234,13 +234,25 @@ counter oid gs = case Game.lookupObject oid gs of
 -- indestructible gate (CR 702.12b) and no regeneration shield consulted (CR
 -- 701.19a): CR 701.21a says sacrificing is not destroying. CR 701.21a also
 -- restricts it to permanents on the battlefield, so anything else is a no-op.
+--
+-- Named elision: CR 701.21a's other clause -- "A player can't sacrifice
+-- something that... [is] a permanent they don't control" -- is not enforced
+-- here. Not wrong today: the only caller (Resolve's Sacrifice arm) reads a
+-- slot the engine itself stamped (Binding.triggerSource, a triggered
+-- ability's own source, CR 113.7), which is always controlled by whoever
+-- triggered it. Expires at the first effect that can name a permanent its
+-- controller does not control -- an opponent-sacrifice effect (an edict,
+-- e.g. Diabolic Edict).
 sacrifice :: ObjectId -> GameState -> GameState
 sacrifice oid gs = case Game.lookupObject oid gs of
   Nothing -> gs
-  Just obj ->
-    if Object.zone obj == Zone.Battlefield
-      then changeZone oid Zone.Graveyard gs
-      else gs
+  Just obj -> case Object.zone obj of
+    Zone.Battlefield -> changeZone oid Zone.Graveyard gs
+    Zone.Library -> gs
+    Zone.Hand -> gs
+    Zone.Graveyard -> gs
+    Zone.Stack -> gs
+    Zone.Exile -> gs
 
 -- CR 111.2: create a token with the given effect-defined characteristics under
 -- `controller`'s control (its owner, CR 111.2), summoning-sick (CR 302.6). A token

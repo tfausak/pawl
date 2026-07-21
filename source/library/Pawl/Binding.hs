@@ -41,6 +41,22 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 -- "this creature" / "this enchantment" is a slot read rather than a
 -- self-referential opcode. No card's targetSpecs may name it (the D4 lint
 -- enforces this): a source is not a target.
+--
+-- The D4 lint and this reserved slot do not collide, but only because of
+-- where the lint currently looks: Resolve.slotsOf DOES return
+-- Binding.triggerSource for an effect that reads it (e.g. Sacrifice
+-- Binding.triggerSource), so a "declared slots == read slots" equality check
+-- run over that effect's OWN mode would demand a matching targetSpecs entry
+-- -- which the "never a declared target slot" rule above then forbids,
+-- making the two lints mutually unsatisfiable. CardSpec.hs's D4 lint avoids
+-- this today because `cardOffends` walks only `Modal.modes (Card.Type.spell
+-- card)` -- a card's SPELL modes -- and every `Sacrifice Binding.triggerSource`
+-- in this phase lives in a TRIGGERED ability, whose modes the lint never
+-- visits. Any future extension of the D4 lint to triggered/activated/delayed
+-- ability modes MUST subtract the reserved slot names (this one, variableX,
+-- chosenModes, copySource) from the read-slots side before comparing --
+-- loosening the equality to a subset would silently retire the lint's
+-- "declared but never read" half instead.
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 

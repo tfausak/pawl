@@ -598,6 +598,40 @@ fizzleTests cards =
               HU.assertEqual "both Bolts in alice's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after))
               HU.assertEqual "the Piker in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
               HU.assertEqual "bob's life untouched: the fizzled Bolt hit nothing" (Just 20) (S.lifeOf S.bob after),
+      -- CR 608.2b pins the `targeted` restriction Task 3 added (Resolve.hs's
+      -- resolveEffects/resolveSpell): a reserved slot (Binding.triggerSource)
+      -- is vacuously legal, since CR 608.2b is about TARGETS and a reserved
+      -- slot was never one -- but its vacuous legality must not rescue a
+      -- fizzle whose one genuinely-targeted slot IS illegal. This needs an
+      -- ability with BOTH kinds of slot at once, plus a second, targetless
+      -- effect (Draw) whose execution is the only way to observe whether the
+      -- fizzle happened: with a single spec'd slot alone, fizzling and
+      -- resolving-with-the-slot-skipped are indistinguishable (Destroy's own
+      -- per-slot legality check already no-ops it either way).
+      HU.testCase "CR 608.2b the reserved trigger-source slot does not rescue a fizzle: the targetless Draw after the ability's only real target dies does not run" $
+        let base0 = Setup.emptyGame S.bothPlayers
+            (source, base1) = S.addPiker cards S.alice base0
+            (victim, base2) = S.addPiker cards S.bob base1
+            (_, base3) = S.addLibraryCard (Cards.forestPrinting cards) S.alice base2
+            handBefore = S.handSize S.alice base3
+            targetSlot = SlotName.MkSlotName (Text.pack "target")
+            specs = Map.singleton targetSlot TargetSpec.CreatureTarget
+            (abilId, base4) = S.spellOnStack (Cards.pikerPrinting cards) S.alice base3
+            -- Mirrors Engine.placeOne's own construction: a real chosen
+            -- target under `targetSlot`, plus the reserved self slot every
+            -- placed trigger carries (Binding.setTriggerSource).
+            bindings =
+              Binding.setTriggerSource
+                source
+                (Binding.fromChoices (Map.singleton targetSlot (Recipient.ToCreature victim)) Map.empty Nothing Set.empty)
+            withBindings = base4 {GameState.objects = Map.adjust (\o -> o {Object.bindings = bindings}) abilId (GameState.objects base4)}
+            -- Kill the sole real target before resolution: CR 608.2b makes it
+            -- illegal (it's no longer a legal CreatureTarget), while the
+            -- reserved slot -- never targeted -- stays vacuously legal.
+            gone = Event.changeZone victim Zone.Graveyard withBindings
+            run = Resolve.resolveEffects abilId source [Effect.Destroy targetSlot, Effect.Draw (Quantity.Literal 1)] specs
+            after = snd (Engine.runGamePure S.identityAnswer gone run)
+         in HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
       HU.testCase "CR 704.5a a Bolt can end the game mid-step" $
         let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
             lowBob =

@@ -439,8 +439,8 @@ applyEffect source controller bound legality chosen effect = case effect of
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs
-          -- CR 701.7: destroy through the single funnel -- indestructible (CR
-          -- 700.4) and regeneration (CR 701.19a) are Event.destroy's to decide.
+          -- CR 701.8: destroy through the single funnel -- indestructible (CR
+          -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide.
           Just target -> Event.destroy target gs
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> gs
@@ -452,6 +452,7 @@ applyEffect source controller bound legality chosen effect = case effect of
           -- CR 701.21: through the single funnel, which is NOT Event.destroy --
           -- CR 701.21a: sacrificing is not destroying.
           Just target -> Event.sacrifice target gs
+        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> gs
   Effect.MoveToZone slot zone ->
     State.modify' $ \gs ->
