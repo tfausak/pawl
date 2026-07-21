@@ -947,9 +947,11 @@ its own gate card and spec, landed as it completes. Umbrella:
   7b owed, and 7d. **Gates: Tarmogoyf** (`{1}{G}` Creature — Lhurgoyf `*`/`1+*`,
   "Tarmogoyf's power is equal to the number of card types among cards in all
   graveyards and its toughness is equal to that number plus 1") falsifies
-  "evaluate `*` once, at entry" — empty graveyards make it 0/1, a Lightning
-  Bolt resolving into a graveyard makes it 1/2 with no re-entry and no effect
-  touching it — and falsifies "a copy snapshots the number" — a Clone of
+  "evaluate `*` once, at entry" — empty graveyards make it 0/1, Fog resolving
+  into a graveyard makes it 1/2 with no re-entry and no effect touching it
+  (Fog, not Lightning Bolt: Bolt targets, and the identity answerer would aim
+  it at the only creature on the board — the 0/1 Goyf being measured — and
+  kill it) — and falsifies "a copy snapshots the number" — a Clone of
   Tarmogoyf must keep recomputing, not freeze at 2/3. **Inner Calm, Outer
   Strength** (`{2}{G}` Instant — Arcane, "Target creature gets +X/+X until end
   of turn, where X is the number of cards in your hand") falsifies "a stored

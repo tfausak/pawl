@@ -69,6 +69,17 @@ layer m = case m of
 -- object every projection). A continuous effect created by a spell's RESOLUTION
 -- must not be re-read (CR 608.2h / 611.2d); it is frozen to Literals at store
 -- time by Resolve, via freezeQuantities.
+--
+-- The `you` passed to Quantity.evaluate here is the AFFECTED object's controller.
+-- That is correct for a characteristic-defining ability (CR 604.3a(3): a CDA does
+-- not affect other objects, so its "you" is the object's own controller). It is
+-- WRONG for a static ability carrying a player-scoped Count -- "the number of
+-- cards in your hand" on a static ability means the SOURCE's controller's hand,
+-- and Gathered.gSource is dropped before this function sees it, so the right
+-- player is not available here at all. Unreachable today: no StaticAbility in the
+-- pool carries a Count. EXPIRES with the first one that does, which is what forces
+-- the source's controller to be threaded into the fold. This is the static-ability
+-- twin of the stored-effect residual documented in freezeQuantities.
 applyModification :: GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification gs oid m pc = case m of
   Modification.GainKeyword k ->

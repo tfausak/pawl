@@ -9,38 +9,18 @@ import qualified Data.Set as Set
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
-import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Affected as Affected
-import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
-
--- Append a stored continuous effect affecting exactly `oid`. Object id 996 is a
--- stand-in source: nothing in these tests reads the source's own characteristics.
-withEffect :: ObjectId.ObjectId -> Modification.Modification -> GameState.GameState -> GameState.GameState
-withEffect oid m gs =
-  let (ts, gs1) = Game.freshTimestamp gs
-      eff =
-        ContinuousEffect.MkContinuousEffect
-          { ContinuousEffect.source = ObjectId.MkObjectId 996,
-            ContinuousEffect.timestamp = ts,
-            ContinuousEffect.duration = Duration.UntilEndOfTurn,
-            ContinuousEffect.modification = m,
-            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
-          }
-   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
@@ -254,16 +234,16 @@ tests cards =
         -- Timestamp-ordered: switch gives 1/2, then the pump gives 3/2.
         let gs0 = Setup.emptyGame S.bothPlayers
             (pikerId, board) = S.addPiker cards S.alice gs0
-            switched = withEffect pikerId Modification.SwitchPowerToughness board
-            gs = withEffect pikerId (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 0)) switched
+            switched = S.withEffect pikerId Modification.SwitchPowerToughness board
+            gs = S.withEffect pikerId (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 0)) switched
          in do
               HU.assertEqual "power is the pumped toughness" (Just 1) (Projection.powerOf pikerId gs)
               HU.assertEqual "toughness is the pumped power" (Just 4) (Projection.toughnessOf pikerId gs),
       HU.testCase "CR 613.4d 2021-03-19 two switches return the object to normal" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (pikerId, board) = S.addPiker cards S.alice gs0
-            once = withEffect pikerId Modification.SwitchPowerToughness board
-            twice = withEffect pikerId Modification.SwitchPowerToughness once
+            once = S.withEffect pikerId Modification.SwitchPowerToughness board
+            twice = S.withEffect pikerId Modification.SwitchPowerToughness once
          in do
               HU.assertEqual "once: the 2/1 is a 1/2" (Just 1) (Projection.powerOf pikerId once)
               HU.assertEqual "twice: back to 2" (Just 2) (Projection.powerOf pikerId twice)

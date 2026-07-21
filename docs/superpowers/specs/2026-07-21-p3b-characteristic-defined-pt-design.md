@@ -372,10 +372,17 @@ through `Pawl.Codec`, and M3.5's honesty property
 Every gate is a **gameplay-level** scenario: cast through the stack, assert on
 game state (design.md §4).
 
-**Existing fixtures reused:** Lightning Bolt (an instant reaching a graveyard),
-Blaze (a sorcery reaching a graveyard), Clone (P2), Humility + Opalescence (M3c),
-Darksteel Myr (an artifact creature, for the switch's target spec), Battlegrowth
-(a `+1/+1` counter), and the mono-colour deck pool.
+**Existing fixtures reused:** Lightning Bolt (an instant reaching a graveyard,
+seeded directly via `S.addGraveyardCard`), Fog (the falsifier-1 graveyard-topper
+that actually resolves — Lightning Bolt targets, and the identity answerer would
+aim it at the only creature on the board and kill the 0/1 Goyf being measured),
+Divination (a second, distinct graveyard-topper proving the switched CDA still
+tracks the graveyards as a *third* card type arrives), Clone (P2), and Humility +
+Opalescence (M3c). Darksteel Myr and Battlegrowth do not appear in what shipped:
+Darksteel Myr's reason for being here was deleted by the Twisted Image errata
+recorded in §0 (the artifact clause dropped, so `CreatureTarget` sufficed and no
+artifact-creature fixture was needed), and the 7a/7c ordering test puts the
++1/+1 counter on directly via `S.addCounter` rather than casting Battlegrowth.
 
 **New card files:** `tarmogoyf.json`, `inner-calm-outer-strength.json`,
 `twisted-image.json`. All three are **deterministic fixtures** in `allPrintings`
@@ -393,7 +400,7 @@ Each kills one specific naive implementation.
 | 3 | a stored continuous effect re-evaluates its quantity | Resolve Inner Calm, Outer Strength with N cards in hand → the target is **+N/+N**. Cast another spell from hand → the pump must **not** shrink (CR 608.2h). |
 | 4 | the freeze is applied to static abilities too | Opalescence's `ManaValue` must keep recomputing per affected object — CR 611.2 scopes the freeze to resolution-created effects. The existing M3c gate is the regression guard. |
 | 5 | 7d switches the **printed / base** box | Twisted Image on a 2/3 Tarmogoyf → **3/2**. Switching before 7a switches `Nothing`/`Nothing`, and the CDA then writes 2/3 back over it. A symmetric fixture proves nothing here — a `+1/+1` counter commutes with the switch — so Tarmogoyf's asymmetric `N`/`N+1` is the only asymmetric source in the pool and the two gate cards falsify each other. |
-| 6 | the switch is permanent state rather than a layer op | Two Twisted Images on the same creature → back to normal (CR 613.4d, two applications). And a switched Tarmogoyf still tracks the graveyards: 3/2 becomes 4/3 when a fourth card type arrives. |
+| 6 | the switch is permanent state rather than a layer op | Two Twisted Images on the same creature → back to normal (CR 613.4d, two applications). And a switched Tarmogoyf still tracks the graveyards: 3/2 becomes 4/3 when a third card type arrives. |
 | 7 | a stored quantity is evaluated against the **target** | Inner Calm, Outer Strength counts the **caster's** hand, not the target's controller's. Cast it at an opponent's creature with differing hand sizes. |
 | 8 | the switch is a display concern rather than a real characteristic | **Twisted Image's own ruling** (§5, rulings): a creature that survived 2 damage at 2/3 is at 3/**2** after the switch, and CR 704.5g kills it at the next SBA check — because damage stays marked (CR 514.2) while toughness moves. Machinery pawl has had since M1b. |
 | 9 | a CDA is a battlefield-only effect | **Tarmogoyf's own ruling** (§5): its P/T is defined in *every* zone, and a Tarmogoyf **in a graveyard counts itself**. `projectFrom` is not zone-scoped, so the in-place fold (§2.3) answers this; a `gather`-based implementation cannot. |
@@ -516,6 +523,7 @@ first (CLAUDE.md: TDD is not optional).
 | `CountSpec` as a whole | **P9**'s criterion / filter language |
 | CR 208.2b "as this creature enters …" P/T choice (a replacement effect that sets copiable values) | **P5**, the replacement-engine phase |
 | CR 208.5 "no value → 0" at the read points | the first creature with no P/T value that a reader observes |
+| CR 208.2a "use 0 for a number that can't be determined" inside a CDA's own calculation (`Projection.applyCharacteristicPT` uses `setPT`/a bare evaluation, neither of which substitutes 0) — the sibling of the CR 208.5 row above | the first CDA whose quantity can fail to evaluate |
 | A one-axis 7b set ("its toughness becomes 4") — `SetBasePowerToughness` takes two `Quantity`s, not two `Maybe`s | the first such card |
 | CR 208.4b "base power/toughness" readers | the first card that checks base P/T |
 | A **dynamic** CDA defining colour or subtype (CR 604.3a(1)) | P3a seeded devoid as a *constant* CDA; the first dynamic one builds the general path |
@@ -523,6 +531,8 @@ first (CLAUDE.md: TDD is not optional).
 | `Quantity.Half` (Little Girl) and `Infinite` (Mox Lotus) | design.md §6's silver-border canaries; still unbuilt |
 | git-bug `c7a0077` (`Quantity.Bound SlotName`) | **not retired here** — no count in this phase needs a binding slot |
 | Copying a permanent's **static** abilities (a Clone of Humility) | unchanged from P2 — a CDA is not a `StaticAbility` in this model, so this phase neither fixes nor worsens it |
+| `freezeQuantities`'s `Nothing` fallback: an unevaluable quantity (an `X` with no binding, or a bare `Star`) survives un-frozen into the stored effect, where `applyModification` later evaluates it against the *affected* object and controller — the wrong-object shape the freeze exists to prevent | the first card that puts an `X` or a `Star` inside a `ModifyTarget`'s `Modification`; also the point at which the freeze should move into a shared continuous-effect store helper rather than staying per-call-site |
+| `applyModification`'s "you" is the *affected* object's controller, correct for a CDA (CR 604.3a(3)) but wrong for a static ability with a player-scoped `Count` — "your hand" should read the *source's* controller, and `Gathered.gSource` is dropped before `applyModification` sees it | the first `StaticAbility` that carries a player-scoped `Count`, which forces the source's controller to be threaded into the fold |
 
 ## 9. Tracking
 

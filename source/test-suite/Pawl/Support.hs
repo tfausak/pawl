@@ -323,6 +323,30 @@ giveControl oid pid gs =
 addPiker :: Cards.Cards -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addPiker cards = addCreature (Cards.pikerPrinting cards)
 
+-- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`.
+-- Object id 998 is a stand-in source: nothing in these tests reads the
+-- source's own characteristics. The general shape (ColorSpec, PowerToughnessSpec,
+-- ProjectionSpec and ResolveSpec all grew their own copy of this before it moved
+-- here).
+withEffectAt :: ObjectId.ObjectId -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withEffectAt oid ts m gs =
+  let eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = ObjectId.MkObjectId 998,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.modification = m,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
+
+-- withEffectAt, allocating its own fresh timestamp -- the convenience shape for
+-- a caller that doesn't care which timestamp the effect lands at.
+withEffect :: ObjectId.ObjectId -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withEffect oid m gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+   in withEffectAt oid ts m gs1
+
 -- The M4h NonlandPermanentTarget fixture (CR 109.2/110.4): alice controls a Piker
 -- (creature), a Mindslaver (a Legendary Artifact -- nonland, non-creature),
 -- and a Mountain (land). Three permanents so a nonland-permanent legal set can

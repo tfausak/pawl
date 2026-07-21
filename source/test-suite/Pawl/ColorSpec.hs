@@ -16,10 +16,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
-import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
@@ -31,21 +28,6 @@ import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
-
--- Append a stored continuous effect affecting exactly `oid`. Object id 996 is a
--- stand-in source: nothing in these tests reads the source's own characteristics.
-withEffect :: ObjectId.ObjectId -> Modification.Modification -> GameState.GameState -> GameState.GameState
-withEffect oid m gs =
-  let (ts, gs1) = Game.freshTimestamp gs
-      eff =
-        ContinuousEffect.MkContinuousEffect
-          { ContinuousEffect.source = ObjectId.MkObjectId 996,
-            ContinuousEffect.timestamp = ts,
-            ContinuousEffect.duration = Duration.UntilEndOfTurn,
-            ContinuousEffect.modification = m,
-            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
-          }
-   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 -- The battlefield objects that are tokens (CR 111.1) rather than cards.
 tokensOf :: GameState.GameState -> [ObjectId.ObjectId]
@@ -86,17 +68,17 @@ tests cards =
         -- black, and after the effect they are red and NOT black.
         let gs0 = Setup.emptyGame S.bothPlayers
             (ratsId, board) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice gs0
-            gs = withEffect ratsId (Modification.SetColor (Set.singleton Color.Red)) board
+            gs = S.withEffect ratsId (Modification.SetColor (Set.singleton Color.Red)) board
          in HU.assertEqual "red only" (Set.singleton Color.Red) (Projection.colorsOf ratsId gs),
       HU.testCase "CR 105.3 an effect may make a coloured object colourless" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (ratsId, board) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice gs0
-            gs = withEffect ratsId (Modification.SetColor Set.empty) board
+            gs = S.withEffect ratsId (Modification.SetColor Set.empty) board
          in HU.assertEqual "colourless" Set.empty (Projection.colorsOf ratsId gs),
       HU.testCase "CR 613.1e a layer-5 colour change beats the CR 702.114a devoid seed" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (droneId, board) = S.addCreature (Cards.devoidDronePrinting cards) S.alice gs0
-            gs = withEffect droneId (Modification.SetColor (Set.singleton Color.Black)) board
+            gs = S.withEffect droneId (Modification.SetColor (Set.singleton Color.Black)) board
          in HU.assertEqual "black" (Set.singleton Color.Black) (Projection.colorsOf droneId gs),
       HU.testCase "Bad Moon pumps a black creature but not a red one" $
         let gs0 = Setup.emptyGame S.bothPlayers
@@ -120,7 +102,7 @@ tests cards =
         let gs0 = Setup.emptyGame S.bothPlayers
             (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice gs0
             (pikerId, board) = S.addPiker cards S.alice withMoon
-            gs = withEffect pikerId (Modification.SetColor (Set.singleton Color.Black)) board
+            gs = S.withEffect pikerId (Modification.SetColor (Set.singleton Color.Black)) board
          in HU.assertEqual "the now-black Piker is 3/2" (Just 3) (Projection.powerOf pikerId gs),
       HU.testCase "CR 111.3 a token's colour comes from the effect that created it" $
         -- FALSIFIER: a token has no mana cost, so an implementation that derives
@@ -228,8 +210,8 @@ tests cards =
         -- of either colour the earlier one set, not just the printed colour.
         let gs0 = Setup.emptyGame S.bothPlayers
             (ratsId, board) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice gs0
-            multi = withEffect ratsId (Modification.SetColor (Set.fromList [Color.Blue, Color.Black])) board
-            gs = withEffect ratsId (Modification.SetColor (Set.singleton Color.Red)) multi
+            multi = S.withEffect ratsId (Modification.SetColor (Set.fromList [Color.Blue, Color.Black])) board
+            gs = S.withEffect ratsId (Modification.SetColor (Set.singleton Color.Red)) multi
          in HU.assertEqual "red only, no residue of blue or black" (Set.singleton Color.Red) (Projection.colorsOf ratsId gs),
       HU.testCase "CR 613.1c/613.1e 2008-05-01 changing a permanent's colour doesn't change its text" $
         -- Gatherer ruling on Crimson Wisps / Aphotic Wisps (WotC, 2008-05-01):
@@ -237,7 +219,7 @@ tests cards =
         -- Wilt-Leaf Liege blue, it will still affect green creatures and
         -- white creatures." Transcribed with Bad Moon, whose own text
         -- ("Black creatures get +1/+1") is keyed to its OWN printed colour:
-        -- turn Bad Moon itself red with a stored SetColor effect (withEffect
+        -- turn Bad Moon itself red with a stored SetColor effect (S.withEffect
         -- reaches non-creature permanents, which no card in the pool
         -- targets) and its ability still reads Typhoid Rats as black. This
         -- guards CR 613.1e/613.1c's layer separation -- colour is layer 5,
@@ -246,7 +228,7 @@ tests cards =
         let gs0 = Setup.emptyGame S.bothPlayers
             (moonId, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice gs0
             (ratsId, board) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice withMoon
-            gs = withEffect moonId (Modification.SetColor (Set.singleton Color.Red)) board
+            gs = S.withEffect moonId (Modification.SetColor (Set.singleton Color.Red)) board
          in do
               HU.assertEqual "Bad Moon itself is now red" (Set.singleton Color.Red) (Projection.colorsOf moonId gs)
               HU.assertEqual "the black Rats are still pumped to 2 power" (Just 2) (Projection.powerOf ratsId gs)

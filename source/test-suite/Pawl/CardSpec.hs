@@ -10,6 +10,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
+import qualified Pawl.Codec as Codec
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
@@ -35,6 +36,7 @@ import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
+import qualified System.Directory as Directory
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -176,8 +178,23 @@ lintTests cards =
                 (cardOffends . Printing.card)
                 (Cards.allPrintings cards)
          in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
-      HU.testCase "the registry holds every printing (59 at M4.5 P3b Task 7)" $
-        HU.assertEqual "count" 59 (length (Cards.allPrintings cards)),
+      HU.testCase "the data/cards directory and Cards.allPrintings agree, by slug" $ do
+        -- A hand-bumped "N printings" count never caught the real hazard: a
+        -- data/cards/*.json file that nobody registers in Pawl.Cards is invisible
+        -- to both the M3.5 honesty round-trip and this lint suite (Pawl.Cards
+        -- and the benchmark both load cards by explicit slug). Scanning the
+        -- directory and comparing it against Cards.allPrintings by the SAME slug
+        -- function Pawl.Cards.loadPrinting keys off of (Codec.slugify applied to
+        -- the card's own name) makes a stray or missing file loud instead of
+        -- silent.
+        entries <- Directory.listDirectory "data/cards"
+        let isJson name = Text.isSuffixOf (Text.pack ".json") (Text.pack name)
+            onDisk = Set.fromList (map (Text.dropEnd 5 . Text.pack) (filter isJson entries))
+            registered = Set.fromList (map (Codec.slugify . Card.Type.name . Printing.card) (Cards.allPrintings cards))
+            unregistered = Set.difference onDisk registered
+            missingFiles = Set.difference registered onDisk
+        HU.assertEqual "data/cards files with no registered printing (each name IS the offender)" Set.empty unregistered
+        HU.assertEqual "registered printings with no data/cards file (each slug IS the offender)" Set.empty missingFiles,
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $
         let card = Printing.card (Cards.blazePrinting cards)
             red = ManaSymbol.OfType (ManaType.Colored Color.Red)

@@ -29,11 +29,9 @@ import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AdditionalCost as AdditionalCost
-import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -72,20 +70,6 @@ import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
-
--- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`
--- (mirrors ProjectionSpec.withEffect; used to pre-stamp a hack on a stack spell).
-withEffect :: ObjectId.ObjectId -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
-withEffect oid ts m gs =
-  let eff =
-        ContinuousEffect.MkContinuousEffect
-          { ContinuousEffect.source = ObjectId.MkObjectId 998,
-            ContinuousEffect.timestamp = ts,
-            ContinuousEffect.duration = Duration.UntilEndOfTurn,
-            ContinuousEffect.modification = m,
-            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
-          }
-   in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
 
 targetTests :: Cards.Cards -> Tasty.TestTree
 targetTests cards =
@@ -291,7 +275,7 @@ resolveTests cards =
                 }
             -- A resolved Magical Hack already changed Swamp -> Mountain on the
             -- Landform spell (stored on the Landform's id).
-            hacked = withEffect landformId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Swamp Subtype.Mountain) g2
+            hacked = S.withEffectAt landformId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Swamp Subtype.Mountain) g2
             after = snd (Engine.runGamePure S.identityAnswer hacked (Resolve.resolveSpell landformId))
          in do
               -- Landform's own subtype does not matter; its EFFECT was rewritten to
@@ -318,7 +302,7 @@ resolveTests cards =
                 { GameState.objects = Map.insert bloodMoonSpellId bmObj (GameState.objects g2),
                   GameState.stack = bloodMoonSpellId : GameState.stack g2
                 }
-            hacked = withEffect bloodMoonSpellId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g3
+            hacked = S.withEffectAt bloodMoonSpellId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g3
             after = snd (Engine.runGamePure S.identityAnswer hacked Stack.resolveTop)
          in -- Blood Moon entered as a NEW object; the hack (locked to the spell id)
             -- no longer names it, so nonbasic lands are Mountains, not Islands.
