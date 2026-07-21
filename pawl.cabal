@@ -201,6 +201,7 @@ test-suite pawl-test-suite
     Pawl.JsonSpec
     Pawl.ManaSpec
     Pawl.ModalSpec
+    Pawl.PowerToughnessSpec
     Pawl.ProjectionSpec
     Pawl.PropertySpec
     Pawl.ReplaySpec

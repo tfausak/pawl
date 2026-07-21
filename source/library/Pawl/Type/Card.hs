@@ -9,6 +9,7 @@ import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
 import Pawl.Type.Modal (Modal)
 import Pawl.Type.Power (Power)
+import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.StaticAbility (StaticAbility)
 import Pawl.Type.Toughness (Toughness)
@@ -38,6 +39,13 @@ data Card = MkCard
     -- characteristic values that are printed on a card", and a token has no mana
     -- cost. Read through Pawl.Projection.colorsOf, never directly.
     colorIndicator :: Set Color,
+    -- CR 604.3 / 208.2a: this card's characteristic-defining P/T ability -- the
+    -- quantity a printed star (Quantity.Star) in its power/toughness box stands
+    -- for. Nothing for every card without a star. A CDA is an ABILITY, not a
+    -- number: the projection seeds it unevaluated so a copy acquires the ability
+    -- (CR 707.2a) and layer 7a recomputes it on every projection. Read through
+    -- Pawl.Projection, never directly.
+    characteristicPT :: Maybe Quantity,
     -- CR 604.1/604.2: this card's static continuous abilities (Humility). Empty
     -- for everything but the few printings that generate a continuous effect just
     -- by being on the battlefield. The projection gathers these live.

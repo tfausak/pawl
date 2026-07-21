@@ -194,6 +194,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Wall -> "Wall"
   Subtype.Wizard -> "Wizard"
   Subtype.Shapeshifter -> "Shapeshifter"
+  Subtype.Lhurgoyf -> "Lhurgoyf"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -219,7 +220,8 @@ jsonToSubtype =
       (Text.pack "Skeleton", Subtype.Skeleton),
       (Text.pack "Wall", Subtype.Wall),
       (Text.pack "Wizard", Subtype.Wizard),
-      (Text.pack "Shapeshifter", Subtype.Shapeshifter)
+      (Text.pack "Shapeshifter", Subtype.Shapeshifter),
+      (Text.pack "Lhurgoyf", Subtype.Lhurgoyf)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -776,6 +778,10 @@ cardToJson c =
                then []
                else [(Text.pack "colorIndicator", setTo colorToJson (CardT.colorIndicator c))]
            )
+        ++ ( case CardT.characteristicPT c of
+               Nothing -> []
+               Just q -> [(Text.pack "characteristicPT", quantityToJson q)]
+           )
     )
 
 getOpt :: Text -> [(Text, Value)] -> Value
@@ -812,6 +818,7 @@ jsonToCard value = do
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= listFrom jsonToCastingPermission
   copyOnEnter <- jsonToBoolDefault False (getOpt (Text.pack "copyOnEnter") ps)
   colorIndicator <- setFromDefault jsonToColor (getOpt (Text.pack "colorIndicator") ps)
+  characteristicPT <- maybeFrom jsonToQuantity (getOpt (Text.pack "characteristicPT") ps)
   pure
     CardT.MkCard
       { CardT.name = name,
@@ -827,7 +834,8 @@ jsonToCard value = do
         CardT.triggeredAbilities = triggered,
         CardT.castingPermissions = permissions,
         CardT.copyOnEnter = copyOnEnter,
-        CardT.colorIndicator = colorIndicator
+        CardT.colorIndicator = colorIndicator,
+        CardT.characteristicPT = characteristicPT
       }
 
 printingToJson :: Printing.Printing -> Value

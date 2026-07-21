@@ -6,6 +6,7 @@ import Pawl.Type.Card (Card)
 import Pawl.Type.CardType (CardType)
 import Pawl.Type.Color (Color)
 import Pawl.Type.Keyword (Keyword)
+import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.Subtype (Subtype)
 import Pawl.Type.TriggeredAbility (TriggeredAbility)
@@ -23,6 +24,12 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     colors :: Set Color,
     power :: Maybe Integer,
     toughness :: Maybe Integer,
+    -- CR 613.4a layer 7a: the object's characteristic-defining P/T, as the pair of
+    -- UNEVALUATED quantities (power, toughness) with the printed star already
+    -- substituted. Seeded from the card, so it rides copiableCharacteristics and a
+    -- Clone acquires the ability rather than the number (CR 707.2a); emptied by
+    -- LoseAllAbilities at layer 6, which is BEFORE 7a.
+    characteristicPT :: Maybe (Quantity, Quantity),
     cardTypes :: Set CardType,
     subtypes :: Set Subtype,
     rulesTextActive :: Bool,

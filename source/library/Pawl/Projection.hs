@@ -185,6 +185,18 @@ copiableCharacteristics oid gs =
     Just snapshot -> snapshot
     Nothing -> baseCharacteristics oid gs
 
+-- CR 208.2 / 604.3: the card's characteristic-defining P/T as a pair of
+-- quantities, with the printed star resolved to what the CDA counts. Nothing
+-- unless the card declares a CDA *and* has a printed power and toughness box for
+-- the star to sit in (CR 208.1) -- a card with one and not the other is
+-- malformed data, and yields no CDA rather than a partial one.
+seedCharacteristicPT :: Card.Type.Card -> Maybe (Quantity.Type.Quantity, Quantity.Type.Quantity)
+seedCharacteristicPT card =
+  case (Card.Type.characteristicPT card, Card.Type.power card, Card.Type.toughness card) of
+    (Just star, Just (Power.MkPower p), Just (Toughness.MkToughness t)) ->
+      Just (Quantity.substituteStar star p, Quantity.substituteStar star t)
+    _ -> Nothing
+
 -- Printed characteristics before any effect (CR 613.2/613.4 starting point).
 baseCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 baseCharacteristics oid gs = case Game.cardOf oid gs of
@@ -194,6 +206,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.colors = Set.empty,
         PC.power = Nothing,
         PC.toughness = Nothing,
+        PC.characteristicPT = Nothing,
         PC.cardTypes = Set.empty,
         PC.subtypes = Set.empty,
         PC.rulesTextActive = True,
@@ -211,6 +224,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.toughness = case Card.Type.toughness card of
           Nothing -> Nothing
           Just (Toughness.MkToughness q) -> Quantity.evaluate gs oid (controllerOf oid gs) q,
+        PC.characteristicPT = seedCharacteristicPT card,
         PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
         PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
         PC.rulesTextActive = True,

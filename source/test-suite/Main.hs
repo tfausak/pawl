@@ -16,6 +16,7 @@ import qualified Pawl.GameSpec as GameSpec
 import qualified Pawl.JsonSpec as JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
 import qualified Pawl.ModalSpec as ModalSpec
+import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
 import qualified Pawl.ReplaySpec as ReplaySpec
@@ -52,6 +53,7 @@ testTree cards =
       CombatSpec.tests cards,
       ResolveSpec.tests cards,
       ProjectionSpec.tests cards,
+      PowerToughnessSpec.tests cards,
       ActivateSpec.tests cards,
       ModalSpec.tests cards,
       CopySpec.tests cards,

@@ -23,4 +23,5 @@ data Subtype
   | Wall -- CR 205.3m (a creature type)
   | Wizard -- CR 205.3m (a creature type)
   | Shapeshifter -- CR 205.3m (a creature type; Clone's printed type)
+  | Lhurgoyf -- CR 205.3m (a creature type; Tarmogoyf's printed type)
   deriving (Eq, Ord, Show)

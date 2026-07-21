@@ -249,7 +249,8 @@ resolveTests cards =
                   Card.Type.replacementEffects = [],
                   Card.Type.triggeredAbilities = [],
                   Card.Type.castingPermissions = [],
-                  Card.Type.copyOnEnter = False
+                  Card.Type.copyOnEnter = False,
+                  Card.Type.characteristicPT = Nothing
                 }
          in do
               HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))
