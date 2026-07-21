@@ -285,7 +285,9 @@ applyOne zc re = case re of
 -- -- CR 603.3a controls the triggered ability, and CR 109.5 is what makes "your"
 -- (as in "your upkeep") mean that controller -- both are part of the match,
 -- because the scan below visits EVERY permanent, not only the one an event
--- names. This module is the sole home of casing on TriggerCondition.
+-- names. This module is the sole home of casing on TriggerCondition for RULES
+-- purposes; Pawl.Codec also cases on every constructor, but only as the JSON
+-- data boundary (encode/decode), not to decide game behaviour.
 matchesTrigger :: ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
 matchesTrigger bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
@@ -312,10 +314,12 @@ matchesTrigger bearer you cond event = case cond of
 --
 -- The candidate set -- the current battlefield permanents -- is the same for
 -- every event; it is projected ONCE via Projection.projectAll, before the
--- event loop, not once per (event, permanent) pair. Projection.projectAll
--- (via triggeredAbilitiesOf's callers) runs a whole-board fold, so the naive
--- per-pair call made settleForPriority's trigger scan quadratic in board
--- size.
+-- event loop, not once per (event, permanent) pair. The naive alternative --
+-- calling Projection.triggeredAbilitiesOf per (event, permanent) pair, as this
+-- scan did before this task -- goes through Projection.project, which reruns
+-- the whole-board `gather` fold on every call; that made settleForPriority's
+-- trigger scan quadratic in board size. Projection.projectAll runs `gather`
+-- exactly once and shares the result across the whole scan.
 --
 -- The battlefield is the ONLY scanned zone. An ability that functions from a
 -- graveyard, hand or exile is a named deferral (the P4 spec, section 8), expiring
@@ -327,14 +331,21 @@ matchesTrigger bearer you cond event = case cond of
 -- Event.changeZone retires the id from GameState.objects on the move that
 -- kills it (CR 400.7's "becomes a new object with no memory of... its
 -- previous existence"), so by the time this scan runs, no candidate carries
--- that id. Closing this is CR 603.10's "look back in time" mechanism --
--- 603.10 lists enters-the-battlefield triggers among the *non*-exceptions
--- (603.10a-g name leaves-the-battlefield, sacrifice, phase-out, and similar
--- triggers, not enters), so the gap is real and not just missing coverage of
--- an existing look-back rule. It is a named deferral of this phase (P4 spec
--- section 8, git-bug b998924); closing it needs the ProjectedCharacteristics
--- snapshot GameEvent.Moved already carries, not an id lookup against current
--- state, since by scan time the id itself may be gone.
+-- that id. This is NOT a "look back in time" gap -- that CR 603.10 term of
+-- art names the opposite case, where a trigger checks the state immediately
+-- PRIOR to an event, and 603.10's own exception list (603.10a-g) is
+-- leaves-the-battlefield, sacrifice, phase-out and similar triggers, not
+-- enters. CR 603.10's NORMAL rule -- the one that applies to an enters
+-- trigger -- is that objects existing immediately AFTER the event are
+-- checked, and the entering permanent does exist immediately after the
+-- Moved event that placed it. The actual defect is timing: this scan runs at
+-- the CR 117.5 priority boundary and derives its candidate set from
+-- BATTLEFIELD STATE AS IT THEN STANDS, rather than checking against the
+-- state immediately after each event, so an id that has since been retired
+-- is invisible to it. It is a named deferral of this phase (P4 spec section
+-- 8's "enters-then-dies-same-settle" bullet); closing it needs the scan to
+-- evaluate candidates against the state at the time of the event rather than
+-- at the boundary.
 --
 -- Events outer, permanents inner (ascending by id): a deterministic canonical
 -- order, which is what the CR 603.3b ordering prompt indexes into.
@@ -344,7 +355,17 @@ eventTriggers events gs =
       onBattlefield =
         Maybe.mapMaybe
           ( \oid -> case Map.lookup oid projected of
+              -- Unreachable: projected (Projection.projectAll gs) is keyed on
+              -- the same GameState.battlefield set this list walks, so every
+              -- oid drawn from that set has an entry.
               Nothing -> Nothing
+              -- CR 603.3a: controlled by whoever controls the source when it
+              -- triggers. Projection.controllerOf reads control AT THE SCAN
+              -- BOUNDARY, not at the moment the underlying event fired --
+              -- pre-existing posture carried forward from M3f, unobservable
+              -- today because nothing changes control between an event and
+              -- the CR 117.5 boundary. Expires at the first effect that can
+              -- change control between an event and the boundary.
               Just pc -> fmap (\ctrl -> (oid, ctrl, PC.triggeredAbilities pc)) (Projection.controllerOf oid gs)
           )
           (Set.toAscList (GameState.battlefield gs))

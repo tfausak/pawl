@@ -4,7 +4,8 @@ import Pawl.Type.Phase (Phase)
 import Pawl.Type.TurnScope (TurnScope)
 
 -- CR 603.2: the pattern that fires a triggered ability. Only Pawl.Event may case
--- on it.
+-- on it for RULES purposes; Pawl.Codec also cases on every constructor, but only
+-- as the JSON data boundary (encode/decode), not to decide game behaviour.
 data TriggerCondition
   = -- CR 603.6a: "when this ... enters [the battlefield]" -- fires when the object
     -- BEARING the ability enters. Self-scoped: the scan checks every permanent

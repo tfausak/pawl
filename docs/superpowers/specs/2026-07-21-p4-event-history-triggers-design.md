@@ -473,6 +473,18 @@ new card exists to confuse the diagnosis.
   603.10/603.10a).** The log *records* deaths — Khabál Ghoul counts them — but no
   `TriggerCondition` matches a leave. **Expires** at the first dies-trigger card;
   relate to git-bug `b998924` (OfAbility LKI), whose substrate §2.2 builds.
+- **Enters-then-dies-same-settle timing gap (CR 603.10, normal clause, not a
+  look-back exception).** The scan runs once, at the CR 117.5 priority boundary,
+  and derives its candidate set from the battlefield as it then stands. If a
+  permanent enters and a state-based action puts it into a graveyard within the
+  same settle (before the boundary's scan runs), its id is no longer on the
+  battlefield and the scan never sees it, so its enters trigger is lost — even
+  though CR 603.10's normal rule says objects existing immediately after the
+  event (which this permanent did) are what get checked. Closing this needs the
+  scan to evaluate candidates against the state at the time of each event rather
+  than at the boundary. **Expires** at the first card that can die on entry (a
+  creature entering with toughness 0 or less — e.g. an entering creature under a
+  −X/−X effect, or a 0-toughness token).
 - **Stated-duration delayed triggers (CR 603.7b).** One-shot only; a delayed
   ability with "this turn" would fire repeatedly until the turn ends. **Expires**
   at the first such card.

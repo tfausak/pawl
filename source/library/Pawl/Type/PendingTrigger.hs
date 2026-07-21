@@ -11,7 +11,9 @@ import Pawl.Type.TriggeredAbility (TriggeredAbility)
 -- CR 603.3: an ability that has TRIGGERED but is not yet on the stack. Gathered
 -- by Pawl.Event at the CR 117.5 boundary, ordered and placed by Pawl.Engine.
 --
--- `source` is the object the ability belongs to (CR 608.2g's effect source);
+-- `source` is the object the ability belongs to (CR 113.7: "The source of a
+-- triggered ability ... that has triggered and is waiting to be put on the
+-- stack, is the object whose ability triggered.");
 -- `controller` is who controls the ability (CR 603.3a). `bindings` is the
 -- environment CAPTURED when a CR 603.7 delayed ability was armed -- how "it" and
 -- "that card" (CR 603.7c) are remembered. Empty for an event- or state-matched

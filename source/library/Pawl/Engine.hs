@@ -435,9 +435,11 @@ runStep :: Game ()
 runStep = do
   phase <- State.gets GameState.phase
   -- CR 603.2b: the step began. Recorded BEFORE the step's turn-based actions, so
-  -- the first priority boundary of this step scans it. The untap step grants no
-  -- priority (CR 503.1), so its event waits until upkeep -- which is exactly what
-  -- CR 503.1 says happens to a trigger during untap.
+  -- the first priority boundary of this step scans it. No player receives
+  -- priority during the untap step (CR 502.4), so an ability that triggers then
+  -- is held until the next time a player would receive priority -- usually
+  -- upkeep, where CR 503.1a puts it on the stack before the active player gets
+  -- priority.
   State.modify' (\gs -> Event.recordEvent (GameEvent.StepBegan phase (GameState.activePlayer gs)) gs)
   runTurnBasedActions phase
   checkSba

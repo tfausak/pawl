@@ -165,7 +165,25 @@ scanTests cards =
               HU.assertBool "enters battlefield matches" $
                 Event.matchesTrigger bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Battlefield)
               HU.assertBool "enters graveyard does not" $
-                not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard))
+                not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard)),
+      -- Pins the canonical emission order this module's `eventTriggers` comment
+      -- documents ("events outer, permanents inner, ascending by id"), which a
+      -- later task's CR 603.3b ordering prompt indexes into. Two RiP bearers
+      -- enter via two separate events recorded in the same order their ids
+      -- were assigned; the resulting PendingTrigger.source list must follow
+      -- that same ascending order.
+      HU.testCase "CR 603.6a two SelfEnters triggers emit in ascending ObjectId order" $
+        let (rip1, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            (rip2, gs1) = S.addCreature (Cards.restInPeacePrinting cards) S.alice gs0
+            entered1 = ZoneChange.MkZoneChange rip1 Zone.Stack Zone.Battlefield
+            entered2 = ZoneChange.MkZoneChange rip2 Zone.Stack Zone.Battlefield
+            gs2 = S.withEvent (GameEvent.Moved entered1 (Projection.project rip1 gs1)) gs1
+            gs3 = Event.recordEvent (GameEvent.Moved entered2 (Projection.project rip2 gs1)) gs2
+            triggers = Event.gatherTriggers (Event.unscannedEvents gs3) gs3
+         in do
+              HU.assertBool "rip1 has the lower id" (rip1 < rip2)
+              HU.assertEqual "both triggers fired" 2 (length triggers)
+              HU.assertEqual "sources in ascending ObjectId order" [rip1, rip2] (map PendingTrigger.source triggers)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
