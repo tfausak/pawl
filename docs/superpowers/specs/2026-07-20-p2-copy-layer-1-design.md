@@ -48,9 +48,10 @@ free.
 
 **In scope:** copy as a projected **layer-1** characteristic; the copiable-value
 computation (base + layer-1 only); the **snapshot-at-entry** storage that locks the
-copy; the lightweight as-enters choice at resolution; and the gate + falsifier
-tests. **Zero new opcodes** — copy is an intrinsic card property, not an `Effect`
-(the M4g/M4h "compose under a wrapper, add no opcode" posture).
+copy; the as-enters choice, hooked into the **battlefield-entry funnel** and drained
+at the settle boundary (§2.4); and the gate + falsifier tests. **Zero new opcodes** —
+copy is an intrinsic card property, not an `Effect` (the M4g/M4h "compose under a
+wrapper, add no opcode" posture).
 
 **Out of scope (deferred, each with a named expiry — §7):** copy-spell (CR 707.10);
 copy-token effects (CR 707.2 token copies); ongoing "becomes a copy" that re-reads
@@ -130,38 +131,58 @@ structural.**
   subtypes, the three ability lists, `rulesTextActive`); name/mana cost/color/
   supertypes are not projected and so not copied (§7).
 
-### 2.4 The as-enters choice (lightweight, at resolution — no opcode)
+### 2.4 The as-enters choice: entry funnel + settle-boundary drain (no opcode)
 
-Clone chooses what to copy **as it enters** (CR 707.9a, **verify**), and "may"
-decline. Copy is an intrinsic property of the card, not an `Effect`, so:
+"Enters as a copy" is, in the rules, **a replacement effect from the object's own
+static ability** (CR 614.1c; CR 603.6d: "*a static ability—not a triggered
+ability—whose effect occurs as part of the event that puts the permanent onto the
+battlefield*"), it fires **as the object enters on any path** (CR 113.6h — not only
+on spell resolution), and its choice is made **before the object enters** (CR
+614.12a). It generates a **copiable** (layer 1a) effect (CR 613.2a). All **verify**.
 
-- **`Card.copyOnEnter :: Bool`** (new classification). True for Clone. Read by the
-  resolution path; the rules core reads the Bool, never Clone's identity.
+So the choice does **not** hang off spell resolution — it hangs off the
+**battlefield-entry event**, the funnel every entry already flows through
+(`Event.changeZone` / `Event.placeObject`, M3f/M4c). But that funnel is *pure* and
+the choice needs a **prompt**. Rather than make the whole funnel monadic (that is
+P5's general monadic-replacement job — §7), P2 splits it into a pure **mark** and a
+monadic **drain**:
+
+- **`Card.copyOnEnter :: Bool`** (new classification). True for Clone. The rules core
+  reads the Bool, never Clone's identity.
+- **Mark (pure).** `Event.placeObject`, when the entering card is `copyOnEnter`,
+  stamps an **"as-enters choice pending"** marker on the new incarnation (a reserved
+  `Object.bindings` slot — auto-cleared on a later zone change, like every binding).
+  No prompt; `changeZone` stays pure (M3f's SBA-death path depends on that purity).
+- **Drain (monadic).** A new pass in the settle loop — running at the CR 117.5
+  boundary **before** the M3f trigger scan and the state-based-action check — finds
+  every battlefield object still carrying the pending marker and resolves its choice:
+  prompt `ChooseCopyTarget`; on `Just chosen`, compute
+  `Projection.copiableCharacteristics chosen gs`, write the snapshot into the copy
+  binding (`Pawl.Binding.fromChoices`), and clear the marker; on `Nothing` (decline),
+  just clear the marker.
 - **`Prompt.ChooseCopyTarget` / `Response.ChoseCopyTarget (Maybe ObjectId)`** (new
-  pair). The legal set is the **battlefield creatures** (projected creature-ness,
-  `Projection.isCreatureOf`) **excluding the entering object itself** (it is a 0/0
-  with nothing useful to copy, and excluding it removes any self-cycle question —
-  CR wording **verify**). `Nothing` is the decline. `Pawl.Target` gains the legal-
-  set helper (`legalCopyTargets`), the targeting-legality home.
-- **The stamp.** After a `copyOnEnter` permanent enters (the **monadic** resolution
-  path — `Resolve.resolveSpell` / the permanent-enters tail), prompt; on a `Just
-  chosen`, compute `Projection.copiableCharacteristics chosen gs` and write it into
-  the new object's copy binding via `Pawl.Binding.fromChoices`; on `Nothing`, write
-  nothing.
-- **Observable-equivalence justification (the `observable-equivalence-is-the-bar`
-  discipline).** "Enters as a copy" means the object is *never* a 0/0 anyone can
-  observe. Placing the permanent as its base 0/0 and *then* stamping the snapshot is
-  observationally equivalent, because the stamp happens **before** the next CR 117.5
-  priority boundary — before any player gets priority, before the M3f trigger scan,
-  before the state-based-action check. So: (a) no player sees the interim 0/0; (b)
-  an enter trigger (the Clone's own, copied from the source) is scanned against the
-  already-copied projection; (c) the decline path's 0/0 is caught by the same post-
-  resolution SBA sweep and dies via `Sba.zeroToughness` (CR 704.5f) with no special
-  handling. Cite the rule/timing in the code comment.
+  pair). Legal set = **battlefield creatures** (projected creature-ness,
+  `Projection.isCreatureOf`) **excluding the entering object itself** (a 0/0 with
+  nothing useful to copy; excluding it removes any self-cycle question — CR wording
+  **verify**). `Nothing` is the decline. `Pawl.Target` gains the legal-set helper
+  (`legalCopyTargets`).
+- **Why this is CR-faithful, not a stopgap.** The choice is attached to the correct
+  event (every battlefield entry — a reanimated, blinked, or token Clone all get it,
+  which the resolution-tail alternative silently drops), and it is
+  **observationally equivalent to CR 614.12a's "before it enters"**
+  (`observable-equivalence-is-the-bar`): the drain runs before any player gets
+  priority, before triggers, before SBAs, so (a) no one sees the interim 0/0; (b) the
+  Clone's own enter triggers (copied from the source) are scanned against the
+  already-copied projection; (c) a declined 0/0 dies to the same SBA sweep via
+  `Sba.zeroToughness` (CR 704.5f). Cite the rule/timing in the code comment.
 - **Replay.** `Response.ChoseCopyTarget` is serialized; the deterministic replay
-  answerer picks a fixed legal choice (the lowest-id legal creature, so replay
-  actually exercises the copy rather than always declining), matching the
-  `ChooseX` / `ChooseModes` posture.
+  answerer picks a fixed legal choice (lowest-id legal creature, so replay exercises
+  the copy rather than always declining), the `ChooseX` / `ChooseModes` posture.
+
+This mark-then-drain seam is the **narrow first version of P5's monadic replacement
+engine** (§7), exactly as M3f's single pure redirect was the narrow first version
+that P5 widens — nothing here is thrown away; the drain folds into the general CR
+614.12 / 616 machinery when P5 lands.
 
 ### 2.5 Why no `continuousEffects` entry and no new base field
 
@@ -178,8 +199,8 @@ applied a second time; copy is its second customer, not a new problem.
    `case`-on-`Modification` home (`BecomeCopy` applied only there). **No new
    `Effect`**, so `Pawl.Resolve`'s `case effect of` is untouched and no new opcode
    classifications (`slotsOf`/`readsX`/`manaProduced`/`searchesLibrary`/
-   `rewriteEffect`) are needed. `copyOnEnter` is a Bool the core consults, never a
-   card identity.
+   `rewriteEffect`) are needed. `copyOnEnter` is a Bool the entry funnel and drain
+   consult, never a card identity.
 2. **The engine makes no choices.** The copy target is a genuine player choice and
    is **prompted** (`ChooseCopyTarget`), including the "may" decline — nothing
    elided.
@@ -229,9 +250,14 @@ exists in the engine — **no synthetic crutch is needed** (the
   `copyGathered` in `gather`; `layer (BecomeCopy _) = Copy`; `applyModification
   (BecomeCopy snap) _ = snap`; identity arms in `rewriteModification` /
   `setLandSubtypeEffects`.
-- `Pawl.Resolve` (the permanent-enters resolution tail) — after a `copyOnEnter`
-  permanent enters, prompt `ChooseCopyTarget`, compute the snapshot, stamp the
-  binding. No `case effect of` change.
+- `Pawl.Binding` — add the reserved **as-enters-pending** marker slot (set by the
+  mark, cleared by the drain) alongside the `copy` slot.
+- `Pawl.Event` (`placeObject`) — pure **mark**: stamp the pending marker on a
+  `copyOnEnter` object as it enters. No `case effect of` / no prompt.
+- The settle loop (`Pawl.Engine` / `Pawl.Stack` — wherever the CR 117.5 boundary
+  scans triggers and SBAs) — monadic **drain**: before the trigger scan and SBA
+  check, resolve each pending object's `ChooseCopyTarget`, compute the snapshot,
+  stamp the copy binding (or clear on decline).
 - `Pawl.Type.Prompt` / `Pawl.Type.Response` — add `ChooseCopyTarget` /
   `ChoseCopyTarget`.
 - `Pawl.Target` — add `legalCopyTargets` (battlefield creatures excluding self).
@@ -248,9 +274,11 @@ Substrate before consumer, falsifier-first: (1) `ProjectedCharacteristics` Ord +
 `Modification.BecomeCopy` + the `layer`/`applyModification` arms; (2)
 `copiableCharacteristics` + `copyGathered` + the `gather` append, tested by
 projecting a hand-placed copy binding directly (unit-level, before the card exists);
-(3) the `Binding.copy` slot + `Pawl.Binding` accessors; (4) `Card.copyOnEnter`,
-`ChooseCopyTarget`/`ChoseCopyTarget`, `Target.legalCopyTargets`, and the resolution-
-path stamp; (5) `clone.json`, the six gate scenarios, `Replay`, `Codec`, round-trip.
+(3) the `Binding.copy` + pending-marker slots + `Pawl.Binding` accessors; (4)
+`Card.copyOnEnter`, `ChooseCopyTarget`/`ChoseCopyTarget`, `Target.legalCopyTargets`,
+the pure `placeObject` mark, and the monadic settle-boundary drain (ordered before
+triggers/SBAs); (5) `clone.json`, the six gate scenarios, `Replay`, `Codec`,
+round-trip.
 Each is one small complete commit; TDD per CLAUDE.md (write the failing gameplay
 test, watch it fail, implement).
 
@@ -270,9 +298,15 @@ test, watch it fail, implement).
   mechanism (umbrella §1). → its own phase/card.
 - **Copy-token effects** (CR 707.2 token copies of a permanent) — mints a token from
   copiable values; rides M4c token minting + this snapshot. → first such card.
-- **The general as-enters replacement** (CR 614.12) — "enters with N counters",
-  "enters tapped unless...", "enters as a copy **with** riders". P2 does the copy
-  choice at resolution, not via a replacement. → first non-copy as-enters card.
+- **The general monadic as-enters replacement engine** (CR 614.12 / 616) — multiple
+  racing "enters with N counters" / "enters tapped unless..." / "enters as a copy
+  **with** riders" replacements, and the CR 616 ordering prompt when several apply to
+  one entry. P2's mark-then-drain seam (§2.4) is the **narrow single-choice first
+  version**: it attaches to the correct entry event and prompts once per object, but
+  does no multi-replacement ordering. The drain **folds into** this engine — the
+  `copyOnEnter` classification and the entry-funnel hook are reused, the bespoke
+  settle pass is replaced by CR 616 application. → **M4.5 P5** (the monadic
+  replacement path; umbrella §3, git-bug `6afb561`).
 - **Face-down** (morph / disguise / manifest / cloak) — a face-down *status* plus
   this copy/characteristics machinery. → backlog (umbrella §4).
 - **Legend rule for two copies** (CR 704.5j) — stays **elided** as it has since M3g
