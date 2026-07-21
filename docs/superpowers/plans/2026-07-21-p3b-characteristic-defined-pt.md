@@ -1320,7 +1320,7 @@ EOF
 - Consumes: Task 3's layer-7a fold (Tarmogoyf is the asymmetric fixture this task needs); Task 6's `freezeQuantities` (which gains one identity arm).
 - Produces: `Modification.SwitchPowerToughness`; `Cards.twistedImagePrinting`. **No new `TargetSpec`** — see Step 0.
 
-- [ ] **Step 0: Read the verified card data (already pinned)**
+- [x] **Step 0: Read the verified card data (already pinned)**
 
 **The controller verified this card against the Scryfall API on 2026-07-21. Do not re-fetch; use these values.**
 
@@ -1339,7 +1339,7 @@ Twisted Image's three Gatherer rulings, all dated **2021-03-19**, verbatim:
 
 Rulings 2 and 3 are transcribed as tests in Step 1. Ruling 1's *"regardless of when those effects began to apply"* clause is the timestamp-independence claim, also transcribed in Step 1 — it is the one genuinely new assertion the rulings added to this task.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to the `PowerToughness` list:
 
@@ -1465,12 +1465,12 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal test --test-options='-p "$0~/PowerToughness/"' 2>&1 | tail -30`
 Expected: FAIL — `Data constructor not in scope: Modification.SwitchPowerToughness`, `Cards.twistedImagePrinting` not in scope.
 
-- [ ] **Step 3: Add the modification and the layer op**
+- [x] **Step 3: Add the modification and the layer op**
 
 In `source/library/Pawl/Type/Modification.hs`, add after `SetColor`:
 
@@ -1498,13 +1498,13 @@ In `source/library/Pawl/Projection.hs`:
 
 `setLandSubtypeEffects`'s `isSet` and `rewriteModification`'s `apply1` both end in a wildcard, so they need no new arm.
 
-- [ ] **Step 4: Add the codec arms**
+- [x] **Step 4: Add the codec arms**
 
 **No `TargetSpec` change in this task** (Step 0's errata note). `Pawl.Type.TargetSpec` and `Pawl.Target` are untouched.
 
 In `source/library/Pawl/Codec.hs`, add `Modification.SwitchPowerToughness -> nullary (Text.pack "SwitchPowerToughness")` to `modificationToJson` and `"SwitchPowerToughness" -> Right Modification.SwitchPowerToughness` to `jsonToModification`. That is the whole codec change.
 
-- [ ] **Step 5: Add the card**
+- [x] **Step 5: Add the card**
 
 Create `data/cards/twisted-image.json` as a single line (**mana cost per Step 0**):
 
@@ -1514,12 +1514,12 @@ Create `data/cards/twisted-image.json` as a single line (**mana cost per Step 0*
 
 In `source/test-suite/Pawl/Cards.hs`, add `twistedImagePrinting` to the record, to `loadCards` (`loadPrinting "twisted-image"`), to the returned record, and to `allPrintings`. Deterministic fixture; no deck.
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test 2>&1 | tail -20`
 Expected: PASS, warning-free.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl/Type/Modification.hs source/library/Pawl/Projection.hs source/library/Pawl/Codec.hs data/cards/twisted-image.json source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/PowerToughnessSpec.hs pawl.cabal
