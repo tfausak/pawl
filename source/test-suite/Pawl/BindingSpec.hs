@@ -18,6 +18,7 @@ sampleSnapshot :: PC.ProjectedCharacteristics
 sampleSnapshot =
   PC.MkProjectedCharacteristics
     { PC.keywords = Set.empty,
+      PC.colors = Set.empty,
       PC.power = Just 2,
       PC.toughness = Just 1,
       PC.cardTypes = Set.empty,

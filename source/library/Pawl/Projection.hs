@@ -14,6 +14,7 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Duration as Duration
@@ -22,6 +23,9 @@ import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.Layer (Layer)
 import qualified Pawl.Type.Layer as Layer
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.ManaType as ManaType
 import Pawl.Type.Modification (Modification)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
@@ -178,6 +182,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
   Nothing ->
     PC.MkProjectedCharacteristics
       { PC.keywords = Set.empty,
+        PC.colors = Set.empty,
         PC.power = Nothing,
         PC.toughness = Nothing,
         PC.cardTypes = Set.empty,
@@ -190,6 +195,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
   Just card ->
     PC.MkProjectedCharacteristics
       { PC.keywords = Card.Type.keywords card,
+        PC.colors = baseColorsOf card,
         PC.power = case Card.Type.power card of
           Nothing -> Nothing
           Just (Power.MkPower q) -> Quantity.evaluate gs oid q,
@@ -203,6 +209,32 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.replacementEffects = Card.Type.replacementEffects card,
         PC.triggeredAbilities = Card.Type.triggeredAbilities card
       }
+
+-- CR 202.2 / 204.2: an object's PRINTED colours -- the colours of the coloured
+-- mana symbols in its mana cost, together with the colours its colour indicator
+-- denotes. CR 202.2b: an object with no coloured mana symbols and no indicator is
+-- colourless.
+baseColorsOf :: Card.Type.Card -> Set Color.Color
+baseColorsOf card =
+  Set.union
+    (Card.Type.colorIndicator card)
+    (manaCostColors (Card.Type.manaCost card))
+
+-- CR 202.1: a land has no mana cost at all, so it contributes no colours.
+manaCostColors :: Maybe ManaCost.ManaCost -> Set Color.Color
+manaCostColors mc = case mc of
+  Nothing -> Set.empty
+  Just (ManaCost.MkManaCost symbols) -> Set.fromList (Maybe.mapMaybe symbolColor symbols)
+
+-- CR 202.2a: only a coloured mana symbol carries a colour. Generic ({2}), {X},
+-- and the colourless symbol ({C}) carry none -- {C} is colourless mana, and
+-- CR 105.2c says colourless is not a colour.
+symbolColor :: ManaSymbol.ManaSymbol -> Maybe Color.Color
+symbolColor symbol = case symbol of
+  ManaSymbol.OfType (ManaType.Colored c) -> Just c
+  ManaSymbol.OfType ManaType.Colorless -> Nothing
+  ManaSymbol.Generic _ -> Nothing
+  ManaSymbol.Variable -> Nothing
 
 -- affects evaluated against an object's BASE characteristics (used by
 -- source-liveness, which must not recurse into the projection it feeds).
@@ -401,6 +433,12 @@ toughnessOf oid gs = PC.toughness (project oid gs)
 
 keywordsOf :: ObjectId -> GameState -> Set Keyword
 keywordsOf oid gs = PC.keywords (project oid gs)
+
+-- CR 105.2 / 613.1e: an object's colours after the layer fold. The SOLE read
+-- point -- the closed half never reads Card.manaCost for colour, the same
+-- discipline keywordsOf established at M2a.
+colorsOf :: ObjectId -> GameState -> Set Color.Color
+colorsOf oid gs = PC.colors (project oid gs)
 
 -- CR 602 / 613.1f: an object's activated abilities after the layer system, the
 -- same projection posture as keywordsOf. A Humility'd creature has none.

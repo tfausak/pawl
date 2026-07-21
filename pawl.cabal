@@ -189,6 +189,7 @@ test-suite pawl-test-suite
     Pawl.CardsSpec
     Pawl.CastSpec
     Pawl.CodecSpec
+    Pawl.ColorSpec
     Pawl.CombatSpec
     Pawl.CopySpec
     Pawl.CoreSpec

@@ -4,6 +4,7 @@ import Data.Set (Set)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.Card (Card)
 import Pawl.Type.CardType (CardType)
+import Pawl.Type.Color (Color)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.Subtype (Subtype)
@@ -16,6 +17,10 @@ import Pawl.Type.TriggeredAbility (TriggeredAbility)
 -- Ord derived so a copy snapshot can ride a Binding (CR 707.2, P2).
 data ProjectedCharacteristics = MkProjectedCharacteristics
   { keywords :: Set Keyword,
+    -- CR 105.2 / 613.1e layer 5: the object's colours after the layer system.
+    -- A Set, not a sum with a Colorless arm: CR 105.2c says a colourless object
+    -- has NO colour, and CR 105.4 denies that colourless is a colour at all.
+    colors :: Set Color,
     power :: Maybe Integer,
     toughness :: Maybe Integer,
     cardTypes :: Set CardType,

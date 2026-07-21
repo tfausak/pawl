@@ -742,6 +742,10 @@ cardToJson c =
         (Text.pack "castingPermissions", listTo castingPermissionToJson (CardT.castingPermissions c))
       ]
         ++ (if CardT.copyOnEnter c then [(Text.pack "copyOnEnter", Json.jBool True)] else [])
+        ++ ( if Set.null (CardT.colorIndicator c)
+               then []
+               else [(Text.pack "colorIndicator", setTo colorToJson (CardT.colorIndicator c))]
+           )
     )
 
 getOpt :: Text -> [(Text, Value)] -> Value
@@ -752,6 +756,14 @@ jsonToBoolDefault d value = case value of
   Null -> Right d
   Boolean b -> Right b
   _ -> Left (Text.pack "expected a boolean")
+
+-- An omitted set field decodes to empty. Lets an all-default field stay OUT of
+-- the committed JSON, so existing files remain byte-identical (the copyOnEnter
+-- precedent, P2).
+setFromDefault :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Set a)
+setFromDefault f value = case value of
+  Null -> Right Set.empty
+  _ -> setFrom f value
 
 jsonToCard :: Value -> Either Text CardT.Card
 jsonToCard value = do
@@ -769,6 +781,7 @@ jsonToCard value = do
   triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= listFrom jsonToCastingPermission
   copyOnEnter <- jsonToBoolDefault False (getOpt (Text.pack "copyOnEnter") ps)
+  colorIndicator <- setFromDefault jsonToColor (getOpt (Text.pack "colorIndicator") ps)
   pure
     CardT.MkCard
       { CardT.name = name,
@@ -783,7 +796,8 @@ jsonToCard value = do
         CardT.replacementEffects = replacements,
         CardT.triggeredAbilities = triggered,
         CardT.castingPermissions = permissions,
-        CardT.copyOnEnter = copyOnEnter
+        CardT.copyOnEnter = copyOnEnter,
+        CardT.colorIndicator = colorIndicator
       }
 
 printingToJson :: Printing.Printing -> Value

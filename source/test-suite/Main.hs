@@ -5,6 +5,7 @@ import qualified Pawl.Cards as Cards
 import qualified Pawl.CardsSpec as CardsSpec
 import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.CodecSpec as CodecSpec
+import qualified Pawl.ColorSpec as ColorSpec
 import qualified Pawl.CombatSpec as CombatSpec
 import qualified Pawl.CopySpec as CopySpec
 import qualified Pawl.CoreSpec as CoreSpec
@@ -53,5 +54,6 @@ testTree cards =
       ProjectionSpec.tests cards,
       ActivateSpec.tests cards,
       ModalSpec.tests cards,
-      CopySpec.tests cards
+      CopySpec.tests cards,
+      ColorSpec.tests cards
     ]

@@ -4,6 +4,7 @@ import Data.Set (Set)
 import Data.Text (Text)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.CastingPermission (CastingPermission)
+import Pawl.Type.Color (Color)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
 import Pawl.Type.Modal (Modal)
@@ -29,6 +30,14 @@ data Card = MkCard
     -- The closed half must read this through Pawl.Projection.keywordsOf, never
     -- directly: layer 6 grants and removes abilities at M3.
     keywords :: Set Keyword,
+    -- CR 204.1/204.2: the colour indicator printed left of the type line. An
+    -- object is each colour it denotes, IN ADDITION to the colours of its mana
+    -- cost (CR 202.2/202.2e). Empty for a card whose colours come from its cost
+    -- alone. This is also where a TOKEN's colour lives: CR 111.3 makes the
+    -- creating effect's stated characteristics "functionally equivalent to the
+    -- characteristic values that are printed on a card", and a token has no mana
+    -- cost. Read through Pawl.Projection.colorsOf, never directly.
+    colorIndicator :: Set Color,
     -- CR 604.1/604.2: this card's static continuous abilities (Humility). Empty
     -- for everything but the few printings that generate a continuous effect just
     -- by being on the battlefield. The projection gathers these live.

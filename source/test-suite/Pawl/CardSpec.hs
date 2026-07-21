@@ -140,6 +140,7 @@ cardTests cards =
                   Card.Type.power = Nothing,
                   Card.Type.toughness = Nothing,
                   Card.Type.keywords = Set.empty,
+                  Card.Type.colorIndicator = Set.empty,
                   Card.Type.staticAbilities = [],
                   Card.Type.spell = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
                   Card.Type.activatedAbilities = [],

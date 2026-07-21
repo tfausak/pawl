@@ -239,6 +239,7 @@ resolveTests cards =
                   Card.Type.power = Nothing,
                   Card.Type.toughness = Nothing,
                   Card.Type.keywords = Set.empty,
+                  Card.Type.colorIndicator = Set.empty,
                   Card.Type.staticAbilities = [],
                   Card.Type.spell =
                     Modal.MkModal
