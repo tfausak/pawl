@@ -83,53 +83,45 @@ zone change for free** (CR 122.2/400.7's `changeZone` reset, the same mechanism
 that clears counters and targets). No new base `Object` field; nothing to clean up
 at cleanup or when the object leaves.
 
-### 2.2 Copy lives in `Pawl.Projection` (the case-on-`Modification` home)
+### 2.2 Copy is the fold seed (layer 1), in `Pawl.Projection`
 
-The standing invariant is that **only `Pawl.Projection` may `case` on a
-`Modification`**, and copy is a layer-1 `Modification`, so it lives there — the same
-placement as `counterGathered` (which reads per-object `Object.counters` and
-synthesizes a layer-7c `ModifyPowerToughness`). Copy mirrors it precisely:
+Layer 1 is the *first* layer, and pawl's projection already begins its fold from a
+starting value — `baseCharacteristics oid gs` (the printed characteristics). A copy
+effect replaces exactly that starting value with the copied object's **copiable
+values** (CR 707.2 / 613.1a). So copy is the **fold seed**, not a synthesized
+`Modification`:
 
 - **`Projection.copiableCharacteristics :: ObjectId -> GameState ->
-  ProjectedCharacteristics`** — the copied object's copiable values: its
-  `baseCharacteristics` folded with **only the `Layer.Copy` candidates** (nothing
-  above layer 1). For an ordinary creature this is just its base characteristics;
-  for a creature that is itself a copy, its own layer-1 `BecomeCopy` (carrying its
-  baked snapshot) applies, yielding the underlying creature. This is the value
-  snapshotted at entry (§2.4).
-- **`Projection.copyGathered :: GameState -> [Gathered]`** — reads each battlefield
-  object's copy binding (via `Pawl.Binding`) and emits, for each object that has
-  one, a `Layer.Copy` `Gathered` whose modification carries the snapshot. Appended
-  in `gather` alongside `stored ++ static_ ++ counterGathered`.
+  ProjectedCharacteristics`** — the object's layer-1 result: if the object carries a
+  copy snapshot in its `bindings` (stamped at entry, §2.4), that snapshot **is** its
+  copiable value; otherwise it is `baseCharacteristics oid gs`. Because the snapshot
+  was itself computed as a copiable value at entry, a copy of a copy already carries
+  the underlying creature — no recursion at fold time, no cycle possible.
+- **`Projection.projectFrom` seeds the layer fold with `copiableCharacteristics oid
+  gs`** in place of `baseCharacteristics oid gs` (a one-line change). Layers 2–7
+  (control, counters, pumps, ability grants) then fold on top exactly as before.
 
-`copiableCharacteristics` folding *only* `Layer.Copy` is what enforces CR 707.2's
-subset: counters and pumps are layer 7c, control is layer 2, ability grants are
-layer 6 — none are folded, so none are copied. **This is the falsifier made
-structural.**
+Seeding at layer 1 with *only* base-or-snapshot is what enforces CR 707.2's subset:
+counters and pumps are layer 7c, control is layer 2, ability grants are layer 6 —
+they fold *after* the seed and so are never part of a copied object's own copiable
+value. **This is the falsifier made structural.** `affectsBase` (source-liveness)
+keeps reading `baseCharacteristics`, never the copiable seed, so nothing recurses.
 
-### 2.3 The synthesized modification
+No new `Modification` constructor is introduced — copy is not a `case`-on-
+`Modification` operation but a replacement of the fold's starting value, so
+`Pawl.Projection` stays the sole home of the layer machinery with **no `Codec`
+surface** (a `Modification.BecomeCopy` would have forced a dead `ProjectedCharacteristics`
+JSON encoding, since it never appears in a card; the seed avoids it entirely).
 
-- **`Modification.BecomeCopy ProjectedCharacteristics`** (new) at `Layer.Copy`. It
-  is **synthesized-only** — produced solely by `copyGathered` from a binding
-  snapshot, **never** present in card JSON or `GameState.continuousEffects` (as the
-  synthesized 7c `ModifyPowerToughness` from `counterGathered` is). Its `Codec` arm
-  is therefore trivial and exists only for totality (it round-trips like any other,
-  but no real card serializes it).
-  - `Projection.layer (BecomeCopy _) = Layer.Copy`.
-  - `Projection.applyModification gs oid (BecomeCopy snap) _ = snap` — it **replaces**
-    the in-progress characteristics wholesale (at layer 1 the incoming value is just
-    the object's base, so nothing is lost), the way CR 707.2's "copiable values
-    become" works.
-  - `rewriteModification` / `setLandSubtypeEffects` gain identity/`False` arms for
-    exhaustiveness (a copy carries no basic-land-type word to text-change, and is
-    not a `SetLandSubtype`), per `Modification`'s discipline.
-- **`ProjectedCharacteristics` gains `deriving Ord`** so it can be a `Modification`
-  field (and a `Binding` field, §2.4). This follows the project's "derive `Ord`
-  broadly — it is harmless and occasionally useful" posture; the old "No Ord: never
-  sorted, never a key" comment is retired. The characteristics carried are exactly
-  CR 707.2's copiable subset pawl currently projects (keywords, P/T, card types,
-  subtypes, the three ability lists, `rulesTextActive`); name/mana cost/color/
-  supertypes are not projected and so not copied (§7).
+### 2.3 `ProjectedCharacteristics` gains `Ord`
+
+The snapshot rides a `Binding` field (§2.4), and `Binding` (via `Object`) derives
+`Ord`, so **`ProjectedCharacteristics` gains `deriving Ord`**. This follows the
+project's "derive `Ord` broadly — it is harmless and occasionally useful" posture;
+the old "No Ord: never sorted, never a key" comment is retired. The characteristics
+carried are exactly CR 707.2's copiable subset pawl currently projects (keywords,
+P/T, card types, subtypes, the three ability lists, `rulesTextActive`); name/mana
+cost/color/supertypes are not projected and so not copied (§7).
 
 ### 2.4 The as-enters choice: entry funnel + settle-boundary drain (no opcode)
 
@@ -158,7 +150,7 @@ monadic **drain**:
   every battlefield object still carrying the pending marker and resolves its choice:
   prompt `ChooseCopyTarget`; on `Just chosen`, compute
   `Projection.copiableCharacteristics chosen gs`, write the snapshot into the copy
-  binding (`Pawl.Binding.fromChoices`), and clear the marker; on `Nothing` (decline),
+  binding (`Pawl.Binding.setCopy`), and clear the marker; on `Nothing` (decline),
   just clear the marker.
 - **`Prompt.ChooseCopyTarget` / `Response.ChoseCopyTarget (Maybe ObjectId)`** (new
   pair). Legal set = **battlefield creatures** (projected creature-ness,
@@ -240,18 +232,13 @@ exists in the engine — **no synthetic crutch is needed** (the
 
 - `Pawl.Type.ProjectedCharacteristics` — add `Ord` to the deriving; retire the "No
   Ord" comment.
-- `Pawl.Type.Modification` — add `BecomeCopy ProjectedCharacteristics` (import
-  `ProjectedCharacteristics`); it is synthesized-only.
 - `Pawl.Type.Binding` — add `copy :: Maybe ProjectedCharacteristics`.
-- `Pawl.Binding` — add the `copyOf` projection, the `fromChoices` write path, and
-  the reserved copy slot name.
+- `Pawl.Binding` — add the `copyOf` projection and `setCopy` write; the reserved
+  copy-snapshot slot; and the reserved **as-enters-pending** marker slot with
+  `pendingCopy` / `markPending` / `clearPending`.
 - `Pawl.Type.Card` — add `copyOnEnter :: Bool`.
-- `Pawl.Projection` — add `copiableCharacteristics` and `copyGathered`; append
-  `copyGathered` in `gather`; `layer (BecomeCopy _) = Copy`; `applyModification
-  (BecomeCopy snap) _ = snap`; identity arms in `rewriteModification` /
-  `setLandSubtypeEffects`.
-- `Pawl.Binding` — add the reserved **as-enters-pending** marker slot (set by the
-  mark, cleared by the drain) alongside the `copy` slot.
+- `Pawl.Projection` — add `copiableCharacteristics`; seed `projectFrom` with it.
+  No `Modification`, `layer`, `applyModification`, or `Codec` change.
 - `Pawl.Event` (`placeObject`) — pure **mark**: stamp the pending marker on a
   `copyOnEnter` object as it enters. No `case effect of` / no prompt.
 - The settle loop (`Pawl.Engine` / `Pawl.Stack` — wherever the CR 117.5 boundary
@@ -262,25 +249,24 @@ exists in the engine — **no synthetic crutch is needed** (the
   `ChoseCopyTarget`.
 - `Pawl.Target` — add `legalCopyTargets` (battlefield creatures excluding self).
 - `Pawl.Replay` — deterministic `ChoseCopyTarget` answer.
-- `Pawl.Codec` — `BecomeCopy` arm (trivial/total), `Card.copyOnEnter` field, the
-  `Binding.copy` field if bindings are serialized (they are not — runtime state — so
-  confirm no Codec work beyond the card field and the modification arm);
-  `clone.json` round-trip.
+- `Pawl.Codec` — `Card.copyOnEnter` field only (emitted **when True**, so the 44
+  existing card files stay byte-stable; decoded optionally, default `False`). No
+  `Modification` arm (§2.2), and bindings are runtime state, never serialized.
+  `clone.json` round-trips.
 - `data/cards/clone.json` added; `allPrintings` updated.
 
 ## 6. Ordering within the phase (for the plan)
 
 Substrate before consumer, falsifier-first: (1) `ProjectedCharacteristics` Ord +
-`Modification.BecomeCopy` + the `layer`/`applyModification` arms; (2)
-`copiableCharacteristics` + `copyGathered` + the `gather` append, tested by
-projecting a hand-placed copy binding directly (unit-level, before the card exists);
-(3) the `Binding.copy` + pending-marker slots + `Pawl.Binding` accessors; (4)
-`Card.copyOnEnter`, `ChooseCopyTarget`/`ChoseCopyTarget`, `Target.legalCopyTargets`,
-the pure `placeObject` mark, and the monadic settle-boundary drain (ordered before
-triggers/SBAs); (5) `clone.json`, the six gate scenarios, `Replay`, `Codec`,
-round-trip.
-Each is one small complete commit; TDD per CLAUDE.md (write the failing gameplay
-test, watch it fail, implement).
+the `Binding.copy` + pending-marker slots + `Pawl.Binding` accessors; (2)
+`copiableCharacteristics` + the `projectFrom` seed, tested by projecting a
+hand-placed copy binding directly (unit-level, before the card exists); (3)
+`Card.copyOnEnter` + `Codec` + `Subtype.Shapeshifter`; (4) `clone.json` +
+`Cards.clonePrinting` + round-trip; (5) `ChooseCopyTarget`/`ChoseCopyTarget` +
+`Replay` + answerers + `Target.legalCopyTargets`; (6) the pure `placeObject` mark;
+(7) the monadic settle-boundary drain + gate scenarios (ordered before
+triggers/SBAs). Each is one small complete commit; TDD per CLAUDE.md (write the
+failing test, watch it fail, implement).
 
 ## 7. Deferred, with named expiries
 
@@ -298,6 +284,19 @@ test, watch it fail, implement).
   mechanism (umbrella §1). → its own phase/card.
 - **Copy-token effects** (CR 707.2 token copies of a permanent) — mints a token from
   copiable values; rides M4c token minting + this snapshot. → first such card.
+- **Copying a permanent's static abilities** (a Clone of Humility / Opalescence).
+  `gather` collects static abilities from an object's *printed* card
+  (`Game.cardOf`), not its copiable value, so a copied static ability does not yet
+  fold. `ProjectedCharacteristics` carries no `staticAbilities` field (statics are
+  gathered separately). *Activated / triggered / replacement* abilities **are**
+  copied (they live in `ProjectedCharacteristics`, seeded from the source's base).
+  No gate scenario copies a static-ability permanent. → first card that copies a
+  static-ability permanent.
+- **Simultaneous entry of multiple copy-choosers** (CR 614.12b / 614.13, two Clones
+  entering at once). The drain resolves pending markers sequentially, each seeing
+  the current board; the "can't choose a co-entering object" rule and CR 616
+  ordering are not modelled. The gate enters Clones one at a time. → rides the P5
+  monadic replacement engine.
 - **The general monadic as-enters replacement engine** (CR 614.12 / 616) — multiple
   racing "enters with N counters" / "enters tapped unless..." / "enters as a copy
   **with** riders" replacements, and the CR 616 ordering prompt when several apply to
