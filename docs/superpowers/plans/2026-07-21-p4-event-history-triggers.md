@@ -1728,7 +1728,7 @@ The log becomes readable as history. `CountSpec` grows one arm that folds `GameS
 - Consumes: `GameState.events`, `GameEvent.Moved` (Task 1); `TriggerCondition.StepBegins`, `TurnScope.EachTurn` (Task 2); `Binding.triggerSource` (Task 3).
 - Produces: `CountSpec.CreaturesDiedThisTurn`; `Subtype.Zombie`; `Pawl.Cards.khabalGhoulPrinting`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/TriggerSpec.hs` (and to the `tests` list):
 
@@ -1760,6 +1760,18 @@ historyTests cards =
              in do
                   HU.assertEqual "two +1/+1 counters" 2 (countersOn ghoul atEnd)
                   HU.assertEqual "a 3/3" (Just 3) (Projection.powerOf ghoul atEnd),
+          -- The ruling's OTHER half: "...as well as creatures put into a graveyard
+          -- before Khabál Ghoul entered the battlefield." Every other case here adds
+          -- the Ghoul first, so without this one nothing proves the count is not
+          -- scoped to the Ghoul's own lifetime. A regression gate on the signature
+          -- rather than a discriminator: `countOf` takes no ObjectId, so scoping the
+          -- fold to the counting object is currently unrepresentable.
+          HU.testCase "CR 608.2i a creature that died before the Ghoul entered is still counted" $
+            let (p1, gs0) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+                dead = Event.destroy p1 gs0
+                (ghoul, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice dead
+                atEnd = resolveAll (settle (beginEndStep gs1))
+             in HU.assertEqual "the earlier death counts" 1 (countersOn ghoul atEnd),
           -- CR 111.3 / 608.2h: a token has NO printed card, so an implementation
           -- that re-derived card types from print instead of from the event's
           -- snapshot would read zero here.
@@ -1811,12 +1823,12 @@ Add to `CodecSpec.hs`'s "P4 runtime types" group:
 
 with `Pawl.Type.CountSpec` imported, and switch the second `StateCondition` round-trip entry added in Task 4 to `StateCondition.NoPermanentsOfSubtype Subtype.Zombie`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `CountSpec.CreaturesDiedThisTurn`, `Subtype.Zombie` and `Cards.khabalGhoulPrinting` are not in scope.
 
-- [ ] **Step 3: Add the counting arm**
+- [x] **Step 3: Add the counting arm**
 
 In `source/library/Pawl/Type/CountSpec.hs`, add the arm — and correct the type's header comment, whose "Both inhabitants read only zone membership and PRINTED card types" claim this arm changes:
 
@@ -1871,7 +1883,7 @@ died event = case event of
 
 Add to `Quantity.hs`'s imports: `qualified Pawl.Type.GameEvent as GameEvent`, `qualified Pawl.Type.ProjectedCharacteristics as PC`, `qualified Pawl.Type.ZoneChange as ZoneChange`. `Data.Foldable`, `Data.Set`, `Pawl.Type.CardType` and `Pawl.Type.Zone` are already imported. Note `Pawl.Quantity` cases on `GameEvent` here while `Pawl.Event` cases on it too — that is fine: `GameEvent` is a data record, not a case-restricted classification like `TriggerCondition`, whose sole casing home stays `Pawl.Event`.
 
-- [ ] **Step 4: Add the codec arm and the card**
+- [x] **Step 4: Add the codec arm and the card**
 
 In `source/library/Pawl/Codec.hs`, add `CountSpec.CreaturesDiedThisTurn -> "CreaturesDiedThisTurn"` to `countSpecToJson` and the matching pair to `jsonToCountSpec`'s table, plus the `Zombie` entries in `subtypeToJson` / `jsonToSubtype`.
 
@@ -1883,12 +1895,12 @@ Create `data/cards/khabál-ghoul.json` — note the non-ASCII `á` (NFC, U+00E1)
 
 In `source/test-suite/Pawl/Cards.hs`, add `khabalGhoulPrinting` (an ASCII field name for a non-ASCII slug) with `khabalGhoulPrinting_ <- loadPrinting "khabál-ghoul"`, the record field, and the `allPrintings` entry.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, including `Pawl.CardSpec`'s "the data/cards directory and Cards.allPrintings agree, by slug" test — that one is the check that the non-ASCII file name survived the filesystem round trip.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add source/library/Pawl/Type/CountSpec.hs source/library/Pawl/Type/Subtype.hs source/library/Pawl/Quantity.hs source/library/Pawl/Codec.hs "data/cards/khabál-ghoul.json" source/test-suite/Pawl/TriggerSpec.hs source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/CodecSpec.hs
