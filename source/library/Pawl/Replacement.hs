@@ -223,7 +223,8 @@ applies gs event candidate =
         -- card pool is self-regeneration (CR 701.19a).
         (ReplacementEffect.DestructionR _, ProposedEvent.WouldBeDestroyed oid) -> src == oid
         (ReplacementEffect.CounterR pat _, ProposedEvent.WouldPutCounters oid kind _) ->
-          -- CR 614.16: `whichKind = Nothing` means any kind, never no kind.
+          -- Our own encoding convention, not a rule: `whichKind = Nothing` means
+          -- any kind, never no kind.
           maybe True (== kind) (CounterPattern.whichKind pat)
             && matchesController gs src (CounterPattern.whose pat) oid
             && matchesPermanent gs (CounterPattern.onWhat pat) oid
@@ -256,7 +257,7 @@ matchesController gs src rel oid = case rel of
   ControllerRelation.Anyones -> True
   ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
 
--- CR 614.16: which permanents a pattern admits. P9 generalizes this.
+-- Which permanents a pattern admits. P9 generalizes this.
 matchesPermanent :: GameState -> PermanentCriterion.PermanentCriterion -> ObjectId -> Bool
 matchesPermanent gs crit oid = case crit of
   PermanentCriterion.AnyPermanent -> True
@@ -298,7 +299,7 @@ bucketOf re = case re of
   -- AsCopy. The split this arm encodes only becomes observable for an object
   -- with an AsCopy AND another entry replacement applicable in the SAME
   -- iteration, which no card in the pool produces, so the bucket ordering
-  -- itself is unexercised by any test (#75).
+  -- itself is unexercised by any test (#73).
   ReplacementEffect.EntryR EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
   ReplacementEffect.EntryR (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
   ReplacementEffect.DamageR _ _ -> ReplacementBucket.Other
@@ -571,6 +572,10 @@ legalCopyTargets batch self gs =
 -- recorded, so no trigger scan and no state-based action can see it. That is
 -- strictly stronger than P2's drain, whose observable-equivalence argument this
 -- discharges.
+-- `Monad.void` discards the `Nothing` case `apply`'s doc warns means "the event
+-- does not happen." Safe here: both EntryR arms (AsCopy, ChoiceOf) always
+-- return `Just`; only DamageR/DestructionR ever return `Nothing`, and neither
+-- pairs with WouldEnter, the only event this loop ever proposes.
 runEntry :: Set ObjectId -> ObjectId -> Game ()
 runEntry batch oid = Monad.void (applyReplacementsIn batch (ProposedEvent.WouldEnter oid))
 

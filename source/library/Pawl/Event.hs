@@ -325,7 +325,8 @@ recordTokenEntry newId = do
 -- CR 121.2/121.3: the single-card draw. Move pid's top library card to their
 -- hand; an empty library records the failed draw (CR 704.5b makes it a loss at
 -- the next state-based-action check). The primitive shared by the draw step
--- (Engine.drawFor), opening hands (Setup.drawCard), and the Draw effect (Resolve).
+-- (Engine.runTurnBasedActions), opening hands (Setup.newGame), and the Draw
+-- effect (Resolve).
 drawCard :: PlayerId -> Game ()
 drawCard pid = do
   gs <- State.get

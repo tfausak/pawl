@@ -39,10 +39,10 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   M3.5 cards-as-data interstitial, and the whole of M4 (M4a–M4g plus the
   M4h fast-follow). **M4.5 (phased) is in progress: P1–P3b closed Cluster 1**
   (every sublayer of the layer system has a producer), **P4 opened Cluster 2**
-  (the event-history substrate), **and P5 closed Cluster 2's second phase —
-  the monadic replacement path and CR 616 — discharging the `P4 → {P6, P7}`
-  edge so both are unblocked. P6 (conditional & event durations) is next**;
-  P8/P9 still float. The umbrella spec is
+  (the event-history substrate) **and discharged the `P4 → {P6, P7}` edge**,
+  **and P5 closed Cluster 2's second phase — the monadic replacement path and
+  CR 616 — leaving P6 and P7 unblocked. P6 (conditional & event durations) is
+  next**; P8/P9 still float. The umbrella spec is
   `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —
@@ -62,7 +62,7 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   not an effect. See §1 of the M2a spec before "fixing" this.
 - **Outstanding work is tracked in GitHub Issues** (`tfausak/pawl`). List with
   `gh issue list`; create with `gh issue create`; close with `gh issue close`.
-  Milestones are the unlanded phases (`M4.5 P5`…`P11`, `M5`–`M7`); the useful
+  Milestones are the unlanded phases (`M4.5 P6`…`P11`, `M5`–`M7`); the useful
   labels are `elision`, `gap`, `rules-correctness`, `bug`, and the two expiry
   triggers `expires:milestone` and `expires:card-driven` — roughly half of
   pawl's deferrals fire when a *card* demands them and have no scheduled date,

@@ -119,9 +119,6 @@ shuffleLibrary pid = do
   shuffled <- Trans.lift (Program.prompt (Prompt.Shuffle ids))
   State.put gs {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library gs)}
 
-drawCard :: PlayerId -> Game ()
-drawCard = Event.drawCard
-
 -- Build each player's library from their deck's multiset, shuffle, draw.
 createDeck :: PlayerId -> Deck.Deck -> Game ()
 createDeck pid (Deck.MkDeck m) =
@@ -132,4 +129,4 @@ newGame :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame matchup = Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
   createDeck pid deck
   shuffleLibrary pid
-  Monad.replicateM_ openingHand (drawCard pid)
+  Monad.replicateM_ openingHand (Event.drawCard pid)

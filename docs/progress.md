@@ -1249,14 +1249,20 @@ its own gate card and spec, landed as it completes. Umbrella:
   — **exactly one replacement path exists in the engine, and it is monadic**,
   replacing the pure single left-to-right fold M3f shipped as a placeholder.
   **Three gate cards, each falsifying a different part of the pure-fold
-  assumption.** **Hardened Scales + Corpsejack Menace** (two "if a +1/+1
-  counter would be put on a permanent you control, put an additional counter
-  of that kind on it instead" effects) falsify determinism-by-list-order: CR
-  616.1 says the affected permanent's controller **chooses** which applies
-  first, and a pure fold has no chooser to ask — it has to invent an order,
-  silently making a choice the rules assign to a player. (The order does not
-  change the *count* here — 1 → 2 → 3 either way — but it is still a choice
-  CR 616.1 assigns to a player, and the engine must not make it unasked.)
+  assumption.** **Hardened Scales + Corpsejack Menace** falsify
+  determinism-by-list-order — and, unlike the two-Hardened-Scales case this
+  phase also tests, the order here changes the *count*, not just the
+  audit trail. Hardened Scales reads "If one or more +1/+1 counters would
+  be put on a creature you control, that many plus one +1/+1 counters are
+  put on it instead"; Corpsejack Menace reads "...twice that many...
+  instead." CR 616.1 says the affected permanent's controller **chooses**
+  which applies first, and a pure fold has no chooser to ask — it has to
+  invent an order, silently making a choice the rules assign to a player.
+  On the same board resolving the same spell, Scales-then-Corpsejack
+  computes (1 + 1) × 2 = **4**; Corpsejack-then-Scales computes
+  (1 × 2) + 1 = **3**. Same input, different outcome, decided solely by
+  which effect the player picks first — a pure fold cannot even fall back
+  on "the answer doesn't matter" here.
   **Doubling Season** is one card with two replacement abilities in two
   different event classes (`TokenR` for "twice that many tokens," `CounterR`
   for "twice that many counters"), which falsifies a design that gives one
@@ -1316,13 +1322,14 @@ its own gate card and spec, landed as it completes. Umbrella:
   the sole candidate, not because of its bucket; what actually makes CR 616.2
   work is CR 616.1f's re-collection each iteration together with departure
   (1)'s value identity, and the bucket split itself is exercised by no test
-  (#75). **CR 616.1g's nesting is implemented but exercised by no test**:
+  (#73). **CR 616.1g's nesting is implemented but exercised by no test**:
   every token card in the pool has empty `replacementEffects`, so
   `Event.createTokens`'s nested per-token entry loop finds no candidates and
   returns immediately — deleting the nesting call would leave all 694 tests
-  passing. This was verified empirically (by reading the diff the deletion
-  would produce and confirming no test's fixture cards populate
-  `replacementEffects`), not inferred from the pool's shape (#73). **Eight
+  passing. This was verified empirically, not inferred from the pool's
+  shape: `7b191b2` actually deleted the `Monad.mapM_ (Replacement.runEntry
+  …)` line from `Event.createTokens`, ran the suite, watched all 694 tests
+  still pass, and restored the line (#73). **Eight
   wrong CR citations were caught during the phase**, worth recording as the
   phase's most transferable lesson: one originated in the design spec itself;
   one was copied from already-landed code on the assumption a landed citation

@@ -91,9 +91,6 @@ nextStillPlaying gs pid =
 checkSba :: Game ()
 checkSba = Sba.checkStateBasedActions
 
-drawFor :: PlayerId -> Game ()
-drawFor = Event.drawCard
-
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
   gs <- State.get
@@ -158,7 +155,7 @@ runTurnBasedActions phase = do
         gs {GameState.landPlayed = Set.delete active (GameState.landPlayed gs)}
     Phase.Beginning BeginningStep.DrawStep -> do
       skip <- State.gets skipsDraw
-      Monad.unless skip (drawFor active)
+      Monad.unless skip (Event.drawCard active)
     Phase.Combat CombatStep.DeclareAttackers -> do
       Combat.declareAttackers active
       -- CR 508.8: with the attacker set now final, drop the two combat steps that
