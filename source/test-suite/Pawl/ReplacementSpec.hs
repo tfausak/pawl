@@ -393,14 +393,18 @@ tests cards =
                           HU.assertEqual "its OWN choice wins on P/T" (Just 3) (Projection.toughnessOf clone s3)
                           HU.assertBool "flying and defender rode the copy chain" (Projection.hasKeyword Keyword.Flying clone s3 && Projection.hasKeyword Keyword.Defender clone s3)
                 _ -> HU.assertFailure "fixture did not deal three cards",
-        -- CR 616.1's own elision, at the ChoiceOf boundary: a single-option
-        -- as-enters choice is not a choice at all, so it must apply with no
-        -- ChooseEntryOption prompt -- same shape as the CR 616.1 "one Hardened
-        -- Scales alone is not asked about" case above, but for EntryR rather
-        -- than CounterR. Built as rules-level data (a floating EntryR ChoiceOf
-        -- with one option, seeded via S.addReplacement) rather than a synthetic
-        -- card file: no printed card in the pool has a single-option choice.
-        HU.testCase "CR 616.1 a single-option ChoiceOf is not a choice and must not prompt" $
+        -- CR 208.2b's own elision, at the ChoiceOf boundary: such an ability
+        -- "lists two or more specific power and toughness values", so a
+        -- single-option as-enters choice is not a 208.2b choice at all and
+        -- must apply with no ChooseEntryOption prompt. NOT the same shape as
+        -- the CR 616.1 "one Hardened Scales alone is not asked about" case
+        -- above -- that is one CANDIDATE in a race between several sources;
+        -- this is one OPTION inside a single candidate's own payload, which
+        -- 616.1 (choosing which replacement effect applies) never reaches.
+        -- Built as rules-level data (a floating EntryR ChoiceOf with one
+        -- option, seeded via S.addReplacement) rather than a synthetic card
+        -- file: no printed card in the pool has a single-option choice.
+        HU.testCase "CR 208.2b a single-option ChoiceOf is not a choice and must not prompt" $
           let (piker, g1) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
               (ts, g2) = Game.freshTimestamp g1
               onlyOption = EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}
@@ -417,5 +421,35 @@ tests cards =
               after = S.runPure S.identityAnswer g3 (Replacement.runEntry Set.empty piker)
            in do
                 HU.assertBool "no ChooseEntryOption was raised" (not (wasAskedForEntryOption asked))
-                HU.assertEqual "the sole option applied anyway" (Just 3) (Projection.powerOf piker after)
+                HU.assertEqual "the sole option applied anyway" (Just 3) (Projection.powerOf piker after),
+        HU.testCase "CR 616.1g Doubling Season turns Dragon Fodder's two Goblins into four" $
+          let base = S.landsInPlay (Cards.mountainPrinting cards) 2
+              (_, g1) = S.addCreature (Cards.doublingSeasonPrinting cards) S.alice base
+              (g2, spellId) = S.handOne (Cards.dragonFodderPrinting cards) g1
+              after = castAndResolve S.identityAnswer g2 spellId
+           in HU.assertEqual "twice that many" 4 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after),
+        HU.testCase "CR 614.5 two Doubling Seasons are two instances: eight Goblins" $
+          let base = S.landsInPlay (Cards.mountainPrinting cards) 2
+              (_, g1) = S.addCreature (Cards.doublingSeasonPrinting cards) S.alice base
+              (_, g2) = S.addCreature (Cards.doublingSeasonPrinting cards) S.alice g1
+              (g3, spellId) = S.handOne (Cards.dragonFodderPrinting cards) g2
+              after = castAndResolve S.identityAnswer g3 spellId
+           in HU.assertEqual "2 -> 4 -> 8" 8 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after),
+        HU.testCase "CR 614.1 Doubling Season's OTHER clause doubles counters, not tokens" $
+          let (gs, spellId, mine, _) = counterBoard cards [Cards.doublingSeasonPrinting cards, Cards.pikerPrinting cards] []
+           in case mine of
+                season : piker : _ ->
+                  let after = castAndResolve (raceAnswer season piker) gs spellId
+                   in HU.assertEqual "1 * 2" 2 (countersOn CounterKind.PlusOnePlusOne piker after)
+                _ -> HU.assertFailure "fixture did not build two permanents",
+        HU.testCase "CR 616.1 Doubling Season racing Hardened Scales: 4 or 3, by the prompt" $
+          let (gs, spellId, mine, _) = counterBoard cards [Cards.doublingSeasonPrinting cards, Cards.hardenedScalesPrinting cards, Cards.pikerPrinting cards] []
+           in case mine of
+                season : scales : piker : _ ->
+                  let seasonFirst = castAndResolve (raceAnswer season piker) gs spellId
+                      scalesFirst = castAndResolve (raceAnswer scales piker) gs spellId
+                   in do
+                        HU.assertEqual "(1 * 2) + 1" 3 (countersOn CounterKind.PlusOnePlusOne piker seasonFirst)
+                        HU.assertEqual "(1 + 1) * 2" 4 (countersOn CounterKind.PlusOnePlusOne piker scalesFirst)
+                _ -> HU.assertFailure "fixture did not build three permanents"
       ]

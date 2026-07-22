@@ -34,6 +34,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import Pawl.Type.CandidateId (CandidateId)
 import qualified Pawl.Type.CandidateId as CandidateId
+import Pawl.Type.Card (Card)
 import Pawl.Type.ControllerRelation (ControllerRelation)
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.CounterKind as CounterKind
@@ -65,6 +66,7 @@ import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TokenPattern as TokenPattern
 import qualified Pawl.Type.Uses as Uses
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
@@ -206,16 +208,17 @@ applies gs event candidate =
           maybe True (== kind) (CounterPattern.whichKind pat)
             && matchesController gs src (CounterPattern.whose pat) oid
             && matchesPermanent gs (CounterPattern.onWhat pat) oid
-        -- Every row below falls through to False, but for two different reasons.
-        -- ZoneChangeR, DamageR, DestructionR, CounterR and (since Task 7) EntryR
-        -- are unreachable HERE because an arm ABOVE already matches every event of
-        -- that class -- a row below only fires for a MISMATCHED class (e.g. a
-        -- DestructionR candidate offered a WouldChangeZone event), where False is
-        -- simply the correct answer, not a stand-in for "not yet implemented".
-        -- TokenR is unreachable for the OTHER reason: nothing in the engine raises
-        -- the ProposedEvent it would need to match (WouldCreateTokens has no
-        -- producer), so every pair naming it is unreachable in practice and False
-        -- is correct until one does.
+        (ReplacementEffect.TokenR pat _, ProposedEvent.WouldCreateTokens pid _ _) ->
+          case TokenPattern.whose pat of
+            ControllerRelation.Anyones -> True
+            -- CR 109.5: "under YOUR control" -- the tokens' controller is the
+            -- effect source's controller.
+            ControllerRelation.Yours -> Projection.controllerOf src gs == Just pid
+        -- Every row below falls through to False, because an arm ABOVE already
+        -- matches every event of that class -- a row below only fires for a
+        -- MISMATCHED class (e.g. a DestructionR candidate offered a
+        -- WouldChangeZone event), where False is simply the correct answer, not
+        -- a stand-in for "not yet implemented".
         -- CR 614.1c: "as [this permanent] enters" is the entering object's OWN
         -- ability, so an entry replacement is self-only. CR 614.1d's
         -- other-objects form (Essence of the Wild) has no producer.
@@ -483,8 +486,12 @@ apply batch candidate event =
       pure (Just (ProposedEvent.WouldPutCounters oid kind (scale scaling n)))
     -- Unreachable: `applies` admits CounterR only against WouldPutCounters.
     (ReplacementEffect.CounterR _ _, _) -> pure (Just event)
-    -- CR 614.16: Doubling Season scales token creation. Waiting on the
-    -- WouldCreateTokens funnel.
+    -- CR 614.16: Doubling Season scales token creation ("if an effect would
+    -- create one or more tokens ... it creates twice that many").
+    (ReplacementEffect.TokenR _ scaling, ProposedEvent.WouldCreateTokens pid card n) -> do
+      consume (ReplacementCandidate.identity candidate)
+      pure (Just (ProposedEvent.WouldCreateTokens pid card (scale scaling n)))
+    -- Unreachable: `applies` admits TokenR only against WouldCreateTokens.
     (ReplacementEffect.TokenR _ _, _) -> pure (Just event)
 
 -- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
@@ -594,3 +601,18 @@ asCounters event = case event of
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed _ -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
+
+-- CR 111.1: settle a proposed token creation. Nothing means none are created.
+resolveTokens :: PlayerId -> Card -> Natural -> Game (Maybe (PlayerId, Card, Natural))
+resolveTokens pid card n = do
+  outcome <- applyReplacements (ProposedEvent.WouldCreateTokens pid card n)
+  pure (outcome >>= asTokens)
+
+asTokens :: ProposedEvent -> Maybe (PlayerId, Card, Natural)
+asTokens event = case event of
+  ProposedEvent.WouldCreateTokens pid card n -> Just (pid, card, n)
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed _ -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing

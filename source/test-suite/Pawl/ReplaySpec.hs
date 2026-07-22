@@ -71,7 +71,7 @@ combatReplayTests =
           HU.testCase "ChooseEntryOption records and replays a Natural" $
             let options = [EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}]
                 p = Prompt.ChooseEntryOption decider S.alice oid options
-             in HU.assertEqual "round trip" (Just (0 :: Natural.Natural)) (Replay.decode p (Replay.encode p 0)),
+             in HU.assertEqual "round trip" (Just (1 :: Natural.Natural)) (Replay.decode p (Replay.encode p 1)),
           HU.testCase "defaultAnswer attacks with nothing" $
             HU.assertEqual "no attacks" [] (Replay.defaultAnswer attackPrompt),
           HU.testCase "defaultAnswer blocks with nothing" $

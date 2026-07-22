@@ -79,7 +79,8 @@ data Cards = MkCards
     sarcomancyPrinting :: Printing.Printing,
     hardenedScalesPrinting :: Printing.Printing,
     corpsejackMenacePrinting :: Printing.Printing,
-    primalPlasmaPrinting :: Printing.Printing
+    primalPlasmaPrinting :: Printing.Printing,
+    doublingSeasonPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -158,6 +159,7 @@ loadCards = do
   hardenedScalesPrinting_ <- loadPrinting "hardened-scales"
   corpsejackMenacePrinting_ <- loadPrinting "corpsejack-menace"
   primalPlasmaPrinting_ <- loadPrinting "primal-plasma"
+  doublingSeasonPrinting_ <- loadPrinting "doubling-season"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -225,7 +227,8 @@ loadCards = do
         sarcomancyPrinting = sarcomancyPrinting_,
         hardenedScalesPrinting = hardenedScalesPrinting_,
         corpsejackMenacePrinting = corpsejackMenacePrinting_,
-        primalPlasmaPrinting = primalPlasmaPrinting_
+        primalPlasmaPrinting = primalPlasmaPrinting_,
+        doublingSeasonPrinting = doublingSeasonPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -295,7 +298,8 @@ allPrintings cards =
     sarcomancyPrinting cards,
     hardenedScalesPrinting cards,
     corpsejackMenacePrinting cards,
-    primalPlasmaPrinting cards
+    primalPlasmaPrinting cards,
+    doublingSeasonPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

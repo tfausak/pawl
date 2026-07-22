@@ -539,26 +539,22 @@ applyEffect source controller bound legality chosen effect = case effect of
       Just n
         | n > 0 -> do
             -- CR 111: create n tokens with these characteristics under the
-            -- effect's controller (CR 111.2). Each createToken mints a distinct
-            -- object.
-            let before = GameState.battlefield gs
-            Monad.replicateM_ (fromInteger n) (Event.createToken controller card)
-            case mSlot of
-              Nothing -> pure ()
-              Just slot -> do
-                -- CR 603.7c: bind the minted token into live Object.bindings so a
-                -- delayed ability THIS SAME resolution arms can name it -- see
-                -- bindSlot's comment for why this reaches ArmDelayedTrigger but
-                -- not a later effect of the same fold. The lint guarantees n == 1
-                -- here, so the single new battlefield id is unambiguous.
-                after <- State.gets GameState.battlefield
-                case Set.toList (Set.difference after before) of
-                  newId : _ -> State.modify' (bindSlot source slot newId)
-                  -- Unreachable: Event.createToken always places its token onto
-                  -- the battlefield (CR 111.2), so `after` strictly grows by n
-                  -- for n > 0. Total rather than partial: a no-op leaves nothing
-                  -- bound, matching "the token never named" instead of crashing.
-                  [] -> pure ()
+            -- effect's controller (CR 111.2), through the single funnel -- so CR
+            -- 614's token replacements (Doubling Season) get their opportunity.
+            minted <- Event.createTokens controller card (fromInteger n)
+            case (mSlot, minted) of
+              (Nothing, _) -> pure ()
+              -- Unreachable: createTokens places every token onto the battlefield
+              -- (CR 111.2). Total rather than partial: nothing bound matches "the
+              -- token was never named" instead of crashing.
+              (Just _, []) -> pure ()
+              -- CR 603.7c: bind the minted token into live Object.bindings so a
+              -- delayed ability THIS SAME resolution arms can name it. The lint
+              -- guarantees the PRINTED quantity is 1 here (#53) -- but a
+              -- replacement can now make it more (Doubling Season doubling a
+              -- delayed ability's named token), in which case "it" names the
+              -- first and the rest are unnamed (#N).
+              (Just slot, newId : _) -> State.modify' (bindSlot source slot newId)
       _ -> pure ()
   Effect.ArmDelayedTrigger name -> do
     gs <- State.get

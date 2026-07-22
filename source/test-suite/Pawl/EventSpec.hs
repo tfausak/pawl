@@ -79,11 +79,11 @@ tests cards =
               HU.assertEqual "alice's graveyard exiled by the ETB" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
               HU.assertEqual "Rest in Peace is on the battlefield" 1 (S.countOnBattlefieldByName (Text.pack "Rest in Peace") S.alice settled)
               HU.assertEqual "stack empty" [] (GameState.stack settled),
-      HU.testCase "CR 111.2 createToken puts a token on the battlefield and emits an enters event" $
+      HU.testCase "CR 111.2 createTokens puts a token on the battlefield and emits an enters event" $
         let base = Setup.emptyGame S.bothPlayers
             goblinCard = Printing.card (Cards.pikerPrinting cards)
             before = Game.objectCount base
-            after = S.runPure S.identityAnswer base (Event.createToken S.alice goblinCard)
+            after = S.runPure S.identityAnswer base (Event.createTokens S.alice goblinCard 1)
             newIds = Set.toList (GameState.battlefield after)
          in do
               HU.assertEqual "one more object exists" (before + 1) (Game.objectCount after)

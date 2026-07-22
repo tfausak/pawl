@@ -262,38 +262,52 @@ sacrifice oid = do
       Zone.Stack -> pure ()
       Zone.Exile -> pure ()
 
--- CR 111.2: create a token with the given effect-defined characteristics under
+-- CR 111.2: create `n` tokens with the given effect-defined characteristics under
 -- `controller`'s control (its owner, CR 111.2), summoning-sick (CR 302.6). A token
 -- is created from nothing -- it has no prior object to move, so changeZone cannot
 -- mint it. Uses from = Battlefield (it appears there; to == from can never read as
 -- a leave). Emits the enters event so ETB triggers (CR 603.6a) fire on the same
--- path a resolved permanent uses. Does NOT consult replacements (Doubling Season
--- is future, spec section 8) -- in particular it does not call
--- Replacement.runEntry, so an EntryR replacement (CR 614.1c-d) on a token does
--- not apply today, even though CR 614.12's own worked example is a token ("An
--- effect creates a token that's a copy of Voice of All. As that token is
--- created, the token's controller chooses a color for it"). No token card in
--- the pool carries replacementEffects, so this is a present limitation with no
--- observable effect yet, not a promise about future work.
-createToken :: PlayerId -> Card -> Game ()
-createToken controller card = do
-  let mkObj ts =
-        Object.MkObject
-          { Object.owner = controller,
-            Object.source = Source.OfToken card,
-            Object.zone = Zone.Battlefield,
-            Object.tapped = TapState.Untapped,
-            Object.damage = 0,
-            Object.sickness = Sickness.Sick,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.timestamp = ts
-          }
-  newId <- placeObject controller mkObj Zone.Battlefield
+-- path a resolved permanent uses.
+--
+-- PLURAL since P5, and that is a rules requirement, not a convenience. CR 614.1
+-- replacements scope to the CREATION EVENT, not to each token -- Doubling Season
+-- says "if an effect would create ONE OR MORE tokens ... it creates twice that
+-- many" (CR 614.16) -- so the count is settled once, up front. Then every token
+-- is materialized, and only then does each run its OWN entry loop (CR 616.1g:
+-- "one replacement or prevention effect may apply to an event, and another may
+-- apply to an event contained within the first event" -- creating a token
+-- CONTAINS that token entering); the whole batch is in scope for that entry
+-- loop, same as a Clone's simultaneous siblings (CR 614.12a).
+createTokens :: PlayerId -> Card -> Natural -> Game [ObjectId]
+createTokens controller card n = do
+  resolved <- Replacement.resolveTokens controller card n
+  case resolved of
+    Nothing -> pure []
+    Just (owner, tokenCard, count) -> do
+      let mkObj ts =
+            Object.MkObject
+              { Object.owner = owner,
+                Object.source = Source.OfToken tokenCard,
+                Object.zone = Zone.Battlefield,
+                Object.tapped = TapState.Untapped,
+                Object.damage = 0,
+                Object.sickness = Sickness.Sick,
+                Object.bindings = Map.empty,
+                Object.counters = Map.empty,
+                Object.timestamp = ts
+              }
+      ids <- Monad.replicateM (fromIntegral count) (placeObject owner mkObj Zone.Battlefield)
+      Monad.mapM_ (Replacement.runEntry (Set.fromList ids)) ids
+      -- A token is created from nothing, so there is no prior incarnation to
+      -- snapshot: its last known information IS what it is now (CR 111.3 makes the
+      -- creating effect's stated values functionally printed values). Recorded
+      -- AFTER every entry loop, so the events describe settled objects.
+      Monad.mapM_ recordEntry ids
+      pure ids
+
+recordEntry :: ObjectId -> Game ()
+recordEntry newId = do
   placed <- State.get
-  -- A token is created from nothing, so there is no prior incarnation to
-  -- snapshot: its last known information IS what it is now (CR 111.3 makes the
-  -- creating effect's stated values functionally printed values).
   let snapshot = Projection.project newId placed
   State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId Zone.Battlefield Zone.Battlefield) snapshot))
 
