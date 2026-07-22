@@ -278,6 +278,15 @@ and cost-modification seams.
 Ranked by machinery risk × leverage (design.md's own ordering philosophy), for
 **your triage** — no roadmap edits made.
 
+> **Superseded as a work list.** Every gap below now has a home in the M4.5
+> phase table (umbrella spec §3), and each unlanded phase is a GitHub issue:
+> GAP-R→#1 (P5), GAP-D→#2 (P6), GAP-P and GAP-Co's modification half→#3 (P7),
+> GAP-Co's payment half→#4 (P8), GAP-F→#5 (P9), GAP-C and GAP-S→#6 (P10),
+> GAP-Z→#7 (P11). Five landed: GAP-L2 as P1, GAP-L1 as P2, GAP-L5 as P3a,
+> GAP-L7cda as P3b, GAP-T as P4. **This section is kept for its derivation and
+> its reasoning about relative risk**, both of which the issue tracker cannot
+> hold; for what to do next, read the issues, not this table.
+
 | # | Gap | Why it ranks here |
 |---|---|---|
 | 1 | **GAP-P** — player-scoped continuous effects/restrictions | Largest unroadmapped surface; blocks control/prison/cost/skip cards; new axis, not a variant. |
@@ -322,5 +331,7 @@ Ranked by machinery risk × leverage (design.md's own ordering philosophy), for
    the layer system is the stated canary and copy (layer 1) is currently a blank.
 4. **Leave GAP-S subsystems as a backlog** — each is a self-contained mini-section;
    poison + energy first (they also force GAP-C).
-5. When moving this to `docs/`, consider filing GAP-P / GAP-R / GAP-L1 as git-bugs
-   (per CLAUDE.md's git-bug workflow) so they're tracked, not lost in prose.
+5. ~~When moving this to `docs/`, consider filing GAP-P / GAP-R / GAP-L1 as
+   git-bugs so they're tracked, not lost in prose.~~ **Done, and superseded:**
+   all three were filed, and every gap is now a GitHub issue against its M4.5
+   phase — see the note under §4.

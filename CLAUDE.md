@@ -46,8 +46,9 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   replacement path) is next.** The umbrella spec is
   `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
-  its gate card, the decision it proved, the opcodes/types it added, and
-  every elision and its named expiry — lives in `docs/progress.md`. The
+  its gate card, the decision it proved, and the opcodes/types it added —
+  lives in `docs/progress.md`. It records what each milestone *established*,
+  not what is left to do; outstanding work is in GitHub Issues. The
   forward path (M0–M7 and the letter/phase splits) is `docs/design.md` §3;
   each milestone's authoritative detail is its spec and plan under
   `docs/superpowers/{specs,plans}/`. **Maintain the status bullet above by
@@ -60,11 +61,21 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
   not an effect. See §1 of the M2a spec before "fixing" this.
-- TODOs are tracked **ephemerally** with **git-bug** (installed in the Nix user
-  profile, not the flake; data lives in `refs/bugs/*`). List with `git-bug bug`;
-  create with `git-bug bug new -t "…" -m "…"`; close with
-  `git-bug bug status close <id>`. This is a temporary pre-flight tool, to be
-  replaced by GitHub Issues once the project is off the ground.
+- **Outstanding work is tracked in GitHub Issues** (`tfausak/pawl`). List with
+  `gh issue list`; create with `gh issue create`; close with `gh issue close`.
+  Milestones are the unlanded phases (`M4.5 P5`…`P11`, `M5`–`M7`); the useful
+  labels are `elision`, `gap`, `rules-correctness`, `bug`, and the two expiry
+  triggers `expires:milestone` and `expires:card-driven` — roughly half of
+  pawl's deferrals fire when a *card* demands them and have no scheduled date,
+  which is why that axis is a label and not a milestone. git-bug is retired; the
+  hash → issue mapping for citations in landed specs and plans is §10 of
+  `docs/superpowers/specs/2026-07-21-github-issue-migration-design.md`.
+- **File the issue, cite it inline.** When you elide something, open an issue
+  carrying the status, rationale and expiry trigger, and leave a comment at the
+  code site stating only what is *not* implemented, plus `(#N)`. Never write the
+  expiry into the comment: an in-code expiry naming a milestone is a promise
+  nothing checks, and it drifted at a 23% rate before the tracker existed. The
+  comment dies in the same commit that closes the issue.
 
 ## Environment and commands
 

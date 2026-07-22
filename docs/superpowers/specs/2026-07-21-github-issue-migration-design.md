@@ -227,10 +227,11 @@ Each of the five in §0 is read before anything is filed. Three outcomes:
   the comment, file nothing.
 - **Live, milestone misnamed** — file with a corrected trigger.
 - **Unfixed defect** — the milestone walked past it. File as `bug`, not
-  `elision`. `Turn.hs:53` is the likely member of this class.
+  `elision`.
 
 Blind conversion would file phantom issues; blind deletion would silently drop
-a real defect. Neither is acceptable.
+a real defect. Neither is acceptable. §11 records what the triage actually
+found — including that this section's guess about `Turn.hs:53` was wrong.
 
 ## 9. Exit criterion
 
@@ -251,4 +252,51 @@ specs and plans (§1.1).
 
 | git-bug | Issue | Title |
 |---|---|---|
-| *(pending Phase A)* | | |
+| `a7ec85e` | #15 | M0 — complete game with zero cards |
+| `16dd59d` | #16 | Fill in project metadata TODOs |
+| `be3848a` | #17 | M1a — casting a creature |
+| `d1ebd83` | #18 | M1b — combat |
+| `5f50eec` | #19 | CR 508.8: declare blockers/combat damage steps not skipped |
+| `675e8df` | #20 | M2a — the keyword seam |
+| `b9164e2` | #21 | Test suite deadlocks under tasty's default parallelism |
+| `b79d36b` | #22 | M2b — first strike and conditional turn structure |
+| `14138aa` | #23 | Add Swamp/Forest basic lands + per-player mono-color decks |
+| `15de615` | #24 | Setup: emptyGame/matchup agreement by construction |
+| `fa2c488` | #25 | M3c: projection is ~10x slower |
+| `83f1a55` | #26 | Gap: copy mechanism / layer 1 (GAP-L1) |
+| `f90e0c4` | #11 | CR 613.8b topological applies-to dependency |
+| `65ce714` | #12 | payCost must prompt when mana sources are distinguishable |
+| `b998924` | #13 | OfAbility resolution reads by id, not LKI (CR 608.2g) |
+| `c7a0077` | #14 | Generalize `Quantity.X`'s reserved slot to `Quantity.Bound` |
+| `6afb561` | #1 | M3f replacement seam — absorbed by the P5 tracker |
+| `48b17cb` | #1 | GAP-R replacement event coverage — absorbed by the P5 tracker |
+| `c5a985d` | #3 | GAP-P player continuous effects — absorbed by the P7 tracker |
+
+## 11. What the triage actually found (§8, executed)
+
+Recorded because three of the five predictions in §0 and §8 were wrong, and the
+corrections are the point of having triaged rather than converted.
+
+| Site | Predicted | Actual |
+|---|---|---|
+| `Type/Combat.hs:34` | live elision | **Cashed.** `struckFirst` *is* the CR 510.4 snapshot the comment asks for; `Damage.dealCombatDamage:207` stores it and 210–213 reads it for "had neither … as the first step began" while reading double strike live — verbatim CR 510.4. No issue filed; comment replaced with what the code does. |
+| `Damage.hs:106` | live elision | **Half cashed.** The Mindslaver half landed at M3g — line 111 threads `Decide.deciderFor`. Only banding (CR 702.22j) survives (#32). |
+| `Turn.hs:53` | **unfixed defect** (§8's prediction) | **Live elision, misnamed expiry.** Nothing constructs a second combat *phase*: `spliceSecondDamage` adds a second combat damage *step*, and `skipEmptyCombat` runs at declare-attackers, so the two never interleave. `Seq.filter` is still correct (#31). |
+| `Combat.hs:49` | live elision | Confirmed live, expiry misnamed — card-driven, not M4 (#30). |
+| `Combat.hs:172` | live elision | Confirmed live, and `isBlocked` turns out to have **no caller in `source/library/`** — test-only, so it cannot affect gameplay as written (#28). |
+
+**Two gaps had no comment and no spec entry**, found only by reading the code
+during the pass: `Damage.hs:92` reads `blockersOf` without filtering departed
+blockers, reachable since M3a added instant-speed removal (#29); and
+`Event.stateTriggers`' `Source`-equality suppression check (#55). A third,
+CR 208.2a/208.5's undeterminable-number substitution, was in the P3b spec but
+had been read as part of the freeze residual rather than as its own deferral
+(#65).
+
+**Refinement to §1.2's rule.** "File what the source comments mark" needed a
+carve-out: a spec deferral with no code site is either cashed *or* an unbuilt
+feature that never had a site to mark (copy-spell, hybrid mana, protection).
+Those are tracked by their phase and remain in the spec; filing one issue per
+future feature would have been noise. Each milestone entry in `progress.md`
+therefore points at its spec's deferral section for the full list, and cites
+issues only for the subset with a live code site.

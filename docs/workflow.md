@@ -74,7 +74,8 @@ the same split.
 |---|---|
 | What's next / current status | `CLAUDE.md` status bullet |
 | Forward path, architecture rationale | `design.md`, the relevant § only |
-| What landed, every elision and its expiry | `progress.md`, newest entry first |
+| What landed, and what each milestone established | `progress.md`, newest entry first |
+| What's left: elisions, gaps, bugs | GitHub Issues — `gh issue list -l elision` |
 | A milestone's authoritative detail | Its spec, then its plan, under `docs/superpowers/{specs,plans}/` |
 | Rules ground truth | `rules.txt`, grepped by rule number — never memory |
 | Prior-art evidence | `prior-art-lessons.md`, cited § only |

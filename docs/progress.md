@@ -4,10 +4,16 @@ pawl's comprehensive-rules core is built milestone by milestone (M0 → M7; the
 full path and the M3a–M3g split table are in `docs/design.md` §3). This file is
 the **completion log**: one distilled entry per landed milestone — its gate
 card, the load-bearing decision it proved, the opcodes and types it added, and
-every **elision with its named expiry**. It moved out of `CLAUDE.md` to keep
-that file to working guidance. The authoritative per-milestone detail is each
-milestone's spec and plan under `docs/superpowers/{specs,plans}/`, cited at the
-end of every entry.
+the corrections worth remembering. It moved out of `CLAUDE.md` to keep that file
+to working guidance. The authoritative per-milestone detail is each milestone's
+spec and plan under `docs/superpowers/{specs,plans}/`, cited at the end of every
+entry.
+
+**This file records what each milestone *established*, not what is left to do.**
+Outstanding work lives in GitHub Issues; each entry points at its spec's
+deferral section for the full list and cites the issues for those deferrals that
+have a live code site. Entries are not edited when an issue closes — a landed
+milestone's record is history, and history does not change.
 
 - **M0 is complete** (a full game of 60 Mountains vs. 60 Mountains, replaying
   deterministically). Its spec and plan are kept as reference:
@@ -31,7 +37,7 @@ end of every entry.
 - **M2b is complete** (first strike + double strike and the CR 506.1 conditional
   turn structure: the turn is now data — `GameState.remaining` is the schedule
   `Engine.advance` pops — so the CR 508.8 skip is a drop and the CR 510.4 second
-  combat damage step is a splice; `git-bug 5f50eec` is closed). Spec and plan kept
+  combat damage step is a splice; `#19 is closed). Spec and plan kept
   as reference:
   `docs/superpowers/specs/2026-07-17-m2b-first-strike-design.md` and
   `docs/superpowers/plans/2026-07-17-m2b-first-strike.md`.
@@ -52,7 +58,7 @@ end of every entry.
   matchups — red-red (unchanged) and green-black (alice green, bob black) — giving
   the 704.5h deathtouch SBA, trample assignment, and their CR 702.2c interaction
   random-game coverage; a deterministic test casts each card through the stack.
-  No new rules, zero opcodes. `git-bug 14138aa` is closed). Spec and plan kept as
+  No new rules, zero opcodes. `#23 is closed). Spec and plan kept as
   reference: `docs/superpowers/specs/2026-07-17-m2d-castable-decks-design.md` and
   `docs/superpowers/plans/2026-07-17-m2d-castable-decks.md`.
 - **M3a is complete** (the first opcode — Lightning Bolt as data. A first-order,
@@ -68,7 +74,7 @@ end of every entry.
   graveyard (CR 608.2n), and fizzles when every target is illegal (CR 608.2b). The
   priority loop checks state-based actions after each resolution (CR 117.5) and
   bails on a result. `Engine.runMatch`/`runMatchPure` derive the player list from
-  the matchup — `git-bug 15de615` is closed — and four Lightning Bolts in
+  the matchup — `#24 is closed — and four Lightning Bolts in
   `redDeck` give instant speed random-game coverage. Spec and plan kept as
   reference: `docs/superpowers/specs/2026-07-17-m3a-effects-design.md` and
   `docs/superpowers/plans/2026-07-17-m3a-effects.md`.
@@ -105,7 +111,7 @@ end of every entry.
   projected creature-ness. Blood Moon, Urborg, and Opalescence are deterministic
   fixtures (no random-game entry, per the white/red-fixture posture). The
   topological CR 613.8b *applies-to* reorder is deferred behind a documenting test
-  (`git-bug f90e0c4`). Performance: `Projection.projectAll` projects the whole
+  (`#11). Performance: `Projection.projectAll` projects the whole
   board from one `gather` per state-based-action sweep. Spec and plan kept as
   reference: `docs/superpowers/specs/2026-07-18-m3c-dependency-design.md` and
   `docs/superpowers/plans/2026-07-18-m3c-dependency.md`.
@@ -166,8 +172,7 @@ end of every entry.
   `ProjectedCharacteristics.activatedAbilities`, emptied by layer-6
   `LoseAllAbilities`), the single switch that makes Humility strip a creature's
   activated **and** mana abilities. `Action`/`Source` are now `data` (both derive
-  `Ord`). Cards are deterministic fixtures (no random-game entry). `git-bug
-  65ce714` (payCost must prompt when mana sources are distinguishable) stays
+  `Ord`). Cards are deterministic fixtures (no random-game entry). #12 (payCost must prompt when mana sources are distinguishable) stays
   **open** by design — the mana-source elision expires at the first dual land, not
   here. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-18-m3e-activated-abilities-design.md` and
@@ -325,14 +330,9 @@ end of every entry.
   coverage by swapping in for four Goblin Pikers, keeping the deck at 60 (so the
   CR 400.7 conservation counts stay 120) — a deliberate deviation from the plan's
   literal "add four Blazes" (which would have grown the deck to 64), taken by user
-  direction when the gap surfaced. **Named expiries opened**: the rest of the
-  numeric tower (`Star`/`Plus`/`Half`/`Infinite`/`Count`) stays shape-only, each
-  due with its first card; X frozen to a `Literal` in a stored continuous effect
-  (the `Projection.hs` note) is due with the first `+X/+X` card; X in
-  activated-ability costs rides M3g's `AbilityCost.mana` and the same `ChooseX`;
-  a general `Quantity.Bound SlotName` (git-bug `c7a0077`) generalizes the single
-  reserved slot when a named or second amount lands; an engine-computed maximum X
-  is a deferred UI nicety. git-bug `65ce714` (mana-source prompt) is unchanged — X
+  direction when the gap surfaced. **Named expiries opened**: spec §7 carries the
+  list; those with a live code site are filed under the `elision` label, notably
+  #14 (`Quantity.Bound SlotName`). #12 (mana-source prompt) is unchanged — X
   substitution precedes source selection. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-19-m4a-numeric-tower-binding-design.md` and
   `docs/superpowers/plans/2026-07-19-m4a-numeric-tower-binding.md`.
@@ -457,14 +457,12 @@ end of every entry.
   conservation stays 120 — regeneration keeps the same object, no mint). The
   negative test: a shielded creature bounced by Unsummon still leaves (regeneration
   intercepts destruction, not every leave-the-battlefield). **Named
-  elisions/expiries**: **CR 701.19c "can't be regenerated" is deferred to Wrath of
-  God** (`Event.destroy` is ungated — no `Regenerability` argument, no mass-destroy
-  opcode); CR 615.7 amount-shields and the multi-source choice, CR 615.10 static
-  prevention, retaining prevented events for CR 615.13/615.5, a general "Regenerate
-  target creature" (`Regenerate SlotName`), CR 701.19b static regeneration, and a
-  distinct "was destroyed" event are all deferred to the first card that needs them;
-  the 704.5f toughness-drop test still uses the synthetic `−0/−1` continuous effect
-  until the first real **−N/−N** ability. Spec and plan kept as reference:
+  elisions/expiries**: spec §7 carries the list — CR 701.19c "can't be
+  regenerated" (#42), CR 615.7 amount-shields and the multi-source choice plus CR
+  615.13 prevented-event triggers (#58), CR 615.10 static prevention, a general
+  "Regenerate target creature", CR 701.19b static regeneration, and a distinct
+  "was destroyed" event — each due with the first card that needs it. Spec and
+  plan kept as reference:
   `docs/superpowers/specs/2026-07-19-m4d-prevention-regeneration.md` and
   `docs/superpowers/plans/2026-07-19-m4d-prevention-regeneration.md`.
 - **M4e is complete** (counter target spell — the first effect that removes a spell
@@ -492,12 +490,11 @@ end of every entry.
   `Pawl.Resolve` stays the sole `case effect of` home; `Event` the sole funnel home;
   `Target` the sole targeting-legality home. **No new prompt/response** (Cancel
   targets through the existing `ChooseTargets`; countering is unprompted). **Named
-  elisions/expiries**: `Event.counter` is ungated — "can't be countered" (CR 701.6),
-  conditional counters ("counter unless pay", Mana Leak/Daze), a distinct "was
-  countered" event and its trigger, countering **abilities** (Stifle — needs an
-  `AbilityTarget`), alternative counter destinations (counter-and-exile, Remand),
-  and restricted counters ("counter target spell with mana value N") are each
-  deferred to the first card that needs them. Spec and plan kept as reference:
+  elisions/expiries**: spec §7 carries the list — `Event.counter` is ungated for
+  "can't be countered" (CR 701.6) and emits no distinct "was countered" event
+  (#43); conditional counters, countering **abilities** (Stifle), alternative
+  counter destinations (Remand), and restricted counters are each due with the
+  first card that needs them. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-19-m4e-counter-spell-design.md` and
   `docs/superpowers/plans/2026-07-19-m4e-counter-spell.md`.
 - **M4f is complete** (counters — +1/+1 and −1/−1 as **persistent permanent
@@ -546,14 +543,12 @@ end of every entry.
   `Pawl.Resolve` stays the sole `case effect of` home; `Pawl.Projection` the sole
   `case … Modification` home. **No new prompt/response** (both cards target through
   the existing `ChooseTargets`; putting counters is unprompted, CR 122.6). **Named
-  deferred expiries:** non-P/T counter kinds (keyword/charge/loyalty/poison/shield/
-  stun, CR 122.1b–i); a "counter placed" event and its triggers (CR 122.7,
-  proliferate); replacements that alter counter placement (Doubling Season/Hardened
-  Scales); counters entering *with* a permanent (CR 122.6a, a replacement); "move a
-  counter" (CR 122.5); the "can't have more than N counters" SBA (CR 122.4 /
-  704.5r); and `Quantity.X`-many counters (rides M4a's `ChooseX` — `PutCounters`
-  already carries a `Quantity`) — each due with the first card that needs it. Spec
-  and plan kept as reference:
+  deferred expiries:** spec §9 carries the list — non-P/T counter kinds, a
+  "counter placed" event, replacements that alter counter placement, counters
+  entering *with* a permanent, "move a counter", the "can't have more than N
+  counters" SBA, and `Quantity.X`-many counters — each due with the first card
+  that needs it; those with a live code site are filed under the `elision` label.
+  Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-20-m4f-counters-design.md` and
   `docs/superpowers/plans/2026-07-20-m4f-counters.md`.
 - **M4g is complete** (modal — the seventh and final M4 letter: a choice at cast
@@ -613,20 +608,11 @@ end of every entry.
   no Wall in any deck — so it offers `{1,2}`).
   `Pawl.Resolve` stays the sole `case effect of` home; `Pawl.Cast` cases on
   `ModeSelection` as an orchestration tag, the same posture it already has for
-  timing, never on a card's identity. **Named deferred expiries:** modality on
-  **activated and triggered abilities** is the design's own stated intent (§0 of
-  the spec) and the *immediate* next step, not merely deferred; `ModeSelection`
-  stays **`ChooseExactly`-only** until a card needs "choose two"/commands (CR
-  700.2d — the same-mode-twice case, which turns `Binding.modes` from a `Set` into
-  a multiset), escalate/additional-cost-per-mode (CR 700.2h), the pawprint "worth
-  of modes" count (CR 700.2i), or another-player-chooses (CR 700.2e); **copy
-  copies modes** (CR 700.2g — a future copy effect must carry the source's chosen
-  `Set ModeIndex` rather than re-prompt) is ungated, no copy effect exists yet;
-  **multi-mode slot-name collision** is unreachable until a selection picks ≥2
-  modes, mitigation (qualify a bound slot by its `ModeIndex`) due with that card;
-  and **a general subtype-restricted target** — `WallTarget` is specific to Wall,
-  generalizing to a subtype-parameterized spec ("target Goblin"/"target Zombie")
-  when the first such card needs it. Spec and plan kept as reference:
+  timing, never on a card's identity. **Named deferred expiries:** spec §13
+  carries the list; those with a live code site are filed under the `elision`
+  label. Modality on **activated and triggered abilities** was the design's own
+  stated intent (§0 of the spec) and the immediate next step rather than a
+  deferral — it landed as M4h. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-20-m4g-modal-design.md` and
   `docs/superpowers/plans/2026-07-20-m4g-modal.md`.
 - **M4h is complete** (the M4g fast-follow: modality on activated and triggered
@@ -674,17 +660,9 @@ end of every entry.
   `NonlandPermanentTarget` bounce modes, source as the board's only nonland
   permanent) covers CR 603.3c removal, expiring when a real all-targeted modal ETB
   trigger lands (none found in the opcode set — every candidate needs a new
-  opcode or an unmodelled characteristic). **Named deferred expiries** (spec §13):
-  a real modal-activated-ability gate card; `X` in an activated-ability cost
-  (M3g's `AbilityCost.mana` + M4a's `ChooseX`, unwired — no `{X}`-cost ability
-  exists); text-change (M3d) reaching an ability's effects (`resolveEffects` still
-  doesn't rewrite); a non-self-excluding `NonlandPermanentTarget` (splits when a
-  card wants plain "target nonland permanent" without "another"); `ModeSelection`
-  beyond `ChooseExactly` on abilities (the M4g deferrals — choose-two/escalate CR
-  700.2h/pawprint CR 700.2i/same-mode-twice CR 700.2d/another-player-chooses CR
-  700.2e — apply equally here); multi-mode slot-name collision (unreachable until
-  a selection picks ≥2 modes); and modal triggers beyond `SelfEnters` (rides
-  `placeOne` unchanged when a non-ETB modal trigger condition lands). Spec and
+  opcode or an unmodelled characteristic). **Named deferred expiries:** spec §13
+  carries the list, including the M4g deferrals that apply equally here; those
+  with a live code site are filed under the `elision` label. Spec and
   plan kept as reference:
   `docs/superpowers/specs/2026-07-20-m4h-modal-abilities-design.md` and
   `docs/superpowers/plans/2026-07-20-m4h-modal-abilities.md`.
@@ -737,18 +715,13 @@ its own gate card and spec, landed as it completes. Umbrella:
   can test control-change sickness with a real indefinite-control card across
   two turns. Act of Treason itself is a **red deterministic fixture** (the M3d
   posture), not in any random-game deck, so CR 400.7 conservation counts are
-  undisturbed. **Named deferred expiries** (spec §7): Auras / indefinite
-  control (Control Magic) — the whole Attach subsystem, retiring the sickness
-  synthetic and adding the cross-turn settle path; instant-speed / mid-combat
-  control change (Ray of Command) — combat-membership edits when control moves
-  mid-step; **CR 613.8 control dependency** beyond timestamp last-wins
-  (multiple simultaneous control effects that depend on one another) — tracked
-  as open git-bug `f90e0c4`; multiplayer leaves-the-game reversion (CR 800.4);
-  mass/conditional untap (`Untap` stays single-target until a card needs
-  more); and control-at-base (a permanent entering under a non-owner's
-  control). Tracking: git-bug `83f1a55` (which also carries the still-open
-  GAP-L1/copy facet for P2) is annotated that its GAP-L2 facet is addressed by
-  this phase; `f90e0c4` stays open. Spec and plan kept as reference:
+  undisturbed. **Named deferred expiries:** spec §7 carries the list — Auras /
+  indefinite control, instant-speed control change, CR 613.8 control dependency,
+  multiplayer leaves-the-game reversion, mass/conditional untap, control-at-base
+  — and those with a live code site are filed under the `elision` label (#62 for
+  the cross-turn settle, #33 for the sickness synthetic). Tracking: #26's GAP-L2
+  facet is addressed by this phase; #11 stays open. Spec and plan kept as
+  reference:
   `docs/superpowers/specs/2026-07-20-p1-permanent-control-design.md` and
   `docs/superpowers/plans/2026-07-20-p1-permanent-control.md`.
 - **M4.5 P2 is complete** (copy — layer 1, GAP-L1; the **M4.5 go/no-go**, a genuine
@@ -796,17 +769,13 @@ its own gate card and spec, landed as it completes. Umbrella:
   **blue deterministic fixture** (`data/cards/clone.json`, in `allPrintings` for the
   honesty round-trip, no random-game deck). `Pawl.Resolve` stays the sole
   `case`-on-`Effect` home; `Pawl.Projection` the sole `case`-on-`Modification` home;
-  the copy target is a genuine prompt, never elided. **Named deferred expiries** (spec
-  §7): copying a permanent's **static abilities** (a Clone of Humility/Opalescence —
-  `gather` reads static abilities from the printed card, not copiable values; the
-  activated/triggered/replacement abilities ARE copied); **name/mana cost/color/
-  supertypes** (not projected — color rides P3a); **7b/CDA P/T-setting** in copiable
-  values (rides P3b, Tarmogoyf); **ongoing "becomes a copy"** (Vesuvan Doppelganger,
-  re-reads the source); **copy-spell** (CR 707.10) and **copy-token** effects;
-  **simultaneous entry** of multiple copy-choosers (CR 614.12b/616); the **general
-  monadic as-enters replacement engine** (CR 614.12/616 — the drain folds into it at
-  **P5**); **face-down** (backlog). git-bug `83f1a55` (GAP-L1) is closed by this
-  phase (its GAP-L2 sibling was addressed by P1); `f90e0c4` stays open (P2 adds no
+  the copy target is a genuine prompt, never elided. **Named deferred expiries:**
+  spec §7 carries the list — static-ability copying, unprojected copiable values,
+  ongoing "becomes a copy", copy-spell and copy-token, simultaneous entry of
+  multiple copy-choosers, face-down — and those with a live code site are filed
+  under the `elision` label; the general monadic as-enters replacement engine
+  (CR 614.12/616), which the drain folds into, is #1. #26 (GAP-L1) is closed by
+  this phase (its GAP-L2 sibling was addressed by P1); #11 stays open (P2 adds no
   within-layer dependency — a copy's affected set is always the object itself). Spec
   and plan kept as reference:
   `docs/superpowers/specs/2026-07-20-p2-copy-layer-1-design.md` and
@@ -914,27 +883,18 @@ its own gate card and spec, landed as it completes. Umbrella:
   spell has been modal since M4g; the fix substitutes a real cast (mirroring
   `ResolveSpec`'s own Dragon Fodder test) and preserves every assertion — a
   fixture caveat worth recording for future test authors reusing
-  `spellOnStack` against a card with effects. **Named deferred expiries**
-  (spec §7): `AddColor` (CR 105.3's "in addition to its other colors") —
-  first card with that wording; hybrid/Phyrexian mana symbols (CR 202.2d,
-  `ManaSymbol` has no hybrid arm) — first hybrid-cost card; the CR 613.3
-  CDA-precedence question, above; layer 7d P/T switching (Twisted Image) —
-  **P3b**, not colour's neighbourhood; colour of an object outside the
-  battlefield read by an effect — **P9** (a graveyard/exile filter naming a
-  colour); the general filter language retiring `NonblackCreatureTarget`/
-  `CreaturesOfColor` — **P9**; colour indicator on real no-mana-cost cards
-  (Ancestral Vision, the suspend cycle) — the field exists, the cards need
-  **suspend**; devoid acquired by copy or text-change (CR 604.3a(2)) — the
-  first card that grants a CDA that way; the synthetic Devoid Drone and
-  Vestige of Emrakul, above; "choose a colour" as a prompt (CR 105.4 —
-  Painter's Servant, Iona) — the first colour-choosing card; protection
-  (CR 702.16, the largest colour reader) — unchanged from M2, blocked on the
-  Attach/Aura subsystem and CR 615 prevention breadth; colour as a copiable
-  value under a layer-5 CDA other than devoid — the first such card.
-  **Tracking:** no git-bug is closed by this phase; `f90e0c4` (topological CR
+  `spellOnStack` against a card with effects. **Named deferred expiries:** spec §7
+  carries the list — `AddColor`, hybrid/Phyrexian mana symbols, the CR 613.3
+  CDA-precedence question above, colour outside the battlefield and the general
+  filter language (both **P9**), colour indicators needing suspend, devoid acquired
+  by copy or text-change, the synthetic Devoid Drone and Vestige of Emrakul,
+  "choose a colour" as a prompt, protection, and colour as a copiable value under a
+  non-devoid layer-5 CDA. Those with a live code site are filed under the `elision`
+  label (#35 for the CDA-precedence shortcut, #40 for the target-spec family).
+  **Tracking:** no issue is closed by this phase; #11 (topological CR
   613.8b applies-to reorder) stays untouched, since every layer-5 effect this
   phase adds replaces rather than depends, so within-layer ordering is
-  last-wins by timestamp; `c7a0077` (`Quantity.Bound`) belongs to **P3b**.
+  last-wins by timestamp; #14 (`Quantity.Bound`) belongs to **P3b**.
   The umbrella's §3 table splits its single P3 row into **P3a** (this phase)
   and **P3b** (characteristic-defined P/T, next), per the umbrella's own §7
   authorization for a phase spec to depart from the map and update it. Spec
@@ -1048,34 +1008,20 @@ its own gate card and spec, landed as it completes. Umbrella:
   becoming an enchantment and ceasing to be a creature — which `Modification`
   doesn't have yet), whichever lands first; the Aura family (Darksteel
   Mutation and kin) is the bulk of the category but is blocked on Attach,
-  outside M4.5 entirely. **Every deferral from the phase spec's §8 table, with
-  its expiry**: power and toughness counting *different* things (one `Star`
-  per axis) — the first card whose two axes count different things; `Count`
-  over **projected** state ("lands you control", "Elves on the battlefield")
-  — Strength of Cedars / Wirewood Pride, either forces quantity evaluation to
-  move into `Pawl.Projection` (a cycle from `Pawl.Quantity` today); counting
-  **projected** card types of graveyard cards (§2.1 reads only printed types
-  through `Game.cardOf`) — the first effect that changes a graveyard card's
-  types; `CountSpec` as a whole — **P9**'s criterion/filter language; CR
-  208.2b's "as this creature enters…" P/T choice (a replacement effect setting
-  copiable values) — **P5**, the replacement-engine phase; CR 208.5's "no
-  value → 0" at read points — the first creature with no P/T value that a
-  reader observes; a one-axis 7b set ("its toughness becomes 4" —
-  `SetBasePowerToughness` takes two `Quantity`s, not two `Maybe`s) — the first
-  such card; CR 208.4b "base power/toughness" readers — the first card that
-  checks base P/T; a **dynamic** CDA defining colour or subtype (CR
-  604.3a(1)) — P3a seeded devoid as a *constant* CDA, so the first dynamic one
-  builds the general path; CR 613.3 CDA-vs-timestamp precedence within layers
-  2–6 — unchanged from P3a, since this phase adds no layer-2–6 CDA;
-  `Quantity.Half` (Little Girl) and `Infinite` (Mox Lotus) — design.md §6's
-  silver-border canaries, still unbuilt; copying a permanent's **static**
-  abilities (a Clone of Humility) — unchanged from P2, since a CDA is not a
-  `StaticAbility` in this model, so this phase neither fixes nor worsens it.
-  **Tracking**: no git-bug is closed by this phase. `c7a0077`
+  outside M4.5 entirely. **Named deferred expiries:** spec §8's table carries
+  every one with its expiry — the two P/T axes counting different things,
+  `Count` over projected state (Strength of Cedars / Wirewood Pride), projected
+  graveyard card types, `CountSpec` as a whole (**P9**), CR 208.2b's as-enters
+  P/T choice (**P5**), CR 208.5 and CR 208.2a's undeterminable-number
+  substitution, a one-axis 7b set, CR 208.4b base-P/T readers, a dynamic CDA
+  defining colour or subtype, CR 613.3 precedence (unchanged from P3a),
+  `Quantity.Half`/`Infinite`, and static-ability copying (unchanged from P2).
+  Those with a live code site are filed under the `elision` label: #41, #65,
+  #36, #35, #39. **Tracking**: no issue is closed by this phase. #14
   (`Quantity.Bound SlotName`) was related to P3b by the umbrella and is
   answered **in the negative**: neither `Count CardTypesInAllGraveyards` nor
   `Count CardsInYourHand` needed a binding slot, so it stays open, unretired.
-  `f90e0c4` (topological CR 613.8b applies-to reorder) is untouched: 7a
+  #11 (topological CR 613.8b applies-to reorder) is untouched: 7a
   applies at most one CDA per object with nothing to order against it, and
   7d's switches order last-wins by timestamp with no same-layer dependency.
   **Rulings yield honestly** (Scryfall, 2026-07-21): Tarmogoyf carries one
@@ -1211,50 +1157,17 @@ its own gate card and spec, landed as it completes. Umbrella:
   Sarcomancy already has two triggered abilities, and they fail to co-trigger
   only by settle-schedule accident — expiring at the first card where they can,
   which needs an ability discriminator on the wire. **Deferred, with named
-  expiries** (spec §8, six of them backfilled at the final review from
-  deferrals that had lived only in code comments): **reflexive triggers** (CR
-  603.12) — the first "you may … When you do, …" card; **leaves-the-battlefield
-  triggers** (603.6c) and the **look-back-in-time list** (603.10/603.10a) — the
-  first dies-trigger card, relating to git-bug `b998924`, whose fix this phase's
-  snapshot is the mechanism for; **the enters-then-dies-same-settle timing gap**
-  — the scan derives its candidates from the battlefield *at the CR 117.5
-  boundary* rather than from the state at each event's time, so a permanent that
-  enters and is put into a graveyard by an SBA within the same settle loses its
-  enters trigger (this is 603.10's **normal** clause, not a look-back exception),
-  expiring at the first card that can die on entry; **stated-duration delayed
-  triggers** (603.7b) — the first "this turn" delayed ability; **CR 603.2d /
-  603.2h / 603.7h / 603.9**, each at its first card; **CR 603.3b's second part**
-  (triggers whose condition is another ability triggering) — the first such
-  condition, noted in code rather than built; **CR 400.7e** — honoured only as
-  far as M3f already does, expiring with the LTB pass; **scanned zones other
-  than the battlefield** — the first ability that functions from a graveyard,
-  hand or exile; **a `Create` binding more than one token to a slot** — the
-  first card referring back to several tokens at once ("sacrifice *them*",
-  Salt Road Skirmish), rejected by a lint today rather than silently binding
-  one; **event kinds with no reader** (spell casts, attacks, life changes,
-  counter placement) — VOCAB, each added by the phase that needs it
-  (`SpellCast` at **P7**); **the unenforced CR 701.21a control clause** —
-  `Event.sacrifice` doesn't check "a player can't sacrifice a permanent they
-  don't control", harmless while its only caller reads `Binding.triggerSource`,
-  expiring at the first opponent-sacrifice edict (Diabolic Edict); **trigger
-  control read at the scan boundary rather than the trigger moment** (CR
-  603.3a) — carried forward from M3f, expiring at the first effect that can
-  change control between an event and the boundary; **state-trigger
-  non-termination if all modes are unfillable** — a mode set that all goes
-  unfillable would cease (603.3c) and re-trigger forever; unreachable today
-  because Barbarian Outcast's single mode has no target slots and is
-  unconditionally fillable, expiring at the first state-triggered card whose
-  modes can all be unfillable; **two identical state triggers on one source
-  conflated by `Source` equality** — the first card with two textually
-  identical `StateIs` abilities; **partial CR 514.3 handling** — `Engine
-  .advance` settles once more at turn end so cleanup's events are scanned before
-  the log is cleared, but builds no 514.3a extra step and priority round,
-  expiring at the first card whose trigger must resolve during that cleanup; and
-  **a delayed ability's intervening "if" pruned before it is checked** —
-  `delayedPending` removes a fired entry on the event match alone, before the CR
-  603.4 filter runs, so a false condition would spend its 603.7b single shot;
-  unreachable while Tidal Wave's is the pool's only delayed ability and has no
-  `intervening`, expiring at the first delayed ability that does. **Corrections
+  expiries:** spec §8 carries all sixteen with their triggers — reflexive
+  triggers (CR 603.12), leaves-the-battlefield triggers and the look-back list,
+  the enters-then-dies-same-settle timing gap, stated-duration delayed triggers,
+  CR 603.2d/603.2h/603.7h/603.9, CR 603.3b's second part, CR 400.7e, scanned
+  zones beyond the battlefield, a `Create` binding several tokens, event kinds
+  with no reader (VOCAB), the unenforced CR 701.21a control clause, trigger
+  control read at the scan boundary, state-trigger non-termination, two
+  identical state triggers conflated by `Source` equality, partial CR 514.3
+  handling, and a delayed ability's intervening "if" pruned before it is
+  checked. Those with a live code site are filed under the `elision` label:
+  #45, #46, #47, #48, #49, #51, #52, #53, #54, #55, and #44. **Corrections
   worth remembering.** A **systemic CR 701.x renumbering**, found only because
   half-fixing Destroy left one file citing **701.8 for two different actions**:
   the codebase's keyword-action citations predated **`Create`'s insertion at
@@ -1308,12 +1221,12 @@ its own gate card and spec, landed as it completes. Umbrella:
   plan paired it with. The implementer proved it with a temporary trace and
   fixed the **test, not the engine**, per CLAUDE.md; had it shipped as written,
   the phase's thesis test would have asserted the opposite of what it claimed
-  and passed. **Tracking:** no git-bug is closed. `b998924` (OfAbility LKI)
+  and passed. **Tracking:** no issue is closed. #13 (OfAbility LKI)
   stays **open and unretired** — §2.2's last-known-information snapshot is the
-  mechanism its fix will use, not the fix; `6afb561` (M3f replacement seam) is
+  mechanism its fix will use, not the fix; #1 (M3f replacement seam) is
   untouched and belongs to **P5** — note the family resemblance, P4 retires the
   *trigger* ordering elision (603.3b) and P5 retires the *replacement* ordering
-  elision (616), different rules and different mechanisms; `c7a0077`
+  elision (616), different rules and different mechanisms; #14
   (`Quantity.Bound → SlotName`) stays open, since like P3b's two arms
   `CreaturesDiedThisTurn` needs no binding slot — it folds the log. Four new
   deterministic fixtures (`barbarian-outcast.json`, `khabál-ghoul.json`,
@@ -1325,7 +1238,7 @@ its own gate card and spec, landed as it completes. Umbrella:
   whole-branch review found **zero Critical and zero Important** code defects and
   confirmed both invariants branch-wide (`TriggerCondition.`/`StateCondition.`
   appear outside `Pawl.Event`/`Pawl.Codec` nowhere). The umbrella's next phase is
-  **P5** (replacement event coverage + CR 616, subsuming git-bug `6afb561`);
+  **P5** (replacement event coverage + CR 616, subsuming #1);
   **P6 and P7 are now unblocked**, each adding a *reader* of this log rather than
   a mechanism, which is the whole reason P4 preceded them. Spec and plan kept as
   reference:
