@@ -199,9 +199,11 @@ castSpell pid oid = do
             case Mana.payCost pid paidCost gs of
               Nothing -> pure ()
               Just paid -> do
-                let moved = Event.changeZone oid Zone.Stack paid
+                State.put paid
+                Event.changeZone oid Zone.Stack
+                moved <- State.get
                 case GameState.stack moved of
-                  [] -> State.put moved
+                  [] -> pure ()
                   top : _ ->
                     State.put
                       moved

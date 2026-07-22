@@ -15,7 +15,6 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
@@ -74,7 +73,7 @@ combatDamageTests cards =
         -- The simultaneity test. Sequential damage kills only one, because the
         -- blocker would be in the graveyard before it dealt its damage.
         let (gs, _, _) = S.combatBoard cards 1 1
-            after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
+            after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "alice's is dead" 0 (S.creaturesInPlay S.alice after)
               HU.assertEqual "bob's is dead" 0 (S.creaturesInPlay S.bob after),
@@ -84,7 +83,7 @@ combatDamageTests cards =
             split p = case p of
               Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (map (\r -> (r, 1)) (filter S.isCreatureRecipient (Map.keys thresholds)))
               _ -> S.aggressiveAnswer p
-            after = Sba.checkStateBasedActions (S.fightWith split gs)
+            after = S.settleSba (S.fightWith split gs)
          in do
               HU.assertEqual "both blockers dead" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "expected two blockers" 2 (length theirs),
@@ -97,7 +96,7 @@ combatDamageTests cards =
                   r : _ -> Map.singleton r n
                   [] -> Map.empty
               _ -> S.aggressiveAnswer p
-            after = Sba.checkStateBasedActions (S.fightWith dump gs)
+            after = S.settleSba (S.fightWith dump gs)
          in HU.assertEqual "one blocker survives" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 510.1e an illegal division is rejected and deals nothing" $
         -- Not a reachable game state: this is the engine's defense against a
@@ -107,7 +106,7 @@ combatDamageTests cards =
             cheat p = case p of
               Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (map (\r -> (r, 99)) (filter S.isCreatureRecipient (Map.keys thresholds)))
               _ -> S.aggressiveAnswer p
-            after = Sba.checkStateBasedActions (S.fightWith cheat gs)
+            after = S.settleSba (S.fightWith cheat gs)
          in HU.assertEqual "both blockers survive" 2 (S.creaturesInPlay S.bob after),
       -- The deterministic successor to the retired "combat happens" property: an
       -- unblocked 2/1 attacker reduces the defender's life by its power.
@@ -386,7 +385,7 @@ evasionTests cards =
         -- WITHOUT flying: the Piker blocks, bob takes 0, and the two TRADE (Bird
         -- Maiden is 1/2, Piker is 2/1). All three assertions distinguish them.
         let (gs, _, _) = S.combatBoardOf [Cards.birdMaidenPrinting cards] [Cards.pikerPrinting cards]
-            after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
+            after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "bob took 1" (Just 19) (S.lifeOf S.bob after)
               HU.assertEqual "the flier lives" 1 (S.creaturesInPlay S.alice after)

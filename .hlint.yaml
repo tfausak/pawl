@@ -22,3 +22,9 @@
 # (freezeQuantities in Pawl.Projection is the first to trip this one). See the
 # style section of CONTRIBUTING.md.
 - ignore: {name: "Replace case with maybe", within: Pawl.Projection}
+
+# HLint rewrites a two-branch Nothing/Just case (do nothing / apply an action)
+# into `Data.Foldable.for_`. Same rule as above: prefer explicit case over a
+# clever combinator (P5's Search and Counter arms, Pawl.Resolve, are the
+# first to trip this one). See the style section of CONTRIBUTING.md.
+- ignore: {name: "Use for_", within: Pawl.Resolve}

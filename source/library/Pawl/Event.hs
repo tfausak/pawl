@@ -5,6 +5,7 @@
 -- be an import cycle. See the plan's module dependency note.
 module Pawl.Event where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -26,6 +27,7 @@ import qualified Pawl.Type.DamageKind as DamageKind
 import Pawl.Type.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.Duration as Duration
+import Pawl.Type.Game (Game)
 import Pawl.Type.GameEvent (GameEvent)
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
@@ -119,13 +121,15 @@ clearRegenerationShields gs = gs {GameState.regenerationShields = Map.empty}
 -- createToken (a token from nothing). `mkObj` receives the fresh timestamp so the
 -- object records when it entered (CR 613.7d). The Moved event is emitted by the
 -- CALLER: only it knows which state the CR 608.2h snapshot must be taken against.
-placeObject :: PlayerId -> (Timestamp.Timestamp -> Object.Object) -> Zone -> GameState -> (ObjectId, GameState)
-placeObject pid mkObj dest gs =
+placeObject :: PlayerId -> (Timestamp.Timestamp -> Object.Object) -> Zone -> Game ObjectId
+placeObject pid mkObj dest = do
+  gs <- State.get
   let (newId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       obj = markCopyOnEnter dest (mkObj ts)
       gs3 = gs2 {GameState.objects = Map.insert newId obj (GameState.objects gs2)}
-   in (newId, Game.insertIntoZone dest pid newId gs3)
+  State.put (Game.insertIntoZone dest pid newId gs3)
+  pure newId
 
 -- CR 614.1c / 603.6d / 113.6h: an object with a "enters as a copy" ability is
 -- marked as-enters-pending as it enters the battlefield, on ANY entry path. The
@@ -150,36 +154,41 @@ cardOfObject obj = case Object.source obj of
 -- The single zone-change primitive (CR 400.7): the source object ceases; a NEW
 -- object with a fresh id is created in the destination, carrying owner and
 -- source forward and resetting per-incarnation state. No-op if the id is unknown.
-changeZone :: ObjectId -> Zone -> GameState -> GameState
-changeZone oid requestedDest gs = case Game.lookupObject oid gs of
-  Nothing -> gs
-  Just obj ->
-    let pid = Object.owner obj
-        fromZone = Object.zone obj
-        -- CR 608.2h: last known information -- the object as it exists in the zone
-        -- it is LEAVING, projected against the PRE-MOVE state. One board
-        -- projection per zone change, forced eagerly (GameEvent.Moved's snapshot
-        -- field is strict) rather than left as a thunk retaining the whole
-        -- pre-move GameState for a turn. Measured on the tasty-bench suite,
-        -- pre-log baseline (3cc3ecd) vs. this log with the strict field (goldfish
-        -- /casting/fighting, 2p): 10.1/9.30/9.31 ms -> 10.6/9.73/9.72 ms -- a ~4-5%
-        -- move, within the benchmark's own run-to-run noise (~800 us stddev on a
-        -- ~10 ms mean), not the large regression a captured pre-move GameState
-        -- would cause. That is the price of an honest history (a token has no
-        -- printed card to re-derive from, CR 111.1).
-        snapshot = Projection.project oid gs
-        -- CR 614.4: replacements exist before the event; read them from the
-        -- pre-move state. CR 614.6: the modified event is what actually happens.
-        proposed = ZoneChange.MkZoneChange oid fromZone requestedDest
-        resolved = applyReplacements gs (Projection.replacementsAffecting gs) proposed
-        dest = ZoneChange.to resolved
-        mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.timestamp = ts}
-        gs1 = Game.removeFromZones pid oid gs
-        gs2 = gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
-        (newId, placed) = placeObject pid mkObj dest gs2
-     in -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
-        -- what an enters trigger scans.
-        recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId fromZone dest) snapshot) placed
+changeZone :: ObjectId -> Zone -> Game ()
+changeZone oid requestedDest = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Nothing -> pure ()
+    Just obj -> do
+      let pid = Object.owner obj
+          fromZone = Object.zone obj
+          -- CR 608.2h: last known information -- the object as it exists in the
+          -- zone it is LEAVING, projected against the PRE-MOVE state. One board
+          -- projection per zone change, forced eagerly (GameEvent.Moved's snapshot
+          -- field is strict) rather than left as a thunk retaining the whole
+          -- pre-move GameState for a turn. Measured on the tasty-bench suite,
+          -- pre-log baseline (3cc3ecd) vs. this log with the strict field
+          -- (goldfish /casting/fighting, 2p): 10.1/9.30/9.31 ms -> 10.6/9.73/9.72
+          -- ms -- a ~4-5% move, within the benchmark's own run-to-run noise
+          -- (~800 us stddev on a ~10 ms mean), not the large regression a
+          -- captured pre-move GameState would cause. That is the price of an
+          -- honest history (a token has no printed card to re-derive from,
+          -- CR 111.1).
+          snapshot = Projection.project oid gs
+          -- CR 614.4: replacements exist before the event; read them from the
+          -- pre-move state. CR 614.6: the modified event is what actually
+          -- happens.
+          proposed = ZoneChange.MkZoneChange oid fromZone requestedDest
+          resolved = applyReplacements gs (Projection.replacementsAffecting gs) proposed
+          dest = ZoneChange.to resolved
+          mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.timestamp = ts}
+          gs1 = Game.removeFromZones pid oid gs
+          gs2 = gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
+      State.put gs2
+      newId <- placeObject pid mkObj dest
+      -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
+      -- what an enters trigger scans.
+      State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId fromZone dest) snapshot))
 
 -- The single destruction funnel (CR 701.8 / 702.12b): every destruction -- the
 -- Destroy opcode and the CR 704.5g/h state-based actions -- flows through here.
@@ -189,20 +198,22 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
 -- into its owner's graveyard via changeZone (so Rest in Peace's redirect and a
 -- token's CR 704.5d cease-to-exist still compose). This funnel is ungated for CR
 -- 701.19c "can't be regenerated" (#42).
-destroy :: ObjectId -> GameState -> GameState
-destroy oid gs = case Game.lookupObject oid gs of
-  Nothing -> gs
-  Just _ ->
-    if Projection.hasKeyword Keyword.Indestructible oid gs
-      then gs
-      else case Map.lookup oid (GameState.regenerationShields gs) of
-        Just n | n > 0 -> regenerate oid gs
-        _ -> changeZone oid Zone.Graveyard gs
+destroy :: ObjectId -> Game ()
+destroy oid = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Nothing -> pure ()
+    Just _ ->
+      if Projection.hasKeyword Keyword.Indestructible oid gs
+        then pure ()
+        else case Map.lookup oid (GameState.regenerationShields gs) of
+          Just n | n > 0 -> regenerate oid
+          _ -> changeZone oid Zone.Graveyard
 
 -- CR 701.19a: consume one shield, remove all marked damage, tap the permanent,
 -- and remove it from combat. The permanent stays on the battlefield (same id).
-regenerate :: ObjectId -> GameState -> GameState
-regenerate oid gs =
+regenerate :: ObjectId -> Game ()
+regenerate oid = State.modify' $ \gs ->
   let shields = Map.update (\n -> if n <= 1 then Nothing else Just (n - 1)) oid (GameState.regenerationShields gs)
       healTap obj = obj {Object.damage = 0, Object.tapped = TapState.Tapped}
       gs1 =
@@ -231,10 +242,12 @@ removeFromCombat oid gs =
 -- compose, exactly as they do for destroy. Ungated for "can't be countered" (CR
 -- 701.6), and emits no distinct "was countered" event (#43) -- the same posture
 -- as Event.destroy being ungated for CR 701.19c.
-counter :: ObjectId -> GameState -> GameState
-counter oid gs = case Game.lookupObject oid gs of
-  Nothing -> gs
-  Just _ -> changeZone oid Zone.Graveyard gs
+counter :: ObjectId -> Game ()
+counter oid = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Nothing -> pure ()
+    Just _ -> changeZone oid Zone.Graveyard
 
 -- CR 701.21/701.21a: the single sacrifice funnel. The permanent is put into its
 -- OWNER's graveyard through changeZone (so Rest in Peace's redirect and a token's
@@ -248,16 +261,18 @@ counter oid gs = case Game.lookupObject oid gs of
 -- the only caller (Resolve's Sacrifice arm) reads a slot the engine itself
 -- stamped (Binding.triggerSource, a triggered ability's own source, CR 113.7),
 -- which is always controlled by whoever triggered it.
-sacrifice :: ObjectId -> GameState -> GameState
-sacrifice oid gs = case Game.lookupObject oid gs of
-  Nothing -> gs
-  Just obj -> case Object.zone obj of
-    Zone.Battlefield -> changeZone oid Zone.Graveyard gs
-    Zone.Library -> gs
-    Zone.Hand -> gs
-    Zone.Graveyard -> gs
-    Zone.Stack -> gs
-    Zone.Exile -> gs
+sacrifice :: ObjectId -> Game ()
+sacrifice oid = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Nothing -> pure ()
+    Just obj -> case Object.zone obj of
+      Zone.Battlefield -> changeZone oid Zone.Graveyard
+      Zone.Library -> pure ()
+      Zone.Hand -> pure ()
+      Zone.Graveyard -> pure ()
+      Zone.Stack -> pure ()
+      Zone.Exile -> pure ()
 
 -- CR 111.2: create a token with the given effect-defined characteristics under
 -- `controller`'s control (its owner, CR 111.2), summoning-sick (CR 302.6). A token
@@ -266,8 +281,8 @@ sacrifice oid gs = case Game.lookupObject oid gs of
 -- a leave). Emits the enters event so ETB triggers (CR 603.6a) fire on the same
 -- path a resolved permanent uses. Does NOT consult replacements (Doubling Season
 -- is future, spec section 8).
-createToken :: PlayerId -> Card -> GameState -> GameState
-createToken controller card gs =
+createToken :: PlayerId -> Card -> Game ()
+createToken controller card = do
   let mkObj ts =
         Object.MkObject
           { Object.owner = controller,
@@ -280,21 +295,24 @@ createToken controller card gs =
             Object.counters = Map.empty,
             Object.timestamp = ts
           }
-      (newId, placed) = placeObject controller mkObj Zone.Battlefield gs
-      -- A token is created from nothing, so there is no prior incarnation to
-      -- snapshot: its last known information IS what it is now (CR 111.3 makes
-      -- the creating effect's stated values functionally printed values).
-      snapshot = Projection.project newId placed
-   in recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId Zone.Battlefield Zone.Battlefield) snapshot) placed
+  newId <- placeObject controller mkObj Zone.Battlefield
+  placed <- State.get
+  -- A token is created from nothing, so there is no prior incarnation to
+  -- snapshot: its last known information IS what it is now (CR 111.3 makes the
+  -- creating effect's stated values functionally printed values).
+  let snapshot = Projection.project newId placed
+  State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId Zone.Battlefield Zone.Battlefield) snapshot))
 
 -- CR 121.2/121.3: the single-card draw. Move pid's top library card to their
 -- hand; an empty library records the failed draw (CR 704.5b makes it a loss at
 -- the next state-based-action check). The primitive shared by the draw step
 -- (Engine.drawFor), opening hands (Setup.drawCard), and the Draw effect (Resolve).
-drawCard :: PlayerId -> GameState -> GameState
-drawCard pid gs = case Game.zoneMembers Zone.Library pid gs of
-  [] -> gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
-  top : _ -> changeZone top Zone.Hand gs
+drawCard :: PlayerId -> Game ()
+drawCard pid = do
+  gs <- State.get
+  case Game.zoneMembers Zone.Library pid gs of
+    [] -> State.put gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
+    top : _ -> changeZone top Zone.Hand
 
 -- CR 614: rewrite the proposed zone change by each active replacement, paired
 -- with its source. CR 614.5: applied left-to-right, each seeing the running

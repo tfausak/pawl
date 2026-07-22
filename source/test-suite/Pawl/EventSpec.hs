@@ -9,7 +9,6 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
@@ -50,7 +49,7 @@ tests cards =
       HU.testCase "CR 614: with Rest in Peace out, a creature sent to the graveyard is exiled" $
         let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             (piker, g1) = S.addPiker cards S.bob g0
-            after = Event.changeZone piker Zone.Graveyard g1
+            after = S.runPure S.identityAnswer g1 (Event.changeZone piker Zone.Graveyard)
             inExile = Set.size (GameState.exile after)
             gyCount = length (Game.zoneMembers Zone.Graveyard S.bob after)
          in do
@@ -59,23 +58,23 @@ tests cards =
       HU.testCase "CR 603.2g: the emitted event records the RESOLVED destination (exile)" $
         let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             (piker, g1) = S.addPiker cards S.bob g0
-            after = Event.changeZone piker Zone.Graveyard g1
+            after = S.runPure S.identityAnswer g1 (Event.changeZone piker Zone.Graveyard)
          in case S.zoneChangesOf after of
               zc : _ -> HU.assertEqual "event says exile" Zone.Exile (ZoneChange.to zc)
               [] -> HU.assertFailure "expected an emitted zone change",
       HU.testCase "without Rest in Peace, a creature goes to the graveyard" $
         let (piker, g1) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
-            after = Event.changeZone piker Zone.Graveyard g1
+            after = S.runPure S.identityAnswer g1 (Event.changeZone piker Zone.Graveyard)
          in HU.assertEqual "in graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
       HU.testCase "CR 608.2n: a resolving spell is exiled from the stack under Rest in Peace" $
         let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             (bolt, g1) = S.addLibraryCard (Cards.lightningBoltPrinting cards) S.bob g0
             onStack = g1 {GameState.stack = bolt : GameState.stack g1, GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Stack}) bolt (GameState.objects g1)}
-            after = Event.changeZone bolt Zone.Graveyard onStack
+            after = S.runPure S.identityAnswer onStack (Event.changeZone bolt Zone.Graveyard)
          in HU.assertEqual "spell exiled, graveyard empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
       HU.testCase "CR 701.6a Event.counter puts a countered spell into its owner's graveyard" $
         let (spellId, onStack) = S.spellOnStack (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-            after = Event.counter spellId onStack
+            after = S.runPure S.identityAnswer onStack (Event.counter spellId)
          in do
               HU.assertEqual "off the stack" [] (GameState.stack after)
               HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
@@ -83,14 +82,14 @@ tests cards =
       HU.testCase "CR 614 a countered spell is exiled under Rest in Peace" $
         let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             (spellId, onStack) = S.spellOnStack (Cards.pikerPrinting cards) S.bob g0
-            after = Event.counter spellId onStack
+            after = S.runPure S.identityAnswer onStack (Event.counter spellId)
          in do
               HU.assertEqual "not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
               HU.assertEqual "exiled instead" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
       HU.testCase "CR 603/614 whole card: cast Rest in Peace, ETB exiles graveyards, then deaths are exiled" $
         let base = S.landsInPlay (Cards.plainsPrinting cards) 2
             (deadId, withDead) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice base
-            g0 = Event.changeZone deadId Zone.Graveyard withDead -- a card already in the graveyard
+            g0 = S.runPure S.identityAnswer withDead (Event.changeZone deadId Zone.Graveyard) -- a card already in the graveyard
             (g1, ripId) = S.handOne (Cards.restInPeacePrinting cards) g0
             afterCast = snd (Engine.runGamePure S.identityAnswer g1 (Cast.castSpell S.alice ripId))
             -- run priority: both players pass, RiP resolves and enters, its ETB is
@@ -104,7 +103,7 @@ tests cards =
         let base = Setup.emptyGame S.bothPlayers
             goblinCard = Printing.card (Cards.pikerPrinting cards)
             before = Game.objectCount base
-            after = Event.createToken S.alice goblinCard base
+            after = S.runPure S.identityAnswer base (Event.createToken S.alice goblinCard)
             newIds = Set.toList (GameState.battlefield after)
          in do
               HU.assertEqual "one more object exists" (before + 1) (Game.objectCount after)
@@ -127,8 +126,8 @@ tests cards =
             (_, withRip) = S.addCreature (Cards.restInPeacePrinting cards) S.bob base
             (tokId, gs) = S.addToken goblinCard S.alice withRip
             -- Kill the token: route it to the graveyard; RiP redirects to exile.
-            dying = Event.changeZone tokId Zone.Graveyard gs
-            settled = Sba.checkStateBasedActions dying
+            dying = S.runPure S.identityAnswer gs (Event.changeZone tokId Zone.Graveyard)
+            settled = S.settleSba dying
          in do
               HU.assertEqual "the token never entered a graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice dying))
               HU.assertEqual "it was redirected to exile" 1 (length (Game.zoneMembers Zone.Exile S.alice dying))
@@ -148,7 +147,7 @@ tests cards =
             (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
             damaged = S.markDamage oid 1 gs0
             shielded = S.addRegenShield oid damaged
-            after = Event.destroy oid shielded
+            after = S.runPure S.identityAnswer shielded (Event.destroy oid)
          in do
               HU.assertEqual "still on the battlefield (regenerated, not destroyed)" True (Set.member oid (GameState.battlefield after))
               HU.assertEqual "shield consumed" Nothing (Map.lookup oid (GameState.regenerationShields after))
@@ -160,20 +159,20 @@ tests cards =
       HU.testCase "CR 701.19a a second destroy with no shield left kills it" $
         let base = Setup.emptyGame S.bothPlayers
             (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
-            once = Event.destroy oid (S.addRegenShield oid gs0) -- regenerated
-            twice = Event.destroy oid once -- no shield -> dies
+            once = S.runPure S.identityAnswer (S.addRegenShield oid gs0) (Event.destroy oid) -- regenerated
+            twice = S.runPure S.identityAnswer once (Event.destroy oid) -- no shield -> dies
          in HU.assertEqual "gone from the battlefield" False (Set.member oid (GameState.battlefield twice)),
       HU.testCase "CR 700.4 Event.destroy no-ops on an indestructible permanent" $
         let base = Setup.emptyGame S.bothPlayers
             (oid, gs0) = S.addCreature (Cards.darksteelMyrPrinting cards) S.alice base
-            after = Event.destroy oid gs0
+            after = S.runPure S.identityAnswer gs0 (Event.destroy oid)
          in HU.assertEqual "indestructible survives" True (Set.member oid (GameState.battlefield after)),
       HU.testCase "CR 122.2 counters cease to exist when an object changes zones" $
         let base = S.landsInPlay (Cards.swampPrinting cards) 0
             (oid, withCreature) = S.addCreature (Cards.pikerPrinting cards) S.bob base
             withCounter = S.addCounter CounterKind.PlusOnePlusOne 2 oid withCreature
             -- Bounce to hand: changeZone mints a new incarnation (CR 400.7).
-            bounced = Event.changeZone oid Zone.Hand withCounter
+            bounced = S.runPure S.identityAnswer withCounter (Event.changeZone oid Zone.Hand)
             -- Total (no `head`): map over the hand zone; expect exactly one card, empty.
             handCounters = map (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h bounced)) (Game.zoneMembers Zone.Hand S.bob bounced)
          in do
@@ -184,14 +183,14 @@ tests cards =
             (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
             gs1 = S.addCounter CounterKind.PlusOnePlusOne 1 oid gs0
             gs2 = S.addCounter CounterKind.MinusOneMinusOne 1 oid gs1
-            after = Sba.checkStateBasedActions gs2
+            after = S.settleSba gs2
          in HU.assertEqual "no counters remain" Map.empty (maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject oid after)),
       HU.testCase "CR 704.5q annihilation removes N = min (asymmetric)" $
         let base = S.landsInPlay (Cards.swampPrinting cards) 0
             (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
             gs1 = S.addCounter CounterKind.PlusOnePlusOne 2 oid gs0
             gs2 = S.addCounter CounterKind.MinusOneMinusOne 1 oid gs1
-            after = Sba.checkStateBasedActions gs2
+            after = S.settleSba gs2
          in do
               HU.assertEqual "one +1/+1 remains" (Just 1) (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid after))
               HU.assertEqual "no -1/-1 remains" (Just 0) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject oid after))

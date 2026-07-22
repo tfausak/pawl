@@ -13,7 +13,6 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -196,7 +195,7 @@ tests cards =
         let (mammothId, gs0) = S.addCreature (Cards.warMammothPrinting cards) S.bob (S.mountainsInPlay cards 1)
             damaged = S.markDamage mammothId 2 gs0
             underHumility = S.withHumility cards damaged
-            afterSba = Sba.checkStateBasedActions underHumility
+            afterSba = S.settleSba underHumility
          in do
               HU.assertEqual "survives at 3/3 with 2 marked" (Just 3) (Projection.toughnessOf mammothId damaged)
               HU.assertEqual "no creature survives once toughness is 1" 0 (S.creaturesInPlay S.bob afterSba),
@@ -345,7 +344,7 @@ tests cards =
               HU.assertBool "Humility is a creature" (Projection.isCreatureOf humilityId g2)
               HU.assertEqual "base P/T = its mana value" (Just 4) (Projection.toughnessOf humilityId g2)
               let damaged = S.markDamage humilityId 4 g2
-                  afterSba = Sba.checkStateBasedActions damaged
+                  afterSba = S.settleSba damaged
               HU.assertBool "lethal damage destroys the animated enchantment" (not (Set.member humilityId (GameState.battlefield afterSba))),
       HU.testCase "CR 613 Humility + Opalescence: a real creature is 1/1 with no abilities" $
         let base = Setup.emptyGame S.bothPlayers

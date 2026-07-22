@@ -27,6 +27,7 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
@@ -623,6 +624,18 @@ fightWith answer gs =
     Combat.declareAttackers alice
     Combat.declareBlockers
     Damage.dealCombatDamage
+
+-- Run a Game action purely under an answerer and keep only the final state. The
+-- shape every direct-call test needs now that the change-and-emit funnels are
+-- monadic (P5): `Event.destroy oid gs` becomes
+-- `S.runPure S.identityAnswer gs (Event.destroy oid)`.
+runPure :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> GameState.GameState
+runPure answer gs game = snd (Engine.runGamePure answer gs game)
+
+-- One CR 704 state-based-action pass, run purely. The direct replacement for the
+-- pre-P5 pure `Sba.checkStateBasedActions gs`.
+settleSba :: GameState.GameState -> GameState.GameState
+settleSba gs = runPure identityAnswer gs Sba.checkStateBasedActions
 
 -- Run whole steps through the engine while the current phase is in the combat
 -- phase, stopping once combat is left or the game ends. Bounded so a bug cannot

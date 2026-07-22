@@ -90,10 +90,10 @@ nextStillPlaying gs pid =
    in nextInOrder order pid
 
 checkSba :: Game ()
-checkSba = State.modify' Sba.checkStateBasedActions
+checkSba = Sba.checkStateBasedActions
 
 drawFor :: PlayerId -> Game ()
-drawFor pid = State.modify' (Event.drawCard pid)
+drawFor = Event.drawCard
 
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
@@ -138,8 +138,7 @@ discardToHandSize pid = do
     chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (fromIntegral excess)))
     let inHand oid = List.elem oid held
         toDiscard = take excess (filter inHand chosen)
-        toGraveyard g oid = Event.changeZone oid Zone.Graveyard g
-    State.modify' (\g -> List.foldl' toGraveyard g toDiscard)
+    Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toDiscard
 
 -- CR 103.7a: the starting player skips their first draw step.
 skipsDraw :: GameState -> Bool
@@ -389,9 +388,7 @@ applyCopyChoice oid chosen gs =
 settleForPriority :: Game ()
 settleForPriority = do
   drained <- drainAsEntersChoices
-  gs <- State.get
-  let (acted, gs') = Sba.performStateBasedActions gs
-  State.put gs'
+  acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
   Monad.when (drained || acted || placed) settleForPriority
 
@@ -433,7 +430,8 @@ priorityLoop = do
                         State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}
                         loop
                   Action.Type.Play oid -> do
-                    State.modify' (\g -> let played = Event.changeZone oid Zone.Battlefield g in played {GameState.landPlayed = Set.insert p (GameState.landPlayed played), GameState.passes = 0, GameState.priority = Just p})
+                    Event.changeZone oid Zone.Battlefield
+                    State.modify' (\g -> g {GameState.landPlayed = Set.insert p (GameState.landPlayed g), GameState.passes = 0, GameState.priority = Just p})
                     settleForPriority
                     loop
                   Action.Type.Cast oid -> do

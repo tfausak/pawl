@@ -136,7 +136,7 @@ tests cards =
             (pikerId, board) = S.addPiker cards S.alice gs0
             (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
             resolved = resolveAndSettle copyNewest staged
-            afterKill = Event.destroy pikerId resolved
+            afterKill = S.runPure S.identityAnswer resolved (Event.destroy pikerId)
          in case cloneOnBattlefield afterKill of
               Nothing -> HU.assertFailure "Clone should survive the source's death"
               Just cloneId -> do

@@ -1,11 +1,14 @@
 module Pawl.Sba where
 
 import Control.Applicative ((<|>))
+import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
@@ -13,6 +16,7 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Departure as Departure
+import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -98,16 +102,22 @@ destroyedBySba gs pc oid =
 -- CR 704.3 says to repeat until no state-based action is performed. One pass is
 -- enough in M1b: a creature dying cannot cause another SBA, because nothing
 -- gains or loses life when a creature dies. Revisit when it can.
-checkStateBasedActions :: GameState -> GameState
-checkStateBasedActions = snd . performStateBasedActions
+checkStateBasedActions :: Game ()
+checkStateBasedActions = Monad.void performStateBasedActions
 
 -- One SBA pass, also reporting whether any state-based action was PERFORMED (a
 -- creature buried or a player departed). CR 704.4: the caller repeats the check
 -- while that flag is True. The flag lets the CR 117.5 settle loop (Engine) decide
--- whether to repeat WITHOUT a deep GameState comparison -- the common case (no SBA
--- fires) then costs one projection, not a full-state equality traversal.
-performStateBasedActions :: GameState -> (Bool, GameState)
-performStateBasedActions gs =
+-- whether to repeat WITHOUT a deep GameState comparison.
+--
+-- Monadic since P5: CR 704.5f's put-into-graveyard and CR 704.5g's destruction
+-- both go through funnels that can now raise a CR 616 replacement prompt (a
+-- creature dying with two applicable death-replacements genuinely must ask its
+-- controller which to apply). M3g's decider re-entrancy already permits prompting
+-- from inside the settle loop.
+performStateBasedActions :: Game Bool
+performStateBasedActions = do
+  gs <- State.get
   let -- CR 704.5f/g are checked against the state BEFORE any of them apply: SBAs
       -- are simultaneous. Project the whole board once (one gather) and judge each
       -- object against it, rather than re-projecting per object.
@@ -122,19 +132,39 @@ performStateBasedActions gs =
       onBattlefield = Set.toList (GameState.battlefield gs)
       toGraveyard = filter (\oid -> classify oid == Just False) onBattlefield
       toDestroy = filter (\oid -> classify oid == Just True) onBattlefield
-      -- CR 704.5f: a plain put-into-graveyard (regeneration cannot save it).
-      buried = List.foldl' (\g oid -> Event.changeZone oid Zone.Graveyard g) gs toGraveyard
-      -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
-      destroyed = List.foldl' (flip Event.destroy) buried toDestroy
-      leaving = filter (losesNow destroyed) (stillPlaying destroyed)
+      -- CR 704.5q / 122.3: a permanent with both a +1/+1 and a -1/-1 counter has N
+      -- of each removed (N = min). Computed against the SAME pre-pass state as the
+      -- bury/destroy classification, which is what makes the ordering immaterial:
+      -- net P/T is preserved, so it can neither cause nor prevent a death.
+      annihilateOne oid = case Game.lookupObject oid gs of
+        Nothing -> Nothing
+        Just obj ->
+          let cs = Object.counters obj
+              plus = Map.findWithDefault 0 CounterKind.PlusOnePlusOne cs
+              minus = Map.findWithDefault 0 CounterKind.MinusOneMinusOne cs
+              n = min plus minus
+           in if n > 0 then Just (oid, n) else Nothing
+      annihilations = Maybe.mapMaybe annihilateOne onBattlefield
+      -- CR 704.5h's window is "since the last SBA check", so the watermark is the
+      -- log length AS THIS PASS BEGAN: every 704.5h victim was computed from that
+      -- same pre-pass state, and the Moved events this pass itself appends carry
+      -- no damage. The record is never removed.
+      watermark :: Natural
+      watermark = fromIntegral (Seq.length (GameState.events gs))
+  -- CR 704.5f: a plain put-into-graveyard (regeneration cannot save it).
+  Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toGraveyard
+  -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
+  Monad.mapM_ Event.destroy toDestroy
+  destroyed <- State.get
+  let leaving = filter (losesNow destroyed) (stillPlaying destroyed)
       departed = foldr depart destroyed leaving
       remaining = stillPlaying departed
       -- CR 704.5d: a token in any zone other than the battlefield ceases to exist.
       -- Computed from the post-bury state so a token that just died (now in the
       -- graveyard) or was redirected (Rest in Peace -> exile) is removed here; its
       -- move already emitted a zone-change event, so a future dies-trigger still
-      -- sees it (CR 111.7's parenthetical). Keyed to "not on the battlefield", never
-      -- to a specific zone, so exile is caught too.
+      -- sees it (CR 111.7's parenthetical). Keyed to "not on the battlefield",
+      -- never to a specific zone, so exile is caught too.
       isVanishingToken oid = case Game.lookupObject oid departed of
         Nothing -> False
         Just obj -> case Object.source obj of
@@ -147,20 +177,6 @@ performStateBasedActions gs =
           let g1 = Game.removeFromZones (Object.owner obj) oid g
            in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
       vanished = List.foldl' ceaseToExist departed vanishing
-      -- CR 704.5q / 122.3: a permanent with both a +1/+1 and a -1/-1 counter has N
-      -- of each removed (N = min). A counter-count edit, not a bury or departure --
-      -- it feeds the `acted` flag (CR 704.4 repeats) but never re-fires once
-      -- balanced. Net P/T is preserved, so it can neither cause nor prevent a
-      -- death; ordering vs the bury/destroy step is immaterial.
-      annihilateOne oid = case Game.lookupObject oid gs of
-        Nothing -> Nothing
-        Just obj ->
-          let cs = Object.counters obj
-              plus = Map.findWithDefault 0 CounterKind.PlusOnePlusOne cs
-              minus = Map.findWithDefault 0 CounterKind.MinusOneMinusOne cs
-              n = min plus minus
-           in if n > 0 then Just (oid, n) else Nothing
-      annihilations = Maybe.mapMaybe annihilateOne onBattlefield
       removeN n c = let c' = c - n in if c' == 0 then Nothing else Just c'
       balance g (oid, n) =
         let strip obj = obj {Object.counters = Map.update (removeN n) CounterKind.MinusOneMinusOne (Map.update (removeN n) CounterKind.PlusOnePlusOne (Object.counters obj))}
@@ -169,15 +185,12 @@ performStateBasedActions gs =
         [winner] -> Just (Result.Won winner)
         [] -> if null leaving then Nothing else Just Result.Drawn
         _ -> Nothing
-      -- CR 704.5h's window is "since the last SBA check", so the watermark is
-      -- advanced to the log length AS THIS PASS BEGAN: every 704.5h victim was
-      -- computed from that same pre-pass state, and the Moved events this pass
-      -- itself appends carry no damage. The record is never removed.
-      drained = vanished {GameState.damageScannedThrough = fromIntegral (Seq.length (GameState.events gs))}
+      drained = vanished {GameState.damageScannedThrough = watermark}
+      balanced = List.foldl' balance drained annihilations
       -- A state-based action was performed iff a creature was buried or destroyed
       -- (a regenerated creature still counts, which the CR 704.4 settle loop
       -- re-checks and -- because the regen healed the damage -- terminates), a
       -- player left, or a token ceased to exist.
-      balanced = List.foldl' balance drained annihilations
       acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations)
-   in (acted, balanced {GameState.result = outcome <|> GameState.result balanced})
+  State.put balanced {GameState.result = outcome <|> GameState.result balanced}
+  pure acted

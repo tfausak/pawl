@@ -58,7 +58,7 @@ sicknessTests cards =
     [ HU.testCase "CR 302.6 a permanent entering the battlefield is summoning sick" $
         -- changeZone mints a new object, so the id to inspect is the new one.
         let (gs, oid) = S.pikerInHand cards 3 Phase.PrecombatMain
-            after = Event.changeZone oid Zone.Battlefield gs
+            after = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Battlefield)
          in case Game.zoneMembers Zone.Battlefield S.alice after of
               [] -> HU.assertFailure "expected a permanent"
               ids -> case filter (\o -> sicknessOf o after == Just Sickness.Sick) ids of
@@ -251,7 +251,7 @@ castTests cards =
          in HU.assertBool "in response" (Cast.castable S.alice oid busy),
       HU.testCase "a Bolt in the graveyard is not castable" $
         let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
-            buried = Event.changeZone oid Zone.Graveyard gs
+            buried = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
          in HU.assertEqual "nothing castable" [] (Cast.castableSpells S.alice buried),
       HU.testCase "CR 601.2c casting a Bolt stamps the chosen target on the stack object" $
         let (base, gs, _) = S.boltAtBobsPiker cards

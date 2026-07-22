@@ -96,7 +96,7 @@ objectFactTests cards =
 
 gameTests :: Cards.Cards -> Tasty.TestTree
 gameTests cards =
-  let after = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield (S.oneMountainState cards Phase.PrecombatMain)
+  let after = S.runPure S.identityAnswer (S.oneMountainState cards Phase.PrecombatMain) (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
    in Tasty.testGroup
         "Game"
         [ HU.testCase "changeZone preserves object count" $
@@ -133,7 +133,7 @@ gameTests cards =
                           (ObjectId.MkObjectId 0)
                           (GameState.objects base)
                     }
-                moved = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
+                moved = S.runPure S.identityAnswer stamped (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
                 landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
              in HU.assertEqual "reset" [Map.empty] (map Object.bindings landed),
           HU.testCase "CR 400.7 changeZone resets a word-swap binding" $
@@ -147,13 +147,13 @@ gameTests cards =
                           (ObjectId.MkObjectId 0)
                           (GameState.objects base)
                     }
-                moved = Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield stamped
+                moved = S.runPure S.identityAnswer stamped (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
                 newObj = Game.lookupObject (ObjectId.MkObjectId 1) moved
              in HU.assertEqual "reset to empty" (Just Map.empty) (fmap Object.bindings newObj),
           HU.testCase "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $
             let (oid, gs) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
                 before = GameState.nextTimestamp gs
-                movedState = Event.changeZone oid Zone.Graveyard gs
+                movedState = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
                 movedId = case Game.zoneMembers Zone.Graveyard S.bob movedState of
                   i : _ -> i
                   [] -> ObjectId.MkObjectId 999

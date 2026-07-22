@@ -13,7 +13,6 @@ import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
-import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ActivePrevention as ActivePrevention
@@ -50,14 +49,14 @@ creatureSbaTests cards =
     "CreatureSba"
     [ HU.testCase "CR 704.5g a creature with lethal damage is destroyed" $
         let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
-            after = Sba.checkStateBasedActions (S.markDamage oid 1 gs)
+            after = S.settleSba (S.markDamage oid 1 gs)
          in do
               HU.assertEqual "off the battlefield" [] (Game.zoneMembers Zone.Battlefield S.alice after)
               HU.assertEqual "in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       HU.testCase "CR 704.5g damage below toughness is not lethal" $
         let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
             -- A Piker is 2/1, so 0 marked damage is survivable and 1 is not.
-            after = Sba.checkStateBasedActions (S.markDamage oid 0 gs)
+            after = S.settleSba (S.markDamage oid 0 gs)
          in HU.assertEqual "still there" 1 (length (Game.zoneMembers Zone.Battlefield S.alice after)),
       HU.testCase "CR 704.5g a Mountain with damage marked is not destroyed" $
         -- Not a creature: 704.5f/g do not apply. This is the classification
@@ -69,20 +68,20 @@ creatureSbaTests cards =
                 HU.assertEqual
                   "survives"
                   1
-                  (length (Game.zoneMembers Zone.Battlefield S.alice (Sba.checkStateBasedActions (S.markDamage oid 5 gs)))),
+                  (length (Game.zoneMembers Zone.Battlefield S.alice (S.settleSba (S.markDamage oid 5 gs)))),
       HU.testCase "a destroyed creature conserves objects" $
         let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
             marked = S.markDamage oid 1 gs
          in HU.assertEqual
               "conserved"
               (Game.objectCount marked)
-              (Game.objectCount (Sba.checkStateBasedActions marked)),
+              (Game.objectCount (S.settleSba marked)),
       -- The deterministic successor to the retired green-black "some seed sends a
       -- creature to the graveyard" property: two 2/1 Pikers trade in combat and
       -- both die to the CR 704.5g state-based action.
       HU.testCase "a creature dies in a played-out combat" $
         let (gs, _, _) = S.combatBoard cards 1 1
-            after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
+            after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "attacker died" 0 (S.creaturesInPlay S.alice after)
               HU.assertEqual "blocker died" 0 (S.creaturesInPlay S.bob after),
@@ -90,9 +89,9 @@ creatureSbaTests cards =
         let base = Setup.emptyGame S.bothPlayers
             goblinCard = Printing.card (Cards.pikerPrinting cards)
             (tokId, gs) = S.addToken goblinCard S.alice base
-            inGrave = Event.changeZone tokId Zone.Graveyard gs
+            inGrave = S.runPure S.identityAnswer gs (Event.changeZone tokId Zone.Graveyard)
             -- The changeZone minted a new incarnation; find it in the graveyard.
-            settled = Sba.checkStateBasedActions inGrave
+            settled = S.settleSba inGrave
          in do
               HU.assertEqual "before the SBA, a token sits in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice inGrave))
               HU.assertEqual "after the SBA, it has ceased to exist" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
@@ -101,7 +100,7 @@ creatureSbaTests cards =
         let base = Setup.emptyGame S.bothPlayers
             goblinCard = Printing.card (Cards.pikerPrinting cards)
             (_, gs) = S.addToken goblinCard S.alice base
-            settled = Sba.checkStateBasedActions gs
+            settled = S.settleSba gs
          in HU.assertEqual "the token survives on the battlefield" 1 (Game.objectCount settled),
       HU.testCase "CR 704.5d/704.5g a 1/1 token dies to lethal damage and ceases to exist" $
         let base = Setup.emptyGame S.bothPlayers
@@ -109,8 +108,8 @@ creatureSbaTests cards =
             -- A real 2/1 Piker (bob's) is the damage source; alice's 1/1 token takes 2.
             (srcId, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob base
             (tokId, gs2) = S.addToken goblinCard S.alice gs1
-            damaged = Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False DamageKind.Combat] gs2
-            settled = Sba.checkStateBasedActions damaged
+            damaged = S.runPure S.identityAnswer gs2 (Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False DamageKind.Combat])
+            settled = S.settleSba damaged
          in do
               HU.assertEqual "the token is gone from the battlefield" 0 (S.creaturesInPlay S.alice settled)
               HU.assertEqual "and NOT sitting in a graveyard (the falsifier)" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled)),
@@ -119,8 +118,8 @@ creatureSbaTests cards =
             (victim, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base -- 2/1
             shielded = S.addRegenShield victim gs0
             -- 2 combat damage is lethal to a 2/1; the shield replaces the CR 704.5g destruction.
-            damaged = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat] shielded
-            settled = Sba.checkStateBasedActions damaged
+            damaged = S.runPure S.identityAnswer shielded (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat])
+            settled = S.settleSba damaged
          in do
               HU.assertEqual "survived (regenerated)" True (Set.member victim (GameState.battlefield settled))
               case Game.lookupObject victim settled of
@@ -148,7 +147,7 @@ damageTests cards =
       HU.testCase "CR 400.7 a new object carries no damage forward" $
         let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
             marked = S.markDamage oid 1 gs
-            after = Event.changeZone oid Zone.Graveyard marked
+            after = S.runPure S.identityAnswer marked (Event.changeZone oid Zone.Graveyard)
          in case Game.zoneMembers Zone.Graveyard S.alice after of
               [] -> HU.assertFailure "expected a card in the graveyard"
               new : _ -> HU.assertEqual "fresh object, no damage" (Just 0) (S.damageOf new after),
@@ -157,8 +156,8 @@ damageTests cards =
             (victim, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
             shield = ActivePrevention.MkActivePrevention Prevention.PreventAllCombatDamage Duration.UntilEndOfTurn
             withShield = S.addPrevention shield gs0
-            combat = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat] withShield
-            spell = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat] withShield
+            combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat])
+            spell = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat])
          in do
               HU.assertEqual "combat damage prevented -- none marked" (Just 0) (S.damageOf victim combat)
               HU.assertEqual "combat damage prevented -- no event recorded" [] (S.damageEventsOf combat)
@@ -178,16 +177,16 @@ sbaTests =
   Tasty.testGroup
     "Sba"
     [ HU.testCase "drew-from-empty loses" $
-        let after = Sba.checkStateBasedActions sbaBase {GameState.drewFromEmpty = Set.singleton S.alice}
+        let after = S.settleSba sbaBase {GameState.drewFromEmpty = Set.singleton S.alice}
          in HU.assertEqual "alice lost" (Just (Status.Departed Departure.Lost)) (fmap Player.status (Map.lookup S.alice (GameState.players after))),
       HU.testCase "one remaining player wins" $
-        let after = Sba.checkStateBasedActions sbaBase {GameState.drewFromEmpty = Set.singleton S.alice}
+        let after = S.settleSba sbaBase {GameState.drewFromEmpty = Set.singleton S.alice}
          in HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result after),
       HU.testCase "life <= 0 loses" $
         let gs = sbaBase {GameState.players = Map.insert S.alice (Player.MkPlayer {Player.life = 0, Player.status = Status.Playing}) (GameState.players sbaBase)}
-         in HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result (Sba.checkStateBasedActions gs)),
+         in HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result (S.settleSba gs)),
       HU.testCase "simultaneous last departures draw" $
-        let after = Sba.checkStateBasedActions sbaBase {GameState.drewFromEmpty = Set.fromList [S.alice, S.bob]}
+        let after = S.settleSba sbaBase {GameState.drewFromEmpty = Set.fromList [S.alice, S.bob]}
          in HU.assertEqual "draw" (Just Result.Drawn) (GameState.result after)
     ]
 
@@ -227,17 +226,17 @@ deathtouchTests cards =
         -- Typhoid Rats attacks, Ogre Sentry blocks. Rat deals 1 -> Ogre dies by
         -- 704.5h (toughness 3, not lethal by the numbers); Ogre's 3 kills the Rat.
         let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
-            after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
+            after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "the Ogre is dead" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "the Rat is dead" 0 (S.creaturesInPlay S.alice after),
       HU.testCase "CR 704.5g the control: a 2/1 without deathtouch leaves the 3/3 alive" $
         let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting cards] [Cards.ogreSentryPrinting cards]
-            after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
+            after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
          in HU.assertEqual "the Ogre survives" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "the SBA check consumes the damage events by watermark, not by draining" $
         let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
-            after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
+            after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "nothing left unscanned" [] (Event.unscannedDamage after)
               HU.assertBool "the record survives (CR 608.2i)" (not (null (S.damageEventsOf after))),
@@ -371,7 +370,7 @@ trampleTests cards =
         -- War Mammoth (3/3 trample) blocked by a Piker (2/1): 1 lethal to the
         -- Piker, 2 to bob. Mammoth survives (2 marked < 3).
         let (gs, _, _) = S.combatBoardOf [Cards.warMammothPrinting cards] [Cards.pikerPrinting cards]
-            after = Sba.checkStateBasedActions (S.fightWith tramplingAnswer gs)
+            after = S.settleSba (S.fightWith tramplingAnswer gs)
          in do
               HU.assertEqual "bob took the 2 overflow" (Just 18) (S.lifeOf S.bob after)
               HU.assertEqual "the Piker is dead" 0 (S.creaturesInPlay S.bob after)
@@ -393,7 +392,7 @@ trampleTests cards =
                   d : _ -> Map.singleton d n
                   [] -> Map.empty
               _ -> S.aggressiveAnswer p
-            after = Sba.checkStateBasedActions (S.fightWith cheat gs)
+            after = S.settleSba (S.fightWith cheat gs)
          in do
               HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after)
               HU.assertEqual "the Piker survives the rejected assignment" 1 (S.creaturesInPlay S.bob after),
@@ -409,7 +408,7 @@ trampleTests cards =
                   r : _ -> Map.singleton r n
                   [] -> Map.empty
               _ -> S.aggressiveAnswer p
-            after = Sba.checkStateBasedActions (S.fightWith dumpOne gs)
+            after = S.settleSba (S.fightWith dumpOne gs)
          in do
               HU.assertEqual "bob untouched (no overflow)" (Just 20) (S.lifeOf S.bob after)
               HU.assertEqual "one Ogre took all 3 and died, the other lived" 1 (S.creaturesInPlay S.bob after)
@@ -444,7 +443,7 @@ trampleDeathtouchTests cards =
               m : _ -> m
               [] -> ObjectId.MkObjectId 999
             gs = grantDeathtouch mammothId gs0
-            after = Sba.checkStateBasedActions (S.fightWith tramplingAnswer gs)
+            after = S.settleSba (S.fightWith tramplingAnswer gs)
          in do
               HU.assertEqual "bob took the 2 overflow" (Just 18) (S.lifeOf S.bob after)
               HU.assertEqual "the Ogre is dead" 0 (S.creaturesInPlay S.bob after),
@@ -452,7 +451,7 @@ trampleDeathtouchTests cards =
         -- War Mammoth (3/3 trample, NO deathtouch) into Ogre Sentry (3/3): lethal
         -- is 3, all 3 go to the Ogre, 0 tramples. Only deathtouch changes the spill.
         let (gs, _, _) = S.combatBoardOf [Cards.warMammothPrinting cards] [Cards.ogreSentryPrinting cards]
-            after = Sba.checkStateBasedActions (S.fightWith tramplingAnswer gs)
+            after = S.settleSba (S.fightWith tramplingAnswer gs)
          in HU.assertEqual "bob untouched without deathtouch" (Just 20) (S.lifeOf S.bob after)
     ]
 
@@ -468,7 +467,7 @@ m2cPropertyTests cards =
         let victims = [Cards.pikerPrinting cards, Cards.nimbleBirdstickerPrinting cards, Cards.ogreSentryPrinting cards]
             killsIt v =
               let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [v]
-                  after = Sba.checkStateBasedActions (S.fightWith S.aggressiveAnswer gs)
+                  after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
                in S.creaturesInPlay S.bob after == 0
          in HU.assertBool "deathtouch kills every toughness" (all killsIt victims),
       HU.testCase "the deathtouch and trample reads never name a card" $

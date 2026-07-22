@@ -1,8 +1,8 @@
 module Pawl.Activate where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
@@ -129,9 +129,9 @@ activateAbility pid srcId ability = do
         else do
           State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
           let additional = AbilityCost.additional (ActivatedAbility.cost ability)
-              payAll g = List.foldl' (payAdditional srcId) g additional
+              payAll = Monad.mapM_ (payAdditional srcId) additional
           case AbilityCost.mana (ActivatedAbility.cost ability) of
-            Nothing -> State.modify' payAll
+            Nothing -> payAll
             Just cost -> do
               g1 <- State.get
               case Mana.payCost pid cost g1 of
@@ -139,11 +139,13 @@ activateAbility pid srcId ability = do
                 -- unreachable; reject-not-repair if a distinguishable source ever makes
                 -- payment fail (#12).
                 Nothing -> State.put gs
-                Just paid -> State.put (payAll paid)
+                Just paid -> do
+                  State.put paid
+                  payAll
 
 -- Pay one additional cost against the source permanent.
-payAdditional :: ObjectId -> GameState -> AdditionalCost.AdditionalCost -> GameState
-payAdditional srcId gs c = case c of
+payAdditional :: ObjectId -> AdditionalCost.AdditionalCost -> Game ()
+payAdditional srcId c = case c of
   AdditionalCost.TapSelf ->
-    gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) srcId (GameState.objects gs)}
-  AdditionalCost.SacrificeSelf -> Event.changeZone srcId Zone.Graveyard gs
+    State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) srcId (GameState.objects gs)})
+  AdditionalCost.SacrificeSelf -> Event.changeZone srcId Zone.Graveyard

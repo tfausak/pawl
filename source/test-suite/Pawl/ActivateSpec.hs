@@ -14,7 +14,6 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
-import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -137,9 +136,9 @@ tests cards =
             activated = snd (Engine.runGamePure S.identityAnswer gs0 (Activate.activateAbility S.alice skel ability))
             resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
             -- First Murder: replaced by the shield.
-            firstKill = Sba.checkStateBasedActions (Event.destroy skel resolved)
+            firstKill = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy skel))
             -- Second Murder: no shield -> dies.
-            secondKill = Sba.checkStateBasedActions (Event.destroy skel firstKill)
+            secondKill = S.settleSba (S.runPure S.identityAnswer firstKill (Event.destroy skel))
          in do
               HU.assertEqual "a shield is up after resolving the ability" (Just 1) (Map.lookup skel (GameState.regenerationShields resolved))
               HU.assertEqual "survived the first destruction (regenerated)" True (Set.member skel (GameState.battlefield firstKill))

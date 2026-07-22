@@ -154,8 +154,9 @@ gatherCombatDamage assigns = do
 -- for combat's two waves and resolving effects alike: the sole place damage is
 -- applied and the sole place an event is recorded, and (M3f) the one seam CR
 -- 614's replacement step will hook.
-applyDamage :: [DamageEvent.DamageEvent] -> GameState -> GameState
-applyDamage events gs =
+applyDamage :: [DamageEvent.DamageEvent] -> Game ()
+applyDamage events = do
+  gs <- State.get
   -- CR 615: prevention is the head of the funnel -- a prevented event never
   -- happens, so it is neither marked/drained nor recorded (no deathtouch bit for
   -- the CR 704.5h SBA to read).
@@ -169,9 +170,9 @@ applyDamage events gs =
            in g {GameState.players = Map.adjust drain pid (GameState.players g)}
         Recipient.ToObject _ -> g
       marked = List.foldl' markOne gs kept
-   in -- CR 608.2i: each kept event is RECORDED, not enqueued. Sba consumes by
-      -- bumping GameState.damageScannedThrough; the record survives the check.
-      List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) marked kept
+  -- CR 608.2i: each kept event is RECORDED, not enqueued. Sba consumes by
+  -- bumping GameState.damageScannedThrough; the record survives the check.
+  State.put (List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) marked kept)
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
 -- i.e. a second combat damage step must be spliced (CR 510.4).
@@ -217,4 +218,4 @@ dealCombatDamage = do
 dealWave :: (ObjectId -> Bool) -> Game ()
 dealWave assigns = do
   assignment <- gatherCombatDamage assigns
-  State.modify' (applyDamage assignment)
+  applyDamage assignment

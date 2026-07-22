@@ -29,7 +29,6 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -80,7 +79,7 @@ logTests cards =
       HU.testCase "CR 608.2h a Moved event snapshots the object it moved" $
         let (piker, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
             expected = Projection.project piker gs
-            after = Event.changeZone piker Zone.Graveyard gs
+            after = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
          in case Foldable.toList (GameState.events after) of
               GameEvent.Moved _ snapshot : _ -> HU.assertEqual "snapshot from the origin zone" expected snapshot
               _ -> HU.assertFailure "expected exactly one Moved event",
@@ -89,14 +88,14 @@ logTests cards =
       HU.testCase "CR 704 the SBA check advances the damage watermark but keeps the record" $
         let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
             fought = S.fightWith S.aggressiveAnswer gs
-            after = Sba.checkStateBasedActions fought
+            after = S.settleSba fought
          in do
               HU.assertEqual "nothing left unscanned for damage" [] (Event.unscannedDamage after)
               HU.assertBool "the damage events are still recorded" (not (null (S.damageEventsOf after))),
       HU.testCase "CR 117.5 the trigger scan advances its watermark but keeps the record" $
         let (_, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             (piker, gs1) = S.addPiker cards S.bob gs
-            moved = Event.changeZone piker Zone.Hand gs1
+            moved = S.runPure S.identityAnswer gs1 (Event.changeZone piker Zone.Hand)
             scanned = snd (Engine.runGamePure S.identityAnswer moved Engine.placePendingTriggers)
          in do
               HU.assertEqual "nothing left unscanned" [] (Event.unscannedEvents scanned)
@@ -105,7 +104,7 @@ logTests cards =
       -- wrong: cleanup is still part of THIS turn.
       HU.testCase "the log and both watermarks are cleared at turn handoff" $
         let (piker, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
-            moved = Event.changeZone piker Zone.Graveyard gs
+            moved = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
             after = snd (Engine.runGamePure S.identityAnswer moved Engine.handoffTurn)
          in do
               HU.assertEqual "log empty" Seq.empty (GameState.events after)
@@ -238,7 +237,7 @@ sacrificeTests cards =
     "Sacrifice"
     [ HU.testCase "CR 701.21a a sacrificed permanent goes to its owner's graveyard" $
         let (piker, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
-            after = Event.sacrifice piker gs
+            after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
          in do
               HU.assertEqual "off the battlefield" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
@@ -250,7 +249,7 @@ sacrificeTests cards =
       HU.testCase "CR 701.21a a sacrifice lands in the OWNER's graveyard even when a different player controls it" $
         let (piker, gs0) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
             gs = S.giveControl piker S.alice gs0
-            after = Event.sacrifice piker gs
+            after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
          in do
               HU.assertEqual "off bob's battlefield" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "in bob's (owner's) graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
@@ -259,18 +258,18 @@ sacrificeTests cards =
       -- 702.12b's indestructible gate nor CR 701.19a's shield applies.
       HU.testCase "CR 701.21a an indestructible permanent can still be sacrificed" $
         let (myr, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-            after = Event.sacrifice myr gs
+            after = S.runPure S.identityAnswer gs (Event.sacrifice myr)
          in HU.assertEqual "gone from the battlefield" 0 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 701.21a sacrificing neither consults nor consumes a regeneration shield" $
         let (piker, gs0) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
             gs = S.addRegenShield piker gs0
-            after = Event.sacrifice piker gs
+            after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
          in do
               HU.assertEqual "still sacrificed" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "the shield is untouched" (Just 1) (Map.lookup piker (GameState.regenerationShields after)),
       HU.testCase "only a battlefield permanent can be sacrificed (CR 701.21a)" $
         let (card, gs) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-            after = Event.sacrifice card gs
+            after = S.runPure S.identityAnswer gs (Event.sacrifice card)
          in HU.assertEqual "the library card is untouched" gs after,
       -- CR 113.7: "this creature" is a slot read, filled at placement.
       HU.testCase "CR 113.7 a placed trigger binds its source into the reserved self slot" $
@@ -339,7 +338,7 @@ stateTriggerTests cards =
                   ids -> case filter (\oid -> Set.member Subtype.Swamp (Projection.subtypesOf oid quiet)) ids of
                     s : _ -> s
                     [] -> ObjectId.MkObjectId 999
-                gone = settle (Event.destroy swamp quiet)
+                gone = settle (S.runPure S.identityAnswer quiet (Event.destroy swamp))
              in HU.assertEqual "the Swamp's death arms it" 1 (length (triggerIds gone)),
           -- CR 603.8: "doesn't trigger again until the ability has resolved, has
           -- been countered, or has otherwise left the stack" -- all three are
@@ -434,7 +433,7 @@ historyTests cards =
             let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
                 (p1, gs1) = S.addPiker cards S.bob gs0
                 (p2, gs2) = S.addPiker cards S.bob gs1
-                dead = Event.destroy p2 (Event.destroy p1 gs2)
+                dead = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs2 (Event.destroy p1)) (Event.destroy p2)
                 scanned = settle dead
                 atEnd = resolveAll (settle (beginEndStep scanned))
              in do
@@ -446,13 +445,13 @@ historyTests cards =
           HU.testCase "CR 111.1 a token creature that died counts, though it has no printed card" $
             let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
                 (tok, gs1) = S.addToken (Printing.card (Cards.pikerPrinting cards)) S.bob gs0
-                dead = Sba.checkStateBasedActions (Event.destroy tok gs1)
+                dead = S.settleSba (S.runPure S.identityAnswer gs1 (Event.destroy tok))
                 atEnd = resolveAll (settle (beginEndStep dead))
              in HU.assertEqual "the token is counted" 1 (countersOn ghoul atEnd),
           HU.testCase "a creature that left the battlefield for HAND did not die (CR 700.4)" $
             let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
                 (p1, gs1) = S.addPiker cards S.bob gs0
-                bounced = Event.changeZone p1 Zone.Hand gs1
+                bounced = S.runPure S.identityAnswer gs1 (Event.changeZone p1 Zone.Hand)
                 atEnd = resolveAll (settle (beginEndStep bounced))
              in HU.assertEqual "a bounce is not a death" 0 (countersOn ghoul atEnd),
           -- CR 608.2i: "look back in time" effects don't require the counted
@@ -466,7 +465,7 @@ historyTests cards =
           -- ever gaining one.
           HU.testCase "CR 608.2i a creature that died before the Ghoul entered is still counted" $
             let (p1, gs0) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
-                dead = Event.destroy p1 gs0
+                dead = S.runPure S.identityAnswer gs0 (Event.destroy p1)
                 (ghoul, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (settle dead)
                 atEnd = resolveAll (settle (beginEndStep gs1))
              in HU.assertEqual "one +1/+1 counter" 1 (countersOn ghoul atEnd),
@@ -474,7 +473,7 @@ historyTests cards =
           HU.testCase "the count resets at turn handoff, not at the trigger scan" $
             let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
                 (p1, gs1) = S.addPiker cards S.bob gs0
-                dead = Event.destroy p1 gs1
+                dead = S.runPure S.identityAnswer gs1 (Event.destroy p1)
                 nextTurn = snd (Engine.runGamePure S.identityAnswer dead Engine.handoffTurn)
                 atEnd = resolveAll (settle (beginEndStep nextTurn))
              in HU.assertEqual "last turn's death does not count" 0 (countersOn ghoul atEnd),
@@ -545,7 +544,7 @@ delayedTests cards =
           HU.testCase "CR 603.7c with the token already gone the ability does nothing and is consumed" $
             let armed = castWave
                 killed = case walls armed of
-                  wall : _ -> Sba.checkStateBasedActions (Event.destroy wall armed)
+                  wall : _ -> S.settleSba (S.runPure S.identityAnswer armed (Event.destroy wall))
                   [] -> armed
                 after = resolveAll (settle (beginEndStep killed))
              in do
@@ -733,7 +732,7 @@ interveningTests cards =
           HU.testCase "CR 603.4 with no Zombie, it triggers and deals 1 to its controller" $
             let (_, board) = withZombie
                 killed = case zombies board of
-                  tok : _ -> Sba.checkStateBasedActions (Event.destroy tok board)
+                  tok : _ -> S.settleSba (S.runPure S.identityAnswer board (Event.destroy tok))
                   [] -> board
                 after = resolveAll (settle (beginUpkeep killed))
              in HU.assertEqual "alice took 1" (Just 19) (S.lifeOf S.alice after),
@@ -743,7 +742,7 @@ interveningTests cards =
           HU.testCase "CR 608.2a a Zombie made in response makes the trigger resolve doing nothing" $
             let (_, board) = withZombie
                 killed = case zombies board of
-                  tok : _ -> Sba.checkStateBasedActions (Event.destroy tok board)
+                  tok : _ -> S.settleSba (S.runPure S.identityAnswer board (Event.destroy tok))
                   [] -> board
                 onStack = settle (beginUpkeep killed)
                 -- The Zombie arrives under BOB's control, which is exactly the

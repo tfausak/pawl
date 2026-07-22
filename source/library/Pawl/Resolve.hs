@@ -3,7 +3,6 @@ module Pawl.Resolve where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -297,7 +296,7 @@ resolveSpell oid = do
             targeted = Map.restrictKeys legality (Map.keysSet specs)
             fizzles = not (Map.null specs) && not (or (Map.elems targeted))
          in if fizzles
-              then State.modify' (Event.changeZone oid Zone.Graveyard)
+              then Event.changeZone oid Zone.Graveyard
               else do
                 -- CR 613 / 608.2c: the resolving spell's controller, projected --
                 -- a spell has no control effect, so this is Object.owner obj
@@ -305,7 +304,7 @@ resolveSpell oid = do
                 -- needs this same projection to resolve under the thief.
                 let effectController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
                 Monad.mapM_ (applyEffect oid effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) (effectsOf oid gs)
-                State.modify' (Event.changeZone oid Zone.Graveyard)
+                Event.changeZone oid Zone.Graveyard
 
 -- CR 608.2: the executor shared by an activated ability (M3e) and a triggered
 -- ability (M3f) on the stack. Re-validate filled slots (CR 608.2b), fold
@@ -372,20 +371,19 @@ cease abilId gs =
 -- source permanent may already be sacrificed as a cost).
 applyEffect :: ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffect source controller bound legality chosen effect = case effect of
-  Effect.DealDamage slot quantity ->
-    State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case Quantity.evaluate gs source (Just controller) quantity of
-          -- An unevaluable quantity is a no-op, the powerOf posture.
-          Nothing -> gs
-          Just n ->
-            if n <= 0
-              then gs
-              -- The applied effect IS the event (the M3a spec, section 4):
-              -- constructing this DamageEvent and funneling it is the whole
-              -- application. CR 120.3e / 120.3a live in applyDamage.
-              else Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n) (Projection.hasKeyword Keyword.Deathtouch source gs) DamageKind.Noncombat] gs
-        _ -> gs
+  Effect.DealDamage slot quantity -> do
+    gs <- State.get
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case Quantity.evaluate gs source (Just controller) quantity of
+        -- An unevaluable quantity is a no-op, the powerOf posture.
+        Nothing -> pure ()
+        Just n ->
+          Monad.when (n > 0) $
+            -- The applied effect IS the event (the M3a spec, section 4):
+            -- constructing this DamageEvent and funneling it is the whole
+            -- application. CR 120.3e / 120.3a live in applyDamage.
+            Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n) (Projection.hasKeyword Keyword.Deathtouch source gs) DamageKind.Noncombat]
+      _ -> pure ()
   Effect.ModifyTarget duration modification slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -450,7 +448,7 @@ applyEffect source controller bound legality chosen effect = case effect of
           found <- Trans.lift (Program.prompt (Prompt.SearchLibrary decider controller matches))
           case found of
             Nothing -> pure ()
-            Just cardId -> State.modify' (putTapped cardId)
+            Just cardId -> putTapped cardId
           -- CR 701.23: shuffle the (possibly reduced) library afterward.
           lib <- State.gets (Game.zoneMembers Zone.Library controller)
           shuffled <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
@@ -461,7 +459,7 @@ applyEffect source controller bound legality chosen effect = case effect of
   Effect.ExileAllGraveyards -> do
     gs <- State.get
     let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Map.keys (GameState.players gs))
-    State.modify' (\g -> List.foldl' (\g1 c -> Event.changeZone c Zone.Exile g1) g gyCards)
+    Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) gyCards
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -472,33 +470,30 @@ applyEffect source controller bound legality chosen effect = case effect of
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
   Effect.Destroy slot ->
-    State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case recipientObject recipient of
-          Nothing -> gs
-          -- CR 701.8: destroy through the single funnel -- indestructible (CR
-          -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide.
-          Just target -> Event.destroy target gs
-        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
-        _ -> gs
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case recipientObject recipient of
+        Nothing -> pure ()
+        -- CR 701.8: destroy through the single funnel -- indestructible (CR
+        -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide.
+        Just target -> Event.destroy target
+      -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
+      _ -> pure ()
   Effect.Sacrifice slot ->
-    State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case recipientObject recipient of
-          Nothing -> gs -- a player recipient cannot be sacrificed
-          -- CR 701.21: through the single funnel, which is NOT Event.destroy --
-          -- CR 701.21a: sacrificing is not destroying.
-          Just target -> Event.sacrifice target gs
-        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
-        _ -> gs
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case recipientObject recipient of
+        Nothing -> pure () -- a player recipient cannot be sacrificed
+        -- CR 701.21: through the single funnel, which is NOT Event.destroy --
+        -- CR 701.21a: sacrificing is not destroying.
+        Just target -> Event.sacrifice target
+      -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
+      _ -> pure ()
   Effect.MoveToZone slot zone ->
-    State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case recipientObject recipient of
-          Nothing -> gs
-          -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative.
-          Just target -> Event.changeZone target zone gs
-        _ -> gs
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case recipientObject recipient of
+        Nothing -> pure ()
+        -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative.
+        Just target -> Event.changeZone target zone
+      _ -> pure ()
   Effect.Draw quantity -> do
     gs <- State.get
     case Quantity.evaluate gs source (Just controller) quantity of
@@ -506,22 +501,22 @@ applyEffect source controller bound legality chosen effect = case effect of
         | n > 0 ->
             -- CR 120: draw n, folding the shared primitive so each draw re-reads the
             -- library top and the CR 121.3 empty-library loss is preserved.
-            State.modify' (\g -> List.foldl' (\g1 _ -> Event.drawCard controller g1) g [1 .. n])
+            Monad.replicateM_ (fromInteger n) (Event.drawCard controller)
       _ -> pure ()
-  Effect.Mill slot quantity ->
-    State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just (Recipient.ToPlayer target), True) ->
-          case Quantity.evaluate gs source (Just controller) quantity of
-            Just n
-              | n > 0 ->
-                  -- CR 701.17/701.17b: top min(n, library) of the target's library to
-                  -- their graveyard, funnelled so each move mints a new incarnation.
-                  let topN = take (fromInteger n) (Game.zoneMembers Zone.Library target gs)
-                   in List.foldl' (\g c -> Event.changeZone c Zone.Graveyard g) gs topN
-            _ -> gs
-        -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
-        _ -> gs
+  Effect.Mill slot quantity -> do
+    gs <- State.get
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just (Recipient.ToPlayer target), True) ->
+        case Quantity.evaluate gs source (Just controller) quantity of
+          Just n
+            | n > 0 ->
+                -- CR 701.17/701.17b: top min(n, library) of the target's library to
+                -- their graveyard, funnelled so each move mints a new incarnation.
+                let topN = take (fromInteger n) (Game.zoneMembers Zone.Library target gs)
+                 in Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) topN
+          _ -> pure ()
+      -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
+      _ -> pure ()
   Effect.Discard slot quantity -> do
     gs <- State.get
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -530,17 +525,18 @@ applyEffect source controller bound legality chosen effect = case effect of
           Just n
             | n > 0 -> do
                 let held = Game.zoneMembers Zone.Hand target gs
-                    bury cs g = List.foldl' (\g1 c -> Event.changeZone c Zone.Graveyard g1) g cs
+                    bury :: [ObjectId] -> Game ()
+                    bury = Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard)
                 if fromInteger n >= length held
                   -- CR 609.3: discarding the whole hand is "as much as possible," so
                   -- it is forced -- no choice, so no prompt.
-                  then State.modify' (bury held)
+                  then bury held
                   else do
                     -- CR 701.9b: the discarding player chooses which cards.
                     let decider = Decide.deciderFor target gs
                     choices <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider target held (fromInteger n)))
                     let toDiscard = take (fromInteger n) (filter (\c -> elem c held) choices)
-                    State.modify' (bury toDiscard)
+                    bury toDiscard
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
@@ -553,7 +549,7 @@ applyEffect source controller bound legality chosen effect = case effect of
             -- effect's controller (CR 111.2). Each createToken mints a distinct
             -- object.
             let before = GameState.battlefield gs
-            State.modify' (\g -> List.foldl' (\g1 _ -> Event.createToken controller card g1) g [1 .. n])
+            Monad.replicateM_ (fromInteger n) (Event.createToken controller card)
             case mSlot of
               Nothing -> pure ()
               Just slot -> do
@@ -603,14 +599,13 @@ applyEffect source controller bound legality chosen effect = case effect of
     State.modify' $ \gs ->
       gs {GameState.regenerationShields = Map.insertWith (+) source 1 (GameState.regenerationShields gs)}
   Effect.Counter slot ->
-    State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        -- CR 701.6a: the slot's target is a spell on the stack; counter it through
-        -- the single funnel. A player recipient / illegal slot (CR 608.2b): no-op.
-        (Just recipient, True) -> case recipientObject recipient of
-          Nothing -> gs
-          Just target -> Event.counter target gs
-        _ -> gs
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      -- CR 701.6a: the slot's target is a spell on the stack; counter it through
+      -- the single funnel. A player recipient / illegal slot (CR 608.2b): no-op.
+      (Just recipient, True) -> case recipientObject recipient of
+        Nothing -> pure ()
+        Just target -> Event.counter target
+      _ -> pure ()
   Effect.PutCounters kind quantity slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -687,13 +682,15 @@ putCounters oid kind n gs =
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.
-putTapped :: ObjectId -> GameState -> GameState
-putTapped cardId gs =
-  let moved = Event.changeZone cardId Zone.Battlefield gs
-   in case newestBattlefieldOf cardId gs moved of
-        Nothing -> moved
-        Just newId ->
-          moved {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) newId (GameState.objects moved)}
+putTapped :: ObjectId -> Game ()
+putTapped cardId = do
+  before <- State.get
+  Event.changeZone cardId Zone.Battlefield
+  moved <- State.get
+  case newestBattlefieldOf cardId before moved of
+    Nothing -> pure ()
+    Just newId ->
+      State.put moved {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) newId (GameState.objects moved)}
 
 -- The single battlefield id present after a one-object move that was absent
 -- before (changeZone mints a fresh id, CR 400.7).

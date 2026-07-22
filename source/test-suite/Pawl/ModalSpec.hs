@@ -157,7 +157,7 @@ fizzleTests cards =
             cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
             -- CR 400.7: leaving the battlefield mints a new incarnation, so
             -- pikerOid's chosen recipient no longer names a legal target.
-            gone = Event.changeZone pikerOid Zone.Graveyard cast
+            gone = S.runPure S.identityAnswer cast (Event.changeZone pikerOid Zone.Graveyard)
             after = snd (Engine.runGamePure answer gone Stack.resolveTop)
          in do
               HU.assertEqual "Chaos Charm in alice's graveyard, unresolved" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
@@ -267,7 +267,7 @@ activationModalTests cards =
                 activated = snd (Engine.runGamePure answer gs2 (Activate.activateAbility S.alice srcId ability))
                 -- CR 400.7: leaving the battlefield mints a new incarnation, so
                 -- victimId's chosen recipient no longer names a legal target.
-                gone = Event.changeZone victimId Zone.Graveyard activated
+                gone = S.runPure S.identityAnswer activated (Event.changeZone victimId Zone.Graveyard)
                 resolved = snd (Engine.runGamePure answer gone Stack.resolveTop)
              in do
                   HU.assertEqual "no damage was dealt" [] (S.damageEventsOf resolved)

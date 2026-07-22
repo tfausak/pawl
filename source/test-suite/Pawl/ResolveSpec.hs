@@ -89,7 +89,7 @@ targetTests cards =
               (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients TargetSpec.AnyTarget gs))),
       HU.testCase "CR 608.2b a creature that left its zone is no longer legal" $
         let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
-            gone = Event.changeZone oid Zone.Graveyard gs
+            gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
          in do
               HU.assertBool "legal while fielded" (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.AnyTarget gs)
               HU.assertBool "illegal once moved" (not (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.AnyTarget gone)),
@@ -112,7 +112,7 @@ targetTests cards =
           (Set.null (Target.legalRecipients TargetSpec.CreatureTarget (Setup.emptyGame S.bothPlayers))),
       HU.testCase "CR 608.2b a creature that left is no longer a legal CreatureTarget" $
         let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
-            gone = Event.changeZone oid Zone.Graveyard gs
+            gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
          in do
               HU.assertBool "legal while fielded" (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gs)
               HU.assertBool "illegal once moved" (not (Target.stillLegal (Recipient.ToCreature oid) TargetSpec.CreatureTarget gone)),
@@ -170,7 +170,7 @@ resolveTests cards =
               (map DamageEvent.kind (S.damageEventsOf resolved)),
       HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $
         let (_, cast, _) = S.boltAtBobsPiker cards
-            after = Sba.checkStateBasedActions (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+            after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
          in do
               HU.assertEqual "stack empty" 0 (length (GameState.stack after))
               HU.assertEqual "no creature survives" 0 (S.creaturesInPlay S.bob after)
@@ -197,7 +197,7 @@ resolveTests cards =
         let (base, cast, _) = S.boltAtBobsPiker cards
             -- Kill the Piker while the Bolt is on the stack, as Bolt B will in
             -- the integration test, then check state-based actions.
-            dead = Sba.checkStateBasedActions (S.markDamage (S.pikerOf base) 3 cast)
+            dead = S.settleSba (S.markDamage (S.pikerOf base) 3 cast)
             after = snd (Engine.runGamePure S.identityAnswer dead Stack.resolveTop)
          in do
               HU.assertEqual "Bolt in the graveyard, unresolved" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
@@ -205,7 +205,7 @@ resolveTests cards =
               HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after),
       HU.testCase "CR 608.2b a fizzled spell applies none of its effects" $
         let (base, cast, _) = S.boltAtBobsPiker cards
-            dead = Sba.checkStateBasedActions (S.markDamage (S.pikerOf base) 3 cast)
+            dead = S.settleSba (S.markDamage (S.pikerOf base) 3 cast)
             after = snd (Engine.runGamePure S.identityAnswer dead Stack.resolveTop)
          in HU.assertEqual "life totals unchanged" (Just 20) (S.lifeOf S.alice after),
       -- The deterministic successor to the retired "instants happen" property: a
@@ -373,7 +373,7 @@ resolveTests cards =
             (ripId, g1) = S.addCreature (Cards.restInPeacePrinting cards) S.alice g0
             (deadId, g2) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob g1
             -- move the Piker into bob's graveyard
-            g3 = Event.changeZone deadId Zone.Graveyard g2
+            g3 = S.runPure S.identityAnswer g2 (Event.changeZone deadId Zone.Graveyard)
             ability =
               TriggeredAbility.MkTriggeredAbility
                 TriggerCondition.SelfEnters
@@ -454,8 +454,8 @@ resolveTests cards =
             (gs1, fogId) = S.handOne (Cards.fogPrinting cards) gs0
             cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice fogId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-            combat = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat] resolved
-            spell = Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat] resolved
+            combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat])
+            spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat])
          in do
               HU.assertEqual "Fog installed one prevention" 1 (length (GameState.preventions resolved))
               HU.assertEqual "combat damage prevented (the cancel shape)" (Just 0) (S.damageOf victim combat)
@@ -630,7 +630,7 @@ fizzleTests cards =
             -- Kill the sole real target before resolution: CR 608.2b makes it
             -- illegal (it's no longer a legal CreatureTarget), while the
             -- reserved slot -- never targeted -- stays vacuously legal.
-            gone = Event.changeZone victim Zone.Graveyard withBindings
+            gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
             run = Resolve.resolveEffects abilId source [Effect.Destroy targetSlot, Effect.Draw (Quantity.Literal 1)] specs
             after = snd (Engine.runGamePure S.identityAnswer gone run)
          in HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
@@ -660,7 +660,7 @@ indestructibleTests cards =
     [ HU.testCase "CR 704.5g an indestructible creature survives lethal marked damage" $
         let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             -- Myr is 0/1; 3 marked damage is lethal (704.5g) but indestructible saves it.
-            after = Sba.checkStateBasedActions (S.markDamage myrId 3 gs)
+            after = S.settleSba (S.markDamage myrId 3 gs)
          in do
               HU.assertEqual "Myr still on the battlefield" 1 (S.creaturesInPlay S.bob after)
               HU.assertEqual "Myr not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
@@ -669,7 +669,7 @@ indestructibleTests cards =
             -- Zero marked damage (so 704.5g is silent) plus a deathtouch event isolates
             -- the 704.5h path; indestructible must guard it too (CR 700.4).
             wounded = S.withEvent (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True DamageKind.Combat)) gs
-            after = Sba.checkStateBasedActions wounded
+            after = S.settleSba wounded
          in HU.assertEqual "Myr survives deathtouch" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $
         let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
@@ -677,7 +677,7 @@ indestructibleTests cards =
             -- put-into-graveyard, not a destroy, so indestructible does not apply
             -- (Myr's own reminder text).
             zeroed = S.addCounter CounterKind.MinusOneMinusOne 1 myrId gs
-            after = Sba.checkStateBasedActions zeroed
+            after = S.settleSba zeroed
          in do
               HU.assertEqual "Myr left the battlefield" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "Myr in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
@@ -688,7 +688,7 @@ indestructibleTests cards =
         -- save it.
             zeroed = S.addCounter CounterKind.MinusOneMinusOne 1 victim gs
             shielded = S.addRegenShield victim zeroed
-            after = Sba.checkStateBasedActions shielded
+            after = S.settleSba shielded
          in HU.assertEqual "died despite the shield (704.5f is not a destruction)" 0 (S.creaturesInPlay S.bob after)
     ]
 
@@ -745,7 +745,7 @@ zoneChangeTests cards =
             shielded = S.addRegenShield victim withFoe
             (gs, spellId) = S.handOne (Cards.murderPrinting cards) shielded
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
-            after = Sba.checkStateBasedActions (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+            after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
          in HU.assertEqual "the shielded creature survived Murder" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 400.7 Unsummon returns a creature to its owner's hand" $
         let base = S.landsInPlay (Cards.islandPrinting cards) 1
@@ -819,7 +819,7 @@ zoneChangeTests cards =
             (_, g2) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob g1
             (gs, spellId) = S.handOne (Cards.tomeScourPrinting cards) g2
             cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
-            after = Sba.checkStateBasedActions (snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop))
+            after = S.settleSba (snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop))
          in do
               HU.assertEqual "two milled" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
               HU.assertBool "bob did not lose (milling is not drawing)" (not (Set.member S.bob (GameState.drewFromEmpty after))),
@@ -857,12 +857,12 @@ drawCardTests cards =
     [ HU.testCase "CR 121.2 drawCard moves the top library card to hand" $
         let base = Setup.emptyGame S.bothPlayers
             (_, withCard) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice base
-            after = Event.drawCard S.alice withCard
+            after = S.runPure S.identityAnswer withCard (Event.drawCard S.alice)
          in do
               HU.assertEqual "one card in hand" 1 (S.handSize S.alice after)
               HU.assertEqual "library empty" [] (Game.zoneMembers Zone.Library S.alice after),
       HU.testCase "CR 121.3 drawing from an empty library records the failed draw" $
-        let after = Event.drawCard S.alice (Setup.emptyGame S.bothPlayers)
+        let after = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Event.drawCard S.alice)
          in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after))
     ]
 
@@ -905,7 +905,7 @@ countersTests cards =
             -- put a card in alice's library so the draw has something to find.
             (_, gs) = S.addLibraryCard (Cards.forestPrinting cards) S.alice gs0
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
-            after = Sba.checkStateBasedActions (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+            after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
          in do
               HU.assertEqual "Piker died to the -1/-1 counter (704.5f)" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "alice drew a card" (handBefore + 1) (S.handSize S.alice after),
@@ -915,7 +915,7 @@ countersTests cards =
             (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.alice base
             gs1 = S.addCounter CounterKind.PlusOnePlusOne 1 victim withFoe
             gs2 = S.addCounter CounterKind.MinusOneMinusOne 1 victim gs1
-            after = Sba.checkStateBasedActions gs2
+            after = S.settleSba gs2
          in do
               HU.assertEqual "creature survives (net 2/1)" 1 (S.creaturesInPlay S.alice after)
               HU.assertEqual "no counters remain" Map.empty (maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject victim after)),

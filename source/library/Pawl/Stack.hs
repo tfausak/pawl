@@ -39,7 +39,7 @@ resolveTop = do
       Just obj -> case Object.source obj of
         Source.OfCard printing ->
           if Card.isPermanent (Printing.card printing)
-            then State.modify' (Event.changeZone oid Zone.Battlefield)
+            then Event.changeZone oid Zone.Battlefield
             else Resolve.resolveSpell oid
         -- A token is never on the stack (created onto the battlefield, never cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
