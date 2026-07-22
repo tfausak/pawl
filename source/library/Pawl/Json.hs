@@ -1,12 +1,14 @@
--- | Rendering, construction, and extraction for 'Value'. Ported from scrod's
+-- | Rendering, construction, normalization, and extraction for 'Value'. Ported from scrod's
 -- JSON encoder (a 'Builder', UTF-8-decoded to 'Text' at the boundary) plus the
 -- small tagged-object helpers the codec (§2 of the M3.5 spec) builds on. Parsing
 -- is added alongside in a later task.
 module Pawl.Json where
 
+import qualified Data.Bifunctor as Bifunctor
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as LazyByteString
 import qualified Data.Functor.Identity as Identity
+import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -33,6 +35,24 @@ tagged t mv =
    in case mv of
         Nothing -> Json.Object base
         Just v -> Json.Object (base <> [(Text.pack "value", v)])
+
+-- Normalization --------------------------------------------------------------
+
+-- | Recursively sorts every object's keys, so that two values differing only in
+-- key order compare equal. JSON objects are unordered, so this is the right
+-- notion of equality for comparing a parsed file against a re-encoded one.
+--
+-- Arrays are deliberately left alone: JSON arrays /are/ ordered, and the codec
+-- relies on that -- a name-keyed map is rendered as a sorted array of entries
+-- precisely so the order is deterministic.
+--
+-- Duplicate keys are not merged. 'List.sortOn' is stable and the extraction
+-- helpers take the first match, so the two agree.
+sortKeys :: Value -> Value
+sortKeys value = case value of
+  Json.Array xs -> Json.Array (map sortKeys xs)
+  Json.Object ps -> Json.Object (List.sortOn fst (map (Bifunctor.second sortKeys) ps))
+  _ -> value
 
 -- Rendering ------------------------------------------------------------------
 
