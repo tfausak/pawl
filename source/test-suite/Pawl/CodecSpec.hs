@@ -31,8 +31,11 @@ import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.CounterPattern as CounterPattern
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.DamagePattern as DamagePattern
+import qualified Pawl.Type.DamageRewrite as DamageRewrite
 import qualified Pawl.Type.Decimal as Decimal
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -63,6 +66,7 @@ import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
+import qualified Pawl.Type.TokenPattern as TokenPattern
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
@@ -204,6 +208,34 @@ tests cards =
                           EntryOption.MkEntryOption {EntryOption.power = 1, EntryOption.toughness = 6, EntryOption.keywords = Set.singleton Keyword.Defender}
                         ]
                     )
+             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
+          HU.testCase "an EntryR AsCopy replacement round-trips" $
+            let re = ReplacementEffect.EntryR EntryRewrite.AsCopy
+             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
+          HU.testCase "a DamageR replacement round-trips (pattern and rewrite are data)" $
+            let re =
+                  ReplacementEffect.DamageR
+                    DamagePattern.MkDamagePattern {DamagePattern.whichKind = Just DamageKind.Combat}
+                    DamageRewrite.PreventAll
+             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
+          HU.testCase "a DestructionR replacement round-trips" $
+            let re = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
+             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
+          HU.testCase "a TokenR replacement round-trips (pattern and scaling are data)" $
+            let re =
+                  ReplacementEffect.TokenR
+                    TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours}
+                    (Scaling.Multiply 2)
+             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
+          HU.testCase "a CounterR replacement round-trips with whichKind = Nothing (explicit JSON null)" $
+            let re =
+                  ReplacementEffect.CounterR
+                    CounterPattern.MkCounterPattern
+                      { CounterPattern.whichKind = Nothing,
+                        CounterPattern.whose = ControllerRelation.Anyones,
+                        CounterPattern.onWhat = PermanentCriterion.AnyPermanent
+                      }
+                    (Scaling.Multiply 2)
              in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re))
         ],
       Tasty.testGroup
