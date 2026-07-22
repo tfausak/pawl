@@ -228,7 +228,7 @@ thaliaTests cards =
                   (Cost.total S.alice bolt (ManaCost.MkManaCost [red]) gs),
           -- Ruling: "Thalia's ability affects each spell that's not a creature
           -- spell, including your own." SpellCriterion reads the PROJECTION.
-          HU.testCase "CR 613.11 a creature spell is unaffected" $
+          HU.testCase "a creature spell fails the effect's criterion, so it is unaffected" $
             let (_, piker, gs) = board 3
              in HU.assertEqual
                   "{1}{R} stays {1}{R}"

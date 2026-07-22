@@ -2,7 +2,10 @@ module Pawl.Type.SpellCriterion where
 
 import Pawl.Type.Color (Color)
 
--- Which spells a cost-modifying continuous effect applies to (CR 613.11). The
+-- Which spells a cost-modifying continuous effect applies to. (CR 613.11 puts
+-- such an effect on the rules-modifying tier and defers its application order
+-- to CR 601.2f; it does not say which spells a criterion admits, which is what
+-- this type decides.) The
 -- third sibling of Pawl.Type.CardCriterion and Pawl.Type.PermanentCriterion,
 -- deliberately NOT merged with either: P9 merges all of them into one filter
 -- language, and merging two of them here would be building half of P9 with one
