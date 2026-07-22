@@ -9,6 +9,7 @@ import qualified Pawl.ColorSpec as ColorSpec
 import qualified Pawl.CombatSpec as CombatSpec
 import qualified Pawl.CopySpec as CopySpec
 import qualified Pawl.CoreSpec as CoreSpec
+import qualified Pawl.CostSpec as CostSpec
 import qualified Pawl.DamageSpec as DamageSpec
 import qualified Pawl.DecideSpec as DecideSpec
 import qualified Pawl.EventSpec as EventSpec
@@ -55,6 +56,7 @@ testTree cards =
       CodecSpec.tests cards,
       ManaSpec.tests cards,
       CastSpec.tests cards,
+      CostSpec.tests cards,
       CombatSpec.tests cards,
       ResolveSpec.tests cards,
       ProjectionSpec.tests cards,

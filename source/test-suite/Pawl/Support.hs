@@ -671,6 +671,12 @@ fightWith answer gs =
 runPure :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> GameState.GameState
 runPure answer gs game = snd (Engine.runGamePure answer gs game)
 
+-- runPure, keeping the action's RESULT alongside the final state -- the shape a
+-- test needs when the door under test answers with a value (Pawl.Cost.pay's
+-- Payment) and not only with a board.
+runPureWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> (a, GameState.GameState)
+runPureWith = Engine.runGamePure
+
 -- One CR 704 state-based-action pass, run purely. The direct replacement for the
 -- pre-P5 pure `Sba.checkStateBasedActions gs`.
 settleSba :: GameState.GameState -> GameState.GameState

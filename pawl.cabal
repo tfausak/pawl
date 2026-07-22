@@ -146,6 +146,7 @@ library
     Pawl.Type.Modification
     Pawl.Type.Object
     Pawl.Type.ObjectId
+    Pawl.Type.Payment
     Pawl.Type.PendingTrigger
     Pawl.Type.PermanentCriterion
     Pawl.Type.Phase
@@ -226,6 +227,7 @@ test-suite pawl-test-suite
     Pawl.CombatSpec
     Pawl.CopySpec
     Pawl.CoreSpec
+    Pawl.CostSpec
     Pawl.DamageSpec
     Pawl.DecideSpec
     Pawl.EventSpec

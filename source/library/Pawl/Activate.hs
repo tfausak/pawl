@@ -1,13 +1,12 @@
 module Pawl.Activate where
 
-import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
+import qualified Pawl.Cost as Cost
 import qualified Pawl.Decide as Decide
-import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
@@ -16,13 +15,12 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Cost as Cost
-import qualified Pawl.Type.CostComponent as CostComponent
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.Payment as Payment
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
@@ -33,23 +31,16 @@ import qualified Pawl.Type.Zone as Zone
 
 -- CR 302.6: a creature's {T}-cost ability can't be activated while summoning
 -- sick. Reads projected creature-ness -- a land (Evolving Wilds) is never sick-
--- gated. Only {T} (TapSelf) is affected.
+-- gated. Asks Pawl.Cost for the CLASSIFICATION rather than matching a component
+-- constructor here.
 tapSicknessOk :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 tapSicknessOk srcId ability gs =
-  let needsTap = elem CostComponent.TapThis (Cost.components (ActivatedAbility.cost ability))
+  let needsTap = Cost.requiresTapSymbol (ActivatedAbility.cost ability)
       isCreature = Set.member CardType.Creature (Projection.cardTypesOf srcId gs)
       settled = case Game.lookupObject srcId gs of
         Just obj -> Object.sickness obj == Sickness.Settled
         Nothing -> False
    in not (needsTap && isCreature && not settled)
-
--- Can this additional cost be paid right now?
-canPayAdditional :: ObjectId -> GameState -> CostComponent.CostComponent -> Bool
-canPayAdditional srcId gs c = case c of
-  CostComponent.TapThis -> case Game.lookupObject srcId gs of
-    Just obj -> Object.tapped obj == TapState.Untapped
-    Nothing -> False
-  CostComponent.SacrificeThis -> Set.member srcId (GameState.battlefield gs)
 
 -- The abilities to consider activating. Task 5: the card's PRINTED abilities.
 -- Task 9 switches the body to `Projection.abilitiesOf srcId gs` so Humility
@@ -57,21 +48,23 @@ canPayAdditional srcId gs c = case c of
 abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
 abilitiesFor = Projection.abilitiesOf
 
--- CR 602.2/602.5: the ability is a member of the source's abilities (abilitiesFor),
--- it is not a mana ability (mana abilities are handled at payment, not the
--- stack), every additional cost is payable, the {T} sickness gate holds, and
--- enough modes are fillable to satisfy the selection (CR 700.2a/602.2b);
--- single-mode abilities need exactly one fillable mode, identical to today.
+-- CR 602.2/602.5: the ability is a member of the source's abilities
+-- (abilitiesFor), it is not a mana ability (mana abilities are handled at
+-- payment, not the stack), the whole activation cost is payable (CR 118.3), the
+-- {T} sickness gate holds, and enough modes are fillable to satisfy the
+-- selection (CR 700.2a/602.2b).
+--
+-- The cost is the PRINTED one: an activated ability's cost is deliberately not
+-- routed through Cost.total (#90).
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatable pid srcId ability gs =
   Projection.controllerOf srcId gs == Just pid
     && elem ability (abilitiesFor srcId gs)
     && not (Mana.isManaAbility ability)
-    && all (canPayAdditional srcId gs) (Cost.components (ActivatedAbility.cost ability))
     && tapSicknessOk srcId ability gs
     && Set.size (Target.fillableModes srcId (ActivatedAbility.modal ability) gs)
       >= fromIntegral (Modal.selectionCount (ActivatedAbility.modal ability))
-    && maybe True (\c -> Mana.canPay pid c gs) (Cost.mana (ActivatedAbility.cost ability))
+    && Cost.canPay pid srcId (ActivatedAbility.cost ability) gs
 
 -- CR 602.2: put the ability on the stack (a fresh OfAbility object), choose
 -- modes (602.2b) then stamp targets, pay the additional costs, keep priority
@@ -128,24 +121,12 @@ activateAbility pid srcId ability = do
         then State.put gs -- reject: the whole activation is a no-op
         else do
           State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
-          let additional = Cost.components (ActivatedAbility.cost ability)
-              payAll = Monad.mapM_ (payAdditional srcId) additional
-          case Cost.mana (ActivatedAbility.cost ability) of
-            Nothing -> payAll
-            Just cost -> do
-              g1 <- State.get
-              case Mana.payCost pid cost g1 of
-                -- activatable pre-checks canPay, so within the source elision this is
-                -- unreachable; reject-not-repair if a distinguishable source ever makes
-                -- payment fail (#12).
-                Nothing -> State.put gs
-                Just paid -> do
-                  State.put paid
-                  payAll
-
--- Pay one additional cost against the source permanent.
-payAdditional :: ObjectId -> CostComponent.CostComponent -> Game ()
-payAdditional srcId c = case c of
-  CostComponent.TapThis ->
-    State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) srcId (GameState.objects gs)})
-  CostComponent.SacrificeThis -> Event.changeZone srcId Zone.Graveyard
+          -- CR 601.2g/h via Pawl.Cost.pay: the mana window, then the components.
+          -- activatable pre-checks payability, so within the source elision (#12)
+          -- Unpaid is unreachable; reject-not-repair restores the whole
+          -- activation -- including the ability object this function put on the
+          -- stack -- if it ever is not.
+          payment <- Cost.pay pid srcId (ActivatedAbility.cost ability)
+          case payment of
+            Payment.Paid -> pure ()
+            Payment.Unpaid -> State.put gs

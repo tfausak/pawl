@@ -23,6 +23,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Expiry as Expiry.Type
 import qualified Pawl.Type.GameEvent as GameEvent
@@ -167,6 +168,13 @@ red = ManaSymbol.OfType (ManaType.Colored Color.Red)
 blue :: ManaSymbol.ManaSymbol
 blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
 
+-- Cost.total via a bare ManaCost, component-free -- this suite predates P8's
+-- Cost/CostComponent generalization and exercises only the mana half
+-- (costAdjustments), so the wrap-and-unwrap stays local here instead of
+-- rewriting every assertion below to a full Cost.Type.MkCost literal.
+totalManaCost :: PlayerId.PlayerId -> ObjectId.ObjectId -> ManaCost.ManaCost -> GameState.GameState -> Maybe ManaCost.ManaCost
+totalManaCost pid oid manaCost gs = Cost.Type.mana (Cost.total pid oid (Cost.Type.MkCost (Just manaCost) []) gs)
+
 adjustmentTests :: Tasty.TestTree
 adjustmentTests =
   Tasty.testGroup
@@ -239,16 +247,16 @@ thaliaTests cards =
             let (bolt, _, gs) = board 3
              in HU.assertEqual
                   "{R} becomes {1}{R}"
-                  (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
-                  (Cost.total S.alice bolt (ManaCost.MkManaCost [red]) gs),
+                  (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+                  (totalManaCost S.alice bolt (ManaCost.MkManaCost [red]) gs),
           -- Ruling: "Thalia's ability affects each spell that's not a creature
           -- spell, including your own." SpellCriterion reads the PROJECTION.
           HU.testCase "a creature spell fails the effect's criterion, so it is unaffected" $
             let (_, piker, gs) = board 3
              in HU.assertEqual
                   "{1}{R} stays {1}{R}"
-                  (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
-                  (Cost.total S.alice piker (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]) gs),
+                  (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+                  (totalManaCost S.alice piker (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]) gs),
           -- BOTH sites, one scenario. Taxing castability but not payment lets
           -- the player underpay; taxing payment but not castability offers a
           -- cast that cannot be afforded, and there is no mid-announcement
@@ -276,8 +284,8 @@ thaliaTests cards =
                 (bobBolt, withBob) = S.addHandCard (Cards.lightningBoltPrinting cards) S.bob gs
              in HU.assertEqual
                   "bob's {R} is also {1}{R}"
-                  (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
-                  (Cost.total S.bob bobBolt (ManaCost.MkManaCost [red]) withBob),
+                  (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+                  (totalManaCost S.bob bobBolt (ManaCost.MkManaCost [red]) withBob),
           -- Cast.castableWhileSearching's cost half (CR 601.2f, via Cost.total),
           -- untested until now: Panglacial Wurm is a CREATURE spell, so Thalia's
           -- NoncreatureSpell criterion (matched against the projection, per
@@ -300,12 +308,12 @@ thaliaTests cards =
              in do
                   HU.assertEqual
                     "positive control: Rule of Law, a noncreature spell, IS taxed here"
-                    (ManaCost.MkManaCost [ManaSymbol.Generic 3, white])
-                    (Cost.total S.alice rol (ManaCost.MkManaCost [ManaSymbol.Generic 2, white]) gs)
+                    (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, white]))
+                    (totalManaCost S.alice rol (ManaCost.MkManaCost [ManaSymbol.Generic 2, white]) gs)
                   HU.assertEqual
                     "the Wurm's total cost is untouched"
-                    (ManaCost.MkManaCost [ManaSymbol.Generic 5, green, green])
-                    (Cost.total S.alice wurm (ManaCost.MkManaCost [ManaSymbol.Generic 5, green, green]) gs)
+                    (Just (ManaCost.MkManaCost [ManaSymbol.Generic 5, green, green]))
+                    (totalManaCost S.alice wurm (ManaCost.MkManaCost [ManaSymbol.Generic 5, green, green]) gs)
                   HU.assertEqual
                     "exactly seven Forests still afford it, so castableWhileSearching offers it"
                     [wurm]
@@ -356,20 +364,20 @@ medallionTests cards =
             let (unsummon, _, _, gs) = board 2
              in HU.assertEqual
                   "unchanged"
-                  (ManaCost.MkManaCost [blue])
-                  (Cost.total S.alice unsummon (ManaCost.MkManaCost [blue]) gs),
+                  (Just (ManaCost.MkManaCost [blue]))
+                  (totalManaCost S.alice unsummon (ManaCost.MkManaCost [blue]) gs),
           HU.testCase "CR 118.7a a {2}{U} spell costs {1}{U}" $
             let (_, divination, _, gs) = board 2
              in HU.assertEqual
                   "one generic off"
-                  (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
-                  (Cost.total S.alice divination (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]) gs),
+                  (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue]))
+                  (totalManaCost S.alice divination (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]) gs),
           HU.testCase "a red spell fails the effect's colour criterion, so it is unaffected" $
             let (_, _, bolt, gs) = board 2
              in HU.assertEqual
                   "unchanged"
-                  (ManaCost.MkManaCost [red])
-                  (Cost.total S.alice bolt (ManaCost.MkManaCost [red]) gs),
+                  (Just (ManaCost.MkManaCost [red]))
+                  (totalManaCost S.alice bolt (ManaCost.MkManaCost [red]) gs),
           -- Divination is {2}{U}: three mana printed, two after the discount. Two
           -- Islands is exactly the amount that tells the two apart.
           HU.testCase "CR 601.2f the discount is observable at the castability gate" $
@@ -394,8 +402,8 @@ medallionTests cards =
                 (bobDivination, withBob) = S.addHandCard (Cards.divinationPrinting cards) S.bob gs
              in HU.assertEqual
                   "bob pays full price"
-                  (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue])
-                  (Cost.total S.bob bobDivination (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]) withBob),
+                  (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
+                  (totalManaCost S.bob bobDivination (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]) withBob),
           -- Ruling: "If there are additional costs to cast a spell, or if the
           -- cost to cast a spell is increased by an effect (such as the one
           -- created by Thalia, Guardian of Thraben's ability), apply those
@@ -407,8 +415,8 @@ medallionTests cards =
              in do
                   HU.assertEqual
                     "increase first, then reduce"
-                    (ManaCost.MkManaCost [blue])
-                    (Cost.total S.alice unsummon (ManaCost.MkManaCost [blue]) gs)
+                    (Just (ManaCost.MkManaCost [blue]))
+                    (totalManaCost S.alice unsummon (ManaCost.MkManaCost [blue]) gs)
                   HU.assertBool "so one Island is enough" (Cast.castable S.alice unsummon gs)
         ]
 

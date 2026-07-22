@@ -11,7 +11,6 @@ import qualified Pawl.Cost as Cost
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
-import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
 import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Resolve as Resolve
@@ -19,33 +18,18 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CastingPermission as CastingPermission
+import Pawl.Type.Cost (Cost)
 import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.ManaCost (ManaCost)
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.Payment as Payment
 import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Zone as Zone
-
--- Nothing when the object has no mana cost at all (CR 202.1: a land).
-costOf :: ObjectId -> GameState -> Maybe ManaCost
-costOf oid gs = case Game.lookupObject oid gs of
-  Nothing -> Nothing
-  Just obj -> case Object.source obj of
-    Source.OfCard printing -> Card.Type.manaCost (Printing.card printing)
-    -- A token is never cast: it is created onto the battlefield, never on the stack.
-    Source.OfToken _ -> Nothing
-    -- An ability on the stack is not a spell; it has no mana cost to cast.
-    Source.OfAbility _ _ -> Nothing
-    Source.OfTrigger _ _ -> Nothing
 
 -- CR 601.3a / 302.1: a creature spell may be cast only when its controller could
 -- cast a sorcery -- a main phase of their own turn, with an empty stack. (The
@@ -83,28 +67,28 @@ targetable oid gs = case Game.cardOf oid gs of
     let count = Modal.selectionCount (Card.Type.spell card)
      in Set.size (Target.fillableModes oid (Card.Type.spell card) gs) >= fromIntegral count
 
+-- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
+-- affordable when it is payable with X=0 (the caster may always choose 0)
+-- against the TOTAL cost, not the printed one. Taxing castability without taxing
+-- payment lets the player underpay; taxing payment without taxing castability
+-- offers a cast that cannot be afforded, and there is no mid-announcement
+-- rewind (#56).
+payableCost :: PlayerId -> ObjectId -> GameState -> Cost -> Bool
+payableCost pid oid gs cost = Cost.canPay pid oid (Cost.total pid oid (Cost.substituteX 0 cost) gs) gs
+
 -- Affordable and correctly timed, actually in this player's hand, fillable, and
--- not prohibited.
+-- not prohibited. CR 601.2b: affordable means at least ONE candidate cost is
+-- payable -- a spell may have alternative costs, and only one need be.
 castable :: PlayerId -> ObjectId -> GameState -> Bool
-castable pid oid gs = case costOf oid gs of
-  Nothing -> False
-  Just cost ->
-    timingOk pid oid gs
-      && elem oid (Game.zoneMembers Zone.Hand pid gs)
-      -- CR 601.3: no rule or effect prohibits this player from casting a spell
-      -- (Rule of Law, Silence). Gated HERE, upstream of Action.legalActions,
-      -- because the engine never offers an illegal action and then rejects it.
-      && not (PlayerEffect.prohibitsCasting pid gs)
-      -- CR 601.2b: a {X} cost is affordable when payable at X=0 (the caster may
-      -- always choose X=0); substituteX 0 is the identity on any Variable-free
-      -- cost, so every existing card is unaffected.
-      --
-      -- CR 601.2f: affordability is measured against the TOTAL cost, not the
-      -- printed one. Taxing castability without taxing payment lets the player
-      -- underpay; taxing payment without taxing castability offers a cast that
-      -- cannot be afforded, and there is no mid-announcement rewind (#56).
-      && Mana.canPay pid (Cost.total pid oid (Mana.substituteX 0 cost) gs) gs
-      && targetable oid gs
+castable pid oid gs =
+  timingOk pid oid gs
+    && elem oid (Game.zoneMembers Zone.Hand pid gs)
+    -- CR 601.3: no rule or effect prohibits this player from casting a spell
+    -- (Rule of Law, Silence). Gated HERE, upstream of Action.legalActions,
+    -- because the engine never offers an illegal action and then rejects it.
+    && not (PlayerEffect.prohibitsCasting pid gs)
+    && any (payableCost pid oid gs) (Cost.costsFor oid gs)
+    && targetable oid gs
 
 castableSpells :: PlayerId -> GameState -> [ObjectId]
 castableSpells pid gs = filter (\oid -> castable pid oid gs) (Game.zoneMembers Zone.Hand pid gs)
@@ -129,10 +113,7 @@ permitsCastWhileSearching card =
 castableWhileSearching :: PlayerId -> GameState -> [ObjectId]
 castableWhileSearching pid gs =
   let permitted oid = maybe False permitsCastWhileSearching (Game.cardOf oid gs)
-      affordable oid = case costOf oid gs of
-        Nothing -> False
-        -- CR 601.2b castability floor at the CR 601.2f total (see Cast.castable).
-        Just cost -> Mana.canPay pid (Cost.total pid oid (Mana.substituteX 0 cost) gs) gs
+      affordable oid = any (payableCost pid oid gs) (Cost.costsFor oid gs)
       allowed oid = permitted oid && affordable oid && targetable oid gs
    in if PlayerEffect.prohibitsCasting pid gs
         then []
@@ -172,74 +153,73 @@ castWhileSearching pid = do
 castSpell :: PlayerId -> ObjectId -> Game ()
 castSpell pid oid = do
   gs <- State.get
-  case costOf oid gs of
+  case Game.cardOf oid gs of
     Nothing -> pure ()
-    Just cost -> case Game.cardOf oid gs of
-      Nothing -> pure ()
-      Just card -> do
-        let decider = Decide.deciderFor pid gs
-            legal = Target.fillableModes oid (Card.Type.spell card) gs
-            count = Modal.selectionCount (Card.Type.spell card)
-        -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
-        -- unprompted) exactly when there is nothing to choose -- as many legal
-        -- modes as the selection demands or fewer (a non-modal card's one mode,
-        -- or a modal card whose only-just-fillable modes leave no real
-        -- choice), #50.
-        chosenModes <-
-          if Set.size legal <= fromIntegral count
-            then pure legal
-            else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid oid legal count))
-        -- Reject-not-repair: an answer that is not a size-`count` subset of the
-        -- legal modes makes the whole cast a no-op, guarding every step below.
-        Monad.when (Set.isSubsetOf chosenModes legal && Set.size chosenModes == fromIntegral count) $ do
-          let sets = Target.legalSetsExcluding oid (Card.modesTargetSpecs chosenModes card) gs
-              -- CR 601.2b precedes 601.2c: choose X before targets, and only when
-              -- the cost carries a Variable (a spell with no {X} is not asked).
-              hasVariable = case cost of
-                ManaCost.MkManaCost symbols -> elem ManaSymbol.Variable symbols
-          mAmount <-
-            if hasVariable
-              then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid)))
-              else pure Nothing
-          chosen <-
-            if Map.null sets
-              then pure Map.empty
-              else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid oid sets))
-          let keysAgree = Map.keysSet chosen == Map.keysSet sets
-              eachLegal = and (Map.intersectionWith Set.member chosen sets)
-          Monad.when (keysAgree && eachLegal) $ do
-            -- CR 612 binding: choose the basic land types for each text-change
-            -- slot. Always answerable (the five basics), so no castability gate.
-            let textSlots = Resolve.textChangeSlots card
-                ask slot = do
-                  pair <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider pid oid slot))
-                  pure (slot, pair)
-            bound <- fmap Map.fromList (traverse ask textSlots)
-            -- CR 601.2b then 601.2f: substitute X, then compute the total cost.
-            -- The object is still in HAND here, one step before 601.2a moves it
-            -- to the stack, so the criterion is read against its hand
-            -- projection (#89).
-            let paidCost = Cost.total pid oid (maybe cost (\x -> Mana.substituteX x cost) mAmount) gs
-            case Mana.payCost pid paidCost gs of
-              Nothing -> pure ()
-              Just paid -> do
-                State.put paid
-                Event.changeZone oid Zone.Stack
-                -- CR 601.2i: the spell has been cast. Emitted here, AFTER the
-                -- last step that can fail, so a rejected announcement records
-                -- nothing. Rule of Law counts this event and not the
-                -- resolution, so a countered spell still counted (its second
-                -- Gatherer ruling).
-                State.modify' (Event.recordEvent (GameEvent.SpellCast pid))
-                moved <- State.get
-                case GameState.stack moved of
-                  [] -> pure ()
-                  top : _ ->
-                    State.put
-                      moved
-                        { GameState.objects =
-                            Map.adjust
-                              (\o -> o {Object.bindings = Binding.fromChoices chosen bound mAmount chosenModes})
-                              top
-                              (GameState.objects moved)
-                        }
+    Just card -> do
+      let decider = Decide.deciderFor pid gs
+          legal = Target.fillableModes oid (Card.Type.spell card) gs
+          count = Modal.selectionCount (Card.Type.spell card)
+      -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
+      -- unprompted) exactly when there is nothing to choose -- as many legal
+      -- modes as the selection demands or fewer (a non-modal card's one mode,
+      -- or a modal card whose only-just-fillable modes leave no real
+      -- choice), #50.
+      chosenModes <-
+        if Set.size legal <= fromIntegral count
+          then pure legal
+          else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid oid legal count))
+      -- Reject-not-repair: an answer that is not a size-`count` subset of the
+      -- legal modes makes the whole cast a no-op, guarding every step below.
+      Monad.when (Set.isSubsetOf chosenModes legal && Set.size chosenModes == fromIntegral count) $ do
+        -- CR 601.2b: the cost to be paid is announced after the modes and
+        -- before X and targets. One candidate today, so nothing is asked; the
+        -- prompt arrives with alternative costs.
+        case filter (payableCost pid oid gs) (Cost.costsFor oid gs) of
+          [] -> pure ()
+          chosenCost : _ -> do
+            let sets = Target.legalSetsExcluding oid (Card.modesTargetSpecs chosenModes card) gs
+            mAmount <-
+              if Cost.hasVariable chosenCost
+                then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid)))
+                else pure Nothing
+            chosen <-
+              if Map.null sets
+                then pure Map.empty
+                else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid oid sets))
+            let keysAgree = Map.keysSet chosen == Map.keysSet sets
+                eachLegal = and (Map.intersectionWith Set.member chosen sets)
+            Monad.when (keysAgree && eachLegal) $ do
+              -- CR 612 binding: choose the basic land types for each
+              -- text-change slot. Always answerable (the five basics), so no
+              -- castability gate.
+              let textSlots = Resolve.textChangeSlots card
+                  ask slot = do
+                    pair <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider pid oid slot))
+                    pure (slot, pair)
+              bound <- fmap Map.fromList (traverse ask textSlots)
+              -- CR 601.2b then 601.2f: substitute X, then compute the total
+              -- cost. The object is still in HAND here, one step before 601.2a
+              -- moves it to the stack, so a criterion is read against its hand
+              -- projection (#89).
+              let paidCost = Cost.total pid oid (maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount) gs
+              payment <- Cost.pay pid oid paidCost
+              case payment of
+                Payment.Unpaid -> pure ()
+                Payment.Paid -> do
+                  Event.changeZone oid Zone.Stack
+                  -- CR 601.2i: the spell has been cast. Emitted here, AFTER
+                  -- the last step that can fail, so a rejected announcement
+                  -- records nothing.
+                  State.modify' (Event.recordEvent (GameEvent.SpellCast pid))
+                  moved <- State.get
+                  case GameState.stack moved of
+                    [] -> pure ()
+                    top : _ ->
+                      State.put
+                        moved
+                          { GameState.objects =
+                              Map.adjust
+                                (\o -> o {Object.bindings = Binding.fromChoices chosen bound mAmount chosenModes})
+                                top
+                                (GameState.objects moved)
+                          }
