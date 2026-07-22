@@ -26,13 +26,17 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import Pawl.Type.CandidateId (CandidateId)
 import qualified Pawl.Type.CandidateId as CandidateId
 import Pawl.Type.ControllerRelation (ControllerRelation)
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamagePattern as DamagePattern
+import qualified Pawl.Type.DamageRewrite as DamageRewrite
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
+import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
@@ -46,6 +50,7 @@ import Pawl.Type.ReplacementCandidate (ReplacementCandidate)
 import qualified Pawl.Type.ReplacementCandidate as ReplacementCandidate
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.Uses as Uses
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
@@ -109,7 +114,14 @@ collect gs =
             ReplacementCandidate.effect = re,
             ReplacementCandidate.source = src
           }
+      fromFloating active =
+        ReplacementCandidate.MkReplacementCandidate
+          { ReplacementCandidate.identity = CandidateId.OfFloating (ActiveReplacement.source active) (ActiveReplacement.timestamp active),
+            ReplacementCandidate.effect = ActiveReplacement.effect active,
+            ReplacementCandidate.source = ActiveReplacement.source active
+          }
    in map fromPermanent (Projection.replacementsAffecting gs)
+        ++ map fromFloating (GameState.replacements gs)
 
 applicable :: GameState -> ProposedEvent -> [ReplacementCandidate]
 applicable gs event = filter (applies gs event) (collect gs)
@@ -124,7 +136,12 @@ applies gs event candidate =
         (ReplacementEffect.ZoneChangeR pat _, ProposedEvent.WouldChangeZone zc) ->
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
             && matchesController gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
-        -- Tasks 4, 5, 6, 7 and 9 fill these in as each funnel starts raising its
+        (ReplacementEffect.DamageR pat _, ProposedEvent.WouldDealDamage de) ->
+          case DamagePattern.whichKind pat of
+            -- CR 615.1: no kind named means every damage event.
+            Nothing -> True
+            Just kind -> DamageEvent.kind de == kind
+        -- Tasks 5, 6, 7 and 9 fill these in as each funnel starts raising its
         -- event; until then no such ProposedEvent is ever constructed.
         (ReplacementEffect.ZoneChangeR _ _, _) -> False
         (ReplacementEffect.EntryR _, _) -> False
@@ -245,22 +262,57 @@ chooserOf gs event = case event of
 apply :: ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
 apply candidate event =
   case (ReplacementCandidate.effect candidate, event) of
-    (ReplacementEffect.ZoneChangeR _ toDest, ProposedEvent.WouldChangeZone zc) ->
+    (ReplacementEffect.ZoneChangeR _ toDest, ProposedEvent.WouldChangeZone zc) -> do
+      consume (ReplacementCandidate.identity candidate)
       pure (Just (ProposedEvent.WouldChangeZone zc {ZoneChange.to = toDest}))
     -- Unreachable: `applies` admits ZoneChangeR only against WouldChangeZone.
     (ReplacementEffect.ZoneChangeR _ _, _) -> pure (Just event)
     -- CR 614.1c: Clone (AsCopy) / Primal Plasma (ChoiceOf) rewrite the copiable
     -- snapshot of an entering permanent. Waiting on the WouldEnter funnel.
     (ReplacementEffect.EntryR _, _) -> pure (Just event)
-    -- CR 615.1/615.6: a Fog-shaped shield cancels a damage event outright.
-    -- Waiting on the WouldDealDamage funnel.
+    -- CR 615.6: a prevented event never happens -- it is not marked, not drained,
+    -- and never recorded, so no deathtouch bit exists for the CR 704.5h SBA to read.
+    (ReplacementEffect.DamageR _ DamageRewrite.PreventAll, ProposedEvent.WouldDealDamage _) -> do
+      consume (ReplacementCandidate.identity candidate)
+      pure Nothing
+    -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR _ _, _) -> pure (Just event)
     -- CR 614.8/701.19a: regeneration rewrites a would-be-destroyed event so the
     -- destruction never happens. Waiting on the WouldBeDestroyed funnel.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)
-    -- CR 122.6: Hardened Scales/Doubling Season scale a counter placement.
+    -- CR 122.6/614.16: Hardened Scales/Doubling Season scale a counter placement.
     -- Waiting on the WouldPutCounters funnel.
     (ReplacementEffect.CounterR _ _, _) -> pure (Just event)
-    -- CR 111.1: Doubling Season scales token creation. Waiting on the
+    -- CR 614.16: Doubling Season scales token creation. Waiting on the
     -- WouldCreateTokens funnel.
     (ReplacementEffect.TokenR _ _, _) -> pure (Just event)
+
+-- CR 614.3: a floating replacement whose `uses` is Once is spent by being
+-- applied. A permanent's STATIC replacement ability has no use count at all --
+-- it is re-derived from the battlefield every iteration -- so only the floating
+-- store is touched here.
+consume :: CandidateId -> Game ()
+consume identity_ = case identity_ of
+  CandidateId.OfPermanent _ _ -> pure ()
+  CandidateId.OfFloating src ts ->
+    State.modify' $ \gs ->
+      let spent active =
+            ActiveReplacement.source active == src
+              && ActiveReplacement.timestamp active == ts
+              && ActiveReplacement.uses active == Uses.Once
+       in gs {GameState.replacements = filter (not . spent) (GameState.replacements gs)}
+
+-- CR 615: settle one proposed damage event. Nothing means it does not happen.
+resolveDamage :: DamageEvent.DamageEvent -> Game (Maybe DamageEvent.DamageEvent)
+resolveDamage de = do
+  outcome <- applyReplacements (ProposedEvent.WouldDealDamage de)
+  pure (outcome >>= asDamageEvent)
+
+asDamageEvent :: ProposedEvent -> Maybe DamageEvent.DamageEvent
+asDamageEvent event = case event of
+  ProposedEvent.WouldDealDamage de -> Just de
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldBeDestroyed _ -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing

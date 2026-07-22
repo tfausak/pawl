@@ -457,7 +457,7 @@ resolveTests cards =
             combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat])
             spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat])
          in do
-              HU.assertEqual "Fog installed one prevention" 1 (length (GameState.preventions resolved))
+              HU.assertEqual "Fog installed one replacement" 1 (length (GameState.replacements resolved))
               HU.assertEqual "combat damage prevented (the cancel shape)" (Just 0) (S.damageOf victim combat)
               -- The falsifier: a tag-blind Fog would also blunt this spell damage.
               HU.assertEqual "spell damage untouched (Noncombat)" (Just 2) (S.damageOf victim spell)

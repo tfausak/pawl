@@ -60,7 +60,6 @@ import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Power as Power
-import qualified Pawl.Type.Prevention as Prevention
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Quantity as Quantity
@@ -79,6 +78,7 @@ import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.TypeLine as TypeLine
+import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
@@ -404,15 +404,18 @@ jsonToDuration =
       (Text.pack "Indefinite", Duration.Indefinite)
     ]
 
-preventionToJson :: Prevention.Prevention -> Value
-preventionToJson p = nullary . Text.pack $ case p of
-  Prevention.PreventAllCombatDamage -> "PreventAllCombatDamage"
+usesToJson :: Uses.Uses -> Value
+usesToJson u = nullary . Text.pack $ case u of
+  Uses.Unlimited -> "Unlimited"
+  Uses.Once -> "Once"
 
-jsonToPrevention :: Value -> Either Text Prevention.Prevention
-jsonToPrevention =
+jsonToUses :: Value -> Either Text Uses.Uses
+jsonToUses =
   decodeNullary
-    (Text.pack "Prevention")
-    [(Text.pack "PreventAllCombatDamage", Prevention.PreventAllCombatDamage)]
+    (Text.pack "Uses")
+    [ (Text.pack "Unlimited", Uses.Unlimited),
+      (Text.pack "Once", Uses.Once)
+    ]
 
 controllerRelationToJson :: ControllerRelation.ControllerRelation -> Value
 controllerRelationToJson r = nullary . Text.pack $ case r of
@@ -984,7 +987,7 @@ effectToJson e = case e of
   Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.Create q c Nothing -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
   Effect.Create q c (Just s) -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c, slotNameToJson s]))
-  Effect.Prevent d p -> Json.tagged (Text.pack "Prevent") (Just (Array [durationToJson d, preventionToJson p]))
+  Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array [durationToJson d, usesToJson u, replacementEffectToJson re]))
   Effect.RegenerateSelf -> nullary (Text.pack "RegenerateSelf")
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
   Effect.Untap s -> Json.tagged (Text.pack "Untap") (Just (slotNameToJson s))
@@ -1024,9 +1027,13 @@ jsonToEffect value = do
       Just (Array [q, c, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> (Just <$> jsonToSlotName s)
       _ -> Left (Text.pack "Create expects [Quantity, Card] or [Quantity, Card, slot]")
     "ArmDelayedTrigger" -> withValue mv (fmap Effect.ArmDelayedTrigger . jsonToAbilityName)
-    "Prevent" -> case mv of
-      Just (Array [d, p]) -> Effect.Prevent <$> jsonToDuration d <*> jsonToPrevention p
-      _ -> Left (Text.pack "Prevent expects [Duration, Prevention]")
+    "Replace" -> case mv of
+      Just (Array [d, u, re]) -> do
+        duration <- jsonToDuration d
+        uses <- jsonToUses u
+        effect <- jsonToReplacementEffect re
+        pure (Effect.Replace duration uses effect)
+      _ -> Left (Text.pack "Replace expects [Duration, Uses, ReplacementEffect]")
     "RegenerateSelf" -> Right Effect.RegenerateSelf
     "PutCounters" -> case mv of
       Just (Array [k, q, s]) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s

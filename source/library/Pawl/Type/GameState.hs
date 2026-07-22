@@ -4,7 +4,7 @@ import Data.Map.Strict (Map)
 import Data.Sequence (Seq)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
-import Pawl.Type.ActivePrevention (ActivePrevention)
+import Pawl.Type.ActiveReplacement (ActiveReplacement)
 import Pawl.Type.Combat (Combat)
 import Pawl.Type.ContinuousEffect (ContinuousEffect)
 import Pawl.Type.Decider (Decider)
@@ -54,10 +54,12 @@ data GameState = MkGameState
     -- Serpent's Gift), each with a duration cleanup consults. Static-ability
     -- effects are NOT here -- the projection re-derives those live.
     continuousEffects :: [ContinuousEffect],
-    -- CR 615.3: floating prevention effects from resolutions (Fog), each with a
-    -- duration cleanup consults (CR 514.2). The event-pipeline analog of
-    -- continuousEffects. Event.applyPreventions reads it.
-    preventions :: [ActivePrevention],
+    -- CR 614.3 / 615.3: floating replacement effects from resolutions (Fog's
+    -- prevention, Drudge Skeletons' regeneration shield), each with a duration
+    -- cleanup consults (CR 514.2) and a use count (CR 614.3). The event-pipeline
+    -- analog of continuousEffects; a permanent's STATIC replacement abilities are
+    -- not here -- the projection re-derives those live. Pawl.Replacement reads it.
+    replacements :: [ActiveReplacement],
     -- CR 701.19a: one-shot regeneration shields, counted per object (activating
     -- twice stacks two; each destruction consumes one). Keyed by the shielded
     -- object's id -- stable across regeneration (the creature stays on the

@@ -31,7 +31,7 @@ import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
-import qualified Pawl.Type.ActivePrevention as ActivePrevention
+import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
@@ -729,11 +729,12 @@ withEvent event gs =
       GameState.damageScannedThrough = 0
     }
 
--- Seed a floating prevention shield directly into GameState (bypasses casting a
--- prevention spell; use when a test needs a shield active without resolving Fog).
-addPrevention :: ActivePrevention.ActivePrevention -> GameState.GameState -> GameState.GameState
-addPrevention shield gs =
-  gs {GameState.preventions = shield : GameState.preventions gs}
+-- Seed a floating replacement directly into GameState (bypasses casting the
+-- spell that would install it; use when a test needs one active without a
+-- resolution).
+addReplacement :: ActiveReplacement.ActiveReplacement -> GameState.GameState -> GameState.GameState
+addReplacement active gs =
+  gs {GameState.replacements = active : GameState.replacements gs}
 
 -- Seed a regeneration shield directly onto an object (bypasses activating a
 -- regenerate ability; use when a test needs a shield up without the activation).
@@ -810,7 +811,7 @@ oneMountainState cards ph =
           GameState.damageScannedThrough = 0,
           GameState.delayedTriggers = Seq.empty,
           GameState.continuousEffects = [],
-          GameState.preventions = [],
+          GameState.replacements = [],
           GameState.regenerationShields = Map.empty,
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,

@@ -20,7 +20,8 @@ data DamageEvent = MkDamageEvent
     -- 704.5h SBA. See the M3b spec, section 4.
     dealtByDeathtouch :: Bool,
     -- CR 510 vs CR 608: combat damage or not. Set at deal time -- Damage tags
-    -- Combat, Resolve's DealDamage tags Noncombat. Read by Event.applyPreventions.
+    -- Combat, Resolve's DealDamage tags Noncombat. Read by Replacement.applies's
+    -- DamageR arm (CR 615.1's damage pattern).
     kind :: DamageKind
   }
   deriving (Eq, Ord, Show)

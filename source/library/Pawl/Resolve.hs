@@ -21,7 +21,7 @@ import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Target as Target
 import Pawl.Type.AbilityName (AbilityName)
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.ActivePrevention as ActivePrevention
+import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardCriterion as CardCriterion
@@ -80,7 +80,7 @@ slotsOf effect = case effect of
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here.
   Effect.Create {} -> Set.empty
-  Effect.Prevent _ _ -> Set.empty
+  Effect.Replace {} -> Set.empty
   Effect.RegenerateSelf -> Set.empty
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ _ slot -> Set.singleton slot
@@ -111,7 +111,7 @@ readsX = any effectReadsX
       Effect.Mill _ quantity -> quantity == Quantity.Type.X
       Effect.Discard _ quantity -> quantity == Quantity.Type.X
       Effect.Create quantity _ _ -> quantity == Quantity.Type.X
-      Effect.Prevent _ _ -> False
+      Effect.Replace {} -> False
       Effect.RegenerateSelf -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
@@ -138,7 +138,7 @@ manaProduced effect = case effect of
   Effect.Mill {} -> Nothing
   Effect.Discard {} -> Nothing
   Effect.Create {} -> Nothing
-  Effect.Prevent _ _ -> Nothing
+  Effect.Replace {} -> Nothing
   Effect.RegenerateSelf -> Nothing
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
@@ -165,7 +165,7 @@ searchesLibrary effect = case effect of
   Effect.Mill {} -> False
   Effect.Discard {} -> False
   Effect.Create {} -> False
-  Effect.Prevent _ _ -> False
+  Effect.Replace {} -> False
   Effect.RegenerateSelf -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
@@ -241,7 +241,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Discard {} -> effect
   -- A text-changer does not reach a token's embedded card here (spec section 8).
   Effect.Create {} -> effect
-  Effect.Prevent _ _ -> effect
+  Effect.Replace {} -> effect
   Effect.RegenerateSelf -> effect
   -- No rewritable land-type word.
   Effect.Counter _ -> effect
@@ -587,11 +587,22 @@ applyEffect source controller bound legality chosen effect = case effect of
                   DelayedTrigger.bindings = captured
                 }
          in State.put gs {GameState.delayedTriggers = GameState.delayedTriggers gs Seq.|> entry}
-  Effect.Prevent duration prevention ->
-    -- CR 615.3: install the shield; Event.applyPreventions consults it at each
-    -- damage funnel until cleanup drops it (CR 514.2). Targetless and unprompted.
+  Effect.Replace duration uses re ->
+    -- CR 614.3 / 615.3: install the floating replacement; Pawl.Replacement
+    -- consults it at every funnel until cleanup drops it (CR 514.2) or its use is
+    -- spent. Targetless and unprompted. CR 113.7: the SOURCE is this effect's
+    -- source, which is what CR 615.13's "prevented" triggers will read (#58).
     State.modify' $ \gs ->
-      gs {GameState.preventions = ActivePrevention.MkActivePrevention prevention duration : GameState.preventions gs}
+      let (ts, gs1) = Game.freshTimestamp gs
+          active =
+            ActiveReplacement.MkActiveReplacement
+              { ActiveReplacement.effect = re,
+                ActiveReplacement.source = source,
+                ActiveReplacement.timestamp = ts,
+                ActiveReplacement.duration = duration,
+                ActiveReplacement.uses = uses
+              }
+       in gs1 {GameState.replacements = active : GameState.replacements gs1}
   Effect.RegenerateSelf ->
     -- CR 701.19a: add one shield to the source permanent. Map.insertWith (+)
     -- stacks a second activation. A shield on a gone/non-battlefield source is

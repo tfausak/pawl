@@ -17,13 +17,11 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
-import qualified Pawl.Type.ActivePrevention as ActivePrevention
+import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.Combat as Combat
 import Pawl.Type.DamageEvent (DamageEvent)
-import qualified Pawl.Type.DamageEvent as DamageEvent
-import qualified Pawl.Type.DamageKind as DamageKind
 import Pawl.Type.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.Duration as Duration
@@ -38,8 +36,6 @@ import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PendingTrigger (PendingTrigger)
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import Pawl.Type.PlayerId (PlayerId)
-import Pawl.Type.Prevention (Prevention)
-import qualified Pawl.Type.Prevention as Prevention
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Sickness as Sickness
@@ -88,26 +84,18 @@ unscannedDamage :: GameState -> [DamageEvent]
 unscannedDamage gs =
   Maybe.mapMaybe damageOf (Foldable.toList (Seq.drop (fromIntegral (GameState.damageScannedThrough gs)) (GameState.events gs)))
 
--- CR 615.6: apply active prevention shields to a batch of damage events, dropping
--- each event a shield cancels -- a prevented event never happens (not marked, not
--- drained, never emitted). The cancel shape, as Replacement.resolveZoneChange is
--- the redirect shape. This module is the sole home of casing on Prevention.
-applyPreventions :: [ActivePrevention.ActivePrevention] -> [DamageEvent] -> [DamageEvent]
-applyPreventions preventions = filter (not . prevented)
-  where
-    prevented ev = any (\p -> cancels (ActivePrevention.prevention p) ev) preventions
-
--- Does this prevention cancel this event? The Prevention case lives here.
-cancels :: Prevention -> DamageEvent -> Bool
-cancels p ev = case p of
-  Prevention.PreventAllCombatDamage -> DamageEvent.kind ev == DamageKind.Combat
-
--- CR 514.2: at cleanup, drop until-end-of-turn preventions (the prevention analog
--- of Projection.dropEndOfTurnEffects). Indefinite preventions, if ever added, stay.
-dropEndOfTurnPreventions :: GameState -> GameState
-dropEndOfTurnPreventions gs =
-  let keep p = ActivePrevention.duration p /= Duration.UntilEndOfTurn
-   in gs {GameState.preventions = filter keep (GameState.preventions gs)}
+-- CR 514.2: at cleanup, drop until-end-of-turn floating replacements (the
+-- event-pipeline analog of Projection.dropEndOfTurnEffects). Indefinite ones
+-- stay. Fog's shield is exactly such an entry now. Drudge Skeletons'
+-- regeneration shield (GameState.regenerationShields, clearRegenerationShields
+-- below) is still a SEPARATE pre-P5 cleanup for this task -- Task 5 folds it
+-- into this same store as an UntilEndOfTurn/Once entry, at which point this one
+-- function retires both cleanups and CR 701.19a's "this turn" falls out of CR
+-- 514.2 rather than needing its own sweep.
+dropEndOfTurnReplacements :: GameState -> GameState
+dropEndOfTurnReplacements gs =
+  let keep active = ActiveReplacement.duration active /= Duration.UntilEndOfTurn
+   in gs {GameState.replacements = filter keep (GameState.replacements gs)}
 
 -- CR 701.19a: regeneration shields last "this turn," so cleanup clears every one.
 clearRegenerationShields :: GameState -> GameState
@@ -160,7 +148,7 @@ changeZone oid requestedDest = do
       let pid = Object.owner obj
           fromZone = Object.zone obj
           -- CR 608.2h: last known information -- the object as it exists in the
-          -- zone it is LEAVING, projected against the PRE-MOVE state -- one
+          -- zone it is LEAVING, projected against the PRE-MOVE state -- one board
           -- projection per zone change, forced eagerly (GameEvent.Moved's
           -- snapshot field is strict) rather than left as a thunk retaining the
           -- whole pre-move GameState for a turn. Measured on the tasty-bench

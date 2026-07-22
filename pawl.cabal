@@ -88,7 +88,7 @@ library
     Pawl.Type.AbilityName
     Pawl.Type.Action
     Pawl.Type.ActivatedAbility
-    Pawl.Type.ActivePrevention
+    Pawl.Type.ActiveReplacement
     Pawl.Type.AdditionalCost
     Pawl.Type.Affected
     Pawl.Type.AttackTarget
@@ -147,7 +147,6 @@ library
     Pawl.Type.Player
     Pawl.Type.PlayerId
     Pawl.Type.Power
-    Pawl.Type.Prevention
     Pawl.Type.Printing
     Pawl.Type.Program
     Pawl.Type.ProjectedCharacteristics
@@ -178,6 +177,7 @@ library
     Pawl.Type.TriggeredAbility
     Pawl.Type.TurnScope
     Pawl.Type.TypeLine
+    Pawl.Type.Uses
     Pawl.Type.Zone
     Pawl.Type.ZoneChange
     Pawl.Type.ZoneChangePattern

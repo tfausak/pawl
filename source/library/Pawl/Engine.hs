@@ -181,7 +181,7 @@ runTurnBasedActions phase = do
       -- simultaneously.
       State.modify' Damage.removeAllDamage
       State.modify' Projection.dropEndOfTurnEffects
-      State.modify' Event.dropEndOfTurnPreventions
+      State.modify' Event.dropEndOfTurnReplacements
       State.modify' Event.clearRegenerationShields
     _ -> pure ()
 

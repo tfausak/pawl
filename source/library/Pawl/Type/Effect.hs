@@ -6,9 +6,10 @@ import Pawl.Type.CounterKind (CounterKind)
 import Pawl.Type.Duration (Duration)
 import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.Modification (Modification)
-import Pawl.Type.Prevention (Prevention)
 import Pawl.Type.Quantity (Quantity)
+import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.SlotName (SlotName)
+import Pawl.Type.Uses (Uses)
 import Pawl.Type.Zone (Zone)
 
 -- The ISA (design.md section 1): first-order, non-recursive (in CONTROL FLOW --
@@ -108,11 +109,19 @@ data Effect card
     -- single-token create; a Create that binds a slot while making several tokens
     -- is rejected by the Pawl.CardSpec lint family rather than guessed at (#53).
     Create Quantity card (Maybe SlotName)
-  | -- CR 615.3: install a floating prevention effect for a duration. Fog =
-    -- Prevent UntilEndOfTurn PreventAllCombatDamage. Targetless (Fog watches a
-    -- class of events, not a chosen object). Resolve stores it into
-    -- GameState.preventions; Event.applyPreventions applies it.
-    Prevent Duration Prevention
+  | -- CR 614.3 / 615.3: install a floating replacement effect for a duration, with
+    -- a use count. Fog is
+    -- `Replace UntilEndOfTurn Unlimited (DamageR (MkDamagePattern (Just Combat)) PreventAll)`;
+    -- Drudge Skeletons' ability is
+    -- `Replace UntilEndOfTurn Once (DestructionR Regenerate)`.
+    --
+    -- ONE opcode for both, where M3f/M4d had `Prevent` and `RegenerateSelf`: the
+    -- difference between a Fog and a regeneration shield is which event class the
+    -- payload names, which is data. Targetless (a floating replacement watches a
+    -- CLASS of events, not a chosen object) and unprompted. Resolve stores it into
+    -- GameState.replacements with this effect's SOURCE (CR 113.7) and a fresh
+    -- timestamp; Pawl.Replacement applies it.
+    Replace Duration Uses ReplacementEffect
   | -- CR 701.19a/c: install a one-shot regeneration shield on THIS effect's source
     -- permanent (CR 608.2g) -- targetless and self-referential (Drudge Skeletons'
     -- "{B}: Regenerate this creature"). NOT the act of regenerating (701.19c): the

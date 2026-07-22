@@ -15,11 +15,13 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.ActivePrevention as ActivePrevention
+import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.DamagePattern as DamagePattern
+import qualified Pawl.Type.DamageRewrite as DamageRewrite
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -30,14 +32,15 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
-import qualified Pawl.Type.Prevention as Prevention
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
+import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -154,19 +157,33 @@ damageTests cards =
       HU.testCase "CR 615 a prevention drops combat damage but spares Noncombat" $
         let base = Setup.emptyGame S.bothPlayers
             (victim, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
-            shield = ActivePrevention.MkActivePrevention Prevention.PreventAllCombatDamage Duration.UntilEndOfTurn
-            withShield = S.addPrevention shield gs0
+            shield =
+              ActiveReplacement.MkActiveReplacement
+                { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat)) DamageRewrite.PreventAll,
+                  ActiveReplacement.source = victim,
+                  ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
+                  ActiveReplacement.duration = Duration.UntilEndOfTurn,
+                  ActiveReplacement.uses = Uses.Unlimited
+                }
+            withShield = S.addReplacement shield gs0
             combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat])
             spell = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat])
          in do
               HU.assertEqual "combat damage prevented -- none marked" (Just 0) (S.damageOf victim combat)
               HU.assertEqual "combat damage prevented -- no event recorded" [] (S.damageEventsOf combat)
               HU.assertEqual "noncombat damage still dealt" (Just 2) (S.damageOf victim spell),
-      HU.testCase "CR 514.2 an until-end-of-turn prevention wears off at cleanup" $
+      HU.testCase "CR 514.2 an until-end-of-turn replacement wears off at cleanup" $
         let base = Setup.emptyGame S.bothPlayers
-            shield = ActivePrevention.MkActivePrevention Prevention.PreventAllCombatDamage Duration.UntilEndOfTurn
-            dropped = Event.dropEndOfTurnPreventions (S.addPrevention shield base)
-         in HU.assertEqual "no preventions remain" [] (GameState.preventions dropped)
+            shield =
+              ActiveReplacement.MkActiveReplacement
+                { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat)) DamageRewrite.PreventAll,
+                  ActiveReplacement.source = ObjectId.MkObjectId 900,
+                  ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
+                  ActiveReplacement.duration = Duration.UntilEndOfTurn,
+                  ActiveReplacement.uses = Uses.Unlimited
+                }
+            dropped = Event.dropEndOfTurnReplacements (S.addReplacement shield base)
+         in HU.assertEqual "no replacements remain" [] (GameState.replacements dropped)
     ]
 
 sbaBase :: GameState.GameState

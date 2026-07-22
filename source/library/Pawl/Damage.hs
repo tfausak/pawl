@@ -5,6 +5,7 @@ import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
@@ -12,6 +13,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Replacement as Replacement
 import Pawl.Type.AttackTarget (AttackTarget)
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.Combat as Combat.Type
@@ -150,18 +152,24 @@ gatherCombatDamage assigns = do
   pure (concat parts ++ fromBlockers)
 
 -- CR 120.3e / 120.3a: mark damage on creatures, drain life from players -- AND
--- record each event into GameState.events. This is the change-and-emit funnel
--- for combat's two waves and resolving effects alike: the sole place damage is
--- applied and the sole place an event is recorded, and (M3f) the one seam CR
--- 614's replacement step will hook.
+-- record each event into GameState.events. The change-and-emit funnel for
+-- combat's two waves and resolving effects alike.
+--
+-- CR 615 / 616: EACH event in the batch runs its OWN CR 616.1 loop, and the
+-- survivors are applied together. Simultaneity is preserved as a SCHEDULING
+-- property; the loop's unit stays one event, uniform with the other five classes.
+-- That is what CR 614.5 ("one opportunity to affect AN EVENT") and CR 615.10
+-- ("applies separately to damage from other applicable events that would happen
+-- at the same time") both describe.
+--
+-- What this shape cannot express is CR 615.7's SHARED N-damage shield -- one
+-- resource allocated across several simultaneous events, with the recipient
+-- choosing which it covers. No such shield exists in the pool (Fog is
+-- unlimited-for-a-duration, not N-damage), so it stays card-driven (#58).
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = do
-  gs <- State.get
-  -- CR 615: prevention is the head of the funnel -- a prevented event never
-  -- happens, so it is neither marked/drained nor recorded (no deathtouch bit for
-  -- the CR 704.5h SBA to read).
-  let kept = Event.applyPreventions (GameState.preventions gs) events
-      markOne g ev = case DamageEvent.target ev of
+  survivors <- fmap Maybe.catMaybes (Monad.mapM Replacement.resolveDamage events)
+  let markOne g ev = case DamageEvent.target ev of
         Recipient.ToCreature oid ->
           let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
            in g {GameState.objects = Map.adjust hurt oid (GameState.objects g)}
@@ -169,10 +177,9 @@ applyDamage events = do
           let drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
            in g {GameState.players = Map.adjust drain pid (GameState.players g)}
         Recipient.ToObject _ -> g
-      marked = List.foldl' markOne gs kept
-  -- CR 608.2i: each kept event is RECORDED, not enqueued. Sba consumes by
+  -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
-  State.put (List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) marked kept)
+  State.modify' (\gs -> List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) (List.foldl' markOne gs survivors) survivors)
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
 -- i.e. a second combat damage step must be spliced (CR 510.4).
