@@ -2774,7 +2774,7 @@ The last gate, and the cheapest: `StateCondition` already exists, so CR 603.4 an
 - Consumes: `StateCondition`, `Event.stateHolds` (Task 4); `Binding.setTriggerSource` (Task 3).
 - Produces: `TriggeredAbility.intervening :: Maybe StateCondition`; `Pawl.Binding.you :: SlotName` (the text `"you"`), `Pawl.Binding.setYou :: PlayerId -> Map SlotName Binding -> Map SlotName Binding`; `Pawl.Cards.sarcomancyPrinting`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/TriggerSpec.hs` (and to the `tests` list):
 
@@ -2879,12 +2879,12 @@ Add to `CodecSpec.hs`'s "P4 runtime types" group:
 
 with `Pawl.Type.TriggeredAbility` imported.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `TriggeredAbility.intervening` is not a field; `Binding.you` and `Cards.sarcomancyPrinting` are not in scope.
 
-- [ ] **Step 3: Add the field and the reserved "you" slot**
+- [x] **Step 3: Add the field and the reserved "you" slot**
 
 In `source/library/Pawl/Type/TriggeredAbility.hs`, add the field:
 
@@ -2918,10 +2918,10 @@ with `import Pawl.Type.PlayerId (PlayerId)`.
 In `source/library/Pawl/Engine.hs`, stamp it in `placeOne` alongside the source slot:
 
 ```haskell
-Binding.setYou controller (Binding.setTriggerSource srcId (Map.union (PendingTrigger.bindings pending) (Binding.fromChoices chosen Map.empty Nothing chosenModes)))
+Binding.setYou controller (Binding.setTriggerSource srcId (Map.union (Binding.fromChoices chosen Map.empty Nothing chosenModes) (PendingTrigger.bindings pending)))
 ```
 
-- [ ] **Step 4: Check the condition at both sites**
+- [x] **Step 4: Check the condition at both sites**
 
 In `source/library/Pawl/Event.hs`, filter the gather (CR 603.4):
 
@@ -2961,7 +2961,7 @@ In `source/library/Pawl/Stack.hs`, gate the `OfTrigger` branch (CR 608.2a):
                in Resolve.resolveEffects oid srcId (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)
 ```
 
-- [ ] **Step 5: Add the codec arm and the card**
+- [x] **Step 5: Add the codec arm and the card**
 
 In `source/library/Pawl/Codec.hs`, replace `triggeredAbilityToJson` / `jsonToTriggeredAbility`. The field is omitted when `Nothing`, so every card file that predates P4 renders byte-identically:
 
@@ -3000,12 +3000,12 @@ Create `data/cards/sarcomancy.json` (one line, plus the trailing newline):
 
 In `source/test-suite/Pawl/Cards.hs`, register `sarcomancyPrinting` (load `"sarcomancy"`) and add it to `allPrintings`.
 
-- [ ] **Step 6: Run the full suite, clean**
+- [x] **Step 6: Run the full suite, clean**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks && cabal test && cabal bench`
 Expected: PASS, warning-free. The clean build is the definitive warning check — incremental builds hide warnings from unchanged modules.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl/Type/TriggeredAbility.hs source/library/Pawl/Binding.hs source/library/Pawl/Event.hs source/library/Pawl/Engine.hs source/library/Pawl/Stack.hs source/library/Pawl/Codec.hs data/cards/sarcomancy.json source/test-suite/Pawl/TriggerSpec.hs source/test-suite/Pawl/Cards.hs source/test-suite/Pawl/CardSpec.hs source/test-suite/Pawl/CodecSpec.hs
