@@ -28,6 +28,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Projection as Projection
 import Pawl.Type.CandidateId (CandidateId)
 import qualified Pawl.Type.CandidateId as CandidateId
+import Pawl.Type.ControllerRelation (ControllerRelation)
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import Pawl.Type.Game (Game)
@@ -134,7 +135,7 @@ applies gs event candidate =
 
 -- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation, read
 -- against the controller of the effect's SOURCE? Anyones always does.
-matchesController :: GameState -> ObjectId -> ControllerRelation.ControllerRelation -> ObjectId -> Bool
+matchesController :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> Bool
 matchesController gs src rel oid = case rel of
   ControllerRelation.Anyones -> True
   ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
@@ -151,7 +152,10 @@ highestBucket candidates =
 -- CR 616.1a-e: which bucket an effect falls in.
 bucketOf :: ReplacementEffect -> ReplacementBucket
 bucketOf re = case re of
-  -- CR 616.1e. Everything with a producer today except the copy-on-entry case.
+  -- CR 616.1e. Every arm lands in Other today -- no arm has a CopyOnEntry (or
+  -- any other non-Other) producer yet. EntryR is here too: splitting its AsCopy
+  -- case into CopyOnEntry is a later task's job (see ReplacementBucket's
+  -- comment), not this one's.
   ReplacementEffect.ZoneChangeR _ _ -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ -> ReplacementBucket.Other
   ReplacementEffect.DamageR _ _ -> ReplacementBucket.Other
@@ -169,6 +173,16 @@ bucketOf re = case re of
 --   * several candidates EQUAL AS VALUES -- each still gets its own CR 614.5
 --     opportunity, so every order produces the same board. Only the PROMPT is
 --     elided, never an application.
+--
+-- The second elision's soundness rests on a premise `apply` must keep true:
+-- applying a candidate is independent of its `source` field. Candidates equal
+-- in `effect` can still differ in `source` (matchesController and the
+-- ChooseReplacement payload both read it), so "equal as values" only implies
+-- "every order yields the same board" as long as no `apply` arm branches on, or
+-- mutates state keyed by, which source is applying. Every future `apply` arm
+-- must preserve that independence; the day one does not, this elision starts
+-- silently choosing between two applications that produce different boards --
+-- deciding for a player who was never asked, the second invariant's violation.
 --
 -- Anything else prompts. The pure fold has silently picked list order since M3f;
 -- that is the second-invariant violation this phase exists to retire, and unlike
@@ -218,11 +232,35 @@ chooserOf gs event = case event of
   ProposedEvent.WouldCreateTokens pid _ _ -> Just pid
 
 -- CR 614.6: apply one chosen effect. Nothing means the event does not happen.
+--
+-- One arm per ReplacementEffect constructor, same shape as `applies` -- so a new
+-- constructor breaks the build HERE too, not just there. A wildcard fallback
+-- would defeat that: an author who teaches `applies` a new arm but forgets this
+-- one gets a silent no-op replacement (the candidate is consumed into the
+-- applied-set, the event passes through unchanged, nothing warns). Every arm
+-- below either rewrites its paired event or, for a pair `applies` already
+-- excludes, falls through to `pure (Just event)` -- unreachable in practice
+-- (nothing reaches `apply` that `applies` rejected) but present so the match
+-- stays total per constructor, not merely total by wildcard.
 apply :: ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
 apply candidate event =
   case (ReplacementCandidate.effect candidate, event) of
     (ReplacementEffect.ZoneChangeR _ toDest, ProposedEvent.WouldChangeZone zc) ->
       pure (Just (ProposedEvent.WouldChangeZone zc {ZoneChange.to = toDest}))
-    -- Unreachable: `applies` excluded every mismatched pair, and the remaining
-    -- rewrite shapes arrive with their funnels in Tasks 4-9. Total, never partial.
-    _ -> pure (Just event)
+    -- Unreachable: `applies` admits ZoneChangeR only against WouldChangeZone.
+    (ReplacementEffect.ZoneChangeR _ _, _) -> pure (Just event)
+    -- CR 614.1c: Clone (AsCopy) / Primal Plasma (ChoiceOf) rewrite the copiable
+    -- snapshot of an entering permanent. Waiting on the WouldEnter funnel.
+    (ReplacementEffect.EntryR _, _) -> pure (Just event)
+    -- CR 615.1/615.6: a Fog-shaped shield cancels a damage event outright.
+    -- Waiting on the WouldDealDamage funnel.
+    (ReplacementEffect.DamageR _ _, _) -> pure (Just event)
+    -- CR 614.8/701.19a: regeneration rewrites a would-be-destroyed event so the
+    -- destruction never happens. Waiting on the WouldBeDestroyed funnel.
+    (ReplacementEffect.DestructionR _, _) -> pure (Just event)
+    -- CR 122.6: Hardened Scales/Doubling Season scale a counter placement.
+    -- Waiting on the WouldPutCounters funnel.
+    (ReplacementEffect.CounterR _ _, _) -> pure (Just event)
+    -- CR 111.1: Doubling Season scales token creation. Waiting on the
+    -- WouldCreateTokens funnel.
+    (ReplacementEffect.TokenR _ _, _) -> pure (Just event)

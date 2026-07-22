@@ -90,8 +90,8 @@ unscannedDamage gs =
 
 -- CR 615.6: apply active prevention shields to a batch of damage events, dropping
 -- each event a shield cancels -- a prevented event never happens (not marked, not
--- drained, never emitted). The cancel shape, as applyReplacements is the redirect
--- shape. This module is the sole home of casing on Prevention.
+-- drained, never emitted). The cancel shape, as Replacement.resolveZoneChange is
+-- the redirect shape. This module is the sole home of casing on Prevention.
 applyPreventions :: [ActivePrevention.ActivePrevention] -> [DamageEvent] -> [DamageEvent]
 applyPreventions preventions = filter (not . prevented)
   where
@@ -160,11 +160,29 @@ changeZone oid requestedDest = do
       let pid = Object.owner obj
           fromZone = Object.zone obj
           -- CR 608.2h: last known information -- the object as it exists in the
-          -- zone it is LEAVING, projected against the PRE-MOVE state. (The
-          -- benchmark note about the strict snapshot field is unchanged.)
+          -- zone it is LEAVING, projected against the PRE-MOVE state -- one
+          -- projection per zone change, forced eagerly (GameEvent.Moved's
+          -- snapshot field is strict) rather than left as a thunk retaining the
+          -- whole pre-move GameState for a turn. Measured on the tasty-bench
+          -- suite, pre-log baseline (3cc3ecd) vs. this log with the strict field
+          -- (goldfish /casting/fighting, 2p): 10.1/9.30/9.31 ms -> 10.6/9.73/9.72
+          -- ms -- a ~4-5% move, within the benchmark's own run-to-run noise
+          -- (~800 us stddev on a ~10 ms mean), not the large regression a
+          -- captured pre-move GameState would cause. That is the price of an
+          -- honest history (a token has no printed card to re-derive from,
+          -- CR 111.1).
           snapshot = Projection.project oid gs
       -- CR 614.4: replacements exist before the event, so the loop reads them from
       -- the PRE-MOVE state. CR 614.6: the modified event is what actually happens.
+      --
+      -- Hazard for a future task: `obj` and `snapshot` are both read from `gs`,
+      -- BEFORE resolveZoneChange runs, and both are still used below, AFTER it
+      -- returns -- only `ZoneChange.to settled` is read back from the settled
+      -- event. That is sound only because the loop today is state-pure (no
+      -- `apply` arm calls State.modify'); a future task that makes `apply` mutate
+      -- state must re-derive `obj` (and decide what "last known information"
+      -- means for `snapshot`) from the state AFTER the loop, not carry these
+      -- pre-loop bindings across it unexamined.
       resolved <- Replacement.resolveZoneChange (ZoneChange.MkZoneChange oid fromZone requestedDest)
       case resolved of
         -- CR 614.6: nothing survived the loop, so no zone change happens. No

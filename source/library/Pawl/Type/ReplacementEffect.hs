@@ -28,10 +28,8 @@ import Pawl.Type.ZoneChangePattern (ZoneChangePattern)
 -- ("[Objects] enter the battlefield ...", Essence of the Wild) has no producer,
 -- so the field appears when a card needs it rather than as speculative structure.
 --
--- Today, the sole rules-casing site is Pawl.Event.applyOne, and that module's own
--- comment labels it TRANSITIONAL: a later task moves that role to
--- Pawl.Replacement, which does not exist yet. Pawl.Codec also cases on every
--- constructor throughout, but only as the JSON data boundary.
+-- The sole rules-casing site is Pawl.Replacement (CR 616.1's loop). Pawl.Codec
+-- also cases on every constructor, but only as the JSON data boundary.
 data ReplacementEffect
   = ZoneChangeR ZoneChangePattern Zone
   | EntryR EntryRewrite
