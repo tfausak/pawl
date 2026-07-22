@@ -372,6 +372,12 @@ withEffect oid m gs =
   let (ts, gs1) = Game.freshTimestamp gs
    in withEffectAt oid ts m gs1
 
+-- The source stand-in for a targeting call whose spec is source-blind (every
+-- spec but OpponentCreatureTarget). Object id 999 names nothing, the same
+-- posture withEffectAt's 998 takes.
+noSource :: ObjectId.ObjectId
+noSource = ObjectId.MkObjectId 999
+
 -- The M4h NonlandPermanentTarget fixture (CR 109.2/110.4): alice controls a Piker
 -- (creature), a Mindslaver (a Legendary Artifact -- nonland, non-creature),
 -- and a Mountain (land). Three permanents so a nonland-permanent legal set can

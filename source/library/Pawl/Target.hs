@@ -32,8 +32,14 @@ import qualified Pawl.Type.Zone as Zone
 -- battlefield plus players still in the game. No restriction (protection,
 -- hexproof, shroud) exists in the pool -- this function is where they will
 -- all land.
-legalRecipients :: TargetSpec -> GameState -> Set Recipient
-legalRecipients spec gs =
+--
+-- `source` is the object the targeting is relative to: the spell object at
+-- cast, the source permanent for an ability. Every spec but
+-- OpponentCreatureTarget ignores it -- a legal set that depends on WHO IS
+-- CHOOSING (CR 109.5) is what forced it in. Self-exclusion ("another") is NOT
+-- applied here; that stays in legalSetsExcluding.
+legalRecipients :: ObjectId -> TargetSpec -> GameState -> Set Recipient
+legalRecipients source spec gs =
   let isCreatureId oid = Projection.isCreatureOf oid gs
       creatures =
         map Recipient.ToCreature $
@@ -90,16 +96,37 @@ legalRecipients spec gs =
                 Recipient.ToPlayer _ -> False
                 Recipient.ToObject _ -> False
            in Set.fromList (filter isNonblack creatures)
+        TargetSpec.ArtifactTarget ->
+          -- CR 115.1a: a battlefield permanent whose PROJECTED card types (M3c)
+          -- include Artifact -- source-blind.
+          let isArtifact oid = Set.member CardType.Artifact (Projection.cardTypesOf oid gs)
+              matches = filter isArtifact (Set.toList (GameState.battlefield gs))
+           in Set.fromList (map Recipient.ToObject matches)
+        TargetSpec.OpponentCreatureTarget ->
+          -- CR 115.1a / 109.5 / 613.1b: CreatureTarget's set narrowed to
+          -- creatures whose PROJECTED controller is not the source's
+          -- controller. A source that has left the battlefield has no projected
+          -- controller, and this yields the EMPTY set rather than falling back
+          -- to last known information (CR 608.2h), so CR 608.2b's re-check
+          -- wrongly fizzles an ability whose source died in response (#N).
+          let mine = Projection.controllerOf source gs
+              theirs recipient = case recipient of
+                Recipient.ToCreature oid -> case mine of
+                  Nothing -> False
+                  Just pid -> Projection.controllerOf oid gs /= Just pid
+                Recipient.ToPlayer _ -> False
+                Recipient.ToObject _ -> False
+           in Set.fromList (filter theirs creatures)
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is
 -- otherwise re-judged against the spec in the current state.
-stillLegal :: Recipient -> TargetSpec -> GameState -> Bool
-stillLegal recipient spec gs = Set.member recipient (legalRecipients spec gs)
+stillLegal :: ObjectId -> Recipient -> TargetSpec -> GameState -> Bool
+stillLegal source recipient spec gs = Set.member recipient (legalRecipients source spec gs)
 
 -- One legal set per named slot; casting prompts with exactly this map.
-legalSets :: Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
-legalSets specs gs = Map.map (\spec -> legalRecipients spec gs) specs
+legalSets :: ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
+legalSets source specs gs = Map.map (\spec -> legalRecipients source spec gs) specs
 
 -- CR "another": specs that exclude the targeting source from their legal set.
 -- Only NonlandPermanentTarget so far; a general per-slot "another" flag is future.
@@ -115,6 +142,8 @@ selfExcludes spec = case spec of
   TargetSpec.SpellTarget -> False
   TargetSpec.WallTarget -> False
   TargetSpec.NonblackCreatureTarget -> False
+  TargetSpec.ArtifactTarget -> False
+  TargetSpec.OpponentCreatureTarget -> False
 
 -- legalSets, then drop the source recipient from each self-excluding slot (CR
 -- "another"). `source` is the object the targeting is relative to -- the spell
@@ -125,7 +154,7 @@ selfExcludes spec = case spec of
 legalSetsExcluding :: ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
 legalSetsExcluding source specs gs =
   let drop1 spec s = if selfExcludes spec then Set.delete (Recipient.ToObject source) s else s
-   in Map.map (\spec -> drop1 spec (legalRecipients spec gs)) specs
+   in Map.map (\spec -> drop1 spec (legalRecipients source spec gs)) specs
 
 -- CR 700.2a: the mode indices all of whose target slots have a legal recipient
 -- (a mode with no slots is trivially fillable). Self-exclusion ("another") is

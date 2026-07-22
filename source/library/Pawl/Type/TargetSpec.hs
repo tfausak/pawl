@@ -50,4 +50,19 @@ data TargetSpec
     -- P9's criterion/filter language replaces the whole family of colour- and
     -- type-restricted specs with data (#40).
     NonblackCreatureTarget
+  | -- CR 115.1a: "target artifact" -- a permanent on the battlefield whose
+    -- PROJECTED card types (M3c layer 4) include Artifact. Reads the
+    -- projection, never Card.typeLine: a permanent made an artifact by a
+    -- type-changing effect is a legal target and a printed artifact that lost
+    -- the type is not. Master Thief's slot.
+    --
+    -- The WallTarget posture: one hand-carved variant, specific before general.
+    -- P9's criterion/filter language replaces the whole family (#40).
+    ArtifactTarget
+  | -- CR 115.1a with CR 109.5: "target creature an opponent controls" -- a
+    -- creature on the battlefield whose PROJECTED controller (CR 613.1b) is not
+    -- the targeting source's controller. The first spec whose legal set depends
+    -- on WHO IS CHOOSING, which is what makes Pawl.Target source-relative. Hag
+    -- of Inner Weakness's slot. Retired with the rest of the family (#40).
+    OpponentCreatureTarget
   deriving (Eq, Ord, Show)

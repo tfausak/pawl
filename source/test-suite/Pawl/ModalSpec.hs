@@ -190,7 +190,7 @@ nonlandPermanentTargetTests cards =
     "M4h NonlandPermanentTarget"
     [ HU.testCase "NonlandPermanentTarget excludes lands (CR 109.2/110.4)" $
         let gs = S.boardWithCreatureArtifactLand cards
-            got = Target.legalRecipients TargetSpec.NonlandPermanentTarget gs
+            got = Target.legalRecipients S.noSource TargetSpec.NonlandPermanentTarget gs
          in HU.assertEqual
               "two nonland permanents, no land"
               (Set.fromList [Recipient.ToObject (S.creatureId gs), Recipient.ToObject (S.artifactId gs)])

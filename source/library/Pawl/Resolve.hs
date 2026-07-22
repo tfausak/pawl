@@ -283,7 +283,7 @@ resolveSpell oid = do
               -- a token this resolution minted -- and was never targeted, so it can
               -- never have become an illegal target.
               Nothing -> True
-              Just spec -> Target.stillLegal recipient spec gs
+              Just spec -> Target.stillLegal oid recipient spec gs
             legality = Map.mapWithKey legalSlot chosen
             -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
             -- reserved slots above cannot rescue a spell whose every target is gone.
@@ -318,7 +318,7 @@ resolveEffects stackId srcId effects specs = do
             -- a token this resolution minted -- and was never targeted, so it can
             -- never have become an illegal target.
             Nothing -> True
-            Just spec -> Target.stillLegal recipient spec gs
+            Just spec -> Target.stillLegal srcId recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
           -- reserved slots above cannot rescue a spell whose every target is gone.

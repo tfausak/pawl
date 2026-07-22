@@ -272,7 +272,11 @@ tests cards =
                   (const True)
                   (const False)
                   (Codec.jsonToModal (Json.Object [(Text.pack "modes", Json.Array []), (Text.pack "selection", Codec.modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
-              )
+              ),
+          HU.testCase "TargetSpec.ArtifactTarget round-trips" $
+            HU.assertEqual "preserved" (Right TargetSpec.ArtifactTarget) (Codec.jsonToTargetSpec (Codec.targetSpecToJson TargetSpec.ArtifactTarget)),
+          HU.testCase "TargetSpec.OpponentCreatureTarget round-trips" $
+            HU.assertEqual "preserved" (Right TargetSpec.OpponentCreatureTarget) (Codec.jsonToTargetSpec (Codec.targetSpecToJson TargetSpec.OpponentCreatureTarget))
         ],
       Tasty.testGroup
         "honesty round-trip over allPrintings"

@@ -598,6 +598,8 @@ targetSpecToJson t = nullary . Text.pack $ case t of
   TargetSpec.WallTarget -> "WallTarget"
   TargetSpec.NonlandPermanentTarget -> "NonlandPermanentTarget"
   TargetSpec.NonblackCreatureTarget -> "NonblackCreatureTarget"
+  TargetSpec.ArtifactTarget -> "ArtifactTarget"
+  TargetSpec.OpponentCreatureTarget -> "OpponentCreatureTarget"
 
 jsonToTargetSpec :: Value -> Either Text TargetSpec.TargetSpec
 jsonToTargetSpec =
@@ -612,7 +614,9 @@ jsonToTargetSpec =
       (Text.pack "SpellTarget", TargetSpec.SpellTarget),
       (Text.pack "WallTarget", TargetSpec.WallTarget),
       (Text.pack "NonlandPermanentTarget", TargetSpec.NonlandPermanentTarget),
-      (Text.pack "NonblackCreatureTarget", TargetSpec.NonblackCreatureTarget)
+      (Text.pack "NonblackCreatureTarget", TargetSpec.NonblackCreatureTarget),
+      (Text.pack "ArtifactTarget", TargetSpec.ArtifactTarget),
+      (Text.pack "OpponentCreatureTarget", TargetSpec.OpponentCreatureTarget)
     ]
 
 turnScopeToJson :: TurnScope.TurnScope -> Value
