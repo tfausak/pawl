@@ -292,10 +292,16 @@ resolveSpell oid = do
          in if fizzles
               then Event.changeZone oid Zone.Graveyard
               else do
-                -- CR 613 / 608.2c: the resolving spell's controller, projected --
-                -- a spell has no control effect, so this is Object.owner obj
-                -- unchanged, but a controlled permanent's later ability (below)
-                -- needs this same projection to resolve under the thief.
+                -- CR 405.4: a spell's controller is the player who cast it,
+                -- fixed once, at cast time -- Object.owner obj already carries
+                -- that value (a card's owner never differs from its caster in
+                -- this pool: nothing lets a player cast a card they don't
+                -- own from hand). This Projection.controllerOf call is a no-op
+                -- today: no effect in the pool ever installs a SetController
+                -- naming a STACK object, so it always folds back to
+                -- Object.owner -- but it re-reads live projected control
+                -- rather than trusting the frozen owner outright, the same
+                -- shape an ability's controller recompute used to take (#83).
                 let effectController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
                 Monad.mapM_ (applyEffect oid effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) (effectsOf oid gs)
                 Event.changeZone oid Zone.Graveyard
@@ -324,15 +330,16 @@ resolveEffects stackId srcId effects specs = do
           -- reserved slots above cannot rescue a spell whose every target is gone.
           targeted = Map.restrictKeys legality (Map.keysSet specs)
           fizzles = not (Map.null specs) && not (or (Map.elems targeted))
-          -- CR 602.2a: an activated ability's controller is the player who
-          -- activated it. CR 603.3a: a triggered ability's controller is
-          -- whoever controlled its source when it triggered. Both are fixed
-          -- once, at the ability's creation -- Activate.activateAbility stamps
-          -- Object.owner = the activating player, and Engine.placeOne stamps it
-          -- with PendingTrigger.controller, the CR 603.3a value -- and never
-          -- revisited (CR 113.7a). `obj` here is the ability object itself
-          -- (looked up by `stackId`, not `srcId`), so its stamped owner IS the
-          -- answer; a stolen permanent's later controller must not override it.
+          -- CR 113.8: the controller of an activated ability on the stack is
+          -- the player who activated it; the controller of a triggered
+          -- ability on the stack is whoever controlled its source when it
+          -- triggered (CR 603.3a). Both are fixed once, at the ability's
+          -- creation -- Activate.activateAbility stamps Object.owner = the
+          -- activating player, and Engine.placeOne stamps it with
+          -- PendingTrigger.controller, the CR 603.3a value -- and never
+          -- revisited. `obj` here is the ability object itself (looked up by
+          -- `stackId`, not `srcId`), so its stamped owner IS the answer; a
+          -- stolen permanent's later controller must not override it.
           effectController = Object.owner obj
        in do
             Monad.unless fizzles $

@@ -348,6 +348,23 @@ giveControl oid pid gs =
 addPiker :: Cards.Cards -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addPiker cards = addCreature (Cards.pikerPrinting cards)
 
+-- Does a stored continuous effect target `target` specifically? Used to tell
+-- "nothing was stored FOR THIS OBJECT" apart from an unrelated entry already
+-- in play (S.giveControl's own AtCleanup SetController on the object whose
+-- control moved, which is not what CR 611.2b's "never starts" is about).
+-- Matches every Affected constructor explicitly (no wildcard): a GainControl
+-- effect only ever stores TheseObjects, so the others are correctly False
+-- here, but an exhaustive case means a future Affected constructor forces a
+-- decision at this site instead of silently reading as "nothing stored".
+continuousEffectAffects :: ObjectId.ObjectId -> ContinuousEffect.ContinuousEffect -> Bool
+continuousEffectAffects target eff = case ContinuousEffect.affected eff of
+  Affected.TheseObjects ids -> Set.member target ids
+  Affected.AllCreatures -> False
+  Affected.AllLands -> False
+  Affected.AllNonbasicLands -> False
+  Affected.OtherNonAuraEnchantments -> False
+  Affected.CreaturesOfColor _ -> False
+
 -- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`.
 -- Object id 998 is a stand-in source: nothing in these tests reads the
 -- source's own characteristics. The general shape (ColorSpec, PowerToughnessSpec,

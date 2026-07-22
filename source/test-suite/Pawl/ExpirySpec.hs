@@ -220,15 +220,6 @@ conditionalTests cards =
                   HU.assertEqual "the replacement is gone" [] (GameState.replacements swept)
         ]
 
--- Does any stored continuous effect name `target` in its affected set? Used to
--- tell "nothing was stored FOR THIS OBJECT" apart from an unrelated entry
--- already in play (S.giveControl's own AtCleanup SetController on the object
--- whose control moved, which is not what CR 611.2b's "never starts" is about).
-affects :: ObjectId.ObjectId -> ContinuousEffect.ContinuousEffect -> Bool
-affects target eff = case ContinuousEffect.affected eff of
-  Affected.TheseObjects ids -> Set.member target ids
-  _ -> False
-
 -- Master Thief {2}{U}{U} Creature -- Human Rogue 2/2: "When this creature
 -- enters, gain control of target artifact for as long as you control this
 -- creature." CR 611.2b's own printed example; the three assertions below in
@@ -289,8 +280,8 @@ masterThiefTests cards =
           -- conjunct (CR 611.2b/613.1b/400.7): Master Thief stays on the
           -- battlefield the whole time -- only its controller changes -- so this
           -- case cannot pass for the "left the battlefield" reason the sibling
-          -- case above covers. End to end through the real pipeline (CR 113.7a/
-          -- 603.3a: the ability's controller is alice, frozen at trigger time, and
+          -- case above covers. End to end through the real pipeline (CR 113.8:
+          -- the ability's controller is alice, frozen at trigger time, and
           -- Resolve.resolveEffects must read that frozen value rather than bob's
           -- live control of the thief).
           HU.testCase "CR 611.2b ceasing to be under your control (not leaving the battlefield) also stops it" $
@@ -306,7 +297,7 @@ masterThiefTests cards =
                   -- already stored an unrelated AtCleanup SetController effect on
                   -- the thief itself, so a blanket `[] == continuousEffects` would
                   -- fail for a reason that has nothing to do with this bug.
-                  HU.assertEqual "nothing was stored for the artifact" [] (filter (affects myr) (GameState.continuousEffects after))
+                  HU.assertEqual "nothing was stored for the artifact" [] (filter (S.continuousEffectAffects myr) (GameState.continuousEffects after))
                   -- CR 302.6: a control-change stored by GainControl re-Sicks the
                   -- target; the duration never starting must leave that untouched.
                   HU.assertEqual "and was never re-Sicked" (Just Sickness.Settled) (fmap Object.sickness (Game.lookupObject myr after)),
