@@ -72,7 +72,9 @@ data Prompt r where
   -- lets Clone enter as itself, a 0/0). Answered inside the zone change that puts
   -- the object onto the battlefield (CR 614.12a), before the enters event is
   -- recorded -- the choice really is made as the object enters. The legal set
-  -- excludes anything entering in the same batch (CR 614.13a).
+  -- excludes anything entering in the same batch (CR 614.12a: a sibling
+  -- entering at the same time is not yet "on the battlefield" when the choice
+  -- is made; see Pawl.Replacement's applyReplacementsIn).
   ChooseCopyTarget :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Prompt (Maybe ObjectId)
   -- CR 603.3b: "If a player controlled two or more triggered abilities ... that
   -- player puts them on the stack in any order they choose." The [ObjectId] is

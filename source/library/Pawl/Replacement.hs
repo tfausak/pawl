@@ -91,12 +91,23 @@ asZoneChange event = case event of
 applyReplacements :: ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacements = applyReplacementsIn Set.empty
 
--- CR 614.13a: `batch` is the set of ids entering the battlefield AT THE SAME TIME
--- as the object this loop is about -- "You can't choose the object that will
--- become that permanent or any other object entering the battlefield at the same
--- time as that object." Clone's own ruling restates it: "If Clone somehow enters
--- at the same time as another creature, Clone can't become a copy of that
--- creature."
+-- CR 614.12a: `batch` is the set of ids entering the battlefield AT THE SAME TIME
+-- as the object this loop is about -- "If a replacement effect that modifies how
+-- a permanent enters the battlefield requires a choice, that choice is made
+-- before the permanent enters the battlefield." Clone reads "any creature ON THE
+-- BATTLEFIELD"; a sibling entering in the same batch is not there yet at the
+-- moment the choice is made, so it is excluded. (CR 614.13a is the wrong cite
+-- here: that rule is about an entry effect moving OTHER objects to a different
+-- zone, e.g. Sutured Ghoul exiling graveyard cards -- a copy target never
+-- changes zones, it just gets copied.) The exclusion is still needed even
+-- though the object being materialized is not itself "entering" from this
+-- loop's point of view: this engine deliberately puts the entering object onto
+-- the battlefield BEFORE running the entry loop (CR 614.12 requires its
+-- characteristics be checked as they would exist there), so without this
+-- explicit batch set a simultaneously-entering sibling would already be sitting
+-- on the battlefield and visible to legalCopyTargets. Clone's own ruling
+-- restates the result: "If Clone somehow enters at the same time as another
+-- creature, Clone can't become a copy of that creature."
 --
 -- Empty for every event class but a nested entry, and empty even for a lone entry
 -- (nothing else is entering). IMPLEMENTED BUT UNTESTED: no real card in reach
@@ -366,6 +377,7 @@ apply batch candidate event =
     -- silently whenever it happened to pair with WouldEnter.
     (ReplacementEffect.EntryR rewrite, ProposedEvent.WouldEnter oid) -> case rewrite of
       EntryRewrite.AsCopy -> do
+        consume (ReplacementCandidate.identity candidate)
         gs <- State.get
         case Projection.controllerOf oid gs of
           -- Unreachable: the object is materialized on the battlefield before this
@@ -382,9 +394,11 @@ apply batch candidate event =
                   let stamp o = o {Object.bindings = Binding.setCopy (Projection.copiableCharacteristics src2 g) (Object.bindings o)}
                    in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
                 pure (Just event)
-      -- CR 614.1c / 208.2b: Primal Plasma's own choice (which creature type to
-      -- become). No producer yet -- the card pool has no ChoiceOf source -- but the
-      -- inner sum is cased exhaustively (per the module comment) so a future
+      -- CR 614.1c / 208.2b: Primal Plasma's own choice (which of its three
+      -- printed power/toughness-and-keywords options to become -- e.g. a 3/3, a
+      -- 2/2 flier, or a 1/6 with defender -- never a creature type). No
+      -- producer yet -- the card pool has no ChoiceOf source -- but the inner
+      -- sum is cased exhaustively (per the module comment) so a future
       -- producer cannot silently no-op here.
       EntryRewrite.ChoiceOf _ -> pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
@@ -425,8 +439,10 @@ apply batch candidate event =
     -- WouldCreateTokens funnel.
     (ReplacementEffect.TokenR _ _, _) -> pure (Just event)
 
--- CR 707.5 / 614.13a: the permanents an entering copy may choose. Battlefield
--- creatures other than itself, minus anything entering in the same batch.
+-- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
+-- creatures other than itself, minus anything entering in the same batch (see
+-- the CR 614.12a note on applyReplacementsIn for why the batch set, not
+-- 614.13a, is what excludes them).
 legalCopyTargets :: Set ObjectId -> ObjectId -> GameState -> [ObjectId]
 legalCopyTargets batch self gs =
   let eligible oid = oid /= self && not (Set.member oid batch) && Projection.isCreatureOf oid gs

@@ -136,14 +136,22 @@ changeZone oid requestedDest = do
       -- CR 614.4: replacements exist before the event, so the loop reads them from
       -- the PRE-MOVE state. CR 614.6: the modified event is what actually happens.
       --
-      -- Hazard for a future task: `obj` and `snapshot` are both read from `gs`,
-      -- BEFORE resolveZoneChange runs, and both are still used below, AFTER it
-      -- returns -- only `ZoneChange.to settled` is read back from the settled
-      -- event. That is sound only because the loop today is state-pure (no
-      -- `apply` arm calls State.modify'); a future task that makes `apply` mutate
-      -- state must re-derive `obj` (and decide what "last known information"
-      -- means for `snapshot`) from the state AFTER the loop, not carry these
-      -- pre-loop bindings across it unexamined.
+      -- `obj` and `snapshot` are both read from `gs`, BEFORE resolveZoneChange
+      -- runs, and both are still used below, AFTER it returns -- only
+      -- `ZoneChange.to settled` is read back from the settled event. This is
+      -- sound despite Pawl.Replacement's AsCopy arm calling State.modify' (it
+      -- stamps a copy snapshot when a permanent enters as a copy): the loop
+      -- resolveZoneChange runs here is a WouldChangeZone loop, which `applies`
+      -- restricts to ZoneChangeR candidates -- it cannot reach the EntryR arm
+      -- that AsCopy lives under, because EntryR only matches a WouldEnter event
+      -- (the entry loop nested inside placeObject/changeZone below, at
+      -- Replacement.runEntry, on the object's NEW id). And `gs` is an immutable
+      -- value, not a reference into mutable state, so a State.modify' anywhere
+      -- downstream cannot retroactively change what `snapshot` already
+      -- captured. A future task extending EITHER loop to mutate state that
+      -- `obj` or `snapshot` reads (e.g. a ZoneChangeR arm that edits the
+      -- object's own fields) would need to re-derive these bindings from the
+      -- state AFTER that loop, not carry the pre-loop ones across unexamined.
       resolved <- Replacement.resolveZoneChange (ZoneChange.MkZoneChange oid fromZone requestedDest)
       case resolved of
         -- CR 614.6: nothing survived the loop, so no zone change happens. No
@@ -161,7 +169,8 @@ changeZone oid requestedDest = do
           -- nowhere else. CR 616.1g: this loop is NESTED inside the zone change,
           -- which is how "an effect may apply to an event contained within another
           -- event" is expressed -- as call nesting, not as a field. A lone entry
-          -- has no same-batch siblings (CR 614.13a).
+          -- has no same-batch siblings (CR 614.12a; see Pawl.Replacement's
+          -- applyReplacementsIn for why 614.12a, not 614.13a, is the cite).
           Monad.when (dest == Zone.Battlefield) (Replacement.runEntry Set.empty newId)
           -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
           -- what an enters trigger scans. Recorded LAST, so the entry loop's
@@ -259,7 +268,13 @@ sacrifice oid = do
 -- mint it. Uses from = Battlefield (it appears there; to == from can never read as
 -- a leave). Emits the enters event so ETB triggers (CR 603.6a) fire on the same
 -- path a resolved permanent uses. Does NOT consult replacements (Doubling Season
--- is future, spec section 8).
+-- is future, spec section 8) -- in particular it does not call
+-- Replacement.runEntry, so an EntryR replacement (CR 616.1c/d) on a token does
+-- not apply today, even though CR 614.12's own worked example is a token ("An
+-- effect creates a token that's a copy of Voice of All. As that token is
+-- created, the token's controller chooses a color for it"). No token card in
+-- the pool carries replacementEffects, so this is a present limitation with no
+-- observable effect yet, not a promise about future work.
 createToken :: PlayerId -> Card -> Game ()
 createToken controller card = do
   let mkObj ts =
