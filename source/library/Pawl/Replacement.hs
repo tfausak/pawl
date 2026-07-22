@@ -103,9 +103,18 @@ loop applied event = do
             Nothing -> pure Nothing
             Just rewritten -> loop (Set.insert (ReplacementCandidate.identity candidate) applied) rewritten
 
--- Every replacement effect instance in the game, in the engine's canonical order:
--- battlefield permanents ascending by id, each permanent's own effects in printed
--- order. That order is what the ChooseReplacement prompt indexes into.
+-- Every replacement effect instance in the game, in the engine's canonical order.
+-- Two segments, concatenated in this order:
+--
+--   1. PERMANENT abilities (Projection.replacementsAffecting): battlefield
+--      permanents ascending by id, each permanent's own effects in printed
+--      order.
+--   2. The FLOATING store (GameState.replacements): newest first -- Resolve.hs
+--      prepends each new ActiveReplacement onto the front of the list as it is
+--      created, so the most recently resolved floating replacement is collected
+--      before any older one.
+--
+-- That concatenated order is what the ChooseReplacement prompt indexes into.
 collect :: GameState -> [ReplacementCandidate]
 collect gs =
   let fromPermanent (src, re) =
@@ -141,8 +150,9 @@ applies gs event candidate =
             -- CR 615.1: no kind named means every damage event.
             Nothing -> True
             Just kind -> DamageEvent.kind de == kind
-        -- Tasks 5, 6, 7 and 9 fill these in as each funnel starts raising its
-        -- event; until then no such ProposedEvent is ever constructed.
+        -- These effect classes have no producer yet: nothing in the engine ever
+        -- raises the ProposedEvent each would need to match, so every pair below
+        -- is unreachable in practice, and False is simply correct until one does.
         (ReplacementEffect.ZoneChangeR _ _, _) -> False
         (ReplacementEffect.EntryR _, _) -> False
         (ReplacementEffect.DamageR _ _, _) -> False
@@ -259,6 +269,15 @@ chooserOf gs event = case event of
 -- excludes, falls through to `pure (Just event)` -- unreachable in practice
 -- (nothing reaches `apply` that `applies` rejected) but present so the match
 -- stays total per constructor, not merely total by wildcard.
+--
+-- The same discipline applies one level down. Several ReplacementEffect
+-- constructors carry their own rewrite/pattern sum (DamageR's DamageRewrite
+-- below; EntryR's EntryRewrite, DestructionR's DestructionRewrite, CounterR's
+-- and TokenR's Scaling as later work fills those arms in). An arm must case on
+-- that inner constructor too, not bind it with `_`: binding it with `_` is
+-- exhaustive today only because the inner type happens to have few
+-- constructors, and stays silently exhaustive -- no build failure, no warning,
+-- a real rewrite silently treated as a no-op -- the day someone adds one more.
 apply :: ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
 apply candidate event =
   case (ReplacementCandidate.effect candidate, event) of
@@ -270,11 +289,13 @@ apply candidate event =
     -- CR 614.1c: Clone (AsCopy) / Primal Plasma (ChoiceOf) rewrite the copiable
     -- snapshot of an entering permanent. Waiting on the WouldEnter funnel.
     (ReplacementEffect.EntryR _, _) -> pure (Just event)
-    -- CR 615.6: a prevented event never happens -- it is not marked, not drained,
-    -- and never recorded, so no deathtouch bit exists for the CR 704.5h SBA to read.
-    (ReplacementEffect.DamageR _ DamageRewrite.PreventAll, ProposedEvent.WouldDealDamage _) -> do
-      consume (ReplacementCandidate.identity candidate)
-      pure Nothing
+    (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage _) -> case rewrite of
+      -- CR 615.6: a prevented event never happens -- it is not marked, not
+      -- drained, and never recorded, so no deathtouch bit exists for the CR
+      -- 704.5h SBA to read.
+      DamageRewrite.PreventAll -> do
+        consume (ReplacementCandidate.identity candidate)
+        pure Nothing
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR _ _, _) -> pure (Just event)
     -- CR 614.8/701.19a: regeneration rewrites a would-be-destroyed event so the

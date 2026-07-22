@@ -88,10 +88,10 @@ unscannedDamage gs =
 -- event-pipeline analog of Projection.dropEndOfTurnEffects). Indefinite ones
 -- stay. Fog's shield is exactly such an entry now. Drudge Skeletons'
 -- regeneration shield (GameState.regenerationShields, clearRegenerationShields
--- below) is still a SEPARATE pre-P5 cleanup for this task -- Task 5 folds it
--- into this same store as an UntilEndOfTurn/Once entry, at which point this one
--- function retires both cleanups and CR 701.19a's "this turn" falls out of CR
--- 514.2 rather than needing its own sweep.
+-- below) is still a SEPARATE cleanup: it is not held in this store as an
+-- UntilEndOfTurn/Once entry, so this function does not retire it, and CR
+-- 701.19a's "this turn" does not yet fall out of CR 514.2 -- it still needs its
+-- own sweep.
 dropEndOfTurnReplacements :: GameState -> GameState
 dropEndOfTurnReplacements gs =
   let keep active = ActiveReplacement.duration active /= Duration.UntilEndOfTurn

@@ -3,12 +3,20 @@
 
 -- Covers: Pawl.Replacement (the CR 616.1 loop, its buckets and its prompt) and
 -- the funnels that raise proposed events through it. Gameplay-level throughout
--- -- put a board together, cast or resolve, assert on game state -- with ONE
--- exception: the CR 614.5 case below drives Replacement.applicable/loop
+-- -- put a board together, cast or resolve, assert on game state -- with one
+-- full exception and one half-exception.
+--
+-- Full exception: the CR 614.5 case below drives Replacement.applicable/loop
 -- directly on hand-built values, because the card pool has exactly one
 -- replacement-bearing printing (Rest in Peace) and no gameplay board can
 -- produce the two independently-sourced, mutually-applicable redirects that
 -- case needs.
+--
+-- Half-exception: the CR 615.10 Fog case casts and resolves a real card through
+-- the stack, but then hand-builds its DamageEvent batch rather than reaching one
+-- through combat -- there is no gameplay path from a cast Fog to a specific
+-- damage batch without driving an entire combat phase, which the CR 615.10
+-- property under test does not need.
 module Pawl.ReplacementSpec where
 
 import qualified Control.Exception as Exception
@@ -99,10 +107,10 @@ tests cards =
       -- Peace), never two independently-sourced redirects that stay applicable
       -- to their own output, so gameplay-level coverage cannot reach this. Two
       -- candidates EQUAL AS VALUES (same ZoneChangeR effect) but with different
-      -- SOURCES, on a SYNTHETIC PRINTING -- it is not a synthetic card: it
-      -- carries Rest in Peace's real name and trigger, but a fabricated
-      -- Graveyard -> Graveyard replacement effect no real card in the pool
-      -- prints -- redirecting to the very zone their own pattern watches, so,
+      -- SOURCES, on a SYNTHETIC PRINTING -- the Card value carries Rest in
+      -- Peace's real name and trigger, but a fabricated Graveyard -> Graveyard
+      -- replacement effect no real card in the pool prints -- redirecting to
+      -- the very zone their own pattern watches, so,
       -- unlike the test above, applying one does NOT make the event stop
       -- matching the other's pattern. Both stay applicable to the rewritten
       -- event FOREVER unless CR 614.5's applied set excludes each one after its

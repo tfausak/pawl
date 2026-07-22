@@ -12,10 +12,20 @@ import Pawl.Type.Uses (Uses)
 -- these are stored because the object that made them may be long gone.
 --
 -- `duration` decides when cleanup drops it (CR 514.2). `uses` is CR 614.3's
--- "until they're used up". `source` and `timestamp` are new here and are exactly
--- the two fields #58 recorded as missing: CR 615.13's "prevented" triggers and CR
--- 615.7's multi-source choice are no longer STRUCTURALLY blocked, only
--- card-blocked.
+-- "until they're used up". `source` and `timestamp` are new here. #58 recorded
+-- their ABSENCE as one blocker on CR 615.13's "prevented" triggers and CR
+-- 615.7's multi-source choice, and that particular blocker is gone: there is
+-- now a source and a timestamp to report.
+--
+-- But a SEPARATE structural blocker remains for both rules, and these two
+-- fields do not touch it: Pawl.Damage.applyDamage runs each DamageEvent in a
+-- simultaneous batch through its own independent CR 616.1 loop (Pawl.Replacement
+-- loop), one event at a time. CR 615.7 allocates ONE shield across the whole
+-- batch, with the recipient choosing which event it prevents -- a choice a
+-- per-event loop has no batch to make it over. CR 615.13 fires once per BATCH
+-- ("each time a prevention effect is applied to one or more simultaneous damage
+-- events"), which a per-event loop has no way to observe. Both rules stay
+-- card-blocked (#58) until that batch shape changes, not merely field-blocked.
 --
 -- `timestamp` doubles as this instance's CR 614.5 identity (Pawl.Type.CandidateId):
 -- GameState.nextTimestamp is monotone, so no two floating replacements share one.

@@ -164,8 +164,16 @@ gatherCombatDamage assigns = do
 --
 -- What this shape cannot express is CR 615.7's SHARED N-damage shield -- one
 -- resource allocated across several simultaneous events, with the recipient
--- choosing which it covers. No such shield exists in the pool (Fog is
--- unlimited-for-a-duration, not N-damage), so it stays card-driven (#58).
+-- choosing which it covers. No such shield exists in the pool today (Fog is
+-- unlimited-for-a-duration, not N-damage), so it stays card-driven (#58) -- but
+-- the trip-wire is concrete, not hypothetical: `Monad.mapM Replacement.resolveDamage
+-- events` below runs each event's CR 616.1 loop SEQUENTIALLY, and
+-- Replacement.consume mutates GameState.replacements between siblings. The day a
+-- card adds a `Uses.Once` `DamageR` shield meant to cover several sources at
+-- once, it will be silently spent on whichever event in the batch happens to
+-- sort first, rather than on the one the shielded player or controller would
+-- have chosen -- the engine making CR 615.7's choice on a player's behalf, the
+-- second invariant's violation. Watch for exactly that combination.
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = do
   survivors <- fmap Maybe.catMaybes (Monad.mapM Replacement.resolveDamage events)
