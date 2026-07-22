@@ -7,6 +7,7 @@ import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
 import Pawl.Type.Decider (Decider)
+import Pawl.Type.EntryOption (EntryOption)
 import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
@@ -76,6 +77,17 @@ data Prompt r where
   -- entering at the same time is not yet "on the battlefield" when the choice
   -- is made; see Pawl.Replacement's applyReplacementsIn).
   ChooseCopyTarget :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Prompt (Maybe ObjectId)
+  -- CR 208.2b / 614.1c: as an object enters, its controller chooses among the
+  -- shapes an "as this creature enters, it becomes your choice of ..." ability
+  -- offers (Primal Plasma). The ObjectId is the entering object; the answer is an
+  -- index into the offered list.
+  --
+  -- The chosen shape is written into the object's COPIABLE snapshot (CR 707.2), so
+  -- a later Clone copies the choice without any further machinery -- and then, if
+  -- it copied the ABILITY too, makes its own choice on top (CR 616.2).
+  --
+  -- Asked only when two or more options are offered; one option is not a choice.
+  ChooseEntryOption :: Decider -> PlayerId -> ObjectId -> [EntryOption] -> Prompt Natural
   -- CR 603.3b: "If a player controlled two or more triggered abilities ... that
   -- player puts them on the stack in any order they choose." The [ObjectId] is
   -- that player's pending triggers, each entry its SOURCE object, in the engine's

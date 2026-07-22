@@ -282,6 +282,7 @@ recordingAnswer p = case p of
   Prompt.ChooseX {} -> pure 0
   Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
+  Prompt.ChooseEntryOption {} -> pure 0
   Prompt.OrderTriggers _ _ sources -> pure (map fromIntegral (take (length sources) [0 :: Int ..]))
   Prompt.ChooseReplacement {} -> pure 0
 
@@ -419,6 +420,7 @@ slaveAnswer p = case p of
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
+  Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
 

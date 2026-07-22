@@ -144,7 +144,7 @@ changeZone oid requestedDest = do
       -- resolveZoneChange runs here is a WouldChangeZone loop, which `applies`
       -- restricts to ZoneChangeR candidates -- it cannot reach the EntryR arm
       -- that AsCopy lives under, because EntryR only matches a WouldEnter event
-      -- (the entry loop nested inside placeObject/changeZone below, at
+      -- (the entry loop nested inside changeZone below, at
       -- Replacement.runEntry, on the object's NEW id). And `gs` is an immutable
       -- value, not a reference into mutable state, so a State.modify' anywhere
       -- downstream cannot retroactively change what `snapshot` already
@@ -269,7 +269,7 @@ sacrifice oid = do
 -- a leave). Emits the enters event so ETB triggers (CR 603.6a) fire on the same
 -- path a resolved permanent uses. Does NOT consult replacements (Doubling Season
 -- is future, spec section 8) -- in particular it does not call
--- Replacement.runEntry, so an EntryR replacement (CR 616.1c/d) on a token does
+-- Replacement.runEntry, so an EntryR replacement (CR 614.1c-d) on a token does
 -- not apply today, even though CR 614.12's own worked example is a token ("An
 -- effect creates a token that's a copy of Voice of All. As that token is
 -- created, the token's controller chooses a color for it"). No token card in

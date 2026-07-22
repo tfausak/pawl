@@ -65,6 +65,9 @@ subtypeMana subtype = case subtype of
   Subtype.Barbarian -> Nothing
   Subtype.Zombie -> Nothing
   Subtype.Fungus -> Nothing
+  -- CR 305.6: no land type produces mana; Elemental is a creature type
+  -- (CR 205.3m), not a land type.
+  Subtype.Elemental -> Nothing
 
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
 -- PLUS every projected activated ability that is a mana ability (CR 605.1a),

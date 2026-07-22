@@ -34,6 +34,7 @@ encode p answer = case p of
   Prompt.ChooseX {} -> Response.ChoseX answer
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
+  Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
 
@@ -85,6 +86,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCopyTarget {} -> case response of
     Response.ChoseCopyTarget m -> Just m
+    _ -> Nothing
+  Prompt.ChooseEntryOption {} -> case response of
+    Response.ChoseEntryOption n -> Just n
     _ -> Nothing
   Prompt.OrderTriggers {} -> case response of
     Response.OrderedTriggers order -> Just order
@@ -140,6 +144,9 @@ defaultAnswer p = case p of
   -- fallback -- Clone is a deterministic fixture, never in a random deck, so
   -- this is never exercised in play.
   Prompt.ChooseCopyTarget {} -> Nothing
+  -- CR 208.2b: the first offered shape is always a legal answer (this is asked
+  -- only when the list has two or more), and is the least eventful fallback.
+  Prompt.ChooseEntryOption {} -> 0
   -- CR 603.3b: the canonical order is always a legal answer, and is the least
   -- eventful fallback when a transcript runs short.
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])

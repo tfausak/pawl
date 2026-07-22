@@ -42,6 +42,7 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamagePattern as DamagePattern
 import qualified Pawl.Type.DamageRewrite as DamageRewrite
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
@@ -51,6 +52,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
 import Pawl.Type.ProposedEvent (ProposedEvent)
 import qualified Pawl.Type.ProposedEvent as ProposedEvent
@@ -99,15 +101,21 @@ applyReplacements = applyReplacementsIn Set.empty
 -- moment the choice is made, so it is excluded. (CR 614.13a is the wrong cite
 -- here: that rule is about an entry effect moving OTHER objects to a different
 -- zone, e.g. Sutured Ghoul exiling graveyard cards -- a copy target never
--- changes zones, it just gets copied.) The exclusion is still needed even
--- though the object being materialized is not itself "entering" from this
--- loop's point of view: this engine deliberately puts the entering object onto
--- the battlefield BEFORE running the entry loop (CR 614.12 requires its
--- characteristics be checked as they would exist there), so without this
--- explicit batch set a simultaneously-entering sibling would already be sitting
--- on the battlefield and visible to legalCopyTargets. Clone's own ruling
--- restates the result: "If Clone somehow enters at the same time as another
--- creature, Clone can't become a copy of that creature."
+-- changes zones, it just gets copied.) The object THIS loop's WouldEnter event
+-- is about is exactly the entering object -- CR 614.12 puts it on the
+-- battlefield before the loop runs, and legalCopyTargets already excludes it by
+-- `self`, so the batch set is never about excluding the loop's own subject.
+--
+-- No path today materializes two objects before running either's entry loop:
+-- `changeZone` handles one entering object at a time and its own entry loop
+-- completes before the next object's begins, and `batch` is `Set.empty` at the
+-- only call site. The exclusion matters for a FUTURE batch-entry path that keeps
+-- this engine's materialize-first design (putting each object on the
+-- battlefield before its entry loop runs, per CR 614.12): without this explicit
+-- batch set, a simultaneously-entering sibling would already be sitting on the
+-- battlefield and visible to legalCopyTargets. Clone's own ruling restates the
+-- result such a path must reach: "If Clone somehow enters at the same time as
+-- another creature, Clone can't become a copy of that creature."
 --
 -- Empty for every event class but a nested entry, and empty even for a lone entry
 -- (nothing else is entering). IMPLEMENTED BUT UNTESTED: no real card in reach
@@ -396,11 +404,35 @@ apply batch candidate event =
                 pure (Just event)
       -- CR 614.1c / 208.2b: Primal Plasma's own choice (which of its three
       -- printed power/toughness-and-keywords options to become -- e.g. a 3/3, a
-      -- 2/2 flier, or a 1/6 with defender -- never a creature type). No
-      -- producer yet -- the card pool has no ChoiceOf source -- but the inner
-      -- sum is cased exhaustively (per the module comment) so a future
-      -- producer cannot silently no-op here.
-      EntryRewrite.ChoiceOf _ -> pure (Just event)
+      -- 2/2 flier, or a 1/6 with defender -- never a creature type). Written
+      -- into the COPIABLE snapshot (applyEntryOption), which is what makes CR
+      -- 616.2 fall out for free: a Clone that copies Primal Plasma's copiable
+      -- values also copies this ability (CR 707.5), and the loop's next
+      -- iteration re-collects and finds it newly applicable.
+      EntryRewrite.ChoiceOf options -> do
+        gs <- State.get
+        case options of
+          -- Malformed card data: an as-enters choice with nothing to choose
+          -- from. No-op rather than a partial function.
+          [] -> pure (Just event)
+          first : rest -> do
+            picked <-
+              if null rest
+                then -- One option is not a choice; where the rules leave
+                -- nothing to ask, don't prompt.
+                  pure first
+                else case Projection.controllerOf oid gs of
+                  -- Unreachable: the object is materialized on the
+                  -- battlefield before this loop runs, so controllerOf falls
+                  -- back to its owner. Defensive: make no unprompted choice.
+                  Nothing -> pure first
+                  Just controller -> do
+                    let decider = Decide.deciderFor controller gs
+                    answer <- Trans.lift (Program.prompt (Prompt.ChooseEntryOption decider controller oid options))
+                    pure (at options answer first)
+            consume (ReplacementCandidate.identity candidate)
+            State.modify' (applyEntryOption oid picked)
+            pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR _, _) -> pure (Just event)
     (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage _) -> case rewrite of
@@ -438,6 +470,29 @@ apply batch candidate event =
     -- CR 614.16: Doubling Season scales token creation. Waiting on the
     -- WouldCreateTokens funnel.
     (ReplacementEffect.TokenR _ _, _) -> pure (Just event)
+
+-- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
+-- snapshot. Power and toughness are SET; keywords are UNIONED into whatever is
+-- already there.
+--
+-- The union is pinned by Primal Plasma's own Gatherer ruling and is the detail
+-- worth stating twice: "a 1/6 creature with flying and defender" is only
+-- reachable if the choice ADDS defender to a snapshot that already carries flying
+-- from the copy.
+applyEntryOption :: ObjectId -> EntryOption.EntryOption -> GameState -> GameState
+applyEntryOption oid option gs =
+  let base = Projection.copiableCharacteristics oid gs
+      stamped =
+        base
+          { PC.power = Just (EntryOption.power option),
+            PC.toughness = Just (EntryOption.toughness option),
+            -- CR 208.2b: the printed star now has a value, so layer 7a's
+            -- characteristic-defining pass must not recompute over it.
+            PC.characteristicPT = Nothing,
+            PC.keywords = Set.union (PC.keywords base) (EntryOption.keywords option)
+          }
+      write o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
+   in gs {GameState.objects = Map.adjust write oid (GameState.objects gs)}
 
 -- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
 -- creatures other than itself, minus anything entering in the same batch (see

@@ -312,8 +312,14 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 -- CDA in-place at Layer.CharacteristicPT (7a, which already exists in
 -- Pawl.Type.Layer as the CR's own dedicated sublayer for this), not at the seed.
 -- The precedent below (baseCharacteristics already evaluating a printed `*` P/T
--- at the seed via Quantity.evaluate) is harmless ONLY because no card in the pool
--- has `*` P/T and is therefore not a licence to seed a dynamic CDA -- see above.
+-- at the seed via Quantity.evaluate) is harmless ONLY for the one card that
+-- has `*` P/T with NO characteristic-defining ability behind it -- Primal Plasma
+-- (P5), whose star is given its value by an as-enters REPLACEMENT (CR 208.2b),
+-- not by a CDA. Quantity.evaluate returns Nothing for a bare Star, so such a card
+-- projects NO power or toughness until its entry choice applies, where CR 208.2b
+-- says to use 0. That is unobservable on the battlefield -- the entry loop always
+-- applies the choice before the Moved event exists -- but a Primal Plasma CARD in
+-- a hand, library or graveyard reports Nothing where the rule says 0 (#N).
 baseColorsOf :: Card.Type.Card -> Set Color.Color
 baseColorsOf card =
   if Set.member Keyword.Devoid (Card.Type.keywords card)

@@ -12,6 +12,8 @@ module Pawl.ReplacementSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -38,11 +40,13 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
@@ -112,6 +116,35 @@ copyOf :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 copyOf wanted p = case p of
   Prompt.ChooseCopyTarget _ _ _ legal -> if List.elem wanted legal then Just wanted else Nothing
   _ -> S.identityAnswer p
+
+-- alice controls `n` untapped Islands in a main phase with priority, holding one
+-- card of each printing in `hand`. Returns the state and the hand ids in order --
+-- unlike S.handOne, which replaces the whole hand.
+blueBoard :: Cards.Cards -> Int -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId])
+blueBoard cards n hand =
+  let base = S.landsInPlay (Cards.islandPrinting cards) n
+      addOne (ids, g) p = let (oid, g1) = S.addHandCard p S.alice g in (ids ++ [oid], g1)
+      (held, gs) = List.foldl' addOne ([], base) hand
+   in ( gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        held
+      )
+
+-- Pick entry option `which`, and copy the highest-id legal creature when offered.
+enteringAs :: Natural.Natural -> Prompt.Prompt r -> r
+enteringAs which p = case p of
+  Prompt.ChooseEntryOption {} -> which
+  Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe (List.sortOn Ord.Down legal)
+  _ -> S.identityAnswer p
+
+-- The newest battlefield object whose printed card has this name.
+newestNamed :: Text.Text -> GameState.GameState -> Maybe ObjectId.ObjectId
+newestNamed wanted gs =
+  let named oid = fmap Card.name (Game.cardOf oid gs) == Just wanted
+   in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
 
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
@@ -287,5 +320,61 @@ tests cards =
               named = filter (\oid -> fmap Card.name (Game.cardOf oid resolved) == Just (Text.pack "Clone")) (Set.toList (GameState.battlefield resolved))
            in case named of
                 [] -> HU.assertFailure "Clone did not reach the battlefield"
-                clone : _ -> HU.assertEqual "already a 2/1, with no settle run" (Just 2) (Projection.powerOf clone resolved)
+                clone : _ -> HU.assertEqual "already a 2/1, with no settle run" (Just 2) (Projection.powerOf clone resolved),
+        HU.testCase "CR 208.2b Primal Plasma enters as the 2/2 with flying its controller picked" $
+          let (gs, held) = blueBoard cards 4 [Cards.primalPlasmaPrinting cards]
+           in case held of
+                plasmaCard : _ ->
+                  let after = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
+                   in case newestNamed (Text.pack "Primal Plasma") after of
+                        Nothing -> HU.assertFailure "Primal Plasma did not reach the battlefield"
+                        Just plasma -> do
+                          HU.assertEqual "power" (Just 2) (Projection.powerOf plasma after)
+                          HU.assertEqual "toughness" (Just 2) (Projection.toughnessOf plasma after)
+                          HU.assertBool "flying" (Projection.hasKeyword Keyword.Flying plasma after)
+                _ -> HU.assertFailure "fixture did not deal a card",
+        HU.testCase "CR 616.2 a Clone of a 2/2-flying Plasma that picks 1/6 is 1/6 with flying AND defender" $
+          -- THE CENTERPIECE, and the Gatherer ruling verbatim: "it copies the values
+          -- determined by its enters-the-battlefield replacement effect, but its
+          -- power and toughness are determined by the copy's own
+          -- enters-the-battlefield replacement effect."
+          let (gs, held) = blueBoard cards 8 [Cards.primalPlasmaPrinting cards, Cards.clonePrinting cards]
+           in case held of
+                plasmaCard : cloneCard : _ ->
+                  let withPlasma = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
+                      after = S.runPure (enteringAs 2) withPlasma (Cast.castSpell S.alice cloneCard >> Stack.resolveTop)
+                   in case newestNamed (Text.pack "Clone") after of
+                        Nothing -> HU.assertFailure "Clone did not reach the battlefield"
+                        Just clone -> do
+                          HU.assertEqual "power is the CLONE's own choice" (Just 1) (Projection.powerOf clone after)
+                          HU.assertEqual "toughness is the CLONE's own choice" (Just 6) (Projection.toughnessOf clone after)
+                          HU.assertBool "flying came from the COPY" (Projection.hasKeyword Keyword.Flying clone after)
+                          HU.assertBool "defender came from the CHOICE" (Projection.hasKeyword Keyword.Defender clone after)
+                _ -> HU.assertFailure "fixture did not deal two cards",
+        HU.testCase "CR 616.2 the same Clone picking 3/3 is a 3/3 with flying" $
+          let (gs, held) = blueBoard cards 8 [Cards.primalPlasmaPrinting cards, Cards.clonePrinting cards]
+           in case held of
+                plasmaCard : cloneCard : _ ->
+                  let withPlasma = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
+                      after = S.runPure (enteringAs 0) withPlasma (Cast.castSpell S.alice cloneCard >> Stack.resolveTop)
+                   in case newestNamed (Text.pack "Clone") after of
+                        Nothing -> HU.assertFailure "Clone did not reach the battlefield"
+                        Just clone -> do
+                          HU.assertEqual "3/3" (Just 3) (Projection.powerOf clone after)
+                          HU.assertBool "still flying (keywords UNION, never assign)" (Projection.hasKeyword Keyword.Flying clone after)
+                          HU.assertBool "no defender" (not (Projection.hasKeyword Keyword.Defender clone after))
+                _ -> HU.assertFailure "fixture did not deal two cards",
+        HU.testCase "CR 707.2 a Clone of that Clone copies 1/6-flying-defender and then chooses again" $
+          let (gs, held) = blueBoard cards 12 [Cards.primalPlasmaPrinting cards, Cards.clonePrinting cards, Cards.clonePrinting cards]
+           in case held of
+                plasmaCard : cloneA : cloneB : _ ->
+                  let s1 = S.runPure (enteringAs 1) gs (Cast.castSpell S.alice plasmaCard >> Stack.resolveTop)
+                      s2 = S.runPure (enteringAs 2) s1 (Cast.castSpell S.alice cloneA >> Stack.resolveTop)
+                      s3 = S.runPure (enteringAs 0) s2 (Cast.castSpell S.alice cloneB >> Stack.resolveTop)
+                   in case newestNamed (Text.pack "Clone") s3 of
+                        Nothing -> HU.assertFailure "the second Clone did not reach the battlefield"
+                        Just clone -> do
+                          HU.assertEqual "its OWN choice wins on P/T" (Just 3) (Projection.powerOf clone s3)
+                          HU.assertBool "flying and defender rode the copy chain" (Projection.hasKeyword Keyword.Flying clone s3 && Projection.hasKeyword Keyword.Defender clone s3)
+                _ -> HU.assertFailure "fixture did not deal three cards"
       ]
