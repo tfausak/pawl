@@ -553,7 +553,7 @@ applyEffect source controller bound legality chosen effect = case effect of
               -- guarantees the PRINTED quantity is 1 here (#53) -- but a
               -- replacement can now make it more (Doubling Season doubling a
               -- delayed ability's named token), in which case "it" names the
-              -- first and the rest are unnamed (#N).
+              -- first and the rest are unnamed (#77).
               (Just slot, newId : _) -> State.modify' (bindSlot source slot newId)
       _ -> pure ()
   Effect.ArmDelayedTrigger name -> do

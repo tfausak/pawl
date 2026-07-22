@@ -21,7 +21,7 @@ import Pawl.Type.Timestamp (Timestamp)
 -- Two Doubling Seasons are still two opportunities: different SOURCES. The cost
 -- of value identity is that a single source carrying two TEXTUALLY IDENTICAL
 -- replacement abilities gets one opportunity instead of two; no card in the pool
--- does that (#N).
+-- does that (#75).
 --
 -- A floating replacement is identified by (source, timestamp): GameState's
 -- timestamp counter is monotone, so two Fogs are two instances even from one

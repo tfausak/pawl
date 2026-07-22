@@ -128,18 +128,20 @@ applyReplacements = applyReplacementsIn Set.empty
 --      candidate to `src == oid` (its OWN source), so a sibling's replacement
 --      effect can never even become a candidate for another sibling's loop.
 --   3. Projection -- a sibling's STATIC ABILITIES would be visible to a later
---      token's projection (Projection.project reads the whole battlefield),
---      and nothing in this module excludes them the way `batch` excludes copy
---      targets. CR 614.12's "continuous effects that already exist" does not
---      sanction this: a simultaneously-entering sibling's static abilities do
---      not "already exist" relative to it. Unreached today only because every
---      token card in the pool has empty `staticAbilities` -- not fixed, just
---      not yet exercisable.
+--      token's projection (this module's own reads of Projection.controllerOf,
+--      Projection.copiableCharacteristics and Projection.isCreatureOf, the last
+--      via legalCopyTargets), and nothing in this module excludes them the way
+--      `batch` excludes copy targets. CR 614.12's "continuous effects that
+--      already exist" does not sanction this: a simultaneously-entering
+--      sibling's static abilities do not "already exist" relative to it. NOT
+--      IMPLEMENTED AT ALL -- unlike channel 1, below -- and unreached today only
+--      because every token card in the pool has empty `staticAbilities`, not
+--      fixed (#78).
 --
 -- Empty for every event class but a nested entry, and empty even for a lone entry
 -- (nothing else is entering). Channel 1's exclusion is IMPLEMENTED BUT UNTESTED:
 -- no card in the pool puts two copy-choosers onto the battlefield simultaneously
--- (#N).
+-- (#73).
 applyReplacementsIn :: Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn batch = loop batch Set.empty
 
@@ -296,7 +298,7 @@ bucketOf re = case re of
   -- AsCopy. The split this arm encodes only becomes observable for an object
   -- with an AsCopy AND another entry replacement applicable in the SAME
   -- iteration, which no card in the pool produces, so the bucket ordering
-  -- itself is unexercised by any test (#N).
+  -- itself is unexercised by any test (#75).
   ReplacementEffect.EntryR EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
   ReplacementEffect.EntryR (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
   ReplacementEffect.DamageR _ _ -> ReplacementBucket.Other
@@ -359,7 +361,7 @@ at xs i fallback = case drop (fromIntegral i) xs of
 -- CR 616.1's APNAP clause -- "If two or more players have to make these choices at
 -- the same time, choices are made in APNAP order (see rule 101.4)" -- has no
 -- producer: one proposed event has exactly one affected object and therefore one
--- chooser, and the damage batch runs each event's loop independently (#N).
+-- chooser, and the damage batch runs each event's loop independently (#71).
 chooserOf :: GameState -> ProposedEvent -> Maybe PlayerId
 chooserOf gs event = case event of
   ProposedEvent.WouldChangeZone zc -> Projection.controllerOf (ZoneChange.object zc) gs

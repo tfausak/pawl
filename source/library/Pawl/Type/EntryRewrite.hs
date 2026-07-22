@@ -15,6 +15,13 @@ import Pawl.Type.EntryOption (EntryOption)
 -- abilities), those abilities will take effect." That is what makes a Clone of a
 -- Primal Plasma run the COPIED "as it enters" choice rather than skip it -- the
 -- CR 616.2 ordering behaviour later tasks in this phase implement.
+--
+-- Neither constructor carries a cost: CR 614.12b ("If multiple replacement
+-- effects that require choices from a player would modify how multiple
+-- permanents enter the battlefield simultaneously, that player may not make
+-- choices for those effects that would cause the combined costs of those
+-- effects to not be payable") has no producer here, because no entry
+-- replacement in this pool has a cost attached to its choice (#72).
 data EntryRewrite
   = AsCopy
   | ChoiceOf [EntryOption]

@@ -319,7 +319,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 -- projects NO power or toughness until its entry choice applies, where CR 208.2b
 -- says to use 0. That is unobservable on the battlefield -- the entry loop always
 -- applies the choice before the Moved event exists -- but a Primal Plasma CARD in
--- a hand, library or graveyard reports Nothing where the rule says 0 (#N).
+-- a hand, library or graveyard reports Nothing where the rule says 0 (#76).
 baseColorsOf :: Card.Type.Card -> Set Color.Color
 baseColorsOf card =
   if Set.member Keyword.Devoid (Card.Type.keywords card)

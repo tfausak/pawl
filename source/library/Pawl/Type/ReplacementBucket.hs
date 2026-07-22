@@ -9,9 +9,9 @@ module Pawl.Type.ReplacementBucket where
 -- Other along with every other arm -- clone.json is the card that produces an
 -- AsCopy rewrite. The remaining three are classification with a documented
 -- absence, not machinery pretending to exist: SelfReplacement is CR 614.15
--- self-replacement effects (#N), ControlOnEntry is CR 616.1b's "enters under
--- your control instead" (#N), and BackFaceOnEntry is CR 616.1d, which needs
--- transform (CR 701.27) first (#N).
+-- self-replacement effects (#68), ControlOnEntry is CR 616.1b's "enters under
+-- your control instead" (#69), and BackFaceOnEntry is CR 616.1d, which needs
+-- transform (CR 701.27) first (#70).
 data ReplacementBucket
   = SelfReplacement -- CR 616.1a
   | ControlOnEntry -- CR 616.1b

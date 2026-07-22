@@ -127,7 +127,7 @@ data Prompt r where
   -- it is not for triggers -- Doubling Season has two replacement abilities -- but
   -- they are in different EVENT CLASSES and so are never candidates for the same
   -- event. A single source with two same-class applicable replacements needs a
-  -- discriminator alongside the source (#N).
+  -- discriminator alongside the source (#74).
   --
   -- Asked ONLY when the bucket holds two or more candidates that are not all equal
   -- as values: with one there is nothing to choose, and among equal values every

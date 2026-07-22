@@ -1244,3 +1244,119 @@ its own gate card and spec, landed as it completes. Umbrella:
   reference:
   `docs/superpowers/specs/2026-07-21-p4-event-history-triggers-design.md` and
   `docs/superpowers/plans/2026-07-21-p4-event-history-triggers.md`.
+- **M4.5 P5 is complete** (replacement event coverage + CR 616, GAP-R and the
+  git-bug `6afb561` M3f seam). P4 opened Cluster 2; P5 closes its second phase
+  — **exactly one replacement path exists in the engine, and it is monadic**,
+  replacing the pure single left-to-right fold M3f shipped as a placeholder.
+  **Three gate cards, each falsifying a different part of the pure-fold
+  assumption.** **Hardened Scales + Corpsejack Menace** (two "if a +1/+1
+  counter would be put on a permanent you control, put an additional counter
+  of that kind on it instead" effects) falsify determinism-by-list-order: CR
+  616.1 says the affected permanent's controller **chooses** which applies
+  first, and a pure fold has no chooser to ask — it has to invent an order,
+  silently making a choice the rules assign to a player. (The order does not
+  change the *count* here — 1 → 2 → 3 either way — but it is still a choice
+  CR 616.1 assigns to a player, and the engine must not make it unasked.)
+  **Doubling Season** is one card with two replacement abilities in two
+  different event classes (`TokenR` for "twice that many tokens," `CounterR`
+  for "twice that many counters"), which falsifies a design that gives one
+  source only one replacement opportunity, and its Voice-of-All-token
+  interaction is CR 616.1g's own worked example: creating a token **contains**
+  that token's own entry, so Doubling Season's count must be chosen before
+  either token's own entry replacement can be chosen. **Clone + Primal
+  Plasma** is the centerpiece: a Clone's `EntryR AsCopy` replaces its copiable
+  snapshot with Primal Plasma's, and Primal Plasma's own `EntryR (ChoiceOf …)`
+  — the CR 208.2b "choose the power and toughness" ability — did not exist as
+  an applicable candidate until that snapshot swap happened. CR 616.2 ("A
+  replacement or prevention effect can become applicable to an event as the
+  result of another replacement or prevention effect that modifies the event")
+  is exactly this, and **no single-pass implementation can produce it**: the
+  loop must re-collect candidates against the CURRENT state on every
+  iteration, not decide once from the original candidate list, and it did not
+  appear anywhere in the umbrella's own gate-card prediction — this spec added
+  it after the umbrella was written. **Deleted:** `Pawl.Type.Prevention`,
+  `ActivePrevention` (the old shield-only record), `GameState.preventions`,
+  `regenerationShields`, `Card.copyOnEnter`, `Engine.drainAsEntersChoices` and
+  the `Binding` pending marker it drained, `Event.applyReplacements` /
+  `applyPreventions` / `cancels` / `regenerate` / `markCopyOnEnter`,
+  `Target.legalCopyTargets`, `Effect.Prevent` / `RegenerateSelf`. **Added:**
+  `Pawl.Replacement` (the CR 616.1 loop, collection, bucketing, `choose`,
+  `chooserOf`, the entry loop, `legalCopyTargets`'s replacement); six
+  `ProposedEvent` arms (`WouldChangeZone` / `WouldEnter` / `WouldDealDamage` /
+  `WouldBeDestroyed` / `WouldPutCounters` / `WouldCreateTokens`); six
+  `ReplacementEffect` arms (`ZoneChangeR` / `EntryR` / `DamageR` /
+  `DestructionR` / `CounterR` / `TokenR`); `ActiveReplacement` (the floating
+  store's record, now carrying `source` and `timestamp`) and `Uses`;
+  `Effect.Replace`; `Event.putCounters` / `createTokens`;
+  `Prompt.ChooseReplacement` / `ChooseEntryOption`; the monadic funnels
+  threading `Game` through what used to be pure, and
+  `Sba.performStateBasedActions :: Game Bool`. **Three deliberate departures
+  from the phase's own spec**, all forced by review, not drift: (1) **CR
+  614.5's identity is `(source, effect VALUE)`, not `(source, index)`** — index
+  identity makes the Clone/Primal Plasma centerpiece unreachable, because
+  Clone's `AsCopy` and the newly-acquired `ChoiceOf` are both index 0 of their
+  respective one-element lists, so the already-applied set would swallow the
+  new ability and CR 616.2 would never fire; value identity's only cost is
+  that a single source with two textually identical replacement abilities gets
+  one CR 614.5 opportunity instead of two, which no card in the pool
+  exercises (#75). (2) **The data-file migrations landed with the opcode that
+  needed them, not all in one task** — `rest-in-peace.json` in the task that
+  reshaped `ReplacementEffect`, `fog.json`/`drudge-skeletons.json`/
+  `clone.json` each with the task introducing `Effect.Replace` /
+  `WouldBeDestroyed` / `EntryR AsCopy` — so every task's commit left the suite
+  green, never a multi-task migration in flight. (3) **Four internal types the
+  spec's own module inventory did not list** — `Pawl.Type.CandidateId`,
+  `Pawl.Type.ReplacementCandidate` and `Pawl.Type.ReplacementBucket` joined
+  `ProposedEvent` under the one-type-per-module rule rather than living as
+  anonymous tuples inside `Pawl.Replacement`. **Two things this note must be
+  honest about, because reviews forced their retraction mid-phase.** CR
+  616.1c's dedicated `CopyOnEntry` bucket split is correct but is **not** what
+  makes the centerpiece work — on the entering Clone's first iteration,
+  `AsCopy` is the *only* applicable candidate, so it is picked because it is
+  the sole candidate, not because of its bucket; what actually makes CR 616.2
+  work is CR 616.1f's re-collection each iteration together with departure
+  (1)'s value identity, and the bucket split itself is exercised by no test
+  (#75). **CR 616.1g's nesting is implemented but exercised by no test**:
+  every token card in the pool has empty `replacementEffects`, so
+  `Event.createTokens`'s nested per-token entry loop finds no candidates and
+  returns immediately — deleting the nesting call would leave all 694 tests
+  passing. This was verified empirically (by reading the diff the deletion
+  would produce and confirming no test's fixture cards populate
+  `replacementEffects`), not inferred from the pool's shape (#73). **Eight
+  wrong CR citations were caught during the phase**, worth recording as the
+  phase's most transferable lesson: one originated in the design spec itself;
+  one was copied from already-landed code on the assumption a landed citation
+  had been checked and had not; four were introduced by later fix passes,
+  each while correcting a *different* citation nearby; and one was
+  re-introduced by a task's brief after an earlier task had already fixed it
+  in code, so the brief's own text regressed a correction the implementation
+  already carried. Three separate implementers, across three separate tasks,
+  refused a brief-specified citation on the strength of `docs/rules.txt` and
+  were right every time — CLAUDE.md's "never trust recalled Magic rules"
+  applies as much to a task brief's citations as to memory. **Tracking:**
+  `48b17cb`/issue #1 (the M3f replacement seam — both GAP-R, the event-coverage
+  facet, **and** the CR 616 ordering/choice facet `6afb561` tracked) is
+  **closed**; #58 (CR 615.7's shared-shield allocation, CR 615.13's
+  prevented-triggers) is **updated, not closed** — `source` and `timestamp`
+  retire the "no way to report either" blocker, but CR 615.7 needs a
+  cross-event allocation the per-event loop shape cannot express, and CR
+  615.13 needs `Pawl.Damage.resolveDamage`'s return type widened to report
+  which candidate applied, two different remaining blockers now named instead
+  of one unstated one; eleven new issues filed for this phase's own
+  deferrals, #68–#78 (ten from the plan's own list plus one — #78 — found
+  while sweeping placeholders: a third, wholly unimplemented channel by which
+  a simultaneously-entering sibling's static abilities could leak into a
+  later token's entry-loop projection, CR 614.12 does not sanction it, and it
+  is unreached only because every token card in the pool has empty
+  `staticAbilities`). Note the family resemblance P4's spec already drew: P4
+  retired the *trigger* ordering elision (CR 603.3b); P5 retires the
+  *replacement* ordering elision (CR 616.1) — different rules, different
+  mechanisms, same shape of mistake, one phase apart. **Final suite 694/694**,
+  warning-clean on a from-scratch `cabal clean` build, `hooky run` clean.
+  `cabal bench`: goldfish 11.3ms, casting 12.3ms, fighting 12.3ms — but issue
+  #66 (pre-existing, not introduced here) means all three benchmarks execute
+  the **identical** pass-pass-draw-until-decked game, so the per-scenario
+  split is not meaningful; the only honest reading is the aggregate, ~12ms,
+  consistent with the pre-P5 baseline. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-21-p5-replacement-events-design.md` and
+  `docs/superpowers/plans/2026-07-21-p5-replacement-events.md`.

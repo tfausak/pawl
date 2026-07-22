@@ -288,7 +288,7 @@ sacrifice oid = do
 -- candidates and returns immediately -- the nesting could be deleted and every
 -- scenario in the test pool would still pass. CR 616.1g's own worked example
 -- (a token copy of Voice of All) needs a token WITH an entry replacement to
--- exercise, and no such card is in this pool (#N).
+-- exercise, and no such card is in this pool (#73).
 createTokens :: PlayerId -> Card -> Natural -> Game [ObjectId]
 createTokens controller card n = do
   resolved <- Replacement.resolveTokens controller card n
