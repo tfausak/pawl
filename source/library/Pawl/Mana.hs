@@ -71,6 +71,12 @@ subtypeMana subtype = case subtype of
   -- CR 205.3m: Rogue is a creature type, not a basic land type, so CR 305.6's
   -- intrinsic mana ability never applies to it.
   Subtype.Rogue -> Nothing
+  -- CR 205.3m: Hag is a creature type, not a basic land type, so CR 305.6's
+  -- intrinsic mana ability never applies to it.
+  Subtype.Hag -> Nothing
+  -- CR 205.3m: Warlock is a creature type, not a basic land type, so CR
+  -- 305.6's intrinsic mana ability never applies to it.
+  Subtype.Warlock -> Nothing
 
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
 -- PLUS every projected activated ability that is a mana ability (CR 605.1a),

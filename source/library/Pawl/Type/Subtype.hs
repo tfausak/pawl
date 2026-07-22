@@ -30,4 +30,6 @@ data Subtype
   | Fungus -- CR 205.3m (a creature type; Corpsejack Menace's)
   | Elemental -- CR 205.3m (a creature type; Primal Plasma's)
   | Rogue -- CR 205.3m (a creature type; Master Thief's)
+  | Hag -- CR 205.3m (a creature type; Hag of Inner Weakness's)
+  | Warlock -- CR 205.3m (a creature type; Hag of Inner Weakness's)
   deriving (Eq, Ord, Show)

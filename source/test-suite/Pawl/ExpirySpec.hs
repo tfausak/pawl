@@ -15,6 +15,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.Duration as Duration
@@ -25,6 +26,7 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
@@ -318,5 +320,55 @@ masterThiefTests cards =
                   HU.assertEqual "and the artifact does NOT" (Just S.bob) (Projection.controllerOf myr relatched)
         ]
 
+-- Hag of Inner Weakness {2}{B} Creature -- Hag Warlock 2/2: "At the beginning of
+-- your upkeep, target creature an opponent controls gets -2/-1 until your next
+-- turn." No Gatherer rulings exist, so these derive from CR 611.2a and CR 514.2.
+hagTests :: Cards.Cards -> Tasty.TestTree
+hagTests cards =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
+      handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
+      -- alice's Hag, and exactly one creature bob controls, so the CR 603.3d
+      -- target choice is forced.
+      boardWith printing =
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, gs1) = S.addCreature (Cards.hagOfInnerWeaknessPrinting cards) S.alice gs0
+            (victimId, gs2) = S.addCreature printing S.bob gs1
+         in (victimId, resolveAll (settle (beginUpkeep gs2)))
+      (mammoth, afterTrigger) = boardWith (Cards.warMammothPrinting cards)
+   in Tasty.testGroup
+        "HagOfInnerWeakness"
+        [ HU.testCase "CR 613.4c it works: the opponent's 3/3 becomes 1/2" $
+            do
+              HU.assertEqual "power" (Just 1) (Projection.powerOf mammoth afterTrigger)
+              HU.assertEqual "toughness" (Just 2) (Projection.toughnessOf mammoth afterTrigger),
+          -- THE FALSIFIER for both "treat it as until end of turn" and any
+          -- implementation that expires the effect by scanning the event log for
+          -- a matching StepBegan: the effect was CREATED on a turn whose untap
+          -- step has already happened, so a log scan kills it the turn it is born.
+          HU.testCase "CR 514.2 it survives cleanup and the whole of the opponent's turn" $
+            let ended = Expiry.dropAtCleanup afterTrigger
+                bobsTurn = handoff ended
+             in do
+                  HU.assertEqual "still 1/2 in its own turn's end step" (Just 1) (Projection.powerOf mammoth ended)
+                  HU.assertEqual "bob is active" S.bob (GameState.activePlayer bobsTurn)
+                  HU.assertEqual "still 1/2 throughout bob's turn" (Just 1) (Projection.powerOf mammoth bobsTurn)
+                  HU.assertEqual "still 1/2 throughout bob's turn" (Just 2) (Projection.toughnessOf mammoth bobsTurn),
+          HU.testCase "CR 611.2a it expires as the controller's next turn begins" $
+            let alicesTurn = handoff (handoff (Expiry.dropAtCleanup afterTrigger))
+             in do
+                  HU.assertEqual "alice is active again" S.alice (GameState.activePlayer alicesTurn)
+                  -- Asserted BEFORE the upkeep trigger fires a second time, so
+                  -- the two effects can never be confused.
+                  HU.assertEqual "back to 3/3" (Just 3) (Projection.powerOf mammoth alicesTurn)
+                  HU.assertEqual "back to 3/3" (Just 3) (Projection.toughnessOf mammoth alicesTurn)
+                  HU.assertEqual "nothing stored" [] (GameState.continuousEffects alicesTurn),
+          HU.testCase "CR 704.5f the modification really applies: a 2/1 becomes 0/0 and dies" $
+            let (_, afterPiker) = boardWith (Cards.pikerPrinting cards)
+             in HU.assertEqual "bob's Piker is gone" 0 (S.creaturesInPlay S.bob afterPiker)
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests cards, handoffTests, conditionalTests cards, masterThiefTests cards]
+tests cards = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests cards, handoffTests, conditionalTests cards, masterThiefTests cards, hagTests cards]

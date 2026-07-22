@@ -16,6 +16,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
@@ -28,6 +29,8 @@ import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
+import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity.Type
@@ -38,6 +41,7 @@ import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 import qualified System.Directory as Directory
@@ -482,6 +486,31 @@ m45p6CardTests cards =
                       HU.assertEqual
                         "one ArtifactTarget slot"
                         (Map.singleton slot TargetSpec.ArtifactTarget)
+                        (Mode.targetSpecs m)
+                    _ -> HU.assertFailure "expected exactly one mode"
+                _ -> HU.assertFailure "expected exactly one triggered ability",
+      HU.testCase "Hag of Inner Weakness is a {2}{B} 2/2 Hag Warlock with an upkeep -2/-1 trigger" $
+        let c = Printing.card (Cards.hagOfInnerWeaknessPrinting cards)
+            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+            slot = SlotName.MkSlotName (Text.pack "target")
+         in do
+              HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, black])) (Card.Type.manaCost c)
+              HU.assertEqual "subtypes" (Set.fromList [Subtype.Hag, Subtype.Warlock]) (TypeLine.subtypes (Card.Type.typeLine c))
+              case Card.Type.triggeredAbilities c of
+                [ab] -> do
+                  HU.assertEqual
+                    "beginning of your upkeep"
+                    (TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
+                    (TriggeredAbility.condition ab)
+                  case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
+                    [m] -> do
+                      HU.assertEqual
+                        "-2/-1 until your next turn"
+                        [Effect.ModifyTarget Duration.UntilYourNextTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-1))) slot]
+                        (Foldable.toList (Mode.effects m))
+                      HU.assertEqual
+                        "one OpponentCreatureTarget slot"
+                        (Map.singleton slot TargetSpec.OpponentCreatureTarget)
                         (Mode.targetSpecs m)
                     _ -> HU.assertFailure "expected exactly one mode"
                 _ -> HU.assertFailure "expected exactly one triggered ability"
