@@ -346,9 +346,12 @@ permute xs order =
 -- a player would get priority" the coarsest moment anything could observe it,
 -- so settling here is indistinguishable from checking continuously. The sweep
 -- runs FIRST, before the SBA check: a "for as long as you control this" effect
--- ending (Master Thief) returns a permanent to another player's control, and
--- CR 704.5j's legend rule is checked "controlled by the same player" -- the SBA
--- pass must see the post-sweep control, not the moment before it reverted. The
+-- ending (Master Thief) returns a permanent to another player's control, and a
+-- control-scoped state-based action must see the post-sweep control, not the
+-- moment before it reverted. CR 704.5j's legend rule ("controlled by the same
+-- player") is the rule that will read it; this engine does not check it yet
+-- (#64), so the ordering is not yet observable -- it is the right order for the
+-- one that lands first. The
 -- loop re-runs whenever ANYTHING fired, because an SBA can itself be what
 -- falsifies a condition (e.g. a permanent the condition names is destroyed). A
 -- game with no While stored pays one list scan.
