@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Data.Sequence (Seq)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
+import Pawl.Type.ActivePlayerEffect (ActivePlayerEffect)
 import Pawl.Type.ActiveReplacement (ActiveReplacement)
 import Pawl.Type.Combat (Combat)
 import Pawl.Type.ContinuousEffect (ContinuousEffect)
@@ -60,6 +61,11 @@ data GameState = MkGameState
     -- analog of continuousEffects; a permanent's STATIC replacement abilities are
     -- not here -- the projection re-derives those live. Pawl.Replacement reads it.
     replacements :: [ActiveReplacement],
+    -- CR 611.1 / 613.11: stored PLAYER and RULES-modifying continuous effects
+    -- from resolutions (Silence), each with an expiry the Pawl.Expiry sweeps
+    -- consult. The third carrier sharing that vocabulary. A permanent's printed
+    -- player abilities are NOT here -- Pawl.PlayerEffect re-derives those live.
+    playerEffects :: [ActivePlayerEffect],
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
     phase :: Phase,

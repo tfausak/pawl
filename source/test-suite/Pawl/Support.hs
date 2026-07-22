@@ -31,6 +31,7 @@ import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
+import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.BeginningStep as BeginningStep
@@ -53,7 +54,9 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
@@ -784,6 +787,30 @@ addRegenShield oid gs =
           }
    in addReplacement active gs1
 
+-- Seed a stored player effect directly into GameState (bypasses resolving the
+-- spell that would install it; use when a test needs one active without a
+-- resolution). Object id 998 is the stand-in source, the withEffectAt posture --
+-- nothing here reads the source's own characteristics.
+addPlayerEffect ::
+  Expiry.Expiry ->
+  PlayerScope.PlayerScope ->
+  PlayerEffect.PlayerEffect ->
+  PlayerId.PlayerId ->
+  GameState.GameState ->
+  GameState.GameState
+addPlayerEffect expiry scope effect controller gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      active =
+        ActivePlayerEffect.MkActivePlayerEffect
+          { ActivePlayerEffect.source = ObjectId.MkObjectId 998,
+            ActivePlayerEffect.controller = controller,
+            ActivePlayerEffect.timestamp = ts,
+            ActivePlayerEffect.expiry = expiry,
+            ActivePlayerEffect.scope = scope,
+            ActivePlayerEffect.effect = effect
+          }
+   in gs1 {GameState.playerEffects = active : GameState.playerEffects gs1}
+
 -- Set an object's tapped state to Tapped directly (bypasses a tap cost or
 -- combat), so a test can set up a tapped permanent for an Untap effect.
 tapObject :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
@@ -854,6 +881,7 @@ oneMountainState cards ph =
           GameState.delayedTriggers = Seq.empty,
           GameState.continuousEffects = [],
           GameState.replacements = [],
+          GameState.playerEffects = [],
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,
           GameState.phase = ph,

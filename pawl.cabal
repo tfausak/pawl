@@ -91,6 +91,7 @@ library
     Pawl.Type.AbilityName
     Pawl.Type.Action
     Pawl.Type.ActivatedAbility
+    Pawl.Type.ActivePlayerEffect
     Pawl.Type.ActiveReplacement
     Pawl.Type.AdditionalCost
     Pawl.Type.Affected

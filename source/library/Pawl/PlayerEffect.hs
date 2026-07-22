@@ -20,6 +20,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.GameState (GameState)
@@ -84,9 +85,18 @@ applying pid gs =
                 then map (\ability -> (controller, PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)) abilities
                 else []
       printed = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+      -- CR 611.2c: the stored carrier. Its controller is read off the record and
+      -- never re-derived -- see Pawl.Type.ActivePlayerEffect -- while its scope is
+      -- resolved live, exactly as the printed carrier's is.
+      storedOne active =
+        ( ActivePlayerEffect.controller active,
+          ActivePlayerEffect.scope active,
+          ActivePlayerEffect.effect active
+        )
+      stored = map storedOne (GameState.playerEffects gs)
       keep (controller, scope, _) = inScope pid controller scope
       effectOf (_, _, effect) = effect
-   in map effectOf (filter keep printed)
+   in map effectOf (filter keep (printed ++ stored))
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over P4's
 -- whole log, which is exactly "this turn" because Engine.handoffTurn clears it at

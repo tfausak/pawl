@@ -2,14 +2,15 @@
 -- ONLY module that may case on Pawl.Type.Expiry -- the standing Pawl.Resolve
 -- has over Effect, Pawl.Projection over Modification and Pawl.Event over
 -- TriggerCondition. It owns the transformation from the PRINTED Duration to the
--- STORED Expiry (`arm`) and every sweep that ends one, over BOTH carriers:
--- GameState.continuousEffects and GameState.replacements share one expiry
--- vocabulary, so they share one sweep.
+-- STORED Expiry (`arm`) and every sweep that ends one, over THREE carriers:
+-- GameState.continuousEffects, GameState.replacements and
+-- GameState.playerEffects share one expiry vocabulary, so they share one sweep.
 module Pawl.Expiry where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Pawl.Event as Event
+import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import Pawl.Type.Duration (Duration)
@@ -45,8 +46,8 @@ arm controller source duration gs = case duration of
 -- CR 514.2: during the cleanup step, "all 'until end of turn' and 'this turn'
 -- effects end". Delete-and-recompute (design.md 2.5): dropping the stored entry
 -- makes the next projection revert -- nothing is explicitly undone. One sweep
--- over both carriers: the two per-carrier sweeps this absorbed existed only
--- because the two lists lived in two modules, not because they differed.
+-- over three carriers: the per-carrier sweeps this absorbed existed only
+-- because the lists lived in different modules, not because they differed.
 dropAtCleanup :: GameState -> GameState
 dropAtCleanup gs =
   let survives expiry = case expiry of
@@ -56,9 +57,11 @@ dropAtCleanup gs =
         Expiry.AtTurnOf _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
+      keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
    in gs
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
-          GameState.replacements = filter keepReplacement (GameState.replacements gs)
+          GameState.replacements = filter keepReplacement (GameState.replacements gs),
+          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs)
         }
 
 -- CR 611.2b: drop every While whose condition has stopped holding. The effect is
@@ -89,13 +92,21 @@ sweepConditional = do
         Expiry.AtTurnOf _ -> True
       keepEffect eff = survives (ContinuousEffect.source eff) (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
+      keepPlayerEffect active = survives (ActivePlayerEffect.source active) (ActivePlayerEffect.expiry active)
       keptEffects = filter keepEffect (GameState.continuousEffects gs)
       keptReplacements = filter keepReplacement (GameState.replacements gs)
+      keptPlayerEffects = filter keepPlayerEffect (GameState.playerEffects gs)
       changed =
         length keptEffects /= length (GameState.continuousEffects gs)
           || length keptReplacements /= length (GameState.replacements gs)
+          || length keptPlayerEffects /= length (GameState.playerEffects gs)
   Monad.when changed $
-    State.put gs {GameState.continuousEffects = keptEffects, GameState.replacements = keptReplacements}
+    State.put
+      gs
+        { GameState.continuousEffects = keptEffects,
+          GameState.replacements = keptReplacements,
+          GameState.playerEffects = keptPlayerEffects
+        }
   pure changed
 
 -- CR 611.2a: "until your next turn" ends as that player's turn begins. Run at
@@ -119,7 +130,9 @@ dropAtHandoff gs =
         Expiry.While _ _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
+      keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
    in gs
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
-          GameState.replacements = filter keepReplacement (GameState.replacements gs)
+          GameState.replacements = filter keepReplacement (GameState.replacements gs),
+          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs)
         }
