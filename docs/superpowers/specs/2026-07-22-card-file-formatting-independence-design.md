@@ -126,14 +126,17 @@ mismatch is the honest choice.
 
 ### The regression guard
 
-`data/cards/clone.json` is committed in `jq -S .` form — sorted keys, indented,
-trailing newline — while the other 68 files stay minified. A permanently
-mixed-format corpus that passes is the proof that formatting is not part of the
-contract. It survives hooky unchanged: `jq` emits a trailing newline and no
-trailing whitespace, satisfying `end_of_file_fixer` and `trailing_whitespace`.
+The whole corpus is committed in `jq -S .` form — sorted keys, indented,
+trailing newline — while `Json.render` stays compact. The two are maximally far
+apart, so the check cannot quietly regress into a byte comparison: every file
+would fail at once, not just the one that happened to be reformatted.
 
-`clone.json` is chosen because it is small and already has a dedicated test in
-`CardsSpec`.
+It survives hooky unchanged: `jq` emits a trailing newline and no trailing
+whitespace, satisfying `end_of_file_fixer` and `trailing_whitespace`.
+
+The property also holds in the other direction without anyone maintaining it.
+Regenerating a card writes compact output into a pretty corpus, and that file
+passes too.
 
 ### Regenerating a card file
 

@@ -47,6 +47,8 @@ checkFile p = do
       -- The loader reads everything the file says and invents nothing:
       -- re-encoding the loaded printing reproduces the file's meaning. Compared
       -- up to key order and whitespace, because JSON objects are unordered and
-      -- formatting is not part of the contract -- which is why clone.json is
-      -- committed in `jq -S .` form and the other files are minified.
+      -- formatting is not part of the contract. The corpus is committed
+      -- pretty-printed (`jq -S .`) while Json.render emits compact output, so
+      -- this can never quietly regress into a byte comparison: every file would
+      -- fail at once.
       HU.assertEqual path (Json.sortKeys value) (Json.sortKeys (Codec.printingToJson p))
