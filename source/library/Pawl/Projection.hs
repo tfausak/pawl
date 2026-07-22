@@ -196,7 +196,7 @@ isBasic oid gs = case Game.cardOf oid gs of
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result -- the value the layer fold
 -- STARTS from. If the object carries a copy snapshot in its bindings (stamped as it
--- entered, CR 707.9a, by Engine.drainAsEntersChoices), that snapshot IS its copiable
+-- entered, CR 707.9a, by Replacement.apply's EntryR AsCopy arm), that snapshot IS its copiable
 -- value; otherwise it is the printed base. Only base-or-snapshot, so counters (7c),
 -- pumps (7c), control (2), and ability grants (6) -- all folded ABOVE this -- are
 -- never part of a copied object's own copiable value (the P2 falsifier, made

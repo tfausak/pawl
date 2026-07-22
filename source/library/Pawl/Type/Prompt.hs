@@ -69,8 +69,10 @@ data Prompt r where
   -- controller chooses which permanent to copy. The ObjectId is the entering
   -- object; the [ObjectId] is the legal copy targets (battlefield creatures other
   -- than itself; the engine pre-filters). Nothing is the "may" decline (CR 707.9a
-  -- lets Clone enter as itself, a 0/0). Answered at the settle boundary (P2 drain),
-  -- not at cast -- the choice is made as the object enters.
+  -- lets Clone enter as itself, a 0/0). Answered inside the zone change that puts
+  -- the object onto the battlefield (CR 614.12a), before the enters event is
+  -- recorded -- the choice really is made as the object enters. The legal set
+  -- excludes anything entering in the same batch (CR 614.13a).
   ChooseCopyTarget :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Prompt (Maybe ObjectId)
   -- CR 603.3b: "If a player controlled two or more triggered abilities ... that
   -- player puts them on the stack in any order they choose." The [ObjectId] is

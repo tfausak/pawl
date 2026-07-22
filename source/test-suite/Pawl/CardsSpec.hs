@@ -8,9 +8,11 @@ import qualified Pawl.Cards as Cards
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
 import qualified Pawl.Type.Card as CardT
+import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -26,10 +28,10 @@ tests cards =
          in HU.assertEqual "unique" (List.sort slugs) (List.sort (List.nub slugs)),
       HU.testCase "each committed file re-parses to its compiled card (P3)" $
         mapM_ checkFile (Cards.allPrintings cards),
-      HU.testCase "clone.json loads as a copyOnEnter 0/0 Shapeshifter" $
+      HU.testCase "clone.json loads as a 0/0 Shapeshifter with an EntryR AsCopy" $
         let c = Printing.card (Cards.clonePrinting cards)
          in do
-              HU.assertBool "copyOnEnter" (CardT.copyOnEnter c)
+              HU.assertEqual "entry replacement" [ReplacementEffect.EntryR EntryRewrite.AsCopy] (CardT.replacementEffects c)
               HU.assertEqual "name" (Text.pack "Clone") (CardT.name c)
               HU.assertEqual "power" (Just (Power.MkPower (Quantity.Literal 0))) (CardT.power c)
     ]

@@ -1205,7 +1205,8 @@ jsonToDelayedAbilities value =
    in Map.fromList <$> listFrom decodeEntry value
 
 -- An omitted delayedAbilities field decodes to empty, so every card file that
--- predates P4 stays byte-identical (the copyOnEnter precedent).
+-- predates P4 stays byte-identical (the same precedent characteristicPT and
+-- colorIndicator follow).
 mapFromDefault :: (Value -> Either Text (Map.Map k v)) -> Value -> Either Text (Map.Map k v)
 mapFromDefault f value = case value of
   Null -> Right Map.empty
@@ -1356,7 +1357,6 @@ cardToJson c =
         (Text.pack "triggeredAbilities", listTo triggeredAbilityToJson (CardT.triggeredAbilities c)),
         (Text.pack "castingPermissions", listTo castingPermissionToJson (CardT.castingPermissions c))
       ]
-        ++ (if CardT.copyOnEnter c then [(Text.pack "copyOnEnter", Json.jBool True)] else [])
         ++ ( if Set.null (CardT.colorIndicator c)
                then []
                else [(Text.pack "colorIndicator", setTo colorToJson (CardT.colorIndicator c))]
@@ -1381,8 +1381,8 @@ jsonToBoolDefault d value = case value of
   _ -> Left (Text.pack "expected a boolean")
 
 -- An omitted set field decodes to empty. Lets an all-default field stay OUT of
--- the committed JSON, so existing files remain byte-identical (the copyOnEnter
--- precedent, P2).
+-- the committed JSON, so existing files remain byte-identical (the same
+-- precedent delayedAbilities and characteristicPT follow, P2/P4).
 setFromDefault :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Set a)
 setFromDefault f value = case value of
   Null -> Right Set.empty
@@ -1403,7 +1403,6 @@ jsonToCard value = do
   replacements <- Json.field (Text.pack "replacementEffects") ps >>= listFrom jsonToReplacementEffect
   triggered <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
   permissions <- Json.field (Text.pack "castingPermissions") ps >>= listFrom jsonToCastingPermission
-  copyOnEnter <- jsonToBoolDefault False (getOpt (Text.pack "copyOnEnter") ps)
   colorIndicator <- setFromDefault jsonToColor (getOpt (Text.pack "colorIndicator") ps)
   characteristicPT <- maybeFrom jsonToQuantity (getOpt (Text.pack "characteristicPT") ps)
   delayed <- mapFromDefault jsonToDelayedAbilities (getOpt (Text.pack "delayedAbilities") ps)
@@ -1421,7 +1420,6 @@ jsonToCard value = do
         CardT.replacementEffects = replacements,
         CardT.triggeredAbilities = triggered,
         CardT.castingPermissions = permissions,
-        CardT.copyOnEnter = copyOnEnter,
         CardT.colorIndicator = colorIndicator,
         CardT.characteristicPT = characteristicPT,
         CardT.delayedAbilities = delayed

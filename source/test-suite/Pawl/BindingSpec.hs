@@ -56,11 +56,5 @@ tests =
       HU.testCase "setCopy then copyOf round-trips the snapshot" $
         HU.assertEqual "copy snapshot" (Just sampleSnapshot) (Binding.copyOf (Binding.setCopy sampleSnapshot Map.empty)),
       HU.testCase "no copy binding means copyOf is Nothing" $
-        HU.assertEqual "absent" Nothing (Binding.copyOf Map.empty),
-      HU.testCase "markPending sets pendingCopy" $
-        HU.assertBool "marked" (Binding.pendingCopy (Binding.markPending Map.empty)),
-      HU.testCase "clearPending removes the marker" $
-        HU.assertBool "cleared" (not (Binding.pendingCopy (Binding.clearPending (Binding.markPending Map.empty)))),
-      HU.testCase "empty bindings are not pending" $
-        HU.assertBool "empty" (not (Binding.pendingCopy Map.empty))
+        HU.assertEqual "absent" Nothing (Binding.copyOf Map.empty)
     ]

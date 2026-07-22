@@ -18,6 +18,7 @@
 -- imports Pawl.Sba, which imports Pawl.Event.
 module Pawl.Replacement where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
@@ -26,6 +27,7 @@ import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
@@ -40,6 +42,7 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamagePattern as DamagePattern
 import qualified Pawl.Type.DamageRewrite as DamageRewrite
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -86,10 +89,23 @@ asZoneChange event = case event of
 -- event has already performed its own consequences by the time it returns
 -- Nothing.
 applyReplacements :: ProposedEvent -> Game (Maybe ProposedEvent)
-applyReplacements = loop Set.empty
+applyReplacements = applyReplacementsIn Set.empty
 
-loop :: Set CandidateId -> ProposedEvent -> Game (Maybe ProposedEvent)
-loop applied event = do
+-- CR 614.13a: `batch` is the set of ids entering the battlefield AT THE SAME TIME
+-- as the object this loop is about -- "You can't choose the object that will
+-- become that permanent or any other object entering the battlefield at the same
+-- time as that object." Clone's own ruling restates it: "If Clone somehow enters
+-- at the same time as another creature, Clone can't become a copy of that
+-- creature."
+--
+-- Empty for every event class but a nested entry, and empty even for a lone entry
+-- (nothing else is entering). IMPLEMENTED BUT UNTESTED: no real card in reach
+-- puts two copy-choosers onto the battlefield simultaneously (#N).
+applyReplacementsIn :: Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
+applyReplacementsIn batch = loop batch Set.empty
+
+loop :: Set ObjectId -> Set CandidateId -> ProposedEvent -> Game (Maybe ProposedEvent)
+loop batch applied event = do
   gs <- State.get
   -- Step 1, from scratch each iteration: collect against the CURRENT state, minus
   -- CR 614.5's already-applied set. Re-collecting is what makes CR 616.2 work --
@@ -108,10 +124,10 @@ loop applied event = do
         -- non-empty and `choose` always picks. Total rather than partial.
         Nothing -> pure (Just event)
         Just candidate -> do
-          outcome <- apply candidate event
+          outcome <- apply batch candidate event
           case outcome of
             Nothing -> pure Nothing
-            Just rewritten -> loop (Set.insert (ReplacementCandidate.identity candidate) applied) rewritten
+            Just rewritten -> loop batch (Set.insert (ReplacementCandidate.identity candidate) applied) rewritten
 
 -- Every replacement effect instance in the game, in the engine's canonical order.
 -- Two segments, concatenated in this order:
@@ -171,15 +187,19 @@ applies gs event candidate =
             && matchesController gs src (CounterPattern.whose pat) oid
             && matchesPermanent gs (CounterPattern.onWhat pat) oid
         -- Every row below falls through to False, but for two different reasons.
-        -- ZoneChangeR, DamageR, DestructionR and CounterR are unreachable HERE
-        -- because an arm ABOVE already matches every event of that class -- a row
-        -- below only fires for a MISMATCHED class (e.g. a DestructionR candidate
-        -- offered a WouldChangeZone event), where False is simply the correct
-        -- answer, not a stand-in for "not yet implemented". EntryR and TokenR are
-        -- unreachable for the OTHER reason: nothing in the engine raises the
-        -- ProposedEvent each would need to match (WouldEnter, WouldCreateTokens
-        -- have no producer), so every pair naming one is unreachable in practice
-        -- and False is correct until one does.
+        -- ZoneChangeR, DamageR, DestructionR, CounterR and (since Task 7) EntryR
+        -- are unreachable HERE because an arm ABOVE already matches every event of
+        -- that class -- a row below only fires for a MISMATCHED class (e.g. a
+        -- DestructionR candidate offered a WouldChangeZone event), where False is
+        -- simply the correct answer, not a stand-in for "not yet implemented".
+        -- TokenR is unreachable for the OTHER reason: nothing in the engine raises
+        -- the ProposedEvent it would need to match (WouldCreateTokens has no
+        -- producer), so every pair naming it is unreachable in practice and False
+        -- is correct until one does.
+        -- CR 614.1c: "as [this permanent] enters" is the entering object's OWN
+        -- ability, so an entry replacement is self-only. CR 614.1d's
+        -- other-objects form (Essence of the Wild) has no producer.
+        (ReplacementEffect.EntryR _, ProposedEvent.WouldEnter oid) -> src == oid
         (ReplacementEffect.ZoneChangeR _ _, _) -> False
         (ReplacementEffect.EntryR _, _) -> False
         (ReplacementEffect.DamageR _ _, _) -> False
@@ -221,12 +241,13 @@ highestBucket candidates =
 -- CR 616.1a-e: which bucket an effect falls in.
 bucketOf :: ReplacementEffect -> ReplacementBucket
 bucketOf re = case re of
-  -- CR 616.1e. Every arm lands in Other today -- no arm has a CopyOnEntry (or
-  -- any other non-Other) producer yet. EntryR is here too: splitting its AsCopy
-  -- case into CopyOnEntry is a later task's job (see ReplacementBucket's
-  -- comment), not this one's.
   ReplacementEffect.ZoneChangeR _ _ -> ReplacementBucket.Other
-  ReplacementEffect.EntryR _ -> ReplacementBucket.Other
+  -- CR 616.1c: "an effect that would cause an object to become a copy of another
+  -- object as it enters" is its own, HIGHER bucket. That is what makes the
+  -- centerpiece work: a Clone's copy applies before the Primal Plasma choice it
+  -- thereby acquires (616.1e), not after.
+  ReplacementEffect.EntryR EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
+  ReplacementEffect.EntryR (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
   ReplacementEffect.DamageR _ _ -> ReplacementBucket.Other
   ReplacementEffect.DestructionR _ -> ReplacementBucket.Other
   ReplacementEffect.CounterR _ _ -> ReplacementBucket.Other
@@ -313,24 +334,60 @@ chooserOf gs event = case event of
 -- stays total per constructor, not merely total by wildcard.
 --
 -- The same discipline applies one level down, to each arm's inner SUM type --
--- DamageR's DamageRewrite below, DestructionR's DestructionRewrite, and (as
--- later work fills those arms in) EntryR's EntryRewrite and CounterR's/TokenR's
--- Scaling -- never to the pattern RECORDS (CounterPattern, TokenPattern,
--- DamagePattern), which are read for their fields rather than cased and so have
--- no constructors to be exhaustive over. An arm must case on the inner sum, not
--- bind it with `_`: binding it with `_` is exhaustive UNCONDITIONALLY -- that is
--- exactly why it raises no build failure and no warning when a new constructor
--- is added, silently treating a real rewrite as a no-op from that day on.
-apply :: ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
-apply candidate event =
+-- DamageR's DamageRewrite below, DestructionR's DestructionRewrite, EntryR's
+-- EntryRewrite (Task 7), and (as later work fills that arm in) TokenR's Scaling
+-- -- never to the pattern RECORDS (CounterPattern, TokenPattern, DamagePattern),
+-- which are read for their fields rather than cased and so have no constructors
+-- to be exhaustive over. An arm must case on the inner sum, not bind it with
+-- `_`: binding it with `_` is exhaustive UNCONDITIONALLY -- that is exactly why
+-- it raises no build failure and no warning when a new constructor is added,
+-- silently treating a real rewrite as a no-op from that day on.
+apply :: Set ObjectId -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
+apply batch candidate event =
   case (ReplacementCandidate.effect candidate, event) of
     (ReplacementEffect.ZoneChangeR _ toDest, ProposedEvent.WouldChangeZone zc) -> do
       consume (ReplacementCandidate.identity candidate)
       pure (Just (ProposedEvent.WouldChangeZone zc {ZoneChange.to = toDest}))
     -- Unreachable: `applies` admits ZoneChangeR only against WouldChangeZone.
     (ReplacementEffect.ZoneChangeR _ _, _) -> pure (Just event)
-    -- CR 614.1c: Clone (AsCopy) / Primal Plasma (ChoiceOf) rewrite the copiable
-    -- snapshot of an entering permanent. Waiting on the WouldEnter funnel.
+    -- CR 707.5 / 614.1c / 614.12a: the entering object's controller chooses a
+    -- permanent to copy, and its copiable characteristics are stamped as this
+    -- object's copy snapshot. Writing to the COPIABLE layer (CR 613.1a's layer-1
+    -- base) is what makes CR 707.2 fall out for free: a later Clone of this object
+    -- copies the stamped values with no further machinery.
+    --
+    -- Clone's "may" is real: Nothing leaves the object as its printed self (a
+    -- 0/0 Shapeshifter, which CR 704.5f then buries).
+    --
+    -- The class match is on the OUTER tuple (EntryR rewrite, WouldEnter oid), same
+    -- shape as DamageR/DestructionR below, so the INNER `case rewrite of` is what
+    -- carries the exhaustiveness obligation -- not a wildcard-bound `_` on the
+    -- outer pattern, which would let a third EntryRewrite constructor fall through
+    -- silently whenever it happened to pair with WouldEnter.
+    (ReplacementEffect.EntryR rewrite, ProposedEvent.WouldEnter oid) -> case rewrite of
+      EntryRewrite.AsCopy -> do
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable: the object is materialized on the battlefield before this
+          -- loop runs, so controllerOf falls back to its owner. Defensive: make no
+          -- unprompted copy choice.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            let decider = Decide.deciderFor controller gs
+            chosen <- Trans.lift (Program.prompt (Prompt.ChooseCopyTarget decider controller oid (legalCopyTargets batch oid gs)))
+            case chosen of
+              Nothing -> pure (Just event)
+              Just src2 -> do
+                State.modify' $ \g ->
+                  let stamp o = o {Object.bindings = Binding.setCopy (Projection.copiableCharacteristics src2 g) (Object.bindings o)}
+                   in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
+                pure (Just event)
+      -- CR 614.1c / 208.2b: Primal Plasma's own choice (which creature type to
+      -- become). No producer yet -- the card pool has no ChoiceOf source -- but the
+      -- inner sum is cased exhaustively (per the module comment) so a future
+      -- producer cannot silently no-op here.
+      EntryRewrite.ChoiceOf _ -> pure (Just event)
+    -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR _, _) -> pure (Just event)
     (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage _) -> case rewrite of
       -- CR 615.6: a prevented event never happens -- it is not marked, not
@@ -367,6 +424,31 @@ apply candidate event =
     -- CR 614.16: Doubling Season scales token creation. Waiting on the
     -- WouldCreateTokens funnel.
     (ReplacementEffect.TokenR _ _, _) -> pure (Just event)
+
+-- CR 707.5 / 614.13a: the permanents an entering copy may choose. Battlefield
+-- creatures other than itself, minus anything entering in the same batch.
+legalCopyTargets :: Set ObjectId -> ObjectId -> GameState -> [ObjectId]
+legalCopyTargets batch self gs =
+  let eligible oid = oid /= self && not (Set.member oid batch) && Projection.isCreatureOf oid gs
+   in filter eligible (Set.toAscList (GameState.battlefield gs))
+
+-- CR 614.1c / 614.12: run the entry loop for an object that has just been
+-- materialized on the battlefield.
+--
+-- The object is in GameState.objects and its zone index BEFORE this runs, because
+-- CR 614.12 demands it: "check the characteristics of the permanent AS IT WOULD
+-- EXIST ON THE BATTLEFIELD, taking into account replacement effects that have
+-- already modified how it enters ... and continuous effects that already exist and
+-- would apply to the permanent." That is a projection of the object in the state
+-- where it has entered, so the cheapest correct implementation is to put it there
+-- and project it normally.
+--
+-- Nothing observes the interim object: this finishes before the Moved event is
+-- recorded, so no trigger scan and no state-based action can see it. That is
+-- strictly stronger than P2's drain, whose observable-equivalence argument this
+-- discharges.
+runEntry :: Set ObjectId -> ObjectId -> Game ()
+runEntry batch oid = Monad.void (applyReplacementsIn batch (ProposedEvent.WouldEnter oid))
 
 -- CR 614.3: a floating replacement whose `uses` is Once is spent by being
 -- applied. A permanent's STATIC replacement ability has no use count at all --

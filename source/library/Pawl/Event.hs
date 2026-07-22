@@ -15,13 +15,11 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Binding as Binding
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import Pawl.Type.Card (Card)
-import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CounterKind as CounterKind
 import Pawl.Type.DamageEvent (DamageEvent)
 import Pawl.Type.DelayedTrigger (DelayedTrigger)
@@ -38,7 +36,6 @@ import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PendingTrigger (PendingTrigger)
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
@@ -107,30 +104,10 @@ placeObject pid mkObj dest = do
   gs <- State.get
   let (newId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj = markCopyOnEnter dest (mkObj ts)
+      obj = mkObj ts
       gs3 = gs2 {GameState.objects = Map.insert newId obj (GameState.objects gs2)}
   State.put (Game.insertIntoZone dest pid newId gs3)
   pure newId
-
--- CR 614.1c / 603.6d / 113.6h: an object with a "enters as a copy" ability is
--- marked as-enters-pending as it enters the battlefield, on ANY entry path. The
--- choice itself is a prompt, so it is drained at the CR 117.5 boundary
--- (Engine.drainAsEntersChoices), not here -- placeObject stays pure. Non-copyOnEnter
--- entries and non-battlefield destinations are untouched.
-markCopyOnEnter :: Zone -> Object.Object -> Object.Object
-markCopyOnEnter dest obj =
-  if dest == Zone.Battlefield && maybe False Card.copyOnEnter (cardOfObject obj)
-    then obj {Object.bindings = Binding.markPending (Object.bindings obj)}
-    else obj
-
--- The card an object is built from, read from its source (P2; a card-less object --
--- an ability or trigger -- has none, and is never copyOnEnter).
-cardOfObject :: Object.Object -> Maybe Card.Card
-cardOfObject obj = case Object.source obj of
-  Source.OfCard printing -> Just (Printing.card printing)
-  Source.OfToken card -> Just card
-  Source.OfAbility _ _ -> Nothing
-  Source.OfTrigger _ _ -> Nothing
 
 -- The single zone-change primitive (CR 400.7): the source object ceases; a NEW
 -- object with a fresh id is created in the destination, carrying owner and
@@ -180,8 +157,15 @@ changeZone oid requestedDest = do
             let g1 = Game.removeFromZones pid oid g
              in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
           newId <- placeObject pid mkObj dest
+          -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
+          -- nowhere else. CR 616.1g: this loop is NESTED inside the zone change,
+          -- which is how "an effect may apply to an event contained within another
+          -- event" is expressed -- as call nesting, not as a field. A lone entry
+          -- has no same-batch siblings (CR 614.13a).
+          Monad.when (dest == Zone.Battlefield) (Replacement.runEntry Set.empty newId)
           -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
-          -- what an enters trigger scans.
+          -- what an enters trigger scans. Recorded LAST, so the entry loop's
+          -- choices are locked in before any trigger or SBA can observe the object.
           State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId fromZone dest) snapshot))
 
 -- The single destruction funnel (CR 701.8 / 702.12b): every destruction -- the

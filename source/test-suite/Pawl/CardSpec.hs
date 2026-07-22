@@ -150,7 +150,6 @@ cardTests cards =
                   Card.Type.triggeredAbilities = [],
                   Card.Type.delayedAbilities = Map.empty,
                   Card.Type.castingPermissions = [],
-                  Card.Type.copyOnEnter = False,
                   Card.Type.characteristicPT = Nothing
                 }
          in do

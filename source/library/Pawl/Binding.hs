@@ -107,12 +107,6 @@ setTriggerSource oid = Map.insert triggerSource (toObject oid)
 setYou :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
 setYou pid = Map.insert you (Binding.empty {Binding.target = Just (Recipient.ToPlayer pid)})
 
--- CR 614.1c / 603.6d: the reserved slot marking that an object that entered as a
--- copy has not yet made its as-enters choice (P2). Set by Event.placeObject,
--- drained at the CR 117.5 boundary by Engine.drainAsEntersChoices.
-asEntersPending :: SlotName
-asEntersPending = SlotName.MkSlotName (Text.pack "asEntersPending")
-
 -- The modes chosen for a spell, read from its binding environment. Empty when
 -- absent (defensive; cast always stamps it, forced or prompted).
 modesOf :: Map SlotName Binding -> Set ModeIndex
@@ -140,19 +134,6 @@ copyOf m = Binding.copy =<< Map.lookup copySource m
 -- stored there), so overwriting it wholesale is lossless.
 setCopy :: ProjectedCharacteristics -> Map SlotName Binding -> Map SlotName Binding
 setCopy pc = Map.insert copySource (Binding.empty {Binding.copy = Just pc})
-
--- Is an as-enters copy choice still pending for this object?
-pendingCopy :: Map SlotName Binding -> Bool
-pendingCopy = Map.member asEntersPending
-
--- Mark an as-enters copy choice pending (Event.placeObject). asEntersPending is a
--- dedicated single-purpose slot, so this insert never clobbers another binding.
-markPending :: Map SlotName Binding -> Map SlotName Binding
-markPending = Map.insert asEntersPending Binding.empty
-
--- Clear the as-enters-pending marker (once the choice is made or declined).
-clearPending :: Map SlotName Binding -> Map SlotName Binding
-clearPending = Map.delete asEntersPending
 
 -- Build the binding environment stamped on a stack object at cast: the chosen
 -- targets, the chosen land-type pairs, (Just x) the chosen X under variableX,

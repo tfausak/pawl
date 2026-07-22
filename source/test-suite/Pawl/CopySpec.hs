@@ -1,9 +1,10 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers: Pawl.Event (the placeObject as-enters mark) and Pawl.Engine (the drain),
--- the P2 copy gate (Clone). Gameplay-level: Clone enters via the zone-change funnel
--- and its projected characteristics are asserted.
+-- Covers: Pawl.Replacement's EntryR AsCopy arm (the CR 614.12a copy choice, run
+-- from inside Pawl.Event's changeZone), the P2 copy gate (Clone). Gameplay-level:
+-- Clone enters via the zone-change funnel and its projected characteristics are
+-- asserted.
 module Pawl.CopySpec where
 
 import qualified Data.List as List
@@ -11,7 +12,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -23,7 +23,6 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Test.Tasty as Tasty
@@ -53,8 +52,10 @@ copyNewest p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   _ -> S.identityAnswer p
 
--- Resolve the stack top (a permanent enters) AND run the settle boundary (so the
--- as-enters drain fires), under the given answerer.
+-- Resolve the stack top (a permanent enters -- the copy choice is now made INSIDE
+-- that resolution, CR 614.12a) AND run the settle boundary (so a 0/0 Clone with
+-- nothing to copy dies to the CR 704.5f state-based action), under the given
+-- answerer.
 resolveAndSettle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 resolveAndSettle answer gs =
   snd (Engine.runGamePure answer gs (Stack.resolveTop >> Engine.settleForPriority))
@@ -63,20 +64,7 @@ tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
     "Copy"
-    [ HU.testCase "a copyOnEnter permanent is marked as-enters-pending when it enters" $
-        let gs0 = Setup.emptyGame S.bothPlayers
-            (_, board) = S.addPiker cards S.alice gs0
-            (_cloneStackId, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
-            -- Resolve the top of the stack purely (a permanent -> changeZone to the
-            -- battlefield), WITHOUT the settle drain, so the mark is observable.
-            resolved = snd (Engine.runGamePure S.identityAnswer staged Stack.resolveTop)
-         in case cloneOnBattlefield resolved of
-              Nothing -> HU.assertFailure "Clone did not reach the battlefield"
-              Just cloneId ->
-                HU.assertBool
-                  "Clone is marked as-enters-pending"
-                  (maybe False (Binding.pendingCopy . Object.bindings) (Game.lookupObject cloneId resolved)),
-      HU.testCase "Clone copies a creature and projects its P/T (CR 707.2)" $
+    [ HU.testCase "Clone copies a creature and projects its P/T (CR 707.2)" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (pikerId, board) = S.addPiker cards S.alice gs0
             (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board

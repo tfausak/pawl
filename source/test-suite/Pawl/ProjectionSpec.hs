@@ -13,10 +13,10 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Target as Target
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
@@ -454,5 +454,5 @@ tests cards =
         let gs0 = Setup.emptyGame S.bothPlayers
             (pikerId, gs1) = S.addPiker cards S.alice gs0
             (cloneId, gs2) = S.addPiker cards S.alice gs1
-         in HU.assertEqual "excludes self, includes the other creature" [pikerId] (Target.legalCopyTargets cloneId gs2)
+         in HU.assertEqual "excludes self, includes the other creature" [pikerId] (Replacement.legalCopyTargets Set.empty cloneId gs2)
     ]
