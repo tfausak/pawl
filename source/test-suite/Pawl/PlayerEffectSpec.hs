@@ -522,5 +522,81 @@ storedTests cards =
                   HU.assertBool "no longer prohibited" (not (PlayerEffect.prohibitsCasting S.bob swept))
         ]
 
+-- Silence {W} Instant: "Your opponents can't cast spells this turn."
+--
+-- The board is BOB's turn on purpose: the "only casting is stopped" ruling names
+-- playing a land and activating an ability, and both are only available to the
+-- active player or need his own permanents. alice casts Silence at instant speed
+-- during his main phase, which is the card's real use.
+silenceTests :: Cards.Cards -> Tasty.TestTree
+silenceTests cards =
+  let resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
+      board =
+        let gs0 = Setup.emptyGame S.bothPlayers
+            -- alice: two Plains, two Silences in hand.
+            (_, gs1) = S.addCreature (Cards.plainsPrinting cards) S.alice gs0
+            (_, gs2) = S.addCreature (Cards.plainsPrinting cards) S.alice gs1
+            (silence, gs3) = S.addHandCard (Cards.silencePrinting cards) S.alice gs2
+            (silence2, gs4) = S.addHandCard (Cards.silencePrinting cards) S.alice gs3
+            -- bob: two Mountains, a Prodigal Sorcerer (a NON-mana activated
+            -- ability), a Goblin Piker in hand to cast and a Mountain in hand to
+            -- play.
+            (_, gs5) = S.addCreature (Cards.mountainPrinting cards) S.bob gs4
+            (_, gs6) = S.addCreature (Cards.mountainPrinting cards) S.bob gs5
+            (_, gs7) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.bob gs6
+            (piker, gs8) = S.addHandCard (Cards.pikerPrinting cards) S.bob gs7
+            (land, gs9) = S.addHandCard (Cards.mountainPrinting cards) S.bob gs8
+         in ( silence,
+              silence2,
+              piker,
+              land,
+              gs9
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.bob,
+                  GameState.priority = Just S.bob
+                }
+            )
+      (silenceId, silence2Id, pikerId, landId, before) = board
+      after = resolveAll (S.runPure S.identityAnswer before (Cast.castSpell S.alice silenceId))
+      isActivate action = case action of
+        Action.Type.Activate _ _ -> True
+        Action.Type.Cast _ -> False
+        Action.Type.Play _ -> False
+        Action.Type.Pass -> False
+   in Tasty.testGroup
+        "Silence"
+        [ HU.testCase "before Silence resolves, bob may cast his creature" $
+            HU.assertBool "offered" (elem (Action.Type.Cast pikerId) (Action.legalActions S.bob before)),
+          -- CR 611.2c, THE FALSIFIER: nothing bob owns is a spell when Silence
+          -- resolves -- the stack holds only Silence itself. Freeze the affected
+          -- set and this card does literally nothing.
+          HU.testCase "CR 611.2c the effect reaches a spell that did not exist when it began" $
+            do
+              HU.assertEqual "one stored effect" 1 (length (GameState.playerEffects after))
+              HU.assertBool "bob is prohibited" (PlayerEffect.prohibitsCasting S.bob after)
+              HU.assertEqual
+                "and no cast is offered"
+                []
+                (filter isCast (Action.legalActions S.bob after)),
+          -- CR 109.5: "your opponents" is scoped off Silence's controller, which
+          -- is baked into the stored effect because its source is in a graveyard.
+          HU.testCase "CR 109.5 the Opponents scope spares the caster" $
+            do
+              HU.assertBool "alice is not prohibited" (not (PlayerEffect.prohibitsCasting S.alice after))
+              HU.assertBool "and may cast her second Silence" (Cast.castable S.alice silence2Id after),
+          -- Ruling: "The only thing Silence stops is casting spells. Your
+          -- opponents can still activate abilities ... they can still play lands,
+          -- and so on."
+          HU.testCase "CR 601.3 only casting is stopped" $
+            do
+              HU.assertBool "bob may still play a land" (elem (Action.Type.Play landId) (Action.legalActions S.bob after))
+              HU.assertBool "and still activate an ability" (any isActivate (Action.legalActions S.bob after)),
+          HU.testCase "CR 514.2 the prohibition ends at cleanup" $
+            let ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+             in do
+                  HU.assertEqual "nothing stored" [] (GameState.playerEffects ended)
+                  HU.assertBool "bob may cast again" (not (PlayerEffect.prohibitsCasting S.bob ended))
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards, medallionTests cards, reliquaryTowerTests cards, storedTests cards]
+tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards, medallionTests cards, reliquaryTowerTests cards, storedTests cards, silenceTests cards]

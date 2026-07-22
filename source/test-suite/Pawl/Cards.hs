@@ -86,7 +86,8 @@ data Cards = MkCards
     ruleOfLawPrinting :: Printing.Printing,
     thaliaPrinting :: Printing.Printing,
     sapphireMedallionPrinting :: Printing.Printing,
-    reliquaryTowerPrinting :: Printing.Printing
+    reliquaryTowerPrinting :: Printing.Printing,
+    silencePrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -172,6 +173,7 @@ loadCards = do
   thaliaPrinting_ <- loadPrinting "thalia-guardian-of-thraben"
   sapphireMedallionPrinting_ <- loadPrinting "sapphire-medallion"
   reliquaryTowerPrinting_ <- loadPrinting "reliquary-tower"
+  silencePrinting_ <- loadPrinting "silence"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -246,7 +248,8 @@ loadCards = do
         ruleOfLawPrinting = ruleOfLawPrinting_,
         thaliaPrinting = thaliaPrinting_,
         sapphireMedallionPrinting = sapphireMedallionPrinting_,
-        reliquaryTowerPrinting = reliquaryTowerPrinting_
+        reliquaryTowerPrinting = reliquaryTowerPrinting_,
+        silencePrinting = silencePrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -323,7 +326,8 @@ allPrintings cards =
     ruleOfLawPrinting cards,
     thaliaPrinting cards,
     sapphireMedallionPrinting cards,
-    reliquaryTowerPrinting cards
+    reliquaryTowerPrinting cards,
+    silencePrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

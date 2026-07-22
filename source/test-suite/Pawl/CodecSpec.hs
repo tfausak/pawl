@@ -165,7 +165,13 @@ tests cards =
              in HU.assertEqual "round-trip" (Right effect) (Codec.jsonToEffect (Codec.effectToJson effect)),
           HU.testCase "both CounterKinds round-trip" $ do
             HU.assertEqual "plus" (Right CounterKind.PlusOnePlusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.PlusOnePlusOne))
-            HU.assertEqual "minus" (Right CounterKind.MinusOneMinusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.MinusOneMinusOne))
+            HU.assertEqual "minus" (Right CounterKind.MinusOneMinusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.MinusOneMinusOne)),
+          HU.testCase "AffectPlayers round-trips" $
+            roundTrip
+              "e6"
+              Codec.effectToJson
+              Codec.jsonToEffect
+              (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells)
         ],
       Tasty.testGroup
         "player effects (P7)"

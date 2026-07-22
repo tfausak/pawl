@@ -588,7 +588,20 @@ m45p7CardTests cards =
                   case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
                     [m] -> HU.assertEqual "adds colorless" [Effect.AddMana ManaType.Colorless] (Foldable.toList (Mode.effects m))
                     _ -> HU.assertFailure "expected exactly one mode"
-                _ -> HU.assertFailure "expected exactly one activated ability"
+                _ -> HU.assertFailure "expected exactly one activated ability",
+      HU.testCase "Silence is a {W} instant whose one effect is AffectPlayers UntilEndOfTurn Opponents CantCastSpells" $
+        let c = Printing.card (Cards.silencePrinting cards)
+            white = ManaSymbol.OfType (ManaType.Colored Color.White)
+         in do
+              HU.assertEqual "name" (Text.pack "Silence") (Card.Type.name c)
+              HU.assertEqual "cost" (Just (ManaCost.MkManaCost [white])) (Card.Type.manaCost c)
+              HU.assertBool "an instant" (Card.isInstant c)
+              HU.assertEqual "no player abilities: it is not a permanent" [] (Card.Type.playerAbilities c)
+              HU.assertEqual
+                "one targetless opcode"
+                [Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells]
+                (Card.allEffects c)
+              HU.assertEqual "no target slots" Map.empty (Card.allTargetSpecs c)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

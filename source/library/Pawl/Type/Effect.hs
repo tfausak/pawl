@@ -6,6 +6,8 @@ import Pawl.Type.CounterKind (CounterKind)
 import Pawl.Type.Duration (Duration)
 import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.Modification (Modification)
+import Pawl.Type.PlayerEffect (PlayerEffect)
+import Pawl.Type.PlayerScope (PlayerScope)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.SlotName (SlotName)
@@ -158,4 +160,14 @@ data Effect card
     -- the ability is armed, which is how "it" / "that card" (CR 603.7c) is
     -- remembered after this resolution ends.
     ArmDelayedTrigger AbilityName
+  | -- CR 611.1 / 613.11: install a stored PLAYER or RULES-modifying continuous
+    -- effect on a class of players for a duration. Silence is
+    -- `AffectPlayers UntilEndOfTurn Opponents CantCastSpells`.
+    --
+    -- Targetless, mirroring Replace: a rules-modifying effect watches a CLASS,
+    -- not a chosen object, so there is nothing to target and nothing to prompt.
+    -- Resolve stores it into GameState.playerEffects with this effect's source,
+    -- its controller (CR 109.5, baked in -- the source may be in a graveyard by
+    -- the time anyone asks), a fresh timestamp, and Expiry.arm's answer.
+    AffectPlayers Duration PlayerScope PlayerEffect
   deriving (Eq, Ord, Show)

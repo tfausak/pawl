@@ -21,6 +21,7 @@ import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Target as Target
 import Pawl.Type.AbilityName (AbilityName)
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
@@ -85,6 +86,7 @@ slotsOf effect = case effect of
   Effect.Untap slot -> Set.singleton slot
   Effect.GainControl _ slot -> Set.singleton slot
   Effect.ArmDelayedTrigger _ -> Set.empty
+  Effect.AffectPlayers {} -> Set.empty
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -115,6 +117,7 @@ readsX = any effectReadsX
       Effect.Untap _ -> False
       Effect.GainControl _ _ -> False
       Effect.ArmDelayedTrigger _ -> False
+      Effect.AffectPlayers {} -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -141,6 +144,7 @@ manaProduced effect = case effect of
   Effect.Untap _ -> Nothing
   Effect.GainControl _ _ -> Nothing
   Effect.ArmDelayedTrigger _ -> Nothing
+  Effect.AffectPlayers {} -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -167,6 +171,7 @@ searchesLibrary effect = case effect of
   Effect.Untap _ -> False
   Effect.GainControl _ _ -> False
   Effect.ArmDelayedTrigger _ -> False
+  Effect.AffectPlayers {} -> False
 
 -- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
 -- a Land with the Basic supertype.
@@ -243,6 +248,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Untap _ -> effect
   Effect.GainControl _ _ -> effect
   Effect.ArmDelayedTrigger _ -> effect
+  -- A player effect carries no basic-land-type word for CR 612 to rewrite.
+  Effect.AffectPlayers {} -> effect
 
 -- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
 -- 608.2c/700.2 -- an unchosen mode's effects never resolve), with every
@@ -622,6 +629,28 @@ applyEffect source controller bound legality chosen effect = case effect of
                   ActiveReplacement.uses = uses
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
+  Effect.AffectPlayers duration scope playerEffect ->
+    -- CR 611.1 / 613.11: install the stored player effect. Targetless and
+    -- unprompted. CR 109.5: the CONTROLLER is baked in now, because the source
+    -- will not have one to project once it leaves the stack (Silence is an
+    -- instant). The SCOPE is not: CR 611.2c makes a rules-modifying effect one
+    -- that "can affect objects that weren't affected when that continuous effect
+    -- began", so it is re-resolved on every read.
+    State.modify' $ \gs -> case Expiry.arm controller source duration gs of
+      -- CR 611.2b: the duration never started, so nothing is stored.
+      Nothing -> gs
+      Just expiry ->
+        let (ts, gs1) = Game.freshTimestamp gs
+            active =
+              ActivePlayerEffect.MkActivePlayerEffect
+                { ActivePlayerEffect.source = source,
+                  ActivePlayerEffect.controller = controller,
+                  ActivePlayerEffect.timestamp = ts,
+                  ActivePlayerEffect.expiry = expiry,
+                  ActivePlayerEffect.scope = scope,
+                  ActivePlayerEffect.effect = playerEffect
+                }
+         in gs1 {GameState.playerEffects = active : GameState.playerEffects gs1}
   Effect.Counter slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- CR 701.6a: the slot's target is a spell on the stack; counter it through
