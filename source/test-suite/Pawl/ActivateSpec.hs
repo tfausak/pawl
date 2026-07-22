@@ -20,6 +20,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
@@ -140,7 +141,10 @@ tests cards =
             -- Second Murder: no shield -> dies.
             secondKill = S.settleSba (S.runPure S.identityAnswer firstKill (Event.destroy skel))
          in do
-              HU.assertEqual "a shield is up after resolving the ability" 1 (length (GameState.replacements resolved))
+              HU.assertEqual
+                "the shield's source is the skeleton itself"
+                [skel]
+                (map ActiveReplacement.source (GameState.replacements resolved))
               HU.assertEqual "survived the first destruction (regenerated)" True (Set.member skel (GameState.battlefield firstKill))
               HU.assertEqual "died to the second (one-shot shield consumed)" False (Set.member skel (GameState.battlefield secondKill))
     ]

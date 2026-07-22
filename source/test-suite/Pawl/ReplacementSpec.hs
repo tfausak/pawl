@@ -37,8 +37,10 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.CandidateId as CandidateId
 import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.Combat as Combat
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -189,11 +191,19 @@ tests cards =
             (skel, g1) = S.addCreature (Cards.drudgeSkeletonsPrinting cards) S.alice base
             -- Activate {B}: regenerate this creature, and resolve it.
             armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice skel (theAbility (Cards.drudgeSkeletonsPrinting cards)) >> Stack.resolveTop)
-            once = S.runPure S.identityAnswer armed (Event.destroy skel)
+            -- CR 701.19a's "remove it from combat" half needs the creature
+            -- actually attacking. Driving a full combat phase to reach a legal
+            -- attack is disproportionate to what this asserts, so seed
+            -- GameState.combat's attacker map directly -- the same shortcut
+            -- Support.addRegenShield takes for the shield itself.
+            attacking = armed {GameState.combat = (GameState.combat armed) {Combat.attackers = Map.singleton skel (AttackTarget.OfPlayer S.bob)}}
+            once = S.runPure S.identityAnswer attacking (Event.destroy skel)
             twice = S.runPure S.identityAnswer once (Event.destroy skel)
          in do
+              HU.assertBool "was declared an attacker" (Map.member skel (Combat.attackers (GameState.combat attacking)))
               HU.assertBool "survived the first destruction" (Set.member skel (GameState.battlefield once))
               HU.assertEqual "the shield was spent" [] (GameState.replacements once)
+              HU.assertBool "removed from combat by the regeneration (CR 701.19a)" (not (Map.member skel (Combat.attackers (GameState.combat once))))
               HU.assertBool "the second destruction kills it" (not (Set.member skel (GameState.battlefield twice))),
       HU.testCase "CR 614.8 regeneration replaces the destruction, so Rest in Peace never sees it" $
         let base = S.landsInPlay (Cards.swampPrinting cards) 1

@@ -56,8 +56,10 @@ data Effect card
   | -- CR 701.8 / 702.12b: destroy the slot's target permanent -- move it to its
     -- owner's graveyard via the changeZone funnel UNLESS it is indestructible.
     -- NOT MoveToZone slot Graveyard: the indestructible check is why this is its
-    -- own opcode (Murder vs Darksteel Myr). A future interceptable "destroy event"
-    -- (regeneration, CR 615) is M4d.
+    -- own opcode (Murder vs Darksteel Myr). Indestructible aside, the destruction
+    -- is itself interceptable: Pawl.Event.destroy offers a WouldBeDestroyed event
+    -- to the CR 616.1 replacement loop before the graveyard move, which is how a
+    -- regeneration shield (CR 701.19a) intercepts it.
     Destroy SlotName
   | -- CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction: CR 701.21a

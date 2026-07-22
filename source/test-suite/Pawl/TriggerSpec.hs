@@ -32,6 +32,7 @@ import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Color as Color
@@ -266,7 +267,10 @@ sacrificeTests cards =
             after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
          in do
               HU.assertEqual "still sacrificed" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "the shield is untouched" 1 (length (GameState.replacements after)),
+              HU.assertEqual
+                "the shield's source is untouched"
+                [piker]
+                (map ActiveReplacement.source (GameState.replacements after)),
       HU.testCase "only a battlefield permanent can be sacrificed (CR 701.21a)" $
         let (card, gs) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             after = S.runPure S.identityAnswer gs (Event.sacrifice card)

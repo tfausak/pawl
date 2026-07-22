@@ -51,8 +51,7 @@ zoneMembers zone pid gs =
 
 -- CR 701.19a: if a permanent is attacking or blocking, remove it from combat.
 -- Edits the GameState.combat maps directly. It lives here, in the lowest layer,
--- because both Pawl.Event and Pawl.Replacement need it and neither may import the
--- other.
+-- because Pawl.Replacement needs it and must never import Pawl.Event.
 removeFromCombat :: ObjectId -> GameState -> GameState
 removeFromCombat oid gs =
   let c = GameState.combat gs

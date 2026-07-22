@@ -157,8 +157,9 @@ applies gs event candidate =
             Nothing -> True
             Just kind -> DamageEvent.kind de == kind
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
-        -- ability's own source, so a destruction replacement is self-only. CR
-        -- 614.1d's other-objects form has no producer.
+        -- ability's own source, so a destruction replacement is self-only.
+        -- DestructionR carries no pattern because the only producer in the
+        -- card pool is self-regeneration (CR 701.19a).
         (ReplacementEffect.DestructionR _, ProposedEvent.WouldBeDestroyed oid) -> src == oid
         -- Every row below falls through to False, but for two different reasons.
         -- ZoneChangeR, DamageR and DestructionR are unreachable HERE because an
@@ -316,12 +317,13 @@ apply candidate event =
         pure Nothing
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR _ _, _) -> pure (Just event)
-    -- CR 701.19a: "the next time [it] would be destroyed this turn, instead
-    -- remove all damage marked on it and tap it. If it's attacking or blocking,
-    -- remove it from combat." The DESTRUCTION does not happen -- so nothing
-    -- downstream of it (a put-into-graveyard, and therefore Rest in Peace's
-    -- redirect) ever runs. That nesting was hardcoded in Event.destroy before
-    -- P5; it is structural now.
+    -- CR 701.19a: "The next time [permanent] would be destroyed this turn,
+    -- instead remove all damage marked on it and its controller taps it. If
+    -- it's an attacking or blocking creature, remove it from combat." The
+    -- DESTRUCTION does not happen -- so nothing downstream of it (a
+    -- put-into-graveyard, and therefore Rest in Peace's redirect) ever runs.
+    -- That nesting was hardcoded in Event.destroy before P5; it is structural
+    -- now.
     (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid) -> case rewrite of
       DestructionRewrite.Regenerate -> do
         consume (ReplacementCandidate.identity candidate)

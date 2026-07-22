@@ -186,9 +186,10 @@ changeZone oid requestedDest = do
 -- Destroy opcode and the CR 704.5g/h state-based actions -- flows through here.
 --
 -- CR 702.12b: an indestructible permanent can't be destroyed, and that gate comes
--- BEFORE the replacement loop, which is CR 614.7 -- "an event that would
--- otherwise be replaced ... doesn't happen, so nothing replaces it": a shield is
--- neither applied nor consumed. Otherwise the would-be-destroyed event is offered
+-- BEFORE the replacement loop, which is CR 614.7: "If a replacement effect would
+-- replace an event, but that event never happens, the replacement effect simply
+-- doesn't do anything" -- a regeneration shield is neither applied nor consumed.
+-- Otherwise the would-be-destroyed event is offered
 -- to CR 616.1; if it survives, the permanent is put into its owner's graveyard via
 -- changeZone (so Rest in Peace's redirect and a token's CR 704.5d cease-to-exist
 -- still compose). Ungated for CR 701.19c "can't be regenerated" (#42).
