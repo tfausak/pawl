@@ -145,6 +145,11 @@ tests cards =
             roundTrip "e2" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (SlotName.MkSlotName (Text.pack "t"))),
           HU.testCase "Duration.UntilYourNextTurn round-trips" $
             HU.assertEqual "preserved" (Right Duration.UntilYourNextTurn) (Codec.jsonToDuration (Codec.durationToJson Duration.UntilYourNextTurn)),
+          HU.testCase "StateCondition.YouControlSource round-trips" $
+            HU.assertEqual "preserved" (Right StateCondition.YouControlSource) (Codec.jsonToStateCondition (Codec.stateConditionToJson StateCondition.YouControlSource)),
+          HU.testCase "Duration.ForAsLongAs round-trips with its condition" $
+            let d = Duration.ForAsLongAs StateCondition.YouControlSource
+             in HU.assertEqual "preserved" (Right d) (Codec.jsonToDuration (Codec.durationToJson d)),
           HU.testCase "AddMana" $
             roundTrip "e3" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana (ManaType.Colored Color.Green)),
           HU.testCase "ExileAllGraveyards" $

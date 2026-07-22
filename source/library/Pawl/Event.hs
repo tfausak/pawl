@@ -402,12 +402,14 @@ eventTriggers events gs =
          in map pend (filter fires abilities)
    in concatMap (\event -> concatMap (forOne event) onBattlefield) events
 
--- CR 603.8 / 603.4: is this state condition currently true, for an ability whose
--- controller is `you`? Reads the PROJECTION -- a subtype is CR 613 layer 4 and
--- control is layer 2, so Blood Moon and Act of Treason both change the answer.
--- This module is the sole home of casing on StateCondition.
-stateHolds :: PlayerId -> StateCondition -> GameState -> Bool
-stateHolds you cond gs =
+-- CR 603.8 / 603.4 / 611.2b: is this state condition currently true, for an
+-- ability or effect whose controller is `you` and whose source object is
+-- `source`? Reads the PROJECTION -- a subtype is CR 613 layer 4 and control is
+-- layer 2, so Blood Moon and Act of Treason both change the answer. This
+-- module is the sole home of casing on StateCondition; the two subtype arms
+-- ignore `source`.
+stateHolds :: PlayerId -> ObjectId -> StateCondition -> GameState -> Bool
+stateHolds you source cond gs =
   let hasSubtype subtype oid = Set.member subtype (Projection.subtypesOf oid gs)
    in case cond of
         -- CR 109.5: "you" on a triggered ability's condition means the
@@ -416,6 +418,10 @@ stateHolds you cond gs =
         StateCondition.YouControlNo subtype -> not (any (hasSubtype subtype) (Projection.controls you gs))
         -- Any player's -- the whole battlefield.
         StateCondition.NoPermanentsOfSubtype subtype -> not (any (hasSubtype subtype) (Set.toList (GameState.battlefield gs)))
+        -- CR 611.2b / 613.1b / 400.7: the source object is still on the
+        -- battlefield AND its projected controller is `you`.
+        StateCondition.YouControlSource ->
+          Set.member source (GameState.battlefield gs) && Projection.controllerOf source gs == Just you
 
 -- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
 -- is currently TRUE and which has no instance already on the stack.
@@ -472,7 +478,7 @@ stateTriggers gs =
         -- YouControlNo's "you control no Swamps") mean that same controller.
         Just ctrl ->
           let live ab = case TriggeredAbility.condition ab of
-                TriggerCondition.StateIs cond -> stateHolds ctrl cond gs && not (alreadyOnStack oid ab)
+                TriggerCondition.StateIs cond -> stateHolds ctrl oid cond gs && not (alreadyOnStack oid ab)
                 TriggerCondition.SelfEnters -> False
                 TriggerCondition.StepBegins _ _ -> False
               pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab Map.empty
@@ -531,4 +537,4 @@ interveningHolds :: GameState -> PendingTrigger -> Bool
 interveningHolds gs pending =
   case TriggeredAbility.intervening (PendingTrigger.ability pending) of
     Nothing -> True
-    Just cond -> stateHolds (PendingTrigger.controller pending) cond gs
+    Just cond -> stateHolds (PendingTrigger.controller pending) (PendingTrigger.source pending) cond gs

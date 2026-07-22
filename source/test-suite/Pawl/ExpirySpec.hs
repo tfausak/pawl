@@ -6,8 +6,10 @@ module Pawl.ExpirySpec where
 import qualified Data.Set as Set
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
@@ -19,6 +21,8 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -38,16 +42,24 @@ effectWith expiry gs =
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
+-- A stand-in source and state for the three arms that don't consult either --
+-- only Duration.ForAsLongAs reads them.
+armGs :: GameState.GameState
+armGs = Setup.emptyGame S.bothPlayers
+
+armSource :: ObjectId.ObjectId
+armSource = ObjectId.MkObjectId 999
+
 armTests :: Tasty.TestTree
 armTests =
   Tasty.testGroup
     "Arm"
     [ HU.testCase "CR 514.2 an until-end-of-turn duration arms to AtCleanup" $
-        HU.assertEqual "armed" (Just Expiry.Type.AtCleanup) (Expiry.arm S.alice Duration.UntilEndOfTurn),
+        HU.assertEqual "armed" (Just Expiry.Type.AtCleanup) (Expiry.arm S.alice armSource Duration.UntilEndOfTurn armGs),
       HU.testCase "CR 611.2a an indefinite duration arms to Never" $
-        HU.assertEqual "armed" (Just Expiry.Type.Never) (Expiry.arm S.alice Duration.Indefinite),
+        HU.assertEqual "armed" (Just Expiry.Type.Never) (Expiry.arm S.alice armSource Duration.Indefinite armGs),
       HU.testCase "CR 611.2a / 109.5 'until your next turn' bakes the controller" $
-        HU.assertEqual "armed" (Just (Expiry.Type.AtTurnOf S.alice)) (Expiry.arm S.alice Duration.UntilYourNextTurn)
+        HU.assertEqual "armed" (Just (Expiry.Type.AtTurnOf S.alice)) (Expiry.arm S.alice armSource Duration.UntilYourNextTurn armGs)
     ]
 
 handoffTests :: Tasty.TestTree
@@ -97,5 +109,74 @@ cleanupTests cards =
               HU.assertEqual "none after" [] (map ActiveReplacement.expiry (GameState.replacements after))
     ]
 
+-- A stored continuous effect whose expiry is a live condition over `src`,
+-- affecting `target`. The Master Thief shape, hand-built so the sweep can be
+-- tested before the card exists.
+whileEffect :: ObjectId.ObjectId -> ObjectId.ObjectId -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+whileEffect src target you gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = src,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.expiry = Expiry.Type.While you StateCondition.YouControlSource,
+            ContinuousEffect.modification = Modification.SetController you,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+          }
+   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+
+conditionalTests :: Cards.Cards -> Tasty.TestTree
+conditionalTests cards =
+  let board =
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (srcId, gs1) = S.addPiker cards S.alice gs0
+            (targetId, gs2) = S.addCreature (Cards.warMammothPrinting cards) S.bob gs1
+         in (srcId, targetId, whileEffect srcId targetId S.alice gs2)
+   in Tasty.testGroup
+        "Conditional"
+        [ HU.testCase "CR 611.2b YouControlSource holds while the source is controlled" $
+            let (srcId, _, gs) = board
+             in HU.assertBool "holds" (Event.stateHolds S.alice srcId StateCondition.YouControlSource gs),
+          HU.testCase "CR 613.1b it stops holding when another player gains control of the source" $
+            let (srcId, _, gs) = board
+                stolen = S.giveControl srcId S.bob gs
+             in HU.assertBool "no longer holds" (not (Event.stateHolds S.alice srcId StateCondition.YouControlSource stolen)),
+          HU.testCase "CR 400.7 it stops holding when the source leaves the battlefield" $
+            let (srcId, _, gs) = board
+                gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
+             in HU.assertBool "no longer holds" (not (Event.stateHolds S.alice srcId StateCondition.YouControlSource gone)),
+          HU.testCase "CR 611.2b arm returns Nothing when the condition is already false" $
+            let (srcId, _, gs) = board
+                gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
+             in HU.assertEqual
+                  "never starts"
+                  Nothing
+                  (Expiry.arm S.alice srcId (Duration.ForAsLongAs StateCondition.YouControlSource) gone),
+          HU.testCase "CR 611.2b arm returns a While when the condition holds now" $
+            let (srcId, _, gs) = board
+             in HU.assertEqual
+                  "starts"
+                  (Just (Expiry.Type.While S.alice StateCondition.YouControlSource))
+                  (Expiry.arm S.alice srcId (Duration.ForAsLongAs StateCondition.YouControlSource) gs),
+          HU.testCase "CR 611.2b the sweep DELETES the effect once the condition fails" $
+            let (srcId, targetId, gs) = board
+                gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
+                (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
+             in do
+                  HU.assertEqual "alice held it while the source stood" (Just S.alice) (Projection.controllerOf targetId gs)
+                  HU.assertBool "the sweep reports a change" changed
+                  HU.assertEqual "the effect is gone, not masked" [] (GameState.continuousEffects swept)
+                  HU.assertEqual "control reverted" (Just S.bob) (Projection.controllerOf targetId swept),
+          HU.testCase "CR 611.2b a sweep that changes nothing reports False" $
+            let (_, _, gs) = board
+                (changed, _) = Engine.runGamePure S.identityAnswer gs Expiry.sweepConditional
+             in HU.assertBool "no change" (not changed),
+          HU.testCase "CR 704.3 settleForPriority runs the sweep" $
+            let (srcId, targetId, gs) = board
+                gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
+                settled = S.runPure S.identityAnswer gone Engine.settleForPriority
+             in HU.assertEqual "control reverted at the settle" (Just S.bob) (Projection.controllerOf targetId settled)
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests cards, handoffTests]
+tests cards = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests cards, handoffTests, conditionalTests cards]

@@ -396,19 +396,21 @@ jsonToPhase value = do
     _ -> Left (Text.pack "unknown Phase: " <> t)
 
 durationToJson :: Duration.Duration -> Value
-durationToJson d = nullary . Text.pack $ case d of
-  Duration.UntilEndOfTurn -> "UntilEndOfTurn"
-  Duration.Indefinite -> "Indefinite"
-  Duration.UntilYourNextTurn -> "UntilYourNextTurn"
+durationToJson d = case d of
+  Duration.UntilEndOfTurn -> nullary (Text.pack "UntilEndOfTurn")
+  Duration.Indefinite -> nullary (Text.pack "Indefinite")
+  Duration.UntilYourNextTurn -> nullary (Text.pack "UntilYourNextTurn")
+  Duration.ForAsLongAs c -> Json.tagged (Text.pack "ForAsLongAs") (Just (stateConditionToJson c))
 
 jsonToDuration :: Value -> Either Text Duration.Duration
-jsonToDuration =
-  decodeNullary
-    (Text.pack "Duration")
-    [ (Text.pack "UntilEndOfTurn", Duration.UntilEndOfTurn),
-      (Text.pack "Indefinite", Duration.Indefinite),
-      (Text.pack "UntilYourNextTurn", Duration.UntilYourNextTurn)
-    ]
+jsonToDuration value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("UntilEndOfTurn", _) -> Right Duration.UntilEndOfTurn
+    ("Indefinite", _) -> Right Duration.Indefinite
+    ("UntilYourNextTurn", _) -> Right Duration.UntilYourNextTurn
+    ("ForAsLongAs", Just v) -> Duration.ForAsLongAs <$> jsonToStateCondition v
+    _ -> Left (Text.pack "unknown Duration: " <> t)
 
 usesToJson :: Uses.Uses -> Value
 usesToJson u = nullary . Text.pack $ case u of
@@ -645,6 +647,7 @@ stateConditionToJson :: StateCondition.StateCondition -> Value
 stateConditionToJson c = case c of
   StateCondition.YouControlNo s -> Json.tagged (Text.pack "YouControlNo") (Just (subtypeToJson s))
   StateCondition.NoPermanentsOfSubtype s -> Json.tagged (Text.pack "NoPermanentsOfSubtype") (Just (subtypeToJson s))
+  StateCondition.YouControlSource -> nullary (Text.pack "YouControlSource")
 
 jsonToStateCondition :: Value -> Either Text StateCondition.StateCondition
 jsonToStateCondition value = do
@@ -652,6 +655,7 @@ jsonToStateCondition value = do
   case (Text.unpack t, mv) of
     ("YouControlNo", Just v) -> StateCondition.YouControlNo <$> jsonToSubtype v
     ("NoPermanentsOfSubtype", Just v) -> StateCondition.NoPermanentsOfSubtype <$> jsonToSubtype v
+    ("YouControlSource", _) -> Right StateCondition.YouControlSource
     _ -> Left (Text.pack "unknown StateCondition: " <> t)
 
 castingPermissionToJson :: CastingPermission.CastingPermission -> Value

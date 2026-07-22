@@ -333,22 +333,35 @@ permute xs order =
         then Maybe.mapMaybe at order
         else xs
 
--- CR 117.5: each time a player would receive priority, perform state-based
--- actions, then put triggered abilities on the stack, repeating until neither does
--- anything. Then priority is granted (by the caller). The repeat is gated on two
--- cheap booleans -- whether an SBA fired and whether a trigger was placed -- so a
--- settle that changes nothing (the common case) costs one board projection, NOT a
--- deep GameState equality check.
+-- CR 117.5: each time a player would receive priority, sweep expired "for as
+-- long as" effects, perform state-based actions, then put triggered abilities
+-- on the stack, repeating until none of the three does anything. Then priority
+-- is granted (by the caller). The repeat is gated on three cheap booleans --
+-- whether the conditional sweep changed anything, whether an SBA fired and
+-- whether a trigger was placed -- so a settle that changes nothing (the common
+-- case) costs one board projection, NOT a deep GameState equality check.
 --
--- P5 removed the third gate. The as-enters copy drain used to run here, first,
--- because a copied permanent's characteristics had to be locked in before any SBA
--- or trigger observed it (CR 614.12a). The entry loop now runs inside the zone
--- change itself, before the Moved event exists, so there is nothing left to drain.
+-- CR 611.2b's condition is checked continuously, and CR 704.3 makes "whenever
+-- a player would get priority" the coarsest moment anything could observe it,
+-- so settling here is indistinguishable from checking continuously. The sweep
+-- runs FIRST, before the SBA check: losing control of a permanent changes what
+-- the state-based-action check sees (a creature that stops being controlled by
+-- its would-be owner of a keyword, say), so the SBA pass must see the
+-- post-sweep board. The loop re-runs whenever ANYTHING fired, because an SBA
+-- can itself be what falsifies a condition (e.g. a permanent the condition
+-- names is destroyed). A game with no While stored pays one list scan.
+--
+-- P5 removed the fourth gate this comment used to describe. The as-enters copy
+-- drain used to run here, first, because a copied permanent's characteristics
+-- had to be locked in before any SBA or trigger observed it (CR 614.12a). The
+-- entry loop now runs inside the zone change itself, before the Moved event
+-- exists, so there is nothing left to drain.
 settleForPriority :: Game ()
 settleForPriority = do
+  swept <- Expiry.sweepConditional
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
-  Monad.when (acted || placed) settleForPriority
+  Monad.when (swept || acted || placed) settleForPriority
 
 priorityLoop :: Game ()
 priorityLoop = do

@@ -64,7 +64,7 @@ resolveTop = do
           -- controller (Engine.placeOne stamps it), which is who "you" means.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Event.stateHolds (Object.owner obj) cond gs) ->
+              | not (Event.stateHolds (Object.owner obj) srcId cond gs) ->
                   State.modify' (Resolve.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)

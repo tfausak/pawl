@@ -7,23 +7,39 @@
 -- vocabulary, so they share one sweep.
 module Pawl.Expiry where
 
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Pawl.Event as Event
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import Pawl.Type.Duration (Duration)
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Expiry (Expiry)
 import qualified Pawl.Type.Expiry as Expiry
+import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 
 -- CR 611.2: the moment a duration BEGINS. `controller` is the effect's
--- controller, which is CR 109.5's "you" for every duration that names a player.
-arm :: PlayerId -> Duration -> Maybe Expiry
-arm controller duration = case duration of
+-- controller -- CR 109.5's "you" -- and `source` is the object the effect comes
+-- from. Nothing means the duration never started, so per CR 611.2b the effect
+-- does nothing and is never stored at all.
+--
+-- CR 611.2b's second sentence -- "if that duration ends before the moment the
+-- effect would first be applied and doesn't begin again during that spell or
+-- ability's resolution" -- is vacuous here: this runs once, at the point the
+-- effect would be stored, and no opcode both ends and restarts a condition
+-- mid-resolution.
+arm :: PlayerId -> ObjectId -> Duration -> GameState -> Maybe Expiry
+arm controller source duration gs = case duration of
   Duration.UntilEndOfTurn -> Just Expiry.AtCleanup
   Duration.Indefinite -> Just Expiry.Never
   Duration.UntilYourNextTurn -> Just (Expiry.AtTurnOf controller)
+  Duration.ForAsLongAs cond ->
+    if Event.stateHolds controller source cond gs
+      then Just (Expiry.While controller cond)
+      else Nothing
 
 -- CR 514.2: during the cleanup step, "all 'until end of turn' and 'this turn'
 -- effects end". Delete-and-recompute (design.md 2.5): dropping the stored entry
@@ -44,6 +60,32 @@ dropAtCleanup gs =
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
           GameState.replacements = filter keepReplacement (GameState.replacements gs)
         }
+
+-- CR 611.2b: drop every While whose condition has stopped holding. The effect is
+-- DELETED, not masked: 611.2b's duration is one continuous period, so an effect
+-- that has ended must stay ended even if the condition becomes true again
+-- ("Regaining control of Master Thief won't cause you to regain control of the
+-- artifact"). Reports whether it changed anything, so Engine.settleForPriority
+-- knows to run again.
+--
+-- CR 704.3 fixes the coarsest moment anything can OBSERVE the condition --
+-- "whenever a player would get priority" -- and settleForPriority runs at
+-- exactly the points where the board can change, so checking here is
+-- indistinguishable from checking continuously.
+sweepConditional :: Game Bool
+sweepConditional = do
+  gs <- State.get
+  let survives source expiry = case expiry of
+        Expiry.While you cond -> Event.stateHolds you source cond gs
+        Expiry.AtCleanup -> True
+        Expiry.Never -> True
+        Expiry.AtTurnOf _ -> True
+      keepEffect eff = survives (ContinuousEffect.source eff) (ContinuousEffect.expiry eff)
+      keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
+      keptEffects = filter keepEffect (GameState.continuousEffects gs)
+      keptReplacements = filter keepReplacement (GameState.replacements gs)
+  State.put gs {GameState.continuousEffects = keptEffects, GameState.replacements = keptReplacements}
+  pure (keptEffects /= GameState.continuousEffects gs || keptReplacements /= GameState.replacements gs)
 
 -- CR 611.2a: "until your next turn" ends as that player's turn begins. Run at
 -- the turn handoff, AFTER activePlayer has been updated, so "a turn began and
