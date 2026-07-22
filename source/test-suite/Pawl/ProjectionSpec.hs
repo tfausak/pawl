@@ -21,6 +21,7 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -38,6 +39,7 @@ import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -384,7 +386,7 @@ tests cards =
         let (rip, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual
               "one redirect replacement"
-              [ReplacementEffect.RedirectZoneChange Zone.Graveyard Zone.Exile]
+              [ReplacementEffect.ZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones) Zone.Exile]
               (Projection.replacementsOf rip gs),
       HU.testCase "a vanilla creature projects no replacements" $
         let (piker, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)

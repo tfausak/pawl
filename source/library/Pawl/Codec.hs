@@ -29,14 +29,21 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.CounterPattern as CounterPattern
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.DamagePattern as DamagePattern
+import qualified Pawl.Type.DamageRewrite as DamageRewrite
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.EntryOption as EntryOption
+import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.Json (Value (Array, Boolean, Null, Object))
 import qualified Pawl.Type.Keyword as Keyword
@@ -49,6 +56,7 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Power as Power
@@ -58,12 +66,14 @@ import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
+import qualified Pawl.Type.TokenPattern as TokenPattern
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
@@ -71,6 +81,7 @@ import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
+import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
 
 -- Helpers --------------------------------------------------------------------
 
@@ -402,6 +413,154 @@ jsonToPrevention =
   decodeNullary
     (Text.pack "Prevention")
     [(Text.pack "PreventAllCombatDamage", Prevention.PreventAllCombatDamage)]
+
+controllerRelationToJson :: ControllerRelation.ControllerRelation -> Value
+controllerRelationToJson r = nullary . Text.pack $ case r of
+  ControllerRelation.Yours -> "Yours"
+  ControllerRelation.Anyones -> "Anyones"
+
+jsonToControllerRelation :: Value -> Either Text ControllerRelation.ControllerRelation
+jsonToControllerRelation =
+  decodeNullary
+    (Text.pack "ControllerRelation")
+    [ (Text.pack "Yours", ControllerRelation.Yours),
+      (Text.pack "Anyones", ControllerRelation.Anyones)
+    ]
+
+permanentCriterionToJson :: PermanentCriterion.PermanentCriterion -> Value
+permanentCriterionToJson c = nullary . Text.pack $ case c of
+  PermanentCriterion.AnyPermanent -> "AnyPermanent"
+  PermanentCriterion.CreaturePermanent -> "CreaturePermanent"
+
+jsonToPermanentCriterion :: Value -> Either Text PermanentCriterion.PermanentCriterion
+jsonToPermanentCriterion =
+  decodeNullary
+    (Text.pack "PermanentCriterion")
+    [ (Text.pack "AnyPermanent", PermanentCriterion.AnyPermanent),
+      (Text.pack "CreaturePermanent", PermanentCriterion.CreaturePermanent)
+    ]
+
+damageRewriteToJson :: DamageRewrite.DamageRewrite -> Value
+damageRewriteToJson r = nullary . Text.pack $ case r of
+  DamageRewrite.PreventAll -> "PreventAll"
+
+jsonToDamageRewrite :: Value -> Either Text DamageRewrite.DamageRewrite
+jsonToDamageRewrite =
+  decodeNullary (Text.pack "DamageRewrite") [(Text.pack "PreventAll", DamageRewrite.PreventAll)]
+
+destructionRewriteToJson :: DestructionRewrite.DestructionRewrite -> Value
+destructionRewriteToJson r = nullary . Text.pack $ case r of
+  DestructionRewrite.Regenerate -> "Regenerate"
+
+jsonToDestructionRewrite :: Value -> Either Text DestructionRewrite.DestructionRewrite
+jsonToDestructionRewrite =
+  decodeNullary (Text.pack "DestructionRewrite") [(Text.pack "Regenerate", DestructionRewrite.Regenerate)]
+
+scalingToJson :: Scaling.Scaling -> Value
+scalingToJson s = case s of
+  Scaling.Multiply n -> Json.tagged (Text.pack "Multiply") (Just (natTo n))
+  Scaling.AddMore n -> Json.tagged (Text.pack "AddMore") (Just (natTo n))
+
+jsonToScaling :: Value -> Either Text Scaling.Scaling
+jsonToScaling value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Multiply", Just v) -> fmap Scaling.Multiply (natFrom v)
+    ("AddMore", Just v) -> fmap Scaling.AddMore (natFrom v)
+    _ -> Left (Text.pack "unknown Scaling: " <> t)
+
+entryOptionToJson :: EntryOption.EntryOption -> Value
+entryOptionToJson o =
+  Object
+    [ (Text.pack "power", Json.jInt (EntryOption.power o)),
+      (Text.pack "toughness", Json.jInt (EntryOption.toughness o)),
+      (Text.pack "keywords", setTo keywordToJson (EntryOption.keywords o))
+    ]
+
+jsonToEntryOption :: Value -> Either Text EntryOption.EntryOption
+jsonToEntryOption value = do
+  ps <- Json.asObject value
+  p <- Json.field (Text.pack "power") ps >>= Json.asInteger
+  t <- Json.field (Text.pack "toughness") ps >>= Json.asInteger
+  ks <- Json.field (Text.pack "keywords") ps >>= setFrom jsonToKeyword
+  pure
+    EntryOption.MkEntryOption
+      { EntryOption.power = p,
+        EntryOption.toughness = t,
+        EntryOption.keywords = ks
+      }
+
+entryRewriteToJson :: EntryRewrite.EntryRewrite -> Value
+entryRewriteToJson r = case r of
+  EntryRewrite.AsCopy -> nullary (Text.pack "AsCopy")
+  EntryRewrite.ChoiceOf options -> Json.tagged (Text.pack "ChoiceOf") (Just (listTo entryOptionToJson options))
+
+jsonToEntryRewrite :: Value -> Either Text EntryRewrite.EntryRewrite
+jsonToEntryRewrite value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("AsCopy", _) -> Right EntryRewrite.AsCopy
+    ("ChoiceOf", Just v) -> fmap EntryRewrite.ChoiceOf (listFrom jsonToEntryOption v)
+    _ -> Left (Text.pack "unknown EntryRewrite: " <> t)
+
+zoneChangePatternToJson :: ZoneChangePattern.ZoneChangePattern -> Value
+zoneChangePatternToJson p =
+  Object
+    [ (Text.pack "whenDestination", zoneToJson (ZoneChangePattern.whenDestination p)),
+      (Text.pack "whoseObject", controllerRelationToJson (ZoneChangePattern.whoseObject p))
+    ]
+
+jsonToZoneChangePattern :: Value -> Either Text ZoneChangePattern.ZoneChangePattern
+jsonToZoneChangePattern value = do
+  ps <- Json.asObject value
+  d <- Json.field (Text.pack "whenDestination") ps >>= jsonToZone
+  w <- Json.field (Text.pack "whoseObject") ps >>= jsonToControllerRelation
+  pure
+    ZoneChangePattern.MkZoneChangePattern
+      { ZoneChangePattern.whenDestination = d,
+        ZoneChangePattern.whoseObject = w
+      }
+
+counterPatternToJson :: CounterPattern.CounterPattern -> Value
+counterPatternToJson p =
+  Object
+    [ (Text.pack "whichKind", maybeTo counterKindToJson (CounterPattern.whichKind p)),
+      (Text.pack "whose", controllerRelationToJson (CounterPattern.whose p)),
+      (Text.pack "onWhat", permanentCriterionToJson (CounterPattern.onWhat p))
+    ]
+
+jsonToCounterPattern :: Value -> Either Text CounterPattern.CounterPattern
+jsonToCounterPattern value = do
+  ps <- Json.asObject value
+  k <- Json.field (Text.pack "whichKind") ps >>= maybeFrom jsonToCounterKind
+  w <- Json.field (Text.pack "whose") ps >>= jsonToControllerRelation
+  o <- Json.field (Text.pack "onWhat") ps >>= jsonToPermanentCriterion
+  pure
+    CounterPattern.MkCounterPattern
+      { CounterPattern.whichKind = k,
+        CounterPattern.whose = w,
+        CounterPattern.onWhat = o
+      }
+
+tokenPatternToJson :: TokenPattern.TokenPattern -> Value
+tokenPatternToJson p =
+  Object [(Text.pack "whose", controllerRelationToJson (TokenPattern.whose p))]
+
+jsonToTokenPattern :: Value -> Either Text TokenPattern.TokenPattern
+jsonToTokenPattern value = do
+  ps <- Json.asObject value
+  w <- Json.field (Text.pack "whose") ps >>= jsonToControllerRelation
+  pure TokenPattern.MkTokenPattern {TokenPattern.whose = w}
+
+damagePatternToJson :: DamagePattern.DamagePattern -> Value
+damagePatternToJson p =
+  Object [(Text.pack "whichKind", maybeTo damageKindToJson (DamagePattern.whichKind p))]
+
+jsonToDamagePattern :: Value -> Either Text DamagePattern.DamagePattern
+jsonToDamagePattern value = do
+  ps <- Json.asObject value
+  k <- Json.field (Text.pack "whichKind") ps >>= maybeFrom jsonToDamageKind
+  pure DamagePattern.MkDamagePattern {DamagePattern.whichKind = k}
 
 additionalCostToJson :: AdditionalCost.AdditionalCost -> Value
 additionalCostToJson a = nullary . Text.pack $ case a of
@@ -952,14 +1111,42 @@ jsonToActivatedAbility value = do
   pure (ActivatedAbility.MkActivatedAbility c m)
 
 replacementEffectToJson :: ReplacementEffect.ReplacementEffect -> Value
-replacementEffectToJson (ReplacementEffect.RedirectZoneChange w t) =
-  Json.tagged (Text.pack "RedirectZoneChange") (Just (Array [zoneToJson w, zoneToJson t]))
+replacementEffectToJson re = case re of
+  ReplacementEffect.ZoneChangeR p z ->
+    Json.tagged (Text.pack "ZoneChangeR") (Just (Array [zoneChangePatternToJson p, zoneToJson z]))
+  ReplacementEffect.EntryR r ->
+    Json.tagged (Text.pack "EntryR") (Just (entryRewriteToJson r))
+  ReplacementEffect.DamageR p r ->
+    Json.tagged (Text.pack "DamageR") (Just (Array [damagePatternToJson p, damageRewriteToJson r]))
+  ReplacementEffect.DestructionR r ->
+    Json.tagged (Text.pack "DestructionR") (Just (destructionRewriteToJson r))
+  ReplacementEffect.CounterR p s ->
+    Json.tagged (Text.pack "CounterR") (Just (Array [counterPatternToJson p, scalingToJson s]))
+  ReplacementEffect.TokenR p s ->
+    Json.tagged (Text.pack "TokenR") (Just (Array [tokenPatternToJson p, scalingToJson s]))
 
 jsonToReplacementEffect :: Value -> Either Text ReplacementEffect.ReplacementEffect
 jsonToReplacementEffect value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("RedirectZoneChange", Just (Array [w, d])) -> ReplacementEffect.RedirectZoneChange <$> jsonToZone w <*> jsonToZone d
+    ("ZoneChangeR", Just (Array [p, z])) -> do
+      pattern_ <- jsonToZoneChangePattern p
+      dest <- jsonToZone z
+      pure (ReplacementEffect.ZoneChangeR pattern_ dest)
+    ("EntryR", Just v) -> fmap ReplacementEffect.EntryR (jsonToEntryRewrite v)
+    ("DamageR", Just (Array [p, r])) -> do
+      pattern_ <- jsonToDamagePattern p
+      rewrite <- jsonToDamageRewrite r
+      pure (ReplacementEffect.DamageR pattern_ rewrite)
+    ("DestructionR", Just v) -> fmap ReplacementEffect.DestructionR (jsonToDestructionRewrite v)
+    ("CounterR", Just (Array [p, s])) -> do
+      pattern_ <- jsonToCounterPattern p
+      scaling <- jsonToScaling s
+      pure (ReplacementEffect.CounterR pattern_ scaling)
+    ("TokenR", Just (Array [p, s])) -> do
+      pattern_ <- jsonToTokenPattern p
+      scaling <- jsonToScaling s
+      pure (ReplacementEffect.TokenR pattern_ scaling)
     _ -> Left (Text.pack "unknown ReplacementEffect: " <> t)
 
 triggeredAbilityToJson :: TriggeredAbility.TriggeredAbility CardT.Card -> Value

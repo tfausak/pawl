@@ -639,19 +639,26 @@ abilitiesOf oid gs = PC.activatedAbilities (project oid gs)
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect]
 replacementsOf oid gs = PC.replacementEffects (project oid gs)
 
--- CR 614.6: every replacement effect active on the battlefield. Short-circuits
--- when no permanent has one in its base card, so an ordinary zone change (a draw,
--- a land entering) does NOT project the whole board -- projection runs only once
--- a replacement source is actually present.
-replacementsAffecting :: GameState -> [ReplacementEffect]
+-- CR 614.6: every replacement effect active on the battlefield, PAIRED WITH ITS
+-- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
+-- without it. Short-circuits when no permanent has one in its base card, so an
+-- ordinary zone change (a draw, a land entering) does NOT project the whole
+-- board.
+--
+-- The short-circuit reads BASE cards while the result reads the PROJECTION, which
+-- is sound only because the one way to acquire a replacement effect you were not
+-- printed with is `EntryR AsCopy` -- and a card with that arm is itself a base
+-- card with a replacement effect, so it keeps `baseHas` true for its own object.
+replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect)]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
       baseHas oid = case Game.cardOf oid gs of
         Nothing -> False
         Just card -> not (null (Card.Type.replacementEffects card))
+      forOne oid = map (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []
-        else concatMap (\oid -> replacementsOf oid gs) onBattlefield
+        else concatMap forOne onBattlefield
 
 -- CR 603 / 613 layer 6: an object's triggered abilities after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none.

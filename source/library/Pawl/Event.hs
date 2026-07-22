@@ -18,6 +18,8 @@ import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.Combat as Combat
+import Pawl.Type.ControllerRelation (ControllerRelation)
+import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import Pawl.Type.DamageEvent (DamageEvent)
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -54,6 +56,7 @@ import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
+import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
 
 -- CR 608.2i: append one entry to the turn-scoped log. The single APPEND point --
 -- Engine.handoffTurn clears the log at turn end, Setup.emptyGame and the test
@@ -168,7 +171,7 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
         -- CR 614.4: replacements exist before the event; read them from the
         -- pre-move state. CR 614.6: the modified event is what actually happens.
         proposed = ZoneChange.MkZoneChange oid fromZone requestedDest
-        resolved = applyReplacements (Projection.replacementsAffecting gs) proposed
+        resolved = applyReplacements gs (Projection.replacementsAffecting gs) proposed
         dest = ZoneChange.to resolved
         mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.timestamp = ts}
         gs1 = Game.removeFromZones pid oid gs
@@ -293,20 +296,39 @@ drawCard pid gs = case Game.zoneMembers Zone.Library pid gs of
   [] -> gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
   top : _ -> changeZone top Zone.Hand gs
 
--- CR 614: rewrite the proposed zone change by each active replacement. CR 614.5:
--- a replacement gets ONE opportunity -- applied left-to-right, each sees the
--- running event; RedirectZoneChange's output destination no longer matches its
--- own `whenDestination`, so it cannot re-fire. This module is the sole home of
--- casing on ReplacementEffect.
-applyReplacements :: [ReplacementEffect] -> ZoneChange -> ZoneChange
-applyReplacements res zc = List.foldl' applyOne zc res
+-- CR 614: rewrite the proposed zone change by each active replacement, paired
+-- with its source. CR 614.5: applied left-to-right, each seeing the running
+-- event; a ZoneChangeR's output destination no longer matches its own
+-- `whenDestination`, so it cannot re-fire.
+--
+-- This pure fold is a TRANSITIONAL shape. It cannot ask a question and it invents
+-- an order when two replacements apply -- CR 616.1's own violation, which this
+-- phase exists to retire. Pawl.Replacement replaces it entirely; nothing else
+-- about it is meant to survive.
+applyReplacements :: GameState -> [(ObjectId, ReplacementEffect)] -> ZoneChange -> ZoneChange
+applyReplacements gs res zc = List.foldl' (applyOne gs) zc res
 
-applyOne :: ZoneChange -> ReplacementEffect -> ZoneChange
-applyOne zc re = case re of
-  ReplacementEffect.RedirectZoneChange whenDest toDest ->
-    if ZoneChange.to zc == whenDest
+applyOne :: GameState -> ZoneChange -> (ObjectId, ReplacementEffect) -> ZoneChange
+applyOne gs zc (src, re) = case re of
+  ReplacementEffect.ZoneChangeR pat toDest ->
+    if ZoneChange.to zc == ZoneChangePattern.whenDestination pat
+      && matchesController gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
       then zc {ZoneChange.to = toDest}
       else zc
+  -- CR 614.1: an effect whose event class is not a zone change never applies to
+  -- one. The type is what rules this out; these arms only make the case total.
+  ReplacementEffect.EntryR _ -> zc
+  ReplacementEffect.DamageR _ _ -> zc
+  ReplacementEffect.DestructionR _ -> zc
+  ReplacementEffect.CounterR _ _ -> zc
+  ReplacementEffect.TokenR _ _ -> zc
+
+-- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation, read
+-- against the controller of the effect's SOURCE? Anyones always does.
+matchesController :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> Bool
+matchesController gs src rel oid = case rel of
+  ControllerRelation.Anyones -> True
+  ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
 
 -- CR 603.2: does this condition fire on this event, for the permanent that bears
 -- it? `bearer` is the object whose ability this is and `you` is its controller

@@ -1,14 +1,40 @@
 module Pawl.Type.ReplacementEffect where
 
+import Pawl.Type.CounterPattern (CounterPattern)
+import Pawl.Type.DamagePattern (DamagePattern)
+import Pawl.Type.DamageRewrite (DamageRewrite)
+import Pawl.Type.DestructionRewrite (DestructionRewrite)
+import Pawl.Type.EntryRewrite (EntryRewrite)
+import Pawl.Type.Scaling (Scaling)
+import Pawl.Type.TokenPattern (TokenPattern)
 import Pawl.Type.Zone (Zone)
+import Pawl.Type.ZoneChangePattern (ZoneChangePattern)
 
--- CR 614.1a: a replacement effect. Classified by the event pattern it intercepts:
--- a zone change whose destination is `whenDestination` heads for `toDestination`
--- instead. Rest in Peace = RedirectZoneChange Graveyard Exile (any object, from
--- any source zone). Its own leaf family, distinct from Effect (one-shot) and
--- Modification (continuous). Only Pawl.Event may case on it.
-data ReplacementEffect = RedirectZoneChange
-  { whenDestination :: Zone,
-    toDestination :: Zone
-  }
+-- CR 614.1a: a replacement effect, classified by the EVENT CLASS it intercepts
+-- and the REWRITE SHAPE it applies. One arm per replaceable event class -- the
+-- arm count tracks the ~40 classes the comprehensive rules define, never the card
+-- pool. Rest in Peace is DATA (`ZoneChangeR (MkZoneChangePattern Graveyard
+-- Anyones) Exile`), not a constructor; so is Fog, so is regeneration, so is
+-- Hardened Scales. The scenario the first invariant forbids --
+-- `case effect of RedirectZoneChange Graveyard Exile -> restInPeace` -- is no
+-- longer expressible.
+--
+-- A (effect, event) pair whose arms disagree simply does not apply, so the type
+-- rules out "redirect a damage event" without a validity pass.
+--
+-- EntryR and DestructionR carry NO pattern: both are self-only in the pool today
+-- (CR 614.1c's "[this permanent] enters as"; CR 201.5/201.5c make "regenerate
+-- this creature" name the ability's own source). CR 614.1d's other-objects form
+-- ("[Objects] enter the battlefield ...", Essence of the Wild) has no producer,
+-- so the field appears when a card needs it rather than as speculative structure.
+--
+-- Only Pawl.Replacement may case on this for RULES purposes; Pawl.Codec also
+-- cases on every constructor, but only as the JSON data boundary.
+data ReplacementEffect
+  = ZoneChangeR ZoneChangePattern Zone
+  | EntryR EntryRewrite
+  | DamageR DamagePattern DamageRewrite
+  | DestructionR DestructionRewrite
+  | CounterR CounterPattern Scaling
+  | TokenR TokenPattern Scaling
   deriving (Eq, Ord, Show)

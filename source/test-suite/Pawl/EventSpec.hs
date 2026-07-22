@@ -12,6 +12,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
@@ -22,6 +23,7 @@ import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
+import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -30,17 +32,21 @@ tests cards =
   Tasty.testGroup
     "Pawl.Event"
     [ HU.testCase "CR 614.1a a graveyard-bound move is redirected to exile" $
-        let rip = ReplacementEffect.RedirectZoneChange {ReplacementEffect.whenDestination = Zone.Graveyard, ReplacementEffect.toDestination = Zone.Exile}
+        let (_, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            rip = ReplacementEffect.ZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones) Zone.Exile
             proposed = ZoneChange.MkZoneChange {ZoneChange.object = ObjectId.MkObjectId 5, ZoneChange.from = Zone.Battlefield, ZoneChange.to = Zone.Graveyard}
-         in HU.assertEqual "redirected to exile" Zone.Exile (ZoneChange.to (Event.applyReplacements [rip] proposed)),
+         in HU.assertEqual "redirected to exile" Zone.Exile (ZoneChange.to (Event.applyReplacements gs [(ObjectId.MkObjectId 0, rip)] proposed)),
       HU.testCase "CR 614.5 the redirect does not re-apply (exile is not graveyard)" $
-        let rip = ReplacementEffect.RedirectZoneChange {ReplacementEffect.whenDestination = Zone.Graveyard, ReplacementEffect.toDestination = Zone.Exile}
+        let (_, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            rip = ReplacementEffect.ZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones) Zone.Exile
             proposed = ZoneChange.MkZoneChange {ZoneChange.object = ObjectId.MkObjectId 5, ZoneChange.from = Zone.Battlefield, ZoneChange.to = Zone.Graveyard}
-         in HU.assertEqual "exile, applied once" Zone.Exile (ZoneChange.to (Event.applyReplacements [rip, rip] proposed)),
+            pairs = [(ObjectId.MkObjectId 0, rip), (ObjectId.MkObjectId 0, rip)]
+         in HU.assertEqual "exile, applied once" Zone.Exile (ZoneChange.to (Event.applyReplacements gs pairs proposed)),
       HU.testCase "a non-graveyard move is untouched" $
-        let rip = ReplacementEffect.RedirectZoneChange {ReplacementEffect.whenDestination = Zone.Graveyard, ReplacementEffect.toDestination = Zone.Exile}
+        let (_, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            rip = ReplacementEffect.ZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones) Zone.Exile
             proposed = ZoneChange.MkZoneChange {ZoneChange.object = ObjectId.MkObjectId 5, ZoneChange.from = Zone.Stack, ZoneChange.to = Zone.Battlefield}
-         in HU.assertEqual "battlefield unchanged" Zone.Battlefield (ZoneChange.to (Event.applyReplacements [rip] proposed)),
+         in HU.assertEqual "battlefield unchanged" Zone.Battlefield (ZoneChange.to (Event.applyReplacements gs [(ObjectId.MkObjectId 0, rip)] proposed)),
       HU.testCase "CR 614: with Rest in Peace out, a creature sent to the graveyard is exiled" $
         let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             (piker, g1) = S.addPiker cards S.bob g0

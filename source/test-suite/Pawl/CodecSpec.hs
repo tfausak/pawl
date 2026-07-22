@@ -25,8 +25,10 @@ import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.CounterPattern as CounterPattern
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decimal as Decimal
@@ -34,6 +36,8 @@ import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.EntryOption as EntryOption
+import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.Json as Json
 import qualified Pawl.Type.Keyword as Keyword
@@ -46,12 +50,14 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
@@ -63,6 +69,7 @@ import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
+import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -170,12 +177,34 @@ tests cards =
                       (ModeSelection.ChooseExactly 1)
                   )
               ),
-          HU.testCase "ReplacementEffect" $
-            roundTrip
-              "re"
-              Codec.replacementEffectToJson
-              Codec.jsonToReplacementEffect
-              (ReplacementEffect.RedirectZoneChange Zone.Graveyard Zone.Exile)
+          HU.testCase "a ZoneChangeR replacement round-trips" $
+            let re =
+                  ReplacementEffect.ZoneChangeR
+                    ZoneChangePattern.MkZoneChangePattern
+                      { ZoneChangePattern.whenDestination = Zone.Graveyard,
+                        ZoneChangePattern.whoseObject = ControllerRelation.Anyones
+                      }
+                    Zone.Exile
+             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
+          HU.testCase "a CounterR replacement round-trips (pattern and scaling are data)" $
+            let re =
+                  ReplacementEffect.CounterR
+                    CounterPattern.MkCounterPattern
+                      { CounterPattern.whichKind = Just CounterKind.PlusOnePlusOne,
+                        CounterPattern.whose = ControllerRelation.Yours,
+                        CounterPattern.onWhat = PermanentCriterion.CreaturePermanent
+                      }
+                    (Scaling.AddMore 1)
+             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
+          HU.testCase "an EntryR ChoiceOf replacement round-trips (P/T and keywords)" $
+            let re =
+                  ReplacementEffect.EntryR
+                    ( EntryRewrite.ChoiceOf
+                        [ EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty},
+                          EntryOption.MkEntryOption {EntryOption.power = 1, EntryOption.toughness = 6, EntryOption.keywords = Set.singleton Keyword.Defender}
+                        ]
+                    )
+             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re))
         ],
       Tasty.testGroup
         "modal"

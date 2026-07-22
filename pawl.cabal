@@ -101,19 +101,26 @@ library
     Pawl.Type.Combat
     Pawl.Type.CombatStep
     Pawl.Type.ContinuousEffect
+    Pawl.Type.ControllerRelation
     Pawl.Type.CounterKind
+    Pawl.Type.CounterPattern
     Pawl.Type.CountSpec
     Pawl.Type.DamageEvent
     Pawl.Type.DamageKind
+    Pawl.Type.DamagePattern
+    Pawl.Type.DamageRewrite
     Pawl.Type.Decider
     Pawl.Type.Decimal
     Pawl.Type.DecisionLog
     Pawl.Type.Deck
     Pawl.Type.DelayedTrigger
     Pawl.Type.Departure
+    Pawl.Type.DestructionRewrite
     Pawl.Type.Duration
     Pawl.Type.Effect
     Pawl.Type.EndingStep
+    Pawl.Type.EntryOption
+    Pawl.Type.EntryRewrite
     Pawl.Type.Game
     Pawl.Type.GameEvent
     Pawl.Type.GameState
@@ -133,6 +140,7 @@ library
     Pawl.Type.Object
     Pawl.Type.ObjectId
     Pawl.Type.PendingTrigger
+    Pawl.Type.PermanentCriterion
     Pawl.Type.Phase
     Pawl.Type.Player
     Pawl.Type.PlayerId
@@ -147,6 +155,7 @@ library
     Pawl.Type.ReplacementEffect
     Pawl.Type.Response
     Pawl.Type.Result
+    Pawl.Type.Scaling
     Pawl.Type.Sickness
     Pawl.Type.SlotName
     Pawl.Type.Source
@@ -158,6 +167,7 @@ library
     Pawl.Type.TapState
     Pawl.Type.TargetSpec
     Pawl.Type.Timestamp
+    Pawl.Type.TokenPattern
     Pawl.Type.Toughness
     Pawl.Type.TriggerCondition
     Pawl.Type.TriggeredAbility
@@ -165,6 +175,7 @@ library
     Pawl.Type.TypeLine
     Pawl.Type.Zone
     Pawl.Type.ZoneChange
+    Pawl.Type.ZoneChangePattern
 
   hs-source-dirs: source/library
 
