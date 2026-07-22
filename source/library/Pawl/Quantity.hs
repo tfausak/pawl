@@ -78,7 +78,7 @@ typesInAllGraveyards gs =
 -- CR 700.4 / 608.2h: did this event record a creature dying? Creature-ness comes
 -- from the event's own snapshot -- the object as it last existed on the
 -- battlefield -- so a land animated into a creature counts, and so does a token
--- (which has no printed card to consult, CR 111.3).
+-- (which has no printed card to consult, CR 111.1).
 died :: GameEvent.GameEvent -> Bool
 died event = case event of
   GameEvent.Moved zc snapshot ->

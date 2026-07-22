@@ -71,7 +71,7 @@ logTests cards =
       -- Peace redirect -- no separate case needed here.
       -- CR 608.2h: the snapshot is the object as it last existed in the zone it
       -- LEFT. Re-deriving from the printed card would be wrong for an animated
-      -- land and impossible for a token (CR 111.3).
+      -- land and impossible for a token (CR 111.1).
       HU.testCase "CR 608.2h a Moved event snapshots the object it moved" $
         let (piker, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
             expected = Projection.project piker gs
@@ -435,10 +435,10 @@ historyTests cards =
              in do
                   HU.assertEqual "two +1/+1 counters" 2 (countersOn ghoul atEnd)
                   HU.assertEqual "a 3/3" (Just 3) (Projection.powerOf ghoul atEnd),
-          -- CR 111.3 / 608.2h: a token has NO printed card, so an implementation
+          -- CR 111.1 / 608.2h: a token has NO printed card, so an implementation
           -- that re-derived card types from print instead of from the event's
           -- snapshot would read zero here.
-          HU.testCase "CR 111.3 a token creature that died counts, though it has no printed card" $
+          HU.testCase "CR 111.1 a token creature that died counts, though it has no printed card" $
             let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
                 (tok, gs1) = S.addToken (Printing.card (Cards.pikerPrinting cards)) S.bob gs0
                 dead = Sba.checkStateBasedActions (Event.destroy tok gs1)
@@ -637,7 +637,7 @@ orderingTests cards =
              in HU.assertEqual "asked once" 1 asked,
           -- Sacrifice resolves FIRST: the Wall token dies, and CR 608.2h has the
           -- Ghoul count it when its own effect is applied. The token has NO printed
-          -- card (CR 111.3) and its death happened at a boundary the scan already
+          -- card (CR 111.1) and its death happened at a boundary the scan already
           -- passed -- so a re-derived type line or a drained queue both read zero.
           --
           -- orderLast's argument is the source PUT LAST on the stack, i.e. the one
@@ -654,7 +654,41 @@ orderingTests cards =
           HU.testCase "CR 608.2h counting first means the token is still alive and is not counted" $
             let (ghoul, gs) = board
                 after = snd (Engine.runGamePure (orderLast ghoul) gs Engine.priorityLoop)
-             in HU.assertEqual "nothing counted" 0 (countersOn ghoul after)
+             in HU.assertEqual "nothing counted" 0 (countersOn ghoul after),
+          -- M-1 (review): permute's reject-not-repair guard, pinned directly. The
+          -- centerpiece above only ever answers with a valid permutation (via
+          -- orderLast/countingAnswer), and the canonical-answer tests elsewhere use
+          -- the identity -- so nothing exercises the fallback branch. "Rejected"
+          -- means the input list comes back verbatim: nothing dropped, nothing
+          -- duplicated.
+          HU.testCase "permute applies a genuine permutation" $
+            HU.assertEqual "reordered" "cba" (Engine.permute "abc" [2, 1, 0]),
+          HU.testCase "permute rejects a short answer, keeping the canonical order" $
+            HU.assertEqual "unchanged" "abc" (Engine.permute "abc" [1, 0]),
+          HU.testCase "permute rejects a duplicate index, keeping the canonical order" $
+            HU.assertEqual "unchanged" "abc" (Engine.permute "abc" [0, 0, 1]),
+          HU.testCase "permute rejects an out-of-range index, keeping the canonical order" $
+            HU.assertEqual "unchanged" "abc" (Engine.permute "abc" [0, 1, 5]),
+          -- M-2 (review): apnapPlayers rotates the turn order to start at the active
+          -- player and filters to controllers with a pending trigger -- genuinely new
+          -- behaviour versus M3f's apnapOrder, which never consulted turn order at
+          -- all, and untested where two DIFFERENT players each control a trigger.
+          -- Barbarian Outcast's state trigger (CR 603.8) needs no event, so one
+          -- Outcast under EACH player, both controlling no Swamps, gives two
+          -- controllers with one trigger apiece -- fewer than two each, so no
+          -- ordering prompt is asked and the test isolates the cross-controller walk.
+          HU.testCase "CR 101.4/603.3b the active player's trigger is placed first (bottom of stack)" $
+            let gs0 = Setup.emptyGame S.bothPlayers
+                (_, gs1) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice gs0
+                (_, gs2) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.bob gs1
+                placed = snd (Engine.runGamePure S.identityAnswer gs2 Engine.placePendingTriggers)
+                controllerOf oid = fmap Object.owner (Game.lookupObject oid placed)
+                stack = GameState.stack placed
+             in case stack of
+                  [top, bottom] -> do
+                    HU.assertEqual "the OTHER player's trigger is on top -- placed second" (Just S.bob) (controllerOf top)
+                    HU.assertEqual "the active player's (alice's) trigger is at the bottom -- placed first" (Just S.alice) (controllerOf bottom)
+                  other -> HU.assertFailure ("expected exactly two triggers on the stack, got " <> show (length other))
         ]
 
 tests :: Cards.Cards -> Tasty.TestTree

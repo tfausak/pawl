@@ -39,10 +39,11 @@ encode p answer = case p of
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
 --
--- The non-matching branches are a wildcard rather than written out. With six
--- prompts and six responses the explicit form is thirty-six branches, and the
--- exhaustiveness that protects us is on Prompt -- the GADT that refines r --
--- which is still total. A new Response constructor correctly decodes to Nothing.
+-- The non-matching branches are a wildcard rather than written out. Writing
+-- every (Prompt, Response) pair explicitly is quadratic in the number of
+-- prompt constructors, and the exhaustiveness that protects us is on Prompt --
+-- the GADT that refines r -- which is still total. A new Response constructor
+-- correctly decodes to Nothing.
 decode :: Prompt r -> Response -> Maybe r
 decode p response = case p of
   Prompt.Shuffle _ -> case response of

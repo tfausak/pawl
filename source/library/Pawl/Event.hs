@@ -162,7 +162,7 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
         -- move, within the benchmark's own run-to-run noise (~800 us stddev on a
         -- ~10 ms mean), not the large regression a captured pre-move GameState
         -- would cause. That is the price of an honest history (a token has no
-        -- printed card to re-derive from, CR 111.3).
+        -- printed card to re-derive from, CR 111.1).
         snapshot = Projection.project oid gs
         -- CR 614.4: replacements exist before the event; read them from the
         -- pre-move state. CR 614.6: the modified event is what actually happens.

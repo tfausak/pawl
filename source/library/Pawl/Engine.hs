@@ -192,12 +192,17 @@ runTurnBasedActions phase = do
 -- ends the step. M0 could skip that distinction because its stack was always
 -- empty.
 -- CR 603.3: put each triggered ability that fired since the last placement on the
--- stack, in APNAP order (CR 603.3b). M3f has at most one trigger controlled by one
--- player, so the ordering is trivial and the own-order/two-part choice (CR 603.3b)
--- is elided until a second simultaneous trigger exists. Advancing scannedThrough
--- makes an event fire its triggers once (CR 603.2c) WITHOUT discarding the record.
--- Targets are chosen as the ability is placed (CR 603.3d). Returns whether any
--- were placed.
+-- stack, in APNAP order (CR 603.3b): active player's triggers first, then each
+-- other player's in turn order (apnapPlayers). Within one controller's own set,
+-- that player chooses the order (orderPending), asked only when they control two
+-- or more -- CR 603.3b's own-order choice is a real prompt now, not an elision.
+-- CR 603.3b's other half -- first place the triggers whose condition ISN'T
+-- another ability triggering, then the rest, as a separate pass -- stays a live,
+-- documented deferral: it is vacuous while nothing in the card pool triggers off
+-- another ability triggering, and is not implemented as machinery here. Advancing
+-- scannedThrough makes an event fire its triggers once (CR 603.2c) WITHOUT
+-- discarding the record. Targets are chosen as the ability is placed (CR 603.3d).
+-- Returns whether any were placed.
 placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
