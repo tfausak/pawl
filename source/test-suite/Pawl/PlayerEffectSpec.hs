@@ -90,9 +90,12 @@ ruleOfLawTests cards =
           -- EachPlayer does not prohibit him.
           HU.testCase "CR 109.5 the EachPlayer scope still counts each player's own casts" $
             HU.assertBool "bob is not prohibited" (not (PlayerEffect.prohibitsCasting S.bob afterFirst)),
-          -- CR 608.2i: the log is cleared at turn handoff, so "this turn" is
-          -- exactly the log's own extent.
-          HU.testCase "CR 608.2i the restriction lifts on the next turn" $
+          -- Engine.handoffTurn clears the event log at the turn handoff, so
+          -- "this turn" (castsThisTurn's fold over the log) is exactly the
+          -- log's own extent -- CR 608.2i is the "look back in time" rule and
+          -- says nothing about the log being cleared, so this is an
+          -- implementation fact rather than a rules citation.
+          HU.testCase "the restriction lifts on the next turn" $
             let handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
                 nextOwnTurn =
                   (handoff (handoff afterFirst))
@@ -274,7 +277,39 @@ thaliaTests cards =
              in HU.assertEqual
                   "bob's {R} is also {1}{R}"
                   (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
-                  (Cost.total S.bob bobBolt (ManaCost.MkManaCost [red]) withBob)
+                  (Cost.total S.bob bobBolt (ManaCost.MkManaCost [red]) withBob),
+          -- Cast.castableWhileSearching's cost half (CR 601.2f, via Cost.total),
+          -- untested until now: Panglacial Wurm is a CREATURE spell, so Thalia's
+          -- NoncreatureSpell criterion (matched against the projection, per
+          -- Projection.cardTypesOf) does not admit it, and its total cost is
+          -- unaffected. Rule of Law -- in the SAME GameState, never cast -- is
+          -- the positive control: it IS a noncreature spell, so its total cost
+          -- IS taxed here, which is what proves Thalia's effect is actually live
+          -- rather than the Wurm assertion passing because nothing was ever
+          -- taxed. Exactly seven Forests pay the Wurm's printed {5}{G}{G} with no
+          -- slack (CastSpec's own "too little mana" case shows fewer is not
+          -- enough), so if the tax wrongly reached the Wurm, castableWhileSearching
+          -- would offer nothing here.
+          HU.testCase "CR 601.2f a library-cast creature spell is unaffected by Thalia's noncreature tax" $
+            let green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+                white = ManaSymbol.OfType (ManaType.Colored Color.White)
+                base = S.landsInPlay (Cards.forestPrinting cards) 7
+                (_, withThalia) = S.addCreature (Cards.thaliaPrinting cards) S.alice base
+                (wurm, withWurm) = S.addLibraryCard (Cards.panglacialWurmPrinting cards) S.alice withThalia
+                (rol, gs) = S.addHandCard (Cards.ruleOfLawPrinting cards) S.alice withWurm
+             in do
+                  HU.assertEqual
+                    "positive control: Rule of Law, a noncreature spell, IS taxed here"
+                    (ManaCost.MkManaCost [ManaSymbol.Generic 3, white])
+                    (Cost.total S.alice rol (ManaCost.MkManaCost [ManaSymbol.Generic 2, white]) gs)
+                  HU.assertEqual
+                    "the Wurm's total cost is untouched"
+                    (ManaCost.MkManaCost [ManaSymbol.Generic 5, green, green])
+                    (Cost.total S.alice wurm (ManaCost.MkManaCost [ManaSymbol.Generic 5, green, green]) gs)
+                  HU.assertEqual
+                    "exactly seven Forests still afford it, so castableWhileSearching offers it"
+                    [wurm]
+                    (Cast.castableWhileSearching S.alice gs)
         ]
 
 -- Sapphire Medallion {2} Artifact: "Blue spells you cast cost {1} less to cast."

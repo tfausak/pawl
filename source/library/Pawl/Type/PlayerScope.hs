@@ -17,7 +17,11 @@ module Pawl.Type.PlayerScope where
 data PlayerScope
   = -- CR 109.5: the effect's controller.
     You
-  | -- CR 102.1: every other player in the game.
+  | -- CR 102.2: "In a two-player game, a player's opponent is the other
+    -- player." `pid /= controller` (Pawl.PlayerEffect.inScope) is exactly
+    -- that, but only in a two-player game -- CR 102.3 makes a teammate NOT an
+    -- opponent in a team game, so the implementation carries an unstated
+    -- two-player assumption.
     Opponents
   | -- Every player, the controller included ("including your own", Thalia's own
     -- ruling).

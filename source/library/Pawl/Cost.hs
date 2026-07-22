@@ -23,7 +23,10 @@ import Pawl.Type.PlayerId (PlayerId)
 -- 601.2f's increases and reductions: a spell's additional and alternative costs
 -- are unmodelled (#4), and an activated ability's total cost never reaches this
 -- function at all -- Pawl.Activate hands AbilityCost.mana straight to Pawl.Mana
--- (#90).
+-- (#90). Nor is the result ever "locked in": CR 601.2f's own last sentence makes
+-- the total cost fixed once determined, but this function is recomputed fresh
+-- from the current game state on every call, with no stored announcement record
+-- (#94).
 total :: PlayerId -> ObjectId -> ManaCost -> GameState -> ManaCost
 total pid oid cost gs = applyAdjustments (PlayerEffect.costAdjustments pid oid gs) cost
 
@@ -68,6 +71,9 @@ applyAdjustments adjustments cost =
       isTyped symbol = case symbol of
         ManaSymbol.Generic _ -> False
         ManaSymbol.OfType _ -> True
+        -- Unreachable for the same reason genericOf's Variable arm is: kept
+        -- (retained, not stripped) so that if it ever were reachable, a bare
+        -- {X} would still be treated as typed and survive the filter below.
         ManaSymbol.Variable -> True
       raised = sum (map genericOf symbols) + sum increases
       taken = sum reductions

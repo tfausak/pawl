@@ -1582,7 +1582,10 @@ its own gate card and spec, landed as it completes. Umbrella:
   **every** order, because CR 118.7a routes every reduction P7 can express to the
   same generic component. **The phase's transferable lesson is about
   citations, and it is sharper than P5's or P6's.** The *plan itself* shipped
-  three classes of rule-citation error, and review caught all three: CR 102.1
+  three classes of rule-citation error, and review caught all three — though
+  the CR 102.1 fix initially landed only in `Pawl.PlayerEffect.inScope` and
+  missed its sibling comment in `Pawl.Type.PlayerScope`, which the final
+  whole-branch review caught and corrected on its own pass: CR 102.1
   where 102.2 was meant (102.1 defines *player*; 102.2 is the two-player
   opponent rule, and 102.3's teams are exactly why the implementation's
   `pid /= controller` carries a documented two-player assumption); CR 118.7e for
