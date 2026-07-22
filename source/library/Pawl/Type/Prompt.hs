@@ -78,12 +78,23 @@ data Prompt r where
   -- canonical order; the answer is a permutation of the entry INDICES, giving the
   -- order they are PUT ON THE STACK (so the last named resolves first).
   --
-  -- Positional by necessity, unlike a target slot: two triggers from one source
-  -- are genuinely indistinguishable, so any permutation among identical entries
-  -- is equivalent. Asked ONLY when the player controls two or more -- with one
-  -- there is nothing to choose, and where the rules leave nothing to ask, don't
-  -- prompt. CR 603.3b's TWO-PART process (first the triggers whose condition is
-  -- not another ability triggering, then the rest) is vacuous while no condition
-  -- triggers on another ability triggering; this carries the note, not the
-  -- machinery.
+  -- Positional by necessity, unlike a target slot: each entry carries only its
+  -- SOURCE, no ability discriminator. That is CONTINGENT, not a rules property:
+  -- it holds only while no single source can have two DISTINCT abilities
+  -- triggered in the same batch (two triggers from the SAME ability on one
+  -- source really are indistinguishable, and any permutation among those is
+  -- equivalent). It holds today only as an accident of the settle schedule --
+  -- Sarcomancy already carries two triggered abilities (an ETB and an upkeep
+  -- trigger), but they cannot co-trigger because the step event that would fire
+  -- the upkeep trigger is always scanned before any spell can resolve to place
+  -- Sarcomancy and fire its ETB in the same batch. EXPIRES at the first card
+  -- whose source can have two distinct abilities triggered together: at that
+  -- point two different abilities become identical entries on the wire while
+  -- their order genuinely matters, and the payload needs an ability
+  -- discriminator alongside the source. Asked ONLY when the player controls two
+  -- or more -- with one there is nothing to choose, and where the rules leave
+  -- nothing to ask, don't prompt. CR 603.3b's TWO-PART process (first the
+  -- triggers whose condition is not another ability triggering, then the rest)
+  -- is vacuous while no condition triggers on another ability triggering; this
+  -- carries the note, not the machinery.
   OrderTriggers :: Decider -> PlayerId -> [ObjectId] -> Prompt [Natural]

@@ -31,9 +31,10 @@ data GameEvent
   | -- CR 120 / 510: damage was dealt. The record the CR 704.5h deathtouch
     -- state-based action reads, watermarked rather than drained.
     DamageDealt DamageEvent
-  | -- CR 603.2b: a phase or step began, on whose turn (the active player). What a
-    -- "at the beginning of each end step" trigger matches against (and, once P4
-    -- Task 6 adds delayed abilities, what a CR 603.7 delayed ability will match
-    -- against too -- that consumer does not exist yet).
+  | -- CR 603.2b: a phase or step began, on whose turn (the active player). What
+    -- both an "at the beginning of each end step" step trigger and a CR 603.7
+    -- delayed ability match against -- the second consumer is
+    -- Pawl.Event.delayedPending (Tidal Wave's "sacrifice it at the beginning of
+    -- the next end step" depends on it).
     StepBegan Phase PlayerId
   deriving (Eq, Ord, Show)

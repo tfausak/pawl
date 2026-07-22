@@ -56,8 +56,9 @@ import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
 
 -- CR 608.2i: append one entry to the turn-scoped log. The single APPEND point --
--- Engine.handoffTurn clears the log at turn end, Setup.emptyGame seeds it empty,
--- and the test helper Support.withEvent sets it directly; none of those append.
+-- Engine.handoffTurn clears the log at turn end, Setup.emptyGame and the test
+-- fixture Support.oneMountainState both seed it empty, and the test helper
+-- Support.withEvent sets it directly; none of those append.
 recordEvent :: GameEvent -> GameState -> GameState
 recordEvent event gs = gs {GameState.events = GameState.events gs Seq.|> event}
 
@@ -497,6 +498,23 @@ stateTriggers gs =
 -- 603.7's few state-triggered delayed abilities, e.g. "at the beginning of the
 -- next end step" clauses, are all StepBegins in this pool). Noted because a later
 -- P4 task touches state conditions again and should see this before adding one.
+--
+-- Named deferral: the surviving store this function returns is computed from
+-- the EVENT MATCH (`fires`) alone, before gatherTriggers's CR 603.4
+-- intervening-"if" filter (`interveningHolds`) ever runs on the entries it
+-- produces. If a stored entry's ability carries an intervening "if" that is
+-- false when its trigger event occurs, `fires` is still True (it only checks
+-- the event, not the condition), so the entry is REMOVED here -- spending CR
+-- 603.7b's one shot -- and then interveningHolds drops it from the pending
+-- list downstream. Net effect: the ability neither goes on the stack now nor
+-- remains armed for its trigger event's next occurrence, even though CR 603.4
+-- says a false intervening "if" means the ability "does nothing" -- for a
+-- delayed ability that should leave it still waiting, not consume its single
+-- CR 603.7b shot. Unreachable today: Tidal Wave's delayed ability, the only
+-- one in this pool, has no `intervening`. EXPIRES at the first delayed ability
+-- with an intervening "if" -- closing this needs either the intervening check
+-- threaded into `fires` itself, or the store pruned from gatherTriggers's
+-- post-filter list instead of from here.
 delayedPending :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 delayedPending events gs =
   let fires entry =

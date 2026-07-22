@@ -66,7 +66,7 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 -- EQUALITY-style D4 lint (declared == read, the spell-mode lint's own shape)
 -- widened to run over a triggered/activated/delayed ability's modes. That
 -- extension MUST subtract the reserved slot names (this one, variableX,
--- chosenModes, copySource) from the read-slots side before comparing --
+-- chosenModes, copySource, you) from the read-slots side before comparing --
 -- loosening the equality to a subset would silently retire its "declared but
 -- never read" half instead.
 triggerSource :: SlotName
@@ -74,8 +74,20 @@ triggerSource = SlotName.MkSlotName (Text.pack "self")
 
 -- CR 109.5: the reserved slot under which a triggered ability's CONTROLLER is
 -- bound ("you"), so a targetless self-referential clause -- Sarcomancy's "deals 1
--- damage to you" -- is a slot read rather than a new opcode. No card's
--- targetSpecs may name it: "you" is not a target.
+-- damage to you" -- is a slot read rather than a new opcode.
+--
+-- Unlike variableX / chosenModes / triggerSource above, "no card's targetSpecs
+-- may name it" is NOT lint-enforced here. The D4 lint that exists only walks a
+-- card's SPELL modes (Card.allTargetSpecs is Modal.allTargetSpecs (Card.spell
+-- card), CardSpec.hs) -- the same scope limit triggerSource's comment above
+-- documents. "you" is stamped exclusively on TRIGGERED abilities (setYou below
+-- is called only when a triggered ability is placed, Pawl.Engine), whose modes
+-- that lint never visits. So a card declaring a "you" target spec on a
+-- triggered ability would pass the lint today, be prompted for a target, and
+-- have the answer silently clobbered by setYou's insert. The fix is extending
+-- the delayed-ability lint's subset shape to Card.triggeredAbilities (out of
+-- scope for this phase); until then this is a documented gap, not an enforced
+-- guarantee.
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
 

@@ -505,6 +505,48 @@ new card exists to confuse the diagnosis.
 - **Event kinds with no reader**: spell casts, attacks, life changes, counter
   placement. **VOCAB**; each is added by the phase that needs it (`SpellCast` at
   **P7**).
+- **Unenforced sacrifice-control restriction (CR 701.21a).** `Event.sacrifice`
+  doesn't check "a player can't sacrifice ... a permanent they don't control" --
+  not wrong today, since its only caller (`Resolve`'s `Sacrifice` arm) reads
+  `Binding.triggerSource` (CR 113.7, a triggered ability's own source), always
+  controlled by whoever triggered it. **Expires** at the first effect that can
+  name a permanent its controller doesn't control (an opponent-sacrifice edict,
+  e.g. Diabolic Edict).
+- **Trigger control read at the scan boundary, not at the trigger moment (CR
+  603.3a).** `Event.eventTriggers` reads a triggered ability's controller via
+  `Projection.controllerOf` at the CR 117.5 scan boundary, not at the moment the
+  underlying event fired. Carried forward from M3f; unobservable today because
+  nothing changes control between an event and the boundary. **Expires** at the
+  first effect that can change control between an event and the boundary.
+- **State-trigger non-termination if all modes are unfillable.** A state trigger
+  whose modes are all unfillable would be removed from the stack (CR 603.3c) and
+  re-trigger on the next settle pass while its condition still held, looping
+  forever. No card in the pool can do that -- Barbarian Outcast's single mode has
+  no target slots and is always fillable. **Expires** at the first state-triggered
+  card whose modes can all be unfillable.
+- **Two identical state triggers on one source conflated by Source equality.**
+  `Event.stateTriggers`' suppression check compares `Object.source obj ==
+  Source.OfTrigger srcId ab`; if a single source ever carried two textually
+  identical `StateIs` abilities, this would conflate them into one value and
+  suppress the second as though it were an instance of the first. No card in the
+  pool has two identical state triggers on one source. **Expires** at the first
+  such card.
+- **Partial CR 514.3 cleanup-step handling.** `Engine.advance` settles once more
+  at turn end so cleanup's turn-based-action events are scanned before
+  `handoffTurn` clears the log, but does not build CR 514.3a's extra cleanup step
+  and priority round -- a trigger placed here resolves at the next turn's first
+  priority instead of during that cleanup. **Expires** at the first card whose
+  triggered ability fires on a cleanup-step event and must resolve during that
+  cleanup.
+- **Delayed ability's intervening "if" pruned before it is checked (CR 603.4 /
+  603.7b).** `Event.delayedPending` removes a fired entry from the delayed-trigger
+  store based on the event match alone, before `gatherTriggers`'s CR 603.4
+  intervening-"if" filter ever runs; if the condition is false, the entry is
+  dropped from the pending list but has already spent its CR 603.7b single shot,
+  instead of remaining armed for the trigger event's next occurrence.
+  Unreachable today: Tidal Wave's delayed ability, the only one in the pool, has
+  no `intervening`. **Expires** at the first delayed ability with an intervening
+  "if".
 
 ## 9. Tracking
 

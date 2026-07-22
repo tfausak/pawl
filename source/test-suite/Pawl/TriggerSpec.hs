@@ -1,13 +1,14 @@
--- Covers M4.5 P4 Task 1: the turn-scoped event log (Pawl.Type.GameEvent,
+-- Covers M4.5 P4 in full. The turn-scoped event log (Pawl.Type.GameEvent,
 -- GameState's log and watermarks) -- append-only recording, watermark-based
 -- consumption per reader (trigger scan, SBA damage check), and the log's
--- turn-scoped clearing at handoff. Task 2 adds the CR 603.2b step-beginning
+-- turn-scoped clearing at handoff -- `logTests`. The CR 603.2b step-beginning
 -- event and the CR 603.6a widened scan (every battlefield permanent, not just
--- an enters event's newcomer) -- `scanTests` below. Task 4 adds CR 603.8
--- state triggers -- `stateTriggerTests` below. Task 6 adds CR 603.7 delayed
--- triggered abilities -- `delayedTests` below. Task 7 adds the CR 603.3b
--- ordering prompt -- `orderingTests` below. Later P4 tasks still owe coverage
--- HERE for intervening "if" (CR 603.4 / 608.2a), not yet implemented.
+-- an enters event's newcomer) -- `scanTests`. The `Sacrifice` opcode and its
+-- reserved trigger-source slot, CR 701.21 -- `sacrificeTests`. CR 603.8 state
+-- triggers -- `stateTriggerTests`. CR 608.2i turn history (Khabál Ghoul's
+-- "died this turn") -- `historyTests`. CR 603.7 delayed triggered abilities
+-- -- `delayedTests`. The CR 603.3b ordering prompt -- `orderingTests`. The CR
+-- 603.4 / 608.2a intervening "if" -- `interveningTests`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
