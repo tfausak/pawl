@@ -2540,7 +2540,7 @@ The centerpiece test is the phase's whole thesis in one scenario: Tidal Wave's d
 - Consumes: everything from Tasks 1–6.
 - Produces: `Prompt.OrderTriggers :: Decider -> PlayerId -> [ObjectId] -> Prompt [Natural]`; `Response.OrderedTriggers [Natural]`; `Pawl.Engine.orderPending :: [PendingTrigger] -> Game [PendingTrigger]`. `Pawl.Engine.apnapOrder` is **replaced** by `Pawl.Engine.apnapPlayers :: GameState -> [PendingTrigger] -> [PlayerId]`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `source/test-suite/Pawl/TriggerSpec.hs` (and to the `tests` list):
 
@@ -2593,16 +2593,20 @@ orderingTests cards =
           -- Ghoul count it when its own effect is applied. The token has NO printed
           -- card (CR 111.3) and its death happened at a boundary the scan already
           -- passed -- so a re-derived type line or a drained queue both read zero.
+          --
+          -- orderLast's argument is the source PUT LAST on the stack, i.e. the one
+          -- that RESOLVES FIRST. For the sacrifice to resolve first, the OTHER
+          -- (non-Ghoul) trigger is the one named -- not the Ghoul itself.
           HU.testCase "CR 608.2h sacrificing first makes the Ghoul count the token" $
             let (ghoul, gs) = board
-                after = snd (Engine.runGamePure (orderLast ghoul) gs Engine.priorityLoop)
+                after = snd (Engine.runGamePure (orderLast (otherThan ghoul gs)) gs Engine.priorityLoop)
              in HU.assertEqual "the token was counted" 1 (countersOn ghoul after),
           -- The Ghoul resolves FIRST: the token is still alive, so it is not
           -- counted. Same board, same cards, opposite answer -- which is what makes
           -- the ordering a genuine choice rather than a formality.
           HU.testCase "CR 608.2h counting first means the token is still alive and is not counted" $
             let (ghoul, gs) = board
-                after = snd (Engine.runGamePure (orderLast (otherThan ghoul gs)) gs Engine.priorityLoop)
+                after = snd (Engine.runGamePure (orderLast ghoul) gs Engine.priorityLoop)
              in HU.assertEqual "nothing counted" 0 (countersOn ghoul after)
         ]
 ```
@@ -2623,12 +2627,12 @@ Add to `source/test-suite/Pawl/ReplaySpec.hs`'s `combatReplayTests` list:
               (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice [oid, ObjectId.MkObjectId 8])),
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Prompt.OrderTriggers` is not a constructor.
 
-- [ ] **Step 3: Add the prompt and its response**
+- [x] **Step 3: Add the prompt and its response**
 
 In `source/library/Pawl/Type/Prompt.hs`:
 
@@ -2680,7 +2684,7 @@ Add the same canonical-order arm to every other answerer: `Pawl.Support`'s `iden
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
 ```
 
-- [ ] **Step 4: Ask the question in `Engine`**
+- [x] **Step 4: Ask the question in `Engine`**
 
 In `source/library/Pawl/Engine.hs`, replace `apnapOrder` with the APNAP player walk plus the per-controller ordering, and call it from `placePendingTriggers`:
 
@@ -2741,12 +2745,12 @@ Add `import Numeric.Natural (Natural)` to `Engine.hs`.
 
 Note the stack semantics the prompt's comment states: `placeOne` conses onto the stack, so the trigger placed **last** is on top and resolves **first**. That is CR 603.3b read literally — the answer is the order they are *put on the stack*.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. The two centerpiece cases must give **different** counter totals; if they agree, either the ordering is not being honoured or the count is not being taken at application time (CR 608.2h) — do not adjust the assertions.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add source/library/Pawl/Type/Prompt.hs source/library/Pawl/Type/Response.hs source/library/Pawl/Engine.hs source/library/Pawl/Replay.hs source/test-suite/Pawl/TriggerSpec.hs source/test-suite/Pawl/ReplaySpec.hs source/test-suite/Pawl/Support.hs source/test-suite/Pawl/GameSpec.hs source/test-suite/Pawl/CastSpec.hs source/test-suite/Pawl/CopySpec.hs source/benchmark/Main.hs
