@@ -7,6 +7,7 @@
 -- vocabulary, so they share one sweep.
 module Pawl.Expiry where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Pawl.Event as Event
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
@@ -63,15 +64,22 @@ dropAtCleanup gs =
 
 -- CR 611.2b: drop every While whose condition has stopped holding. The effect is
 -- DELETED, not masked: 611.2b's duration is one continuous period, so an effect
--- that has ended must stay ended even if the condition becomes true again
--- ("Regaining control of Master Thief won't cause you to regain control of the
--- artifact"). Reports whether it changed anything, so Engine.settleForPriority
+-- that has ended must stay ended even if the condition becomes true again --
+-- CR 611.2b: "It doesn't start and immediately stop again, and it doesn't last
+-- forever." Reports whether it changed anything, so Engine.settleForPriority
 -- knows to run again.
 --
 -- CR 704.3 fixes the coarsest moment anything can OBSERVE the condition --
 -- "whenever a player would get priority" -- and settleForPriority runs at
 -- exactly the points where the board can change, so checking here is
 -- indistinguishable from checking continuously.
+--
+-- `filter` only ever removes elements and preserves the survivors' relative
+-- order, so a LENGTH compare is exactly equivalent to the deep structural `/=`
+-- this used before -- and cheaper: no need to walk every kept element's Eq
+-- instance on a settle that changed nothing (the common case). `State.put` is
+-- skipped on that same common case, so a no-op sweep doesn't even rewrite the
+-- GameState.
 sweepConditional :: Game Bool
 sweepConditional = do
   gs <- State.get
@@ -84,8 +92,12 @@ sweepConditional = do
       keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
       keptEffects = filter keepEffect (GameState.continuousEffects gs)
       keptReplacements = filter keepReplacement (GameState.replacements gs)
-  State.put gs {GameState.continuousEffects = keptEffects, GameState.replacements = keptReplacements}
-  pure (keptEffects /= GameState.continuousEffects gs || keptReplacements /= GameState.replacements gs)
+      changed =
+        length keptEffects /= length (GameState.continuousEffects gs)
+          || length keptReplacements /= length (GameState.replacements gs)
+  Monad.when changed $
+    State.put gs {GameState.continuousEffects = keptEffects, GameState.replacements = keptReplacements}
+  pure changed
 
 -- CR 611.2a: "until your next turn" ends as that player's turn begins. Run at
 -- the turn handoff, AFTER activePlayer has been updated, so "a turn began and

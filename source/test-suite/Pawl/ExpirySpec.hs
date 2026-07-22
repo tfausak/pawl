@@ -15,6 +15,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Expiry as Expiry.Type
 import qualified Pawl.Type.GameState as GameState
@@ -22,7 +23,10 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.StateCondition as StateCondition
+import qualified Pawl.Type.Uses as Uses
+import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -125,6 +129,24 @@ whileEffect src target you gs =
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
+-- The OTHER carrier's shape of whileEffect: a floating replacement whose expiry
+-- is a live condition over `src`. The effect payload is irrelevant to what this
+-- proves (only `expiry` and `source` are read by sweepConditional's
+-- keepReplacement predicate), so it reuses Support.addRegenShield's
+-- DestructionR Regenerate as the shortest available fixture.
+whileReplacement :: ObjectId.ObjectId -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+whileReplacement src you gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      active =
+        ActiveReplacement.MkActiveReplacement
+          { ActiveReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            ActiveReplacement.source = src,
+            ActiveReplacement.timestamp = ts,
+            ActiveReplacement.expiry = Expiry.Type.While you StateCondition.YouControlSource,
+            ActiveReplacement.uses = Uses.Unlimited
+          }
+   in S.addReplacement active gs1
+
 conditionalTests :: Cards.Cards -> Tasty.TestTree
 conditionalTests cards =
   let board =
@@ -175,7 +197,22 @@ conditionalTests cards =
             let (srcId, targetId, gs) = board
                 gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
                 settled = S.runPure S.identityAnswer gone Engine.settleForPriority
-             in HU.assertEqual "control reverted at the settle" (Just S.bob) (Projection.controllerOf targetId settled)
+             in HU.assertEqual "control reverted at the settle" (Just S.bob) (Projection.controllerOf targetId settled),
+          HU.testCase "CR 611.2b the sweep's replacements half survives while the source stands, then deletes once it doesn't" $
+            let (srcId, _, gs0) = board
+                gs = whileReplacement srcId S.alice gs0
+                (unchanged, stillUp) = Engine.runGamePure S.identityAnswer gs Expiry.sweepConditional
+                -- A direct zone change, NOT Event.destroy: the fixture's own
+                -- payload is a DestructionR (Regenerate), so routing the removal
+                -- through the destruction funnel would let it replace/regenerate
+                -- itself instead of leaving the battlefield.
+                gone = S.runPure S.identityAnswer gs (Event.changeZone srcId Zone.Graveyard)
+                (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
+             in do
+                  HU.assertBool "no change while the source stands" (not unchanged)
+                  HU.assertEqual "the replacement survives" 1 (length (GameState.replacements stillUp))
+                  HU.assertBool "the sweep reports a change once the source is gone" changed
+                  HU.assertEqual "the replacement is gone" [] (GameState.replacements swept)
         ]
 
 tests :: Cards.Cards -> Tasty.TestTree

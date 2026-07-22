@@ -339,19 +339,21 @@ permute xs order =
 -- is granted (by the caller). The repeat is gated on three cheap booleans --
 -- whether the conditional sweep changed anything, whether an SBA fired and
 -- whether a trigger was placed -- so a settle that changes nothing (the common
--- case) costs one board projection, NOT a deep GameState equality check.
+-- case) costs one board projection and one length comparison per carrier, NOT
+-- a deep GameState equality check.
 --
 -- CR 611.2b's condition is checked continuously, and CR 704.3 makes "whenever
 -- a player would get priority" the coarsest moment anything could observe it,
 -- so settling here is indistinguishable from checking continuously. The sweep
--- runs FIRST, before the SBA check: losing control of a permanent changes what
--- the state-based-action check sees (a creature that stops being controlled by
--- its would-be owner of a keyword, say), so the SBA pass must see the
--- post-sweep board. The loop re-runs whenever ANYTHING fired, because an SBA
--- can itself be what falsifies a condition (e.g. a permanent the condition
--- names is destroyed). A game with no While stored pays one list scan.
+-- runs FIRST, before the SBA check: a "for as long as you control this" effect
+-- ending (Master Thief) returns a permanent to another player's control, and
+-- CR 704.5j's legend rule is checked "controlled by the same player" -- the SBA
+-- pass must see the post-sweep control, not the moment before it reverted. The
+-- loop re-runs whenever ANYTHING fired, because an SBA can itself be what
+-- falsifies a condition (e.g. a permanent the condition names is destroyed). A
+-- game with no While stored pays one list scan.
 --
--- P5 removed the fourth gate this comment used to describe. The as-enters copy
+-- P5 removed the third gate this comment used to describe. The as-enters copy
 -- drain used to run here, first, because a copied permanent's characteristics
 -- had to be locked in before any SBA or trigger observed it (CR 614.12a). The
 -- entry loop now runs inside the zone change itself, before the Moved event
