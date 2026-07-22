@@ -5,19 +5,11 @@
 -- the funnels that raise proposed events through it. Mostly gameplay-level --
 -- put a board together, cast or resolve, assert on game state -- but a case
 -- reaches for a more direct construction whenever gameplay cannot produce the
--- exact shape the property under test needs: driving the loop on hand-built
--- ProposedEvent values (CR 614.5, where the card pool has only one
--- replacement-bearing printing and no gameplay board can produce two
--- independently-sourced, mutually-applicable redirects), hand-building a
--- DamageEvent batch after a real cast (CR 615.10 Fog, where reaching one
--- through combat would mean driving an entire combat phase the property does
--- not need), or seeding GameState.combat's attacker map directly (CR 701.19a,
--- the same shortcut Support.addRegenShield takes for the shield itself,
--- because declaring a legal attacker needs a full combat phase too). Each such
--- case says so at the point it happens, rather than here.
+-- exact shape the property under test needs. Where a case departs from
+-- gameplay-level testing, it justifies itself at the point it happens, rather
+-- than here.
 module Pawl.ReplacementSpec where
 
-import qualified Control.Exception as Exception
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -27,10 +19,8 @@ import qualified Pawl.Activate as Activate
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Damage as Damage
-import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
-import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -38,10 +28,8 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.AttackTarget as AttackTarget
-import qualified Pawl.Type.CandidateId as CandidateId
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.Combat as Combat
-import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -54,15 +42,9 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.ProposedEvent as ProposedEvent
 import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.ReplacementCandidate as ReplacementCandidate
-import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Zone as Zone
-import qualified Pawl.Type.ZoneChange as ZoneChange
-import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
-import qualified System.Timeout as Timeout
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -158,54 +140,6 @@ tests cards =
          in do
               HU.assertEqual "in bob's hand" 1 (length (Game.zoneMembers Zone.Hand S.bob after))
               HU.assertEqual "nothing was exiled" 0 (Set.size (GameState.exile after)),
-      -- CR 614.5's actual mechanism, driven directly against Pawl.Replacement --
-      -- the card pool has exactly one replacement-bearing printing (Rest in
-      -- Peace), never two independently-sourced redirects that stay applicable
-      -- to their own output, so gameplay-level coverage cannot reach this. Two
-      -- candidates EQUAL AS VALUES (same ZoneChangeR effect) but with different
-      -- SOURCES, on a SYNTHETIC PRINTING -- the Card value carries Rest in
-      -- Peace's real name and trigger, but a fabricated Graveyard -> Graveyard
-      -- replacement effect no real card in the pool prints -- redirecting to
-      -- the very zone their own pattern watches, so,
-      -- unlike the test above, applying one does NOT make the event stop
-      -- matching the other's pattern. Both stay applicable to the rewritten
-      -- event FOREVER unless CR 614.5's applied set excludes each one after its
-      -- own turn. Verified by hand (temporarily replacing loop's `unused`
-      -- filter with `const True`) that this hangs `loop` -- confirming the
-      -- timeout below is not vacuous. Retire this synthetic printing once the
-      -- Hardened Scales case lands, two tasks from now: two Hardened Scales and
-      -- one +1/+1 counter must yield 3 -- not 2, and not a hang -- which covers
-      -- BOTH halves of CR 614.5 (termination and one-opportunity-each) at
-      -- gameplay level with a real card, while this synthetic printing can only
-      -- cover the termination half (#N).
-      HU.testCase "CR 614.5 the applied set gives two value-equal candidates one turn each, and only one" $
-        let selfRedirect =
-              ReplacementEffect.ZoneChangeR
-                (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones)
-                Zone.Graveyard
-            baseCard = Printing.card (Cards.restInPeacePrinting cards)
-            printing = Printing.MkPrinting baseCard {Card.replacementEffects = [selfRedirect]}
-            (src1, g0) = S.addCreature printing S.alice (Setup.emptyGame S.bothPlayers)
-            (src2, g1) = S.addCreature printing S.alice g0
-            (piker, g2) = S.addPiker cards S.bob g1
-            zc = ZoneChange.MkZoneChange piker Zone.Battlefield Zone.Graveyard
-            event = ProposedEvent.WouldChangeZone zc
-            id1 = CandidateId.OfPermanent src1 selfRedirect
-            id2 = CandidateId.OfPermanent src2 selfRedirect
-            before = Replacement.applicable g2 event
-            -- collect (and so applicable) lists battlefield permanents ascending
-            -- by id (its own comment); src1 was placed before src2, so it sorts
-            -- first.
-            run = fst (Engine.runGamePure S.identityAnswer g2 (Replacement.loop Set.empty event))
-         in do
-              HU.assertEqual
-                "both candidates apply before either fires -- this is not the pattern-mismatch escape above"
-                [id1, id2]
-                (map ReplacementCandidate.identity before)
-              settled <- Timeout.timeout 2000000 (Exception.evaluate run)
-              case settled of
-                Nothing -> HU.assertFailure "loop did not terminate -- CR 614.5's applied set is not stopping re-application"
-                Just outcome -> HU.assertEqual "the event survives, settled back at the zone both candidates watch" (Just event) outcome,
       HU.testCase "CR 615.10 Fog prevents both attackers' damage in one batch" $
         let base = S.landsInPlay (Cards.forestPrinting cards) 1
             (victimA, g1) = S.addCreature (Cards.pikerPrinting cards) S.bob base

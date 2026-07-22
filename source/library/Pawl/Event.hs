@@ -187,14 +187,15 @@ changeZone oid requestedDest = do
 -- The single destruction funnel (CR 701.8 / 702.12b): every destruction -- the
 -- Destroy opcode and the CR 704.5g/h state-based actions -- flows through here.
 --
--- CR 702.12b: an indestructible permanent can't be destroyed, and that gate comes
--- BEFORE the replacement loop, which is CR 614.7: "If a replacement effect would
--- replace an event, but that event never happens, the replacement effect simply
--- doesn't do anything" -- a regeneration shield is neither applied nor consumed.
--- Otherwise the would-be-destroyed event is offered to CR 616.1; if it
--- survives, the permanent is put into its owner's graveyard via
--- changeZone (so Rest in Peace's redirect and a token's CR 704.5d cease-to-exist
--- still compose). Ungated for CR 701.19c "can't be regenerated" (#42).
+-- CR 702.12b: an indestructible permanent can't be destroyed, and that gate
+-- comes BEFORE the replacement loop, which is CR 614.7: "If a replacement
+-- effect would replace an event, but that event never happens, the
+-- replacement effect simply doesn't do anything" -- a regeneration shield is
+-- neither applied nor consumed. Otherwise the would-be-destroyed event is
+-- offered to CR 616.1; if it survives, the permanent is put into its owner's
+-- graveyard via changeZone (so Rest in Peace's redirect and a token's CR
+-- 704.5d cease-to-exist still compose). Ungated for CR 701.19c "can't be
+-- regenerated" (#42).
 destroy :: ObjectId -> Game ()
 destroy oid = do
   gs <- State.get
@@ -207,9 +208,11 @@ destroy oid = do
           happens <- Replacement.resolveDestruction oid
           Monad.when happens (changeZone oid Zone.Graveyard)
 
--- The single counter funnel (CR 122.6). Before P5 the PutCounters opcode edited
--- Object.counters in place with no funnel at all, so there was nothing for a
--- replacement to intercept.
+-- The single counter-PLACEMENT funnel (CR 122.6: counters as markers on a
+-- permanent -- not to be confused with `counter` below, CR 701.6's countering
+-- of a spell). Before P5 the PutCounters opcode edited Object.counters in
+-- place with no funnel at all, so there was nothing for a replacement to
+-- intercept.
 --
 -- CR 122.6 makes this the right single seam: "Some spells and abilities refer to
 -- counters being put on an object. This refers to putting counters on that object
@@ -226,12 +229,14 @@ putCounters oid kind n = do
           let bump obj = obj {Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters obj)}
            in gs {GameState.objects = Map.adjust bump target (GameState.objects gs)}
 
--- The single counter funnel (CR 701.6). A countered spell is removed from the
--- stack and put into its owner's graveyard (CR 701.6a) via changeZone -- so Rest
--- in Peace's redirect (graveyard->exile) and CR 400.7's new incarnation still
--- compose, exactly as they do for destroy. Ungated for "can't be countered" (CR
--- 701.6), and emits no distinct "was countered" event (#43) -- the same posture
--- as Event.destroy being ungated for CR 701.19c.
+-- The single spell-countering funnel (CR 701.6 -- not to be confused with
+-- `putCounters` above, CR 122.6's placement of counter markers). A countered
+-- spell is removed from the stack and put into its owner's graveyard (CR
+-- 701.6a) via changeZone -- so Rest in Peace's redirect (graveyard->exile) and
+-- CR 400.7's new incarnation still compose, exactly as they do for destroy.
+-- Ungated for "can't be countered" (CR 701.6), and emits no distinct "was
+-- countered" event (#43) -- the same posture as Event.destroy being ungated
+-- for CR 701.19c.
 counter :: ObjectId -> Game ()
 counter oid = do
   gs <- State.get

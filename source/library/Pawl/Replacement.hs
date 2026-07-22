@@ -166,7 +166,7 @@ applies gs event candidate =
         -- card pool is self-regeneration (CR 701.19a).
         (ReplacementEffect.DestructionR _, ProposedEvent.WouldBeDestroyed oid) -> src == oid
         (ReplacementEffect.CounterR pat _, ProposedEvent.WouldPutCounters oid kind _) ->
-          -- CR 614.1: `whichKind = Nothing` means any kind, never no kind.
+          -- CR 614.16: `whichKind = Nothing` means any kind, never no kind.
           maybe True (== kind) (CounterPattern.whichKind pat)
             && matchesController gs src (CounterPattern.whose pat) oid
             && matchesPermanent gs (CounterPattern.onWhat pat) oid
@@ -194,15 +194,15 @@ matchesController gs src rel oid = case rel of
   ControllerRelation.Anyones -> True
   ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
 
--- CR 614.1: which permanents a pattern admits. P9 generalizes this.
+-- CR 614.16: which permanents a pattern admits. P9 generalizes this.
 matchesPermanent :: GameState -> PermanentCriterion.PermanentCriterion -> ObjectId -> Bool
 matchesPermanent gs crit oid = case crit of
   PermanentCriterion.AnyPermanent -> True
-  -- CR 305.2 / 613.1d: creature-ness is the PROJECTED question, so an
+  -- CR 205.2b / 300.2 / 613.1d: creature-ness is the PROJECTED question, so an
   -- Opalescence'd enchantment counts.
   PermanentCriterion.CreaturePermanent -> Projection.isCreatureOf oid gs
 
--- CR 614.1: apply a scaling to a count. "That many plus one" and "twice that
+-- CR 614.16: apply a scaling to a count. "That many plus one" and "twice that
 -- many" are the same operation with different data.
 scale :: Scaling.Scaling -> Natural -> Natural
 scale s n = case s of
