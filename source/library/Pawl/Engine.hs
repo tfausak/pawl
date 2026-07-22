@@ -24,6 +24,7 @@ import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
+import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
@@ -128,14 +129,20 @@ settleAll pid = do
 discardToHandSize :: PlayerId -> Game ()
 discardToHandSize pid = do
   gs <- State.get
-  let held = Game.zoneMembers Zone.Hand pid gs
-      excess = length held - Setup.openingHand
-  Monad.when (excess > 0) $ do
-    let decider = Decide.deciderFor pid gs
-    chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (fromIntegral excess)))
-    let inHand oid = List.elem oid held
-        toDiscard = take excess (filter inHand chosen)
-    Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toDiscard
+  -- CR 402.2, not CR 103.5: the maximum hand size is its own rule and its own
+  -- seven, and an effect may remove it entirely (Reliquary Tower). A player with
+  -- no maximum discards nothing and is never asked.
+  case PlayerEffect.maximumHandSize pid gs of
+    Nothing -> pure ()
+    Just limit -> do
+      let held = Game.zoneMembers Zone.Hand pid gs
+          excess = length held - fromIntegral limit
+      Monad.when (excess > 0) $ do
+        let decider = Decide.deciderFor pid gs
+        chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (fromIntegral excess)))
+        let inHand oid = List.elem oid held
+            toDiscard = take excess (filter inHand chosen)
+        Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toDiscard
 
 -- CR 103.7a: the starting player skips their first draw step.
 skipsDraw :: GameState -> Bool

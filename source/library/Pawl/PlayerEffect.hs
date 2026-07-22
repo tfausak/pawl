@@ -162,3 +162,25 @@ costAdjustments pid oid gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
       effects = applying pid gs
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
+
+-- CR 402.2: "each player has a maximum hand size, which is normally seven
+-- cards." This is NOT CR 103.5's starting hand size, which is a different seven
+-- (Setup.openingHand) that this constant deliberately does not share -- the
+-- rules keep them apart, and Reliquary Tower changes only one of them.
+defaultMaximumHandSize :: Natural
+defaultMaximumHandSize = 7
+
+-- CR 402.2 / 613.11: this player's maximum hand size. Nothing IS "no maximum
+-- hand size" (Reliquary Tower) -- never a sentinel, and never a very large
+-- number.
+maximumHandSize :: PlayerId -> GameState -> Maybe Natural
+maximumHandSize pid gs =
+  let removes effect = case effect of
+        PlayerEffect.NoMaximumHandSize -> True
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.IncreaseSpellCost _ _ -> False
+        PlayerEffect.ReduceSpellCost _ _ -> False
+   in if any removes (applying pid gs)
+        then Nothing
+        else Just defaultMaximumHandSize

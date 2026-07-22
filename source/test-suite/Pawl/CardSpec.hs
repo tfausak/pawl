@@ -16,6 +16,9 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.AbilityCost as AbilityCost
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
@@ -566,7 +569,26 @@ m45p7CardTests cards =
               HU.assertEqual
                 "one player ability"
                 [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (SpellCriterion.SpellOfColor Color.Blue) 1)]
+                (Card.Type.playerAbilities c),
+      HU.testCase "Reliquary Tower is a land with a You NoMaximumHandSize ability and a {T} colorless mana ability" $
+        let c = Printing.card (Cards.reliquaryTowerPrinting cards)
+         in do
+              HU.assertEqual "name" (Text.pack "Reliquary Tower") (Card.Type.name c)
+              HU.assertEqual "no mana cost" Nothing (Card.Type.manaCost c)
+              HU.assertEqual "types" (Set.singleton CardType.Land) (TypeLine.types (Card.Type.typeLine c))
+              HU.assertEqual "not basic" Set.empty (TypeLine.supertypes (Card.Type.typeLine c))
+              HU.assertEqual
+                "one player ability"
+                [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.NoMaximumHandSize]
                 (Card.Type.playerAbilities c)
+              case Card.Type.activatedAbilities c of
+                [ab] -> do
+                  HU.assertEqual "tap cost only" [AdditionalCost.TapSelf] (AbilityCost.additional (ActivatedAbility.cost ab))
+                  HU.assertEqual "no mana cost" Nothing (AbilityCost.mana (ActivatedAbility.cost ab))
+                  case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
+                    [m] -> HU.assertEqual "adds colorless" [Effect.AddMana ManaType.Colorless] (Foldable.toList (Mode.effects m))
+                    _ -> HU.assertFailure "expected exactly one mode"
+                _ -> HU.assertFailure "expected exactly one activated ability"
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

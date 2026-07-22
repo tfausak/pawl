@@ -8,16 +8,20 @@
 -- Medallion, Reliquary Tower and Silence.
 module Pawl.PlayerEffectSpec where
 
+import qualified Data.List as List
 import qualified Pawl.Action as Action
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Game as Game
 import qualified Pawl.PlayerEffect as PlayerEffect
+import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -25,6 +29,7 @@ import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -365,5 +370,51 @@ medallionTests cards =
                   HU.assertBool "so one Island is enough" (Cast.castable S.alice unsummon gs)
         ]
 
+-- Reliquary Tower, a Land: "You have no maximum hand size. / {T}: Add {C}."
+reliquaryTowerTests :: Cards.Cards -> Tasty.TestTree
+reliquaryTowerTests cards =
+  let -- alice holds nine Plains cards; the board is otherwise empty unless a
+      -- printing is named.
+      handOfNine extra =
+        let gs0 = Setup.emptyGame S.bothPlayers
+            put g printing = snd (S.addCreature printing S.alice g)
+            withExtra = List.foldl' put gs0 extra
+            add g _ = snd (S.addHandCard (Cards.plainsPrinting cards) S.alice g)
+         in List.foldl' add withExtra [1 .. 9 :: Int]
+      cleanup gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+   in Tasty.testGroup
+        "ReliquaryTower"
+        [ HU.testCase "CR 402.2 the maximum hand size is normally seven" $
+            HU.assertEqual "seven" (Just 7) (PlayerEffect.maximumHandSize S.alice (handOfNine [])),
+          HU.testCase "CR 514.1 nine cards at cleanup discards down to seven" $
+            let after = cleanup (handOfNine [])
+             in do
+                  HU.assertEqual "hand" 7 (S.handSize S.alice after)
+                  HU.assertEqual "two discarded" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+          HU.testCase "CR 402.2 Reliquary Tower removes the maximum entirely" $
+            HU.assertEqual
+              "no maximum"
+              Nothing
+              (PlayerEffect.maximumHandSize S.alice (handOfNine [Cards.reliquaryTowerPrinting cards])),
+          HU.testCase "CR 514.1 with Reliquary Tower nothing is discarded and nothing is asked" $
+            let after = cleanup (handOfNine [Cards.reliquaryTowerPrinting cards])
+             in do
+                  HU.assertEqual "hand keeps nine" 9 (S.handSize S.alice after)
+                  HU.assertEqual "nothing discarded" 0 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+          -- CR 109.5: the You scope. bob does not share alice's Tower.
+          HU.testCase "CR 109.5 the opponent still has a maximum hand size" $
+            HU.assertEqual
+              "seven"
+              (Just 7)
+              (PlayerEffect.maximumHandSize S.bob (handOfNine [Cards.reliquaryTowerPrinting cards])),
+          -- CR 305.7: a land whose subtype is SET to a basic type loses its
+          -- rules-text abilities. Reliquary Tower is nonbasic, and Blood Moon is
+          -- in the pool -- so this axis composes with the layer system without
+          -- being part of it.
+          HU.testCase "CR 305.7 Blood Moon strips the ability off the Tower" $
+            let board = handOfNine [Cards.reliquaryTowerPrinting cards, Cards.bloodMoonPrinting cards]
+             in HU.assertEqual "seven again" (Just 7) (PlayerEffect.maximumHandSize S.alice board)
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards, medallionTests cards]
+tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards, medallionTests cards, reliquaryTowerTests cards]
