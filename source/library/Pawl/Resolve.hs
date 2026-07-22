@@ -13,6 +13,7 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
+import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
@@ -30,9 +31,9 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
-import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Type.Expiry as Expiry
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -382,24 +383,28 @@ applyEffect source controller bound legality chosen effect = case effect of
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs
-          Just target ->
-            -- CR 611.2c: the affected set is locked to this one object now.
-            -- CR 608.2h / 611.2d: and so is the VALUE -- "the answer is determined
-            -- only once, when the effect is applied". The quantities are frozen to
-            -- Literals against the SOURCE (which holds a chosen X) and the source's
-            -- CONTROLLER (whose hand a player-scoped count counts), never against
-            -- the target. See the P3b spec, section 2.4.
-            let (ts, gs1) = Game.freshTimestamp gs
-                frozen = Projection.freezeQuantities gs source (Just controller) modification
-                eff =
-                  ContinuousEffect.MkContinuousEffect
-                    { ContinuousEffect.source = source,
-                      ContinuousEffect.timestamp = ts,
-                      ContinuousEffect.duration = duration,
-                      ContinuousEffect.modification = frozen,
-                      ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
-                    }
-             in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+          Just target -> case Expiry.arm duration of
+            -- CR 611.2b: the duration never started, so the effect does nothing
+            -- and is never stored.
+            Nothing -> gs
+            Just expiry ->
+              -- CR 611.2c: the affected set is locked to this one object now.
+              -- CR 608.2h / 611.2d: and so is the VALUE -- "the answer is determined
+              -- only once, when the effect is applied". The quantities are frozen to
+              -- Literals against the SOURCE (which holds a chosen X) and the source's
+              -- CONTROLLER (whose hand a player-scoped count counts), never against
+              -- the target. See the P3b spec, section 2.4.
+              let (ts, gs1) = Game.freshTimestamp gs
+                  frozen = Projection.freezeQuantities gs source (Just controller) modification
+                  eff =
+                    ContinuousEffect.MkContinuousEffect
+                      { ContinuousEffect.source = source,
+                        ContinuousEffect.timestamp = ts,
+                        ContinuousEffect.expiry = expiry,
+                        ContinuousEffect.modification = frozen,
+                        ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+                      }
+               in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
         -- A modification cannot land on a player (CreatureTarget/LandTarget name
         -- objects) or an illegal slot (CR 608.2b): no-op.
         _ -> gs
@@ -420,7 +425,7 @@ applyEffect source controller bound legality chosen effect = case effect of
                     ContinuousEffect.MkContinuousEffect
                       { ContinuousEffect.source = source,
                         ContinuousEffect.timestamp = ts,
-                        ContinuousEffect.duration = Duration.Indefinite,
+                        ContinuousEffect.expiry = Expiry.Never,
                         ContinuousEffect.modification = Modification.ChangeSubtypeWord from to,
                         ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
                       }
@@ -581,17 +586,21 @@ applyEffect source controller bound legality chosen effect = case effect of
     -- consults it at every funnel until cleanup drops it (CR 514.2) or its use is
     -- spent. Targetless and unprompted. CR 113.7: the SOURCE is this effect's
     -- source, which is what CR 615.13's "prevented" triggers will read (#58).
-    State.modify' $ \gs ->
-      let (ts, gs1) = Game.freshTimestamp gs
-          active =
-            ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = re,
-                ActiveReplacement.source = source,
-                ActiveReplacement.timestamp = ts,
-                ActiveReplacement.duration = duration,
-                ActiveReplacement.uses = uses
-              }
-       in gs1 {GameState.replacements = active : GameState.replacements gs1}
+    State.modify' $ \gs -> case Expiry.arm duration of
+      -- CR 611.2b: the duration never started, so no floating replacement is
+      -- installed.
+      Nothing -> gs
+      Just expiry ->
+        let (ts, gs1) = Game.freshTimestamp gs
+            active =
+              ActiveReplacement.MkActiveReplacement
+                { ActiveReplacement.effect = re,
+                  ActiveReplacement.source = source,
+                  ActiveReplacement.timestamp = ts,
+                  ActiveReplacement.expiry = expiry,
+                  ActiveReplacement.uses = uses
+                }
+         in gs1 {GameState.replacements = active : GameState.replacements gs1}
   Effect.Counter slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- CR 701.6a: the slot's target is a spell on the stack; counter it through
@@ -624,25 +633,29 @@ applyEffect source controller bound legality chosen effect = case effect of
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs -- a player recipient cannot be controlled
-          Just target ->
-            -- CR 613.1b / 611.2c: the new controller is `controller` (this
-            -- effect's source's controller), baked in now -- derived, never
-            -- chosen. CR 302.6: the new controller has not controlled the
-            -- permanent continuously, so it is re-Sicked.
-            let (ts, gs1) = Game.freshTimestamp gs
-                eff =
-                  ContinuousEffect.MkContinuousEffect
-                    { ContinuousEffect.source = source,
-                      ContinuousEffect.timestamp = ts,
-                      ContinuousEffect.duration = duration,
-                      ContinuousEffect.modification = Modification.SetController controller,
-                      ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+          Just target -> case Expiry.arm duration of
+            -- CR 611.2b: the duration never started -- no control effect is
+            -- stored, and nothing is re-Sicked, because control never changed.
+            Nothing -> gs
+            Just expiry ->
+              -- CR 613.1b / 611.2c: the new controller is `controller` (this
+              -- effect's source's controller), baked in now -- derived, never
+              -- chosen. CR 302.6: the new controller has not controlled the
+              -- permanent continuously, so it is re-Sicked.
+              let (ts, gs1) = Game.freshTimestamp gs
+                  eff =
+                    ContinuousEffect.MkContinuousEffect
+                      { ContinuousEffect.source = source,
+                        ContinuousEffect.timestamp = ts,
+                        ContinuousEffect.expiry = expiry,
+                        ContinuousEffect.modification = Modification.SetController controller,
+                        ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+                      }
+                  sicken o = o {Object.sickness = Sickness.Sick}
+               in gs1
+                    { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
+                      GameState.objects = Map.adjust sicken target (GameState.objects gs1)
                     }
-                sicken o = o {Object.sickness = Sickness.Sick}
-             in gs1
-                  { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
-                    GameState.objects = Map.adjust sicken target (GameState.objects gs1)
-                  }
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a

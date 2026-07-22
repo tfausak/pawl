@@ -22,8 +22,8 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Expiry as Expiry
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Layer as Layer
@@ -61,7 +61,7 @@ withDynamicEffect aff ts m gs =
         ContinuousEffect.MkContinuousEffect
           { ContinuousEffect.source = ObjectId.MkObjectId 997,
             ContinuousEffect.timestamp = ts,
-            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.expiry = Expiry.AtCleanup,
             ContinuousEffect.modification = m,
             ContinuousEffect.affected = aff
           }
@@ -420,7 +420,7 @@ tests cards =
                     ContinuousEffect.MkContinuousEffect
                       { ContinuousEffect.source = oid,
                         ContinuousEffect.timestamp = ts,
-                        ContinuousEffect.duration = Duration.UntilEndOfTurn,
+                        ContinuousEffect.expiry = Expiry.AtCleanup,
                         ContinuousEffect.modification = Modification.SetController pid,
                         ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
                       }

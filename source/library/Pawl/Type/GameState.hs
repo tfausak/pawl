@@ -51,12 +51,12 @@ data GameState = MkGameState
     -- before the ability was armed.
     delayedTriggers :: Seq DelayedTrigger,
     -- CR 611.2: stored continuous effects from resolutions (Giant Growth,
-    -- Serpent's Gift), each with a duration cleanup consults. Static-ability
-    -- effects are NOT here -- the projection re-derives those live.
+    -- Serpent's Gift), each with an expiry the Pawl.Expiry sweeps consult.
+    -- Static-ability effects are NOT here -- the projection re-derives those live.
     continuousEffects :: [ContinuousEffect],
     -- CR 614.3 / 615.3: floating replacement effects from resolutions (Fog's
-    -- prevention, Drudge Skeletons' regeneration shield), each with a duration
-    -- cleanup consults (CR 514.2) and a use count (CR 614.3). The event-pipeline
+    -- prevention, Drudge Skeletons' regeneration shield), each with an expiry the
+    -- Pawl.Expiry sweeps consult (CR 514.2) and a use count (CR 614.3). The event-pipeline
     -- analog of continuousEffects; a permanent's STATIC replacement abilities are
     -- not here -- the projection re-derives those live. Pawl.Replacement reads it.
     replacements :: [ActiveReplacement],

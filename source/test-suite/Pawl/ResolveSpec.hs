@@ -17,6 +17,7 @@ import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
@@ -887,7 +888,7 @@ countersTests cards =
             (gs, spellId) = S.handOne (Cards.battlegrowthPrinting cards) withFoe
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-            afterCleanup = Projection.dropEndOfTurnEffects resolved
+            afterCleanup = Expiry.dropAtCleanup resolved
          in do
               HU.assertEqual "still 3/2 after cleanup" (Just 3) (Projection.powerOf victim afterCleanup)
               HU.assertEqual "still 3/2 after cleanup" (Just 2) (Projection.toughnessOf victim afterCleanup),
@@ -970,7 +971,7 @@ gainControlTests cards =
          in do
               HU.assertEqual "alice now controls it" (Just S.alice) (Projection.controllerOf oid after)
               HU.assertEqual "it is summoning sick for the new controller" (Just Sickness.Sick) (fmap Object.sickness (Game.lookupObject oid after))
-              HU.assertEqual "control reverts after cleanup" (Just S.bob) (Projection.controllerOf oid (Projection.dropEndOfTurnEffects after))
+              HU.assertEqual "control reverts after cleanup" (Just S.bob) (Projection.controllerOf oid (Expiry.dropAtCleanup after))
     ]
 
 -- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
@@ -992,7 +993,7 @@ actOfTreasonTests cards =
               HU.assertBool "it has haste" (Projection.hasKeyword Keyword.Haste oid resolved)
               HU.assertBool "alice may attack with it this turn" (oid `elem` Combat.legalAttackers S.alice resolved)
               HU.assertBool "bob may not attack with it" (oid `notElem` Combat.legalAttackers S.bob resolved)
-              HU.assertEqual "control reverts at cleanup" (Just S.bob) (Projection.controllerOf oid (Projection.dropEndOfTurnEffects resolved))
+              HU.assertEqual "control reverts at cleanup" (Just S.bob) (Projection.controllerOf oid (Expiry.dropAtCleanup resolved))
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

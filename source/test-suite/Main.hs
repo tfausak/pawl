@@ -12,6 +12,7 @@ import qualified Pawl.CoreSpec as CoreSpec
 import qualified Pawl.DamageSpec as DamageSpec
 import qualified Pawl.DecideSpec as DecideSpec
 import qualified Pawl.EventSpec as EventSpec
+import qualified Pawl.ExpirySpec as ExpirySpec
 import qualified Pawl.GameSpec as GameSpec
 import qualified Pawl.JsonSpec as JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
@@ -46,6 +47,7 @@ testTree cards =
       DamageSpec.tests cards,
       DecideSpec.tests,
       EventSpec.tests cards,
+      ExpirySpec.tests cards,
       ReplaySpec.tests cards,
       PropertySpec.tests cards,
       JsonSpec.tests,

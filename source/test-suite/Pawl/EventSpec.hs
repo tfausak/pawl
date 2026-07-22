@@ -7,6 +7,7 @@ import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
@@ -115,7 +116,7 @@ tests cards =
       HU.testCase "CR 701.19a / 514.2 a regeneration shield is dropped at cleanup (this turn)" $
         let base = Setup.emptyGame S.bothPlayers
             (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base
-            cleared = Event.dropEndOfTurnReplacements (S.addRegenShield oid gs0)
+            cleared = Expiry.dropAtCleanup (S.addRegenShield oid gs0)
          in HU.assertEqual "no shields remain" [] (GameState.replacements cleared),
       HU.testCase "CR 701.19a Event.destroy consumes a shield and regenerates instead" $
         let base = Setup.emptyGame S.bothPlayers

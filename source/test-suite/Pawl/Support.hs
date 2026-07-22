@@ -42,8 +42,8 @@ import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
-import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Expiry as Expiry
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
@@ -335,7 +335,7 @@ giveControl oid pid gs =
         ContinuousEffect.MkContinuousEffect
           { ContinuousEffect.source = oid,
             ContinuousEffect.timestamp = ts,
-            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.expiry = Expiry.AtCleanup,
             ContinuousEffect.modification = Modification.SetController pid,
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
@@ -359,7 +359,7 @@ withEffectAt oid ts m gs =
         ContinuousEffect.MkContinuousEffect
           { ContinuousEffect.source = ObjectId.MkObjectId 998,
             ContinuousEffect.timestamp = ts,
-            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.expiry = Expiry.AtCleanup,
             ContinuousEffect.modification = m,
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
@@ -756,7 +756,7 @@ addRegenShield oid gs =
           { ActiveReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
             ActiveReplacement.source = oid,
             ActiveReplacement.timestamp = ts,
-            ActiveReplacement.duration = Duration.UntilEndOfTurn,
+            ActiveReplacement.expiry = Expiry.AtCleanup,
             ActiveReplacement.uses = Uses.Once
           }
    in addReplacement active gs1

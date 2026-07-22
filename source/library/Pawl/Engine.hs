@@ -20,6 +20,7 @@ import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
+import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
@@ -174,10 +175,9 @@ runTurnBasedActions phase = do
     Phase.Ending EndingStep.Cleanup -> do
       discardToHandSize active
       -- CR 514.2: damage wears off AND until-end-of-turn effects end,
-      -- simultaneously.
+      -- simultaneously. One sweep over both carriers (Pawl.Expiry).
       State.modify' Damage.removeAllDamage
-      State.modify' Projection.dropEndOfTurnEffects
-      State.modify' Event.dropEndOfTurnReplacements
+      State.modify' Expiry.dropAtCleanup
     _ -> pure ()
 
 -- Ask the priority holder for an action until every still-playing player has

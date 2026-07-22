@@ -18,13 +18,11 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
-import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.CounterKind as CounterKind
 import Pawl.Type.DamageEvent (DamageEvent)
 import Pawl.Type.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
-import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameEvent (GameEvent)
 import qualified Pawl.Type.GameEvent as GameEvent
@@ -82,17 +80,6 @@ unscannedEvents gs =
 unscannedDamage :: GameState -> [DamageEvent]
 unscannedDamage gs =
   Maybe.mapMaybe damageOf (Foldable.toList (Seq.drop (fromIntegral (GameState.damageScannedThrough gs)) (GameState.events gs)))
-
--- CR 514.2: at cleanup, drop until-end-of-turn floating replacements (the
--- event-pipeline analog of Projection.dropEndOfTurnEffects). Indefinite ones
--- stay. Fog's shield and, since P5, Drudge Skeletons' regeneration shield
--- (Replace UntilEndOfTurn Once (DestructionR Regenerate)) are both exactly such
--- an entry now, so CR 701.19a's "this turn" falls out of this one sweep -- no
--- separate regeneration-shield cleanup exists any more.
-dropEndOfTurnReplacements :: GameState -> GameState
-dropEndOfTurnReplacements gs =
-  let keep active = ActiveReplacement.duration active /= Duration.UntilEndOfTurn
-   in gs {GameState.replacements = filter keep (GameState.replacements gs)}
 
 -- Insert a freshly-built object into `dest` under a new id and timestamp, and
 -- return that id. The common tail of changeZone (a moved incarnation) and

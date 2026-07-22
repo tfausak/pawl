@@ -17,7 +17,6 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Keyword (Keyword)
@@ -712,11 +711,3 @@ controllerOf oid gs = case Game.lookupObject oid gs of
 -- control", replacing the owner-based Game.zoneMembers Battlefield.
 controls :: PlayerId.PlayerId -> GameState -> [ObjectId]
 controls pid gs = filter (\oid -> controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs))
-
--- CR 514.2: during cleanup, "all 'until end of turn' and 'this turn' effects
--- end". Delete-and-recompute (design.md §2.5): dropping the stored effect makes
--- the next projection revert -- nothing is explicitly undone.
-dropEndOfTurnEffects :: GameState -> GameState
-dropEndOfTurnEffects gs =
-  let keep eff = ContinuousEffect.duration eff /= Duration.UntilEndOfTurn
-   in gs {GameState.continuousEffects = filter keep (GameState.continuousEffects gs)}

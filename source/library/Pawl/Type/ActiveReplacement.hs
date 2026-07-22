@@ -1,6 +1,6 @@
 module Pawl.Type.ActiveReplacement where
 
-import Pawl.Type.Duration (Duration)
+import Pawl.Type.Expiry (Expiry)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.Timestamp (Timestamp)
@@ -11,7 +11,7 @@ import Pawl.Type.Uses (Uses)
 -- projection re-derives a permanent's static replacement abilities live, while
 -- these are stored because the object that made them may be long gone.
 --
--- `duration` decides when cleanup drops it (CR 514.2). `uses` is CR 614.3's
+-- `expiry` decides when a sweep drops it (Pawl.Expiry; CR 514.2). `uses` is CR 614.3's
 -- "until they're used up". `source` and `timestamp` are new here. #58 recorded
 -- their ABSENCE as one blocker on CR 615.13's "prevented" triggers and CR
 -- 615.7's multi-source choice, and that particular blocker is gone: there is
@@ -40,7 +40,7 @@ data ActiveReplacement = MkActiveReplacement
   { effect :: ReplacementEffect,
     source :: ObjectId,
     timestamp :: Timestamp,
-    duration :: Duration,
+    expiry :: Expiry,
     uses :: Uses
   }
   deriving (Eq, Ord, Show)

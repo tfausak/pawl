@@ -40,9 +40,9 @@ import qualified Pawl.Type.Combat as Combat
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
-import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
+import qualified Pawl.Type.Expiry as Expiry
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -413,7 +413,7 @@ tests cards =
                   { ActiveReplacement.effect = ReplacementEffect.EntryR (EntryRewrite.ChoiceOf [onlyOption]),
                     ActiveReplacement.source = piker,
                     ActiveReplacement.timestamp = ts,
-                    ActiveReplacement.duration = Duration.UntilEndOfTurn,
+                    ActiveReplacement.expiry = Expiry.AtCleanup,
                     ActiveReplacement.uses = Uses.Once
                   }
               g3 = S.addReplacement active g2

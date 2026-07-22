@@ -25,6 +25,7 @@ import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Type.Expiry as Expiry
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
@@ -300,7 +301,7 @@ withFear oid gs =
         ContinuousEffect.MkContinuousEffect
           { ContinuousEffect.source = oid,
             ContinuousEffect.timestamp = ts,
-            ContinuousEffect.duration = Duration.UntilEndOfTurn,
+            ContinuousEffect.expiry = Expiry.AtCleanup,
             ContinuousEffect.modification = Modification.GainKeyword Keyword.Fear,
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
