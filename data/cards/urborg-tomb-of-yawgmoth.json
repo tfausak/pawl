@@ -1,1 +1,49 @@
-{"name":"Urborg, Tomb of Yawgmoth","manaCost":null,"typeLine":{"supertypes":[{"type":"Legendary"}],"types":[{"type":"Land"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[{"affected":{"type":"AllLands"},"modification":{"type":"AddLandSubtype","value":{"type":"Swamp"}}}],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[]}
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": null,
+  "name": "Urborg, Tomb of Yawgmoth",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [
+    {
+      "affected": {
+        "type": "AllLands"
+      },
+      "modification": {
+        "type": "AddLandSubtype",
+        "value": {
+          "type": "Swamp"
+        }
+      }
+    }
+  ],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [
+      {
+        "type": "Legendary"
+      }
+    ],
+    "types": [
+      {
+        "type": "Land"
+      }
+    ]
+  }
+}

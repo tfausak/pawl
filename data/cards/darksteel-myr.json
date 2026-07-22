@@ -1,1 +1,55 @@
-{"name":"Darksteel Myr","manaCost":[{"type":"Generic","value":3}],"typeLine":{"supertypes":[],"types":[{"type":"Creature"},{"type":"Artifact"}],"subtypes":[{"type":"Myr"}]},"power":{"type":"Literal","value":0},"toughness":{"type":"Literal","value":1},"keywords":[{"type":"Indestructible"}],"staticAbilities":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[]}
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Indestructible"
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    }
+  ],
+  "name": "Darksteel Myr",
+  "power": {
+    "type": "Literal",
+    "value": 0
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 1
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Myr"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      },
+      {
+        "type": "Artifact"
+      }
+    ]
+  }
+}

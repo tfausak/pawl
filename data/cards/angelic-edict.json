@@ -1,1 +1,64 @@
-{"name":"Angelic Edict","manaCost":[{"type":"Generic","value":4},{"type":"OfType","value":{"type":"Colored","value":{"type":"White"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Sorcery"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[{"type":"MoveToZone","value":["target",{"type":"Exile"}]}],"targetSpecs":[{"slot":"target","spec":{"type":"CreatureOrEnchantmentTarget"}}]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[]}
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 4
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "White"
+        }
+      }
+    }
+  ],
+  "name": "Angelic Edict",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "MoveToZone",
+            "value": [
+              "target",
+              {
+                "type": "Exile"
+              }
+            ]
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "target",
+            "spec": {
+              "type": "CreatureOrEnchantmentTarget"
+            }
+          }
+        ]
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Sorcery"
+      }
+    ]
+  }
+}

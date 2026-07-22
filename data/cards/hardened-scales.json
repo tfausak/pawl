@@ -1,1 +1,64 @@
-{"name":"Hardened Scales","manaCost":[{"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Enchantment"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[{"type":"CounterR","value":[{"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"CreaturePermanent"}},{"type":"AddMore","value":1}]}],"triggeredAbilities":[],"castingPermissions":[]}
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    }
+  ],
+  "name": "Hardened Scales",
+  "power": null,
+  "replacementEffects": [
+    {
+      "type": "CounterR",
+      "value": [
+        {
+          "onWhat": {
+            "type": "CreaturePermanent"
+          },
+          "whichKind": {
+            "type": "PlusOnePlusOne"
+          },
+          "whose": {
+            "type": "Yours"
+          }
+        },
+        {
+          "type": "AddMore",
+          "value": 1
+        }
+      ]
+    }
+  ],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

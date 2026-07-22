@@ -1,1 +1,90 @@
-{"name":"Aphotic Wisps","manaCost":[{"type":"OfType","value":{"type":"Colored","value":{"type":"Black"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Instant"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[{"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"SetColor","value":[{"type":"Black"}]},"target"]},{"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"GainKeyword","value":{"type":"Fear"}},"target"]},{"type":"Draw","value":{"type":"Literal","value":1}}],"targetSpecs":[{"slot":"target","spec":{"type":"CreatureTarget"}}]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[]}
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Aphotic Wisps",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "ModifyTarget",
+            "value": [
+              {
+                "type": "UntilEndOfTurn"
+              },
+              {
+                "type": "SetColor",
+                "value": [
+                  {
+                    "type": "Black"
+                  }
+                ]
+              },
+              "target"
+            ]
+          },
+          {
+            "type": "ModifyTarget",
+            "value": [
+              {
+                "type": "UntilEndOfTurn"
+              },
+              {
+                "type": "GainKeyword",
+                "value": {
+                  "type": "Fear"
+                }
+              },
+              "target"
+            ]
+          },
+          {
+            "type": "Draw",
+            "value": {
+              "type": "Literal",
+              "value": 1
+            }
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "target",
+            "spec": {
+              "type": "CreatureTarget"
+            }
+          }
+        ]
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}

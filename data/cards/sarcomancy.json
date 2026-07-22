@@ -1,1 +1,164 @@
-{"name":"Sarcomancy","manaCost":[{"type":"OfType","value":{"type":"Colored","value":{"type":"Black"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Enchantment"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[{"condition":{"type":"SelfEnters"},"modal":{"modes":[{"effects":[{"type":"Create","value":[{"type":"Literal","value":1},{"name":"Zombie","manaCost":null,"typeLine":{"supertypes":[],"types":[{"type":"Creature"}],"subtypes":[{"type":"Zombie"}]},"power":{"type":"Literal","value":2},"toughness":{"type":"Literal","value":2},"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"colorIndicator":[{"type":"Black"}]}]}],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}},{"condition":{"type":"StepBegins","value":[{"type":"Beginning","value":{"type":"Upkeep"}},{"type":"ControllersTurn"}]},"modal":{"modes":[{"effects":[{"type":"DealDamage","value":["you",{"type":"Literal","value":1}]}],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"intervening":{"type":"NoPermanentsOfSubtype","value":{"type":"Zombie"}}}],"castingPermissions":[]}
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Sarcomancy",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfEnters"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Create",
+                "value": [
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  },
+                  {
+                    "activatedAbilities": [],
+                    "castingPermissions": [],
+                    "colorIndicator": [
+                      {
+                        "type": "Black"
+                      }
+                    ],
+                    "keywords": [],
+                    "manaCost": null,
+                    "name": "Zombie",
+                    "power": {
+                      "type": "Literal",
+                      "value": 2
+                    },
+                    "replacementEffects": [],
+                    "spell": {
+                      "modes": [
+                        {
+                          "effects": [],
+                          "targetSpecs": []
+                        }
+                      ],
+                      "selection": {
+                        "type": "ChooseExactly",
+                        "value": 1
+                      }
+                    },
+                    "staticAbilities": [],
+                    "toughness": {
+                      "type": "Literal",
+                      "value": 2
+                    },
+                    "triggeredAbilities": [],
+                    "typeLine": {
+                      "subtypes": [
+                        {
+                          "type": "Zombie"
+                        }
+                      ],
+                      "supertypes": [],
+                      "types": [
+                        {
+                          "type": "Creature"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    },
+    {
+      "condition": {
+        "type": "StepBegins",
+        "value": [
+          {
+            "type": "Beginning",
+            "value": {
+              "type": "Upkeep"
+            }
+          },
+          {
+            "type": "ControllersTurn"
+          }
+        ]
+      },
+      "intervening": {
+        "type": "NoPermanentsOfSubtype",
+        "value": {
+          "type": "Zombie"
+        }
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "DealDamage",
+                "value": [
+                  "you",
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

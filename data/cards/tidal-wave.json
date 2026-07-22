@@ -1,1 +1,152 @@
-{"name":"Tidal Wave","manaCost":[{"type":"Generic","value":2},{"type":"OfType","value":{"type":"Colored","value":{"type":"Blue"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Instant"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[{"type":"Create","value":[{"type":"Literal","value":1},{"name":"Wall","manaCost":null,"typeLine":{"supertypes":[],"types":[{"type":"Creature"}],"subtypes":[{"type":"Wall"}]},"power":{"type":"Literal","value":5},"toughness":{"type":"Literal","value":5},"keywords":[{"type":"Defender"}],"staticAbilities":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"colorIndicator":[{"type":"Blue"}]},"token"]},{"type":"ArmDelayedTrigger","value":"sacrifice it"}],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"delayedAbilities":[{"name":"sacrifice it","ability":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Sacrifice","value":"token"}],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}}}]}
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "delayedAbilities": [
+    {
+      "ability": {
+        "condition": {
+          "type": "StepBegins",
+          "value": [
+            {
+              "type": "Ending",
+              "value": {
+                "type": "EndStep"
+              }
+            },
+            {
+              "type": "EachTurn"
+            }
+          ]
+        },
+        "modal": {
+          "modes": [
+            {
+              "effects": [
+                {
+                  "type": "Sacrifice",
+                  "value": "token"
+                }
+              ],
+              "targetSpecs": []
+            }
+          ],
+          "selection": {
+            "type": "ChooseExactly",
+            "value": 1
+          }
+        }
+      },
+      "name": "sacrifice it"
+    }
+  ],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Tidal Wave",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "Create",
+            "value": [
+              {
+                "type": "Literal",
+                "value": 1
+              },
+              {
+                "activatedAbilities": [],
+                "castingPermissions": [],
+                "colorIndicator": [
+                  {
+                    "type": "Blue"
+                  }
+                ],
+                "keywords": [
+                  {
+                    "type": "Defender"
+                  }
+                ],
+                "manaCost": null,
+                "name": "Wall",
+                "power": {
+                  "type": "Literal",
+                  "value": 5
+                },
+                "replacementEffects": [],
+                "spell": {
+                  "modes": [
+                    {
+                      "effects": [],
+                      "targetSpecs": []
+                    }
+                  ],
+                  "selection": {
+                    "type": "ChooseExactly",
+                    "value": 1
+                  }
+                },
+                "staticAbilities": [],
+                "toughness": {
+                  "type": "Literal",
+                  "value": 5
+                },
+                "triggeredAbilities": [],
+                "typeLine": {
+                  "subtypes": [
+                    {
+                      "type": "Wall"
+                    }
+                  ],
+                  "supertypes": [],
+                  "types": [
+                    {
+                      "type": "Creature"
+                    }
+                  ]
+                }
+              },
+              "token"
+            ]
+          },
+          {
+            "type": "ArmDelayedTrigger",
+            "value": "sacrifice it"
+          }
+        ],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}

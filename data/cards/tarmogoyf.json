@@ -1,1 +1,70 @@
-{"name":"Tarmogoyf","manaCost":[{"type":"Generic","value":1},{"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Creature"}],"subtypes":[{"type":"Lhurgoyf"}]},"power":{"type":"Star"},"toughness":{"type":"Plus","value":[{"type":"Literal","value":1},{"type":"Star"}]},"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"characteristicPT":{"type":"Count","value":{"type":"CardTypesInAllGraveyards"}}}
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "characteristicPT": {
+    "type": "Count",
+    "value": {
+      "type": "CardTypesInAllGraveyards"
+    }
+  },
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    }
+  ],
+  "name": "Tarmogoyf",
+  "power": {
+    "type": "Star"
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Plus",
+    "value": [
+      {
+        "type": "Literal",
+        "value": 1
+      },
+      {
+        "type": "Star"
+      }
+    ]
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Lhurgoyf"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

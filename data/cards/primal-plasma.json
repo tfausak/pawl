@@ -1,1 +1,90 @@
-{"name":"Primal Plasma","manaCost":[{"type":"Generic","value":3},{"type":"OfType","value":{"type":"Colored","value":{"type":"Blue"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Creature"}],"subtypes":[{"type":"Shapeshifter"},{"type":"Elemental"}]},"power":{"type":"Star"},"toughness":{"type":"Star"},"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[{"type":"EntryR","value":{"type":"ChoiceOf","value":[{"power":3,"toughness":3,"keywords":[]},{"power":2,"toughness":2,"keywords":[{"type":"Flying"}]},{"power":1,"toughness":6,"keywords":[{"type":"Defender"}]}]}}],"triggeredAbilities":[],"castingPermissions":[]}
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Primal Plasma",
+  "power": {
+    "type": "Star"
+  },
+  "replacementEffects": [
+    {
+      "type": "EntryR",
+      "value": {
+        "type": "ChoiceOf",
+        "value": [
+          {
+            "keywords": [],
+            "power": 3,
+            "toughness": 3
+          },
+          {
+            "keywords": [
+              {
+                "type": "Flying"
+              }
+            ],
+            "power": 2,
+            "toughness": 2
+          },
+          {
+            "keywords": [
+              {
+                "type": "Defender"
+              }
+            ],
+            "power": 1,
+            "toughness": 6
+          }
+        ]
+      }
+    }
+  ],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Star"
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Shapeshifter"
+      },
+      {
+        "type": "Elemental"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

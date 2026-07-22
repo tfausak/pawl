@@ -1,1 +1,85 @@
-{"name":"Mindslaver","manaCost":[{"type":"Generic","value":6}],"typeLine":{"supertypes":[{"type":"Legendary"}],"types":[{"type":"Artifact"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[{"cost":{"mana":[{"type":"Generic","value":4}],"additional":[{"type":"TapSelf"},{"type":"SacrificeSelf"}]},"modal":{"modes":[{"effects":[{"type":"ControlPlayerNextTurn","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"type":"PlayerTarget"}}]}],"selection":{"type":"ChooseExactly","value":1}}}],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[]}
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "additional": [
+          {
+            "type": "TapSelf"
+          },
+          {
+            "type": "SacrificeSelf"
+          }
+        ],
+        "mana": [
+          {
+            "type": "Generic",
+            "value": 4
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ControlPlayerNextTurn",
+                "value": "target"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "type": "PlayerTarget"
+                }
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 6
+    }
+  ],
+  "name": "Mindslaver",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [
+      {
+        "type": "Legendary"
+      }
+    ],
+    "types": [
+      {
+        "type": "Artifact"
+      }
+    ]
+  }
+}

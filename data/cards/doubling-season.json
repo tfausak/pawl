@@ -1,1 +1,80 @@
-{"name":"Doubling Season","manaCost":[{"type":"Generic","value":4},{"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}}],"typeLine":{"supertypes":[],"types":[{"type":"Enchantment"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[],"replacementEffects":[{"type":"TokenR","value":[{"whose":{"type":"Yours"}},{"type":"Multiply","value":2}]},{"type":"CounterR","value":[{"whichKind":null,"whose":{"type":"Yours"},"onWhat":{"type":"AnyPermanent"}},{"type":"Multiply","value":2}]}],"triggeredAbilities":[],"castingPermissions":[]}
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 4
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    }
+  ],
+  "name": "Doubling Season",
+  "power": null,
+  "replacementEffects": [
+    {
+      "type": "TokenR",
+      "value": [
+        {
+          "whose": {
+            "type": "Yours"
+          }
+        },
+        {
+          "type": "Multiply",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "type": "CounterR",
+      "value": [
+        {
+          "onWhat": {
+            "type": "AnyPermanent"
+          },
+          "whichKind": null,
+          "whose": {
+            "type": "Yours"
+          }
+        },
+        {
+          "type": "Multiply",
+          "value": 2
+        }
+      ]
+    }
+  ],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

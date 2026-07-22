@@ -1,1 +1,66 @@
-{"name":"Evolving Wilds","manaCost":null,"typeLine":{"supertypes":[],"types":[{"type":"Land"}],"subtypes":[]},"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}},"activatedAbilities":[{"cost":{"mana":null,"additional":[{"type":"TapSelf"},{"type":"SacrificeSelf"}]},"modal":{"modes":[{"effects":[{"type":"Search","value":{"type":"BasicLandCard"}}],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}}],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[]}
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "additional": [
+          {
+            "type": "TapSelf"
+          },
+          {
+            "type": "SacrificeSelf"
+          }
+        ],
+        "mana": null
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Search",
+                "value": {
+                  "type": "BasicLandCard"
+                }
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": null,
+  "name": "Evolving Wilds",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Land"
+      }
+    ]
+  }
+}
