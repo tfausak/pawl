@@ -10,6 +10,7 @@ import Pawl.Type.Color (Color)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
 import Pawl.Type.Modal (Modal)
+import Pawl.Type.PlayerStaticAbility (PlayerStaticAbility)
 import Pawl.Type.Power (Power)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
@@ -85,6 +86,12 @@ data Card = MkCard
     -- normal timing. Read directly from the card (NOT the projection): the
     -- permission functions in the library (CR 113.6), where the CR 613 layer
     -- system does not reach. Empty for all but Panglacial Wurm.
-    castingPermissions :: [CastingPermission]
+    castingPermissions :: [CastingPermission],
+    -- CR 604.1/604.2 / 611.1: this card's printed PLAYER and RULES-modifying
+    -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary
+    -- Tower). The sibling of staticAbilities on the axis CR 613.10/613.11 put
+    -- OUTSIDE the layer system, so these are read by Pawl.PlayerEffect and never
+    -- by Pawl.Projection. Empty for every other printing.
+    playerAbilities :: [PlayerStaticAbility]
   }
   deriving (Eq, Ord, Show)

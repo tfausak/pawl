@@ -55,6 +55,9 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PlayerEffect as PlayerEffect
+import qualified Pawl.Type.PlayerScope as PlayerScope
+import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
@@ -62,6 +65,7 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.SpellCriterion as SpellCriterion
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
@@ -162,6 +166,46 @@ tests cards =
           HU.testCase "both CounterKinds round-trip" $ do
             HU.assertEqual "plus" (Right CounterKind.PlusOnePlusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.PlusOnePlusOne))
             HU.assertEqual "minus" (Right CounterKind.MinusOneMinusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.MinusOneMinusOne))
+        ],
+      Tasty.testGroup
+        "player effects (P7)"
+        [ HU.testCase "every PlayerScope round-trips" $
+            mapM_
+              (roundTrip "scope" Codec.playerScopeToJson Codec.jsonToPlayerScope)
+              [PlayerScope.You, PlayerScope.Opponents, PlayerScope.EachPlayer],
+          HU.testCase "every SpellCriterion round-trips" $
+            mapM_
+              (roundTrip "criterion" Codec.spellCriterionToJson Codec.jsonToSpellCriterion)
+              [SpellCriterion.NoncreatureSpell, SpellCriterion.SpellOfColor Color.Blue],
+          HU.testCase "every PlayerEffect round-trips" $
+            mapM_
+              (roundTrip "effect" Codec.playerEffectToJson Codec.jsonToPlayerEffect)
+              [ PlayerEffect.CantCastSpells,
+                PlayerEffect.CantCastMoreThan 1,
+                PlayerEffect.IncreaseSpellCost SpellCriterion.NoncreatureSpell 1,
+                PlayerEffect.ReduceSpellCost (SpellCriterion.SpellOfColor Color.Blue) 1,
+                PlayerEffect.NoMaximumHandSize
+              ],
+          HU.testCase "PlayerStaticAbility round-trips" $
+            roundTrip
+              "ability"
+              Codec.playerStaticAbilityToJson
+              Codec.jsonToPlayerStaticAbility
+              (PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.CantCastMoreThan 1)),
+          HU.testCase "a Card carrying player abilities round-trips" $
+            let base = Printing.card (Cards.bloodMoonPrinting cards)
+                c = base {CardT.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.NoMaximumHandSize]}
+             in roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
+          -- Byte-stability: an empty list must not appear in the rendered JSON,
+          -- or every committed card file changes. The same posture
+          -- colorIndicator and delayedAbilities already take.
+          HU.testCase "an empty playerAbilities list is omitted from the JSON" $
+            let base = Printing.card (Cards.bloodMoonPrinting cards)
+             in do
+                  HU.assertEqual "the fixture really has none" [] (CardT.playerAbilities base)
+                  case J.asObject (Codec.cardToJson base) of
+                    Left err -> HU.assertFailure (Text.unpack err)
+                    Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "playerAbilities") (map fst pairs))
         ],
       Tasty.testGroup
         "records"

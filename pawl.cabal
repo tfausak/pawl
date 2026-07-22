@@ -147,7 +147,10 @@ library
     Pawl.Type.PermanentCriterion
     Pawl.Type.Phase
     Pawl.Type.Player
+    Pawl.Type.PlayerEffect
     Pawl.Type.PlayerId
+    Pawl.Type.PlayerScope
+    Pawl.Type.PlayerStaticAbility
     Pawl.Type.Power
     Pawl.Type.Printing
     Pawl.Type.Program
@@ -165,6 +168,7 @@ library
     Pawl.Type.Sickness
     Pawl.Type.SlotName
     Pawl.Type.Source
+    Pawl.Type.SpellCriterion
     Pawl.Type.StateCondition
     Pawl.Type.StaticAbility
     Pawl.Type.Status

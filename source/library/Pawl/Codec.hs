@@ -58,7 +58,10 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.PlayerScope as PlayerScope
+import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
@@ -67,6 +70,7 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.SpellCriterion as SpellCriterion
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
@@ -456,6 +460,53 @@ jsonToPermanentCriterion =
     [ (Text.pack "AnyPermanent", PermanentCriterion.AnyPermanent),
       (Text.pack "CreaturePermanent", PermanentCriterion.CreaturePermanent)
     ]
+
+playerScopeToJson :: PlayerScope.PlayerScope -> Value
+playerScopeToJson s = nullary . Text.pack $ case s of
+  PlayerScope.You -> "You"
+  PlayerScope.Opponents -> "Opponents"
+  PlayerScope.EachPlayer -> "EachPlayer"
+
+jsonToPlayerScope :: Value -> Either Text PlayerScope.PlayerScope
+jsonToPlayerScope =
+  decodeNullary
+    (Text.pack "PlayerScope")
+    [ (Text.pack "You", PlayerScope.You),
+      (Text.pack "Opponents", PlayerScope.Opponents),
+      (Text.pack "EachPlayer", PlayerScope.EachPlayer)
+    ]
+
+spellCriterionToJson :: SpellCriterion.SpellCriterion -> Value
+spellCriterionToJson c = case c of
+  SpellCriterion.NoncreatureSpell -> nullary (Text.pack "NoncreatureSpell")
+  SpellCriterion.SpellOfColor color -> Json.tagged (Text.pack "SpellOfColor") (Just (colorToJson color))
+
+jsonToSpellCriterion :: Value -> Either Text SpellCriterion.SpellCriterion
+jsonToSpellCriterion value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("NoncreatureSpell", _) -> Right SpellCriterion.NoncreatureSpell
+    ("SpellOfColor", Just v) -> SpellCriterion.SpellOfColor <$> jsonToColor v
+    _ -> Left (Text.pack "unknown SpellCriterion: " <> t)
+
+playerEffectToJson :: PlayerEffect.PlayerEffect -> Value
+playerEffectToJson e = case e of
+  PlayerEffect.CantCastSpells -> nullary (Text.pack "CantCastSpells")
+  PlayerEffect.CantCastMoreThan n -> Json.tagged (Text.pack "CantCastMoreThan") (Just (natTo n))
+  PlayerEffect.IncreaseSpellCost c n -> Json.tagged (Text.pack "IncreaseSpellCost") (Just (Array [spellCriterionToJson c, natTo n]))
+  PlayerEffect.ReduceSpellCost c n -> Json.tagged (Text.pack "ReduceSpellCost") (Just (Array [spellCriterionToJson c, natTo n]))
+  PlayerEffect.NoMaximumHandSize -> nullary (Text.pack "NoMaximumHandSize")
+
+jsonToPlayerEffect :: Value -> Either Text PlayerEffect.PlayerEffect
+jsonToPlayerEffect value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("CantCastSpells", _) -> Right PlayerEffect.CantCastSpells
+    ("CantCastMoreThan", Just v) -> PlayerEffect.CantCastMoreThan <$> natFrom v
+    ("IncreaseSpellCost", Just (Array [c, n])) -> PlayerEffect.IncreaseSpellCost <$> jsonToSpellCriterion c <*> natFrom n
+    ("ReduceSpellCost", Just (Array [c, n])) -> PlayerEffect.ReduceSpellCost <$> jsonToSpellCriterion c <*> natFrom n
+    ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
+    _ -> Left (Text.pack "unknown PlayerEffect: " <> t)
 
 damageRewriteToJson :: DamageRewrite.DamageRewrite -> Value
 damageRewriteToJson r = nullary . Text.pack $ case r of
@@ -1107,6 +1158,20 @@ jsonToStaticAbility value = do
   m <- Json.field (Text.pack "modification") ps >>= jsonToModification
   pure (StaticAbility.MkStaticAbility a m)
 
+playerStaticAbilityToJson :: PlayerStaticAbility.PlayerStaticAbility -> Value
+playerStaticAbilityToJson pa =
+  Object
+    [ (Text.pack "scope", playerScopeToJson (PlayerStaticAbility.scope pa)),
+      (Text.pack "effect", playerEffectToJson (PlayerStaticAbility.effect pa))
+    ]
+
+jsonToPlayerStaticAbility :: Value -> Either Text PlayerStaticAbility.PlayerStaticAbility
+jsonToPlayerStaticAbility value = do
+  ps <- Json.asObject value
+  s <- Json.field (Text.pack "scope") ps >>= jsonToPlayerScope
+  e <- Json.field (Text.pack "effect") ps >>= jsonToPlayerEffect
+  pure (PlayerStaticAbility.MkPlayerStaticAbility s e)
+
 abilityCostToJson :: AbilityCost.AbilityCost -> Value
 abilityCostToJson ac =
   Object
@@ -1387,6 +1452,10 @@ cardToJson c =
                then []
                else [(Text.pack "delayedAbilities", delayedAbilitiesToJson (CardT.delayedAbilities c))]
            )
+        ++ ( if null (CardT.playerAbilities c)
+               then []
+               else [(Text.pack "playerAbilities", listTo playerStaticAbilityToJson (CardT.playerAbilities c))]
+           )
     )
 
 getOpt :: Text -> [(Text, Value)] -> Value
@@ -1406,6 +1475,14 @@ setFromDefault f value = case value of
   Null -> Right Set.empty
   _ -> setFrom f value
 
+-- An omitted list field decodes to empty, the list counterpart of
+-- setFromDefault. Lets an all-default field stay OUT of the committed JSON, so
+-- every existing card file remains byte-identical.
+listFromDefault :: (Value -> Either Text a) -> Value -> Either Text [a]
+listFromDefault f value = case value of
+  Null -> Right []
+  _ -> listFrom f value
+
 jsonToCard :: Value -> Either Text CardT.Card
 jsonToCard value = do
   ps <- Json.asObject value
@@ -1424,6 +1501,7 @@ jsonToCard value = do
   colorIndicator <- setFromDefault jsonToColor (getOpt (Text.pack "colorIndicator") ps)
   characteristicPT <- maybeFrom jsonToQuantity (getOpt (Text.pack "characteristicPT") ps)
   delayed <- mapFromDefault jsonToDelayedAbilities (getOpt (Text.pack "delayedAbilities") ps)
+  playerAbilities <- listFromDefault jsonToPlayerStaticAbility (getOpt (Text.pack "playerAbilities") ps)
   pure
     CardT.MkCard
       { CardT.name = name,
@@ -1440,7 +1518,8 @@ jsonToCard value = do
         CardT.castingPermissions = permissions,
         CardT.colorIndicator = colorIndicator,
         CardT.characteristicPT = characteristicPT,
-        CardT.delayedAbilities = delayed
+        CardT.delayedAbilities = delayed,
+        CardT.playerAbilities = playerAbilities
       }
 
 printingToJson :: Printing.Printing -> Value

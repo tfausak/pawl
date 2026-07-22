@@ -269,7 +269,8 @@ resolveTests cards =
                   Card.Type.triggeredAbilities = [],
                   Card.Type.delayedAbilities = Map.empty,
                   Card.Type.castingPermissions = [],
-                  Card.Type.characteristicPT = Nothing
+                  Card.Type.characteristicPT = Nothing,
+                  Card.Type.playerAbilities = []
                 }
          in do
               HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))
