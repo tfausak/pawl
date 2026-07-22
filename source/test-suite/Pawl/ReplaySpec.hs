@@ -15,6 +15,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Decider as Decider
+import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
@@ -63,6 +64,14 @@ combatReplayTests =
             let p = Prompt.ChooseCopyTarget decider S.alice oid [ObjectId.MkObjectId 7]
                 answer = Just (ObjectId.MkObjectId 7)
              in HU.assertEqual "round-trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
+          -- CR 208.2b: Primal Plasma is in no deck, so no gameplay-level test
+          -- reaches Response.ChoseEntryOption through the record/replay path --
+          -- this exercises the transcript codec directly, matching the shape
+          -- of every other payload-carrying prompt above.
+          HU.testCase "ChooseEntryOption records and replays a Natural" $
+            let options = [EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}]
+                p = Prompt.ChooseEntryOption decider S.alice oid options
+             in HU.assertEqual "round trip" (Just (0 :: Natural.Natural)) (Replay.decode p (Replay.encode p 0)),
           HU.testCase "defaultAnswer attacks with nothing" $
             HU.assertEqual "no attacks" [] (Replay.defaultAnswer attackPrompt),
           HU.testCase "defaultAnswer blocks with nothing" $

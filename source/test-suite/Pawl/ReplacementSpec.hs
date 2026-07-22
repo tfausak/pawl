@@ -26,18 +26,23 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.Combat as Combat
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.Duration as Duration
+import qualified Pawl.Type.EntryOption as EntryOption
+import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -50,7 +55,9 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Response as Response
+import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -78,6 +85,13 @@ wasAskedToReplace responses =
         Response.ChoseReplacement _ -> True
         _ -> False
    in any isReplacement responses
+
+wasAskedForEntryOption :: [Response.Response] -> Bool
+wasAskedForEntryOption responses =
+  let isEntryOption r = case r of
+        Response.ChoseEntryOption _ -> True
+        _ -> False
+   in any isEntryOption responses
 
 -- alice controls one Forest plus `mine`; bob controls `theirs`; alice holds one
 -- Battlegrowth ({G} instant: put a +1/+1 counter on target creature). Returns the
@@ -361,6 +375,7 @@ tests cards =
                         Nothing -> HU.assertFailure "Clone did not reach the battlefield"
                         Just clone -> do
                           HU.assertEqual "3/3" (Just 3) (Projection.powerOf clone after)
+                          HU.assertEqual "3/3" (Just 3) (Projection.toughnessOf clone after)
                           HU.assertBool "still flying (keywords UNION, never assign)" (Projection.hasKeyword Keyword.Flying clone after)
                           HU.assertBool "no defender" (not (Projection.hasKeyword Keyword.Defender clone after))
                 _ -> HU.assertFailure "fixture did not deal two cards",
@@ -375,6 +390,32 @@ tests cards =
                         Nothing -> HU.assertFailure "the second Clone did not reach the battlefield"
                         Just clone -> do
                           HU.assertEqual "its OWN choice wins on P/T" (Just 3) (Projection.powerOf clone s3)
+                          HU.assertEqual "its OWN choice wins on P/T" (Just 3) (Projection.toughnessOf clone s3)
                           HU.assertBool "flying and defender rode the copy chain" (Projection.hasKeyword Keyword.Flying clone s3 && Projection.hasKeyword Keyword.Defender clone s3)
-                _ -> HU.assertFailure "fixture did not deal three cards"
+                _ -> HU.assertFailure "fixture did not deal three cards",
+        -- CR 616.1's own elision, at the ChoiceOf boundary: a single-option
+        -- as-enters choice is not a choice at all, so it must apply with no
+        -- ChooseEntryOption prompt -- same shape as the CR 616.1 "one Hardened
+        -- Scales alone is not asked about" case above, but for EntryR rather
+        -- than CounterR. Built as rules-level data (a floating EntryR ChoiceOf
+        -- with one option, seeded via S.addReplacement) rather than a synthetic
+        -- card file: no printed card in the pool has a single-option choice.
+        HU.testCase "CR 616.1 a single-option ChoiceOf is not a choice and must not prompt" $
+          let (piker, g1) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+              (ts, g2) = Game.freshTimestamp g1
+              onlyOption = EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}
+              active =
+                ActiveReplacement.MkActiveReplacement
+                  { ActiveReplacement.effect = ReplacementEffect.EntryR (EntryRewrite.ChoiceOf [onlyOption]),
+                    ActiveReplacement.source = piker,
+                    ActiveReplacement.timestamp = ts,
+                    ActiveReplacement.duration = Duration.UntilEndOfTurn,
+                    ActiveReplacement.uses = Uses.Once
+                  }
+              g3 = S.addReplacement active g2
+              asked = answersFor S.identityAnswer g3 (Replacement.runEntry Set.empty piker)
+              after = S.runPure S.identityAnswer g3 (Replacement.runEntry Set.empty piker)
+           in do
+                HU.assertBool "no ChooseEntryOption was raised" (not (wasAskedForEntryOption asked))
+                HU.assertEqual "the sole option applied anyway" (Just 3) (Projection.powerOf piker after)
       ]

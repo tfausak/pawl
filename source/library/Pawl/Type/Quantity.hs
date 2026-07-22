@@ -34,14 +34,22 @@ data Quantity
     -- Quantity.evaluate returns Nothing for it. Projection.baseCharacteristics
     -- resolves it at the seed by substituting Card.characteristicPT, so a Star
     -- is meant to never survive into a projection -- but that is a CONVENTION the
-    -- card data must honour, not something this type guarantees: the seed
-    -- substitutes Star for the printed characteristicPT without re-descending
-    -- into the replacement, and the codec accepts Star in any Quantity position,
-    -- so a card whose OWN characteristicPT itself contained a Star would leave
-    -- one in the projection. The consequence is benign (evaluate returns Nothing,
-    -- setPT keeps the base) and no card in the pool does this; the
-    -- Pawl.CardSpec `cardOffends` lint family is where that check would live if
-    -- it is ever added.
+    -- card data must honour, not something this type guarantees. Two cases reach
+    -- evaluate anyway, both benign (evaluate returns Nothing, setPT keeps the
+    -- base):
+    --
+    --   * a card whose OWN characteristicPT itself contained a Star -- the seed
+    --     substitutes Star for the printed characteristicPT without
+    --     re-descending into the replacement, and the codec accepts Star in any
+    --     Quantity position. Hypothetical: no card in the pool does this; the
+    --     Pawl.CardSpec `cardOffends` lint family is where that check would live
+    --     if it is ever added.
+    --   * a card with printed Star power/toughness and NO characteristicPT at
+    --     all, so there is nothing for the seed to substitute and the Star
+    --     reaches evaluate directly. Real: Primal Plasma (P5) is exactly this --
+    --     its star gets a value from an as-enters REPLACEMENT (CR 208.2b), not a
+    --     CDA. See Pawl.Projection's doc comment above `baseColorsOf` for the
+    --     consequence in full (#N).
     Star
   | -- CR 208.2: composition, so a printed 1+* needs no constructor of its own.
     Plus Quantity Quantity

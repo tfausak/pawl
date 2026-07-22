@@ -102,9 +102,10 @@ applyReplacements = applyReplacementsIn Set.empty
 -- here: that rule is about an entry effect moving OTHER objects to a different
 -- zone, e.g. Sutured Ghoul exiling graveyard cards -- a copy target never
 -- changes zones, it just gets copied.) The object THIS loop's WouldEnter event
--- is about is exactly the entering object -- CR 614.12 puts it on the
--- battlefield before the loop runs, and legalCopyTargets already excludes it by
--- `self`, so the batch set is never about excluding the loop's own subject.
+-- is about is exactly the entering object -- this engine's materialize-first
+-- design (see below) already puts it on the battlefield before the loop runs,
+-- and legalCopyTargets already excludes it by `self`, so the batch set is
+-- never about excluding the loop's own subject.
 --
 -- No path today materializes two objects before running either's entry loop:
 -- `changeZone` handles one entering object at a time and its own entry loop
@@ -262,9 +263,20 @@ bucketOf :: ReplacementEffect -> ReplacementBucket
 bucketOf re = case re of
   ReplacementEffect.ZoneChangeR _ _ -> ReplacementBucket.Other
   -- CR 616.1c: "an effect that would cause an object to become a copy of another
-  -- object as it enters" is its own, HIGHER bucket. That is what makes the
-  -- centerpiece work: a Clone's copy applies before the Primal Plasma choice it
-  -- thereby acquires (616.1e), not after.
+  -- object as it enters" is its own, HIGHER bucket. This is NOT what makes the
+  -- centerpiece work: on the entering Clone's first iteration, AsCopy is the
+  -- ONLY applicable candidate (the copied ChoiceOf does not exist yet, because
+  -- nothing has stamped the snapshot), so it is picked because it is the sole
+  -- candidate, not because of its bucket -- mapping this arm to Other instead
+  -- does not change any of the four centerpiece scenarios' outcomes. What
+  -- actually makes the centerpiece work is CR 616.1f's re-collection each
+  -- iteration (so the loop finds the ChoiceOf the object did not have before)
+  -- together with CR 614.5's identity being keyed on the effect VALUE, which
+  -- keeps the newly-acquired ChoiceOf distinct from the already-applied
+  -- AsCopy. The split this arm encodes only becomes observable for an object
+  -- with an AsCopy AND another entry replacement applicable in the SAME
+  -- iteration, which no card in the pool produces, so the bucket ordering
+  -- itself is unexercised by any test (#N).
   ReplacementEffect.EntryR EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
   ReplacementEffect.EntryR (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
   ReplacementEffect.DamageR _ _ -> ReplacementBucket.Other
@@ -413,8 +425,12 @@ apply batch candidate event =
         gs <- State.get
         case options of
           -- Malformed card data: an as-enters choice with nothing to choose
-          -- from. No-op rather than a partial function.
-          [] -> pure (Just event)
+          -- from. No-op rather than a partial function, but still consumed --
+          -- a floating one-shot must not survive to apply again, matching the
+          -- `first : rest` arm below and AsCopy above.
+          [] -> do
+            consume (ReplacementCandidate.identity candidate)
+            pure (Just event)
           first : rest -> do
             picked <-
               if null rest
@@ -486,8 +502,13 @@ applyEntryOption oid option gs =
         base
           { PC.power = Just (EntryOption.power option),
             PC.toughness = Just (EntryOption.toughness option),
-            -- CR 208.2b: the printed star now has a value, so layer 7a's
-            -- characteristic-defining pass must not recompute over it.
+            -- Defensive, not load-bearing: a CR 208.2b card has no
+            -- characteristic-defining ability by construction (CR 208.2a and
+            -- 208.2b are alternatives), so this field is already Nothing on
+            -- any object that reaches `applyEntryOption` (it exists only
+            -- because the object has a ChoiceOf). Setting it again costs
+            -- nothing and keeps this function correct if that invariant ever
+            -- changes.
             PC.characteristicPT = Nothing,
             PC.keywords = Set.union (PC.keywords base) (EntryOption.keywords option)
           }
