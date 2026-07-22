@@ -7,6 +7,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
+import qualified Pawl.Cost as Cost
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -97,7 +98,12 @@ castable pid oid gs = case costOf oid gs of
       -- CR 601.2b: a {X} cost is affordable when payable at X=0 (the caster may
       -- always choose X=0); substituteX 0 is the identity on any Variable-free
       -- cost, so every existing card is unaffected.
-      && Mana.canPay pid (Mana.substituteX 0 cost) gs
+      --
+      -- CR 601.2f: affordability is measured against the TOTAL cost, not the
+      -- printed one. Taxing castability without taxing payment lets the player
+      -- underpay; taxing payment without taxing castability offers a cast that
+      -- cannot be afforded, and there is no mid-announcement rewind (#56).
+      && Mana.canPay pid (Cost.total pid oid (Mana.substituteX 0 cost) gs) gs
       && targetable oid gs
 
 castableSpells :: PlayerId -> GameState -> [ObjectId]
@@ -125,8 +131,8 @@ castableWhileSearching pid gs =
   let permitted oid = maybe False permitsCastWhileSearching (Game.cardOf oid gs)
       affordable oid = case costOf oid gs of
         Nothing -> False
-        -- CR 601.2b castability floor: payable at X=0 (see Cast.castable).
-        Just cost -> Mana.canPay pid (Mana.substituteX 0 cost) gs
+        -- CR 601.2b castability floor at the CR 601.2f total (see Cast.castable).
+        Just cost -> Mana.canPay pid (Cost.total pid oid (Mana.substituteX 0 cost) gs) gs
       allowed oid = permitted oid && affordable oid && targetable oid gs
    in if PlayerEffect.prohibitsCasting pid gs
         then []
@@ -209,8 +215,11 @@ castSpell pid oid = do
                   pair <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider pid oid slot))
                   pure (slot, pair)
             bound <- fmap Map.fromList (traverse ask textSlots)
-            -- CR 601.2f: pay the cost with X substituted (identity when no {X}).
-            let paidCost = maybe cost (\x -> Mana.substituteX x cost) mAmount
+            -- CR 601.2b then 601.2f: substitute X, then compute the total cost.
+            -- The object is still in HAND here, one step before 601.2a moves it
+            -- to the stack, so the criterion is read against its hand
+            -- projection (#89).
+            let paidCost = Cost.total pid oid (maybe cost (\x -> Mana.substituteX x cost) mAmount) gs
             case Mana.payCost pid paidCost gs of
               Nothing -> pure ()
               Just paid -> do

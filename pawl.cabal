@@ -66,6 +66,7 @@ library
     Pawl.Cast
     Pawl.Codec
     Pawl.Combat
+    Pawl.Cost
     Pawl.Damage
     Pawl.Decide
     Pawl.Engine

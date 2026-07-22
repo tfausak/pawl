@@ -32,4 +32,5 @@ data Subtype
   | Rogue -- CR 205.3m (a creature type; Master Thief's)
   | Hag -- CR 205.3m (a creature type; Hag of Inner Weakness's)
   | Warlock -- CR 205.3m (a creature type; Hag of Inner Weakness's)
+  | Soldier -- CR 205.3m (a creature type; Thalia, Guardian of Thraben's)
   deriving (Eq, Ord, Show)

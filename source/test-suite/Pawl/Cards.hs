@@ -83,7 +83,8 @@ data Cards = MkCards
     doublingSeasonPrinting :: Printing.Printing,
     masterThiefPrinting :: Printing.Printing,
     hagOfInnerWeaknessPrinting :: Printing.Printing,
-    ruleOfLawPrinting :: Printing.Printing
+    ruleOfLawPrinting :: Printing.Printing,
+    thaliaPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -166,6 +167,7 @@ loadCards = do
   masterThiefPrinting_ <- loadPrinting "master-thief"
   hagOfInnerWeaknessPrinting_ <- loadPrinting "hag-of-inner-weakness"
   ruleOfLawPrinting_ <- loadPrinting "rule-of-law"
+  thaliaPrinting_ <- loadPrinting "thalia-guardian-of-thraben"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -237,7 +239,8 @@ loadCards = do
         doublingSeasonPrinting = doublingSeasonPrinting_,
         masterThiefPrinting = masterThiefPrinting_,
         hagOfInnerWeaknessPrinting = hagOfInnerWeaknessPrinting_,
-        ruleOfLawPrinting = ruleOfLawPrinting_
+        ruleOfLawPrinting = ruleOfLawPrinting_,
+        thaliaPrinting = thaliaPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -311,7 +314,8 @@ allPrintings cards =
     doublingSeasonPrinting cards,
     masterThiefPrinting cards,
     hagOfInnerWeaknessPrinting cards,
-    ruleOfLawPrinting cards
+    ruleOfLawPrinting cards,
+    thaliaPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

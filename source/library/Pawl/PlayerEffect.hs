@@ -16,18 +16,23 @@ module Pawl.PlayerEffect where
 import qualified Data.Foldable as Foldable
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerEffect (PlayerEffect)
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.PlayerScope (PlayerScope)
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
+import Pawl.Type.SpellCriterion (SpellCriterion)
+import qualified Pawl.Type.SpellCriterion as SpellCriterion
 
 -- CR 109.5: "the words 'you' and 'your' on an object refer to the object's
 -- controller ... for a static ability, this is the current controller of the
@@ -120,3 +125,40 @@ prohibitsCasting pid gs =
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.NoMaximumHandSize -> False
    in any prohibits (applying pid gs)
+
+-- CR 613.11: does this spell match the criterion? Both inhabitants read the
+-- PROJECTION -- a card type is CR 613 layer 4 and a colour is layer 5 -- and
+-- never a printed characteristic, per the standing house rule.
+matchesSpell :: SpellCriterion -> ObjectId -> GameState -> Bool
+matchesSpell criterion oid gs = case criterion of
+  SpellCriterion.NoncreatureSpell -> not (Set.member CardType.Creature (Projection.cardTypesOf oid gs))
+  SpellCriterion.SpellOfColor color -> Set.member color (Projection.colorsOf oid gs)
+
+-- CR 613.11 / 601.2f: the cost increases and the cost reductions that apply to
+-- `pid` casting `oid`, as two lists.
+--
+-- Kept APART, never summed into one signed delta: CR 601.2f applies every
+-- increase before any reduction, and CR 118.7a gives a reduction a restriction
+-- an increase does not have. Pawl.Cost.applyAdjustments is what consumes the
+-- pair; this function only decides membership.
+--
+-- matchesSpell is called only from inside an arm that already matched a
+-- cost-modifying constructor, so a board with no Thalia and no Medallion runs no
+-- projections at all.
+costAdjustments :: PlayerId -> ObjectId -> GameState -> ([Natural], [Natural])
+costAdjustments pid oid gs =
+  let matching criterion amount = if matchesSpell criterion oid gs then Just amount else Nothing
+      increaseOf effect = case effect of
+        PlayerEffect.IncreaseSpellCost criterion amount -> matching criterion amount
+        PlayerEffect.ReduceSpellCost _ _ -> Nothing
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+      reductionOf effect = case effect of
+        PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
+        PlayerEffect.IncreaseSpellCost _ _ -> Nothing
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+      effects = applying pid gs
+   in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)

@@ -38,8 +38,10 @@ import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.SpellCriterion as SpellCriterion
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
@@ -539,6 +541,21 @@ m45p7CardTests cards =
               HU.assertEqual
                 "one player ability"
                 [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.CantCastMoreThan 1)]
+                (Card.Type.playerAbilities c),
+      HU.testCase "Thalia is a {1}{W} 2/1 Legendary Human Soldier with first strike and one IncreaseSpellCost ability" $
+        let c = Printing.card (Cards.thaliaPrinting cards)
+            white = ManaSymbol.OfType (ManaType.Colored Color.White)
+         in do
+              HU.assertEqual "name" (Text.pack "Thalia, Guardian of Thraben") (Card.Type.name c)
+              HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white])) (Card.Type.manaCost c)
+              HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
+              HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
+              HU.assertEqual "supertypes" (Set.singleton Supertype.Legendary) (TypeLine.supertypes (Card.Type.typeLine c))
+              HU.assertEqual "subtypes" (Set.fromList [Subtype.Human, Subtype.Soldier]) (TypeLine.subtypes (Card.Type.typeLine c))
+              HU.assertEqual "keywords" (Set.singleton Keyword.FirstStrike) (Card.Type.keywords c)
+              HU.assertEqual
+                "one player ability"
+                [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.IncreaseSpellCost SpellCriterion.NoncreatureSpell 1)]
                 (Card.Type.playerAbilities c)
     ]
 

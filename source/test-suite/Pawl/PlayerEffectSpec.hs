@@ -11,13 +11,18 @@ module Pawl.PlayerEffectSpec where
 import qualified Pawl.Action as Action
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as Action.Type
+import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Test.Tasty as Tasty
@@ -139,5 +144,126 @@ isCast action = case action of
   Action.Type.Activate _ _ -> False
   Action.Type.Pass -> False
 
+-- The CR 601.2f arithmetic, with no board at all. The unit half of the cost
+-- axis; the gate cards below are the gameplay half.
+red :: ManaSymbol.ManaSymbol
+red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+
+blue :: ManaSymbol.ManaSymbol
+blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+
+adjustmentTests :: Tasty.TestTree
+adjustmentTests =
+  Tasty.testGroup
+    "Adjustments"
+    [ HU.testCase "no adjustments is the identity on a printed cost" $
+        HU.assertEqual
+          "unchanged"
+          (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
+          (Cost.applyAdjustments ([], []) (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])),
+      HU.testCase "CR 601.2f an increase adds generic mana" $
+        HU.assertEqual
+          "{R} taxed by {1} is {1}{R}"
+          (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
+          (Cost.applyAdjustments ([1], []) (ManaCost.MkManaCost [red])),
+      -- CR 118.7a: "Effects that reduce a cost by an amount of generic mana
+      -- affect only the generic mana component of that cost. They can't affect
+      -- the colored or colorless mana components."
+      HU.testCase "CR 118.7a a reduction with no generic component to take is lost" $
+        HU.assertEqual
+          "{U} reduced by {1} is still {U}"
+          (ManaCost.MkManaCost [blue])
+          (Cost.applyAdjustments ([], [1]) (ManaCost.MkManaCost [blue])),
+      HU.testCase "CR 118.7a a reduction takes only the generic component" $
+        HU.assertEqual
+          "{2}{U} reduced by {1} is {1}{U}"
+          (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
+          (Cost.applyAdjustments ([], [1]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue])),
+      HU.testCase "CR 601.2f the total can't be reduced below {0}" $
+        HU.assertEqual
+          "{1} reduced by {3} is {0}"
+          (ManaCost.MkManaCost [])
+          (Cost.applyAdjustments ([], [3]) (ManaCost.MkManaCost [ManaSymbol.Generic 1])),
+      -- THE ORDER TEST, in the small. Increase first gives {1}{U}, which the
+      -- reduction takes back to {U}. Reduce first loses the reduction to CR
+      -- 118.7a's empty generic component, and the increase then leaves {1}{U}.
+      HU.testCase "CR 601.2f every increase applies before any reduction" $
+        HU.assertEqual
+          "{U} +{1} -{1} is {U}"
+          (ManaCost.MkManaCost [blue])
+          (Cost.applyAdjustments ([1], [1]) (ManaCost.MkManaCost [blue]))
+    ]
+
+-- Thalia, Guardian of Thraben {1}{W} Legendary Creature -- Human Soldier 2/1:
+-- "First strike / Noncreature spells cost {1} more to cast."
+thaliaTests :: Cards.Cards -> Tasty.TestTree
+thaliaTests cards =
+  let -- alice controls Thalia and `n` untapped Mountains; her hand holds one
+      -- Lightning Bolt ({R} instant -- noncreature) and one Goblin Piker
+      -- ({1}{R} creature).
+      board n =
+        let base = S.landsInPlay (Cards.mountainPrinting cards) n
+            (_, gs1) = S.addCreature (Cards.thaliaPrinting cards) S.alice base
+            (bolt, gs2) = S.addHandCard (Cards.lightningBoltPrinting cards) S.alice gs1
+            (piker, gs3) = S.addHandCard (Cards.pikerPrinting cards) S.alice gs2
+         in ( bolt,
+              piker,
+              gs3
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      untaxed n =
+        let base = S.landsInPlay (Cards.mountainPrinting cards) n
+            (bolt, gs1) = S.addHandCard (Cards.lightningBoltPrinting cards) S.alice base
+         in (bolt, gs1 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+   in Tasty.testGroup
+        "Thalia"
+        [ HU.testCase "CR 601.2f a noncreature spell's total cost is one more" $
+            let (bolt, _, gs) = board 3
+             in HU.assertEqual
+                  "{R} becomes {1}{R}"
+                  (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
+                  (Cost.total S.alice bolt (ManaCost.MkManaCost [red]) gs),
+          -- Ruling: "Thalia's ability affects each spell that's not a creature
+          -- spell, including your own." SpellCriterion reads the PROJECTION.
+          HU.testCase "CR 613.11 a creature spell is unaffected" $
+            let (_, piker, gs) = board 3
+             in HU.assertEqual
+                  "{1}{R} stays {1}{R}"
+                  (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
+                  (Cost.total S.alice piker (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]) gs),
+          -- BOTH sites, one scenario. Taxing castability but not payment lets
+          -- the player underpay; taxing payment but not castability offers a
+          -- cast that cannot be afforded, and there is no mid-announcement
+          -- rewind (#56) -- that is a wedged game, not a rejected action.
+          HU.testCase "CR 601.2f castability is measured against the total cost" $
+            let (boltOne, _, oneLand) = board 1
+                (boltTwo, _, twoLands) = board 2
+                (_, pikerTwo, twoLandsAgain) = board 2
+             in do
+                  HU.assertBool "one Mountain is not enough for a taxed Bolt" (not (Cast.castable S.alice boltOne oneLand))
+                  HU.assertBool "two Mountains are" (Cast.castable S.alice boltTwo twoLands)
+                  HU.assertBool "and an untaxed creature spell needs only its printed two" (Cast.castable S.alice pikerTwo twoLandsAgain),
+          HU.testCase "CR 601.2f payment spends the total cost" $
+            let (bolt, _, gs) = board 3
+                paid = S.runPure S.identityAnswer gs (Cast.castSpell S.alice bolt)
+                (boltU, gsU) = untaxed 3
+                paidU = S.runPure S.identityAnswer gsU (Cast.castSpell S.alice boltU)
+             in do
+                  HU.assertEqual "taxed: two lands tapped" 2 (S.tappedCount S.alice paid)
+                  HU.assertEqual "untaxed: one land tapped" 1 (S.tappedCount S.alice paidU),
+          -- The EachPlayer scope: Thalia's controller is taxed (every assertion
+          -- above is alice's own spell) and so is her opponent.
+          HU.testCase "CR 611.1 the opponent is taxed too" $
+            let (_, _, gs) = board 3
+                (bobBolt, withBob) = S.addHandCard (Cards.lightningBoltPrinting cards) S.bob gs
+             in HU.assertEqual
+                  "bob's {R} is also {1}{R}"
+                  (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
+                  (Cost.total S.bob bobBolt (ManaCost.MkManaCost [red]) withBob)
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards]
+tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards]
