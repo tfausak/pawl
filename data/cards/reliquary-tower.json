@@ -2,12 +2,12 @@
   "activatedAbilities": [
     {
       "cost": {
-        "additional": [
+        "components": [
           {
-            "type": "TapSelf"
+            "type": "TapThis"
           }
         ],
-        "mana": null
+        "mana": []
       },
       "modal": {
         "modes": [

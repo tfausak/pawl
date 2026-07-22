@@ -87,13 +87,11 @@ library
     Pawl.Stack
     Pawl.Target
     Pawl.Turn
-    Pawl.Type.AbilityCost
     Pawl.Type.AbilityName
     Pawl.Type.Action
     Pawl.Type.ActivatedAbility
     Pawl.Type.ActivePlayerEffect
     Pawl.Type.ActiveReplacement
-    Pawl.Type.AdditionalCost
     Pawl.Type.Affected
     Pawl.Type.AttackTarget
     Pawl.Type.BeginningStep
@@ -108,6 +106,8 @@ library
     Pawl.Type.CombatStep
     Pawl.Type.ContinuousEffect
     Pawl.Type.ControllerRelation
+    Pawl.Type.Cost
+    Pawl.Type.CostComponent
     Pawl.Type.CounterKind
     Pawl.Type.CounterPattern
     Pawl.Type.CountSpec

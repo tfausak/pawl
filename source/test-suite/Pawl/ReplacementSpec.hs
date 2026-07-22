@@ -31,12 +31,12 @@ import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.Combat as Combat
+import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -46,6 +46,7 @@ import qualified Pawl.Type.Expiry as Expiry
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
@@ -77,7 +78,7 @@ answersFor answer gs game = snd (Replay.record answer gs game)
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
 theAbility p = case Card.activatedAbilities (Printing.card p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
 
 wasAskedToReplace :: [Response.Response] -> Bool
 wasAskedToReplace responses =

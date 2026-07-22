@@ -16,13 +16,13 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Cost as Cost.Type
+import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.Keyword as Keyword
@@ -583,8 +583,8 @@ m45p7CardTests cards =
                 (Card.Type.playerAbilities c)
               case Card.Type.activatedAbilities c of
                 [ab] -> do
-                  HU.assertEqual "tap cost only" [AdditionalCost.TapSelf] (AbilityCost.additional (ActivatedAbility.cost ab))
-                  HU.assertEqual "no mana cost" Nothing (AbilityCost.mana (ActivatedAbility.cost ab))
+                  HU.assertEqual "tap cost only" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost ab))
+                  HU.assertEqual "a real {0} mana cost, not an unpayable one (CR 118.5a/118.6)" (Just (ManaCost.MkManaCost [])) (Cost.Type.mana (ActivatedAbility.cost ab))
                   case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
                     [m] -> HU.assertEqual "adds colorless" [Effect.AddMana ManaType.Colorless] (Foldable.toList (Mode.effects m))
                     _ -> HU.assertFailure "expected exactly one mode"

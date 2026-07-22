@@ -13,11 +13,11 @@ import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Target as Target
-import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.Cost as Cost
+import qualified Pawl.Type.CostComponent as CostComponent
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -36,7 +36,7 @@ import qualified Pawl.Type.Zone as Zone
 -- gated. Only {T} (TapSelf) is affected.
 tapSicknessOk :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 tapSicknessOk srcId ability gs =
-  let needsTap = elem AdditionalCost.TapSelf (AbilityCost.additional (ActivatedAbility.cost ability))
+  let needsTap = elem CostComponent.TapThis (Cost.components (ActivatedAbility.cost ability))
       isCreature = Set.member CardType.Creature (Projection.cardTypesOf srcId gs)
       settled = case Game.lookupObject srcId gs of
         Just obj -> Object.sickness obj == Sickness.Settled
@@ -44,12 +44,12 @@ tapSicknessOk srcId ability gs =
    in not (needsTap && isCreature && not settled)
 
 -- Can this additional cost be paid right now?
-canPayAdditional :: ObjectId -> GameState -> AdditionalCost.AdditionalCost -> Bool
+canPayAdditional :: ObjectId -> GameState -> CostComponent.CostComponent -> Bool
 canPayAdditional srcId gs c = case c of
-  AdditionalCost.TapSelf -> case Game.lookupObject srcId gs of
+  CostComponent.TapThis -> case Game.lookupObject srcId gs of
     Just obj -> Object.tapped obj == TapState.Untapped
     Nothing -> False
-  AdditionalCost.SacrificeSelf -> Set.member srcId (GameState.battlefield gs)
+  CostComponent.SacrificeThis -> Set.member srcId (GameState.battlefield gs)
 
 -- The abilities to consider activating. Task 5: the card's PRINTED abilities.
 -- Task 9 switches the body to `Projection.abilitiesOf srcId gs` so Humility
@@ -67,11 +67,11 @@ activatable pid srcId ability gs =
   Projection.controllerOf srcId gs == Just pid
     && elem ability (abilitiesFor srcId gs)
     && not (Mana.isManaAbility ability)
-    && all (canPayAdditional srcId gs) (AbilityCost.additional (ActivatedAbility.cost ability))
+    && all (canPayAdditional srcId gs) (Cost.components (ActivatedAbility.cost ability))
     && tapSicknessOk srcId ability gs
     && Set.size (Target.fillableModes srcId (ActivatedAbility.modal ability) gs)
       >= fromIntegral (Modal.selectionCount (ActivatedAbility.modal ability))
-    && maybe True (\c -> Mana.canPay pid c gs) (AbilityCost.mana (ActivatedAbility.cost ability))
+    && maybe True (\c -> Mana.canPay pid c gs) (Cost.mana (ActivatedAbility.cost ability))
 
 -- CR 602.2: put the ability on the stack (a fresh OfAbility object), choose
 -- modes (602.2b) then stamp targets, pay the additional costs, keep priority
@@ -128,9 +128,9 @@ activateAbility pid srcId ability = do
         then State.put gs -- reject: the whole activation is a no-op
         else do
           State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
-          let additional = AbilityCost.additional (ActivatedAbility.cost ability)
+          let additional = Cost.components (ActivatedAbility.cost ability)
               payAll = Monad.mapM_ (payAdditional srcId) additional
-          case AbilityCost.mana (ActivatedAbility.cost ability) of
+          case Cost.mana (ActivatedAbility.cost ability) of
             Nothing -> payAll
             Just cost -> do
               g1 <- State.get
@@ -144,8 +144,8 @@ activateAbility pid srcId ability = do
                   payAll
 
 -- Pay one additional cost against the source permanent.
-payAdditional :: ObjectId -> AdditionalCost.AdditionalCost -> Game ()
+payAdditional :: ObjectId -> CostComponent.CostComponent -> Game ()
 payAdditional srcId c = case c of
-  AdditionalCost.TapSelf ->
+  CostComponent.TapThis ->
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) srcId (GameState.objects gs)})
-  AdditionalCost.SacrificeSelf -> Event.changeZone srcId Zone.Graveyard
+  CostComponent.SacrificeThis -> Event.changeZone srcId Zone.Graveyard

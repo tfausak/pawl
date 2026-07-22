@@ -14,10 +14,7 @@ import qualified Pawl.Json as J
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.AbilityName as AbilityName
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Binding as Binding.Type
@@ -26,6 +23,8 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
+import qualified Pawl.Type.Cost as Cost.Type
+import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.CounterPattern as CounterPattern
@@ -221,23 +220,39 @@ tests cards =
               Codec.typeLineToJson
               Codec.jsonToTypeLine
               (TypeLine.MkTypeLine (Set.singleton Supertype.Basic) (Set.singleton CardType.Land) (Set.singleton Subtype.Mountain)),
-          HU.testCase "ActivatedAbility" $
-            roundTrip
-              "aa"
-              Codec.activatedAbilityToJson
-              Codec.jsonToActivatedAbility
-              ( ActivatedAbility.MkActivatedAbility
-                  (AbilityCost.MkAbilityCost Nothing [AdditionalCost.TapSelf])
-                  ( Modal.MkModal
-                      ( Seq.singleton
-                          ( Mode.MkMode
-                              (Seq.fromList [Effect.AddMana (ManaType.Colored Color.Green)])
-                              (Map.fromList [(SlotName.MkSlotName (Text.pack "t"), TargetSpec.CreatureTarget)])
-                          )
-                      )
-                      (ModeSelection.ChooseExactly 1)
-                  )
-              ),
+          Tasty.testGroup
+            "cost (P8)"
+            [ HU.testCase "every CostComponent round-trips" $
+                mapM_
+                  (roundTrip "component" Codec.costComponentToJson Codec.jsonToCostComponent)
+                  [CostComponent.TapThis, CostComponent.SacrificeThis],
+              HU.testCase "a Cost with a mana part and components round-trips" $
+                roundTrip
+                  "cost"
+                  Codec.costToJson
+                  Codec.jsonToCost
+                  Cost.Type.MkCost
+                    { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
+                      Cost.Type.components = [CostComponent.TapThis, CostComponent.SacrificeThis]
+                    },
+              -- CR 118.5a: {0} is a real, payable cost, and ManaCost's empty list IS
+              -- {0}. This is the shape every migrated ability now carries.
+              HU.testCase "a {0} cost round-trips as Just an empty ManaCost" $
+                roundTrip
+                  "zero"
+                  Codec.costToJson
+                  Codec.jsonToCost
+                  Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
+              -- CR 118.6: an ABSENT mana field is an UNPAYABLE cost, not {0}. This is
+              -- the footgun the corpus migration exists to avoid, pinned so a future
+              -- card file cannot lose its mana field unnoticed.
+              HU.testCase "an omitted mana field decodes to Nothing, not to {0}" $
+                let value = Json.Object [(Text.pack "components", Json.Array [])]
+                 in HU.assertEqual
+                      "unpayable"
+                      (Right Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})
+                      (Codec.jsonToCost value)
+            ],
           HU.testCase "a ZoneChangeR replacement round-trips" $
             let re =
                   ReplacementEffect.ZoneChangeR

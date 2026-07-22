@@ -26,13 +26,13 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
-import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Cost as Cost.Type
+import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -347,7 +347,7 @@ resolveTests cards =
         let (srcId, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             ability = case Card.Type.activatedAbilities (Printing.card (Cards.prodigalSorcererPrinting cards)) of
               ab : _ -> ab
-              [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
+              [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g1) = Game.freshObjectId g0
             (ts, g2) = Game.freshTimestamp g1
             slot = SlotName.MkSlotName (Text.pack "target")
@@ -380,7 +380,7 @@ resolveTests cards =
             (_, g1) = S.addLibraryCard (Cards.mountainPrinting cards) S.alice base
             ability =
               ActivatedAbility.MkActivatedAbility
-                (AbilityCost.MkAbilityCost Nothing [])
+                (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
                 (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search CardCriterion.BasicLandCard]) Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
@@ -395,7 +395,7 @@ resolveTests cards =
       HU.testCase "CR 701.23b Search may fail to find" $
         let base = Setup.emptyGame S.bothPlayers
             (_, g1) = S.addLibraryCard (Cards.mountainPrinting cards) S.alice base
-            ability = ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search CardCriterion.BasicLandCard]) Map.empty)) (ModeSelection.ChooseExactly 1))
+            ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search CardCriterion.BasicLandCard]) Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty ts
@@ -439,9 +439,9 @@ resolveTests cards =
             ability =
               ActivatedAbility.MkActivatedAbility
                 { ActivatedAbility.cost =
-                    AbilityCost.MkAbilityCost
-                      { AbilityCost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
-                        AbilityCost.additional = [AdditionalCost.TapSelf, AdditionalCost.SacrificeSelf]
+                    Cost.Type.MkCost
+                      { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
+                        Cost.Type.components = [CostComponent.TapThis, CostComponent.SacrificeThis]
                       },
                   ActivatedAbility.modal =
                     Modal.MkModal

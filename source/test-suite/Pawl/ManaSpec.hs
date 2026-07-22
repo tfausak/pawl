@@ -12,9 +12,9 @@ import qualified Pawl.Mana as Mana
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Mana as Mana.Type
@@ -152,14 +152,14 @@ manaTests cards =
       HU.testCase "CR 605.1a a {T}: Add {G} ability is a mana ability" $
         let ab =
               ActivatedAbility.MkActivatedAbility
-                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
+                { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
                   ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaType.Colored Color.Green)] Map.empty
                 }
          in HU.assertBool "mana ability" (Mana.isManaAbility ab),
       HU.testCase "CR 605.1a an ability that targets is NOT a mana ability" $
         let ab =
               ActivatedAbility.MkActivatedAbility
-                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
+                { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.AddMana (ManaType.Colored Color.Green)]
@@ -169,7 +169,7 @@ manaTests cards =
       HU.testCase "CR 605.1a a damage ability is NOT a mana ability" $
         let ab =
               ActivatedAbility.MkActivatedAbility
-                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
+                { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1)]

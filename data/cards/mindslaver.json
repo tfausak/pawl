@@ -2,12 +2,12 @@
   "activatedAbilities": [
     {
       "cost": {
-        "additional": [
+        "components": [
           {
-            "type": "TapSelf"
+            "type": "TapThis"
           },
           {
-            "type": "SacrificeSelf"
+            "type": "SacrificeThis"
           }
         ],
         "mana": [

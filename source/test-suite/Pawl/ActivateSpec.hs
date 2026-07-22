@@ -19,11 +19,11 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
@@ -58,7 +58,7 @@ findFirst p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) (singleModeAbility [] Map.empty)
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty)
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
@@ -127,9 +127,9 @@ tests cards =
             costlyAbility =
               ActivatedAbility.MkActivatedAbility
                 { ActivatedAbility.cost =
-                    AbilityCost.MkAbilityCost
-                      { AbilityCost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
-                        AbilityCost.additional = []
+                    Cost.Type.MkCost
+                      { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
+                        Cost.Type.components = []
                       },
                   ActivatedAbility.modal = singleModeAbility [] Map.empty
                 }
@@ -178,7 +178,7 @@ tests cards =
             targetSlot = SlotName.MkSlotName (Text.pack "target")
             ability =
               ActivatedAbility.MkActivatedAbility
-                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
+                { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.GainControl (Duration.ForAsLongAs StateCondition.YouControlSource) targetSlot]
@@ -214,7 +214,7 @@ tests cards =
             targetSlot = SlotName.MkSlotName (Text.pack "target")
             ability =
               ActivatedAbility.MkActivatedAbility
-                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
+                { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.GainControl (Duration.ForAsLongAs StateCondition.YouControlSource) targetSlot]

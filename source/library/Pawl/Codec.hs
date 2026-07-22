@@ -16,10 +16,8 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Json as Json
-import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.AbilityName as AbilityName
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.AdditionalCost as AdditionalCost
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Binding as Binding
@@ -30,6 +28,8 @@ import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
+import qualified Pawl.Type.Cost as Cost
+import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.CounterPattern as CounterPattern
@@ -632,18 +632,21 @@ jsonToDamagePattern value = do
   k <- Json.field (Text.pack "whichKind") ps >>= maybeFrom jsonToDamageKind
   pure DamagePattern.MkDamagePattern {DamagePattern.whichKind = k}
 
-additionalCostToJson :: AdditionalCost.AdditionalCost -> Value
-additionalCostToJson a = nullary . Text.pack $ case a of
-  AdditionalCost.TapSelf -> "TapSelf"
-  AdditionalCost.SacrificeSelf -> "SacrificeSelf"
+-- Tagged rather than bare-nullary from the start: this family grows
+-- payload-carrying constructors (PayLife, Sacrifice), so the decoder is written
+-- against Json.tag and only gains arms.
+costComponentToJson :: CostComponent.CostComponent -> Value
+costComponentToJson c = case c of
+  CostComponent.TapThis -> nullary (Text.pack "TapThis")
+  CostComponent.SacrificeThis -> nullary (Text.pack "SacrificeThis")
 
-jsonToAdditionalCost :: Value -> Either Text AdditionalCost.AdditionalCost
-jsonToAdditionalCost =
-  decodeNullary
-    (Text.pack "AdditionalCost")
-    [ (Text.pack "TapSelf", AdditionalCost.TapSelf),
-      (Text.pack "SacrificeSelf", AdditionalCost.SacrificeSelf)
-    ]
+jsonToCostComponent :: Value -> Either Text CostComponent.CostComponent
+jsonToCostComponent value = do
+  (t, _) <- Json.tag value
+  case Text.unpack t of
+    "TapThis" -> Right CostComponent.TapThis
+    "SacrificeThis" -> Right CostComponent.SacrificeThis
+    _ -> Left (Text.pack "unknown CostComponent: " <> t)
 
 targetSpecToJson :: TargetSpec.TargetSpec -> Value
 targetSpecToJson t = nullary . Text.pack $ case t of
@@ -1180,31 +1183,34 @@ jsonToPlayerStaticAbility value = do
   e <- Json.field (Text.pack "effect") ps >>= jsonToPlayerEffect
   pure (PlayerStaticAbility.MkPlayerStaticAbility s e)
 
-abilityCostToJson :: AbilityCost.AbilityCost -> Value
-abilityCostToJson ac =
+costToJson :: Cost.Cost -> Value
+costToJson c =
   Object
-    [ (Text.pack "mana", maybeTo manaCostToJson (AbilityCost.mana ac)),
-      (Text.pack "additional", listTo additionalCostToJson (AbilityCost.additional ac))
+    [ (Text.pack "mana", maybeTo manaCostToJson (Cost.mana c)),
+      (Text.pack "components", listTo costComponentToJson (Cost.components c))
     ]
 
-jsonToAbilityCost :: Value -> Either Text AbilityCost.AbilityCost
-jsonToAbilityCost value = do
+-- CR 118.6: an ABSENT mana field decodes to Nothing -- an unpayable cost -- and
+-- never to {0}. Every ability-bearing card file states its mana part explicitly
+-- (`[]` for {0}), so the absent case is only ever reached by a malformed file.
+jsonToCost :: Value -> Either Text Cost.Cost
+jsonToCost value = do
   ps <- Json.asObject value
-  manaCost <- maybeFrom jsonToManaCost (Maybe.fromMaybe Null (Json.optField (Text.pack "mana") ps))
-  add <- Json.field (Text.pack "additional") ps >>= listFrom jsonToAdditionalCost
-  pure (AbilityCost.MkAbilityCost manaCost add)
+  m <- maybeFrom jsonToManaCost (getOpt (Text.pack "mana") ps)
+  cs <- listFromDefault jsonToCostComponent (getOpt (Text.pack "components") ps)
+  pure Cost.MkCost {Cost.mana = m, Cost.components = cs}
 
 activatedAbilityToJson :: ActivatedAbility.ActivatedAbility CardT.Card -> Value
 activatedAbilityToJson aa =
   Object
-    [ (Text.pack "cost", abilityCostToJson (ActivatedAbility.cost aa)),
+    [ (Text.pack "cost", costToJson (ActivatedAbility.cost aa)),
       (Text.pack "modal", modalToJson (ActivatedAbility.modal aa))
     ]
 
 jsonToActivatedAbility :: Value -> Either Text (ActivatedAbility.ActivatedAbility CardT.Card)
 jsonToActivatedAbility value = do
   ps <- Json.asObject value
-  c <- Json.field (Text.pack "cost") ps >>= jsonToAbilityCost
+  c <- Json.field (Text.pack "cost") ps >>= jsonToCost
   m <- Json.field (Text.pack "modal") ps >>= jsonToModal
   pure (ActivatedAbility.MkActivatedAbility c m)
 
