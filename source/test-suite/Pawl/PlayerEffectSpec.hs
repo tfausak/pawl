@@ -21,6 +21,7 @@ import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as Action.Type
+import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Expiry as Expiry.Type
@@ -32,6 +33,7 @@ import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerEffect as PlayerEffect.Type
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Zone as Zone
@@ -421,11 +423,36 @@ reliquaryTowerTests cards =
              in HU.assertEqual "seven again" (Just 7) (PlayerEffect.maximumHandSize S.alice board)
         ]
 
+-- Seed a stored player effect keyed to a REAL battlefield object, not
+-- S.addPlayerEffect's stand-in id 998 -- so a StateCondition.YouControlSource
+-- check has something to genuinely hold or fail against. Mirrors
+-- ExpirySpec's whileEffect, adapted to ActivePlayerEffect.
+addPlayerEffectAt ::
+  ObjectId.ObjectId ->
+  Expiry.Type.Expiry ->
+  PlayerScope.PlayerScope ->
+  PlayerEffect.Type.PlayerEffect ->
+  PlayerId.PlayerId ->
+  GameState.GameState ->
+  GameState.GameState
+addPlayerEffectAt source expiry scope effect controller gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      active =
+        ActivePlayerEffect.MkActivePlayerEffect
+          { ActivePlayerEffect.source = source,
+            ActivePlayerEffect.controller = controller,
+            ActivePlayerEffect.timestamp = ts,
+            ActivePlayerEffect.expiry = expiry,
+            ActivePlayerEffect.scope = scope,
+            ActivePlayerEffect.effect = effect
+          }
+   in gs1 {GameState.playerEffects = active : GameState.playerEffects gs1}
+
 -- The STORED carrier: a player effect that outlives the object that made it.
 -- Hand-built here, exactly as ExpirySpec hand-builds a ContinuousEffect, so the
 -- carrier and its sweeps are proven before an opcode can produce one.
-storedTests :: Tasty.TestTree
-storedTests =
+storedTests :: Cards.Cards -> Tasty.TestTree
+storedTests cards =
   let base = Setup.emptyGame S.bothPlayers
       silenced =
         S.addPlayerEffect
@@ -434,17 +461,23 @@ storedTests =
           PlayerEffect.Type.CantCastSpells
           S.alice
           base
+      -- A real permanent on the battlefield, so the effect's condition can
+      -- genuinely hold rather than being false by construction.
+      (srcId, withSrc) = S.addPiker cards S.alice base
+      conditional =
+        addPlayerEffectAt
+          srcId
+          (Expiry.Type.While S.alice StateCondition.YouControlSource)
+          PlayerScope.Opponents
+          PlayerEffect.Type.CantCastSpells
+          S.alice
+          withSrc
    in Tasty.testGroup
         "Stored"
         [ HU.testCase "CR 611.1 a stored effect applies through its scope" $
             do
               HU.assertBool "bob is prohibited" (PlayerEffect.prohibitsCasting S.bob silenced)
               HU.assertBool "alice is not" (not (PlayerEffect.prohibitsCasting S.alice silenced)),
-          -- CR 611.2c: the CONTROLLER is baked in at creation, so the scope is
-          -- still answerable once the source has left the battlefield -- which
-          -- for an instant it always has.
-          HU.testCase "CR 611.2c the scope resolves without the source existing" $
-            HU.assertEqual "the source id names nothing" Nothing (Game.lookupObject (ObjectId.MkObjectId 998) silenced),
           HU.testCase "CR 514.2 the cleanup sweep drops an AtCleanup player effect" $
             let after = Expiry.dropAtCleanup silenced
              in do
@@ -454,27 +487,40 @@ storedTests =
           HU.testCase "CR 514.2 the cleanup sweep keeps a Never player effect" $
             let forever = S.addPlayerEffect Expiry.Type.Never PlayerScope.Opponents PlayerEffect.Type.CantCastSpells S.alice base
              in HU.assertEqual "survives" 1 (length (GameState.playerEffects (Expiry.dropAtCleanup forever))),
-          HU.testCase "CR 611.2a the handoff sweep drops an AtTurnOf player effect for the player whose turn began" $
-            let armed = S.addPlayerEffect (Expiry.Type.AtTurnOf S.bob) PlayerScope.Opponents PlayerEffect.Type.CantCastSpells S.alice base
+          -- THE DISCRIMINATING SHAPE: two entries, keyed to the two different
+          -- players, on the SAME handoff. An indiscriminate sweep (one that
+          -- dropped every stored player effect) would pass the old
+          -- single-entry version of this test; here it would wrongly drop
+          -- bob's still-live entry too.
+          HU.testCase "CR 611.2a the handoff sweep drops only the entry keyed to the player whose turn began" $
+            let forBob = S.addPlayerEffect (Expiry.Type.AtTurnOf S.bob) PlayerScope.Opponents PlayerEffect.Type.CantCastSpells S.alice base
+                armed = S.addPlayerEffect (Expiry.Type.AtTurnOf S.alice) PlayerScope.Opponents PlayerEffect.Type.CantCastSpells S.alice forBob
                 bobsTurn = S.runPure S.identityAnswer armed Engine.handoffTurn
              in do
                   HU.assertEqual "bob is active" S.bob (GameState.activePlayer bobsTurn)
-                  HU.assertEqual "and it ended" [] (GameState.playerEffects bobsTurn),
-          HU.testCase "CR 611.2b the conditional sweep deletes a player effect whose condition has failed" $
-            let armed =
-                  S.addPlayerEffect
-                    (Expiry.Type.While S.alice StateCondition.YouControlSource)
-                    PlayerScope.Opponents
-                    PlayerEffect.Type.CantCastSpells
-                    S.alice
-                    base
-                (changed, swept) = Engine.runGamePure S.identityAnswer armed Expiry.sweepConditional
+                  HU.assertEqual
+                    "the bob-keyed entry ended; the alice-keyed entry survives"
+                    [Expiry.Type.AtTurnOf S.alice]
+                    (map ActivePlayerEffect.expiry (GameState.playerEffects bobsTurn)),
+          -- The POSITIVE case: while the condition genuinely holds, the sweep
+          -- must leave the effect in place and report that nothing changed.
+          -- Without this, "deletes on failure" is indistinguishable from
+          -- "empties the list unconditionally".
+          HU.testCase "CR 611.2b the conditional sweep keeps a player effect whose condition still holds" $
+            let (changed, swept) = Engine.runGamePure S.identityAnswer conditional Expiry.sweepConditional
              in do
-                  -- Object 998 is not on the battlefield, so YouControlSource is
-                  -- false the moment it is checked.
+                  HU.assertBool "still prohibited while the source stands" (PlayerEffect.prohibitsCasting S.bob conditional)
+                  HU.assertBool "the sweep reports no change" (not changed)
+                  HU.assertEqual "still stored" 1 (length (GameState.playerEffects swept))
+                  HU.assertBool "still prohibited after a no-op sweep" (PlayerEffect.prohibitsCasting S.bob swept),
+          HU.testCase "CR 611.2b the conditional sweep deletes a player effect whose condition has failed" $
+            let gone = S.runPure S.identityAnswer conditional (Event.destroy srcId)
+                (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
+             in do
                   HU.assertBool "the sweep reports a change" changed
                   HU.assertEqual "deleted, not masked" [] (GameState.playerEffects swept)
+                  HU.assertBool "no longer prohibited" (not (PlayerEffect.prohibitsCasting S.bob swept))
         ]
 
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards, medallionTests cards, reliquaryTowerTests cards, storedTests]
+tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards, medallionTests cards, reliquaryTowerTests cards, storedTests cards]
