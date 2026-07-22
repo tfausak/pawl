@@ -7,6 +7,7 @@
 -- be an import cycle. See the plan's module dependency note.
 module Pawl.Event where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
@@ -20,7 +21,6 @@ import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.Combat as Combat
 import Pawl.Type.DamageEvent (DamageEvent)
 import Pawl.Type.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
@@ -86,20 +86,14 @@ unscannedDamage gs =
 
 -- CR 514.2: at cleanup, drop until-end-of-turn floating replacements (the
 -- event-pipeline analog of Projection.dropEndOfTurnEffects). Indefinite ones
--- stay. Fog's shield is exactly such an entry now. Drudge Skeletons'
--- regeneration shield (GameState.regenerationShields, clearRegenerationShields
--- below) is still a SEPARATE cleanup: it is not held in this store as an
--- UntilEndOfTurn/Once entry, so this function does not retire it, and CR
--- 701.19a's "this turn" does not yet fall out of CR 514.2 -- it still needs its
--- own sweep.
+-- stay. Fog's shield and, since P5, Drudge Skeletons' regeneration shield
+-- (Replace UntilEndOfTurn Once (DestructionR Regenerate)) are both exactly such
+-- an entry now, so CR 701.19a's "this turn" falls out of this one sweep -- no
+-- separate regeneration-shield cleanup exists any more.
 dropEndOfTurnReplacements :: GameState -> GameState
 dropEndOfTurnReplacements gs =
   let keep active = ActiveReplacement.duration active /= Duration.UntilEndOfTurn
    in gs {GameState.replacements = filter keep (GameState.replacements gs)}
-
--- CR 701.19a: regeneration shields last "this turn," so cleanup clears every one.
-clearRegenerationShields :: GameState -> GameState
-clearRegenerationShields gs = gs {GameState.regenerationShields = Map.empty}
 
 -- Insert a freshly-built object into `dest` under a new id and timestamp, and
 -- return that id. The common tail of changeZone (a moved incarnation) and
@@ -190,12 +184,14 @@ changeZone oid requestedDest = do
 
 -- The single destruction funnel (CR 701.8 / 702.12b): every destruction -- the
 -- Destroy opcode and the CR 704.5g/h state-based actions -- flows through here.
--- CR 702.12b: an indestructible permanent can't be destroyed (the event never
--- happens, so a shield is neither applied nor consumed, CR 614.7). CR 701.19a: a
--- regeneration shield replaces the destruction. Otherwise the permanent is put
--- into its owner's graveyard via changeZone (so Rest in Peace's redirect and a
--- token's CR 704.5d cease-to-exist still compose). This funnel is ungated for CR
--- 701.19c "can't be regenerated" (#42).
+--
+-- CR 702.12b: an indestructible permanent can't be destroyed, and that gate comes
+-- BEFORE the replacement loop, which is CR 614.7 -- "an event that would
+-- otherwise be replaced ... doesn't happen, so nothing replaces it": a shield is
+-- neither applied nor consumed. Otherwise the would-be-destroyed event is offered
+-- to CR 616.1; if it survives, the permanent is put into its owner's graveyard via
+-- changeZone (so Rest in Peace's redirect and a token's CR 704.5d cease-to-exist
+-- still compose). Ungated for CR 701.19c "can't be regenerated" (#42).
 destroy :: ObjectId -> Game ()
 destroy oid = do
   gs <- State.get
@@ -204,35 +200,9 @@ destroy oid = do
     Just _ ->
       if Projection.hasKeyword Keyword.Indestructible oid gs
         then pure ()
-        else case Map.lookup oid (GameState.regenerationShields gs) of
-          Just n | n > 0 -> regenerate oid
-          _ -> changeZone oid Zone.Graveyard
-
--- CR 701.19a: consume one shield, remove all marked damage, tap the permanent,
--- and remove it from combat. The permanent stays on the battlefield (same id).
-regenerate :: ObjectId -> Game ()
-regenerate oid = State.modify' $ \gs ->
-  let shields = Map.update (\n -> if n <= 1 then Nothing else Just (n - 1)) oid (GameState.regenerationShields gs)
-      healTap obj = obj {Object.damage = 0, Object.tapped = TapState.Tapped}
-      gs1 =
-        gs
-          { GameState.regenerationShields = shields,
-            GameState.objects = Map.adjust healTap oid (GameState.objects gs)
-          }
-   in removeFromCombat oid gs1
-
--- CR 701.19a: if it is attacking or blocking, remove it from combat. Edits the
--- GameState.combat maps directly (Event must not import Pawl.Combat -- that would
--- cycle through Sba; see the plan's Global Constraints).
-removeFromCombat :: ObjectId -> GameState -> GameState
-removeFromCombat oid gs =
-  let c = GameState.combat gs
-      c1 =
-        c
-          { Combat.attackers = Map.delete oid (Combat.attackers c),
-            Combat.blockers = Map.map (Set.delete oid) (Map.delete oid (Combat.blockers c))
-          }
-   in gs {GameState.combat = c1}
+        else do
+          happens <- Replacement.resolveDestruction oid
+          Monad.when happens (changeZone oid Zone.Graveyard)
 
 -- The single counter funnel (CR 701.6). A countered spell is removed from the
 -- stack and put into its owner's graveyard (CR 701.6a) via changeZone -- so Rest

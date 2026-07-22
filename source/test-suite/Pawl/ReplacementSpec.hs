@@ -20,7 +20,10 @@
 module Pawl.ReplacementSpec where
 
 import qualified Control.Exception as Exception
+import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Damage as Damage
@@ -32,6 +35,8 @@ import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Type.AbilityCost as AbilityCost
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.CandidateId as CandidateId
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
@@ -39,6 +44,9 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.ProposedEvent as ProposedEvent
@@ -58,6 +66,17 @@ import qualified Test.Tasty.HUnit as HU
 -- indistinguishable and correctly elided).
 answersFor :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> [Response.Response]
 answersFor answer gs game = snd (Replay.record answer gs game)
+
+-- The single activated ability of a printing (Drudge Skeletons has exactly
+-- one). Total: the empty-ability fallback is unreachable in this fixture.
+-- Same shape as ActivateSpec.theAbility -- duplicated per this test suite's
+-- existing convention of group-local helpers (ActivateSpec and ManaSpec
+-- already duplicate singleModeAbility the same way) rather than centralizing
+-- a helper this small in Support.
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
+theAbility p = case Card.activatedAbilities (Printing.card p) of
+  ab : _ -> ab
+  [] -> ActivatedAbility.MkActivatedAbility (AbilityCost.MkAbilityCost Nothing []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
 
 wasAskedToReplace :: [Response.Response] -> Bool
 wasAskedToReplace responses =
@@ -164,5 +183,34 @@ tests cards =
          in do
               HU.assertEqual "the first attacker's damage was prevented" (Just 0) (S.damageOf victimA after)
               HU.assertEqual "and so was the second's, independently" (Just 0) (S.damageOf victimB after)
-              HU.assertEqual "no damage event was recorded at all" [] (S.damageEventsOf after)
+              HU.assertEqual "no damage event was recorded at all" [] (S.damageEventsOf after),
+      HU.testCase "CR 701.19a Uses=Once: the first destruction is replaced, the second is not" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 1
+            (skel, g1) = S.addCreature (Cards.drudgeSkeletonsPrinting cards) S.alice base
+            -- Activate {B}: regenerate this creature, and resolve it.
+            armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice skel (theAbility (Cards.drudgeSkeletonsPrinting cards)) >> Stack.resolveTop)
+            once = S.runPure S.identityAnswer armed (Event.destroy skel)
+            twice = S.runPure S.identityAnswer once (Event.destroy skel)
+         in do
+              HU.assertBool "survived the first destruction" (Set.member skel (GameState.battlefield once))
+              HU.assertEqual "the shield was spent" [] (GameState.replacements once)
+              HU.assertBool "the second destruction kills it" (not (Set.member skel (GameState.battlefield twice))),
+      HU.testCase "CR 614.8 regeneration replaces the destruction, so Rest in Peace never sees it" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 1
+            (_, g1) = S.addCreature (Cards.restInPeacePrinting cards) S.bob base
+            (skel, g2) = S.addCreature (Cards.drudgeSkeletonsPrinting cards) S.alice g1
+            shielded = S.addRegenShield skel g2
+            after = S.runPure S.identityAnswer shielded (Event.destroy skel)
+         in do
+              HU.assertBool "still on the battlefield" (Set.member skel (GameState.battlefield after))
+              HU.assertEqual "nothing was exiled -- the put-into-graveyard never happened" 0 (Set.size (GameState.exile after))
+              HU.assertEqual "and nothing reached a graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 614.7 an event that never happens does not consume a shield" $
+        let base = Setup.emptyGame S.bothPlayers
+            (myr, g1) = S.addCreature (Cards.darksteelMyrPrinting cards) S.alice base
+            shielded = S.addRegenShield myr g1
+            after = S.runPure S.identityAnswer shielded (Event.destroy myr)
+         in do
+              HU.assertBool "the indestructible creature survives" (Set.member myr (GameState.battlefield after))
+              HU.assertEqual "the shield is intact" 1 (length (GameState.replacements after))
     ]

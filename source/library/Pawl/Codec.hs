@@ -988,7 +988,6 @@ effectToJson e = case e of
   Effect.Create q c Nothing -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
   Effect.Create q c (Just s) -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c, slotNameToJson s]))
   Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array [durationToJson d, usesToJson u, replacementEffectToJson re]))
-  Effect.RegenerateSelf -> nullary (Text.pack "RegenerateSelf")
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
   Effect.Untap s -> Json.tagged (Text.pack "Untap") (Just (slotNameToJson s))
   Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array [durationToJson d, slotNameToJson s]))
@@ -1034,7 +1033,6 @@ jsonToEffect value = do
         effect <- jsonToReplacementEffect re
         pure (Effect.Replace duration uses effect)
       _ -> Left (Text.pack "Replace expects [Duration, Uses, ReplacementEffect]")
-    "RegenerateSelf" -> Right Effect.RegenerateSelf
     "PutCounters" -> case mv of
       Just (Array [k, q, s]) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s
       _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")

@@ -60,11 +60,6 @@ data GameState = MkGameState
     -- analog of continuousEffects; a permanent's STATIC replacement abilities are
     -- not here -- the projection re-derives those live. Pawl.Replacement reads it.
     replacements :: [ActiveReplacement],
-    -- CR 701.19a: one-shot regeneration shields, counted per object (activating
-    -- twice stacks two; each destruction consumes one). Keyed by the shielded
-    -- object's id -- stable across regeneration (the creature stays on the
-    -- battlefield). Cleared at cleanup ("this turn"). Event.destroy reads it.
-    regenerationShields :: Map ObjectId Natural,
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
     phase :: Phase,

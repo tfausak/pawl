@@ -21,10 +21,13 @@ module Pawl.Replacement where
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import Pawl.Type.CandidateId (CandidateId)
@@ -34,9 +37,11 @@ import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamagePattern as DamagePattern
 import qualified Pawl.Type.DamageRewrite as DamageRewrite
+import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
@@ -50,6 +55,7 @@ import Pawl.Type.ReplacementCandidate (ReplacementCandidate)
 import qualified Pawl.Type.ReplacementCandidate as ReplacementCandidate
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Uses as Uses
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
@@ -150,9 +156,20 @@ applies gs event candidate =
             -- CR 615.1: no kind named means every damage event.
             Nothing -> True
             Just kind -> DamageEvent.kind de == kind
-        -- These effect classes have no producer yet: nothing in the engine ever
-        -- raises the ProposedEvent each would need to match, so every pair below
-        -- is unreachable in practice, and False is simply correct until one does.
+        -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
+        -- ability's own source, so a destruction replacement is self-only. CR
+        -- 614.1d's other-objects form has no producer.
+        (ReplacementEffect.DestructionR _, ProposedEvent.WouldBeDestroyed oid) -> src == oid
+        -- Every row below falls through to False, but for two different reasons.
+        -- ZoneChangeR, DamageR and DestructionR are unreachable HERE because an
+        -- arm ABOVE already matches every event of that class -- a row below only
+        -- fires for a MISMATCHED class (e.g. a DestructionR candidate offered a
+        -- WouldChangeZone event), where False is simply the correct answer, not a
+        -- stand-in for "not yet implemented". EntryR, CounterR and TokenR are
+        -- unreachable for the OTHER reason: nothing in the engine raises the
+        -- ProposedEvent each would need to match (WouldEnter, WouldPutCounters,
+        -- WouldCreateTokens have no producer), so every pair naming one is
+        -- unreachable in practice and False is correct until one does.
         (ReplacementEffect.ZoneChangeR _ _, _) -> False
         (ReplacementEffect.EntryR _, _) -> False
         (ReplacementEffect.DamageR _ _, _) -> False
@@ -270,14 +287,15 @@ chooserOf gs event = case event of
 -- (nothing reaches `apply` that `applies` rejected) but present so the match
 -- stays total per constructor, not merely total by wildcard.
 --
--- The same discipline applies one level down. Several ReplacementEffect
--- constructors carry their own rewrite/pattern sum (DamageR's DamageRewrite
--- below; EntryR's EntryRewrite, DestructionR's DestructionRewrite, CounterR's
--- and TokenR's Scaling as later work fills those arms in). An arm must case on
--- that inner constructor too, not bind it with `_`: binding it with `_` is
--- exhaustive today only because the inner type happens to have few
--- constructors, and stays silently exhaustive -- no build failure, no warning,
--- a real rewrite silently treated as a no-op -- the day someone adds one more.
+-- The same discipline applies one level down, to each arm's inner SUM type --
+-- DamageR's DamageRewrite below, DestructionR's DestructionRewrite, and (as
+-- later work fills those arms in) EntryR's EntryRewrite and CounterR's/TokenR's
+-- Scaling -- never to the pattern RECORDS (CounterPattern, TokenPattern,
+-- DamagePattern), which are read for their fields rather than cased and so have
+-- no constructors to be exhaustive over. An arm must case on the inner sum, not
+-- bind it with `_`: binding it with `_` is exhaustive UNCONDITIONALLY -- that is
+-- exactly why it raises no build failure and no warning when a new constructor
+-- is added, silently treating a real rewrite as a no-op from that day on.
 apply :: ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
 apply candidate event =
   case (ReplacementCandidate.effect candidate, event) of
@@ -298,8 +316,21 @@ apply candidate event =
         pure Nothing
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR _ _, _) -> pure (Just event)
-    -- CR 614.8/701.19a: regeneration rewrites a would-be-destroyed event so the
-    -- destruction never happens. Waiting on the WouldBeDestroyed funnel.
+    -- CR 701.19a: "the next time [it] would be destroyed this turn, instead
+    -- remove all damage marked on it and tap it. If it's attacking or blocking,
+    -- remove it from combat." The DESTRUCTION does not happen -- so nothing
+    -- downstream of it (a put-into-graveyard, and therefore Rest in Peace's
+    -- redirect) ever runs. That nesting was hardcoded in Event.destroy before
+    -- P5; it is structural now.
+    (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid) -> case rewrite of
+      DestructionRewrite.Regenerate -> do
+        consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \gs ->
+          let healTap obj = obj {Object.damage = 0, Object.tapped = TapState.Tapped}
+              healed = gs {GameState.objects = Map.adjust healTap oid (GameState.objects gs)}
+           in Game.removeFromCombat oid healed
+        pure Nothing
+    -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)
     -- CR 122.6/614.16: Hardened Scales/Doubling Season scale a counter placement.
     -- Waiting on the WouldPutCounters funnel.
@@ -337,3 +368,11 @@ asDamageEvent event = case event of
   ProposedEvent.WouldBeDestroyed _ -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
+
+-- CR 701.8 / 614.8: settle a proposed destruction. True means the permanent is
+-- actually destroyed; False means a replacement took it (regeneration), and that
+-- rewrite has already done its own work.
+resolveDestruction :: ObjectId -> Game Bool
+resolveDestruction oid = do
+  outcome <- applyReplacements (ProposedEvent.WouldBeDestroyed oid)
+  pure (Maybe.isJust outcome)

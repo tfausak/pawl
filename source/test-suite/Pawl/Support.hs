@@ -41,6 +41,7 @@ import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Deck as Deck
+import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
@@ -57,11 +58,13 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
+import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified System.Random as Random
@@ -736,11 +739,22 @@ addReplacement :: ActiveReplacement.ActiveReplacement -> GameState.GameState -> 
 addReplacement active gs =
   gs {GameState.replacements = active : GameState.replacements gs}
 
--- Seed a regeneration shield directly onto an object (bypasses activating a
--- regenerate ability; use when a test needs a shield up without the activation).
+-- Seed a regeneration shield directly (bypasses activating a regenerate ability;
+-- use when a test needs a shield up without the activation). Since P5 a shield is
+-- an ordinary floating replacement: CR 701.19a's "the next time ... this turn" is
+-- exactly UntilEndOfTurn + Once.
 addRegenShield :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 addRegenShield oid gs =
-  gs {GameState.regenerationShields = Map.insertWith (+) oid 1 (GameState.regenerationShields gs)}
+  let (ts, gs1) = Game.freshTimestamp gs
+      active =
+        ActiveReplacement.MkActiveReplacement
+          { ActiveReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            ActiveReplacement.source = oid,
+            ActiveReplacement.timestamp = ts,
+            ActiveReplacement.duration = Duration.UntilEndOfTurn,
+            ActiveReplacement.uses = Uses.Once
+          }
+   in addReplacement active gs1
 
 -- Set an object's tapped state to Tapped directly (bypasses a tap cost or
 -- combat), so a test can set up a tapped permanent for an Untap effect.
@@ -812,7 +826,6 @@ oneMountainState cards ph =
           GameState.delayedTriggers = Seq.empty,
           GameState.continuousEffects = [],
           GameState.replacements = [],
-          GameState.regenerationShields = Map.empty,
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,
           GameState.phase = ph,

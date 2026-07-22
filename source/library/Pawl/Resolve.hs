@@ -81,7 +81,6 @@ slotsOf effect = case effect of
   -- lint must not see it here.
   Effect.Create {} -> Set.empty
   Effect.Replace {} -> Set.empty
-  Effect.RegenerateSelf -> Set.empty
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ _ slot -> Set.singleton slot
   Effect.Untap slot -> Set.singleton slot
@@ -112,7 +111,6 @@ readsX = any effectReadsX
       Effect.Discard _ quantity -> quantity == Quantity.Type.X
       Effect.Create quantity _ _ -> quantity == Quantity.Type.X
       Effect.Replace {} -> False
-      Effect.RegenerateSelf -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.Untap _ -> False
@@ -139,7 +137,6 @@ manaProduced effect = case effect of
   Effect.Discard {} -> Nothing
   Effect.Create {} -> Nothing
   Effect.Replace {} -> Nothing
-  Effect.RegenerateSelf -> Nothing
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.Untap _ -> Nothing
@@ -166,7 +163,6 @@ searchesLibrary effect = case effect of
   Effect.Discard {} -> False
   Effect.Create {} -> False
   Effect.Replace {} -> False
-  Effect.RegenerateSelf -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.Untap _ -> False
@@ -242,7 +238,6 @@ rewriteEffect pairs effect = case effect of
   -- A text-changer does not reach a token's embedded card here (spec section 8).
   Effect.Create {} -> effect
   Effect.Replace {} -> effect
-  Effect.RegenerateSelf -> effect
   -- No rewritable land-type word.
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
@@ -603,12 +598,6 @@ applyEffect source controller bound legality chosen effect = case effect of
                 ActiveReplacement.uses = uses
               }
        in gs1 {GameState.replacements = active : GameState.replacements gs1}
-  Effect.RegenerateSelf ->
-    -- CR 701.19a: add one shield to the source permanent. Map.insertWith (+)
-    -- stacks a second activation. A shield on a gone/non-battlefield source is
-    -- harmless (nothing will destroy it).
-    State.modify' $ \gs ->
-      gs {GameState.regenerationShields = Map.insertWith (+) source 1 (GameState.regenerationShields gs)}
   Effect.Counter slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- CR 701.6a: the slot's target is a spell on the stack; counter it through

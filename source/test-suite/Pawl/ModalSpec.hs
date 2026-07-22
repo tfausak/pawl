@@ -218,13 +218,13 @@ modalReaderTests =
               ModalT.MkModal
                 ( Seq.fromList
                     [ Mode.MkMode (Seq.singleton (Effect.Draw (Quantity.Literal 1))) Map.empty,
-                      Mode.MkMode (Seq.singleton Effect.RegenerateSelf) Map.empty
+                      Mode.MkMode (Seq.singleton (Effect.Draw (Quantity.Literal 2))) Map.empty
                     ]
                 )
                 (ModeSelection.ChooseExactly 1) ::
                 ModalT.Modal Card.Type.Card
             chosen = Set.singleton (ModeIndex.MkModeIndex 1)
-        HU.assertEqual "only mode 1's effect" [Effect.RegenerateSelf] (Modal.modesEffects chosen m)
+        HU.assertEqual "only mode 1's effect" [Effect.Draw (Quantity.Literal 2)] (Modal.modesEffects chosen m)
         HU.assertEqual "selectionCount is the ChooseExactly count" 1 (Modal.selectionCount m)
     ]
 

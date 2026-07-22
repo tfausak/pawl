@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Pawl.Type.Card (Card)
+import qualified Pawl.Type.Combat as Combat
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Object (Object)
@@ -47,6 +48,20 @@ zoneMembers zone pid gs =
         Zone.Battlefield -> ownedShared (GameState.battlefield gs)
         Zone.Exile -> ownedShared (GameState.exile gs)
         Zone.Stack -> filter ownedBy (GameState.stack gs)
+
+-- CR 701.19a: if a permanent is attacking or blocking, remove it from combat.
+-- Edits the GameState.combat maps directly. It lives here, in the lowest layer,
+-- because both Pawl.Event and Pawl.Replacement need it and neither may import the
+-- other.
+removeFromCombat :: ObjectId -> GameState -> GameState
+removeFromCombat oid gs =
+  let c = GameState.combat gs
+      c1 =
+        c
+          { Combat.attackers = Map.delete oid (Combat.attackers c),
+            Combat.blockers = Map.map (Set.delete oid) (Map.delete oid (Combat.blockers c))
+          }
+   in gs {GameState.combat = c1}
 
 removeFromZones :: PlayerId -> ObjectId -> GameState -> GameState
 removeFromZones pid oid gs =

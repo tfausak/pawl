@@ -71,7 +71,6 @@ emptyGame order =
           GameState.delayedTriggers = Seq.empty,
           GameState.continuousEffects = [],
           GameState.replacements = [],
-          GameState.regenerationShields = Map.empty,
           GameState.turnOrder = order_,
           GameState.activePlayer = NonEmpty.head order,
           GameState.phase = Turn.firstPhase,

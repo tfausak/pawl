@@ -64,11 +64,10 @@ data Effect card
     -- says so explicitly, so this consults neither indestructible (CR 702.12b) nor
     -- a regeneration shield (CR 701.19a), and is therefore not a reuse of Destroy.
     --
-    -- One opcode, not a targetless SacrificeSelf plus a slotted variant on
-    -- RegenerateSelf's precedent: "this creature" is expressible because
-    -- Engine.placeOne binds the trigger's SOURCE into the reserved
-    -- Pawl.Binding.triggerSource slot, and "this creature" recurs far too often to
-    -- pay for a second opcode.
+    -- One opcode, not a targetless SacrificeSelf plus a slotted variant: "this
+    -- creature" is expressible because Engine.placeOne binds the trigger's
+    -- SOURCE into the reserved Pawl.Binding.triggerSource slot, and "this
+    -- creature" recurs far too often to pay for a second opcode.
     Sacrifice SlotName
   | -- CR 400.7: move the slot's target object to a zone through the changeZone
     -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries
@@ -115,19 +114,14 @@ data Effect card
     -- Drudge Skeletons' ability is
     -- `Replace UntilEndOfTurn Once (DestructionR Regenerate)`.
     --
-    -- ONE opcode for both, where M3f/M4d had `Prevent` and `RegenerateSelf`: the
-    -- difference between a Fog and a regeneration shield is which event class the
-    -- payload names, which is data. Targetless (a floating replacement watches a
-    -- CLASS of events, not a chosen object) and unprompted. Resolve stores it into
-    -- GameState.replacements with this effect's SOURCE (CR 113.7) and a fresh
-    -- timestamp; Pawl.Replacement applies it.
+    -- ONE opcode for both, where M3f/M4d had two separate opcodes -- a `Prevent`
+    -- and a one-shot self-regenerate -- because the difference between a Fog and
+    -- a regeneration shield is which event class the payload names, which is
+    -- data. Targetless (a floating replacement watches a CLASS of events, not a
+    -- chosen object) and unprompted. Resolve stores it into GameState.replacements
+    -- with this effect's SOURCE (CR 113.7) and a fresh timestamp; Pawl.Replacement
+    -- applies it.
     Replace Duration Uses ReplacementEffect
-  | -- CR 701.19a/c: install a one-shot regeneration shield on THIS effect's source
-    -- permanent (CR 608.2g) -- targetless and self-referential (Drudge Skeletons'
-    -- "{B}: Regenerate this creature"). NOT the act of regenerating (701.19c): the
-    -- shield fires later, at Event.destroy. A general "Regenerate target creature"
-    -- is future (Regenerate SlotName). Executed by Resolve.applyEffect.
-    RegenerateSelf
   | -- CR 701.6: counter the slot's target spell -- remove it from the stack and
     -- put it into its owner's graveyard (CR 701.6a) via the Event.counter funnel,
     -- so it does not resolve. Distinct from MoveToZone slot Graveyard the way

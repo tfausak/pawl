@@ -266,7 +266,7 @@ sacrificeTests cards =
             after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
          in do
               HU.assertEqual "still sacrificed" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "the shield is untouched" (Just 1) (Map.lookup piker (GameState.regenerationShields after)),
+              HU.assertEqual "the shield is untouched" 1 (length (GameState.replacements after)),
       HU.testCase "only a battlefield permanent can be sacrificed (CR 701.21a)" $
         let (card, gs) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             after = S.runPure S.identityAnswer gs (Event.sacrifice card)

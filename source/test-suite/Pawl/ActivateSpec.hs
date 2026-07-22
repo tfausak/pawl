@@ -140,7 +140,7 @@ tests cards =
             -- Second Murder: no shield -> dies.
             secondKill = S.settleSba (S.runPure S.identityAnswer firstKill (Event.destroy skel))
          in do
-              HU.assertEqual "a shield is up after resolving the ability" (Just 1) (Map.lookup skel (GameState.regenerationShields resolved))
+              HU.assertEqual "a shield is up after resolving the ability" 1 (length (GameState.replacements resolved))
               HU.assertEqual "survived the first destruction (regenerated)" True (Set.member skel (GameState.battlefield firstKill))
               HU.assertEqual "died to the second (one-shot shield consumed)" False (Set.member skel (GameState.battlefield secondKill))
     ]
