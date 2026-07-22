@@ -58,6 +58,15 @@ resolveTop = do
             Cast.castWhileSearching (Object.owner obj)
           Resolve.resolveAbility oid srcId ability
         Source.OfTrigger srcId ability ->
-          let chosen = Binding.modesOf (Object.bindings obj)
-              modal = TriggeredAbility.modal ability
-           in Resolve.resolveEffects oid srcId (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)
+          -- CR 608.2a: an intervening "if" is checked AGAIN as the ability
+          -- resolves; if it is no longer true the ability is removed from the
+          -- stack and none of its effects happen. Object.owner is the ability's
+          -- controller (Engine.placeOne stamps it), which is who "you" means.
+          case TriggeredAbility.intervening ability of
+            Just cond
+              | not (Event.stateHolds (Object.owner obj) cond gs) ->
+                  State.modify' (Resolve.cease oid)
+            _ ->
+              let chosen = Binding.modesOf (Object.bindings obj)
+                  modal = TriggeredAbility.modal ability
+               in Resolve.resolveEffects oid srcId (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)

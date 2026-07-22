@@ -75,7 +75,8 @@ data Cards = MkCards
     twistedImagePrinting :: Printing.Printing,
     barbarianOutcastPrinting :: Printing.Printing,
     khabalGhoulPrinting :: Printing.Printing,
-    tidalWavePrinting :: Printing.Printing
+    tidalWavePrinting :: Printing.Printing,
+    sarcomancyPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -150,6 +151,7 @@ loadCards = do
   barbarianOutcastPrinting_ <- loadPrinting "barbarian-outcast"
   khabalGhoulPrinting_ <- loadPrinting "khabál-ghoul"
   tidalWavePrinting_ <- loadPrinting "tidal-wave"
+  sarcomancyPrinting_ <- loadPrinting "sarcomancy"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -213,7 +215,8 @@ loadCards = do
         twistedImagePrinting = twistedImagePrinting_,
         barbarianOutcastPrinting = barbarianOutcastPrinting_,
         khabalGhoulPrinting = khabalGhoulPrinting_,
-        tidalWavePrinting = tidalWavePrinting_
+        tidalWavePrinting = tidalWavePrinting_,
+        sarcomancyPrinting = sarcomancyPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -279,7 +282,8 @@ allPrintings cards =
     twistedImagePrinting cards,
     barbarianOutcastPrinting cards,
     khabalGhoulPrinting cards,
-    tidalWavePrinting cards
+    tidalWavePrinting cards,
+    sarcomancyPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

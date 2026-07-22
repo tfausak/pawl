@@ -965,16 +965,27 @@ jsonToReplacementEffect value = do
 triggeredAbilityToJson :: TriggeredAbility.TriggeredAbility CardT.Card -> Value
 triggeredAbilityToJson ta =
   Object
-    [ (Text.pack "condition", triggerConditionToJson (TriggeredAbility.condition ta)),
-      (Text.pack "modal", modalToJson (TriggeredAbility.modal ta))
-    ]
+    ( [ (Text.pack "condition", triggerConditionToJson (TriggeredAbility.condition ta)),
+        (Text.pack "modal", modalToJson (TriggeredAbility.modal ta))
+      ]
+        ++ ( case TriggeredAbility.intervening ta of
+               Nothing -> []
+               Just c -> [(Text.pack "intervening", stateConditionToJson c)]
+           )
+    )
 
 jsonToTriggeredAbility :: Value -> Either Text (TriggeredAbility.TriggeredAbility CardT.Card)
 jsonToTriggeredAbility value = do
   ps <- Json.asObject value
   c <- Json.field (Text.pack "condition") ps >>= jsonToTriggerCondition
   m <- Json.field (Text.pack "modal") ps >>= jsonToModal
-  pure (TriggeredAbility.MkTriggeredAbility c m)
+  i <- maybeFrom jsonToStateCondition (getOpt (Text.pack "intervening") ps)
+  pure
+    TriggeredAbility.MkTriggeredAbility
+      { TriggeredAbility.condition = c,
+        TriggeredAbility.modal = m,
+        TriggeredAbility.intervening = i
+      }
 
 abilityNameToJson :: AbilityName.AbilityName -> Value
 abilityNameToJson (AbilityName.MkAbilityName t) = Json.jText t

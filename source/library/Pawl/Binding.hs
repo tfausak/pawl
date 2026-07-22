@@ -12,6 +12,7 @@ import Pawl.Type.Binding (Binding)
 import qualified Pawl.Type.Binding as Binding
 import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
@@ -71,6 +72,13 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 
+-- CR 109.5: the reserved slot under which a triggered ability's CONTROLLER is
+-- bound ("you"), so a targetless self-referential clause -- Sarcomancy's "deals 1
+-- damage to you" -- is a slot read rather than a new opcode. No card's
+-- targetSpecs may name it: "you" is not a target.
+you :: SlotName
+you = SlotName.MkSlotName (Text.pack "you")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -81,6 +89,11 @@ toObject oid = Binding.empty {Binding.target = Just (Recipient.ToObject oid)}
 -- posture).
 setTriggerSource :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setTriggerSource oid = Map.insert triggerSource (toObject oid)
+
+-- Bind a player under the reserved you slot. A dedicated single-purpose slot,
+-- so this insert never clobbers another binding (setCopy's posture).
+setYou :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
+setYou pid = Map.insert you (Binding.empty {Binding.target = Just (Recipient.ToPlayer pid)})
 
 -- CR 614.1c / 603.6d: the reserved slot marking that an object that entered as a
 -- copy has not yet made its as-enters choice (P2). Set by Event.placeObject,

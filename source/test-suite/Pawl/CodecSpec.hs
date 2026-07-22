@@ -305,7 +305,8 @@ tests cards =
             let ability =
                   TriggeredAbility.MkTriggeredAbility
                     { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn,
-                      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)
+                      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
+                      TriggeredAbility.intervening = Nothing
                     }
                 entry =
                   DelayedTrigger.MkDelayedTrigger
@@ -314,6 +315,14 @@ tests cards =
                       DelayedTrigger.controller = S.alice,
                       DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.toObject (ObjectId.MkObjectId 9))
                     }
-             in roundTrip "delayed" Codec.delayedTriggerToJson Codec.jsonToDelayedTrigger entry
+             in roundTrip "delayed" Codec.delayedTriggerToJson Codec.jsonToDelayedTrigger entry,
+          HU.testCase "a TriggeredAbility with an intervening if round-trips" $
+            let ability =
+                  TriggeredAbility.MkTriggeredAbility
+                    { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+                      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
+                      TriggeredAbility.intervening = Just (StateCondition.NoPermanentsOfSubtype Subtype.Zombie)
+                    }
+             in roundTrip "ta" Codec.triggeredAbilityToJson Codec.jsonToTriggeredAbility ability
         ]
     ]

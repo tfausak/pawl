@@ -378,6 +378,7 @@ resolveTests cards =
               TriggeredAbility.MkTriggeredAbility
                 TriggerCondition.SelfEnters
                 (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ExileAllGraveyards]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                Nothing
             (abilId, g4) = Game.freshObjectId g3
             (ts, g5) = Game.freshTimestamp g4
             abilObj =

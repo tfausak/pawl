@@ -236,6 +236,12 @@ lintTests cards =
                 (Map.member Binding.triggerSource . Card.allTargetSpecs . Printing.card)
                 (Cards.allPrintings cards)
          in HU.assertEqual "no card names the self slot" [] (map (Card.Type.name . Printing.card) offenders),
+      HU.testCase "the reserved you slot is never a declared target slot" $
+        let offenders =
+              filter
+                (Map.member Binding.you . Card.allTargetSpecs . Printing.card)
+                (Cards.allPrintings cards)
+         in HU.assertEqual "no card names the you slot" [] (map (Card.Type.name . Printing.card) offenders),
       HU.testCase "Lightning Bolt is in the red pool with one AnyTarget slot" $
         let card = Printing.card (Cards.lightningBoltPrinting cards)
          in do

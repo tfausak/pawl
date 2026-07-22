@@ -517,4 +517,15 @@ delayedPending events gs =
 gatherTriggers :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 gatherTriggers events gs =
   let (fromDelayed, surviving) = delayedPending events gs
-   in (eventTriggers events gs ++ stateTriggers gs ++ fromDelayed, surviving)
+      all_ = eventTriggers events gs ++ stateTriggers gs ++ fromDelayed
+   in (filter (interveningHolds gs) all_, surviving)
+
+-- CR 603.4: "the ability doesn't trigger at all" when its intervening "if" is
+-- false as the trigger event occurs. Checked HERE, at the gather -- not at
+-- placement -- because "doesn't trigger" must be indistinguishable from "no
+-- ability existed", including to the CR 117.5 settle loop's re-run flag.
+interveningHolds :: GameState -> PendingTrigger -> Bool
+interveningHolds gs pending =
+  case TriggeredAbility.intervening (PendingTrigger.ability pending) of
+    Nothing -> True
+    Just cond -> stateHolds (PendingTrigger.controller pending) cond gs

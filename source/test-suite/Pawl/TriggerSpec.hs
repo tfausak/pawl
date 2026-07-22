@@ -25,6 +25,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
@@ -32,7 +33,10 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.BeginningStep as BeginningStep
+import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
@@ -575,7 +579,8 @@ delayedTests cards =
                 ability =
                   TriggeredAbility.MkTriggeredAbility
                     { TriggeredAbility.condition = TriggerCondition.SelfEnters,
-                      TriggeredAbility.modal = Modal.MkModal {Modal.modes = Seq.singleton onlyMode, Modal.selection = ModeSelection.ChooseExactly 1}
+                      TriggeredAbility.modal = Modal.MkModal {Modal.modes = Seq.singleton onlyMode, Modal.selection = ModeSelection.ChooseExactly 1},
+                      TriggeredAbility.intervening = Nothing
                     }
                 -- Stands in for a modal arming spell's own captured chosenModes --
                 -- built with the SAME Binding.fromChoices Cast.castSpell uses, so
@@ -691,5 +696,76 @@ orderingTests cards =
                   other -> HU.assertFailure ("expected exactly two triggers on the stack, got " <> show (length other))
         ]
 
+-- Sarcomancy {B} Enchantment: "When this enchantment enters, create a 2/2 black
+-- Zombie creature token. At the beginning of your upkeep, if there are no Zombies
+-- on the battlefield, this enchantment deals 1 damage to you."
+interveningTests :: Cards.Cards -> Tasty.TestTree
+interveningTests cards =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      zombies gs = filter (\oid -> Set.member Subtype.Zombie (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
+      -- Sarcomancy enters and its ETB resolves, so a Zombie token is out.
+      withZombie =
+        let (sarcId, gs0) = S.addCreature (Cards.sarcomancyPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            entered = ZoneChange.MkZoneChange sarcId Zone.Stack Zone.Battlefield
+            gs1 = S.withEvent (GameEvent.Moved entered (Projection.project sarcId gs0)) gs0
+         in (sarcId, resolveAll (settle gs1))
+   in Tasty.testGroup
+        "InterveningIf"
+        [ HU.testCase "CR 603.6a the enters trigger makes a 2/2 black Zombie token" $
+            let (_, after) = withZombie
+             in case zombies after of
+                  [tok] -> do
+                    HU.assertEqual "2 power" (Just 2) (Projection.powerOf tok after)
+                    HU.assertEqual "black" (Set.singleton Color.Black) (Projection.colorsOf tok after)
+                  other -> HU.assertFailure ("expected exactly one Zombie token, got " <> show (length other)),
+          -- CR 603.4: with the condition FALSE, the ability does not trigger AT ALL
+          -- -- nothing reaches the stack.
+          HU.testCase "CR 603.4 with a Zombie out, the upkeep ability does not trigger" $
+            let (_, board) = withZombie
+                atUpkeep = settle (beginUpkeep board)
+             in do
+                  HU.assertEqual "nothing on the stack" [] (GameState.stack atUpkeep)
+                  HU.assertEqual "no life lost" (Just 20) (S.lifeOf S.alice atUpkeep),
+          HU.testCase "CR 603.4 with no Zombie, it triggers and deals 1 to its controller" $
+            let (_, board) = withZombie
+                killed = case zombies board of
+                  tok : _ -> Sba.checkStateBasedActions (Event.destroy tok board)
+                  [] -> board
+                after = resolveAll (settle (beginUpkeep killed))
+             in HU.assertEqual "alice took 1" (Just 19) (S.lifeOf S.alice after),
+          -- CR 608.2a: the case that distinguishes an intervening "if" from a plain
+          -- condition. The ability triggered legitimately; a Zombie appearing in
+          -- RESPONSE makes it do nothing on resolution.
+          HU.testCase "CR 608.2a a Zombie made in response makes the trigger resolve doing nothing" $
+            let (_, board) = withZombie
+                killed = case zombies board of
+                  tok : _ -> Sba.checkStateBasedActions (Event.destroy tok board)
+                  [] -> board
+                onStack = settle (beginUpkeep killed)
+                -- The Zombie arrives under BOB's control, which is exactly the
+                -- point: CR 603.4's clause is "no Zombies on the battlefield", not
+                -- "no Zombies you control".
+                responded = snd (S.addToken (zombieTokenOf cards) S.bob onStack)
+                after = resolveAll responded
+             in do
+                  HU.assertBool "the trigger really was on the stack" (not (null (GameState.stack onStack)))
+                  HU.assertEqual "no damage on resolution" (Just 20) (S.lifeOf S.alice after)
+        ]
+
+-- The 2/2 black Zombie Sarcomancy's own ETB mints, read back out of the card data
+-- so the "in response" fixture makes the same object the card would.
+zombieTokenOf :: Cards.Cards -> Card.Type.Card
+zombieTokenOf cards =
+  let created effect = case effect of
+        Effect.Create _ card _ -> Just card
+        _ -> Nothing
+      abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Card.Type.triggeredAbilities (Printing.card (Cards.sarcomancyPrinting cards)))
+   in case Maybe.mapMaybe created abilityEffects of
+        card : _ -> card
+        [] -> Printing.card (Cards.pikerPrinting cards)
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards, stateTriggerTests cards, historyTests cards, delayedTests cards, orderingTests cards]
+tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards, stateTriggerTests cards, historyTests cards, delayedTests cards, orderingTests cards, interveningTests cards]

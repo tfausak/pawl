@@ -333,9 +333,14 @@ triggerModalTests cards =
                   -- Sacrifice-using card, and Binding.targetsOf projects it right
                   -- alongside a real chosen target (the same field). So "permanent"
                   -- (the real chosen target) is no longer the only bound slot.
+                  --
+                  -- M4.5 P4 Task 8 (CR 109.5): Engine.placeOne now ALSO stamps the
+                  -- ability's controller under the reserved Binding.you ("you") slot,
+                  -- unconditionally and for the same reason -- so it joins "self" here
+                  -- too, whether or not this card's own text ever reads it.
                   HU.assertEqual
-                    "the 'permanent' slot and the reserved self slot are bound"
-                    (Just (Set.fromList [SlotName.MkSlotName (Text.pack "permanent"), Binding.triggerSource]))
+                    "the 'permanent' slot and the reserved self/you slots are bound"
+                    (Just (Set.fromList [SlotName.MkSlotName (Text.pack "permanent"), Binding.triggerSource, Binding.you]))
                     boundSlots,
           HU.testCase "draw mode ({2}) draws exactly one; no token made" $
             let (acId, gs1) = etb S.alice (Setup.emptyGame S.bothPlayers)
