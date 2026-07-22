@@ -103,10 +103,9 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
           blockers -> case Projection.controllerOf attacker gs of
             Nothing -> pure []
             -- CR 702.19b: the excess is assigned "as its controller chooses," so the
-            -- chooser is the attacker's controller. EXPIRES at M3: banding (702.22j,
-            -- the DEFENDING player chooses) and Mindslaver (a Decider, not this
-            -- PlayerId) both invert it -- a Decider problem, not a combat one. See
-            -- the M2c spec, sections 4 and 8.
+            -- chooser is the attacker's controller. Banding (CR 702.22j) inverts
+            -- that -- the DEFENDING player chooses -- and is not implemented (#32).
+            -- See the M2c spec, sections 4 and 8.
             Just pid -> do
               let decider = Decide.deciderFor pid gs
                   thresholdOf b = if trample then blockerThreshold gs attacker b else 0

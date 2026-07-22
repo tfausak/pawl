@@ -19,7 +19,7 @@ import Pawl.Type.TriggeredAbility (TriggeredAbility)
 --
 -- An entry is removed as it fires (CR 603.7b: "only once, the next time its
 -- trigger event occurs"). A STATED-DURATION delayed ability ("this turn") would
--- fire repeatedly instead; that is a named deferral (the P4 spec, section 8).
+-- fire repeatedly instead; stated durations are not modelled (#52).
 data DelayedTrigger = MkDelayedTrigger
   { ability :: TriggeredAbility Card,
     source :: ObjectId,

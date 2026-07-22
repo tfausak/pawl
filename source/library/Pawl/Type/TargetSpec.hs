@@ -47,7 +47,7 @@ data TargetSpec
     -- is not.
     --
     -- The WallTarget posture: one hand-carved variant, specific before general.
-    -- EXPIRES at P9, whose criterion/filter language replaces the whole family of
-    -- colour- and type-restricted specs with data.
+    -- P9's criterion/filter language replaces the whole family of colour- and
+    -- type-restricted specs with data (#40).
     NonblackCreatureTarget
   deriving (Eq, Ord, Show)

@@ -845,7 +845,7 @@ zoneChangeTests cards =
             cast = snd (Engine.runGamePure noDiscard gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure noDiscard cast Stack.resolveTop)
          in do
-              -- Elision (hand == count): the whole hand is discarded without asking.
+              -- Elision (hand == count): the whole hand is discarded without asking (#63).
               HU.assertEqual "bob's hand emptied" 0 (S.handSize S.bob after)
               HU.assertEqual "both cards discarded" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
     ]

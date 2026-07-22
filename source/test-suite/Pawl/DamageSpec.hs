@@ -463,7 +463,7 @@ m2cPropertyTests cards =
     [ HU.testCase "a deathtoucher's victim with toughness > 0 is gone after the SBA" $
         -- The property in fixture form (the deck has no deathtoucher, so this is
         -- the M2c coverage; it becomes a random-game property when a deathtoucher
-        -- joins a deck -- git-bug's castability work). Every toughness we throw at
+        -- joins a deck -- the castability work, #23). Every toughness we throw at
         -- the 1/1 deathtoucher dies to it.
         let victims = [Cards.pikerPrinting cards, Cards.nimbleBirdstickerPrinting cards, Cards.ogreSentryPrinting cards]
             killsIt v =

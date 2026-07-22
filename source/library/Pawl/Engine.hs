@@ -63,7 +63,7 @@ runGamePure answer gs game = Program.foldProgram answer (State.runStateT game gs
 
 -- One entry point from matchup to played game: the player list is DERIVED from
 -- the matchup, so a matchup player without a Player record is unrepresentable
--- here (git-bug 15de615). Setup.emptyGame stays public as the deckless fixture
+-- here (#24). Setup.emptyGame stays public as the deckless fixture
 -- door, where no deck agreement exists to violate.
 runMatch :: (Monad m) => (forall r. Prompt r -> m r) -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> m (Result, GameState)
 runMatch answer matchup =
@@ -197,9 +197,9 @@ runTurnBasedActions phase = do
 -- that player chooses the order (orderPending), asked only when they control two
 -- or more -- CR 603.3b's own-order choice is a real prompt now, not an elision.
 -- CR 603.3b's other half -- first place the triggers whose condition ISN'T
--- another ability triggering, then the rest, as a separate pass -- stays a live,
--- documented deferral: it is vacuous while nothing in the card pool triggers off
--- another ability triggering, and is not implemented as machinery here. Advancing
+-- another ability triggering, then the rest, as a separate pass -- is not
+-- implemented here (#49); it is vacuous while nothing in the card pool triggers
+-- off another ability triggering. Advancing
 -- scannedThrough makes an event fire its triggers once (CR 603.2c) WITHOUT
 -- discarding the record. Targets are chosen as the ability is placed (CR 603.3d).
 -- Returns whether any were placed.
@@ -220,7 +220,7 @@ placePendingTriggers = do
 -- its mode(s) and their targets as it is placed (CR 603.3d). This mirrors
 -- Cast.castSpell's cast-time flow: CR 700.2b -- the controller chooses the mode
 -- when the ability triggers (elided, forced and unprompted, exactly when the
--- fillable modes are no more than the selection demands) -- then CR 603.3d --
+-- fillable modes are no more than the selection demands, #50) -- then CR 603.3d --
 -- targets for the CHOSEN mode(s) are chosen now, at placement.
 --
 -- CR 603.3c/700.2b: "If no mode is chosen, the ability is removed from the
@@ -487,10 +487,8 @@ advance = do
     -- CR 514.3 (partial) / 117.5: the turn is over. Settle once more so every
     -- event the cleanup step's turn-based actions emitted is scanned BEFORE
     -- handoffTurn clears the log -- an unscanned event discarded at handoff is a
-    -- lost trigger. EXPIRES at the first card whose triggered ability fires on a
-    -- cleanup-step event and must resolve during that cleanup -- that is what
-    -- forces CR 514.3a's extra cleanup step and its priority round to be built.
-    -- Until then, a trigger placed here resolves at the next turn's first
+    -- lost trigger. CR 514.3a's extra cleanup step and its priority round are not
+    -- built (#51), so a trigger placed here resolves at the next turn's first
     -- priority rather than during this cleanup.
     Seq.EmptyL -> do
       settleForPriority

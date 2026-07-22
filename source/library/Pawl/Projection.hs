@@ -76,10 +76,8 @@ layer m = case m of
 -- WRONG for a static ability carrying a player-scoped Count -- "the number of
 -- cards in your hand" on a static ability means the SOURCE's controller's hand,
 -- and Gathered.gSource is dropped before this function sees it, so the right
--- player is not available here at all. Unreachable today: no StaticAbility in the
--- pool carries a Count. EXPIRES with the first one that does, which is what forces
--- the source's controller to be threaded into the fold. This is the static-ability
--- twin of the stored-effect residual documented in freezeQuantities.
+-- player is not available here at all (#34). This is the static-ability twin of
+-- the stored-effect residual documented in freezeQuantities.
 applyModification :: GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification gs oid m pc = case m of
   Modification.GainKeyword k ->
@@ -298,11 +296,9 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 --     this, so it stays unobserved -- but it is the case that retires this
 --     shortcut, not a hypothetical.
 --
--- EXPIRES with the first card needing a genuine CDA-vs-timestamp interleave
--- WITHIN layers 2-6, which is what builds the Gathered precedence key -- OR the
--- first layer-2/3/4 effect whose affected set is colour-keyed (the fifth bullet
--- above), whichever comes first. P3a's spec section 2.2 carries the full
--- argument.
+-- The CR 613.3 CDA-vs-timestamp precedence key this would need is not built, and
+-- neither is the colour-keyed-affected-set path of the fifth bullet (#35). P3a's
+-- spec section 2.2 carries the full argument.
 --
 -- P3b does NOT reopen this question. Devoid is a CONSTANT CDA (its value doesn't
 -- depend on game state), so seeding it is sound: a copy snapshot recomputes the
@@ -372,10 +368,7 @@ freezeQuantities gs oid you m =
   -- quantity (an X with no binding on the source, or a bare Star) survives into
   -- the stored effect, where applyModification later evaluates it against the
   -- AFFECTED object and that object's controller -- the very mis-evaluation this
-  -- freeze exists to prevent. Unreachable today: no card in the pool puts an X or
-  -- a Star inside a ModifyTarget's Modification. EXPIRES with the first card that
-  -- does, which is also the point at which the freeze should move into a shared
-  -- continuous-effect store helper rather than staying per-call-site.
+  -- freeze exists to prevent (#36).
   let freeze q = case Quantity.evaluate gs oid you q of
         Nothing -> q
         Just n -> Quantity.Type.Literal n
@@ -424,7 +417,7 @@ setLandSubtypeEffects gs =
 -- BASE characteristics (nonbasic is a printed supertype; card-type Land is
 -- unchanged by any M3c effect), so nothing recurses into the projection and the
 -- result is order-INDEPENDENT. A cycle trips the visited set (both treated as
--- live -- the CR 613.8b loop-escape analog; expiry in the spec).
+-- live -- the CR 613.8b loop-escape analog, not an implementation of it, #37).
 staticAbilitiesLive :: ObjectId -> GameState -> Bool
 staticAbilitiesLive oid gs = liveGiven (setLandSubtypeEffects gs) Set.empty oid gs
 
@@ -547,9 +540,9 @@ counterGathered gs = Maybe.mapMaybe fromObject (Set.toList (GameState.battlefiel
 -- CR 613: apply continuous effects layer by layer (only the layers with effects,
 -- ascending). Within a layer, CR 613.7 timestamp order. An effect's affected set
 -- is evaluated against the partial projection through the previous layers.
--- CR 613.8 EXISTENCE dependency is handled by source-liveness in Task 6, not a
--- within-layer reorder; the topological CR 613.8b applies-to reorder is deferred
--- (spec §6, git-bug). design.md §2.5.
+-- CR 613.8 EXISTENCE dependency is handled by source-liveness, not a within-layer
+-- reorder; the topological CR 613.8b applies-to reorder is not implemented (#11).
+-- design.md §2.5.
 project :: ObjectId -> GameState -> ProjectedCharacteristics
 project oid gs = projectFrom (gather gs) oid gs
 
@@ -576,11 +569,7 @@ project oid gs = projectFrom (gather gs) oid gs
 -- NOTE: CR 208.2a has a stricter rule for that case -- "If the ability needs to
 -- use a number that can't be determined, including inside a calculation, use 0
 -- instead of that number" -- which neither setPT nor a bare assignment
--- implements. Unreachable in the current pool: seedCharacteristicPT requires a
--- printed P/T box, and after substituteStar every CDA quantity in the pool is
--- total (a Count, or a Plus of a Literal and a Count). EXPIRES with the first
--- CDA whose quantity can fail to evaluate; it is the sibling of the CR 208.5
--- deferral already recorded in the P3b spec, section 8.
+-- implements, and neither does its CR 208.5 sibling at the read points (#65).
 applyCharacteristicPT :: GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyCharacteristicPT gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
@@ -608,10 +597,10 @@ projectFrom cands oid gs =
                 then applyCharacteristicPT gs oid partial
                 else partial
             here = filter (\c -> gLayer c == lyr && affects (gSource c) oid (gAffected c) seeded gs) cands
-            -- CR 613.7 timestamp order within a layer. EXPIRES: CR 613.8b dependency
-            -- (a same-layer effect that changes which objects another applies to)
-            -- would override this. Deferred -- no M3c card falsifies it; existence
-            -- dependencies are handled by staticAbilitiesLive. git-bug f90e0c4.
+            -- CR 613.7 timestamp order within a layer; the CR 613.8b dependency
+            -- reorder (a same-layer effect that changes which objects another
+            -- applies to) is not implemented (#11). Existence dependencies are
+            -- handled separately by staticAbilitiesLive.
             ordered = List.sortOn gTimestamp here
             step pc c = applyModification gs oid (gModification c) pc
          in List.foldl' step seeded ordered

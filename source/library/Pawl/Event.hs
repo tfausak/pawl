@@ -184,8 +184,8 @@ changeZone oid requestedDest gs = case Game.lookupObject oid gs of
 -- happens, so a shield is neither applied nor consumed, CR 614.7). CR 701.19a: a
 -- regeneration shield replaces the destruction. Otherwise the permanent is put
 -- into its owner's graveyard via changeZone (so Rest in Peace's redirect and a
--- token's CR 704.5d cease-to-exist still compose). CR 701.19c "can't be
--- regenerated" is deferred to Wrath (spec section 7): this funnel is ungated.
+-- token's CR 704.5d cease-to-exist still compose). This funnel is ungated for CR
+-- 701.19c "can't be regenerated" (#42).
 destroy :: ObjectId -> GameState -> GameState
 destroy oid gs = case Game.lookupObject oid gs of
   Nothing -> gs
@@ -225,9 +225,9 @@ removeFromCombat oid gs =
 -- The single counter funnel (CR 701.6). A countered spell is removed from the
 -- stack and put into its owner's graveyard (CR 701.6a) via changeZone -- so Rest
 -- in Peace's redirect (graveyard->exile) and CR 400.7's new incarnation still
--- compose, exactly as they do for destroy. Ungated today: "can't be countered"
--- (CR 701.6) and a distinct "was countered" event are deferred (spec section 7),
--- as Event.destroy is ungated for CR 701.19c.
+-- compose, exactly as they do for destroy. Ungated for "can't be countered" (CR
+-- 701.6), and emits no distinct "was countered" event (#43) -- the same posture
+-- as Event.destroy being ungated for CR 701.19c.
 counter :: ObjectId -> GameState -> GameState
 counter oid gs = case Game.lookupObject oid gs of
   Nothing -> gs
@@ -240,14 +240,11 @@ counter oid gs = case Game.lookupObject oid gs of
 -- 701.19a): CR 701.21a says sacrificing is not destroying. CR 701.21a also
 -- restricts it to permanents on the battlefield, so anything else is a no-op.
 --
--- Named elision: CR 701.21a's other clause -- "A player can't sacrifice
--- something that... [is] a permanent they don't control" -- is not enforced
--- here. Not wrong today: the only caller (Resolve's Sacrifice arm) reads a
--- slot the engine itself stamped (Binding.triggerSource, a triggered
--- ability's own source, CR 113.7), which is always controlled by whoever
--- triggered it. Expires at the first effect that can name a permanent its
--- controller does not control -- an opponent-sacrifice effect (an edict,
--- e.g. Diabolic Edict).
+-- CR 701.21a's other clause -- "A player can't sacrifice something that... [is] a
+-- permanent they don't control" -- is not enforced here (#44). Not wrong today:
+-- the only caller (Resolve's Sacrifice arm) reads a slot the engine itself
+-- stamped (Binding.triggerSource, a triggered ability's own source, CR 113.7),
+-- which is always controlled by whoever triggered it.
 sacrifice :: ObjectId -> GameState -> GameState
 sacrifice oid gs = case Game.lookupObject oid gs of
   Nothing -> gs
@@ -355,31 +352,16 @@ matchesTrigger bearer you cond event = case cond of
 -- trigger scan quadratic in board size. Projection.projectAll runs `gather`
 -- exactly once and shares the result across the whole scan.
 --
--- The battlefield is the ONLY scanned zone. An ability that functions from a
--- graveyard, hand or exile is a named deferral (the P4 spec, section 8), expiring
--- at the first such card.
+-- The battlefield is the ONLY scanned zone; an ability that functions from a
+-- graveyard, hand or exile is never scanned (#45).
 --
--- A permanent that enters and then dies to a state-based action within the
--- same settle (Engine.settleForPriority runs Sba.performStateBasedActions
--- before placePendingTriggers) DOES currently lose its enters trigger:
--- Event.changeZone retires the id from GameState.objects on the move that
--- kills it (CR 400.7's "becomes a new object with no memory of... its
--- previous existence"), so by the time this scan runs, no candidate carries
--- that id. This is NOT a "look back in time" gap -- that CR 603.10 term of
--- art names the opposite case, where a trigger checks the state immediately
--- PRIOR to an event, and 603.10's own exception list (603.10a-g) is
--- leaves-the-battlefield, sacrifice, phase-out and similar triggers, not
--- enters. CR 603.10's NORMAL rule -- the one that applies to an enters
--- trigger -- is that objects existing immediately AFTER the event are
--- checked, and the entering permanent does exist immediately after the
--- Moved event that placed it. The actual defect is timing: this scan runs at
--- the CR 117.5 priority boundary and derives its candidate set from
--- BATTLEFIELD STATE AS IT THEN STANDS, rather than checking against the
--- state immediately after each event, so an id that has since been retired
--- is invisible to it. It is a named deferral of this phase (P4 spec section
--- 8's "enters-then-dies-same-settle" bullet); closing it needs the scan to
--- evaluate candidates against the state at the time of the event rather than
--- at the boundary.
+-- This scan derives its candidate set from BATTLEFIELD STATE AS IT THEN STANDS
+-- at the CR 117.5 priority boundary, rather than checking against the state
+-- immediately after each event -- so a permanent that enters and then dies to a
+-- state-based action within the same settle loses its enters trigger (#46). Note
+-- this is NOT a "look back in time" gap: that CR 603.10 term of art names the
+-- opposite case, and 603.10's exception list (603.10a-g) is
+-- leaves-the-battlefield, sacrifice, phase-out and similar, not enters.
 --
 -- Events outer, permanents inner (ascending by id): a deterministic canonical
 -- order, which is what the CR 603.3b ordering prompt indexes into.
@@ -395,11 +377,9 @@ eventTriggers events gs =
               Nothing -> Nothing
               -- CR 603.3a: controlled by whoever controls the source when it
               -- triggers. Projection.controllerOf reads control AT THE SCAN
-              -- BOUNDARY, not at the moment the underlying event fired --
-              -- pre-existing posture carried forward from M3f, unobservable
-              -- today because nothing changes control between an event and
-              -- the CR 117.5 boundary. Expires at the first effect that can
-              -- change control between an event and the boundary.
+              -- BOUNDARY, not at the moment the underlying event fired (#47) --
+              -- unobservable today because nothing changes control between an
+              -- event and the CR 117.5 boundary.
               Just pc -> fmap (\ctrl -> (oid, ctrl, PC.triggeredAbilities pc)) (Projection.controllerOf oid gs)
           )
           (Set.toAscList (GameState.battlefield gs))
@@ -467,6 +447,9 @@ stateTriggers gs =
               -- removes the stack entry and its object together, so a stack
               -- id is never left dangling.
               Nothing -> True
+              -- Source equality, so one source carrying two textually identical
+              -- StateIs abilities would conflate them and suppress the second
+              -- as though it were an instance of the first (#55).
               Just obj -> Object.source obj == Source.OfTrigger srcId ab
          in any isInstance (GameState.stack gs)
       forOne oid = case Projection.controllerOf oid gs of
@@ -499,22 +482,11 @@ stateTriggers gs =
 -- next end step" clauses, are all StepBegins in this pool). Noted because a later
 -- P4 task touches state conditions again and should see this before adding one.
 --
--- Named deferral: the surviving store this function returns is computed from
--- the EVENT MATCH (`fires`) alone, before gatherTriggers's CR 603.4
--- intervening-"if" filter (`interveningHolds`) ever runs on the entries it
--- produces. If a stored entry's ability carries an intervening "if" that is
--- false when its trigger event occurs, `fires` is still True (it only checks
--- the event, not the condition), so the entry is REMOVED here -- spending CR
--- 603.7b's one shot -- and then interveningHolds drops it from the pending
--- list downstream. Net effect: the ability neither goes on the stack now nor
--- remains armed for its trigger event's next occurrence, even though CR 603.4
--- says a false intervening "if" means the ability "does nothing" -- for a
--- delayed ability that should leave it still waiting, not consume its single
--- CR 603.7b shot. Unreachable today: Tidal Wave's delayed ability, the only
--- one in this pool, has no `intervening`. EXPIRES at the first delayed ability
--- with an intervening "if" -- closing this needs either the intervening check
--- threaded into `fires` itself, or the store pruned from gatherTriggers's
--- post-filter list instead of from here.
+-- The surviving store this function returns is computed from the EVENT MATCH
+-- (`fires`) alone, before gatherTriggers's CR 603.4 intervening-"if" filter
+-- (`interveningHolds`) ever runs on the entries it produces -- so an entry whose
+-- intervening "if" is false is removed here, spending CR 603.7b's one shot,
+-- rather than staying armed for the trigger event's next occurrence (#48).
 delayedPending :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 delayedPending events gs =
   let fires entry =

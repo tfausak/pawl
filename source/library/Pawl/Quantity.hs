@@ -66,7 +66,7 @@ countOf gs you spec = case spec of
 -- The distinct card types among the cards in every player's graveyard. Reads the
 -- PRINTED type line (Game.cardOf), never the projection: nothing projects a
 -- graveyard card today, and a projected read here would recurse into the layer
--- fold that calls this. Expiry in the P3b spec, section 8.
+-- fold that calls this (#41).
 typesInAllGraveyards :: GameState -> Set CardType
 typesInAllGraveyards gs =
   let ids = concatMap Foldable.toList (Map.elems (GameState.graveyard gs))

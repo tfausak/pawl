@@ -12,7 +12,7 @@ import Pawl.Type.Subtype (Subtype)
 -- the PROJECTION: a subtype is CR 613 layer 4 and control is layer 2, so a card
 -- that changed either must change the answer.
 --
--- EXPIRES at P9, whose criterion/filter language retires this type wholesale.
+-- Retired wholesale by P9's criterion/filter language (#38).
 data StateCondition
   = -- CR 603.8: Barbarian Outcast, "you control no Swamps". Scoped to the
     -- ABILITY's controller (CR 603.3a), not to the board.

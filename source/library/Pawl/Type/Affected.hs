@@ -23,7 +23,6 @@ data Affected
     -- so a CR 613.1e colour change is visible to it -- but this is the general
     -- rule, not something specific to layer 7c: pairing this affected set with a
     -- modification BELOW layer 5 (a layer-2/3/4 op) is the untested case that
-    -- Projection.baseColorsOf's devoid-seed comment names as the shortcut's
-    -- named expiry.
+    -- breaks Projection.baseColorsOf's devoid seed (#35).
     CreaturesOfColor Color
   deriving (Eq, Ord, Show)

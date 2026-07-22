@@ -266,7 +266,7 @@ controlChangeSicknessTests cards =
     "ControlChangeSickness"
     [ -- SYNTHETIC (labeled crutch, spec §4): a "steal until end of turn, no haste"
       -- effect. A real card would grant haste (masking CR 302.6) or be an Aura
-      -- (Attach, out of M4.5 scope). EXPIRES: Auras / Control Magic phase.
+      -- (Attach, out of M4.5 scope). Retired by the Auras / Control Magic phase (#33).
       HU.testCase "CR 302.6 a creature that just changed control is summoning sick (no haste)" $
         let (oid, base) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             slot = SlotName.MkSlotName (Text.pack "target")

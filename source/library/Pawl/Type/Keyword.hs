@@ -36,5 +36,5 @@ data Keyword
 -- Devoid is read only at the projection SEED (Projection.baseColorsOf), not as a
 -- layer-6 GainKeyword grant -- so a Devoid GRANTED by a layer-6 effect does
 -- nothing to colour, silently. Expressible open-half data today; no card in the
--- pool does it. See P3a's spec section 7 (the CDA-vs-timestamp deferral) and
--- Projection.baseColorsOf's comment for the full argument.
+-- pool does it (#35). See Projection.baseColorsOf's comment for the full
+-- argument.

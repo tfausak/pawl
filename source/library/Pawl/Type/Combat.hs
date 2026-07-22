@@ -31,9 +31,11 @@ data Combat = MkCombat
     -- excluded ("had neither...") and the step router knows a second step already
     -- ran. Reset at CR 511 (end of combat).
     --
-    -- EXPIRES at M3: this is captured live off the projection because nothing
-    -- changes keywords mid-combat; at M3 (layer 6) "had it then" and "has it now"
-    -- come apart, and the CR 510.3 window between the two steps can change it.
+    -- Stored, not re-derived: layer 6 means "had it then" and "has it now" come
+    -- apart, and the CR 510.3 window between the two steps can change a keyword.
+    -- Damage.dealCombatDamage reads this snapshot for CR 510.4's "had neither ...
+    -- as the first step began" and reads DOUBLE strike live, which is what CR
+    -- 510.4 says verbatim.
     struckFirst :: Maybe (Set ObjectId)
   }
   deriving (Eq, Ord, Show)

@@ -142,10 +142,10 @@ castWhileSearching pid = do
 
 -- CR 601.2b then 601.2c: choose modes, THEN targets (601.2c), pay (601.2f-h),
 -- move to the stack (601.2a), stamp the choices on the NEW stack incarnation
--- (CR 400.7). Prompting before payment is 601.2's own order; what stays elided
--- is the rewind -- legalActions only offers affordable, fully-fillable casts,
--- so a legal answer cannot fail after the prompt (expiry: mid-announcement
--- failure, e.g. cast-during-search). An illegal answer at ANY step makes the
+-- (CR 400.7). Prompting before payment is 601.2's own order; there is no rewind
+-- for mid-announcement failure (#56) -- legalActions only offers affordable,
+-- fully-fillable casts, so a legal answer cannot fail after the prompt.
+-- An illegal answer at ANY step makes the
 -- whole cast a no-op: reject-not-repair, the AssignCombatDamage posture. A
 -- spell with no slots (in its chosen modes) asks nothing.
 castSpell :: PlayerId -> ObjectId -> Game ()
@@ -162,7 +162,8 @@ castSpell pid oid = do
         -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
         -- unprompted) exactly when there is nothing to choose -- as many legal
         -- modes as the selection demands or fewer (a non-modal card's one mode,
-        -- or a modal card whose only-just-fillable modes leave no real choice).
+        -- or a modal card whose only-just-fillable modes leave no real
+        -- choice), #50.
         chosenModes <-
           if Set.size legal <= fromIntegral count
             then pure legal

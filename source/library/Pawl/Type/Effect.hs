@@ -106,8 +106,7 @@ data Effect card
     -- same list still reads the pre-Create snapshot. A DEFINITION, not a read: it
     -- is not a target and never appears in targetSpecs. Defined only for a
     -- single-token create; a Create that binds a slot while making several tokens
-    -- is a named deferral (the P4 spec, section 8) that the Pawl.CardSpec lint
-    -- family rejects rather than guessing at.
+    -- is rejected by the Pawl.CardSpec lint family rather than guessed at (#53).
     Create Quantity card (Maybe SlotName)
   | -- CR 615.3: install a floating prevention effect for a duration. Fog =
     -- Prevent UntilEndOfTurn PreventAllCombatDamage. Targetless (Fog watches a

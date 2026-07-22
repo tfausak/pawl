@@ -8,14 +8,14 @@ module Pawl.Type.CountSpec where
 -- small, closed numeric-tower type (CR 107.3, 208.2), and card-shaped growth
 -- belongs somewhere P9's criterion/filter language can retire WHOLESALE.
 --
--- EXPIRES at P9.
+-- Retired wholesale by P9's criterion/filter language (#39).
 --
 -- The first two inhabitants read only zone membership and PRINTED card types, and
 -- CreaturesDiedThisTurn reads only the event log's own snapshots -- never the LIVE
 -- projection. Pawl.Quantity cannot import Pawl.Projection (Projection imports
 -- Quantity), and a count evaluated inside the layer fold would recurse into the
 -- fold that called it. A count over live projected state ("lands you control") is
--- a named deferral in the P3b spec, section 8.
+-- not projected (#41).
 data CountSpec
   = -- CR 208.2a: Tarmogoyf. The number of DISTINCT card types among the cards in
     -- every graveyard -- a count of types, not of objects.

@@ -369,7 +369,7 @@ tests cards =
             (opalId, g1) = S.addCreature (Cards.opalescencePrinting cards) S.alice base
             (_, gs) = S.addCreature (Cards.humilityPrinting cards) S.alice g1
          in HU.assertBool "Opalescence stays a non-creature enchantment" (not (Projection.isCreatureOf opalId gs)),
-      HU.testCase "CR 613.7 within layer 4, timestamp order (EXPIRES at CR 613.8b, git-bug f90e0c4)" $
+      HU.testCase "CR 613.7 within layer 4, timestamp order (EXPIRES at CR 613.8b, #11)" $
         -- A Piker made a Land by B (layer 4, TheseObjects), and A = AddLandSubtype
         -- Swamp over AllLands (layer 4). With A OLDER than B, timestamp order applies
         -- A before B, so A does not yet see the Piker as a land and adds no Swamp.

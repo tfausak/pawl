@@ -46,7 +46,7 @@ clearCombat gs = gs {GameState.combat = emptyCombat}
 -- CR 508.8: if no creatures were declared as attackers, skip the declare
 -- blockers and combat damage steps. Called right after declareAttackers, when
 -- the attacker set is final. "Put onto the battlefield attacking" (508.8) has no
--- source at M2b; EXPIRES at M4+ with the effects that create attacking creatures.
+-- source in the pool, so the attacker set really is final here (#30).
 skipEmptyCombat :: GameState -> GameState
 skipEmptyCombat gs =
   if Map.null (Combat.attackers (GameState.combat gs))
@@ -146,10 +146,10 @@ fearAllows blocker attacker gs =
 -- CR 509.1c REQUIREMENTS ("must block if able") are NOT implemented, and are not
 -- a check but a maximization: 509.1c demands the declaration obey the maximum
 -- possible number of requirements achievable without disobeying any restriction.
--- Nothing in M2a creates a requirement, so that maximum is trivially zero. This
--- function is named for restrictions so requirements arrive as a SECOND function
--- rather than as a surprise inside this one. EXPIRES with the first requirement,
--- which also invalidates declareBlockers' fallback -- see there.
+-- Nothing in the pool creates a requirement, so that maximum is trivially zero.
+-- This function is named for restrictions so requirements arrive as a SECOND
+-- function rather than as a surprise inside this one (#27). The first
+-- requirement also invalidates declareBlockers' fallback -- see there.
 legalBlockDeclaration :: PlayerId -> Map ObjectId ObjectId -> GameState -> Bool
 legalBlockDeclaration pid declaration gs =
   let attackers = Map.keys (Combat.attackers (GameState.combat gs))
@@ -166,10 +166,9 @@ legalBlockDeclaration pid declaration gs =
 blockersOf :: ObjectId -> GameState -> Set ObjectId
 blockersOf oid gs = Map.findWithDefault Set.empty oid (Combat.blockers (GameState.combat gs))
 
--- CR 509.1h: a creature remains blocked even if its blockers leave. M1b cannot
--- construct that state -- nothing removes a blocker mid-combat without
--- instant-speed interaction -- so this is derived rather than stored.
--- EXPIRES at M2.
+-- CR 509.1h: a creature remains blocked even if its blockers leave. This derives
+-- blocked-ness from the map rather than storing it, so a departed blocker is not
+-- honoured (#28). No library caller today -- CombatSpec is the only reader.
 isBlocked :: ObjectId -> GameState -> Bool
 isBlocked oid gs = not (Set.null (blockersOf oid gs))
 
@@ -232,9 +231,9 @@ declareBlockers = do
         -- re-prompting a pure `Prompt r -> r` returns the identical wrong answer.
         --
         -- Declining to block is always legal today, so "no blocks" is a legal
-        -- state to fall back to. EXPIRES with CR 509.1c requirements: once
-        -- something must block, "no blocks" can itself be illegal and this
-        -- fallback stops being available.
+        -- state to fall back to. With a CR 509.1c requirement in the pool, "no
+        -- blocks" can itself be illegal and this fallback stops being
+        -- available (#27).
         gs1 <- State.get
         Monad.when (legalBlockDeclaration pid chosen gs1) $ do
           let add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m

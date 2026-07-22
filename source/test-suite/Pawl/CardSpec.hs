@@ -279,7 +279,7 @@ lintTests cards =
             offenders = filter (cardOffends . Printing.card) (Cards.allPrintings cards)
          in HU.assertEqual "no dangling delayed-ability slot" [] (map (Card.Type.name . Printing.card) offenders),
       -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
-      -- of them. A named deferral (P4 spec section 8), rejected rather than guessed.
+      -- of them. Rejected rather than guessed (#53).
       HU.testCase "no Create binds a slot while making more than one token" $
         let offenders =
               filter

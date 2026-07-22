@@ -48,10 +48,9 @@ isMainPhase phase = case phase of
 
 -- CR 508.8 / 500.11: drop the declare blockers and combat damage steps from a
 -- schedule, so the turn proceeds "as though they didn't exist". There is one
--- combat phase per turn at M2b, so removing every occurrence is unambiguous.
---
--- EXPIRES at M4: with a second combat phase (CR 500.8) this must drop only the
--- current phase's steps, positionally, not every combat step in the schedule.
+-- combat phase per turn, so removing every occurrence is unambiguous. With a
+-- second combat phase (CR 500.8) this must instead drop only the current phase's
+-- steps, positionally (#31).
 dropSkippedCombatSteps :: Seq Phase -> Seq Phase
 dropSkippedCombatSteps =
   let kept p =

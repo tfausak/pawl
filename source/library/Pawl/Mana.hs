@@ -123,9 +123,8 @@ manaSources pid gs =
 -- a mana ability does not use the stack, so this is immediate.
 --
 -- Takes the first mana type the object can produce. A Mountain produces exactly
--- one, so there is no choice to make. EXPIRES when a source can produce more
--- than one type (any dual land): choosing between them is a real decision and
--- must become a Prompt.
+-- one, so there is no choice to make. A source that can produce more than one
+-- type (any dual land) makes this a real decision that must become a Prompt (#12).
 tapForMana :: ObjectId -> GameState -> GameState
 tapForMana oid gs = case Game.lookupObject oid gs of
   Nothing -> gs
@@ -198,9 +197,9 @@ spend cost (Mana.MkMana units) =
 -- This elides a choice, and that is legitimate ONLY because the sources are
 -- INDISTINGUISHABLE: every Mountain produces exactly one red unit, so picking
 -- among them is canonicalization, not a decision -- there is no policy to have.
--- The engine makes no player choices; strategy belongs to the interpreter.
--- EXPIRES the moment mana sources differ in any way a player could care about,
--- at which point this must become a real Prompt.
+-- The engine makes no player choices; strategy belongs to the interpreter. The
+-- moment sources differ in any way a player could care about, this must become a
+-- real Prompt (#12).
 payCost :: PlayerId -> ManaCost -> GameState -> Maybe GameState
 payCost pid cost gs =
   let tapUntilPaid remaining state = case spend cost (poolOf pid state) of

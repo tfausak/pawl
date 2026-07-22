@@ -49,8 +49,8 @@ resolveTop = do
           -- castable-while-searching card from their library. The ability is still
           -- on the stack, so a cast lands on top of it (the ruling's sequence).
           -- Offered at resolution start, not per-Search-effect within a
-          -- multi-effect ability -- exact intra-resolution interleaving is a named
-          -- expiry (spec section 7); Evolving Wilds' only effect is the search.
+          -- multi-effect ability -- exact intra-resolution interleaving is not
+          -- modelled (#57); Evolving Wilds' only effect is the search.
           -- CR 700.2c/M4g: scanned over only the CHOSEN modes -- Evolving Wilds is
           -- single-mode, so chosen = {ModeIndex 0} and behavior is unchanged.
           let chosen = Binding.modesOf (Object.bindings obj)

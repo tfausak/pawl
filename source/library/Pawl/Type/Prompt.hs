@@ -21,7 +21,7 @@ data Prompt r where
   ChooseDiscard :: Decider -> PlayerId -> [ObjectId] -> Natural -> Prompt [ObjectId]
   -- CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
   -- attack. Whom they attack is not asked: M1b has exactly one opponent and no
-  -- planeswalkers, so there is nothing to choose. EXPIRES at multiplayer.
+  -- planeswalkers, so there is nothing to choose (#59).
   DeclareAttackers :: Decider -> PlayerId -> [ObjectId] -> Prompt [ObjectId]
   -- CR 509.1. The legal blockers, then the attackers they may block. The answer
   -- maps each blocking creature to the attacker it blocks.
@@ -40,8 +40,8 @@ data Prompt r where
   -- CR 612 / the D4 binding: choose the two basic land types for a text-changing
   -- spell's slot (Magical Hack: "one basic land type" -> "another"). Bound at cast
   -- alongside ChooseTargets; the legal set is always the five basics, so unlike a
-  -- target it never gates castability. Cast-vs-resolution timing is elided as
-  -- indistinguishable (spec §3), expiry named there.
+  -- target it never gates castability, which is what makes cast-vs-resolution
+  -- timing indistinguishable here (#60).
   ChooseBasicLandTypes :: Decider -> PlayerId -> ObjectId -> SlotName -> Prompt (Subtype, Subtype)
   -- CR 701.23 / 701.23b: the [ObjectId] is the library cards MATCHING the
   -- criterion (the engine pre-filters to legal choices); Nothing is "fail to
@@ -87,11 +87,10 @@ data Prompt r where
   -- Sarcomancy already carries two triggered abilities (an ETB and an upkeep
   -- trigger), but they cannot co-trigger because the step event that would fire
   -- the upkeep trigger is always scanned before any spell can resolve to place
-  -- Sarcomancy and fire its ETB in the same batch. EXPIRES at the first card
-  -- whose source can have two distinct abilities triggered together: at that
-  -- point two different abilities become identical entries on the wire while
-  -- their order genuinely matters, and the payload needs an ability
-  -- discriminator alongside the source. Asked ONLY when the player controls two
+  -- Sarcomancy and fire its ETB in the same batch. A source with two distinct
+  -- abilities triggered together makes two different abilities identical entries
+  -- on the wire while their order genuinely matters, and the payload would need
+  -- an ability discriminator alongside the source (#61). Asked ONLY when the player controls two
   -- or more -- with one there is nothing to choose, and where the rules leave
   -- nothing to ask, don't prompt. CR 603.3b's TWO-PART process (first the
   -- triggers whose condition is not another ability triggering, then the rest)

@@ -137,7 +137,7 @@ activateAbility pid srcId ability = do
               case Mana.payCost pid cost g1 of
                 -- activatable pre-checks canPay, so within the source elision this is
                 -- unreachable; reject-not-repair if a distinguishable source ever makes
-                -- payment fail (git-bug 65ce714).
+                -- payment fail (#12).
                 Nothing -> State.put gs
                 Just paid -> State.put (payAll paid)
 

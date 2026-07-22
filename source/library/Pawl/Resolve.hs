@@ -211,9 +211,8 @@ definedSlots effects =
    in Set.fromList (Maybe.mapMaybe bound effects)
 
 -- Does any Create bind a slot while minting more than one token? CR 603.7c's "it"
--- names ONE object; binding one of several would be the engine choosing. A named
--- deferral (the P4 spec, section 8), rejected by the lint until a card needs
--- "sacrifice THEM".
+-- names ONE object; binding one of several would be the engine choosing, so the
+-- lint rejects it rather than guessing (#53).
 bindsSeveralTokens :: [Effect Card.Type.Card] -> Bool
 bindsSeveralTokens effects =
   let offends effect = case effect of

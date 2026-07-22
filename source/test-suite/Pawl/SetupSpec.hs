@@ -89,7 +89,7 @@ setupTests cards =
         HU.assertEqual "hand" 7 (length (Game.zoneMembers Zone.Hand S.bob (setupState cards))),
       HU.testCase "active player is first in turn order" $
         HU.assertEqual "active" S.alice (GameState.activePlayer (setupState cards)),
-      HU.testCase "runMatch derives the players from the matchup (git-bug 15de615)" $
+      HU.testCase "runMatch derives the players from the matchup (#24)" $
         let (result, final) = Engine.runMatchPure S.identityAnswer (S.redRed cards)
          in do
               HU.assertBool "has a result" (Maybe.isJust (GameState.result final))
