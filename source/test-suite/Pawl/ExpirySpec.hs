@@ -18,15 +18,19 @@ import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Expiry as Expiry.Type
+import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -215,5 +219,70 @@ conditionalTests cards =
                   HU.assertEqual "the replacement is gone" [] (GameState.replacements swept)
         ]
 
+-- Master Thief {2}{U}{U} Creature -- Human Rogue 2/2: "When this creature
+-- enters, gain control of target artifact for as long as you control this
+-- creature." CR 611.2b's own printed example; the three assertions below in
+-- tests 2-4 are its three Gatherer rulings, verbatim.
+masterThiefTests :: Cards.Cards -> Tasty.TestTree
+masterThiefTests cards =
+  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
+      -- bob's Darksteel Myr (Artifact Creature -- Myr, 0/1) is the only artifact
+      -- on the board, so the CR 603.3d target choice is forced.
+      board =
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (myrId, gs1) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob gs0
+            (thiefId, gs2) = S.addCreature (Cards.masterThiefPrinting cards) S.alice gs1
+            entered = ZoneChange.MkZoneChange thiefId Zone.Stack Zone.Battlefield
+            gs3 = S.withEvent (GameEvent.Moved entered (Projection.project thiefId gs2)) gs2
+         in (thiefId, myrId, gs3)
+      (thief, myr, entering) = board
+      stolen = resolveAll (settle entering)
+   in Tasty.testGroup
+        "MasterThief"
+        [ HU.testCase "CR 611.2b it works: the ETB resolves and control of the artifact changes" $
+            do
+              HU.assertEqual "alice controls the Myr" (Just S.alice) (Projection.controllerOf myr stolen)
+              -- CR 302.6: the new controller has not controlled it continuously.
+              HU.assertEqual "and it is re-Sicked" (Just Sickness.Sick) (fmap Object.sickness (Game.lookupObject myr stolen)),
+          -- Ruling: "If Master Thief leaves the battlefield, you no longer
+          -- control it, and its control-change effect ends."
+          HU.testCase "CR 611.2b leaving the battlefield ends it" $
+            let dead = S.runPure S.identityAnswer stolen (Event.destroy thief)
+                swept = settle dead
+             in do
+                  HU.assertEqual "control reverts at the next settle" (Just S.bob) (Projection.controllerOf myr swept)
+                  HU.assertEqual "and stays reverted" (Just S.bob) (Projection.controllerOf myr (settle swept)),
+          -- Ruling: "If Master Thief ceases to be under your control before its
+          -- ability resolves, you won't gain control of the targeted artifact at
+          -- all." CR 704.5g destroys it for lethal damage while the trigger is
+          -- on the stack; the trigger still RESOLVES (its target is legal, CR
+          -- 608.2b), but the duration never starts.
+          HU.testCase "CR 611.2b the duration never starts, so no effect is stored" $
+            let onStack = settle entering
+                lethal = S.settleSba (S.markDamage thief 2 onStack)
+                after = resolveAll lethal
+             in do
+                  HU.assertBool "the trigger really was on the stack" (not (null (GameState.stack onStack)))
+                  HU.assertEqual "Master Thief died before it resolved" Nothing (Game.lookupObject thief after)
+                  HU.assertEqual "nothing was stored" [] (GameState.continuousEffects after)
+                  HU.assertEqual "control never changed" (Just S.bob) (Projection.controllerOf myr after),
+          -- Ruling: "If another player gains control of Master Thief, its
+          -- control-change effect ends. Regaining control of Master Thief won't
+          -- cause you to regain control of the artifact." THE FALSIFIER: an
+          -- implementation that filters the effect out of the projection while
+          -- the condition is false, instead of deleting it, fails exactly here.
+          HU.testCase "CR 611.2b the latch: regaining the source does not regain the artifact" $
+            let taken = S.giveControl thief S.bob stolen
+                swept = settle taken
+                returned = Expiry.dropAtCleanup swept
+                relatched = settle returned
+             in do
+                  HU.assertEqual "bob has Master Thief" (Just S.bob) (Projection.controllerOf thief taken)
+                  HU.assertEqual "so the artifact goes back to its owner" (Just S.bob) (Projection.controllerOf myr swept)
+                  HU.assertEqual "at cleanup Master Thief comes home" (Just S.alice) (Projection.controllerOf thief returned)
+                  HU.assertEqual "and the artifact does NOT" (Just S.bob) (Projection.controllerOf myr relatched)
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests cards, handoffTests, conditionalTests cards]
+tests cards = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests cards, handoffTests, conditionalTests cards, masterThiefTests cards]

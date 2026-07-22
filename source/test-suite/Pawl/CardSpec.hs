@@ -19,6 +19,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -31,9 +32,12 @@ import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Toughness as Toughness
+import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 import qualified System.Directory as Directory
@@ -451,8 +455,38 @@ m4bCardTests cards =
               HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) TargetSpec.PlayerTarget) (Card.allTargetSpecs c)
     ]
 
+m45p6CardTests :: Cards.Cards -> Tasty.TestTree
+m45p6CardTests cards =
+  Tasty.testGroup
+    "M45p6Cards"
+    [ HU.testCase "Master Thief is a {2}{U}{U} 2/2 Human Rogue whose ETB steals an artifact" $
+        let c = Printing.card (Cards.masterThiefPrinting cards)
+            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+            slot = SlotName.MkSlotName (Text.pack "target")
+         in do
+              HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue, blue])) (Card.Type.manaCost c)
+              HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
+              HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c)
+              HU.assertEqual "subtypes" (Set.fromList [Subtype.Human, Subtype.Rogue]) (TypeLine.subtypes (Card.Type.typeLine c))
+              case Card.Type.triggeredAbilities c of
+                [ab] -> do
+                  HU.assertEqual "enters trigger" TriggerCondition.SelfEnters (TriggeredAbility.condition ab)
+                  case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
+                    [m] -> do
+                      HU.assertEqual
+                        "one GainControl effect with a conditional duration"
+                        [Effect.GainControl (Duration.ForAsLongAs StateCondition.YouControlSource) slot]
+                        (Foldable.toList (Mode.effects m))
+                      HU.assertEqual
+                        "one ArtifactTarget slot"
+                        (Map.singleton slot TargetSpec.ArtifactTarget)
+                        (Mode.targetSpecs m)
+                    _ -> HU.assertFailure "expected exactly one mode"
+                _ -> HU.assertFailure "expected exactly one triggered ability"
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
     "Card"
-    [cardTests cards, lintTests cards, m2aCardTests cards, m2bCardTests cards, m2cCardTests cards, basicLandTests cards, m3cCardTests cards, m3eCardTests cards, m4bCardTests cards]
+    [cardTests cards, lintTests cards, m2aCardTests cards, m2bCardTests cards, m2cCardTests cards, basicLandTests cards, m3cCardTests cards, m3eCardTests cards, m4bCardTests cards, m45p6CardTests cards]

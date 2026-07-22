@@ -29,4 +29,5 @@ data Subtype
   | Zombie -- CR 205.3m (a creature type; Khabál Ghoul's and Sarcomancy's token's)
   | Fungus -- CR 205.3m (a creature type; Corpsejack Menace's)
   | Elemental -- CR 205.3m (a creature type; Primal Plasma's)
+  | Rogue -- CR 205.3m (a creature type; Master Thief's)
   deriving (Eq, Ord, Show)
