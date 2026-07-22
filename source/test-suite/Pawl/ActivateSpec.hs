@@ -7,6 +7,7 @@ module Pawl.ActivateSpec where
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Cards as Cards
@@ -14,6 +15,7 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -21,7 +23,10 @@ import qualified Pawl.Type.AbilityCost as AbilityCost
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -34,6 +39,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
@@ -146,7 +152,70 @@ tests cards =
                 [skel]
                 (map ActiveReplacement.source (GameState.replacements resolved))
               HU.assertEqual "survived the first destruction (regenerated)" True (Set.member skel (GameState.battlefield firstKill))
-              HU.assertEqual "died to the second (one-shot shield consumed)" False (Set.member skel (GameState.battlefield secondKill))
+              HU.assertEqual "died to the second (one-shot shield consumed)" False (Set.member skel (GameState.battlefield secondKill)),
+      -- CR 113.7a: "any activated or triggered ability that references
+      -- information about the source... checks that information when the
+      -- ability is put onto the stack." CR 602.2a: "[An activated ability's]
+      -- controller is the player who activated the ability." Both are stamped
+      -- once, at activation (Activate.activateAbility sets Object.owner = pid),
+      -- and never revisited -- so a control change to the SOURCE PERMANENT
+      -- after activation must not move the ability to the new controller.
+      --
+      -- Prodigal Sorcerer's own ability (a flat DealDamage 1, CR 115.4/608.2h's
+      -- "any target" has no controller-sensitive restriction) has no
+      -- controller-sensitive OUTPUT, so it cannot make "whose control"
+      -- observable here. A GainControl/ForAsLongAs effect does -- the same
+      -- shape Master Thief's ETB uses in Pawl.ExpirySpec's masterThiefTests --
+      -- attached to a synthetic ability on the same creature so this exercises
+      -- the ACTIVATED path rather than the TRIGGERED one that card already covers.
+      HU.testCase "CR 113.7a/602.2a an activated ability resolves under whoever activated it, not a later controller" $
+        let base = Setup.emptyGame S.bothPlayers
+            (myrId, g0) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob base
+            (srcId, g1) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice g0
+            g2 = g1 {GameState.priority = Just S.alice}
+            targetSlot = SlotName.MkSlotName (Text.pack "target")
+            ability =
+              ActivatedAbility.MkActivatedAbility
+                { ActivatedAbility.cost = AbilityCost.MkAbilityCost {AbilityCost.mana = Nothing, AbilityCost.additional = []},
+                  ActivatedAbility.modal =
+                    singleModeAbility
+                      [Effect.GainControl (Duration.ForAsLongAs StateCondition.YouControlSource) targetSlot]
+                      (Map.singleton targetSlot TargetSpec.ArtifactTarget)
+                }
+            activated = snd (Engine.runGamePure S.identityAnswer g2 (Activate.activateAbility S.alice srcId ability))
+            -- Control of the SOURCE CREATURE (not the ability object) moves to bob
+            -- while the ability sits on the stack.
+            taken = S.giveControl srcId S.bob activated
+            resolved = snd (Engine.runGamePure S.identityAnswer taken Stack.resolveTop)
+            affectsMyr eff = case ContinuousEffect.affected eff of
+              Affected.TheseObjects ids -> Set.member myrId ids
+              _ -> False
+         in do
+              HU.assertEqual "one thing on the stack before resolution" 1 (length (GameState.stack taken))
+              HU.assertEqual "stack empty after resolution" [] (GameState.stack resolved)
+              HU.assertEqual "control of the artifact never changed" (Just S.bob) (Projection.controllerOf myrId resolved)
+              -- Filtered to the artifact: S.giveControl's own AtCleanup
+              -- SetController effect on srcId itself is already in this list and
+              -- is not what CR 611.2b's "never starts" is about.
+              HU.assertEqual
+                "nothing was stored for the artifact -- the duration never starts for alice, the ability's frozen activator"
+                []
+                (filter affectsMyr (GameState.continuousEffects resolved)),
+      -- The stolen-creature case the OLD (deleted) Resolve.hs comment named: by
+      -- the time the ability is ACTIVATED, control has already moved, so
+      -- Object.owner is stamped with the new controller (CR 602.2a) and this
+      -- passes for the same reason before and after the fix -- there is no
+      -- later re-read to get wrong.
+      HU.testCase "CR 113.7a/602.2a a stolen creature's ability, activated by the new controller, resolves under them" $
+        let (srcId, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            taken = S.giveControl srcId S.bob g0
+            g1 = taken {GameState.priority = Just S.bob}
+            activated = snd (Engine.runGamePure S.identityAnswer g1 (Activate.activateAbility S.bob srcId (theAbility (Cards.prodigalSorcererPrinting cards))))
+            resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+         in do
+              HU.assertEqual "bob controls the stolen sorcerer" (Just S.bob) (Projection.controllerOf srcId activated)
+              HU.assertEqual "one thing on the stack" 1 (length (GameState.stack activated))
+              HU.assertEqual "stack empty after resolution" [] (GameState.stack resolved)
     ]
 
 isActivate :: A.Action -> Bool

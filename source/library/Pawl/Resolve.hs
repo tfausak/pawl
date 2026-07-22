@@ -324,10 +324,16 @@ resolveEffects stackId srcId effects specs = do
           -- reserved slots above cannot rescue a spell whose every target is gone.
           targeted = Map.restrictKeys legality (Map.keysSet specs)
           fizzles = not (Map.null specs) && not (or (Map.elems targeted))
-          -- CR 613 / 608.2c: the source PERMANENT's controller, projected -- so a
-          -- controlled permanent's ability (e.g. a stolen creature's tap ability)
-          -- resolves under the thief, not the original owner.
-          effectController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf srcId gs)
+          -- CR 602.2a: an activated ability's controller is the player who
+          -- activated it. CR 603.3a: a triggered ability's controller is
+          -- whoever controlled its source when it triggered. Both are fixed
+          -- once, at the ability's creation -- Activate.activateAbility stamps
+          -- Object.owner = the activating player, and Engine.placeOne stamps it
+          -- with PendingTrigger.controller, the CR 603.3a value -- and never
+          -- revisited (CR 113.7a). `obj` here is the ability object itself
+          -- (looked up by `stackId`, not `srcId`), so its stamped owner IS the
+          -- answer; a stolen permanent's later controller must not override it.
+          effectController = Object.owner obj
        in do
             Monad.unless fizzles $
               Monad.mapM_ (applyEffect srcId effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) effects

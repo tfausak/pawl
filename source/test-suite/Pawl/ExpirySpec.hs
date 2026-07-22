@@ -3,6 +3,7 @@
 -- and the two gate cards (Master Thief, Hag of Inner Weakness).
 module Pawl.ExpirySpec where
 
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
@@ -219,6 +220,15 @@ conditionalTests cards =
                   HU.assertEqual "the replacement is gone" [] (GameState.replacements swept)
         ]
 
+-- Does any stored continuous effect name `target` in its affected set? Used to
+-- tell "nothing was stored FOR THIS OBJECT" apart from an unrelated entry
+-- already in play (S.giveControl's own AtCleanup SetController on the object
+-- whose control moved, which is not what CR 611.2b's "never starts" is about).
+affects :: ObjectId.ObjectId -> ContinuousEffect.ContinuousEffect -> Bool
+affects target eff = case ContinuousEffect.affected eff of
+  Affected.TheseObjects ids -> Set.member target ids
+  _ -> False
+
 -- Master Thief {2}{U}{U} Creature -- Human Rogue 2/2: "When this creature
 -- enters, gain control of target artifact for as long as you control this
 -- creature." CR 611.2b's own printed example; the three assertions below in
@@ -279,30 +289,27 @@ masterThiefTests cards =
           -- conjunct (CR 611.2b/613.1b/400.7): Master Thief stays on the
           -- battlefield the whole time -- only its controller changes -- so this
           -- case cannot pass for the "left the battlefield" reason the sibling
-          -- case above covers.
-          --
-          -- This calls Expiry.arm DIRECTLY with alice (the frozen controller CR
-          -- 603.3a says the ability keeps for its whole time on the stack, the
-          -- same "you" Stack.hs's intervening-if check reads off Object.owner),
-          -- rather than through resolveAll as the sibling cases do. Routing this
-          -- scenario through the full engine does not currently exercise this: CR
-          -- 611.2c is a different code path than the one under test here, and
-          -- Resolve.resolveEffects's own controller binding rebinds to the
-          -- SOURCE's live projected controller (bob, once stolen) instead of the
-          -- ability's frozen one, so the full pipeline currently hands the
-          -- artifact to bob rather than doing nothing -- a Resolve.hs bug, filed
-          -- as #81, out of scope for this card's test coverage. Expiry.arm and
-          -- Event.stateHolds themselves are correct, which is what this proves.
+          -- case above covers. End to end through the real pipeline (CR 113.7a/
+          -- 603.3a: the ability's controller is alice, frozen at trigger time, and
+          -- Resolve.resolveEffects must read that frozen value rather than bob's
+          -- live control of the thief).
           HU.testCase "CR 611.2b ceasing to be under your control (not leaving the battlefield) also stops it" $
             let onStack = settle entering
                 taken = S.giveControl thief S.bob onStack
+                after = resolveAll taken
              in do
                   HU.assertBool "the trigger really was on the stack" (not (null (GameState.stack onStack)))
                   HU.assertEqual "Master Thief is still on the battlefield, under bob" (Just S.bob) (Projection.controllerOf thief taken)
-                  HU.assertEqual
-                    "the duration never starts for alice, the ability's frozen controller"
-                    Nothing
-                    (Expiry.arm S.alice thief (Duration.ForAsLongAs StateCondition.YouControlSource) taken),
+                  HU.assertBool "Master Thief is still on the battlefield after resolution" (Maybe.isJust (Game.lookupObject thief after))
+                  HU.assertEqual "control never changed" (Just S.bob) (Projection.controllerOf myr after)
+                  -- Filtered to the ARTIFACT: `taken`'s own S.giveControl fixture
+                  -- already stored an unrelated AtCleanup SetController effect on
+                  -- the thief itself, so a blanket `[] == continuousEffects` would
+                  -- fail for a reason that has nothing to do with this bug.
+                  HU.assertEqual "nothing was stored for the artifact" [] (filter (affects myr) (GameState.continuousEffects after))
+                  -- CR 302.6: a control-change stored by GainControl re-Sicks the
+                  -- target; the duration never starting must leave that untouched.
+                  HU.assertEqual "and was never re-Sicked" (Just Sickness.Settled) (fmap Object.sickness (Game.lookupObject myr after)),
           -- Ruling: "If another player gains control of Master Thief, its
           -- control-change effect ends. Regaining control of Master Thief won't
           -- cause you to regain control of the artifact." THE FALSIFIER: an
