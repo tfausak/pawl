@@ -27,4 +27,5 @@ data Subtype
   | Arcane -- CR 205.3k (a spell type; Inner Calm, Outer Strength's)
   | Barbarian -- CR 205.3m (a creature type; Barbarian Outcast's)
   | Zombie -- CR 205.3m (a creature type; Khabál Ghoul's and Sarcomancy's token's)
+  | Fungus -- CR 205.3m (a creature type; Corpsejack Menace's)
   deriving (Eq, Ord, Show)

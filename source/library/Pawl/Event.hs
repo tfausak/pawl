@@ -14,6 +14,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
@@ -21,6 +22,7 @@ import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.CounterKind as CounterKind
 import Pawl.Type.DamageEvent (DamageEvent)
 import Pawl.Type.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
@@ -189,8 +191,8 @@ changeZone oid requestedDest = do
 -- BEFORE the replacement loop, which is CR 614.7: "If a replacement effect would
 -- replace an event, but that event never happens, the replacement effect simply
 -- doesn't do anything" -- a regeneration shield is neither applied nor consumed.
--- Otherwise the would-be-destroyed event is offered
--- to CR 616.1; if it survives, the permanent is put into its owner's graveyard via
+-- Otherwise the would-be-destroyed event is offered to CR 616.1; if it
+-- survives, the permanent is put into its owner's graveyard via
 -- changeZone (so Rest in Peace's redirect and a token's CR 704.5d cease-to-exist
 -- still compose). Ungated for CR 701.19c "can't be regenerated" (#42).
 destroy :: ObjectId -> Game ()
@@ -204,6 +206,25 @@ destroy oid = do
         else do
           happens <- Replacement.resolveDestruction oid
           Monad.when happens (changeZone oid Zone.Graveyard)
+
+-- The single counter funnel (CR 122.6). Before P5 the PutCounters opcode edited
+-- Object.counters in place with no funnel at all, so there was nothing for a
+-- replacement to intercept.
+--
+-- CR 122.6 makes this the right single seam: "Some spells and abilities refer to
+-- counters being put on an object. This refers to putting counters on that object
+-- while it's on the battlefield and also to an object that's given counters as it
+-- enters the battlefield." A zero count after the loop puts nothing on.
+putCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game ()
+putCounters oid kind n = do
+  resolved <- Replacement.resolveCounters oid kind n
+  case resolved of
+    Nothing -> pure ()
+    Just (target, settledKind, settledCount) ->
+      Monad.when (settledCount > 0) $
+        State.modify' $ \gs ->
+          let bump obj = obj {Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters obj)}
+           in gs {GameState.objects = Map.adjust bump target (GameState.objects gs)}
 
 -- The single counter funnel (CR 701.6). A countered spell is removed from the
 -- stack and put into its owner's graveyard (CR 701.6a) via changeZone -- so Rest

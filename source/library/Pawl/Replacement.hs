@@ -34,6 +34,8 @@ import Pawl.Type.CandidateId (CandidateId)
 import qualified Pawl.Type.CandidateId as CandidateId
 import Pawl.Type.ControllerRelation (ControllerRelation)
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
+import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.CounterPattern as CounterPattern
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamagePattern as DamagePattern
 import qualified Pawl.Type.DamageRewrite as DamageRewrite
@@ -43,6 +45,7 @@ import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
@@ -55,6 +58,7 @@ import Pawl.Type.ReplacementCandidate (ReplacementCandidate)
 import qualified Pawl.Type.ReplacementCandidate as ReplacementCandidate
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Uses as Uses
 import Pawl.Type.ZoneChange (ZoneChange)
@@ -161,16 +165,21 @@ applies gs event candidate =
         -- DestructionR carries no pattern because the only producer in the
         -- card pool is self-regeneration (CR 701.19a).
         (ReplacementEffect.DestructionR _, ProposedEvent.WouldBeDestroyed oid) -> src == oid
+        (ReplacementEffect.CounterR pat _, ProposedEvent.WouldPutCounters oid kind _) ->
+          -- CR 614.1: `whichKind = Nothing` means any kind, never no kind.
+          maybe True (== kind) (CounterPattern.whichKind pat)
+            && matchesController gs src (CounterPattern.whose pat) oid
+            && matchesPermanent gs (CounterPattern.onWhat pat) oid
         -- Every row below falls through to False, but for two different reasons.
-        -- ZoneChangeR, DamageR and DestructionR are unreachable HERE because an
-        -- arm ABOVE already matches every event of that class -- a row below only
-        -- fires for a MISMATCHED class (e.g. a DestructionR candidate offered a
-        -- WouldChangeZone event), where False is simply the correct answer, not a
-        -- stand-in for "not yet implemented". EntryR, CounterR and TokenR are
+        -- ZoneChangeR, DamageR, DestructionR and CounterR are unreachable HERE
+        -- because an arm ABOVE already matches every event of that class -- a row
+        -- below only fires for a MISMATCHED class (e.g. a DestructionR candidate
+        -- offered a WouldChangeZone event), where False is simply the correct
+        -- answer, not a stand-in for "not yet implemented". EntryR and TokenR are
         -- unreachable for the OTHER reason: nothing in the engine raises the
-        -- ProposedEvent each would need to match (WouldEnter, WouldPutCounters,
-        -- WouldCreateTokens have no producer), so every pair naming one is
-        -- unreachable in practice and False is correct until one does.
+        -- ProposedEvent each would need to match (WouldEnter, WouldCreateTokens
+        -- have no producer), so every pair naming one is unreachable in practice
+        -- and False is correct until one does.
         (ReplacementEffect.ZoneChangeR _ _, _) -> False
         (ReplacementEffect.EntryR _, _) -> False
         (ReplacementEffect.DamageR _ _, _) -> False
@@ -184,6 +193,21 @@ matchesController :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> 
 matchesController gs src rel oid = case rel of
   ControllerRelation.Anyones -> True
   ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
+
+-- CR 614.1: which permanents a pattern admits. P9 generalizes this.
+matchesPermanent :: GameState -> PermanentCriterion.PermanentCriterion -> ObjectId -> Bool
+matchesPermanent gs crit oid = case crit of
+  PermanentCriterion.AnyPermanent -> True
+  -- CR 305.2 / 613.1d: creature-ness is the PROJECTED question, so an
+  -- Opalescence'd enchantment counts.
+  PermanentCriterion.CreaturePermanent -> Projection.isCreatureOf oid gs
+
+-- CR 614.1: apply a scaling to a count. "That many plus one" and "twice that
+-- many" are the same operation with different data.
+scale :: Scaling.Scaling -> Natural -> Natural
+scale s n = case s of
+  Scaling.Multiply m -> n * m
+  Scaling.AddMore m -> n + m
 
 -- CR 616.1a-e: take the HIGHEST non-empty bucket. Ord on ReplacementBucket is
 -- ascending in the CR's own order, so that is the minimum present; the fold seeds
@@ -335,7 +359,10 @@ apply candidate event =
     -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)
     -- CR 122.6/614.16: Hardened Scales/Doubling Season scale a counter placement.
-    -- Waiting on the WouldPutCounters funnel.
+    (ReplacementEffect.CounterR _ scaling, ProposedEvent.WouldPutCounters oid kind n) -> do
+      consume (ReplacementCandidate.identity candidate)
+      pure (Just (ProposedEvent.WouldPutCounters oid kind (scale scaling n)))
+    -- Unreachable: `applies` admits CounterR only against WouldPutCounters.
     (ReplacementEffect.CounterR _ _, _) -> pure (Just event)
     -- CR 614.16: Doubling Season scales token creation. Waiting on the
     -- WouldCreateTokens funnel.
@@ -378,3 +405,18 @@ resolveDestruction :: ObjectId -> Game Bool
 resolveDestruction oid = do
   outcome <- applyReplacements (ProposedEvent.WouldBeDestroyed oid)
   pure (Maybe.isJust outcome)
+
+-- CR 122.6: settle a proposed counter placement. Nothing means none are put on.
+resolveCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind, Natural))
+resolveCounters oid kind n = do
+  outcome <- applyReplacements (ProposedEvent.WouldPutCounters oid kind n)
+  pure (outcome >>= asCounters)
+
+asCounters :: ProposedEvent -> Maybe (ObjectId, CounterKind.CounterKind, Natural)
+asCounters event = case event of
+  ProposedEvent.WouldPutCounters oid kind n -> Just (oid, kind, n)
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed _ -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing

@@ -76,7 +76,9 @@ data Cards = MkCards
     barbarianOutcastPrinting :: Printing.Printing,
     khabalGhoulPrinting :: Printing.Printing,
     tidalWavePrinting :: Printing.Printing,
-    sarcomancyPrinting :: Printing.Printing
+    sarcomancyPrinting :: Printing.Printing,
+    hardenedScalesPrinting :: Printing.Printing,
+    corpsejackMenacePrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -152,6 +154,8 @@ loadCards = do
   khabalGhoulPrinting_ <- loadPrinting "khabál-ghoul"
   tidalWavePrinting_ <- loadPrinting "tidal-wave"
   sarcomancyPrinting_ <- loadPrinting "sarcomancy"
+  hardenedScalesPrinting_ <- loadPrinting "hardened-scales"
+  corpsejackMenacePrinting_ <- loadPrinting "corpsejack-menace"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -216,7 +220,9 @@ loadCards = do
         barbarianOutcastPrinting = barbarianOutcastPrinting_,
         khabalGhoulPrinting = khabalGhoulPrinting_,
         tidalWavePrinting = tidalWavePrinting_,
-        sarcomancyPrinting = sarcomancyPrinting_
+        sarcomancyPrinting = sarcomancyPrinting_,
+        hardenedScalesPrinting = hardenedScalesPrinting_,
+        corpsejackMenacePrinting = corpsejackMenacePrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -283,7 +289,9 @@ allPrintings cards =
     barbarianOutcastPrinting cards,
     khabalGhoulPrinting cards,
     tidalWavePrinting cards,
-    sarcomancyPrinting cards
+    sarcomancyPrinting cards,
+    hardenedScalesPrinting cards,
+    corpsejackMenacePrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

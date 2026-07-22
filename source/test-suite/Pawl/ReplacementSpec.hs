@@ -2,27 +2,27 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers: Pawl.Replacement (the CR 616.1 loop, its buckets and its prompt) and
--- the funnels that raise proposed events through it. Gameplay-level throughout
--- -- put a board together, cast or resolve, assert on game state -- with one
--- full exception and one half-exception.
---
--- Full exception: the CR 614.5 case below drives Replacement.applicable/loop
--- directly on hand-built values, because the card pool has exactly one
--- replacement-bearing printing (Rest in Peace) and no gameplay board can
--- produce the two independently-sourced, mutually-applicable redirects that
--- case needs.
---
--- Half-exception: the CR 615.10 Fog case casts and resolves a real card through
--- the stack, but then hand-builds its DamageEvent batch rather than reaching one
--- through combat -- there is no gameplay path from a cast Fog to a specific
--- damage batch without driving an entire combat phase, which the CR 615.10
--- property under test does not need.
+-- the funnels that raise proposed events through it. Mostly gameplay-level --
+-- put a board together, cast or resolve, assert on game state -- but a case
+-- reaches for a more direct construction whenever gameplay cannot produce the
+-- exact shape the property under test needs: driving the loop on hand-built
+-- ProposedEvent values (CR 614.5, where the card pool has only one
+-- replacement-bearing printing and no gameplay board can produce two
+-- independently-sourced, mutually-applicable redirects), hand-building a
+-- DamageEvent batch after a real cast (CR 615.10 Fog, where reaching one
+-- through combat would mean driving an entire combat phase the property does
+-- not need), or seeding GameState.combat's attacker map directly (CR 701.19a,
+-- the same shortcut Support.addRegenShield takes for the shield itself,
+-- because declaring a legal attacker needs a full combat phase too). Each such
+-- case says so at the point it happens, rather than here.
 module Pawl.ReplacementSpec where
 
 import qualified Control.Exception as Exception
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
@@ -42,6 +42,7 @@ import qualified Pawl.Type.CandidateId as CandidateId
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.Combat as Combat
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Game as Game.Type
@@ -49,6 +50,8 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
+import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.ProposedEvent as ProposedEvent
@@ -86,6 +89,38 @@ wasAskedToReplace responses =
         Response.ChoseReplacement _ -> True
         _ -> False
    in any isReplacement responses
+
+-- alice controls one Forest plus `mine`; bob controls `theirs`; alice holds one
+-- Battlegrowth ({G} instant: put a +1/+1 counter on target creature). Returns the
+-- state, Battlegrowth's hand id, and the two id lists in the order given.
+counterBoard :: Cards.Cards -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId])
+counterBoard cards mine theirs =
+  let addAll pid ps gs =
+        List.foldl'
+          (\(ids, g) p -> let (oid, g1) = S.addCreature p pid g in (ids ++ [oid], g1))
+          ([], gs)
+          ps
+      (ours, gs1) = addAll S.alice mine (S.landsInPlay (Cards.forestPrinting cards) 1)
+      (yours, gs2) = addAll S.bob theirs gs1
+      (gs3, spellId) = S.handOne (Cards.battlegrowthPrinting cards) gs2
+   in (gs3, spellId, ours, yours)
+
+-- Aim every target slot at `victim`, and answer a CR 616.1 race by picking the
+-- candidate whose SOURCE is `preferred` -- by id, so the assertion does not
+-- depend on the engine's canonical candidate order.
+raceAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+raceAnswer preferred victim p = case p of
+  Prompt.ChooseReplacement _ _ sources -> maybe 0 fromIntegral (List.elemIndex preferred sources)
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToCreature victim)) sets
+  _ -> S.identityAnswer p
+
+countersOn :: CounterKind.CounterKind -> ObjectId.ObjectId -> GameState.GameState -> Natural.Natural
+countersOn kind oid gs =
+  maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
+
+castAndResolve :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+castAndResolve answer gs spellId =
+  S.runPure answer gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
 
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
@@ -200,7 +235,7 @@ tests cards =
             once = S.runPure S.identityAnswer attacking (Event.destroy skel)
             twice = S.runPure S.identityAnswer once (Event.destroy skel)
          in do
-              HU.assertBool "was declared an attacker" (Map.member skel (Combat.attackers (GameState.combat attacking)))
+              HU.assertBool "combat started with no attackers" (Map.null (Combat.attackers (GameState.combat armed)))
               HU.assertBool "survived the first destruction" (Set.member skel (GameState.battlefield once))
               HU.assertEqual "the shield was spent" [] (GameState.replacements once)
               HU.assertBool "removed from combat by the regeneration (CR 701.19a)" (not (Map.member skel (Combat.attackers (GameState.combat once))))
@@ -222,5 +257,60 @@ tests cards =
             after = S.runPure S.identityAnswer shielded (Event.destroy myr)
          in do
               HU.assertBool "the indestructible creature survives" (Set.member myr (GameState.battlefield after))
-              HU.assertEqual "the shield is intact" 1 (length (GameState.replacements after))
+              HU.assertEqual "the shield is intact" 1 (length (GameState.replacements after)),
+      HU.testCase "CR 616.1 Scales first, then Corpsejack: 1 -> 2 -> 4" $
+        let (gs, spellId, mine, _) = counterBoard cards [Cards.hardenedScalesPrinting cards, Cards.corpsejackMenacePrinting cards, Cards.pikerPrinting cards] []
+         in case mine of
+              scales : _ : piker : _ ->
+                let after = castAndResolve (raceAnswer scales piker) gs spellId
+                 in HU.assertEqual "(1 + 1) * 2" 4 (countersOn CounterKind.PlusOnePlusOne piker after)
+              _ -> HU.assertFailure "fixture did not build three permanents",
+      HU.testCase "CR 616.1 Corpsejack first, then Scales: 1 -> 2 -> 3 (same input, different board)" $
+        let (gs, spellId, mine, _) = counterBoard cards [Cards.hardenedScalesPrinting cards, Cards.corpsejackMenacePrinting cards, Cards.pikerPrinting cards] []
+         in case mine of
+              _ : corpsejack : piker : _ ->
+                let after = castAndResolve (raceAnswer corpsejack piker) gs spellId
+                 in HU.assertEqual "(1 * 2) + 1" 3 (countersOn CounterKind.PlusOnePlusOne piker after)
+              _ -> HU.assertFailure "fixture did not build three permanents",
+      HU.testCase "CR 616.1 the engine ASKS -- it does not proceed on list order" $
+        let (gs, spellId, mine, _) = counterBoard cards [Cards.hardenedScalesPrinting cards, Cards.corpsejackMenacePrinting cards, Cards.pikerPrinting cards] []
+         in case mine of
+              scales : _ : piker : _ ->
+                let asked = answersFor (raceAnswer scales piker) gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+                 in HU.assertBool "a ChooseReplacement was raised" (wasAskedToReplace asked)
+              _ -> HU.assertFailure "fixture did not build three permanents",
+      HU.testCase "CR 616.1 one Hardened Scales alone is not asked about (nothing to choose)" $
+        let (gs, spellId, mine, _) = counterBoard cards [Cards.hardenedScalesPrinting cards, Cards.pikerPrinting cards] []
+         in case mine of
+              scales : piker : _ ->
+                let after = castAndResolve (raceAnswer scales piker) gs spellId
+                    asked = answersFor (raceAnswer scales piker) gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+                 in do
+                      HU.assertEqual "1 + 1" 2 (countersOn CounterKind.PlusOnePlusOne piker after)
+                      HU.assertBool "no ChooseReplacement was raised" (not (wasAskedToReplace asked))
+              _ -> HU.assertFailure "fixture did not build two permanents",
+      HU.testCase "CR 614.5 two Hardened Scales are two instances: 1 -> 2 -> 3, unprompted" $
+        let (gs, spellId, mine, _) = counterBoard cards [Cards.hardenedScalesPrinting cards, Cards.hardenedScalesPrinting cards, Cards.pikerPrinting cards] []
+         in case mine of
+              scales : _ : piker : _ ->
+                let after = castAndResolve (raceAnswer scales piker) gs spellId
+                    asked = answersFor (raceAnswer scales piker) gs (Cast.castSpell S.alice spellId >> Stack.resolveTop)
+                 in do
+                      HU.assertEqual "each gets its own opportunity" 3 (countersOn CounterKind.PlusOnePlusOne piker after)
+                      HU.assertBool "value-equal candidates elide the prompt" (not (wasAskedToReplace asked))
+              _ -> HU.assertFailure "fixture did not build three permanents",
+      HU.testCase "CR 614.1 Hardened Scales ignores a -1/-1 counter (whichKind)" $
+        let base = S.landsInPlay (Cards.swampPrinting cards) 4
+            (scales, g1) = S.addCreature (Cards.hardenedScalesPrinting cards) S.alice base
+            (piker, g2) = S.addCreature (Cards.pikerPrinting cards) S.alice g1
+            (g3, spellId) = S.handOne (Cards.instillInfectionPrinting cards) g2
+            after = castAndResolve (raceAnswer scales piker) g3 spellId
+         in HU.assertEqual "one -1/-1 counter, unscaled" 1 (countersOn CounterKind.MinusOneMinusOne piker after),
+      HU.testCase "CR 109.5 Corpsejack Menace does not double an opponent's counters" $
+        let (gs, spellId, mine, theirs) = counterBoard cards [Cards.corpsejackMenacePrinting cards] [Cards.pikerPrinting cards]
+         in case (mine, theirs) of
+              (corpsejack : _, piker : _) ->
+                let after = castAndResolve (raceAnswer corpsejack piker) gs spellId
+                 in HU.assertEqual "not doubled -- ControllerRelation is Yours" 1 (countersOn CounterKind.PlusOnePlusOne piker after)
+              _ -> HU.assertFailure "fixture did not build both sides"
     ]

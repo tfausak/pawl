@@ -8,7 +8,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Damage as Damage
@@ -27,7 +26,6 @@ import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
@@ -606,15 +604,17 @@ applyEffect source controller bound legality chosen effect = case effect of
         Nothing -> pure ()
         Just target -> Event.counter target
       _ -> pure ()
-  Effect.PutCounters kind quantity slot ->
-    State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case recipientObject recipient of
-          Nothing -> gs -- a player recipient takes no counters
-          Just target -> case Quantity.evaluate gs source (Just controller) quantity of
-            Nothing -> gs -- unevaluable quantity: no-op (the powerOf posture)
-            Just n -> if n <= 0 then gs else putCounters target kind (fromInteger n) gs
-        _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
+  Effect.PutCounters kind quantity slot -> do
+    gs <- State.get
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case recipientObject recipient of
+        Nothing -> pure () -- a player recipient takes no counters
+        Just target -> case Quantity.evaluate gs source (Just controller) quantity of
+          Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
+          -- CR 122.6: through the single funnel, so CR 614's counter replacements
+          -- (Hardened Scales, Doubling Season) get their opportunity.
+          Just n -> Monad.when (n > 0) (Event.putCounters target kind (fromInteger n))
+      _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
   Effect.Untap slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -673,12 +673,6 @@ bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
 bindSlot holder slot target gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
-
--- CR 122.6: add `n` counters of a kind to a permanent's per-incarnation state.
-putCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> GameState -> GameState
-putCounters oid kind n gs =
-  let bump obj = obj {Object.counters = Map.insertWith (+) kind n (Object.counters obj)}
-   in gs {GameState.objects = Map.adjust bump oid (GameState.objects gs)}
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

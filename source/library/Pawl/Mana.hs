@@ -64,6 +64,7 @@ subtypeMana subtype = case subtype of
   Subtype.Arcane -> Nothing
   Subtype.Barbarian -> Nothing
   Subtype.Zombie -> Nothing
+  Subtype.Fungus -> Nothing
 
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
 -- PLUS every projected activated ability that is a mana ability (CR 605.1a),
