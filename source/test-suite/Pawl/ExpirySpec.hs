@@ -351,11 +351,14 @@ hagTests cards =
           HU.testCase "CR 514.2 it survives cleanup and the whole of the opponent's turn" $
             let ended = Expiry.dropAtCleanup afterTrigger
                 bobsTurn = handoff ended
+                bobsTurnSwept = Expiry.dropAtCleanup bobsTurn
              in do
-                  HU.assertEqual "still 1/2 in its own turn's end step" (Just 1) (Projection.powerOf mammoth ended)
+                  HU.assertEqual "survives its own turn's CR 514.2 cleanup sweep" (Just 1) (Projection.powerOf mammoth ended)
                   HU.assertEqual "bob is active" S.bob (GameState.activePlayer bobsTurn)
-                  HU.assertEqual "still 1/2 throughout bob's turn" (Just 1) (Projection.powerOf mammoth bobsTurn)
-                  HU.assertEqual "still 1/2 throughout bob's turn" (Just 2) (Projection.toughnessOf mammoth bobsTurn),
+                  HU.assertEqual "power still 1 at the start of bob's turn" (Just 1) (Projection.powerOf mammoth bobsTurn)
+                  HU.assertEqual "toughness still 2 at the start of bob's turn" (Just 2) (Projection.toughnessOf mammoth bobsTurn)
+                  HU.assertEqual "power survives bob's own CR 514.2 cleanup sweep too" (Just 1) (Projection.powerOf mammoth bobsTurnSwept)
+                  HU.assertEqual "toughness survives bob's own CR 514.2 cleanup sweep too" (Just 2) (Projection.toughnessOf mammoth bobsTurnSwept),
           HU.testCase "CR 611.2a it expires as the controller's next turn begins" $
             let alicesTurn = handoff (handoff (Expiry.dropAtCleanup afterTrigger))
              in do

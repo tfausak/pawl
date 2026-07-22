@@ -494,7 +494,11 @@ m45p6CardTests cards =
             black = ManaSymbol.OfType (ManaType.Colored Color.Black)
             slot = SlotName.MkSlotName (Text.pack "target")
          in do
+              HU.assertEqual "name" (Text.pack "Hag of Inner Weakness") (Card.Type.name c)
               HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, black])) (Card.Type.manaCost c)
+              HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
+              HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c)
+              HU.assertEqual "types" (Set.singleton CardType.Creature) (TypeLine.types (Card.Type.typeLine c))
               HU.assertEqual "subtypes" (Set.fromList [Subtype.Hag, Subtype.Warlock]) (TypeLine.subtypes (Card.Type.typeLine c))
               case Card.Type.triggeredAbilities c of
                 [ab] -> do
