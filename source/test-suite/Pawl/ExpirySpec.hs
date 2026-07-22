@@ -266,7 +266,43 @@ masterThiefTests cards =
                   HU.assertBool "the trigger really was on the stack" (not (null (GameState.stack onStack)))
                   HU.assertEqual "Master Thief died before it resolved" Nothing (Game.lookupObject thief after)
                   HU.assertEqual "nothing was stored" [] (GameState.continuousEffects after)
-                  HU.assertEqual "control never changed" (Just S.bob) (Projection.controllerOf myr after),
+                  HU.assertEqual "control never changed" (Just S.bob) (Projection.controllerOf myr after)
+                  -- CR 302.6: a control-change stored by GainControl re-Sicks the
+                  -- target; the duration never starting must leave that untouched.
+                  -- This is the discriminator settleForPriority's sweepConditional
+                  -- can't launder away: it proves nothing was EVER stored, not
+                  -- merely that nothing survived the sweep.
+                  HU.assertEqual "and was never re-Sicked" (Just Sickness.Settled) (fmap Object.sickness (Game.lookupObject myr after)),
+          -- Ruling: "If Master Thief ceases to be under your control before its
+          -- ability resolves, you won't gain control of the targeted artifact at
+          -- all." Falsifies the CONTROL half of Event.stateHolds's YouControlSource
+          -- conjunct (CR 611.2b/613.1b/400.7): Master Thief stays on the
+          -- battlefield the whole time -- only its controller changes -- so this
+          -- case cannot pass for the "left the battlefield" reason the sibling
+          -- case above covers.
+          --
+          -- This calls Expiry.arm DIRECTLY with alice (the frozen controller CR
+          -- 603.3a says the ability keeps for its whole time on the stack, the
+          -- same "you" Stack.hs's intervening-if check reads off Object.owner),
+          -- rather than through resolveAll as the sibling cases do. Routing this
+          -- scenario through the full engine does not currently exercise this: CR
+          -- 611.2c is a different code path than the one under test here, and
+          -- Resolve.resolveEffects's own controller binding rebinds to the
+          -- SOURCE's live projected controller (bob, once stolen) instead of the
+          -- ability's frozen one, so the full pipeline currently hands the
+          -- artifact to bob rather than doing nothing -- a Resolve.hs bug, filed
+          -- as #81, out of scope for this card's test coverage. Expiry.arm and
+          -- Event.stateHolds themselves are correct, which is what this proves.
+          HU.testCase "CR 611.2b ceasing to be under your control (not leaving the battlefield) also stops it" $
+            let onStack = settle entering
+                taken = S.giveControl thief S.bob onStack
+             in do
+                  HU.assertBool "the trigger really was on the stack" (not (null (GameState.stack onStack)))
+                  HU.assertEqual "Master Thief is still on the battlefield, under bob" (Just S.bob) (Projection.controllerOf thief taken)
+                  HU.assertEqual
+                    "the duration never starts for alice, the ability's frozen controller"
+                    Nothing
+                    (Expiry.arm S.alice thief (Duration.ForAsLongAs StateCondition.YouControlSource) taken),
           -- Ruling: "If another player gains control of Master Thief, its
           -- control-change effect ends. Regaining control of Master Thief won't
           -- cause you to regain control of the artifact." THE FALSIFIER: an
