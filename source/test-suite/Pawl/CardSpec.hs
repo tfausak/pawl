@@ -556,6 +556,16 @@ m45p7CardTests cards =
               HU.assertEqual
                 "one player ability"
                 [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.IncreaseSpellCost SpellCriterion.NoncreatureSpell 1)]
+                (Card.Type.playerAbilities c),
+      HU.testCase "Sapphire Medallion is a {2} artifact with one You ReduceSpellCost Blue ability" $
+        let c = Printing.card (Cards.sapphireMedallionPrinting cards)
+         in do
+              HU.assertEqual "name" (Text.pack "Sapphire Medallion") (Card.Type.name c)
+              HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) (Card.Type.manaCost c)
+              HU.assertEqual "types" (Set.singleton CardType.Artifact) (TypeLine.types (Card.Type.typeLine c))
+              HU.assertEqual
+                "one player ability"
+                [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (SpellCriterion.SpellOfColor Color.Blue) 1)]
                 (Card.Type.playerAbilities c)
     ]
 

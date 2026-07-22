@@ -84,7 +84,8 @@ data Cards = MkCards
     masterThiefPrinting :: Printing.Printing,
     hagOfInnerWeaknessPrinting :: Printing.Printing,
     ruleOfLawPrinting :: Printing.Printing,
-    thaliaPrinting :: Printing.Printing
+    thaliaPrinting :: Printing.Printing,
+    sapphireMedallionPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -168,6 +169,7 @@ loadCards = do
   hagOfInnerWeaknessPrinting_ <- loadPrinting "hag-of-inner-weakness"
   ruleOfLawPrinting_ <- loadPrinting "rule-of-law"
   thaliaPrinting_ <- loadPrinting "thalia-guardian-of-thraben"
+  sapphireMedallionPrinting_ <- loadPrinting "sapphire-medallion"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -240,7 +242,8 @@ loadCards = do
         masterThiefPrinting = masterThiefPrinting_,
         hagOfInnerWeaknessPrinting = hagOfInnerWeaknessPrinting_,
         ruleOfLawPrinting = ruleOfLawPrinting_,
-        thaliaPrinting = thaliaPrinting_
+        thaliaPrinting = thaliaPrinting_,
+        sapphireMedallionPrinting = sapphireMedallionPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -315,7 +318,8 @@ allPrintings cards =
     masterThiefPrinting cards,
     hagOfInnerWeaknessPrinting cards,
     ruleOfLawPrinting cards,
-    thaliaPrinting cards
+    thaliaPrinting cards,
+    sapphireMedallionPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

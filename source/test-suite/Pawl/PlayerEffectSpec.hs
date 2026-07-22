@@ -265,5 +265,106 @@ thaliaTests cards =
                   (Cost.total S.bob bobBolt (ManaCost.MkManaCost [red]) withBob)
         ]
 
+-- Sapphire Medallion {2} Artifact: "Blue spells you cast cost {1} less to cast."
+medallionTests :: Cards.Cards -> Tasty.TestTree
+medallionTests cards =
+  let -- alice controls a Sapphire Medallion, `n` untapped Islands, and a Piker
+      -- for Unsummon to target; her hand holds Unsummon ({U} instant),
+      -- Divination ({2}{U} sorcery) and Lightning Bolt ({R} instant).
+      board n =
+        let base = S.landsInPlay (Cards.islandPrinting cards) n
+            (_, gs1) = S.addCreature (Cards.sapphireMedallionPrinting cards) S.alice base
+            (_, gs2) = S.addPiker cards S.bob gs1
+            (unsummon, gs3) = S.addHandCard (Cards.unsummonPrinting cards) S.alice gs2
+            (divination, gs4) = S.addHandCard (Cards.divinationPrinting cards) S.alice gs3
+            (bolt, gs5) = S.addHandCard (Cards.lightningBoltPrinting cards) S.alice gs4
+         in ( unsummon,
+              divination,
+              bolt,
+              gs5
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      -- Thalia AND the Medallion, and one Island. The CR 601.2f order test.
+      bothBoard =
+        let base = S.landsInPlay (Cards.islandPrinting cards) 1
+            (_, gs1) = S.addCreature (Cards.sapphireMedallionPrinting cards) S.alice base
+            (_, gs2) = S.addCreature (Cards.thaliaPrinting cards) S.alice gs1
+            (unsummon, gs3) = S.addHandCard (Cards.unsummonPrinting cards) S.alice gs2
+         in ( unsummon,
+              gs3
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+   in Tasty.testGroup
+        "SapphireMedallion"
+        [ -- Ruling: "The ability can't reduce the amount of colored mana you pay
+          -- for a spell. It reduces only the generic mana component of that
+          -- cost." THE HEADLINE FALSIFIER: subtracting from the mana value would
+          -- make this spell free.
+          HU.testCase "CR 118.7a a {U} spell still costs {U}" $
+            let (unsummon, _, _, gs) = board 2
+             in HU.assertEqual
+                  "unchanged"
+                  (ManaCost.MkManaCost [blue])
+                  (Cost.total S.alice unsummon (ManaCost.MkManaCost [blue]) gs),
+          HU.testCase "CR 118.7a a {2}{U} spell costs {1}{U}" $
+            let (_, divination, _, gs) = board 2
+             in HU.assertEqual
+                  "one generic off"
+                  (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
+                  (Cost.total S.alice divination (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]) gs),
+          HU.testCase "CR 613.11 a red spell is unaffected" $
+            let (_, _, bolt, gs) = board 2
+             in HU.assertEqual
+                  "unchanged"
+                  (ManaCost.MkManaCost [red])
+                  (Cost.total S.alice bolt (ManaCost.MkManaCost [red]) gs),
+          -- Divination is {2}{U}: three mana printed, two after the discount. Two
+          -- Islands is exactly the amount that tells the two apart.
+          HU.testCase "CR 601.2f the discount is observable at the castability gate" $
+            let (_, divination, _, withMedallion) = board 2
+                bareBoard =
+                  let base = S.landsInPlay (Cards.islandPrinting cards) 2
+                      (d, gs1) = S.addHandCard (Cards.divinationPrinting cards) S.alice base
+                   in ( d,
+                        gs1
+                          { GameState.phase = Phase.PrecombatMain,
+                            GameState.activePlayer = S.alice,
+                            GameState.priority = Just S.alice
+                          }
+                      )
+                (bareDivination, bare) = bareBoard
+             in do
+                  HU.assertBool "castable for {1}{U} with two Islands" (Cast.castable S.alice divination withMedallion)
+                  HU.assertBool "and not castable for {2}{U} without the Medallion" (not (Cast.castable S.alice bareDivination bare)),
+          -- CR 611.1 / 109.5: the You scope is the effect's controller.
+          HU.testCase "CR 109.5 the You scope does not discount an opponent's spell" $
+            let (_, _, _, gs) = board 2
+                (bobDivination, withBob) = S.addHandCard (Cards.divinationPrinting cards) S.bob gs
+             in HU.assertEqual
+                  "bob pays full price"
+                  (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue])
+                  (Cost.total S.bob bobDivination (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]) withBob),
+          -- Ruling: "If there are additional costs to cast a spell, or if the
+          -- cost to cast a spell is increased by an effect (such as the one
+          -- created by Thalia, Guardian of Thraben's ability), apply those
+          -- increases before applying cost reductions." THE ORDER TEST, and it
+          -- names a cost with NO generic component on purpose: the two orders
+          -- agree wherever the CR 601.2f floor does not bind.
+          HU.testCase "CR 601.2f Thalia then the Medallion leaves a {U} spell at exactly {U}" $
+            let (unsummon, gs) = bothBoard
+             in do
+                  HU.assertEqual
+                    "increase first, then reduce"
+                    (ManaCost.MkManaCost [blue])
+                    (Cost.total S.alice unsummon (ManaCost.MkManaCost [blue]) gs)
+                  HU.assertBool "so one Island is enough" (Cast.castable S.alice unsummon gs)
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards]
+tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards, medallionTests cards]
