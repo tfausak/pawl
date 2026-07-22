@@ -408,29 +408,33 @@ priorityLoop = do
 handoffTurn :: Game ()
 handoffTurn = State.modify' $ \gs ->
   let newActive = nextInOrder (GameState.turnOrder gs) (GameState.activePlayer gs)
-   in gs
-        { GameState.activePlayer = newActive,
-          GameState.turnNumber = GameState.turnNumber gs + 1,
-          -- CR 608.2i is why a log exists at all -- "some effects look back in
-          -- time and require information about previous game states and
-          -- actions." It does not itself say how far back; the ONE-turn scope is
-          -- this engine's choice, made because every history-reading card in the
-          -- pool asks "this turn" (Khabál Ghoul: "creatures that died this
-          -- turn"). Cleared here, with both watermarks, and never at cleanup --
-          -- cleanup is still part of this turn and CR 514.1's discard is itself
-          -- an event of it. Engine.advance settles immediately before calling
-          -- this, so nothing unscanned is discarded.
-          GameState.events = Seq.empty,
-          GameState.scannedThrough = 0,
-          GameState.damageScannedThrough = 0,
-          GameState.phase = Turn.firstPhase,
-          GameState.remaining = Turn.laterPhases,
-          -- CR 723.1/723.1b: the new active player's pending control (if any)
-          -- becomes this turn's active control; overwriting activeControl every
-          -- turn is what ends a prior control at the next turn's start (CR 723.1).
-          GameState.activeControl = Map.lookup newActive (GameState.pendingControl gs),
-          GameState.pendingControl = Map.delete newActive (GameState.pendingControl gs)
-        }
+   in -- CR 611.2a: with activePlayer already advanced, drop every "until your
+      -- next turn" effect belonging to the player whose turn just began. The
+      -- transition IS the event, known exactly here; see Pawl.Expiry.
+      Expiry.dropAtHandoff $
+        gs
+          { GameState.activePlayer = newActive,
+            GameState.turnNumber = GameState.turnNumber gs + 1,
+            -- CR 608.2i is why a log exists at all -- "some effects look back in
+            -- time and require information about previous game states and
+            -- actions." It does not itself say how far back; the ONE-turn scope is
+            -- this engine's choice, made because every history-reading card in the
+            -- pool asks "this turn" (Khabál Ghoul: "creatures that died this
+            -- turn"). Cleared here, with both watermarks, and never at cleanup --
+            -- cleanup is still part of this turn and CR 514.1's discard is itself
+            -- an event of it. Engine.advance settles immediately before calling
+            -- this, so nothing unscanned is discarded.
+            GameState.events = Seq.empty,
+            GameState.scannedThrough = 0,
+            GameState.damageScannedThrough = 0,
+            GameState.phase = Turn.firstPhase,
+            GameState.remaining = Turn.laterPhases,
+            -- CR 723.1/723.1b: the new active player's pending control (if any)
+            -- becomes this turn's active control; overwriting activeControl every
+            -- turn is what ends a prior control at the next turn's start (CR 723.1).
+            GameState.activeControl = Map.lookup newActive (GameState.pendingControl gs),
+            GameState.pendingControl = Map.delete newActive (GameState.pendingControl gs)
+          }
 
 -- Consume the schedule: the next step becomes current. An empty schedule means
 -- the turn is over, so hand off. Replaces the old `Turn.next` walk -- the turn is

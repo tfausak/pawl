@@ -383,7 +383,7 @@ applyEffect source controller bound legality chosen effect = case effect of
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs
-          Just target -> case Expiry.arm duration of
+          Just target -> case Expiry.arm controller duration of
             -- CR 611.2b: the duration never started, so the effect does nothing
             -- and is never stored.
             Nothing -> gs
@@ -586,7 +586,7 @@ applyEffect source controller bound legality chosen effect = case effect of
     -- consults it at every funnel until cleanup drops it (CR 514.2) or its use is
     -- spent. Targetless and unprompted. CR 113.7: the SOURCE is this effect's
     -- source, which is what CR 615.13's "prevented" triggers will read (#58).
-    State.modify' $ \gs -> case Expiry.arm duration of
+    State.modify' $ \gs -> case Expiry.arm controller duration of
       -- CR 611.2b: the duration never started, so no floating replacement is
       -- installed.
       Nothing -> gs
@@ -633,7 +633,7 @@ applyEffect source controller bound legality chosen effect = case effect of
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs -- a player recipient cannot be controlled
-          Just target -> case Expiry.arm duration of
+          Just target -> case Expiry.arm controller duration of
             -- CR 611.2b: the duration never started -- no control effect is
             -- stored, and nothing is re-Sicked, because control never changed.
             Nothing -> gs

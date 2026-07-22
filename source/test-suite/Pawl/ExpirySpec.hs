@@ -5,6 +5,7 @@ module Pawl.ExpirySpec where
 
 import qualified Data.Set as Set
 import qualified Pawl.Cards as Cards
+import qualified Pawl.Engine as Engine
 import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Setup as Setup
@@ -42,9 +43,37 @@ armTests =
   Tasty.testGroup
     "Arm"
     [ HU.testCase "CR 514.2 an until-end-of-turn duration arms to AtCleanup" $
-        HU.assertEqual "armed" (Just Expiry.Type.AtCleanup) (Expiry.arm Duration.UntilEndOfTurn),
+        HU.assertEqual "armed" (Just Expiry.Type.AtCleanup) (Expiry.arm S.alice Duration.UntilEndOfTurn),
       HU.testCase "CR 611.2a an indefinite duration arms to Never" $
-        HU.assertEqual "armed" (Just Expiry.Type.Never) (Expiry.arm Duration.Indefinite)
+        HU.assertEqual "armed" (Just Expiry.Type.Never) (Expiry.arm S.alice Duration.Indefinite),
+      HU.testCase "CR 611.2a / 109.5 'until your next turn' bakes the controller" $
+        HU.assertEqual "armed" (Just (Expiry.Type.AtTurnOf S.alice)) (Expiry.arm S.alice Duration.UntilYourNextTurn)
+    ]
+
+handoffTests :: Tasty.TestTree
+handoffTests =
+  Tasty.testGroup
+    "DropAtHandoff"
+    [ HU.testCase "CR 611.2a an AtTurnOf effect ends as that player's turn begins, not before" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            -- alice is the active player; the effect ends at ALICE's next turn.
+            armed = effectWith (Expiry.Type.AtTurnOf S.alice) gs0
+            bobsTurn = S.runPure S.identityAnswer armed Engine.handoffTurn
+            alicesTurn = S.runPure S.identityAnswer bobsTurn Engine.handoffTurn
+         in do
+              HU.assertEqual "alice is active when it is created" S.alice (GameState.activePlayer armed)
+              HU.assertEqual "it survives the creating turn's handoff" 1 (length (GameState.continuousEffects bobsTurn))
+              HU.assertEqual "bob is active" S.bob (GameState.activePlayer bobsTurn)
+              HU.assertEqual "it ends as alice's next turn begins" [] (GameState.continuousEffects alicesTurn),
+      HU.testCase "CR 514.2 does not touch an AtTurnOf effect" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            armed = effectWith (Expiry.Type.AtTurnOf S.alice) gs0
+         in HU.assertEqual "survives cleanup" 1 (length (GameState.continuousEffects (Expiry.dropAtCleanup armed))),
+      HU.testCase "CR 611.2a the sweep is scoped to the player whose turn began" $
+        let gs0 = Setup.emptyGame S.bothPlayers
+            armed = effectWith (Expiry.Type.AtTurnOf S.bob) gs0
+            bobsTurn = S.runPure S.identityAnswer armed Engine.handoffTurn
+         in HU.assertEqual "bob's turn ends bob's effect" [] (GameState.continuousEffects bobsTurn)
     ]
 
 cleanupTests :: Cards.Cards -> Tasty.TestTree
@@ -69,4 +98,4 @@ cleanupTests cards =
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests cards]
+tests cards = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests cards, handoffTests]

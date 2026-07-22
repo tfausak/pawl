@@ -399,13 +399,15 @@ durationToJson :: Duration.Duration -> Value
 durationToJson d = nullary . Text.pack $ case d of
   Duration.UntilEndOfTurn -> "UntilEndOfTurn"
   Duration.Indefinite -> "Indefinite"
+  Duration.UntilYourNextTurn -> "UntilYourNextTurn"
 
 jsonToDuration :: Value -> Either Text Duration.Duration
 jsonToDuration =
   decodeNullary
     (Text.pack "Duration")
     [ (Text.pack "UntilEndOfTurn", Duration.UntilEndOfTurn),
-      (Text.pack "Indefinite", Duration.Indefinite)
+      (Text.pack "Indefinite", Duration.Indefinite),
+      (Text.pack "UntilYourNextTurn", Duration.UntilYourNextTurn)
     ]
 
 usesToJson :: Uses.Uses -> Value
