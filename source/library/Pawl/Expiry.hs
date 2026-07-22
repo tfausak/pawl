@@ -45,9 +45,8 @@ arm controller source duration gs = case duration of
 -- CR 514.2: during the cleanup step, "all 'until end of turn' and 'this turn'
 -- effects end". Delete-and-recompute (design.md 2.5): dropping the stored entry
 -- makes the next projection revert -- nothing is explicitly undone. One sweep
--- over both carriers, replacing Projection.dropEndOfTurnEffects and
--- Event.dropEndOfTurnReplacements, which existed only because the two lists
--- lived in two modules.
+-- over both carriers: the two per-carrier sweeps this absorbed existed only
+-- because the two lists lived in two modules, not because they differed.
 dropAtCleanup :: GameState -> GameState
 dropAtCleanup gs =
   let survives expiry = case expiry of

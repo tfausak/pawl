@@ -31,9 +31,9 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.Expiry as Expiry
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -427,22 +427,30 @@ applyEffect source controller bound legality chosen effect = case effect of
         (Just recipient, True, Just (from, to)) ->
           case recipientObject recipient of
             Nothing -> gs
-            Just target ->
-              -- CR 611 / 612: an indefinite continuous effect over the one target
-              -- (CR 611.2c fixed set). The (from, to) is the caster's binding, baked
-              -- in here; Projection rewrites both the target's type line and, at
-              -- gather, any static-ability words (Task 7). Resolve CONSTRUCTS the
-              -- Modification but never cases on one.
-              let (ts, gs1) = Game.freshTimestamp gs
-                  eff =
-                    ContinuousEffect.MkContinuousEffect
-                      { ContinuousEffect.source = source,
-                        ContinuousEffect.timestamp = ts,
-                        ContinuousEffect.expiry = Expiry.Never,
-                        ContinuousEffect.modification = Modification.ChangeSubtypeWord from to,
-                        ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
-                      }
-               in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+            -- CR 611.2a: the opcode states no duration, so the effect "lasts
+            -- until the end of the game" -- Duration.Indefinite, armed through
+            -- Pawl.Expiry like the other three storing arms rather than naming a
+            -- stored Expiry here. Indefinite always arms, so the Nothing branch
+            -- is unreachable; it is written out because arm is total over
+            -- Duration and CR 611.2b's "never starts" is its general answer.
+            Just target -> case Expiry.arm controller source Duration.Indefinite gs of
+              Nothing -> gs
+              Just expiry ->
+                -- CR 611 / 612: a continuous effect over the one target (CR 611.2c
+                -- fixed set). The (from, to) is the caster's binding, baked in here;
+                -- Projection rewrites both the target's type line and, at gather, any
+                -- static-ability words. Resolve CONSTRUCTS the Modification but never
+                -- cases on one.
+                let (ts, gs1) = Game.freshTimestamp gs
+                    eff =
+                      ContinuousEffect.MkContinuousEffect
+                        { ContinuousEffect.source = source,
+                          ContinuousEffect.timestamp = ts,
+                          ContinuousEffect.expiry = expiry,
+                          ContinuousEffect.modification = Modification.ChangeSubtypeWord from to,
+                          ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+                        }
+                 in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
         _ -> gs
   -- CR 605.3b: a mana ability never resolves on the stack. AddMana is applied by
   -- Mana.tapForMana at payment, never here. Reaching this arm means a mana ability

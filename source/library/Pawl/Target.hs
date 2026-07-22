@@ -107,8 +107,11 @@ legalRecipients source spec gs =
           -- creatures whose PROJECTED controller is not the source's
           -- controller. A source that has left the battlefield has no projected
           -- controller, and this yields the EMPTY set rather than falling back
-          -- to last known information (CR 608.2h), so CR 608.2b's re-check
-          -- wrongly fizzles an ability whose source died in response (#N).
+          -- to the source's last known information, which CR 608.2b's own text
+          -- requires ("If the source of an ability has left the zone it was in,
+          -- its last known information is used during this process"), so that
+          -- rule's re-check wrongly fizzles an ability whose source died in
+          -- response (#85).
           let mine = Projection.controllerOf source gs
               theirs recipient = case recipient of
                 Recipient.ToCreature oid -> case mine of

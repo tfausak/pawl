@@ -1367,3 +1367,126 @@ its own gate card and spec, landed as it completes. Umbrella:
   consistent with the pre-P5 baseline. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-21-p5-replacement-events-design.md` and
   `docs/superpowers/plans/2026-07-21-p5-replacement-events.md`.
+- **M4.5 P6 is complete** (conditional and event durations, GAP-D). A stored
+  effect's duration now has a **beginning** as well as an end. `Duration` — the
+  printed card-data vocabulary — split from a new runtime-only `Expiry`, and
+  the whole life cycle moved into one module: `Pawl.Expiry` is the **sole home
+  of `case … Expiry`**, the standing `Pawl.Resolve` has over `Effect` and
+  `Pawl.Projection` over `Modification`. **Two gate cards, each falsifying a
+  different fixed point.** **Master Thief** is CR 611.2b's own printed example
+  — the rules text names the card — and its three Gatherer rulings *are* three
+  of the four tests, verbatim. The load-bearing one is **the latch**: "If
+  another player gains control of Master Thief, its control-change effect ends.
+  Regaining control of Master Thief won't cause you to regain control of the
+  artifact." An implementation that *masks* a conditional effect out of the
+  projection while its condition is false — the obvious cheap design — passes
+  every other assertion and fails exactly here, because masking un-masks when
+  the source comes home. `sweepConditional` therefore **deletes**, and deletion
+  is irreversible in the right way. Its sibling ruling ("if Master Thief ceases
+  to be under your control before its ability resolves, you won't gain control
+  of the targeted artifact at all") is CR 611.2b's "if the duration never
+  starts, the effect does nothing": `arm` returns `Nothing` and nothing is
+  stored at all. **Hag of Inner Weakness** ("target creature an opponent
+  controls gets -2/-1 until your next turn") falsifies two designs at once: an
+  `UntilEndOfTurn` stand-in dies at its own CR 514.2 cleanup, and an expiry
+  implemented by scanning P4's event log for a matching `StepBegan` dies *at
+  birth*, because the effect is created during an upkeep whose untap step has
+  already happened this turn. **Added:** `Pawl.Type.Expiry`
+  (`AtCleanup | Never | While PlayerId StateCondition | AtTurnOf PlayerId`) and
+  `Pawl.Expiry` (`arm`, `dropAtCleanup`, `dropAtHandoff`, `sweepConditional`);
+  `Duration.ForAsLongAs`/`UntilYourNextTurn`; `StateCondition.YouControlSource`
+  (that vocabulary's third customer, after CR 603.8 state triggers and CR 603.4
+  intervening "if"s); `TargetSpec.ArtifactTarget`/`OpponentCreatureTarget`;
+  `Subtype.Rogue`/`Hag`/`Warlock`; `data/cards/master-thief.json` and
+  `data/cards/hag-of-inner-weakness.json`. **Deleted:**
+  `Projection.dropEndOfTurnEffects`, `Event.dropEndOfTurnReplacements` — two
+  sweeps that differed only in which module their list lived in, now one
+  `dropAtCleanup` over both carriers — and the `duration` field on
+  `ContinuousEffect` and `ActiveReplacement`. **`Pawl.Target` became
+  source-relative**: `legalRecipients`, `stillLegal` and `legalSets` all take
+  the targeting source, because `OpponentCreatureTarget` is the first spec
+  whose legal set depends on *who is choosing* (CR 109.5 with CR 613.1b —
+  projected control, not ownership). **The design's one departure from the
+  umbrella spec: event-relative durations are decided at the turn handoff, not
+  by reading P4's event log.** The handoff transition *is* the event, known
+  exactly and for free at the one site that performs it; reading
+  `GameEvent.StepBegan` back out of a turn-scoped log would need a per-effect
+  watermark to distinguish "your untap already happened this turn" from "your
+  next turn began" — the exact trap Hag sets, and the log is cleared at the
+  handoff anyway. Dropping at the handoff is *observably* identical to dropping
+  "as the turn begins" (CR 500.12: no game events occur between turns; CR
+  502.4: no player receives priority during the untap step; CR 704.3: SBAs and
+  the projection are only consulted when a player would get priority), so no
+  observer can tell the two apart. P6 still reads P4's work — `stateHolds` is
+  the shared predicate evaluator. **Four departures from P6's own spec**, all
+  corrections rather than drift: (1) `Expiry.arm` grew its parameters across
+  three tasks (`Duration ->`, then `PlayerId -> Duration ->`, then the spec's
+  final `PlayerId -> ObjectId -> Duration -> GameState ->`) because arriving
+  four-parameter in task 1 leaves three unused parameters and `-Weverything` +
+  `-Werror` fails the build; (2) `Target.legalSets` took the source parameter
+  too, though the spec named only `legalRecipients` and `stillLegal` — it is a
+  wrapper over the former; (3) a controller-relative spec whose source has left
+  the battlefield yields an **empty** legal set, a rules deviation against CR
+  608.2b's own last-known-information clause, kept because the narrower fix
+  changes a signature four call sites use for a case no card in the pool
+  reaches (#85); (4) the spec's single "codec round-trips" test is distributed
+  — each new arm's round-trip landed with the arm, and each card file's is
+  enforced for free by `CardsSpec.checkFile`. **No prompt was added and none
+  elided.** Every value this phase computes is derived: CR 109.5's "you" off
+  the effect's controller, the condition off the board. There is nothing to ask
+  a player, so there is no elision and no expiry to name. **A pre-existing bug
+  was found by a gate card and fixed inside the phase.**
+  `Resolve.resolveEffects` re-read a triggered ability's controller from the
+  source permanent's **live** projected controller; **CR 113.8** fixes it when
+  the ability goes on the stack ("the controller of a triggered ability on the
+  stack … is the player who controlled the ability's source when it
+  triggered"). Stealing Master Thief while its ETB trigger was on the stack
+  transferred the ability's "you" to the thief, contradicting the card's own
+  ruling. Both producers already stamped the frozen value; only the reader was
+  wrong. Filed as #81 and **closed** (`fb0f18d`, `11a9b20`). **The phase's
+  transferable lessons.** (a) *Both gate cards' falsifiers passed on the first
+  run* — the latch and Hag's cross-turn survival both worked immediately,
+  because tasks 1–4 built the machinery before either card existed. That is
+  what substrate-before-consumers buys, and it is the strongest evidence yet
+  for the ordering. (b) *A single CR citation was wrong three times over*: the
+  task brief said CR 113.7a, the implementer corrected it to CR 602.2a, and
+  review found **CR 113.8** is the rule that actually states both halves and
+  scopes them to the ability *on the stack*. P5 recorded citation drift as its
+  lesson; this is the sharper form of it — every party did check `rules.txt`,
+  and the failure was in *which rule to look up*, not in whether to look.
+  (c) *Two review findings were defects in the plan's own prescribed tests*,
+  not in the implementations: an assertion that could not distinguish "never
+  stored" from "stored then swept" (fixed by asserting the CR 302.6 re-Sick
+  residue, which the sweep cannot launder away), and a card-shape test titled
+  "2/2" that never asserted P/T. Both fixes were then verified by deliberately
+  injecting the fault they were supposed to catch. (d) *An honest negative
+  result was kept*: one activated-ability regression passes with **and**
+  without the #81 fix, because when control moves *before* activation the
+  frozen and live controllers are definitionally equal — no test of that shape
+  can discriminate. It was reported rather than quietly dropped, and the
+  discrimination is carried by the two tests that do fail under a revert.
+  (e) Writing a test surfaced a real fixture trap: a regeneration-shield
+  payload intercepts the very `Event.destroy` used to remove its own source, so
+  the fixture removes the source with `Event.changeZone` instead. **Tracking:**
+  **#81 is closed.** #38 (`StateCondition` retired wholesale by P9's filter
+  language) and #40 (the hand-carved `TargetSpec` family) are cited at the new
+  arms, not retired. Three deferrals filed and cited in code: #82 (a synthetic
+  `GainControl` activated ability stands in for a controller-sensitive printed
+  one — none is in the pool), #83 (`resolveSpell` re-reads a spell's projected
+  controller, the same shape as #81 and benign today), #84 (no card produces a
+  conditional or turn-relative *floating replacement*, so `Expiry.While` on
+  that carrier is covered only by a hand-built unit fixture and `AtTurnOf` on
+  it has no test at all), plus #85 from departure (3). #62's cross-turn settle
+  is untouched — no test this phase holds a permanent under conditional control
+  across an untap step. **Two files were touched beyond the plan's
+  expectations**, worth knowing for the next phase: `Pawl.Mana.subtypeMana`
+  twice, because every new `Subtype` constructor breaks its exhaustive `case`;
+  and `Pawl.Support`, which gained a shared `continuousEffectAffects` fixture.
+  **Final suite 732/732**, warning-clean on a from-scratch `cabal clean` build,
+  `hooky run` clean. `cabal bench`: goldfish 11.6ms, casting 12.6ms, fighting
+  12.6ms — issue #66 (pre-existing) still makes all three benchmarks execute
+  the identical game, so the per-scenario split is meaningless and the
+  aggregate, ~12ms, is the only honest reading; unchanged from P5. Spec and
+  plan kept as reference:
+  `docs/superpowers/specs/2026-07-22-p6-conditional-event-durations-design.md`
+  and `docs/superpowers/plans/2026-07-22-p6-conditional-event-durations.md`.

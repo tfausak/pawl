@@ -40,9 +40,10 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   M4h fast-follow). **M4.5 (phased) is in progress: P1–P3b closed Cluster 1**
   (every sublayer of the layer system has a producer), **P4 opened Cluster 2**
   (the event-history substrate) **and discharged the `P4 → {P6, P7}` edge**,
-  **and P5 closed Cluster 2's second phase — the monadic replacement path and
-  CR 616 — leaving P6 and P7 unblocked. P6 (conditional & event durations) is
-  next**; P8/P9 still float. The umbrella spec is
+  **P5 closed Cluster 2's second phase (the monadic replacement path and CR
+  616), and P6 closed GAP-D — a stored duration now has a beginning, plus
+  conditional and turn-relative shapes. P7 (the player projection, Cluster 3)
+  is next**, already unblocked by P4; P8/P9 still float. The umbrella spec is
   `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —

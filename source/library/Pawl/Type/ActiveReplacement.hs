@@ -11,7 +11,11 @@ import Pawl.Type.Uses (Uses)
 -- projection re-derives a permanent's static replacement abilities live, while
 -- these are stored because the object that made them may be long gone.
 --
--- `expiry` decides when a sweep drops it (Pawl.Expiry; CR 514.2). `uses` is CR 614.3's
+-- `expiry` decides when a sweep drops it (Pawl.Expiry; CR 514.2). No card in the
+-- pool arms a floating replacement to anything but AtCleanup or Never, so the
+-- conditional (CR 611.2b) and turn-relative (CR 611.2a) expiries reach this
+-- carrier only through hand-built test fixtures, and AtTurnOf on a replacement
+-- has no test at all (#84). `uses` is CR 614.3's
 -- "until they're used up". `source` and `timestamp` are new here. #58 recorded
 -- their ABSENCE as one blocker on CR 615.13's "prevented" triggers and CR
 -- 615.7's multi-source choice, and that particular blocker is gone: there is
