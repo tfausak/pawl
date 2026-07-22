@@ -225,7 +225,7 @@ tests cards =
             [ HU.testCase "every CostComponent round-trips" $
                 mapM_
                   (roundTrip "component" Codec.costComponentToJson Codec.jsonToCostComponent)
-                  [CostComponent.TapThis, CostComponent.SacrificeThis],
+                  [CostComponent.TapThis, CostComponent.SacrificeThis, CostComponent.PayLife 2],
               HU.testCase "a Cost with a mana part and components round-trips" $
                 roundTrip
                   "cost"

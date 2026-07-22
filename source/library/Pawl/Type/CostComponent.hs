@@ -1,5 +1,7 @@
 module Pawl.Type.CostComponent where
 
+import Numeric.Natural (Natural)
+
 -- CR 601.2f's list of what a cost's non-mana part can be: "paying mana, tapping
 -- permanents, sacrificing permanents, discarding cards, and so on." One
 -- component of a Pawl.Type.Cost, alongside its mana part.
@@ -22,4 +24,14 @@ data CostComponent
     -- self-referential cost names one object and offers no choice, so folding it
     -- into the criterion form would invent a prompt the rules do not have.
     SacrificeThis
+  | -- CR 119.4 / Greed: pay this much life. "If a cost or effect allows a player
+    -- to pay an amount of life greater than 0, the player may do so only if
+    -- their life total is greater than or equal to the amount of the payment. If
+    -- a player pays life, the payment is subtracted from their life total; in
+    -- other words, the player loses that much life."
+    --
+    -- A Natural and not a Quantity: a Quantity's evaluation needs a binding
+    -- environment, which a cost has no access to at CR 601.2f time, and no card
+    -- in the pool pays a variable amount of life (#99).
+    PayLife Natural
   deriving (Eq, Ord, Show)

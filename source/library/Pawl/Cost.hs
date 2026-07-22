@@ -29,6 +29,7 @@ import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Payment as Payment
+import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Source as Source
@@ -133,6 +134,12 @@ canPayComponent pid oid component gs = case component of
   -- CR 701.21a: only a permanent, and only one this player controls.
   CostComponent.SacrificeThis ->
     Set.member oid (GameState.battlefield gs) && Projection.controllerOf oid gs == Just pid
+  -- CR 119.4: payable only if the life total is at least the amount. CR 119.4b:
+  -- "Players can always pay 0 life, no matter what their ... life total is" --
+  -- which falls out of >= rather than needing a case.
+  CostComponent.PayLife n -> case Map.lookup pid (GameState.players gs) of
+    Nothing -> False
+    Just player -> Player.life player >= toInteger n
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment. Components are
 -- paid in PRINTED order; CR 601.2h lets the player pay in any order, which is an
@@ -169,7 +176,7 @@ payComponents pid oid components = case components of
       Payment.Paid -> payComponents pid oid rest
 
 payComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent -> Game Payment.Payment
-payComponent _ oid component = case component of
+payComponent pid oid component = case component of
   CostComponent.TapThis -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)})
     pure Payment.Paid
@@ -178,6 +185,12 @@ payComponent _ oid component = case component of
   -- turn history all see it.
   CostComponent.SacrificeThis -> do
     Event.sacrifice oid
+    pure Payment.Paid
+  -- CR 119.4: "the payment is subtracted from their life total; in other words,
+  -- the player loses that much life." A direct subtraction, and the CR 704.5a
+  -- state-based action that may follow is the existing one in Pawl.Sba.
+  CostComponent.PayLife n -> do
+    State.modify' (\gs -> gs {GameState.players = Map.adjust (\p -> p {Player.life = Player.life p - toInteger n}) pid (GameState.players gs)})
     pure Payment.Paid
 
 -- The arithmetic half, pure and board-free.

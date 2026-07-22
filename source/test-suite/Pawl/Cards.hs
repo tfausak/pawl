@@ -87,7 +87,8 @@ data Cards = MkCards
     thaliaPrinting :: Printing.Printing,
     sapphireMedallionPrinting :: Printing.Printing,
     reliquaryTowerPrinting :: Printing.Printing,
-    silencePrinting :: Printing.Printing
+    silencePrinting :: Printing.Printing,
+    greedPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -174,6 +175,7 @@ loadCards = do
   sapphireMedallionPrinting_ <- loadPrinting "sapphire-medallion"
   reliquaryTowerPrinting_ <- loadPrinting "reliquary-tower"
   silencePrinting_ <- loadPrinting "silence"
+  greedPrinting_ <- loadPrinting "greed"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -249,7 +251,8 @@ loadCards = do
         thaliaPrinting = thaliaPrinting_,
         sapphireMedallionPrinting = sapphireMedallionPrinting_,
         reliquaryTowerPrinting = reliquaryTowerPrinting_,
-        silencePrinting = silencePrinting_
+        silencePrinting = silencePrinting_,
+        greedPrinting = greedPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -327,7 +330,8 @@ allPrintings cards =
     thaliaPrinting cards,
     sapphireMedallionPrinting cards,
     reliquaryTowerPrinting cards,
-    silencePrinting cards
+    silencePrinting cards,
+    greedPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

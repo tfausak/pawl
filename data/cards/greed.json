@@ -1,0 +1,89 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [
+          {
+            "type": "PayLife",
+            "value": 2
+          }
+        ],
+        "mana": [
+          {
+            "type": "OfType",
+            "value": {
+              "type": "Colored",
+              "value": {
+                "type": "Black"
+              }
+            }
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Draw",
+                "value": {
+                  "type": "Literal",
+                  "value": 1
+                }
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Greed",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

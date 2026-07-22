@@ -639,13 +639,15 @@ costComponentToJson :: CostComponent.CostComponent -> Value
 costComponentToJson c = case c of
   CostComponent.TapThis -> nullary (Text.pack "TapThis")
   CostComponent.SacrificeThis -> nullary (Text.pack "SacrificeThis")
+  CostComponent.PayLife n -> Json.tagged (Text.pack "PayLife") (Just (natTo n))
 
 jsonToCostComponent :: Value -> Either Text CostComponent.CostComponent
 jsonToCostComponent value = do
-  (t, _) <- Json.tag value
-  case Text.unpack t of
-    "TapThis" -> Right CostComponent.TapThis
-    "SacrificeThis" -> Right CostComponent.SacrificeThis
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("TapThis", _) -> Right CostComponent.TapThis
+    ("SacrificeThis", _) -> Right CostComponent.SacrificeThis
+    ("PayLife", Just v) -> fmap CostComponent.PayLife (natFrom v)
     _ -> Left (Text.pack "unknown CostComponent: " <> t)
 
 targetSpecToJson :: TargetSpec.TargetSpec -> Value

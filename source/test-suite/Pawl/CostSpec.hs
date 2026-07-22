@@ -11,18 +11,27 @@
 -- no mana in it at all).
 module Pawl.CostSpec where
 
+import qualified Data.Map.Strict as Map
+import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Setup as Setup
+import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
+import qualified Pawl.Type.Departure as Departure
+import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.Payment as Payment
+import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Status as Status
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -107,5 +116,78 @@ doorTests cards =
               HU.assertEqual "no land tapped" 0 (S.tappedCount S.alice after)
     ]
 
+-- Greed {3}{B} Enchantment: "{B}, Pay 2 life: Draw a card."
+--
+-- Scryfall returned no rulings for this card; CR 118.3's own worked example is
+-- the specification of the discriminating test.
+greedTests :: Cards.Cards -> Tasty.TestTree
+greedTests cards =
+  let -- alice controls Greed and one untapped Swamp, with three cards in her
+      -- library so a draw is never a CR 121.3 loss, and priority in her own
+      -- precombat main phase.
+      board life =
+        let base = S.landsInPlay (Cards.swampPrinting cards) 1
+            (greed, gs1) = S.addCreature (Cards.greedPrinting cards) S.alice base
+            (_, gs2) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice gs1
+            (_, gs3) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice gs2
+            (_, gs4) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice gs3
+         in ( greed,
+              gs4
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice,
+                  GameState.players = Map.adjust (\p -> p {Player.life = life}) S.alice (GameState.players gs4)
+                }
+            )
+      isActivate a = case a of
+        Action.Type.Activate _ _ -> True
+        _ -> False
+   in Tasty.testGroup
+        "Greed"
+        [ HU.testCase "CR 119.4 activating draws a card and subtracts the life" $
+            let (greed, gs) = board 20
+                activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice greed (theAbility (Cards.greedPrinting cards)))
+                resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+             in do
+                  HU.assertEqual "life 20 - 2" (Just 18) (S.lifeOf S.alice resolved)
+                  HU.assertEqual "one card drawn" 1 (S.handSize S.alice resolved)
+                  HU.assertEqual "the Swamp is tapped" 1 (S.tappedCount S.alice resolved),
+          -- CR 118.3: "A player can't pay a cost without having the necessary
+          -- resources to pay it fully. For example, a player with only 1 life
+          -- can't pay a cost of 2 life." THE discriminating test: a payability
+          -- check that ignores the amount passes the case above and fails here.
+          HU.testCase "CR 118.3 at 1 life the ability is not offered" $
+            let (greed, gs) = board 1
+             in do
+                  HU.assertBool
+                    "not activatable"
+                    (not (Activate.activatable S.alice greed (theAbility (Cards.greedPrinting cards)) gs))
+                  HU.assertBool "no Activate action offered" (not (any isActivate (Action.legalActions S.alice gs))),
+          HU.testCase "CR 119.4b at 2 life the ability IS offered" $
+            let (greed, gs) = board 2
+             in HU.assertBool
+                  "activatable"
+                  (Activate.activatable S.alice greed (theAbility (Cards.greedPrinting cards)) gs),
+          -- CR 704.5a: "If a player has 0 or less life, that player loses the
+          -- game." Paying life is a real life-total change, and a cost may
+          -- legally kill its payer.
+          HU.testCase "CR 704.5a paying the last 2 life is legal and loses the game" $
+            let (greed, gs) = board 2
+                activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice greed (theAbility (Cards.greedPrinting cards)))
+                settled = S.settleSba activated
+             in do
+                  HU.assertEqual "life 0" (Just 0) (S.lifeOf S.alice activated)
+                  HU.assertEqual
+                    "alice has lost"
+                    (Just (Status.Departed Departure.Lost))
+                    (fmap Player.status (Map.lookup S.alice (GameState.players settled))),
+          -- Greed has no {T} in its cost, so CR 302.6 never applies -- the
+          -- counterpart to Llanowar Elves, whose cost is Just [] plus TapThis.
+          HU.testCase "CR 302.6 Greed's cost requires no tap symbol" $
+            HU.assertBool
+              "no {T}"
+              (not (Cost.requiresTapSymbol (ActivatedAbility.cost (theAbility (Cards.greedPrinting cards)))))
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.Cost" [doorTests cards]
+tests cards = Tasty.testGroup "Pawl.Cost" [doorTests cards, greedTests cards]
