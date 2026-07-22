@@ -31,6 +31,9 @@ import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PlayerEffect as PlayerEffect
+import qualified Pawl.Type.PlayerScope as PlayerScope
+import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity.Type
@@ -521,8 +524,26 @@ m45p6CardTests cards =
                 _ -> HU.assertFailure "expected exactly one triggered ability"
     ]
 
+m45p7CardTests :: Cards.Cards -> Tasty.TestTree
+m45p7CardTests cards =
+  Tasty.testGroup
+    "M4.5 P7"
+    [ HU.testCase "Rule of Law is a {2}{W} enchantment with one EachPlayer CantCastMoreThan 1 player ability" $
+        let c = Printing.card (Cards.ruleOfLawPrinting cards)
+            white = ManaSymbol.OfType (ManaType.Colored Color.White)
+         in do
+              HU.assertEqual "name" (Text.pack "Rule of Law") (Card.Type.name c)
+              HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, white])) (Card.Type.manaCost c)
+              HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine c))
+              HU.assertEqual "no object-axis static abilities" [] (Card.Type.staticAbilities c)
+              HU.assertEqual
+                "one player ability"
+                [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.CantCastMoreThan 1)]
+                (Card.Type.playerAbilities c)
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
     "Card"
-    [cardTests cards, lintTests cards, m2aCardTests cards, m2bCardTests cards, m2cCardTests cards, basicLandTests cards, m3cCardTests cards, m3eCardTests cards, m4bCardTests cards, m45p6CardTests cards]
+    [cardTests cards, lintTests cards, m2aCardTests cards, m2bCardTests cards, m2cCardTests cards, basicLandTests cards, m3cCardTests cards, m3eCardTests cards, m4bCardTests cards, m45p6CardTests cards, m45p7CardTests cards]

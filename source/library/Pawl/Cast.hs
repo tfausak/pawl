@@ -12,6 +12,7 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
+import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
@@ -81,13 +82,18 @@ targetable oid gs = case Game.cardOf oid gs of
     let count = Modal.selectionCount (Card.Type.spell card)
      in Set.size (Target.fillableModes oid (Card.Type.spell card) gs) >= fromIntegral count
 
--- Affordable and correctly timed, actually in this player's hand, and fillable.
+-- Affordable and correctly timed, actually in this player's hand, fillable, and
+-- not prohibited.
 castable :: PlayerId -> ObjectId -> GameState -> Bool
 castable pid oid gs = case costOf oid gs of
   Nothing -> False
   Just cost ->
     timingOk pid oid gs
       && elem oid (Game.zoneMembers Zone.Hand pid gs)
+      -- CR 601.3: no rule or effect prohibits this player from casting a spell
+      -- (Rule of Law, Silence). Gated HERE, upstream of Action.legalActions,
+      -- because the engine never offers an illegal action and then rejects it.
+      && not (PlayerEffect.prohibitsCasting pid gs)
       -- CR 601.2b: a {X} cost is affordable when payable at X=0 (the caster may
       -- always choose X=0); substituteX 0 is the identity on any Variable-free
       -- cost, so every existing card is unaffected.
@@ -106,9 +112,14 @@ permitsCastWhileSearching card =
   elem CastingPermission.CastFromLibraryWhileSearching (Card.Type.castingPermissions card)
 
 -- The library cards this player may cast while searching their own library:
--- permitted, affordable (Mana.canPay), and with a fillable target set (Cast
--- .targetable). Deliberately omits timingOk -- the permission IS the CR 601.3
--- timing exception (the ruling: "follows all normal rules ... except for timing").
+-- permitted, not prohibited, affordable (Mana.canPay), and with a fillable
+-- target set (Cast.targetable). Deliberately omits timingOk -- the permission IS
+-- the CR 601.3 timing exception (the ruling: "follows all normal rules ...
+-- except for timing").
+--
+-- The prohibition is NOT omitted, and that is the point: CR 601.3 is one
+-- sentence with two halves, and the Panglacial permission excepts only the
+-- timing one. A Rule of Law still stops a cast from the library.
 castableWhileSearching :: PlayerId -> GameState -> [ObjectId]
 castableWhileSearching pid gs =
   let permitted oid = maybe False permitsCastWhileSearching (Game.cardOf oid gs)
@@ -116,7 +127,10 @@ castableWhileSearching pid gs =
         Nothing -> False
         -- CR 601.2b castability floor: payable at X=0 (see Cast.castable).
         Just cost -> Mana.canPay pid (Mana.substituteX 0 cost) gs
-   in filter (\oid -> permitted oid && affordable oid && targetable oid gs) (Game.zoneMembers Zone.Library pid gs)
+      allowed oid = permitted oid && affordable oid && targetable oid gs
+   in if PlayerEffect.prohibitsCasting pid gs
+        then []
+        else filter allowed (Game.zoneMembers Zone.Library pid gs)
 
 -- CR 601.3 (Panglacial): while a player searches their own library, offer them
 -- the chance to cast a castable-while-searching card from it, before any card is

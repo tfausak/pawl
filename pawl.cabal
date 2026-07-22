@@ -75,6 +75,7 @@ library
     Pawl.Json
     Pawl.Mana
     Pawl.Modal
+    Pawl.PlayerEffect
     Pawl.Projection
     Pawl.Quantity
     Pawl.Replacement
@@ -231,6 +232,7 @@ test-suite pawl-test-suite
     Pawl.JsonSpec
     Pawl.ManaSpec
     Pawl.ModalSpec
+    Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
     Pawl.ProjectionSpec
     Pawl.PropertySpec
