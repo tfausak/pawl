@@ -117,6 +117,7 @@ identityAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.ChooseReplacement {} -> 0
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -149,6 +150,7 @@ castAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.ChooseReplacement {} -> 0
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -174,6 +176,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.ChooseReplacement {} -> 0
 
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
@@ -203,6 +206,7 @@ playLandAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.ChooseReplacement {} -> 0
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -264,6 +268,7 @@ randomAnswer p = case p of
     pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.OrderTriggers _ _ sources -> pure (map fromIntegral (take (length sources) [0 :: Int ..]))
+  Prompt.ChooseReplacement {} -> pure 0
 
 -- Total index into a list; the engine always offers at least Pass, so the
 -- fallback is unreachable in practice but keeps this free of partial functions.

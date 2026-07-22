@@ -335,6 +335,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.ChooseReplacement {} -> 0
 
 lastN :: Int -> [a] -> [a]
 lastN n xs = drop (length xs - n) xs
@@ -517,6 +518,7 @@ castFirstOption p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.ChooseReplacement {} -> 0
 
 nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
@@ -548,3 +550,4 @@ castPanglacial p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.ChooseReplacement {} -> 0

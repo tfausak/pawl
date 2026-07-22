@@ -35,6 +35,7 @@ encode p answer = case p of
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
+  Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -88,6 +89,9 @@ decode p response = case p of
   Prompt.OrderTriggers {} -> case response of
     Response.OrderedTriggers order -> Just order
     _ -> Nothing
+  Prompt.ChooseReplacement {} -> case response of
+    Response.ChoseReplacement n -> Just n
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -139,6 +143,9 @@ defaultAnswer p = case p of
   -- CR 603.3b: the canonical order is always a legal answer, and is the least
   -- eventful fallback when a transcript runs short.
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  -- CR 616.1: index 0 is always a legal answer (the bucket is non-empty when this
+  -- is asked), and is the least eventful fallback when a transcript runs short.
+  Prompt.ChooseReplacement {} -> 0
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

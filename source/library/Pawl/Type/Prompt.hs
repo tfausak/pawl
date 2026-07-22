@@ -97,3 +97,23 @@ data Prompt r where
   -- is vacuous while no condition triggers on another ability triggering; this
   -- carries the note, not the machinery.
   OrderTriggers :: Decider -> PlayerId -> [ObjectId] -> Prompt [Natural]
+  -- CR 616.1: with two or more applicable replacement or prevention effects in
+  -- the highest non-empty bucket, the affected object's controller (or its owner,
+  -- or the affected player) chooses which to apply NEXT -- and then the process
+  -- repeats over what is applicable now (616.1f), so this is asked once per
+  -- iteration, not once per event. The [ObjectId] is each candidate's SOURCE, in
+  -- the engine's canonical order (battlefield ascending, then the floating
+  -- store); the answer is an index into it.
+  --
+  -- Positional, and carrying exactly the caveat #61 records for OrderTriggers: a
+  -- source with two DISTINCT applicable replacement abilities would put two
+  -- different effects on the wire as identical entries. That is reachable in a way
+  -- it is not for triggers -- Doubling Season has two replacement abilities -- but
+  -- they are in different EVENT CLASSES and so are never candidates for the same
+  -- event. A single source with two same-class applicable replacements needs a
+  -- discriminator alongside the source (#N).
+  --
+  -- Asked ONLY when the bucket holds two or more candidates that are not all equal
+  -- as values: with one there is nothing to choose, and among equal values every
+  -- order yields the same board (each still gets its own CR 614.5 opportunity).
+  ChooseReplacement :: Decider -> PlayerId -> [ObjectId] -> Prompt Natural

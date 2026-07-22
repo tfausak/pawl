@@ -1,5 +1,7 @@
 -- The event pipeline (CR 603/614). This module owns the single zone-change
--- funnel and, later, the sole casing on ReplacementEffect and TriggerCondition.
+-- funnel and the sole casing on TriggerCondition; casing on ReplacementEffect
+-- lives in Pawl.Replacement (CR 616.1's loop), which this module's changeZone
+-- calls through rather than cases on directly.
 -- changeZone lives here (not in Pawl.Game) so it can read the projection --
 -- Projection imports Game, so a Game.changeZone that read the projection would
 -- be an import cycle. See the plan's module dependency note.
@@ -7,7 +9,6 @@ module Pawl.Event where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
-import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -15,12 +16,11 @@ import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Type.ActivePrevention as ActivePrevention
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.Combat as Combat
-import Pawl.Type.ControllerRelation (ControllerRelation)
-import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import Pawl.Type.DamageEvent (DamageEvent)
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -42,8 +42,6 @@ import Pawl.Type.Prevention (Prevention)
 import qualified Pawl.Type.Prevention as Prevention
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
-import Pawl.Type.ReplacementEffect (ReplacementEffect)
-import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
 import Pawl.Type.StateCondition (StateCondition)
@@ -58,7 +56,6 @@ import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
-import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
 
 -- CR 608.2i: append one entry to the turn-scoped log. The single APPEND point --
 -- Engine.handoffTurn clears the log at turn end, Setup.emptyGame and the test
@@ -163,32 +160,27 @@ changeZone oid requestedDest = do
       let pid = Object.owner obj
           fromZone = Object.zone obj
           -- CR 608.2h: last known information -- the object as it exists in the
-          -- zone it is LEAVING, projected against the PRE-MOVE state. One board
-          -- projection per zone change, forced eagerly (GameEvent.Moved's snapshot
-          -- field is strict) rather than left as a thunk retaining the whole
-          -- pre-move GameState for a turn. Measured on the tasty-bench suite,
-          -- pre-log baseline (3cc3ecd) vs. this log with the strict field
-          -- (goldfish /casting/fighting, 2p): 10.1/9.30/9.31 ms -> 10.6/9.73/9.72
-          -- ms -- a ~4-5% move, within the benchmark's own run-to-run noise
-          -- (~800 us stddev on a ~10 ms mean), not the large regression a
-          -- captured pre-move GameState would cause. That is the price of an
-          -- honest history (a token has no printed card to re-derive from,
-          -- CR 111.1).
+          -- zone it is LEAVING, projected against the PRE-MOVE state. (The
+          -- benchmark note about the strict snapshot field is unchanged.)
           snapshot = Projection.project oid gs
-          -- CR 614.4: replacements exist before the event; read them from the
-          -- pre-move state. CR 614.6: the modified event is what actually
-          -- happens.
-          proposed = ZoneChange.MkZoneChange oid fromZone requestedDest
-          resolved = applyReplacements gs (Projection.replacementsAffecting gs) proposed
-          dest = ZoneChange.to resolved
-          mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.timestamp = ts}
-          gs1 = Game.removeFromZones pid oid gs
-          gs2 = gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
-      State.put gs2
-      newId <- placeObject pid mkObj dest
-      -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
-      -- what an enters trigger scans.
-      State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId fromZone dest) snapshot))
+      -- CR 614.4: replacements exist before the event, so the loop reads them from
+      -- the PRE-MOVE state. CR 614.6: the modified event is what actually happens.
+      resolved <- Replacement.resolveZoneChange (ZoneChange.MkZoneChange oid fromZone requestedDest)
+      case resolved of
+        -- CR 614.6: nothing survived the loop, so no zone change happens. No
+        -- producer today -- no card in the pool cancels a zone change outright --
+        -- but Maybe is what "the event does not happen" means on this path.
+        Nothing -> pure ()
+        Just settled -> do
+          let dest = ZoneChange.to settled
+              mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.timestamp = ts}
+          State.modify' $ \g ->
+            let g1 = Game.removeFromZones pid oid g
+             in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
+          newId <- placeObject pid mkObj dest
+          -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
+          -- what an enters trigger scans.
+          State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId fromZone dest) snapshot))
 
 -- The single destruction funnel (CR 701.8 / 702.12b): every destruction -- the
 -- Destroy opcode and the CR 704.5g/h state-based actions -- flows through here.
@@ -313,40 +305,6 @@ drawCard pid = do
   case Game.zoneMembers Zone.Library pid gs of
     [] -> State.put gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
     top : _ -> changeZone top Zone.Hand
-
--- CR 614: rewrite the proposed zone change by each active replacement, paired
--- with its source. CR 614.5: applied left-to-right, each seeing the running
--- event; a ZoneChangeR's output destination no longer matches its own
--- `whenDestination`, so it cannot re-fire.
---
--- This pure fold is a TRANSITIONAL shape. It cannot ask a question and it invents
--- an order when two replacements apply -- CR 616.1's own violation, which this
--- phase exists to retire. Pawl.Replacement replaces it entirely; nothing else
--- about it is meant to survive.
-applyReplacements :: GameState -> [(ObjectId, ReplacementEffect)] -> ZoneChange -> ZoneChange
-applyReplacements gs res zc = List.foldl' (applyOne gs) zc res
-
-applyOne :: GameState -> ZoneChange -> (ObjectId, ReplacementEffect) -> ZoneChange
-applyOne gs zc (src, re) = case re of
-  ReplacementEffect.ZoneChangeR pat toDest ->
-    if ZoneChange.to zc == ZoneChangePattern.whenDestination pat
-      && matchesController gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
-      then zc {ZoneChange.to = toDest}
-      else zc
-  -- CR 614.1: an effect whose event class is not a zone change never applies to
-  -- one. The type is what rules this out; these arms only make the case total.
-  ReplacementEffect.EntryR _ -> zc
-  ReplacementEffect.DamageR _ _ -> zc
-  ReplacementEffect.DestructionR _ -> zc
-  ReplacementEffect.CounterR _ _ -> zc
-  ReplacementEffect.TokenR _ _ -> zc
-
--- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation, read
--- against the controller of the effect's SOURCE? Anyones always does.
-matchesController :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> Bool
-matchesController gs src rel oid = case rel of
-  ControllerRelation.Anyones -> True
-  ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
 
 -- CR 603.2: does this condition fire on this event, for the permanent that bears
 -- it? `bearer` is the object whose ability this is and `you` is its controller

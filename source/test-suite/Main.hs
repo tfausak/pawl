@@ -19,6 +19,7 @@ import qualified Pawl.ModalSpec as ModalSpec
 import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
+import qualified Pawl.ReplacementSpec as ReplacementSpec
 import qualified Pawl.ReplaySpec as ReplaySpec
 import qualified Pawl.ResolveSpec as ResolveSpec
 import qualified Pawl.SetupSpec as SetupSpec
@@ -58,6 +59,7 @@ testTree cards =
       ActivateSpec.tests cards,
       ModalSpec.tests cards,
       CopySpec.tests cards,
+      ReplacementSpec.tests cards,
       ColorSpec.tests cards,
       TriggerSpec.tests cards
     ]

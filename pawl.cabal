@@ -76,6 +76,7 @@ library
     Pawl.Modal
     Pawl.Projection
     Pawl.Quantity
+    Pawl.Replacement
     Pawl.Replay
     Pawl.Resolve
     Pawl.Sba
@@ -93,6 +94,7 @@ library
     Pawl.Type.AttackTarget
     Pawl.Type.BeginningStep
     Pawl.Type.Binding
+    Pawl.Type.CandidateId
     Pawl.Type.Card
     Pawl.Type.CardCriterion
     Pawl.Type.CardType
@@ -150,8 +152,11 @@ library
     Pawl.Type.Program
     Pawl.Type.ProjectedCharacteristics
     Pawl.Type.Prompt
+    Pawl.Type.ProposedEvent
     Pawl.Type.Quantity
     Pawl.Type.Recipient
+    Pawl.Type.ReplacementBucket
+    Pawl.Type.ReplacementCandidate
     Pawl.Type.ReplacementEffect
     Pawl.Type.Response
     Pawl.Type.Result
@@ -222,6 +227,7 @@ test-suite pawl-test-suite
     Pawl.PowerToughnessSpec
     Pawl.ProjectionSpec
     Pawl.PropertySpec
+    Pawl.ReplacementSpec
     Pawl.ReplaySpec
     Pawl.ResolveSpec
     Pawl.SetupSpec

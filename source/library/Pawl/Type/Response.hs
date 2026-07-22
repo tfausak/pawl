@@ -39,4 +39,7 @@ data Response
   | -- CR 603.3b: the order a player chose for their simultaneous triggers, as a
     -- permutation of the offered indices, serialized so a DecisionLog replays it.
     OrderedTriggers [Natural]
+  | -- CR 616.1: the index of the replacement effect a player chose to apply next,
+    -- serialized so a DecisionLog replays a replacement race deterministically.
+    ChoseReplacement Natural
   deriving (Eq, Show)
