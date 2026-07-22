@@ -38,11 +38,12 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 - **Status: M0–M4h are complete** — the closed-half milestones M0–M3g, the
   M3.5 cards-as-data interstitial, and the whole of M4 (M4a–M4g plus the
   M4h fast-follow). **M4.5 (phased) is in progress: P1 (permanent control),
-  P2 (copy / layer 1, the milestone's go/no-go), P3a (color / layer 5), and
-  P3b (characteristic-defined P/T) are complete — every sublayer of the
-  layer system now has a producer, closing Cluster 1 (layer-system
-  completion). P4 (event history + state/delayed triggers, which gates P6
-  and P7) is next.** The umbrella spec is
+  P2 (copy / layer 1, the milestone's go/no-go), P3a (color / layer 5) and
+  P3b (characteristic-defined P/T) closed Cluster 1 — every sublayer of the
+  layer system has a producer — and P4 (event history + state/delayed
+  triggers) opened Cluster 2, discharging the `P4 → {P6, P7}` edge so both
+  are unblocked. P5 (replacement event coverage + CR 616, the monadic
+  replacement path) is next.** The umbrella spec is
   `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, the opcodes/types it added, and

@@ -1098,3 +1098,236 @@ its own gate card and spec, landed as it completes. Umbrella:
   P7). Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-21-p3b-characteristic-defined-pt-design.md`
   and `docs/superpowers/plans/2026-07-21-p3b-characteristic-defined-pt.md`.
+- **M4.5 P4 is complete** (event history + state/delayed triggers, GAP-T).
+  Cluster 1 closed at P3b; P4 opens **Cluster 2, the event substrate
+  generalized**, and discharges the umbrella's only remaining hard dependency
+  edge, `P4 → {P6, P7}`. **The decision proved, in one line: events are
+  recorded, not consumed; and a trigger's condition is a classification over
+  game *state*, not only over the event stream.** The two halves are one phase
+  because each is the other's falsifier — a log that is merely a longer queue is
+  not history, and a condition language that only matches events cannot express
+  a state trigger at all. **Gates, four cards, each one or two clauses:**
+  **Barbarian Outcast** (`{1}{R}` Creature — Human Barbarian Beast, 2/2, "When
+  you control no Swamps, sacrifice this creature.") is CR 603.8, and its
+  falsifier is **flooding**: exactly **one** trigger reaches the stack, not one
+  per priority boundary — which is the failure CR 603.8's second sentence exists
+  to prevent, and it is CR 603.8's own illustrative shape ("a player controlling
+  no permanents of a particular card type"). Armed-ness is **derived, not
+  stored**: an instance is suppressed while a matching `Source.OfTrigger` object
+  sits on the stack, so 603.8's three exits ("resolved, countered, or otherwise
+  left the stack") are all just "no longer on the stack" and there is no
+  bookkeeping field to leak; suppression is structural on **both** source id and
+  ability, so two Outcasts give two instances. Both `StateCondition` arms read
+  the **projection**, pinned by two tests that would otherwise have been
+  assertion-only: give a Mountain the Swamp subtype (layer 4) and the trigger
+  stops; hand Alice control of Bob's Swamp (P1's layer 2) and it stops.
+  **Khabál Ghoul** (`{2}{B}` Creature — Zombie, 1/1, "At the beginning of each
+  end step, put a +1/+1 counter on this creature for each creature that died
+  this turn.") is CR 608.2i turn history, read from the log's
+  `ProjectedCharacteristics` **snapshots**: the deaths it counts happened at
+  boundaries the trigger scan already passed (a drained queue reads zero), the
+  thing counted is a token with **no printed card** (CR 111.1/111.3 — re-deriving
+  types from print reads zero), and the count resets at **turn handoff**, not at
+  the scan. Zero new opcodes: it is `PutCounters PlusOnePlusOne (Quantity.Count
+  …)`, cashing P3b's numeric tower against one new `CountSpec` arm. **Tidal
+  Wave** (`{2}{U}` Instant — "Create a 5/5 blue Wall creature token with
+  defender. Sacrifice it at the beginning of the next end step.") is CR 603.7,
+  and its shape is forced by the closed half: `Effect` is **first-order and
+  non-recursive**, so the delayed ability is **card data** (`Card
+  .delayedAbilities`, keyed by a new `AbilityName`) and the opcode only **arms**
+  it, capturing the resolving object's binding environment — which is how "it"
+  (CR 603.7c) is remembered. It fires exactly once (603.7b), does nothing if the
+  token has already left the battlefield (603.7c) and is consumed anyway, and
+  603.7a's "no event from before it was created" falls out for free from the
+  watermark. The card-text-in-two-fields join is policed by the lint family
+  `SlotName` already documents: an `ArmDelayedTrigger` naming an undeclared
+  ability is a **failing test**, not a trigger that never fires. **Sarcomancy**
+  (`{B}` Enchantment — ETB 2/2 black Zombie token; "At the beginning of your
+  upkeep, if there are no Zombies on the battlefield, this enchantment deals 1
+  damage to you.") is the intervening "if" at **both** check sites, CR 603.4
+  (it does not trigger at all) and CR 608.2a (it is removed from the stack if
+  the condition has become false). The distinguishing case is a Zombie created
+  **in response**, and CR 608.2a was proven load-bearing rather than asserted:
+  deleting the resolution-time re-check makes that test fail (1 damage instead
+  of 0), while a single trigger-time check passes the other two. It is also
+  `NoPermanentsOfSubtype`'s first behavioural customer, and the test
+  **discriminates it from `YouControlNo`** — the responding Zombie is under
+  *Bob's* control, so a "you control no" implementation reads the wrong answer.
+  **The centerpiece scenario is where the four falsifiers interlock**: Tidal
+  Wave's delayed sacrifice and Khabál Ghoul's count trigger at the beginning of
+  the *same* end step under one controller, so the controller must **order**
+  them (CR 603.3b), and the order **changes the answer** — CR 608.2h determines
+  the count when the effect is applied, so sacrifice-first gives **1** counter
+  and count-first gives **0**, from one board on two answers. The thing counted
+  is a token with no printed card, and the death happened at a boundary the scan
+  already passed; an engine that picks the order silently, re-derives from print,
+  or reads a drained queue fails one of the four. **Types and opcodes**: new
+  `Pawl.Type.GameEvent` (`Moved ZoneChange !ProjectedCharacteristics` /
+  `DamageDealt DamageEvent` / `StepBegan Phase PlayerId` — `ZoneChange` and
+  `DamageEvent` survive as the payloads they already were, a re-homing, not a
+  redesign), `TurnScope` (`EachTurn`/`ControllersTurn`), `PendingTrigger`,
+  `StateCondition` (`YouControlNo Subtype`/`NoPermanentsOfSubtype Subtype` —
+  hand-carved, **expires at P9**'s criterion language, the posture `CountSpec`
+  and `WallTarget` already carry), `AbilityName` (`SlotName`'s shape, named
+  never positional) and `DelayedTrigger`. Two new opcodes: **`Effect.Sacrifice
+  SlotName`** (CR 701.21/701.21a — sacrificing is **not** destroying, so it
+  consults neither regeneration shields nor indestructible; the reviewer
+  confirmed that by construction, `Event.sacrifice`'s body naming none of them)
+  and **`Effect.ArmDelayedTrigger AbilityName`**. `TriggerCondition` gains
+  `StepBegins Phase TurnScope` and `StateIs StateCondition`; `TriggeredAbility`
+  gains `intervening :: Maybe StateCondition` (one predicate vocabulary, two
+  customers — that reuse is why 603.4 was cheap to include); `Card` gains
+  `delayedAbilities`; `Effect.Create` grows a `Maybe SlotName`; `CountSpec`
+  gains `CreaturesDiedThisTurn` (folds the log and reads `PC.cardTypes`, never
+  `Game.cardOf`; `Pawl.Quantity` still does **not** import `Pawl.Projection`, so
+  the layer-fold recursion hazard stays impossible);
+  `Prompt.OrderTriggers`/`Response.OrderedTriggers`. `GameState` gains
+  `events`, `scannedThrough`, `damageScannedThrough` and `delayedTriggers`, and
+  **loses `zoneChanges` and `damageEvents`** — consumption becomes an index
+  bump and the record stays, with clearing a **turn-handoff** act rather than a
+  cleanup-step one (cleanup is still part of *this* turn, and CR 514.1's discard
+  is an event of it). Two reserved binding slots: **`self`** (CR 113.7, a
+  triggered ability's own source, stamped at placement, which is what makes
+  "this creature" expressible without a second `SacrificeSelf` opcode) and
+  **`you`** (the ability's controller, making Sarcomancy's "deals 1 damage to
+  you" a slot read rather than a new opcode). The trigger scan gathers from
+  three sources — event-matched over **all** battlefield permanents (CR 603.6a
+  widens M3f's newcomer-only scan), state-matched, and delayed — with the CR
+  603.4 filter applied at the gather, which is what keeps
+  `placePendingTriggers`' re-run flag honest. **An elision is RETIRED, not
+  added.** M3f's CR 603.3b ordering elision ("at most one trigger controlled by
+  one player … elided until a second simultaneous trigger exists") falls due in
+  a single line of card text, and `Prompt.OrderTriggers` replaces it — asked
+  **only** when a player controls two or more pending triggers, since with one
+  there is nothing to choose. The payload is that player's pending triggers as
+  an indexed list of source `ObjectId`s in the engine's canonical order and the
+  answer is a permutation of the indices, validated **reject-not-repair** (short,
+  duplicate and out-of-range answers all fall back to canonical, each pinned by
+  a test). `Engine.apnapOrder` was replaced by `apnapPlayers`, total on a
+  degenerate turn order and strictly more correct — the old one never consulted
+  turn order at all. The source-only payload is **contingent, not a rules
+  property**, and carries its own named expiry in `Prompt`: it holds only while
+  no single source can have two *distinct* abilities triggered in one batch —
+  Sarcomancy already has two triggered abilities, and they fail to co-trigger
+  only by settle-schedule accident — expiring at the first card where they can,
+  which needs an ability discriminator on the wire. **Deferred, with named
+  expiries** (spec §8, six of them backfilled at the final review from
+  deferrals that had lived only in code comments): **reflexive triggers** (CR
+  603.12) — the first "you may … When you do, …" card; **leaves-the-battlefield
+  triggers** (603.6c) and the **look-back-in-time list** (603.10/603.10a) — the
+  first dies-trigger card, relating to git-bug `b998924`, whose fix this phase's
+  snapshot is the mechanism for; **the enters-then-dies-same-settle timing gap**
+  — the scan derives its candidates from the battlefield *at the CR 117.5
+  boundary* rather than from the state at each event's time, so a permanent that
+  enters and is put into a graveyard by an SBA within the same settle loses its
+  enters trigger (this is 603.10's **normal** clause, not a look-back exception),
+  expiring at the first card that can die on entry; **stated-duration delayed
+  triggers** (603.7b) — the first "this turn" delayed ability; **CR 603.2d /
+  603.2h / 603.7h / 603.9**, each at its first card; **CR 603.3b's second part**
+  (triggers whose condition is another ability triggering) — the first such
+  condition, noted in code rather than built; **CR 400.7e** — honoured only as
+  far as M3f already does, expiring with the LTB pass; **scanned zones other
+  than the battlefield** — the first ability that functions from a graveyard,
+  hand or exile; **a `Create` binding more than one token to a slot** — the
+  first card referring back to several tokens at once ("sacrifice *them*",
+  Salt Road Skirmish), rejected by a lint today rather than silently binding
+  one; **event kinds with no reader** (spell casts, attacks, life changes,
+  counter placement) — VOCAB, each added by the phase that needs it
+  (`SpellCast` at **P7**); **the unenforced CR 701.21a control clause** —
+  `Event.sacrifice` doesn't check "a player can't sacrifice a permanent they
+  don't control", harmless while its only caller reads `Binding.triggerSource`,
+  expiring at the first opponent-sacrifice edict (Diabolic Edict); **trigger
+  control read at the scan boundary rather than the trigger moment** (CR
+  603.3a) — carried forward from M3f, expiring at the first effect that can
+  change control between an event and the boundary; **state-trigger
+  non-termination if all modes are unfillable** — a mode set that all goes
+  unfillable would cease (603.3c) and re-trigger forever; unreachable today
+  because Barbarian Outcast's single mode has no target slots and is
+  unconditionally fillable, expiring at the first state-triggered card whose
+  modes can all be unfillable; **two identical state triggers on one source
+  conflated by `Source` equality** — the first card with two textually
+  identical `StateIs` abilities; **partial CR 514.3 handling** — `Engine
+  .advance` settles once more at turn end so cleanup's events are scanned before
+  the log is cleared, but builds no 514.3a extra step and priority round,
+  expiring at the first card whose trigger must resolve during that cleanup; and
+  **a delayed ability's intervening "if" pruned before it is checked** —
+  `delayedPending` removes a fired entry on the event match alone, before the CR
+  603.4 filter runs, so a false condition would spend its 603.7b single shot;
+  unreachable while Tidal Wave's is the pool's only delayed ability and has no
+  `intervening`, expiring at the first delayed ability that does. **Corrections
+  worth remembering.** A **systemic CR 701.x renumbering**, found only because
+  half-fixing Destroy left one file citing **701.8 for two different actions**:
+  the codebase's keyword-action citations predated **`Create`'s insertion at
+  701.7**, so everything from Destroy onward was cited low — Destroy 701.7→
+  **701.8**, Discard 701.8/8a/8b→**701.9/701.9b/CR 609.3**, Exile 701.10→
+  **701.13**, Mill 701.13/13b→**701.17/701.17b**, Mill by four. Sub-letters do
+  not remap mechanically (the old `701.8a`, "the discarding player chooses",
+  is **701.9b**, not 701.9a), and the old `701.8b` has no 701.9 counterpart at
+  all — it is **CR 609.3**, "does only as much as possible", researched rather
+  than invented. Counter (701.6), Regenerate (701.19), Sacrifice (701.21),
+  Search (701.23) and Tap/Untap (701.26) were already right and were left alone.
+  This was a **pre-existing** defect in the project's most binding constraint,
+  invisible until a partial fix made one file self-contradictory.
+  `GameEvent.Moved`'s snapshot field had to be made **strict**: left lazy, no
+  production reader forced it, so the snapshot was a thunk retaining the entire
+  pre-move `GameState` for a whole turn — defeating the `Map.delete` two lines
+  below it. Fixed with a plain Haskell 2010 bang (no pragma) and **measured**
+  against the pre-log baseline `3cc3ecd` in a scratch worktree rather than
+  asserted: goldfish 10.1→10.6ms, casting 9.30→9.73ms, fighting 9.31→9.72ms —
+  ~4-5%, inside the ~850µs run-to-run stddev, and the numbers are in the code
+  comment where an unquantified claim used to be. **The delayed-trigger binding
+  merge was backwards**: `placeOne` merged the captured environment over the
+  placement-time bindings with a left-biased `Map.union`, and the captured side
+  was on the left, so a spell's own reserved `modes` slot (stamped by
+  `Binding.fromChoices` on every cast) **overrode the delayed ability's own** —
+  invisible only because both were mode 0; a modal spell arming a delayed
+  ability would have resolved the wrong mode or none. `variableX` collided
+  identically. Argument order flipped so placement-time wins; verified by revert
+  (`expected {0}, got {7}`). **Nine rules-citation errors were caught in total**,
+  several by implementers and reviewers who read `rules.txt` rather than copying
+  the brief: CR 608.2g→**113.7** for the source of a triggered ability (found
+  twice, independently); CR 700.4→**702.12b** for indestructible (700.4 really
+  is the definition of *dies*, and stayed where it belonged); CR 108.4→**109.5**
+  for what "you control" means; CR 503.1→**502.4 + 503.1a** for held triggers at
+  untap; and CR 111.3→**111.1** at five sites for "a token isn't represented by
+  a card" (two genuine 111.3 uses left alone). Each was corrected **at source in
+  the plan** so it could not propagate to a later task. Two process failures are
+  recorded rather than buried. A reviewer finding that the widened CR 603.6a scan
+  had dropped an enters trigger whose source had already left the battlefield was
+  **adjudicated false** — `Event.changeZone` deletes the id from `GameState
+  .objects` on the very next line after removing it from the battlefield, so
+  `∉ battlefield ⟹ ∉ objects` by construction and the "fix" was dead code with a
+  test building a state no library path can produce; it was reverted (the
+  independently valuable projection hoist, one `projectAll` per settle instead of
+  one `gather` per event × permanent pair, was kept). The lesson recorded: **a
+  finding that asserts what existing, unchanged code does is a claim to verify
+  before acting, not after.** And the centerpiece test shipped in the plan with
+  its **two arguments transposed** — `orderLast` puts a trigger last on the
+  stack, `placeOne` conses, so last-placed resolves *first*, making
+  `orderLast ghoul` the counting-first case, not the sacrificing-first one the
+  plan paired it with. The implementer proved it with a temporary trace and
+  fixed the **test, not the engine**, per CLAUDE.md; had it shipped as written,
+  the phase's thesis test would have asserted the opposite of what it claimed
+  and passed. **Tracking:** no git-bug is closed. `b998924` (OfAbility LKI)
+  stays **open and unretired** — §2.2's last-known-information snapshot is the
+  mechanism its fix will use, not the fix; `6afb561` (M3f replacement seam) is
+  untouched and belongs to **P5** — note the family resemblance, P4 retires the
+  *trigger* ordering elision (603.3b) and P5 retires the *replacement* ordering
+  elision (616), different rules and different mechanisms; `c7a0077`
+  (`Quantity.Bound → SlotName`) stays open, since like P3b's two arms
+  `CreaturesDiedThisTurn` needs no binding slot — it folds the log. Four new
+  deterministic fixtures (`barbarian-outcast.json`, `khabál-ghoul.json`,
+  `tidal-wave.json` — carrying a nested Wall token card — and `sarcomancy.json`);
+  **no pre-existing card file was modified** — verified by diff, so `Create`'s
+  new arity and `Card`'s new field are invisible to all 59 of them.
+  Final suite **670/670**, warning-clean under `-Werror` on a from-scratch
+  build, hlint clean, `cabal bench` statistically identical to baseline; the
+  whole-branch review found **zero Critical and zero Important** code defects and
+  confirmed both invariants branch-wide (`TriggerCondition.`/`StateCondition.`
+  appear outside `Pawl.Event`/`Pawl.Codec` nowhere). The umbrella's next phase is
+  **P5** (replacement event coverage + CR 616, subsuming git-bug `6afb561`);
+  **P6 and P7 are now unblocked**, each adding a *reader* of this log rather than
+  a mechanism, which is the whole reason P4 preceded them. Spec and plan kept as
+  reference:
+  `docs/superpowers/specs/2026-07-21-p4-event-history-triggers-design.md` and
+  `docs/superpowers/plans/2026-07-21-p4-event-history-triggers.md`.
