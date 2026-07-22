@@ -39,11 +39,13 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   M3.5 cards-as-data interstitial, and the whole of M4 (M4a–M4g plus the
   M4h fast-follow). **M4.5 (phased) is in progress: P1–P3b closed Cluster 1**
   (every sublayer of the layer system has a producer), **P4 opened Cluster 2**
-  (the event-history substrate) **and discharged the `P4 → {P6, P7}` edge**,
-  **P5 closed Cluster 2's second phase (the monadic replacement path and CR
-  616), and P6 closed GAP-D — a stored duration now has a beginning, plus
-  conditional and turn-relative shapes. P7 (the player projection, Cluster 3)
-  is next**, already unblocked by P4; P8/P9 still float. The umbrella spec is
+  (the event-history substrate), **P5 closed its second phase (the monadic
+  replacement path and CR 616), and P6 closed GAP-D — a stored duration now
+  has a beginning. P7 closed GAP-P and the *modification* half of GAP-Co, and
+  with them the whole of Cluster 3**: player and rules-modifying continuous
+  effects, which CR 613.10/613.11 put *outside* the layer system. **P8 (costs)
+  and P9 (filters) now float freely; P10 (player counters) and P11 (command
+  zone) remain.** The umbrella spec is
   `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —

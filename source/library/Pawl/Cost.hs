@@ -19,7 +19,11 @@ import Pawl.Type.PlayerId (PlayerId)
 -- has {X} in its mana cost, you choose the value of X before calculating the
 -- spell's total cost."
 --
--- Additional costs are NOT here: AdditionalCost is untouched by this phase (P8).
+-- Additional costs are NOT here, so this is the total only in the sense of CR
+-- 601.2f's increases and reductions: a spell's additional and alternative costs
+-- are unmodelled (#4), and an activated ability's total cost never reaches this
+-- function at all -- Pawl.Activate hands AbilityCost.mana straight to Pawl.Mana
+-- (#90).
 total :: PlayerId -> ObjectId -> ManaCost -> GameState -> ManaCost
 total pid oid cost gs = applyAdjustments (PlayerEffect.costAdjustments pid oid gs) cost
 

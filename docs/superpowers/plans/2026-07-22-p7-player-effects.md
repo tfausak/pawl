@@ -121,7 +121,7 @@ Card data can *say* a player effect. Nothing reads one yet. Behaviour-neutral: e
 - Consumes: nothing from earlier tasks.
 - Produces: `PlayerEffect.PlayerEffect = CantCastSpells | CantCastMoreThan Natural | IncreaseSpellCost SpellCriterion Natural | ReduceSpellCost SpellCriterion Natural | NoMaximumHandSize`; `PlayerScope.PlayerScope = You | Opponents | EachPlayer`; `SpellCriterion.SpellCriterion = NoncreatureSpell | SpellOfColor Color`; `PlayerStaticAbility.MkPlayerStaticAbility {scope :: PlayerScope, effect :: PlayerEffect}`; `Card.playerAbilities :: [PlayerStaticAbility]`; `Codec.playerEffectToJson`/`jsonToPlayerEffect`, `playerScopeToJson`/`jsonToPlayerScope`, `spellCriterionToJson`/`jsonToSpellCriterion`, `playerStaticAbilityToJson`/`jsonToPlayerStaticAbility`, `listFromDefault`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/CodecSpec.hs`, add a new group to `tests`'s list (after the `"effect"` group), and register the needed imports (`Pawl.Type.PlayerEffect as PlayerEffect`, `Pawl.Type.PlayerScope as PlayerScope`, `Pawl.Type.PlayerStaticAbility as PlayerStaticAbility`, `Pawl.Type.SpellCriterion as SpellCriterion`, `Pawl.Type.Printing as Printing` — already there):
 
@@ -168,12 +168,12 @@ In `source/test-suite/Pawl/CodecSpec.hs`, add a new group to `tests`'s list (aft
         ],
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Could not find module 'Pawl.Type.PlayerEffect'` (and the three siblings).
 
-- [ ] **Step 3: Create the four types**
+- [x] **Step 3: Create the four types**
 
 `source/library/Pawl/Type/SpellCriterion.hs`:
 
@@ -296,7 +296,7 @@ data PlayerStaticAbility = MkPlayerStaticAbility
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the `Card` field**
+- [x] **Step 4: Add the `Card` field**
 
 In `source/library/Pawl/Type/Card.hs`, add the import of `Pawl.Type.PlayerStaticAbility (PlayerStaticAbility)` and append this field to the record, after `castingPermissions`:
 
@@ -311,7 +311,7 @@ In `source/library/Pawl/Type/Card.hs`, add the import of `Pawl.Type.PlayerStatic
 
 Remember the comma after `castingPermissions :: [CastingPermission]`.
 
-- [ ] **Step 5: Add the codecs**
+- [x] **Step 5: Add the codecs**
 
 In `source/library/Pawl/Codec.hs`, add the four pairs. Put `playerScopeToJson`/`jsonToPlayerScope` and `spellCriterionToJson`/`jsonToSpellCriterion` next to `permanentCriterionToJson` (the leaf-enum neighbourhood, around line 447), `playerEffectToJson`/`jsonToPlayerEffect` after them, and `playerStaticAbilityToJson`/`jsonToPlayerStaticAbility` beside `staticAbilityToJson` (around line 1096).
 
@@ -378,7 +378,7 @@ jsonToPlayerStaticAbility value = do
   pure (PlayerStaticAbility.MkPlayerStaticAbility s e)
 ```
 
-- [ ] **Step 6: Wire the field through the `Card` codec, omitted when empty**
+- [x] **Step 6: Wire the field through the `Card` codec, omitted when empty**
 
 Beside `setFromDefault` (around line 1404) add its list sibling:
 
@@ -411,12 +411,12 @@ In `jsonToCard`, add the read and the field:
         CardT.playerAbilities = playerAbilities
 ```
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the new `player effects (P7)` group green, and **every pre-existing test still green**, `CardsSpec`'s byte-stability check included. A byte-stability failure means the field is being emitted when empty: fix `cardToJson`, never the assertion.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add source/library/Pawl source/test-suite pawl.cabal
@@ -451,7 +451,7 @@ The event kind Rule of Law counts. The umbrella predicted this edge ("each later
 - Consumes: nothing from Task 1.
 - Produces: `GameEvent.SpellCast :: PlayerId -> GameEvent`; `Event.castOf :: GameEvent -> Maybe PlayerId`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/CastSpec.hs`, add these cases to the module's top-level `tests` group (add imports for `Pawl.Event as Event`, `Pawl.Type.GameEvent as GameEvent`, `Data.Foldable as Foldable`, `Data.Maybe as Maybe` as needed):
 
@@ -478,12 +478,12 @@ In `source/test-suite/Pawl/CodecSpec.hs`, add to the group that already round-tr
             roundTrip "ev" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.SpellCast S.alice),
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Data constructor not in scope: GameEvent.SpellCast`, `Variable not in scope: Event.castOf`.
 
-- [ ] **Step 3: Add the constructor**
+- [x] **Step 3: Add the constructor**
 
 In `source/library/Pawl/Type/GameEvent.hs`, append:
 
@@ -499,7 +499,7 @@ In `source/library/Pawl/Type/GameEvent.hs`, append:
     SpellCast PlayerId
 ```
 
-- [ ] **Step 4: Add `castOf` and the four new arms in `Pawl.Event`**
+- [x] **Step 4: Add `castOf` and the four new arms in `Pawl.Event`**
 
 In `source/library/Pawl/Event.hs`, add beside `damageOf`:
 
@@ -517,7 +517,7 @@ Add `GameEvent.SpellCast _ -> Nothing` to `movedOf` (line 65) and to `damageOf` 
 
 In `source/library/Pawl/Quantity.hs`, add `GameEvent.SpellCast _ -> False` to `died` (line 89).
 
-- [ ] **Step 5: Add the codec arms**
+- [x] **Step 5: Add the codec arms**
 
 In `source/library/Pawl/Codec.hs`, add to `gameEventToJson`:
 
@@ -531,7 +531,7 @@ and to `jsonToGameEvent`'s case:
     ("SpellCast", Just v) -> GameEvent.SpellCast <$> jsonToPlayerId v
 ```
 
-- [ ] **Step 6: Emit it from `Cast.castSpell`**
+- [x] **Step 6: Emit it from `Cast.castSpell`**
 
 In `source/library/Pawl/Cast.hs`, inside the `Just paid -> do` branch (line 201), insert the emission between `Event.changeZone` and `moved <- State.get`:
 
@@ -548,12 +548,12 @@ In `source/library/Pawl/Cast.hs`, inside the `Just paid -> do` branch (line 201)
                 moved <- State.get
 ```
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — both `CastSpec` cases and the codec round-trip green, everything else unchanged. `PropertySpec`'s conservation properties must still hold: a `SpellCast` entry in the log is not an object and moves nothing.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add source/library/Pawl source/test-suite
@@ -587,7 +587,7 @@ The sole casing home arrives with its first question, its first two read sites, 
 - Consumes: `PlayerEffect.PlayerEffect`, `PlayerScope.PlayerScope`, `PlayerStaticAbility.{scope,effect}`, `Card.playerAbilities` (Task 1); `Event.castOf`, `GameEvent.SpellCast` (Task 2).
 - Produces: `Pawl.PlayerEffect.applying :: PlayerId -> GameState -> [PlayerEffect]`; `Pawl.PlayerEffect.inScope :: PlayerId -> PlayerId -> PlayerScope -> Bool`; `Pawl.PlayerEffect.prohibitsCasting :: PlayerId -> GameState -> Bool`; `Cards.ruleOfLawPrinting :: Cards -> Printing`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `source/test-suite/Pawl/PlayerEffectSpec.hs`. Note the dual alias: the logic module is `PlayerEffect`, the type module is `PlayerEffect.Type` (the `Expiry.Type` precedent).
 
@@ -744,12 +744,12 @@ m45p7CardTests cards =
     ]
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Could not find module 'Pawl.PlayerEffect'`, `Variable not in scope: Cards.ruleOfLawPrinting`.
 
-- [ ] **Step 3: Create `Pawl.PlayerEffect`**
+- [x] **Step 3: Create `Pawl.PlayerEffect`**
 
 `source/library/Pawl/PlayerEffect.hs`:
 
@@ -873,7 +873,7 @@ prohibitsCasting pid gs =
    in any prohibits (applying pid gs)
 ```
 
-- [ ] **Step 4: Gate both casting sites**
+- [x] **Step 4: Gate both casting sites**
 
 In `source/library/Pawl/Cast.hs`, `castable` becomes:
 
@@ -924,7 +924,7 @@ castableWhileSearching pid gs =
 
 Add `import qualified Pawl.PlayerEffect as PlayerEffect` to `Pawl.Cast`.
 
-- [ ] **Step 5: Write the card file**
+- [x] **Step 5: Write the card file**
 
 Create `data/cards/rule-of-law.json` with exactly this content, on one line, with a trailing newline:
 
@@ -953,18 +953,18 @@ HS
 
 Expected: no output (the file parsed and was re-rendered in place).
 
-- [ ] **Step 6: Register the printing**
+- [x] **Step 6: Register the printing**
 
 In `source/test-suite/Pawl/Cards.hs`, add `ruleOfLawPrinting :: Printing.Printing` to the `Cards` record (at the end, after `hagOfInnerWeaknessPrinting`), `ruleOfLawPrinting_ <- loadPrinting "rule-of-law"` to `loadCards`, the field to the returned `MkCards`, and `ruleOfLawPrinting cards,` to `allPrintings`. Do **not** add it to any deck.
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — the `RuleOfLaw` group green (all six cases), the `CardSpec` shape assertion green, `CardsSpec`'s directory lint and byte-stability green, everything else unchanged.
 
 If the "casting Rule of Law itself uses up the turn's one spell" case fails, the count is being taken from somewhere other than the whole turn log — fix `castsThisTurn`, never the test.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add source/library/Pawl data/cards/rule-of-law.json source/test-suite pawl.cabal
@@ -1002,7 +1002,7 @@ The total-cost computation and the cost-increase arm, taxing both castability an
 - Consumes: `PlayerEffect.applying` (Task 3).
 - Produces: `Pawl.Cost.total :: PlayerId -> ObjectId -> ManaCost -> GameState -> ManaCost`; `Pawl.Cost.applyAdjustments :: ([Natural], [Natural]) -> ManaCost -> ManaCost`; `Pawl.PlayerEffect.costAdjustments :: PlayerId -> ObjectId -> GameState -> ([Natural], [Natural])`; `Pawl.PlayerEffect.matchesSpell :: SpellCriterion -> ObjectId -> GameState -> Bool`; `Subtype.Soldier`; `Cards.thaliaPrinting :: Cards -> Printing`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/PlayerEffectSpec.hs`, add two groups and register both in `tests`:
 
@@ -1151,12 +1151,12 @@ In `source/test-suite/Pawl/CardSpec.hs`, add to `m45p7CardTests`:
                 (Card.Type.playerAbilities c),
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Could not find module 'Pawl.Cost'`, `Data constructor not in scope: Subtype.Soldier`, `Variable not in scope: Cards.thaliaPrinting`.
 
-- [ ] **Step 3: Add the subtype**
+- [x] **Step 3: Add the subtype**
 
 In `source/library/Pawl/Type/Subtype.hs`, append at the **end** of the constructor list (declaration order is the JSON's `Set.toAscList` order, so `Human` must keep preceding `Soldier`):
 
@@ -1172,7 +1172,7 @@ Add the matching arms to `subtypeToJson` and `jsonToSubtype` in `source/library/
   Subtype.Soldier -> Nothing
 ```
 
-- [ ] **Step 4: Add `costAdjustments` and `matchesSpell`**
+- [x] **Step 4: Add `costAdjustments` and `matchesSpell`**
 
 In `source/library/Pawl/PlayerEffect.hs`:
 
@@ -1215,7 +1215,7 @@ costAdjustments pid oid gs =
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
 ```
 
-- [ ] **Step 5: Create `Pawl.Cost`**
+- [x] **Step 5: Create `Pawl.Cost`**
 
 `source/library/Pawl/Cost.hs`:
 
@@ -1295,7 +1295,7 @@ applyAdjustments adjustments cost =
    in ManaCost.MkManaCost (leading ++ filter isTyped symbols)
 ```
 
-- [ ] **Step 6: Route the three cost sites through `Pawl.Cost`**
+- [x] **Step 6: Route the three cost sites through `Pawl.Cost`**
 
 In `source/library/Pawl/Cast.hs`, add `import qualified Pawl.Cost as Cost` and change the three sites.
 
@@ -1328,7 +1328,7 @@ In `source/library/Pawl/Cast.hs`, add `import qualified Pawl.Cost as Cost` and c
             let paidCost = Cost.total pid oid (maybe cost (\x -> Mana.substituteX x cost) mAmount) gs
 ```
 
-- [ ] **Step 7: Write the card file and register the printing**
+- [x] **Step 7: Write the card file and register the printing**
 
 Create `data/cards/thalia-guardian-of-thraben.json` with exactly this content, on one line, with a trailing newline:
 
@@ -1338,12 +1338,12 @@ Create `data/cards/thalia-guardian-of-thraben.json` with exactly this content, o
 
 Run the `regen` recipe from Task 3 Step 5 against `data/cards/thalia-guardian-of-thraben.json` and confirm it produces no output. Register `thaliaPrinting` in `source/test-suite/Pawl/Cards.hs` (record field, `loadCards` with slug `"thalia-guardian-of-thraben"`, `MkCards`, `allPrintings`). Do **not** add it to any deck.
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — `Adjustments` and `Thalia` green, the `CardSpec` shape assertion green, everything else unchanged.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add source/library/Pawl data/cards/thalia-guardian-of-thraben.json source/test-suite pawl.cabal
@@ -1375,7 +1375,7 @@ The reduction producer, the `You` scope, and the one test that can tell CR 601.2
 - Consumes: `Cost.total`, `Cost.applyAdjustments`, `PlayerEffect.costAdjustments` (Task 4); `Cards.thaliaPrinting` (Task 4).
 - Produces: `Cards.sapphireMedallionPrinting :: Cards -> Printing`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/PlayerEffectSpec.hs`, add a group and register it in `tests`:
 
@@ -1497,12 +1497,12 @@ In `source/test-suite/Pawl/CardSpec.hs`, add to `m45p7CardTests`:
                 (Card.Type.playerAbilities c),
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Variable not in scope: Cards.sapphireMedallionPrinting`.
 
-- [ ] **Step 3: Write the card file**
+- [x] **Step 3: Write the card file**
 
 Create `data/cards/sapphire-medallion.json` with exactly this content, on one line, with a trailing newline:
 
@@ -1512,18 +1512,18 @@ Create `data/cards/sapphire-medallion.json` with exactly this content, on one li
 
 Run the `regen` recipe from Task 3 Step 5 against it; expect no output.
 
-- [ ] **Step 4: Register the printing**
+- [x] **Step 4: Register the printing**
 
 In `source/test-suite/Pawl/Cards.hs`, add `sapphireMedallionPrinting` (record field, `loadCards` with slug `"sapphire-medallion"`, `MkCards`, `allPrintings`). Do **not** add it to any deck.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — `SapphireMedallion` green (all six cases, the order test included).
 
 If the order test reports `{1}{U}`, the reduction is being applied before the increase — fix `Cost.applyAdjustments`, never the test. If it reports `{0}` or an empty cost for the `{U}` case, the reduction is coming off the coloured component and CR 118.7a is being violated.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add data/cards/sapphire-medallion.json source/test-suite
@@ -1557,7 +1557,7 @@ The value-override arm, read off the casting path entirely — and the separatio
 - Consumes: `PlayerEffect.applying` (Task 3).
 - Produces: `PlayerEffect.defaultMaximumHandSize :: Natural`; `PlayerEffect.maximumHandSize :: PlayerId -> GameState -> Maybe Natural`; `Cards.reliquaryTowerPrinting :: Cards -> Printing`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/PlayerEffectSpec.hs`, add a group and register it in `tests`:
 
@@ -1633,12 +1633,12 @@ In `source/test-suite/Pawl/CardSpec.hs`, add to `m45p7CardTests`:
 
 `Modal.allEffects` here is `Pawl.Modal`'s; if `CardSpec` imports only `Pawl.Type.Modal`, use `Foldable.toList (Mode.effects m)` over the single mode instead, exactly as the P6 Master Thief assertion does.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Variable not in scope: PlayerEffect.maximumHandSize`, `Cards.reliquaryTowerPrinting`.
 
-- [ ] **Step 3: Add `maximumHandSize`**
+- [x] **Step 3: Add `maximumHandSize`**
 
 In `source/library/Pawl/PlayerEffect.hs`:
 
@@ -1666,7 +1666,7 @@ maximumHandSize pid gs =
         else Just defaultMaximumHandSize
 ```
 
-- [ ] **Step 4: Read it at the cleanup step**
+- [x] **Step 4: Read it at the cleanup step**
 
 In `source/library/Pawl/Engine.hs`, `discardToHandSize` becomes:
 
@@ -1692,7 +1692,7 @@ discardToHandSize pid = do
 
 Add `import qualified Pawl.PlayerEffect as PlayerEffect`. Drop the `Pawl.Setup` import **only** if nothing else in `Engine` uses it.
 
-- [ ] **Step 5: Write the card file and register the printing**
+- [x] **Step 5: Write the card file and register the printing**
 
 Create `data/cards/reliquary-tower.json` with exactly this content, on one line, with a trailing newline:
 
@@ -1702,12 +1702,12 @@ Create `data/cards/reliquary-tower.json` with exactly this content, on one line,
 
 Run the `regen` recipe from Task 3 Step 5 against it; expect no output. Register `reliquaryTowerPrinting` in `source/test-suite/Pawl/Cards.hs` (slug `"reliquary-tower"`). Do **not** add it to any deck.
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — `ReliquaryTower` green (all six cases), the `CardSpec` shape assertion green, and **every pre-existing cleanup test still green**: `defaultMaximumHandSize` is 7, the same number `Setup.openingHand` was, so no existing behaviour changes.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl data/cards/reliquary-tower.json source/test-suite
@@ -1744,7 +1744,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Consumes: `PlayerEffect.applying`, `PlayerEffect.prohibitsCasting` (Task 3); `Expiry.Expiry`, `Expiry.dropAtCleanup`, `Expiry.dropAtHandoff`, `Expiry.sweepConditional` (P6).
 - Produces: `ActivePlayerEffect.MkActivePlayerEffect {source :: ObjectId, controller :: PlayerId, timestamp :: Timestamp, expiry :: Expiry, scope :: PlayerScope, effect :: PlayerEffect}`; `GameState.playerEffects :: [ActivePlayerEffect]`; `S.addPlayerEffect :: Expiry -> PlayerScope -> PlayerEffect -> PlayerId -> GameState -> GameState`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/Support.hs`, add the fixture:
 
@@ -1833,12 +1833,12 @@ storedTests =
         ]
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Could not find module 'Pawl.Type.ActivePlayerEffect'`, `GameState.playerEffects` not in scope.
 
-- [ ] **Step 3: Create `Pawl.Type.ActivePlayerEffect`**
+- [x] **Step 3: Create `Pawl.Type.ActivePlayerEffect`**
 
 ```haskell
 module Pawl.Type.ActivePlayerEffect where
@@ -1890,7 +1890,7 @@ data ActivePlayerEffect = MkActivePlayerEffect
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the `GameState` field and both construction sites**
+- [x] **Step 4: Add the `GameState` field and both construction sites**
 
 In `source/library/Pawl/Type/GameState.hs`, add the import and this field beside `replacements`:
 
@@ -1904,7 +1904,7 @@ In `source/library/Pawl/Type/GameState.hs`, add the import and this field beside
 
 Add `GameState.playerEffects = [],` to `Setup.emptyGame`'s record (beside `GameState.replacements = []`) and to `Support.hs`'s `MkGameState` at line 840.
 
-- [ ] **Step 5: Grow `applying`'s second carrier**
+- [x] **Step 5: Grow `applying`'s second carrier**
 
 In `source/library/Pawl/PlayerEffect.hs`, `applying` gains the stored half. The `printed` binding is unchanged; add:
 
@@ -1921,7 +1921,7 @@ In `source/library/Pawl/PlayerEffect.hs`, `applying` gains the stored half. The 
    in map effectOf (filter keep (printed ++ stored))
 ```
 
-- [ ] **Step 6: Grow `Pawl.Expiry`'s three sweeps**
+- [x] **Step 6: Grow `Pawl.Expiry`'s three sweeps**
 
 In `source/library/Pawl/Expiry.hs`, each of `dropAtCleanup`, `dropAtHandoff` and `sweepConditional` gains a `keepPlayerEffect` and a third field update. The module's own comment already records why the sweeps are shared — "the two lists lived in two modules, not because they differed" — so extend it to say **three** carriers.
 
@@ -1958,12 +1958,12 @@ In `source/library/Pawl/Expiry.hs`, each of `dropAtCleanup`, `dropAtHandoff` and
         }
 ```
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — `Stored` green (all six cases), everything else unchanged. No existing test creates a stored player effect, so every sweep's behaviour on the other two carriers is untouched.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add source/library/Pawl source/test-suite pawl.cabal
@@ -1998,7 +1998,7 @@ The opcode that fills the stored carrier, and the last gate card — the one tha
 - Consumes: `ActivePlayerEffect`, `GameState.playerEffects` (Task 7); `Expiry.arm` (P6).
 - Produces: `Effect.AffectPlayers :: Duration -> PlayerScope -> PlayerEffect -> Effect card`; `Cards.silencePrinting :: Cards -> Printing`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/CodecSpec.hs`, add to the `"effect"` group:
 
@@ -2109,12 +2109,12 @@ In `source/test-suite/Pawl/CardSpec.hs`, add to `m45p7CardTests`:
               HU.assertEqual "no target slots" Map.empty (Card.allTargetSpecs c)
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Data constructor not in scope: Effect.AffectPlayers`, `Variable not in scope: Cards.silencePrinting`.
 
-- [ ] **Step 3: Add the opcode**
+- [x] **Step 3: Add the opcode**
 
 In `source/library/Pawl/Type/Effect.hs`, add the two imports (`Pawl.Type.PlayerEffect (PlayerEffect)`, `Pawl.Type.PlayerScope (PlayerScope)`) and append:
 
@@ -2131,7 +2131,7 @@ In `source/library/Pawl/Type/Effect.hs`, add the two imports (`Pawl.Type.PlayerE
     AffectPlayers Duration PlayerScope PlayerEffect
 ```
 
-- [ ] **Step 4: Add the six `Pawl.Resolve` arms**
+- [x] **Step 4: Add the six `Pawl.Resolve` arms**
 
 In `source/library/Pawl/Resolve.hs`, add to each existing exhaustive match:
 
@@ -2168,7 +2168,7 @@ and the executor arm in `applyEffect`, beside `Effect.Replace`:
          in gs1 {GameState.playerEffects = active : GameState.playerEffects gs1}
 ```
 
-- [ ] **Step 5: Add the codec arms**
+- [x] **Step 5: Add the codec arms**
 
 In `source/library/Pawl/Codec.hs`, add to `effectToJson`:
 
@@ -2184,7 +2184,7 @@ and to `jsonToEffect`:
       _ -> Left (Text.pack "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]")
 ```
 
-- [ ] **Step 6: Write the card file and register the printing**
+- [x] **Step 6: Write the card file and register the printing**
 
 Create `data/cards/silence.json` with exactly this content, on one line, with a trailing newline:
 
@@ -2194,14 +2194,14 @@ Create `data/cards/silence.json` with exactly this content, on one line, with a 
 
 Run the `regen` recipe from Task 3 Step 5 against it; expect no output. Register `silencePrinting` in `source/test-suite/Pawl/Cards.hs` (slug `"silence"`). Do **not** add it to any deck.
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS — `Silence` green (all five cases), the codec round-trip green, the `CardSpec` shape assertion green.
 
 If the "reaches a spell that did not exist when it began" case fails with bob still able to cast, the scope is being frozen rather than re-resolved — fix `applyEffect`, never the test. If the "only casting is stopped" case fails, the prohibition has leaked past `Cast.castable` into `Action.legalActions`' land or activation branches.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add source/library/Pawl data/cards/silence.json source/test-suite
@@ -2229,7 +2229,7 @@ Every `(#N)` placeholder the earlier tasks left in the code is replaced here wit
 - Modify: `source/library/Pawl/Type/SpellCriterion.hs` (confirm the P9 citation), `source/library/Pawl/Cast.hs`, `source/library/Pawl/Cost.hs`, `source/library/Pawl/PlayerEffect.hs`, `source/library/Pawl/Type/ActivePlayerEffect.hs`
 - Modify: `docs/progress.md`, `CLAUDE.md`, `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`
 
-- [ ] **Step 1: File the eleven new issues**
+- [x] **Step 1: File the eleven new issues**
 
 Run each `gh issue create` and record the number it prints. Labels come from CLAUDE.md's set: `elision`, `gap`, `rules-correctness`, `bug`, `expires:milestone`, `expires:card-driven`. The eleven rows are the spec's §8 table, verbatim in intent.
 
@@ -2247,7 +2247,7 @@ Run each `gh issue create` and record the number it prints. Labels come from CLA
 | J | `Cast.castSpell` computes the total cost against an object still in hand | `rules-correctness`, `expires:card-driven` | CR 601.2f runs after 601.2a has moved the spell to the stack; pawl pays first, so `SpellCriterion` is evaluated against the object's *hand* projection. Newly load-bearing, since the total cost now depends on the spell's projected characteristics. Unreached today — nothing in the pool projects differently in hand than on the stack. Adjacent to #56. Expires on a card whose type or colour differs between the two zones. |
 | K | Turn-structure skips are replacement effects and have no producer | `gap`, `expires:card-driven` | The gap census (`docs/mtgish-gap-census.md` §3.2) lists `SkipsUntapStep`/`SkipsDrawStep`/`SkipsMainPhase` under `PlayerEffect`; **CR 614.1b is explicit that "effects that use the word 'skip' are replacement effects"**, so they belong on P5's `ReplacementEffect`, not this axis. Filed so the census's misplacement is not followed by a later phase. `Engine.skipsDraw`'s CR 103.7a first-turn skip is a turn-based rule, not an effect, and stays where it is. Expires on a skip card, built on P5. |
 
-- [ ] **Step 2: Sweep the `(#N)` placeholders and confirm the cited ones**
+- [x] **Step 2: Sweep the `(#N)` placeholders and confirm the cited ones**
 
 Run: `grep -rn '(#N)' source/`
 
@@ -2271,7 +2271,7 @@ Confirm (do not re-file): `#38`/`#39`/`#40` are the P9 filter-language deferral 
 Run: `grep -rn '(#N)' source/`
 Expected: no output.
 
-- [ ] **Step 3: Verify the exit criterion mechanically**
+- [x] **Step 3: Verify the exit criterion mechanically**
 
 Run each and confirm the expected result:
 
@@ -2307,7 +2307,7 @@ cabal bench                                                             # three 
 
 **Watch the benchmark.** `Cast.castable` now runs `PlayerEffect.applying` twice per card in hand per `legalActions` call, each walking the battlefield. `Projection.controllerOf` is a lean fold and the CR 305.7 check is skipped for a permanent with no player abilities, so the added cost should be small — but if `cabal bench` shows a move beyond the suite's own run-to-run noise (~800 µs stddev on a ~12 ms mean), say so plainly in the completion note rather than rounding it away. Note that `#66` still makes all three benchmarks execute the identical game, so the aggregate is the only honest reading.
 
-- [ ] **Step 4: Append the `docs/progress.md` completion entry**
+- [x] **Step 4: Append the `docs/progress.md` completion entry**
 
 One entry, in the file's established voice, recording what P7 *established* — not what is left. It must state:
 
@@ -2321,11 +2321,11 @@ One entry, in the file's established voice, recording what P7 *established* — 
 - the final suite count, that the build is warning-clean on a from-scratch `cabal clean` build, and the benchmark comparison with `#66` noted;
 - the spec and plan paths, kept as reference.
 
-- [ ] **Step 5: Replace the `CLAUDE.md` status bullet**
+- [x] **Step 5: Replace the `CLAUDE.md` status bullet**
 
 **Replace, never append** — milestone history goes in `progress.md`. The new bullet says M0–M4h plus M4.5 P1–P7 are complete, that P7 closed **GAP-P** and the *modification* half of **GAP-Co** and with it the whole of Cluster 3, and that **P8 (costs) and P9 (filters) float freely**, with P10 (player counters) and P11 (Command zone) remaining. Keep it to the same length as the bullet it replaces.
 
-- [ ] **Step 6: Update the umbrella spec**
+- [x] **Step 6: Update the umbrella spec**
 
 `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`:
 - §3's P7 row (line 109): mark it landed, with a pointer to `docs/superpowers/specs/2026-07-22-p7-player-effects-design.md`. **Correct the row's own description** — it says the axis is "resolved by the projection over players"; it is not, and the reason is CR 613.10/613.11.
@@ -2333,7 +2333,7 @@ One entry, in the file's established voice, recording what P7 *established* — 
 - §6's mapping (line 245): `c5a985d` (GAP-P) → P7, **discharged**.
 - Record the **CR 614.1b skips correction** where the census's §3.2 placement is referenced, so a later phase does not build a `SkipsDrawStep` on the wrong carrier.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add docs/progress.md CLAUDE.md docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md source/library/Pawl
@@ -2353,13 +2353,13 @@ effects. Cluster 3 is closed.
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 8: Close the milestone issue**
+- [x] **Step 8: Close the milestone issue**
 
 ```bash
 gh issue close 3 --comment "Landed. See docs/progress.md for the completion entry and docs/superpowers/plans/2026-07-22-p7-player-effects.md for the executed plan."
 ```
 
-- [ ] **Step 9: Confirm the plan is complete**
+- [x] **Step 9: Confirm the plan is complete**
 
 Run: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-22-p7-player-effects.md`
 Expected: `0`.

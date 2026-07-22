@@ -31,6 +31,10 @@ data PlayerEffect
     -- reduction a restriction an increase does not have -- it "can't affect the
     -- colored or colorless mana components". Collapsing them would put both
     -- rules into arithmetic that cannot state either.
+    --
+    -- The Natural is an amount of GENERIC mana and nothing else. CR 118.7b-g's
+    -- colored, colorless, hybrid, Phyrexian and snow reductions are not
+    -- representable (#91).
     ReduceSpellCost SpellCriterion Natural
   | -- CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize

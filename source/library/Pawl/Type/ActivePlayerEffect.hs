@@ -28,11 +28,13 @@ import Pawl.Type.Timestamp (Timestamp)
 -- type on both carriers.
 --
 -- `expiry` decides when a Pawl.Expiry sweep drops it (CR 514.2, 611.2a, 611.2b).
+-- Only AtCleanup has a producer: no card arms While or AtTurnOf on this carrier,
+-- so those two sweeps run against hand-built fixtures alone (#97).
 --
 -- `timestamp` is stored even though nothing observes it yet: CR 613.10 and 613.11
 -- both order by timestamp (CR 613.7), and no two of P7's constructors conflict,
 -- so the order is unobservable in this pool. Stamping at creation is free;
--- retrofitting an order onto effects already stored is not (#N).
+-- retrofitting an order onto effects already stored is not (#93).
 --
 -- Runtime-only, like Expiry and ActiveReplacement: it never appears in card JSON
 -- and has no codec, which is what keeps a stored value out of a card file and a

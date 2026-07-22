@@ -1490,3 +1490,166 @@ its own gate card and spec, landed as it completes. Umbrella:
   plan kept as reference:
   `docs/superpowers/specs/2026-07-22-p6-conditional-event-durations-design.md`
   and `docs/superpowers/plans/2026-07-22-p6-conditional-event-durations.md`.
+- **M4.5 P7 is complete** (player and rules-modifying continuous effects,
+  GAP-P plus the *modification* half of GAP-Co, and with them the whole of
+  Cluster 3). CR 611.1's third clause finally has a carrier: a continuous effect
+  that "affects players or the rules of the game" rather than the
+  characteristics of an object. **The structural fact the whole phase rests on
+  is that this axis is *outside* the layer system.** CR 613.1 makes the seven
+  layers a machine for computing an *object's* characteristics; CR 613.10 and CR
+  613.11 apply their effects *after* that machine has run. So there is no new
+  `Layer`, no new `Modification`, no `Affected` constructor, and
+  `Pawl.Projection` was **read from and never edited** — mechanically proven,
+  not asserted: `git diff --stat 1b5d24a -- Pawl/Projection.hs
+  Pawl/Type/{Layer,Modification,Affected,ContinuousEffect,StaticAbility,Player}.hs`
+  is empty across the phase's twelve commits. The first invariant has the same
+  kind of audit from the other side: a tree-wide grep for any `PlayerEffect.`,
+  `PlayerScope.` or `SpellCriterion.` constructor outside `Pawl.PlayerEffect`,
+  `Pawl.Codec` and `Pawl.Type.*` returns nothing, so **`Pawl.PlayerEffect` is
+  the sole rules home of casing on this axis** — the standing that `Pawl.Resolve`
+  has over `Effect`, `Pawl.Projection` over `Modification` and `Pawl.Expiry`
+  over `Expiry`. `Pawl.Resolve` names `AffectPlayers` as an opcode and passes its
+  payload through *without importing the payload's type at all*: the invariant
+  is enforced by the import list, not by discipline. **Five gate cards, each
+  falsifying a different fixed point.** **Rule of Law** ("each player can't cast
+  more than one spell each turn") makes the count a fold over P4's *whole* turn
+  log rather than anything watermark-bounded, because the spell that used up the
+  allowance is Rule of Law itself — cast before the effect existed — and the
+  counted event is the **cast** (CR 601.2i), so a countered spell still counts;
+  its own ruling demands exactly this ("looks at the entire turn … even if Rule
+  of Law wasn't on the battlefield when that spell was cast"). **Thalia,
+  Guardian of Thraben** proves the tax has to land on *both* castability and
+  payment: taxing only the payment underpays the offer, and taxing only the
+  offer wedges a game that has no rewind (#56). **Sapphire Medallion** is CR
+  118.7a — a reduction takes only the *generic* component, so `{1}` off `{U}`
+  leaves `{U}` — and, crossed with Thalia on a cost with **no** generic
+  component at all, is the one board shape that can tell CR 601.2f's order
+  (every increase, *then* every reduction) from its reverse. **Reliquary Tower**
+  makes "no maximum hand size" a `Nothing` threaded end to end with no sentinel,
+  and splits CR 402.2 into its own rule with its own seven, separate from CR
+  103.5's opening hand: `defaultMaximumHandSize` is an independent literal, and
+  `Setup.openingHand` now serves only the opening draw — the two sevens the
+  rules keep apart are finally apart in the engine. **Silence** is CR 611.2c's
+  third sentence, and the card does *literally nothing* without it: 611.2c's
+  first sentence freezes a stored effect's object set, but its third carves out
+  exactly this axis — such an effect "modifies the rules of the game, so it can
+  affect objects that weren't affected when that continuous effect began" — so a
+  stored `ActivePlayerEffect`'s `scope` is recomputed fresh on every `applying`
+  call and never frozen, while its `controller` *is* baked in at creation
+  (Silence is an instant, so by the time its effect is live the source is in a
+  graveyard with no controller left to project). **A census correction, filed so
+  a later phase does not inherit it.** `docs/mtgish-gap-census.md` §3.2 lists
+  `SkipsUntapStep`/`SkipsDrawStep`/`SkipsMainPhase` under `PlayerEffect`. They do
+  not belong on this axis: **CR 614.1b** is explicit that "effects that use the
+  word 'skip' are replacement effects", so they are P5's carrier, not P7's.
+  Filed as #98. `Engine.skipsDraw`'s CR 103.7a first-turn skip is a *turn-based
+  rule* rather than an effect and correctly stays where it is. **Added:**
+  `Pawl.Type.PlayerEffect` (`CantCastSpells | CantCastMoreThan |
+  IncreaseSpellCost | ReduceSpellCost | NoMaximumHandSize` — increase and reduce
+  are two constructors, never one signed delta, because CR 601.2f orders them
+  and CR 118.7a restricts only the reduction), `Pawl.Type.PlayerScope`,
+  `Pawl.Type.SpellCriterion`, `Pawl.Type.PlayerStaticAbility` (the printed
+  carrier) and `Pawl.Type.ActivePlayerEffect` (the stored one); `Pawl.PlayerEffect`
+  (`applying`, `inScope`, `prohibitsCasting`, `castsThisTurn`, `costAdjustments`,
+  `matchesSpell`, `maximumHandSize`, `defaultMaximumHandSize`) and `Pawl.Cost`
+  (`total`, `applyAdjustments`); `Card.playerAbilities`,
+  `GameState.playerEffects`, `Effect.AffectPlayers`, `GameEvent.SpellCast`,
+  `Event.castOf`, `Subtype.Soldier`; six read sites (`Cast.castable`,
+  `Cast.castableWhileSearching`, `Cast.castSpell`, `Engine.discardToHandSize`,
+  `Pawl.Expiry`'s three sweeps, `Pawl.Resolve`); and five card files. **Four
+  deliberate departures from P7's own spec**, refinements rather than drift:
+  (1) `Pawl.Cost` is factored into a stateful `total` and a **pure**
+  `applyAdjustments :: ([Natural], [Natural]) -> ManaCost -> ManaCost`, which is
+  what lets the CR 601.2f order and the CR 118.7a floor be unit-tested without a
+  board; (2) the total cost is **canonicalized** — one leading `Generic` symbol,
+  then the printed typed symbols in order, a zero generic component dropped
+  entirely — because the spec's own order test demands the answer be *exactly*
+  `{U}`, and `Mana.spend` sums every generic symbol anyway, so this is
+  presentation and not semantics; (3) the printed gather honours **CR 305.7**,
+  which the spec does not mention: Reliquary Tower is a nonbasic land and Blood
+  Moon is in the pool, so an ability read straight off the card would survive
+  having its land's subtype set to a basic type — the gather reuses
+  `Projection.liveGiven`, exactly as `Projection.gather` does, and the
+  differential test (Tower alone → `Nothing`; Tower under Blood Moon → `Just 7`)
+  proves the strip really happens; (4) `applying` grew its **second** carrier in
+  the seventh task rather than arriving with both, so no task left a
+  `GameState` field that nothing writes. **No prompt was added, and one is asked
+  less often.** `Prompt.ChooseDiscard` is skipped *entirely* for a player with no
+  maximum hand size — the absence of a choice, not the making of one — rather
+  than prompting for zero cards. The single elision is CR 601.2f's "if multiple
+  cost reductions apply, the player may apply them in any order" (#88):
+  `applyAdjustments` sums, which is equivalent not to *some* order but to
+  **every** order, because CR 118.7a routes every reduction P7 can express to the
+  same generic component. **The phase's transferable lesson is about
+  citations, and it is sharper than P5's or P6's.** The *plan itself* shipped
+  three classes of rule-citation error, and review caught all three: CR 102.1
+  where 102.2 was meant (102.1 defines *player*; 102.2 is the two-player
+  opponent rule, and 102.3's teams are exactly why the implementation's
+  `pid /= controller` carries a documented two-player assumption); CR 118.7e for
+  601.2f's "reductions in any order" (118.7e is about *hybrid* symbols, and the
+  sentence lives in 601.2f); and CR 613.11 attached at **four** sites to claims
+  it does not support — it governs the *application order* of rules-modifying
+  effects and explicitly defers cost order to 601.2f, so it substantiates the
+  tier, `costAdjustments` and `maximumHandSize`, but says nothing about which
+  spells a criterion admits (CR 613.1d/613.1e do). **Every one of the three was a
+  wrong justification attached to correct behaviour**, which is the failure mode
+  worth naming: a citation error never showed up as a failing test, only as a
+  reader being misled, and the only thing that caught any of them was somebody
+  opening `rules.txt`. Two implementers refused a brief-specified citation on
+  that evidence and were right both times. **Two of the plan's own tests were not
+  discriminating**, and strengthening them was not weakening the plan: the
+  turn-handoff sweep for the new stored carrier stored one entry and asserted
+  the list empties, which a `\_ -> False` keep-predicate would also satisfy; and
+  the conditional sweep used a stand-in source that was never on the battlefield,
+  so its condition was false from construction and no case proved an effect
+  *survives* while its condition holds. Both were fixed and then verified by
+  **sabotage** — break the keep-predicate, watch the new case fail with real
+  output, revert, watch it pass — and the first sabotage attempt landed on
+  `dropAtCleanup`'s identically shaped line and was caught by the *wrong* test
+  failing, which is itself evidence the cases now discriminate. Separately,
+  `Cast.castableWhileSearching`'s prohibition gate was implemented but **untested**
+  — a stated spec requirement running unproven — and is now covered, with a
+  positive control so the negative assertion cannot pass because the Panglacial
+  Wurm was never castable at all. **Tracking:** **#3 is closed**, and with it
+  git-bug `c5a985d` (GAP-P) and the *modification* half of GAP-Co; **#4** (P8,
+  the cost *payment* half) stays open, and `Pawl.Cost.total` cites it where
+  additional and alternative costs would land. #38 (`StateCondition`), #39
+  (`CountSpec`) and #40 (the `TargetSpec` family) are cited and **not** retired —
+  `Pawl.Type.SpellCriterion` joins that list as a **fourth** member of the family
+  P9's filter language replaces, and says so in its own header. Eleven deferrals
+  filed and cited at their code sites: #88 (CR 601.2f's reduction order) and #89
+  (`castSpell` computes the total cost against an object still in *hand*, CR
+  601.2a having already moved it to the stack) were filed during the phase rather
+  than batched at close-out; #90 (activated-ability cost modification has no
+  producer — `Pawl.Activate` hands `AbilityCost.mana` straight to `Pawl.Mana` and
+  never reaches `Cost.total`), #91 (CR 118.7b–g's colored, colorless, hybrid,
+  Phyrexian and snow reductions are unrepresentable behind `ReduceSpellCost`'s
+  bare `Natural`), #92 (CR 613.10's *player*-affecting tier — protection from red
+  for a player — is a genuinely distinct tier from 613.11's rules tier and has no
+  constructor), #93 (CR 613.10/613.11 both order by timestamp; `applying` returns
+  its effects unsorted, unobservably so because none of the five constructors
+  conflicts with another, and the field is stored so the fix is a sort rather
+  than a migration — expires on Null Profusion + Reliquary Tower, the pair
+  Reliquary Tower's own ruling names), #94 (CR 601.2f's "locked in" total cost is
+  recomputed on demand rather than stored), #95 (CR 601.3a's quality-bearing
+  prohibitions are unrepresentable — `prohibitsCasting` takes no `ObjectId`
+  because both of P7's prohibitions are quality-free; Void Winnower is 601.3a's
+  own worked example), #96 (player-scoped casting and land-play permissions have
+  no carrier: `Card.castingPermissions` is object-scoped for Panglacial Wurm, and
+  `Pawl.Action`'s land gate is a `Set PlayerId` where CR 305.2a wants a count),
+  #97 (no card arms a conditional or turn-relative expiry on the stored player
+  carrier, the sibling of #84 on the third and last carrier) and #98 (the CR
+  614.1b skips correction above). **Final suite 788/788**, warning-clean on a
+  from-scratch `cabal clean` build, `hooky run` clean. `cabal bench`: goldfish
+  11.7ms, casting 12.9ms, fighting 12.9ms against P6's 11.6/12.6/12.6 — issue
+  #66 (pre-existing) still makes all three benchmarks execute the identical game,
+  so the per-scenario split is meaningless and the aggregate is the only honest
+  reading. The +0.3ms is roughly a third of the suite's own ±0.9ms stddev and
+  reproduced across two runs, so it is **inside the noise, not a clean
+  no-change**: `Cast.castable` now calls `PlayerEffect.applying` per card in hand
+  per `legalActions`, each call walking the battlefield, which is real work the
+  benchmark cannot resolve. If `legalActions` ever gets hot, hoisting the
+  spell-independent `prohibitsCasting` out of the per-card loop is the first
+  move. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-22-p7-player-effects-design.md` and
+  `docs/superpowers/plans/2026-07-22-p7-player-effects.md`.

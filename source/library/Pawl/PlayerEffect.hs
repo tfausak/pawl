@@ -124,7 +124,7 @@ castsThisTurn pid gs =
 -- quality-free -- "can't cast spells", "can't cast more than one spell" -- so the
 -- answer does not depend on WHICH spell, and a parameter nothing reads would
 -- assert a generality this phase has not built. It grows an ObjectId when CR
--- 601.3a's quality-bearing prohibitions do (#N).
+-- 601.3a's quality-bearing prohibitions do (#95).
 prohibitsCasting :: PlayerId -> GameState -> Bool
 prohibitsCasting pid gs =
   let cast = castsThisTurn pid gs

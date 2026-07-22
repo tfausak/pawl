@@ -9,7 +9,9 @@ import Pawl.Type.Color (Color)
 -- third sibling of Pawl.Type.CardCriterion and Pawl.Type.PermanentCriterion,
 -- deliberately NOT merged with either: P9 merges all of them into one filter
 -- language, and merging two of them here would be building half of P9 with one
--- customer (#38/#39/#40 are the same deferral for the other three).
+-- customer. This type is retired by that merge as a FOURTH member of the family
+-- #38 (StateCondition), #39 (CountSpec) and #40 (the TargetSpec family) already
+-- record.
 --
 -- Both inhabitants are evaluated against the PROJECTION by
 -- Pawl.PlayerEffect.matchesSpell, never against a printed characteristic: a card
