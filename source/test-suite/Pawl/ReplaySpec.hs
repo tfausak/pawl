@@ -70,7 +70,16 @@ combatReplayTests =
           HU.testCase "defaultAnswer assigns a LEGAL division" $
             -- Total must equal the attacker's power, or the fallback would be
             -- rejected by validation and deal no damage at all.
-            HU.assertEqual "all to one blocker" (Map.singleton (Recipient.ToCreature oid) 2) (Replay.defaultAnswer damagePrompt)
+            HU.assertEqual "all to one blocker" (Map.singleton (Recipient.ToCreature oid) 2) (Replay.defaultAnswer damagePrompt),
+          HU.testCase "OrderTriggers records and replays a permutation" $
+            let p = Prompt.OrderTriggers decider S.alice [oid, ObjectId.MkObjectId 8]
+                answer = [1, 0] :: [Natural.Natural]
+             in HU.assertEqual "round-trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
+          HU.testCase "defaultAnswer keeps the canonical order" $
+            HU.assertEqual
+              "identity permutation"
+              [0, 1 :: Natural.Natural]
+              (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice [oid, ObjectId.MkObjectId 8]))
         ]
 
 replayTests :: Cards.Cards -> Tasty.TestTree

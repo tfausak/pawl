@@ -50,6 +50,7 @@ newest = Maybe.listToMaybe . List.sortOn Ord.Down
 copyNewest :: Prompt.Prompt r -> r
 copyNewest p = case p of
   Prompt.ChooseCopyTarget _ _ _ legal -> newest legal
+  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   _ -> S.identityAnswer p
 
 -- Resolve the stack top (a permanent enters) AND run the settle boundary (so the

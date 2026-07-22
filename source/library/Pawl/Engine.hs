@@ -11,6 +11,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Binding as Binding
@@ -206,7 +207,8 @@ placePendingTriggers = do
       { GameState.scannedThrough = fromIntegral (Seq.length (GameState.events gs)),
         GameState.delayedTriggers = surviving
       }
-  Monad.mapM_ placeOne (apnapOrder gs pending)
+  ordered <- orderPending pending
+  Monad.mapM_ placeOne ordered
   pure (not (null pending))
 
 -- Put one triggered ability on the stack as a fresh OfTrigger object, choosing
@@ -287,13 +289,50 @@ placeOne pending = do
       -- 0.
       State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Map.union (Binding.fromChoices chosen Map.empty Nothing chosenModes) (PendingTrigger.bindings pending))}) abilId (GameState.objects g)})
 
--- CR 603.3b: active player's triggers first, then the others. Stable within a
--- controller; the within-controller ORDER becomes that player's choice at Task 7.
-apnapOrder :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
-apnapOrder gs pend =
-  let active = GameState.activePlayer gs
-      mine pt = PendingTrigger.controller pt == active
-   in filter mine pend ++ filter (not . mine) pend
+-- CR 101.4 / 603.3b: the players who control a pending trigger, active player
+-- first and then the rest in turn order. Replaces M3f's apnapOrder, which sorted
+-- the triggers directly -- with a within-controller ORDER now being a choice, the
+-- pass has to group by controller first.
+apnapPlayers :: GameState -> [PendingTrigger.PendingTrigger] -> [PlayerId]
+apnapPlayers gs pending =
+  let order = GameState.turnOrder gs
+      active = GameState.activePlayer gs
+      rotated = dropWhile (/= active) order ++ takeWhile (/= active) order
+      controls pid = any (\pt -> PendingTrigger.controller pt == pid) pending
+   in filter controls rotated
+
+-- CR 603.3b: APNAP across controllers, and within one controller's set, that
+-- player's chosen order. Asked only when they control two or more.
+orderPending :: [PendingTrigger.PendingTrigger] -> Game [PendingTrigger.PendingTrigger]
+orderPending pending = do
+  gs <- State.get
+  groups <- Monad.mapM (orderFor gs pending) (apnapPlayers gs pending)
+  pure (concat groups)
+
+orderFor :: GameState -> [PendingTrigger.PendingTrigger] -> PlayerId -> Game [PendingTrigger.PendingTrigger]
+orderFor gs pending pid = do
+  let mine = filter (\pt -> PendingTrigger.controller pt == pid) pending
+  if length mine < 2
+    then pure mine
+    else do
+      let decider = Decide.deciderFor pid gs
+      answer <- Trans.lift (Program.prompt (Prompt.OrderTriggers decider pid (map PendingTrigger.source mine)))
+      pure (permute mine answer)
+
+-- Reject-not-repair, as payment already does: only a genuine permutation of the
+-- offered indices is honoured. Anything else -- a short answer, a duplicate, an
+-- out-of-range index -- leaves the canonical order standing rather than dropping
+-- or duplicating a trigger.
+permute :: [a] -> [Natural] -> [a]
+permute xs order =
+  let canonical :: [Natural]
+      canonical = map fromIntegral (take (length xs) [0 :: Int ..])
+      at i = case drop (fromIntegral i) xs of
+        h : _ -> Just h
+        [] -> Nothing
+   in if List.sort order == canonical
+        then Maybe.mapMaybe at order
+        else xs
 
 -- CR 614.1c / 603.6d / 614.12a: drain each object still carrying an as-enters copy
 -- marker, resolving its choice AT the CR 117.5 boundary but BEFORE state-based

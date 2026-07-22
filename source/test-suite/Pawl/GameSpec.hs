@@ -282,6 +282,7 @@ recordingAnswer p = case p of
   Prompt.ChooseX {} -> pure 0
   Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
+  Prompt.OrderTriggers _ _ sources -> pure (map fromIntegral (take (length sources) [0 :: Int ..]))
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
@@ -417,6 +418,7 @@ slaveAnswer p = case p of
   Prompt.ChooseX {} -> 0
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
+  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of

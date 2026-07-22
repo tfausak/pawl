@@ -72,3 +72,18 @@ data Prompt r where
   -- lets Clone enter as itself, a 0/0). Answered at the settle boundary (P2 drain),
   -- not at cast -- the choice is made as the object enters.
   ChooseCopyTarget :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Prompt (Maybe ObjectId)
+  -- CR 603.3b: "If a player controlled two or more triggered abilities ... that
+  -- player puts them on the stack in any order they choose." The [ObjectId] is
+  -- that player's pending triggers, each entry its SOURCE object, in the engine's
+  -- canonical order; the answer is a permutation of the entry INDICES, giving the
+  -- order they are PUT ON THE STACK (so the last named resolves first).
+  --
+  -- Positional by necessity, unlike a target slot: two triggers from one source
+  -- are genuinely indistinguishable, so any permutation among identical entries
+  -- is equivalent. Asked ONLY when the player controls two or more -- with one
+  -- there is nothing to choose, and where the rules leave nothing to ask, don't
+  -- prompt. CR 603.3b's TWO-PART process (first the triggers whose condition is
+  -- not another ability triggering, then the rest) is vacuous while no condition
+  -- triggers on another ability triggering; this carries the note, not the
+  -- machinery.
+  OrderTriggers :: Decider -> PlayerId -> [ObjectId] -> Prompt [Natural]

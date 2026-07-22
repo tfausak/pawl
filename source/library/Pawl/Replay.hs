@@ -34,6 +34,7 @@ encode p answer = case p of
   Prompt.ChooseX {} -> Response.ChoseX answer
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
+  Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -83,6 +84,9 @@ decode p response = case p of
   Prompt.ChooseCopyTarget {} -> case response of
     Response.ChoseCopyTarget m -> Just m
     _ -> Nothing
+  Prompt.OrderTriggers {} -> case response of
+    Response.OrderedTriggers order -> Just order
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -131,6 +135,9 @@ defaultAnswer p = case p of
   -- fallback -- Clone is a deterministic fixture, never in a random deck, so
   -- this is never exercised in play.
   Prompt.ChooseCopyTarget {} -> Nothing
+  -- CR 603.3b: the canonical order is always a legal answer, and is the least
+  -- eventful fallback when a transcript runs short.
+  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

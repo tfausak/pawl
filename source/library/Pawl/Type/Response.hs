@@ -36,4 +36,7 @@ data Response
   | -- CR 707.9a: the permanent a copy chose to copy (Nothing = declined),
     -- serialized so a DecisionLog replays an as-enters copy deterministically.
     ChoseCopyTarget (Maybe ObjectId)
+  | -- CR 603.3b: the order a player chose for their simultaneous triggers, as a
+    -- permutation of the offered indices, serialized so a DecisionLog replays it.
+    OrderedTriggers [Natural]
   deriving (Eq, Show)

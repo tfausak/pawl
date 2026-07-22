@@ -5,11 +5,15 @@
 -- event and the CR 603.6a widened scan (every battlefield permanent, not just
 -- an enters event's newcomer) -- `scanTests` below. Task 4 adds CR 603.8
 -- state triggers -- `stateTriggerTests` below. Task 6 adds CR 603.7 delayed
--- triggered abilities -- `delayedTests` below. Later P4 tasks still owe
--- coverage HERE for intervening "if" (CR 603.4 / 608.2a) and the CR 603.3b
--- ordering prompt -- neither is implemented yet.
+-- triggered abilities -- `delayedTests` below. Task 7 adds the CR 603.3b
+-- ordering prompt -- `orderingTests` below. Later P4 tasks still owe coverage
+-- HERE for intervening "if" (CR 603.4 / 608.2a), not yet implemented.
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 module Pawl.TriggerSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -43,6 +47,7 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
@@ -586,5 +591,71 @@ delayedTests cards =
              in HU.assertEqual "the ability's own mode (0), not the captured spell's mode (7)" (Set.singleton (ModeIndex.MkModeIndex 0)) placedModes
         ]
 
+-- CR 603.3b: "that player puts them on the stack in any order they choose". The
+-- centerpiece: two triggers, one controller, and an order that changes the answer.
+orderingTests :: Cards.Cards -> Tasty.TestTree
+orderingTests cards =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      countersOn oid gs = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      -- alice has Khabál Ghoul out and casts Tidal Wave, so both a delayed
+      -- sacrifice and a step trigger are pending at the same end step.
+      board =
+        let (gs0, waveId) = S.handOne (Cards.tidalWavePrinting cards) (S.landsInPlay (Cards.islandPrinting cards) 3)
+            (ghoul, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice gs0
+            cast = resolveAll (snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice waveId)))
+         in (ghoul, beginEndStep cast)
+      -- The source of the OTHER pending trigger: Tidal Wave's delayed ability,
+      -- whose source is the resolved spell's id rather than any permanent.
+      otherThan ghoul gs =
+        let sources = map PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs))
+         in case filter (/= ghoul) sources of
+              oid : _ -> oid
+              [] -> ghoul
+      -- An answerer that puts a chosen source LAST on the stack, so it resolves
+      -- FIRST (CR 603.3b's answer is the order they are PUT on the stack).
+      orderLast :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      orderLast wanted p = case p of
+        Prompt.OrderTriggers _ _ sources ->
+          let indexed = zip [0 :: Int ..] sources
+              pick keep = map (fromIntegral . fst) (filter (\entry -> (snd entry == wanted) == keep) indexed)
+           in pick False ++ pick True
+        _ -> S.identityAnswer p
+      -- Counts how many times the ordering prompt was asked, answering canonically.
+      countingAnswer :: Prompt.Prompt r -> State.State Int r
+      countingAnswer p = case p of
+        Prompt.OrderTriggers _ _ sources -> do
+          State.modify' (+ 1)
+          pure (map fromIntegral (take (length sources) [0 :: Int ..]))
+        _ -> pure (S.identityAnswer p)
+   in Tasty.testGroup
+        "TriggerOrdering"
+        [ HU.testCase "CR 603.3b two triggers under one controller ask for an order, exactly once" $
+            let (_, gs) = board
+                (_, asked) = State.runState (Engine.runGame countingAnswer gs Engine.settleForPriority) 0
+             in HU.assertEqual "asked once" 1 asked,
+          -- Sacrifice resolves FIRST: the Wall token dies, and CR 608.2h has the
+          -- Ghoul count it when its own effect is applied. The token has NO printed
+          -- card (CR 111.3) and its death happened at a boundary the scan already
+          -- passed -- so a re-derived type line or a drained queue both read zero.
+          --
+          -- orderLast's argument is the source PUT LAST on the stack, i.e. the one
+          -- that RESOLVES FIRST (CR 603.3b, see orderLast's own comment above): for
+          -- the sacrifice to resolve first, the OTHER (non-Ghoul) trigger is the one
+          -- named -- not the Ghoul itself.
+          HU.testCase "CR 608.2h sacrificing first makes the Ghoul count the token" $
+            let (ghoul, gs) = board
+                after = snd (Engine.runGamePure (orderLast (otherThan ghoul gs)) gs Engine.priorityLoop)
+             in HU.assertEqual "the token was counted" 1 (countersOn ghoul after),
+          -- The Ghoul resolves FIRST: the token is still alive, so it is not
+          -- counted. Same board, same cards, opposite answer -- which is what makes
+          -- the ordering a genuine choice rather than a formality.
+          HU.testCase "CR 608.2h counting first means the token is still alive and is not counted" $
+            let (ghoul, gs) = board
+                after = snd (Engine.runGamePure (orderLast ghoul) gs Engine.priorityLoop)
+             in HU.assertEqual "nothing counted" 0 (countersOn ghoul after)
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards, stateTriggerTests cards, historyTests cards, delayedTests cards]
+tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards, stateTriggerTests cards, historyTests cards, delayedTests cards, orderingTests cards]
