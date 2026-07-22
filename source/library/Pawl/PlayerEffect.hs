@@ -37,7 +37,10 @@ import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
 inScope :: PlayerId -> PlayerId -> PlayerScope -> Bool
 inScope pid controller scope = case scope of
   PlayerScope.You -> pid == controller
-  -- CR 102.1: a player's opponents are the other players in the game.
+  -- CR 102.2: "In a two-player game, a player's opponent is the other
+  -- player." `pid /= controller` is exactly that, but only in a two-player
+  -- game -- CR 102.3 makes a teammate NOT an opponent in a team game, so this
+  -- carries an unstated two-player assumption.
   PlayerScope.Opponents -> pid /= controller
   -- Thalia's ruling: "including your own".
   PlayerScope.EachPlayer -> True
@@ -92,8 +95,10 @@ castsThisTurn pid gs =
    in toInteger (length (filter mine (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events gs)))))
 
 -- CR 601.3: "a player can begin to cast a spell only if ... no rule or effect
--- prohibits that player from casting it". The prohibit half; Cast
--- .permitsCastWhileSearching is the allow half.
+-- prohibits that player from casting it". The prohibit half. Cast
+-- .permitsCastWhileSearching is not the general allow half of CR 601.3 (the
+-- ordinary casting permission) -- it is only the Panglacial Wurm timing
+-- exception, one specific instance of "allows".
 --
 -- CR 101.2 is why this folds as a DISJUNCTION: "When a rule or effect allows or
 -- directs something to happen, and another effect states that it can't happen,

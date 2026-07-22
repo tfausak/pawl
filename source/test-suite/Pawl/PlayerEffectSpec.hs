@@ -71,7 +71,7 @@ ruleOfLawTests cards =
                 (filter isCast (Action.legalActions S.alice afterFirst)),
           -- The limit is counted PER PLAYER: bob has cast nothing this turn, so
           -- EachPlayer does not prohibit him.
-          HU.testCase "CR 611.1 the EachPlayer scope still counts each player's own casts" $
+          HU.testCase "CR 109.5 the EachPlayer scope still counts each player's own casts" $
             HU.assertBool "bob is not prohibited" (not (PlayerEffect.prohibitsCasting S.bob afterFirst)),
           -- CR 608.2i: the log is cleared at turn handoff, so "this turn" is
           -- exactly the log's own extent.
@@ -109,7 +109,27 @@ ruleOfLawTests cards =
              in do
                   HU.assertBool "prohibited while it stands" (PlayerEffect.prohibitsCasting S.alice castOne)
                   HU.assertBool "not prohibited once it is gone" (not (PlayerEffect.prohibitsCasting S.alice gone))
-                  HU.assertBool "and a cast is offered again" (elem (Action.Type.Cast z) (Action.legalActions S.alice gone))
+                  HU.assertBool "and a cast is offered again" (elem (Action.Type.Cast z) (Action.legalActions S.alice gone)),
+          -- CR 601.3's prohibit half applies to EVERY cast, including a
+          -- Panglacial Wurm cast from the library: the Panglacial permission
+          -- (Cast.permitsCastWhileSearching) excepts only the timing half, not
+          -- the prohibition half. Seven Forests pay the Wurm's {5}{G}{G}.
+          HU.testCase "CR 601.3 Rule of Law also prohibits casting Panglacial Wurm from the library" $
+            let base = S.landsInPlay (Cards.forestPrinting cards) 7
+                (_, withRuleOfLaw) = S.addCreature (Cards.ruleOfLawPrinting cards) S.alice base
+                (_, gs) = S.addLibraryCard (Cards.panglacialWurmPrinting cards) S.alice withRuleOfLaw
+                castOne = S.withEvent (GameEvent.SpellCast S.alice) gs
+             in do
+                  -- Positive control: without it, the negative assertion below
+                  -- could pass merely because the Wurm was never offered at all.
+                  HU.assertEqual
+                    "before any cast, the Wurm is offered from the library"
+                    1
+                    (length (Cast.castableWhileSearching S.alice gs))
+                  HU.assertEqual
+                    "Rule of Law's one-spell limit blocks the library cast too"
+                    []
+                    (Cast.castableWhileSearching S.alice castOne)
         ]
 
 isCast :: Action.Type.Action -> Bool
