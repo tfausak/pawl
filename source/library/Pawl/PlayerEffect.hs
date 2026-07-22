@@ -126,9 +126,9 @@ prohibitsCasting pid gs =
         PlayerEffect.NoMaximumHandSize -> False
    in any prohibits (applying pid gs)
 
--- CR 613.11: does this spell match the criterion? Both inhabitants read the
--- PROJECTION -- a card type is CR 613 layer 4 and a colour is layer 5 -- and
--- never a printed characteristic, per the standing house rule.
+-- Does this spell match the criterion? Both inhabitants read the PROJECTION
+-- -- a card type is CR 613.1d layer 4 and a colour is CR 613.1e layer 5 --
+-- and never a printed characteristic, per the standing house rule.
 matchesSpell :: SpellCriterion -> ObjectId -> GameState -> Bool
 matchesSpell criterion oid gs = case criterion of
   SpellCriterion.NoncreatureSpell -> not (Set.member CardType.Creature (Projection.cardTypesOf oid gs))

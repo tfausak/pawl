@@ -268,14 +268,13 @@ thaliaTests cards =
 -- Sapphire Medallion {2} Artifact: "Blue spells you cast cost {1} less to cast."
 medallionTests :: Cards.Cards -> Tasty.TestTree
 medallionTests cards =
-  let -- alice controls a Sapphire Medallion, `n` untapped Islands, and a Piker
-      -- for Unsummon to target; her hand holds Unsummon ({U} instant),
-      -- Divination ({2}{U} sorcery) and Lightning Bolt ({R} instant).
+  let -- alice controls a Sapphire Medallion and `n` untapped Islands; her hand
+      -- holds Unsummon ({U} instant), Divination ({2}{U} sorcery) and
+      -- Lightning Bolt ({R} instant).
       board n =
         let base = S.landsInPlay (Cards.islandPrinting cards) n
             (_, gs1) = S.addCreature (Cards.sapphireMedallionPrinting cards) S.alice base
-            (_, gs2) = S.addPiker cards S.bob gs1
-            (unsummon, gs3) = S.addHandCard (Cards.unsummonPrinting cards) S.alice gs2
+            (unsummon, gs3) = S.addHandCard (Cards.unsummonPrinting cards) S.alice gs1
             (divination, gs4) = S.addHandCard (Cards.divinationPrinting cards) S.alice gs3
             (bolt, gs5) = S.addHandCard (Cards.lightningBoltPrinting cards) S.alice gs4
          in ( unsummon,
@@ -318,7 +317,7 @@ medallionTests cards =
                   "one generic off"
                   (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
                   (Cost.total S.alice divination (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]) gs),
-          HU.testCase "CR 613.11 a red spell is unaffected" $
+          HU.testCase "a red spell fails the effect's colour criterion, so it is unaffected" $
             let (_, _, bolt, gs) = board 2
              in HU.assertEqual
                   "unchanged"
