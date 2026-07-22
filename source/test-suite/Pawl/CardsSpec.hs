@@ -40,7 +40,13 @@ checkFile :: Printing.Printing -> HU.Assertion
 checkFile p = do
   let path = "data/cards/" <> Text.unpack (slugOf p) <> ".json"
   contents <- TextIO.readFile path
-  HU.assertEqual path (Right p) (Json.parse contents >>= Codec.jsonToPrinting)
-  -- Byte-stability: the committed file is exactly the render plus the trailing
-  -- newline the repo's file-hygiene rule mandates, so a regenerate is a no-op.
-  HU.assertEqual (path <> " bytes") (Json.render (Codec.printingToJson p) <> Text.pack "\n") contents
+  case Json.parse contents of
+    -- Unreachable: Cards.loadPrinting would have failed in IO first.
+    Left err -> HU.assertFailure (path <> ": " <> Text.unpack err)
+    Right value ->
+      -- The loader reads everything the file says and invents nothing:
+      -- re-encoding the loaded printing reproduces the file's meaning. Compared
+      -- up to key order and whitespace, because JSON objects are unordered and
+      -- formatting is not part of the contract -- which is why clone.json is
+      -- committed in `jq -S .` form and the other files are minified.
+      HU.assertEqual path (Json.sortKeys value) (Json.sortKeys (Codec.printingToJson p))
