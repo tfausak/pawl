@@ -1028,6 +1028,7 @@ gameEventToJson e = case e of
   GameEvent.Moved zc pc -> Json.tagged (Text.pack "Moved") (Just (Array [zoneChangeToJson zc, projectedCharacteristicsToJson pc]))
   GameEvent.DamageDealt ev -> Json.tagged (Text.pack "DamageDealt") (Just (damageEventToJson ev))
   GameEvent.StepBegan p pid -> Json.tagged (Text.pack "StepBegan") (Just (Array [phaseToJson p, playerIdToJson pid]))
+  GameEvent.SpellCast pid -> Json.tagged (Text.pack "SpellCast") (Just (playerIdToJson pid))
 
 jsonToGameEvent :: Value -> Either Text GameEvent.GameEvent
 jsonToGameEvent value = do
@@ -1036,6 +1037,7 @@ jsonToGameEvent value = do
     ("Moved", Just (Array [zc, pc])) -> GameEvent.Moved <$> jsonToZoneChange zc <*> jsonToProjectedCharacteristics pc
     ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> jsonToDamageEvent v
     ("StepBegan", Just (Array [p, pid])) -> GameEvent.StepBegan <$> jsonToPhase p <*> jsonToPlayerId pid
+    ("SpellCast", Just v) -> GameEvent.SpellCast <$> jsonToPlayerId v
     _ -> Left (Text.pack "unknown GameEvent: " <> t)
 
 -- Effect ---------------------------------------------------------------------

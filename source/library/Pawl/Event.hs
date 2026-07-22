@@ -63,12 +63,22 @@ movedOf event = case event of
   GameEvent.Moved zc _ -> Just zc
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.SpellCast _ -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent
 damageOf event = case event of
   GameEvent.DamageDealt ev -> Just ev
   GameEvent.Moved _ _ -> Nothing
+  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.SpellCast _ -> Nothing
+
+-- The caster an event describes, if it is a cast (CR 601.2i).
+castOf :: GameEvent -> Maybe PlayerId
+castOf event = case event of
+  GameEvent.SpellCast pid -> Just pid
+  GameEvent.Moved _ _ -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed.
@@ -336,6 +346,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.Moved zc _ -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins wanted scope -> case event of
     GameEvent.StepBegan began active ->
@@ -344,6 +355,7 @@ matchesTrigger bearer you cond event = case cond of
         TurnScope.ControllersTurn -> active == you
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
+    GameEvent.SpellCast _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False

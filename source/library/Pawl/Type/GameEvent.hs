@@ -37,4 +37,13 @@ data GameEvent
     -- Pawl.Event.delayedPending (Tidal Wave's "sacrifice it at the beginning of
     -- the next end step" depends on it).
     StepBegan Phase PlayerId
+  | -- CR 601.2i: a player cast a spell. The event Rule of Law counts, and the
+    -- reason the count is a fold over P4's whole turn log rather than a
+    -- per-effect watermark: its ruling looks at "the entire turn ... even if
+    -- Rule of Law wasn't on the battlefield when that spell was cast".
+    --
+    -- The CAST is the event, not the resolution -- its second ruling ("If you
+    -- cast a spell that was countered, you can't cast another spell during the
+    -- same turn") is what fixes that.
+    SpellCast PlayerId
   deriving (Eq, Ord, Show)

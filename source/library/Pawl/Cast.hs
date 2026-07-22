@@ -18,6 +18,7 @@ import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CastingPermission as CastingPermission
 import Pawl.Type.Game (Game)
+import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.ManaCost (ManaCost)
@@ -201,6 +202,12 @@ castSpell pid oid = do
               Just paid -> do
                 State.put paid
                 Event.changeZone oid Zone.Stack
+                -- CR 601.2i: the spell has been cast. Emitted here, AFTER the
+                -- last step that can fail, so a rejected announcement records
+                -- nothing. Rule of Law counts this event and not the
+                -- resolution, so a countered spell still counted (its second
+                -- Gatherer ruling).
+                State.modify' (Event.recordEvent (GameEvent.SpellCast pid))
                 moved <- State.get
                 case GameState.stack moved of
                   [] -> pure ()

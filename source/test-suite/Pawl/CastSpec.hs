@@ -5,6 +5,7 @@
 module Pawl.CastSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -302,7 +303,20 @@ castTests cards =
          in do
               HU.assertEqual "Panglacial is on the stack" 1 onStack
               HU.assertEqual "Panglacial left the library" 0 (S.countByName (Text.pack "Panglacial Wurm") S.alice after)
-              HU.assertEqual "seven Forests tapped to pay {5}{G}{G}" 7 (S.tappedCount S.alice after)
+              HU.assertEqual "seven Forests tapped to pay {5}{G}{G}" 7 (S.tappedCount S.alice after),
+      HU.testCase "CR 601.2i casting a spell records a SpellCast event for the caster" $
+        let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
+            after = S.runPure S.identityAnswer gs (Cast.castSpell S.alice oid)
+            casts = Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events after))
+         in do
+              HU.assertEqual "no cast before" [] (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events gs)))
+              HU.assertEqual "exactly one cast, by alice" [S.alice] casts,
+      HU.testCase "CR 601.2i a cast that is rejected records nothing" $
+        -- A Bolt with no mana available: legalActions would never offer it, and
+        -- castSpell's payment fails, so no event is recorded.
+        let (gs, oid) = S.boltInHand cards 0 Phase.PrecombatMain
+            after = S.runPure S.identityAnswer gs (Cast.castSpell S.alice oid)
+         in HU.assertEqual "no cast recorded" [] (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events after)))
     ]
 
 -- Chooses X=3 and aims every target slot at bob; other prompts take the identity

@@ -371,6 +371,8 @@ tests cards =
               (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True DamageKind.Combat)),
           HU.testCase "GameEvent.StepBegan round-trips" $
             roundTrip "step" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice),
+          HU.testCase "GameEvent.SpellCast round-trips" $
+            roundTrip "ev" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.SpellCast S.alice),
           HU.testCase "TurnScope round-trips" $
             mapM_ (roundTrip "scope" Codec.turnScopeToJson Codec.jsonToTurnScope) [TurnScope.EachTurn, TurnScope.ControllersTurn],
           HU.testCase "TriggerCondition.StepBegins round-trips" $
