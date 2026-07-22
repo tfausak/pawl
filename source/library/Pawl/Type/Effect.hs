@@ -96,7 +96,7 @@ data Effect card
     -- round-trip cover it). Quantity is how many (reused from M4a as
     -- Draw/Mill/Discard do); Create (Literal 2) mints two distinct objects.
     -- Targetless and unprompted -- creating a token is never a choice. Executed by
-    -- Resolve.applyEffect via Event.createToken. NOT a copy-token (CR 707) and NOT a
+    -- Resolve.applyEffect via Event.createTokens. NOT a copy-token (CR 707) and NOT a
     -- predefined token (CR 111.10): given, not derived.
     --
     -- The Maybe SlotName BINDS the minted token into the resolving object's LIVE

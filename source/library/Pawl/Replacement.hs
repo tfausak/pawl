@@ -109,20 +109,37 @@ applyReplacements = applyReplacementsIn Set.empty
 -- and legalCopyTargets already excludes it by `self`, so the batch set is
 -- never about excluding the loop's own subject.
 --
--- No path today materializes two objects before running either's entry loop:
--- `changeZone` handles one entering object at a time and its own entry loop
--- completes before the next object's begins, and `batch` is `Set.empty` at the
--- only call site. The exclusion matters for a FUTURE batch-entry path that keeps
--- this engine's materialize-first design (putting each object on the
--- battlefield before its entry loop runs, per CR 614.12): without this explicit
--- batch set, a simultaneously-entering sibling would already be sitting on the
--- battlefield and visible to legalCopyTargets. Clone's own ruling restates the
--- result such a path must reach: "If Clone somehow enters at the same time as
--- another creature, Clone can't become a copy of that creature."
+-- `changeZone` still handles one entering object at a time -- its own entry
+-- loop completes before the next object's begins, and `batch` is `Set.empty` at
+-- that call site. But Event.createTokens (P5) is a second call site, and there
+-- `batch` is genuinely non-empty: it materializes every token of a Create
+-- BEFORE running any of their entry loops (CR 614.16's doubled count is settled
+-- once, up front), so a later token's entry loop finds its siblings already
+-- sitting on the battlefield. Without this explicit exclusion they would be
+-- visible to legalCopyTargets. Clone's own ruling states the result this batch
+-- set exists to reach: "If Clone somehow enters at the same time as another
+-- creature, Clone can't become a copy of that creature."
+--
+-- A simultaneously-entering sibling can reach a later token's entry loop
+-- through three channels; only the first needs this explicit exclusion:
+--   1. Copy targets -- excluded by `batch`, above.
+--   2. Candidate collection -- impossible regardless of `batch`: the entry loop
+--      only ever raises a WouldEnter event, and `applies` gates every EntryR
+--      candidate to `src == oid` (its OWN source), so a sibling's replacement
+--      effect can never even become a candidate for another sibling's loop.
+--   3. Projection -- a sibling's STATIC ABILITIES would be visible to a later
+--      token's projection (Projection.project reads the whole battlefield),
+--      and nothing in this module excludes them the way `batch` excludes copy
+--      targets. CR 614.12's "continuous effects that already exist" does not
+--      sanction this: a simultaneously-entering sibling's static abilities do
+--      not "already exist" relative to it. Unreached today only because every
+--      token card in the pool has empty `staticAbilities` -- not fixed, just
+--      not yet exercisable.
 --
 -- Empty for every event class but a nested entry, and empty even for a lone entry
--- (nothing else is entering). IMPLEMENTED BUT UNTESTED: no real card in reach
--- puts two copy-choosers onto the battlefield simultaneously (#N).
+-- (nothing else is entering). Channel 1's exclusion is IMPLEMENTED BUT UNTESTED:
+-- no card in the pool puts two copy-choosers onto the battlefield simultaneously
+-- (#N).
 applyReplacementsIn :: Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn batch = loop batch Set.empty
 
@@ -369,13 +386,19 @@ chooserOf gs event = case event of
 --
 -- The same discipline applies one level down, to each arm's inner SUM type --
 -- DamageR's DamageRewrite below, DestructionR's DestructionRewrite, EntryR's
--- EntryRewrite (Task 7), and (as later work fills that arm in) TokenR's Scaling
--- -- never to the pattern RECORDS (CounterPattern, TokenPattern, DamagePattern),
+-- EntryRewrite (Task 7), and CounterR's and TokenR's shared Scaling -- never to
+-- the pattern RECORDS (CounterPattern, TokenPattern, DamagePattern),
 -- which are read for their fields rather than cased and so have no constructors
 -- to be exhaustive over. An arm must case on the inner sum, not bind it with
 -- `_`: binding it with `_` is exhaustive UNCONDITIONALLY -- that is exactly why
 -- it raises no build failure and no warning when a new constructor is added,
 -- silently treating a real rewrite as a no-op from that day on.
+--
+-- CounterR's and TokenR's arms below do not case on Scaling themselves -- they
+-- delegate it whole to the `scale` helper, which is where the exhaustive case
+-- lives. That still satisfies the guarantee above (a new Scaling constructor
+-- breaks `scale`'s build, which breaks both arms' build transitively); casing
+-- it again inline here would just duplicate `scale`'s match, not strengthen it.
 apply :: Set ObjectId -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
 apply batch candidate event =
   case (ReplacementCandidate.effect candidate, event) of

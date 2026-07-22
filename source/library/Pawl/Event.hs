@@ -96,7 +96,7 @@ dropEndOfTurnReplacements gs =
 
 -- Insert a freshly-built object into `dest` under a new id and timestamp, and
 -- return that id. The common tail of changeZone (a moved incarnation) and
--- createToken (a token from nothing). `mkObj` receives the fresh timestamp so the
+-- createTokens (a token from nothing). `mkObj` receives the fresh timestamp so the
 -- object records when it entered (CR 613.7d). The Moved event is emitted by the
 -- CALLER: only it knows which state the CR 608.2h snapshot must be taken against.
 placeObject :: PlayerId -> (Timestamp.Timestamp -> Object.Object) -> Zone -> Game ObjectId
@@ -276,8 +276,19 @@ sacrifice oid = do
 -- is materialized, and only then does each run its OWN entry loop (CR 616.1g:
 -- "one replacement or prevention effect may apply to an event, and another may
 -- apply to an event contained within the first event" -- creating a token
--- CONTAINS that token entering); the whole batch is in scope for that entry
--- loop, same as a Clone's simultaneous siblings (CR 614.12a).
+-- CONTAINS that token entering); each token's entry loop is handed the whole
+-- batch, which EXCLUDES its simultaneously-entering siblings from any copy
+-- choice (CR 614.12a; see Pawl.Replacement's applyReplacementsIn for why
+-- 614.12a, not 614.13a, is the cite).
+--
+-- The call nesting below (runEntry, called once per token, nested inside this
+-- function which itself settles the CREATE event) implements CR 616.1g's
+-- containment as DESIGN INTENT, but no test exercises it: every token card in
+-- the pool has empty `replacementEffects`, so each token's entry loop finds no
+-- candidates and returns immediately -- the nesting could be deleted and every
+-- scenario in the test pool would still pass. CR 616.1g's own worked example
+-- (a token copy of Voice of All) needs a token WITH an entry replacement to
+-- exercise, and no such card is in this pool (#N).
 createTokens :: PlayerId -> Card -> Natural -> Game [ObjectId]
 createTokens controller card n = do
   resolved <- Replacement.resolveTokens controller card n
@@ -302,11 +313,11 @@ createTokens controller card n = do
       -- snapshot: its last known information IS what it is now (CR 111.3 makes the
       -- creating effect's stated values functionally printed values). Recorded
       -- AFTER every entry loop, so the events describe settled objects.
-      Monad.mapM_ recordEntry ids
+      Monad.mapM_ recordTokenEntry ids
       pure ids
 
-recordEntry :: ObjectId -> Game ()
-recordEntry newId = do
+recordTokenEntry :: ObjectId -> Game ()
+recordTokenEntry newId = do
   placed <- State.get
   let snapshot = Projection.project newId placed
   State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId Zone.Battlefield Zone.Battlefield) snapshot))

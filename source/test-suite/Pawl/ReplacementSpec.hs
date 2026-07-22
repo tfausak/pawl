@@ -422,7 +422,7 @@ tests cards =
            in do
                 HU.assertBool "no ChooseEntryOption was raised" (not (wasAskedForEntryOption asked))
                 HU.assertEqual "the sole option applied anyway" (Just 3) (Projection.powerOf piker after),
-        HU.testCase "CR 616.1g Doubling Season turns Dragon Fodder's two Goblins into four" $
+        HU.testCase "CR 614.16 Doubling Season turns Dragon Fodder's two Goblins into four" $
           let base = S.landsInPlay (Cards.mountainPrinting cards) 2
               (_, g1) = S.addCreature (Cards.doublingSeasonPrinting cards) S.alice base
               (g2, spellId) = S.handOne (Cards.dragonFodderPrinting cards) g1

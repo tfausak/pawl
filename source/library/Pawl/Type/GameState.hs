@@ -33,7 +33,7 @@ data GameState = MkGameState
     -- CR 508/509. Lives for one combat phase; cleared at CR 511.
     combat :: Combat,
     -- CR 608.2i: what happened this turn, in order. Appended by the
-    -- change-and-emit funnels (Event.changeZone, Event.createToken,
+    -- change-and-emit funnels (Event.changeZone, Event.createTokens,
     -- Damage.applyDamage) and by Engine.runStep's step-begin emission; NEVER
     -- cleared by a reader. Cleared with both watermarks at turn handoff
     -- (Engine.handoffTurn) -- not at cleanup, which is still part of this turn.

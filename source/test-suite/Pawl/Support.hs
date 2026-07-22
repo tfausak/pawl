@@ -402,7 +402,7 @@ artifactId gs =
         [] -> ObjectId.MkObjectId 999
 
 -- A token built directly from effect-defined characteristics (Source.OfToken),
--- Settled so combat fixtures can attack/block with it. Bypasses createToken; use
+-- Settled so combat fixtures can attack/block with it. Bypasses createTokens; use
 -- when a test needs a token on the board without resolving a maker.
 addToken :: Card.Type.Card -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addToken card pid gs =
