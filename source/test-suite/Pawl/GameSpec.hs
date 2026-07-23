@@ -404,7 +404,19 @@ ruleTests cards =
               HU.assertEqual "bob's Bolt went to bob's graveyard" 1 boltInBobGrave
               HU.assertEqual "bob's Mountain (his resource) is tapped" 1 (S.tappedCount S.bob bobPlayed)
               HU.assertEqual "CR 723.1: control lapses at the next turn" (Decider.MkDecider S.bob) (Decide.deciderFor S.bob afterBob)
-              HU.assertEqual "active control cleared after bob's turn" Nothing (GameState.activeControl afterBob)
+              HU.assertEqual "active control cleared after bob's turn" Nothing (GameState.activeControl afterBob),
+      HU.testCase "CR 723.5 combat: alice declares bob's attackers, so alice takes the hit" $
+        -- bob's turn, controlled by alice, with one 2/1 Piker. combatBoardOf sets
+        -- alice active with `mine` and bob with `theirs`; here alice attacks with
+        -- nothing and bob has the Piker, and we flip the active player to bob.
+        let (board, _mine, _bobsPikers) = S.combatBoardOf [] [Cards.pikerPrinting cards]
+            g0 =
+              board
+                { GameState.activePlayer = S.bob,
+                  GameState.activeControl = Just (Decider.MkDecider S.alice)
+                }
+            after = S.runCombat controlCombatAnswer g0
+         in HU.assertEqual "alice took 2 from bob's Piker, declared by alice-as-bob" (Just 18) (S.lifeOf S.alice after)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
@@ -478,6 +490,22 @@ slaveAnswer p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+
+-- CR 723.5 combat: alice, controlling bob, declares bob's attackers. Attackers
+-- are declared only when the prompt's Decider is alice for player bob; a naive
+-- engine that sent the prompt with Decider = bob would fall to `[]` and no one
+-- would attack. Damage from the lone unblocked attacker goes to its sole
+-- recipient (the defending player, alice). Everything else delegates to
+-- slaveAnswer (blocks: none; priority: pass).
+controlCombatAnswer :: Prompt.Prompt r -> r
+controlCombatAnswer p = case p of
+  Prompt.DeclareAttackers (Decider.MkDecider d) player attackers ->
+    if d == S.alice && player == S.bob then attackers else []
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case Map.keys thresholds of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
+  _ -> slaveAnswer p
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of
