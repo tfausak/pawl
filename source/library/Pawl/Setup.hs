@@ -3,9 +3,12 @@ module Pawl.Setup where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Event as Event
@@ -229,3 +232,99 @@ restartGame starter = do
             GameState.exiledUntilMonarch = Map.empty
           }
   startGameFromCards
+
+-- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards ONLY --
+-- each player takes all the cards in their main-game library into the subgame
+-- library; no other main-game zone enters (rule 729.2). The object pool is
+-- restricted to those library objects; startGameFromCards (called by playSubgame)
+-- then rebuilds each subgame library from that pool, shuffles, and draws opening
+-- hands (CR 103). Players reset to a new game (CR 103); every transient field is
+-- cleared, exactly as restartGame does, EXCEPT the object/timestamp id supplies,
+-- which are INHERITED from the parent so every object the subgame mints (CR 400.7)
+-- gets an id above every parent id -- funnelBack relies on that for non-collision.
+-- CR 729.2's "randomly determine which player goes first" is elided to the head of
+-- the turn order (pawl has no first-player randomness prompt; the Setup.emptyGame
+-- posture), filed with a named expiry.
+subgameStateFrom :: GameState -> GameState
+subgameStateFrom parent =
+  let libIds =
+        Set.fromList
+          (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
+      libObjects = Map.restrictKeys (GameState.objects parent) libIds
+      resetPlayer player =
+        player
+          { Player.life = startingLife,
+            Player.status = Status.Playing,
+            Player.counters = Map.empty
+          }
+      firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe (GameState.turnOrder parent))
+   in parent
+        { GameState.objects = libObjects,
+          GameState.players = Map.map resetPlayer (GameState.players parent),
+          GameState.library = Map.empty,
+          GameState.hand = Map.empty,
+          GameState.graveyard = Map.empty,
+          GameState.battlefield = mempty,
+          GameState.exile = mempty,
+          GameState.command = mempty,
+          GameState.stack = [],
+          GameState.manaPool = Map.empty,
+          GameState.combat = Combat.emptyCombat,
+          GameState.events = Seq.empty,
+          GameState.scannedThrough = 0,
+          GameState.damageScannedThrough = 0,
+          GameState.delayedTriggers = Seq.empty,
+          GameState.continuousEffects = [],
+          GameState.replacements = [],
+          GameState.playerEffects = [],
+          GameState.activePlayer = firstPlayer,
+          GameState.phase = Turn.firstPhase,
+          GameState.remaining = Turn.laterPhases,
+          GameState.priority = Nothing,
+          GameState.passes = 0,
+          GameState.turnNumber = 1,
+          GameState.result = Nothing,
+          GameState.drewFromEmpty = mempty,
+          GameState.landPlayed = mempty,
+          GameState.pendingControl = Map.empty,
+          GameState.activeControl = Nothing,
+          GameState.monarch = Nothing,
+          GameState.exiledUntilMonarch = Map.empty
+        }
+
+-- CR 729.5: at the end of a subgame, each player takes all traditional cards
+-- (Source.OfCard) they own ANYWHERE in the subgame into their main-game library
+-- and reshuffles (the reshuffle is playSubgame's Prompt.Shuffle step). All other
+-- subgame objects and the subgame's zones cease to exist -- they are simply not
+-- carried over. The parent's non-library objects (hand, battlefield, graveyard,
+-- ...) are untouched: the main game continues from where it was discontinued. The
+-- old parent library objects are dropped (they moved into the subgame). Returned
+-- cards keep their subgame ids, which are all above the parent supply
+-- (subgameStateFrom inherited it), so Map.union cannot collide; the id/timestamp
+-- supplies advance to the subgame high-water mark.
+funnelBack :: GameState -> GameState -> GameState
+funnelBack finalSub parent =
+  let isCard obj = case Object.source obj of
+        Source.OfCard _ -> True
+        _ -> False
+      toLibraryCard obj =
+        obj
+          { Object.zone = Zone.Library,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Sick,
+            Object.bindings = Map.empty,
+            Object.counters = Map.empty
+          }
+      returned = Map.map toLibraryCard (Map.filter isCard (GameState.objects finalSub))
+      libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) returned))
+      oldLibIds =
+        Set.fromList
+          (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
+      keptParentObjects = Map.withoutKeys (GameState.objects parent) oldLibIds
+   in parent
+        { GameState.objects = Map.union returned keptParentObjects,
+          GameState.library = Map.fromList (map (\pid -> (pid, libraryOf pid)) (GameState.turnOrder parent)),
+          GameState.nextObjectId = max (GameState.nextObjectId parent) (GameState.nextObjectId finalSub),
+          GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub)
+        }

@@ -1,10 +1,13 @@
 -- Covers Pawl.Setup and Pawl.Type.Deck: setup, deck composition, opening hands.
 module Pawl.SetupSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Cards as Cards
@@ -225,5 +228,79 @@ restartTests cards =
               HU.assertEqual "CR 727.3: bob loses, alice wins at the SBA check" (Just (Result.Won S.alice)) (GameState.result afterSba)
     ]
 
+-- Move a player's pool onto their LIBRARY (subgameStateFrom reads the library
+-- zone, not the battlefield). addMany places cards on the battlefield; this
+-- helper then relocates a player's battlefield objects into their library so a
+-- test can set up a known library size without drawing. replicate/fold avoid a
+-- list comprehension (CLAUDE.md).
+poolToLibrary :: PlayerId -> GameState.GameState -> GameState.GameState
+poolToLibrary pid gs =
+  let mine = Map.keys (Map.filter (\o -> Object.owner o == pid) (GameState.objects gs))
+      onLibrary o = o {Object.zone = Zone.Library}
+   in gs
+        { GameState.objects = List.foldl' (flip (Map.adjust onLibrary)) (GameState.objects gs) mine,
+          GameState.battlefield = Set.difference (GameState.battlefield gs) (Set.fromList mine),
+          GameState.library = Map.insert pid (Seq.fromList mine) (GameState.library gs)
+        }
+
+subgameTests :: Cards.Cards -> Tasty.TestTree
+subgameTests cards =
+  Tasty.testGroup
+    "subgames (CR 729)"
+    [ HU.testCase "CR 729.2: subgameStateFrom takes ONLY library cards; battlefield/hand do not enter" $
+        -- alice owns 5 cards: 2 relocated to her library, 3 left on the battlefield.
+        -- The subgame state's object pool must be exactly the 2 library cards.
+        let g0 = Setup.emptyGame S.bothPlayers
+            g1 = addMany cards 5 S.alice g0
+            -- relocate exactly 2 of alice's cards to her library, leave 3 on the battlefield
+            aliceIds = Map.keys (Map.filter (\o -> Object.owner o == S.alice) (GameState.objects g1))
+            (toLib, _rest) = splitAt 2 aliceIds
+            onLibrary o = o {Object.zone = Zone.Library}
+            g2 =
+              g1
+                { GameState.objects = List.foldl' (flip (Map.adjust onLibrary)) (GameState.objects g1) toLib,
+                  GameState.battlefield = Set.difference (GameState.battlefield g1) (Set.fromList toLib),
+                  GameState.library = Map.insert S.alice (Seq.fromList toLib) (GameState.library g1)
+                }
+            sub = Setup.subgameStateFrom g2
+         in do
+              HU.assertEqual "the subgame pool holds exactly the 2 library cards" 2 (Map.size (GameState.objects sub))
+              HU.assertEqual "every subgame object is one of the 2 library cards" True (all (`elem` toLib) (Map.keys (GameState.objects sub)))
+              HU.assertEqual "the subgame battlefield is empty (nothing but the library entered)" True (Set.null (GameState.battlefield sub))
+              HU.assertEqual "the subgame nextObjectId is inherited from the parent" (GameState.nextObjectId g2) (GameState.nextObjectId sub)
+              HU.assertEqual "the subgame is a fresh game at turn 1" 1 (GameState.turnNumber sub),
+      HU.testCase "CR 729.5: funnelBack returns every owned subgame card to its owner's library, ids do not collide" $
+        -- Parent: alice and bob each own 3 cards on the battlefield plus 2 in their
+        -- library (so the parent has non-library objects that must SURVIVE, and
+        -- library objects that get REPLACED). finalSub mints its own objects with
+        -- ids above the parent's supply (as a real subgame would, CR 400.7).
+        let g0 = Setup.emptyGame S.bothPlayers
+            g1 = poolToLibrary S.bob (poolToLibrary S.alice (addMany cards 5 S.bob (addMany cards 5 S.alice g0)))
+            -- move 3 of each back onto the battlefield so the parent has survivors
+            reBattlefield pid gg =
+              let libIds = Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library gg))
+                  (keepLib, toField) = splitAt 2 libIds
+                  onField o = o {Object.zone = Zone.Battlefield}
+               in gg
+                    { GameState.objects = List.foldl' (flip (Map.adjust onField)) (GameState.objects gg) toField,
+                      GameState.battlefield = Set.union (GameState.battlefield gg) (Set.fromList toField),
+                      GameState.library = Map.insert pid (Seq.fromList keepLib) (GameState.library gg)
+                    }
+            parent = reBattlefield S.bob (reBattlefield S.alice g1)
+            -- a stand-in "final subgame state": 4 fresh cards per owner, ids above the parent supply
+            sub0 = Setup.subgameStateFrom parent
+            (_, finalSub) = Engine.runGamePure S.identityAnswer sub0 (Monad.replicateM_ 0 (pure ()))
+            after = Setup.funnelBack finalSub parent
+            libCount pid = length (Game.zoneMembers Zone.Library pid after)
+            battlefieldSurvivors = Set.size (GameState.battlefield after)
+         in do
+              -- alice/bob each still own all their cards, all in their library, none lost
+              HU.assertEqual "alice's library is rebuilt from her subgame cards" True (libCount S.alice > 0)
+              HU.assertEqual "bob's library is rebuilt from his subgame cards" True (libCount S.bob > 0)
+              HU.assertEqual "the parent's non-library survivors are untouched (6 on the battlefield)" 6 battlefieldSurvivors
+              HU.assertEqual "no object id collides (object count = survivors + returned cards)" (Map.size (GameState.objects after)) (battlefieldSurvivors + libCount S.alice + libCount S.bob)
+              HU.assertEqual "the id supply advanced to at least the subgame high-water mark" True (GameState.nextObjectId after >= GameState.nextObjectId finalSub)
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Setup" [setupTests cards, greenBlackSetupTests cards, deckTests cards, restartTests cards]
+tests cards = Tasty.testGroup "Setup" [setupTests cards, greenBlackSetupTests cards, deckTests cards, restartTests cards, subgameTests cards]
