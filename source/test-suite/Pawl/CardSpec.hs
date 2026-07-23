@@ -199,8 +199,13 @@ lintTests cards =
     "Lint"
     [ HU.testCase "every mode's slot reads equal its declared slots" $
         let modeOffends m =
-              Set.unions (map Resolve.slotsOf (Foldable.toList (Mode.effects m)))
-                /= Map.keysSet (Mode.targetSpecs m)
+              let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
+                  reads_ = Set.unions (map Resolve.slotsOf (Foldable.toList (Mode.effects m)))
+               in -- A slot DEFINED in this mode (a Create's minted token, or a
+                  -- PlaySubgame's bound subgame outcome) and then read by a later
+                  -- effect is legitimate dataflow, not an undeclared target -- the
+                  -- same definedSlots exemption the delayed-ability lint below uses.
+                  Set.difference reads_ defined /= Map.keysSet (Mode.targetSpecs m)
             cardOffends card =
               any modeOffends (Modal.modes (Card.Type.spell card))
             offenders =
