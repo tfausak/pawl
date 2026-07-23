@@ -19,6 +19,7 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.Duration as Duration
+import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Expiry as Expiry.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
@@ -320,6 +321,28 @@ masterThiefTests cards =
                   HU.assertEqual "and the artifact does NOT" (Just S.bob) (Projection.controllerOf myr relatched)
         ]
 
+-- CR 725.2: the monarch's inherent end-step draw -- a triggered ability that
+-- belongs to NO object. The falsifier: no permanents on the battlefield at all,
+-- so the draw cannot hang on a bearer.
+monarchTests :: Cards.Cards -> Tasty.TestTree
+monarchTests cards =
+  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
+   in Tasty.testGroup
+        "Monarch"
+        [ HU.testCase "CR 725.2 the monarch draws at the beginning of their own end step" $
+            let (_, gs0) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
+                began = S.withEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice) gs0
+                after = resolveAll (settle began)
+             in HU.assertEqual "alice drew (one card now in hand)" 1 (length (Game.zoneMembers Zone.Hand S.alice after)),
+          HU.testCase "CR 725.2 the end-step draw fires only on the monarch's own end step" $
+            let (_, gs0) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob (S.withMonarch S.bob (Setup.emptyGame S.bothPlayers))
+                -- alice is the active player; her end step is not bob's (the monarch).
+                began = S.withEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice) gs0
+                after = resolveAll (settle began)
+             in HU.assertEqual "bob did not draw on alice's end step" 0 (length (Game.zoneMembers Zone.Hand S.bob after))
+        ]
+
 -- Hag of Inner Weakness {2}{B} Creature -- Hag Warlock 2/2: "At the beginning of
 -- your upkeep, target creature an opponent controls gets -2/-1 until your next
 -- turn." No Gatherer rulings exist, so these derive from CR 611.2a and CR 514.2.
@@ -374,4 +397,4 @@ hagTests cards =
         ]
 
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests cards, handoffTests, conditionalTests cards, masterThiefTests cards, hagTests cards]
+tests cards = Tasty.testGroup "Pawl.ExpirySpec" [armTests, cleanupTests cards, handoffTests, conditionalTests cards, masterThiefTests cards, monarchTests cards, hagTests cards]

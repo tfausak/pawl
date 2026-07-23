@@ -24,6 +24,7 @@ import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
+import qualified Pawl.Monarch as Monarch
 import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
@@ -207,7 +208,12 @@ runTurnBasedActions phase = do
 placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
-  let (pending, surviving) = Event.gatherTriggers (Event.unscannedEvents gs) gs
+  let evs = Event.unscannedEvents gs
+      (pending, surviving) = Event.gatherTriggers evs gs
+      -- CR 725.2: the monarch's inherent triggers hang on no object, so the
+      -- normal ObjectId-sourced pending pipeline can't carry them. Gather them
+      -- from the SAME unscanned-event snapshot, before the watermark bump.
+      inherent = Monarch.inherentMonarchPending evs gs
   State.put
     gs
       { GameState.scannedThrough = fromIntegral (Seq.length (GameState.events gs)),
@@ -215,7 +221,8 @@ placePendingTriggers = do
       }
   ordered <- orderPending pending
   Monad.mapM_ placeOne ordered
-  pure (not (null pending))
+  Monad.mapM_ (\(p, ab, b) -> Monarch.placeInherent p ab b) inherent
+  pure (not (null pending) || not (null inherent))
 
 -- Put one triggered ability on the stack as a fresh OfTrigger object, choosing
 -- its mode(s) and their targets as it is placed (CR 603.3d). This mirrors
