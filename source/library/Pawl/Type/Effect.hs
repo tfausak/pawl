@@ -200,4 +200,11 @@ data Effect card
     -- GameState.exiledUntilMonarch and returned by Pawl.Monarch's settle-loop
     -- sweep. NOT MoveToZone: that has no duration and schedules no return.
     ExileUntilMonarch SlotName
+  | -- CR 729.1/729.1b: play a Magic subgame, then bind its outcome (the derived
+    -- loser) into this slot for a later effect to read. This slot is DEFINED here
+    -- (like Create's minted-token slot), not a cast-time target -- the loser is
+    -- determined only when the subgame ends, so the following effect reads it
+    -- through the per-effect binding re-read in resolveSpellWith. Generic: the
+    -- engine reaches subgames through this opcode, never Shahrazad's identity.
+    PlaySubgame SlotName
   deriving (Eq, Ord, Show)

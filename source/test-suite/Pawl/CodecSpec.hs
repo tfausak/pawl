@@ -195,7 +195,10 @@ tests cards =
           HU.testCase "BecomeMonarch" $
             roundTrip "e" Codec.effectToJson Codec.jsonToEffect (Effect.BecomeMonarch MonarchTarget.TheController),
           HU.testCase "ExileUntilMonarch" $
-            roundTrip "eum" Codec.effectToJson Codec.jsonToEffect (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target")))
+            roundTrip "eum" Codec.effectToJson Codec.jsonToEffect (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target"))),
+          HU.testCase "PlaySubgame round-trips" $
+            let e = Effect.PlaySubgame (SlotName.MkSlotName (Text.pack "loser"))
+             in HU.assertEqual "PlaySubgame round-trips" (Right e) (Codec.jsonToEffect (Codec.effectToJson e))
         ],
       Tasty.testGroup
         "player effects (P7)"

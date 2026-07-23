@@ -94,6 +94,9 @@ slotsOf effect = case effect of
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
   Effect.ExileUntilMonarch slot -> Set.singleton slot
+  -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
+  -- bound once the subgame ends), not a read -- same shape as Create's slot.
+  Effect.PlaySubgame _ -> Set.empty
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -130,6 +133,7 @@ readsX = any effectReadsX
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
       Effect.ExileUntilMonarch _ -> False
+      Effect.PlaySubgame _ -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -162,6 +166,7 @@ manaProduced effect = case effect of
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
+  Effect.PlaySubgame _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -194,6 +199,7 @@ searchesLibrary effect = case effect of
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
   Effect.ExileUntilMonarch _ -> False
+  Effect.PlaySubgame _ -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -220,6 +226,7 @@ definedSlots :: [Effect Card.Type.Card] -> Set SlotName
 definedSlots effects =
   let bound effect = case effect of
         Effect.Create _ _ mSlot -> mSlot
+        Effect.PlaySubgame slot -> Just slot
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe bound effects)
 
@@ -274,6 +281,8 @@ rewriteEffect pairs effect = case effect of
   Effect.BecomeMonarch {} -> effect
   -- No rewritable land-type word.
   Effect.ExileUntilMonarch _ -> effect
+  -- No rewritable land-type word.
+  Effect.PlaySubgame _ -> effect
 
 -- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
 -- 608.2c/700.2 -- an unchosen mode's effects never resolve), with every
@@ -522,6 +531,10 @@ applyEffect source controller bound legality chosen effect = case effect of
   -- the CR 727.5/727.5a exemption + put-onto-battlefield rider of full Karn
   -- Liberated (#135), which retires the synthetic-restart gate.
   Effect.RestartGame -> Setup.restartGame controller
+  -- CR 729.1: play a subgame. Wired to the injected runner in resolveSpellWith
+  -- (Task 3); the bare applyEffect path is the no-subgame default (an ability
+  -- that plays a subgame is deferred). Placeholder no-op until Task 3.
+  Effect.PlaySubgame _ -> pure ()
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
