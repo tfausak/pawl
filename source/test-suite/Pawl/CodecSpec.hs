@@ -40,6 +40,10 @@ import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
+-- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
+-- evaluator module Pawl.Filter is not imported here today, but the alias
+-- convention is fixed project-wide so a later import never collides.
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.Json as Json
 import qualified Pawl.Type.Keyword as Keyword
@@ -55,6 +59,7 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
+import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Type.Power as Power
@@ -211,6 +216,24 @@ tests cards =
                   case J.asObject (Codec.cardToJson base) of
                     Left err -> HU.assertFailure (Text.unpack err)
                     Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "playerAbilities") (map fst pairs))
+        ],
+      Tasty.testGroup
+        "filter (P9)"
+        [ HU.testCase "Filter round-trips including nested And/Or/Not" $
+            let doomBlade = Filter.Type.Not (Filter.Type.HasColor Color.Black)
+                terror = Filter.Type.And [Filter.Type.Not (Filter.Type.HasColor Color.Black), Filter.Type.Not (Filter.Type.HasCardType CardType.Artifact)]
+                reprisal = Filter.Type.PowerAtLeast 4
+                basicLand = Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic]
+                angelicEdict = Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasCardType CardType.Enchantment]
+                controlled = Filter.Type.ControlledBy PlayerRelation.Opponent
+                bySubtype = Filter.Type.HasSubtype Subtype.Wall
+             in mapM_
+                  (roundTrip "filter" Codec.filterToJson Codec.jsonToFilter)
+                  [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype],
+          HU.testCase "PlayerRelation round-trips" $
+            mapM_
+              (roundTrip "relation" Codec.playerRelationToJson Codec.jsonToPlayerRelation)
+              [PlayerRelation.You, PlayerRelation.Opponent]
         ],
       Tasty.testGroup
         "records"

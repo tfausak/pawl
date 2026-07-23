@@ -44,6 +44,7 @@ import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
+import qualified Pawl.Type.Filter as Filter
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.Json (Value (Array, Boolean, Null, Object))
 import qualified Pawl.Type.Keyword as Keyword
@@ -60,6 +61,7 @@ import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Type.Power as Power
@@ -449,6 +451,49 @@ jsonToControllerRelation =
     [ (Text.pack "Yours", ControllerRelation.Yours),
       (Text.pack "Anyones", ControllerRelation.Anyones)
     ]
+
+playerRelationToJson :: PlayerRelation.PlayerRelation -> Value
+playerRelationToJson r = nullary . Text.pack $ case r of
+  PlayerRelation.You -> "You"
+  PlayerRelation.Opponent -> "Opponent"
+
+jsonToPlayerRelation :: Value -> Either Text PlayerRelation.PlayerRelation
+jsonToPlayerRelation =
+  decodeNullary
+    (Text.pack "PlayerRelation")
+    [ (Text.pack "You", PlayerRelation.You),
+      (Text.pack "Opponent", PlayerRelation.Opponent)
+    ]
+
+-- Recursive, mirroring quantityToJson/jsonToQuantity: And/Or carry their
+-- operands as a JSON Array, Not as a single nested object, and each atom
+-- delegates to the leaf-enum codec for the characteristic it cases on.
+filterToJson :: Filter.Filter -> Value
+filterToJson filter_ = case filter_ of
+  Filter.HasCardType t -> Json.tagged (Text.pack "HasCardType") (Just (cardTypeToJson t))
+  Filter.HasSupertype s -> Json.tagged (Text.pack "HasSupertype") (Just (supertypeToJson s))
+  Filter.HasColor c -> Json.tagged (Text.pack "HasColor") (Just (colorToJson c))
+  Filter.HasSubtype s -> Json.tagged (Text.pack "HasSubtype") (Just (subtypeToJson s))
+  Filter.PowerAtLeast n -> Json.tagged (Text.pack "PowerAtLeast") (Just (Json.jInt n))
+  Filter.ControlledBy r -> Json.tagged (Text.pack "ControlledBy") (Just (playerRelationToJson r))
+  Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (map filterToJson fs)))
+  Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (map filterToJson fs)))
+  Filter.Not f -> Json.tagged (Text.pack "Not") (Just (filterToJson f))
+
+jsonToFilter :: Value -> Either Text Filter.Filter
+jsonToFilter value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("HasCardType", Just v) -> Filter.HasCardType <$> jsonToCardType v
+    ("HasSupertype", Just v) -> Filter.HasSupertype <$> jsonToSupertype v
+    ("HasColor", Just v) -> Filter.HasColor <$> jsonToColor v
+    ("HasSubtype", Just v) -> Filter.HasSubtype <$> jsonToSubtype v
+    ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Json.asInteger v
+    ("ControlledBy", Just v) -> Filter.ControlledBy <$> jsonToPlayerRelation v
+    ("And", Just (Array vs)) -> Filter.And <$> traverse jsonToFilter vs
+    ("Or", Just (Array vs)) -> Filter.Or <$> traverse jsonToFilter vs
+    ("Not", Just v) -> Filter.Not <$> jsonToFilter v
+    _ -> Left (Text.pack "unknown Filter: " <> t)
 
 -- Tagged rather than bare-nullary: this family grows a payload-carrying
 -- constructor (PermanentOfSubtype), so the decoder is written against
