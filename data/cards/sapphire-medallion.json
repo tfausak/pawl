@@ -15,7 +15,7 @@
         "type": "ReduceSpellCost",
         "value": [
           {
-            "type": "SpellOfColor",
+            "type": "HasColor",
             "value": {
               "type": "Blue"
             }

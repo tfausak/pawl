@@ -1,6 +1,7 @@
--- Covers Pawl.PlayerEffect and Pawl.Cost, plus the four types they case on
--- (Pawl.Type.PlayerEffect, PlayerScope, SpellCriterion, PlayerStaticAbility) and
--- the stored carrier Pawl.Type.ActivePlayerEffect. CR 613.10/613.11: the
+-- Covers Pawl.PlayerEffect and Pawl.Cost, plus the types they case on
+-- (Pawl.Type.PlayerEffect, PlayerScope, PlayerStaticAbility) and
+-- the stored carrier Pawl.Type.ActivePlayerEffect. The spell match runs through
+-- the identity-blind Pawl.Filter over a Pawl.Type.Filter. CR 613.10/613.11: the
 -- continuous effects that affect PLAYERS and the RULES OF THE GAME, which sit
 -- outside the CR 613 layer system entirely.
 --
@@ -22,10 +23,14 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Expiry as Expiry.Type
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator Pawl.Filter already claims the alias Filter.
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -250,7 +255,7 @@ thaliaTests cards =
                   (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
                   (totalManaCost S.alice bolt (ManaCost.MkManaCost [red]) gs),
           -- Ruling: "Thalia's ability affects each spell that's not a creature
-          -- spell, including your own." SpellCriterion reads the PROJECTION.
+          -- spell, including your own." The Filter reads the PROJECTION.
           HU.testCase "a creature spell fails the effect's criterion, so it is unaffected" $
             let (_, piker, gs) = board 3
              in HU.assertEqual
@@ -641,5 +646,27 @@ silenceTests cards =
                   HU.assertBool "bob may cast again" (not (PlayerEffect.prohibitsCasting S.bob ended))
         ]
 
+-- The spell-match half of the cost-adjustment axis, now expressed as a Filter
+-- over the PROJECTED view (CR 613.1d layer 4 for a card type, CR 613.1e layer 5
+-- for a colour) rather than the retired SpellCriterion. A noncreature spell is
+-- Filter.Not (Filter.HasCardType Creature); a coloured spell is Filter.HasColor.
+matchesSpellTests :: Cards.Cards -> Tasty.TestTree
+matchesSpellTests cards =
+  let base = Setup.emptyGame S.bothPlayers
+      (bolt, withBolt) = S.spellOnStack (Cards.lightningBoltPrinting cards) S.alice base
+      (piker, gs) = S.spellOnStack (Cards.pikerPrinting cards) S.alice withBolt
+      noncreature = Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
+   in Tasty.testGroup
+        "matchesSpell"
+        [ HU.testCase "CR 613.1d Thalia's noncreature criterion admits an instant" $
+            HU.assertBool "Lightning Bolt is a noncreature spell" (PlayerEffect.matchesSpell noncreature bolt gs),
+          HU.testCase "CR 613.1d a creature spell fails the noncreature criterion" $
+            HU.assertBool "Goblin Piker is a creature spell" (not (PlayerEffect.matchesSpell noncreature piker gs)),
+          HU.testCase "CR 613.1e a colour criterion admits a matching-colour spell" $
+            HU.assertBool "Lightning Bolt is red" (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Red) bolt gs),
+          HU.testCase "CR 613.1e a colour criterion rejects a non-matching colour" $
+            HU.assertBool "Lightning Bolt is not blue" (not (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Blue) bolt gs))
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards, medallionTests cards, reliquaryTowerTests cards, storedTests cards, silenceTests cards]
+tests cards = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests cards, adjustmentTests, thaliaTests cards, medallionTests cards, reliquaryTowerTests cards, storedTests cards, silenceTests cards, matchesSpellTests cards]

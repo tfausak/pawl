@@ -28,7 +28,13 @@
         "type": "IncreaseSpellCost",
         "value": [
           {
-            "type": "NoncreatureSpell"
+            "type": "Not",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
           },
           1
         ]

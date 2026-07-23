@@ -70,7 +70,6 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.SpellCriterion as SpellCriterion
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
@@ -184,17 +183,13 @@ tests cards =
             mapM_
               (roundTrip "scope" Codec.playerScopeToJson Codec.jsonToPlayerScope)
               [PlayerScope.You, PlayerScope.Opponents, PlayerScope.EachPlayer],
-          HU.testCase "every SpellCriterion round-trips" $
-            mapM_
-              (roundTrip "criterion" Codec.spellCriterionToJson Codec.jsonToSpellCriterion)
-              [SpellCriterion.NoncreatureSpell, SpellCriterion.SpellOfColor Color.Blue],
           HU.testCase "every PlayerEffect round-trips" $
             mapM_
               (roundTrip "effect" Codec.playerEffectToJson Codec.jsonToPlayerEffect)
               [ PlayerEffect.CantCastSpells,
                 PlayerEffect.CantCastMoreThan 1,
-                PlayerEffect.IncreaseSpellCost SpellCriterion.NoncreatureSpell 1,
-                PlayerEffect.ReduceSpellCost (SpellCriterion.SpellOfColor Color.Blue) 1,
+                PlayerEffect.IncreaseSpellCost (Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)) 1,
+                PlayerEffect.ReduceSpellCost (Filter.Type.HasColor Color.Blue) 1,
                 PlayerEffect.NoMaximumHandSize
               ],
           HU.testCase "PlayerStaticAbility round-trips" $

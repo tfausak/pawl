@@ -47,7 +47,6 @@ import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.SpellCriterion as SpellCriterion
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
@@ -566,7 +565,7 @@ m45p7CardTests cards =
               HU.assertEqual "keywords" (Set.singleton Keyword.FirstStrike) (Card.Type.keywords c)
               HU.assertEqual
                 "one player ability"
-                [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.IncreaseSpellCost SpellCriterion.NoncreatureSpell 1)]
+                [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.IncreaseSpellCost (Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)) 1)]
                 (Card.Type.playerAbilities c),
       HU.testCase "Sapphire Medallion is a {2} artifact with one You ReduceSpellCost Blue ability" $
         let c = Printing.card (Cards.sapphireMedallionPrinting cards)
@@ -576,7 +575,7 @@ m45p7CardTests cards =
               HU.assertEqual "types" (Set.singleton CardType.Artifact) (TypeLine.types (Card.Type.typeLine c))
               HU.assertEqual
                 "one player ability"
-                [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (SpellCriterion.SpellOfColor Color.Blue) 1)]
+                [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (Filter.Type.HasColor Color.Blue) 1)]
                 (Card.Type.playerAbilities c),
       HU.testCase "Reliquary Tower is a land with a You NoMaximumHandSize ability and a {T} colorless mana ability" $
         let c = Printing.card (Cards.reliquaryTowerPrinting cards)

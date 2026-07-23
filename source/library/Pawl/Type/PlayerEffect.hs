@@ -1,7 +1,7 @@
 module Pawl.Type.PlayerEffect where
 
 import Numeric.Natural (Natural)
-import Pawl.Type.SpellCriterion (SpellCriterion)
+import Pawl.Type.Filter (Filter)
 
 -- CR 611.1's third clause: a continuous effect that "affects players or the
 -- rules of the game" rather than the characteristics of an object. The player
@@ -21,7 +21,7 @@ data PlayerEffect
     CantCastMoreThan Natural
   | -- CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
     -- mana to cast.
-    IncreaseSpellCost SpellCriterion Natural
+    IncreaseSpellCost Filter Natural
   | -- CR 613.11 / 601.2f / Sapphire Medallion: matching spells cost this much
     -- less to cast.
     --
@@ -35,7 +35,7 @@ data PlayerEffect
     -- The Natural is an amount of GENERIC mana and nothing else. CR 118.7b-g's
     -- colored, colorless, hybrid, Phyrexian and snow reductions are not
     -- representable (#91).
-    ReduceSpellCost SpellCriterion Natural
+    ReduceSpellCost Filter Natural
   | -- CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize
   deriving (Eq, Ord, Show)

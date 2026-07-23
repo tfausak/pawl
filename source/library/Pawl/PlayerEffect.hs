@@ -6,8 +6,8 @@
 -- nothing else, and 613.10/613.11 both apply AFTER that machine has run.
 -- Pawl.Projection is untouched by this module and never sees these types.
 --
--- This module is the ONLY module that may case on Pawl.Type.PlayerEffect,
--- Pawl.Type.PlayerScope or Pawl.Type.SpellCriterion -- the standing Pawl.Resolve
+-- This module is the ONLY module that may case on Pawl.Type.PlayerEffect and
+-- Pawl.Type.PlayerScope -- the standing Pawl.Resolve
 -- has over Effect, Pawl.Projection over Modification, Pawl.Event over
 -- TriggerCondition and Pawl.Expiry over Expiry. Every consumer asks a TYPED
 -- QUESTION and never sees a constructor.
@@ -18,11 +18,12 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Event as Event
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.CardType as CardType
+import Pawl.Type.Filter (Filter)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.ObjectId (ObjectId)
@@ -32,8 +33,6 @@ import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.PlayerScope (PlayerScope)
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
-import Pawl.Type.SpellCriterion (SpellCriterion)
-import qualified Pawl.Type.SpellCriterion as SpellCriterion
 
 -- CR 109.5: "the words 'you' and 'your' on an object refer to the object's
 -- controller ... for a static ability, this is the current controller of the
@@ -136,13 +135,16 @@ prohibitsCasting pid gs =
         PlayerEffect.NoMaximumHandSize -> False
    in any prohibits (applying pid gs)
 
--- Does this spell match the criterion? Both inhabitants read the PROJECTION
--- -- a card type is CR 613.1d layer 4 and a colour is CR 613.1e layer 5 --
--- and never a printed characteristic, per the standing house rule.
-matchesSpell :: SpellCriterion -> ObjectId -> GameState -> Bool
-matchesSpell criterion oid gs = case criterion of
-  SpellCriterion.NoncreatureSpell -> not (Set.member CardType.Creature (Projection.cardTypesOf oid gs))
-  SpellCriterion.SpellOfColor color -> Set.member color (Projection.colorsOf oid gs)
+-- Does this spell match the cost-adjustment Filter? Evaluated against the
+-- PROJECTED view (Projection.viewOfObject) -- a card type is CR 613.1d layer 4
+-- and a colour is CR 613.1e layer 5 -- never a printed characteristic, per the
+-- standing house rule. The perspective is the spell's own controller (CR 109.5),
+-- harmless to today's card-type/colour filters and well-defined for a future
+-- ControlledBy filter. Runs through the identity-blind Filter.matches: this
+-- module never learns which spell produced the Filter.
+matchesSpell :: Filter -> ObjectId -> GameState -> Bool
+matchesSpell filter_ oid gs =
+  Filter.matches (Filter.MkContext (Projection.controllerOf oid gs)) (Projection.viewOfObject oid gs) filter_
 
 -- CR 613.11 / 601.2f: the cost increases and the cost reductions that apply to
 -- `pid` casting `oid`, as two lists.

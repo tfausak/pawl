@@ -119,8 +119,8 @@ doorTests cards =
               HU.assertBool "Drudge Skeletons' {B} regenerate cost does not" (not (Cost.requiresTapSymbol skeletons)),
       -- Departure 1: Pawl.Activate does NOT route an ability cost through
       -- Cost.total. PlayerEffect.matchesSpell classifies an OBJECT, not a spell,
-      -- so a noncreature PERMANENT matches SpellCriterion.NoncreatureSpell --
-      -- and Thalia taxes noncreature SPELLS, never abilities. Four Mountains
+      -- so a noncreature PERMANENT matches Thalia's Not (HasCardType Creature)
+      -- filter -- and Thalia taxes noncreature SPELLS, never abilities. Four Mountains
       -- must still afford Mindslaver's printed {4}; a fifth would be needed if
       -- the tax wrongly reached the activation (#90).
       HU.testCase "CR 613.11 Thalia does not tax a noncreature permanent's activated ability" $

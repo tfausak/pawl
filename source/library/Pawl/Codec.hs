@@ -72,7 +72,6 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.SpellCriterion as SpellCriterion
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
@@ -510,25 +509,12 @@ jsonToPlayerScope =
       (Text.pack "EachPlayer", PlayerScope.EachPlayer)
     ]
 
-spellCriterionToJson :: SpellCriterion.SpellCriterion -> Value
-spellCriterionToJson c = case c of
-  SpellCriterion.NoncreatureSpell -> nullary (Text.pack "NoncreatureSpell")
-  SpellCriterion.SpellOfColor color -> Json.tagged (Text.pack "SpellOfColor") (Just (colorToJson color))
-
-jsonToSpellCriterion :: Value -> Either Text SpellCriterion.SpellCriterion
-jsonToSpellCriterion value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("NoncreatureSpell", _) -> Right SpellCriterion.NoncreatureSpell
-    ("SpellOfColor", Just v) -> SpellCriterion.SpellOfColor <$> jsonToColor v
-    _ -> Left (Text.pack "unknown SpellCriterion: " <> t)
-
 playerEffectToJson :: PlayerEffect.PlayerEffect -> Value
 playerEffectToJson e = case e of
   PlayerEffect.CantCastSpells -> nullary (Text.pack "CantCastSpells")
   PlayerEffect.CantCastMoreThan n -> Json.tagged (Text.pack "CantCastMoreThan") (Just (natTo n))
-  PlayerEffect.IncreaseSpellCost c n -> Json.tagged (Text.pack "IncreaseSpellCost") (Just (Array [spellCriterionToJson c, natTo n]))
-  PlayerEffect.ReduceSpellCost c n -> Json.tagged (Text.pack "ReduceSpellCost") (Just (Array [spellCriterionToJson c, natTo n]))
+  PlayerEffect.IncreaseSpellCost c n -> Json.tagged (Text.pack "IncreaseSpellCost") (Just (Array [filterToJson c, natTo n]))
+  PlayerEffect.ReduceSpellCost c n -> Json.tagged (Text.pack "ReduceSpellCost") (Just (Array [filterToJson c, natTo n]))
   PlayerEffect.NoMaximumHandSize -> nullary (Text.pack "NoMaximumHandSize")
 
 jsonToPlayerEffect :: Value -> Either Text PlayerEffect.PlayerEffect
@@ -537,8 +523,8 @@ jsonToPlayerEffect value = do
   case (Text.unpack t, mv) of
     ("CantCastSpells", _) -> Right PlayerEffect.CantCastSpells
     ("CantCastMoreThan", Just v) -> PlayerEffect.CantCastMoreThan <$> natFrom v
-    ("IncreaseSpellCost", Just (Array [c, n])) -> PlayerEffect.IncreaseSpellCost <$> jsonToSpellCriterion c <*> natFrom n
-    ("ReduceSpellCost", Just (Array [c, n])) -> PlayerEffect.ReduceSpellCost <$> jsonToSpellCriterion c <*> natFrom n
+    ("IncreaseSpellCost", Just (Array [c, n])) -> PlayerEffect.IncreaseSpellCost <$> jsonToFilter c <*> natFrom n
+    ("ReduceSpellCost", Just (Array [c, n])) -> PlayerEffect.ReduceSpellCost <$> jsonToFilter c <*> natFrom n
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
     _ -> Left (Text.pack "unknown PlayerEffect: " <> t)
 

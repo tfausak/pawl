@@ -175,7 +175,6 @@ library
     Pawl.Type.Sickness
     Pawl.Type.SlotName
     Pawl.Type.Source
-    Pawl.Type.SpellCriterion
     Pawl.Type.StateCondition
     Pawl.Type.StaticAbility
     Pawl.Type.Status
