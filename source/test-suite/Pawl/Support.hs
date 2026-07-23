@@ -27,6 +27,7 @@ import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
@@ -64,9 +65,11 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
@@ -541,6 +544,16 @@ addHandCard printing pid gs =
 -- AllCreatures does not touch it). Returns the updated state.
 withHumility :: Cards.Cards -> GameState.GameState -> GameState.GameState
 withHumility cards gs = snd (addCreature (Cards.humilityPrinting cards) bob gs)
+
+-- The "target" slot's TargetSpec, read straight out of a JSON-loaded printing's
+-- spell (Modal.allTargetSpecs, keyed by SlotName) -- so a gate test exercises
+-- the codec's parse of the committed card data, never a hand-built TargetSpec
+-- (P9 Task 5: Terror, Reprisal).
+spellTargetSpec :: Printing.Printing -> Maybe TargetSpec.TargetSpec
+spellTargetSpec printing =
+  Map.lookup
+    (SlotName.MkSlotName (Text.pack "target"))
+    (Modal.allTargetSpecs (Card.Type.spell (Printing.card printing)))
 
 -- alice controls n untapped basic lands of one printing, nothing else.
 landsInPlay :: Printing.Printing -> Int -> GameState.GameState

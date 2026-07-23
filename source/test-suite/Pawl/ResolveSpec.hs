@@ -218,7 +218,37 @@ targetTests cards =
           (Target.selfExcludes (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource))
         HU.assertBool
           "IncludesSource includes"
-          (not (Target.selfExcludes (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource)))
+          (not (Target.selfExcludes (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource))),
+      -- Gate cards for P9 Task 5: Terror and Reprisal. Both cards' printed text
+      -- ends "It can't be regenerated."; regeneration is not modelled (no
+      -- regeneration shield to suppress), so that clause is a no-op and is
+      -- omitted from data/cards/{terror,reprisal}.json -- regeneration clause
+      -- omitted; not modelled (#113).
+      HU.testCase "Terror: And of Not(HasColor Black) and Not(HasCardType Artifact) excludes black and artifact creatures" $
+        case S.spellTargetSpec (Cards.terrorPrinting cards) of
+          Nothing -> HU.assertFailure "Terror's printing carries no 'target' slot"
+          Just spec ->
+            let gs0 = Setup.emptyGame S.bothPlayers
+                (blackOid, gs1) = S.addCreature (Cards.typhoidRatsPrinting cards) S.bob gs0
+                (artifactOid, gs2) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob gs1
+                (plainOid, gs) = S.addPiker cards S.alice gs2
+                legal = Target.legalRecipients S.noSource spec gs
+             in do
+                  HU.assertBool "black creature illegal" (not (Set.member (Recipient.ToCreature blackOid) legal))
+                  HU.assertBool "artifact creature illegal" (not (Set.member (Recipient.ToCreature artifactOid) legal))
+                  HU.assertBool "nonblack, nonartifact creature legal" (Set.member (Recipient.ToCreature plainOid) legal),
+      HU.testCase "Reprisal: PowerAtLeast 4 legality tracks a projected power pump" $
+        case S.spellTargetSpec (Cards.reprisalPrinting cards) of
+          Nothing -> HU.assertFailure "Reprisal's printing carries no 'target' slot"
+          Just spec ->
+            let gs0 = Setup.emptyGame S.bothPlayers
+                (smallOid, gs) = S.addPiker cards S.bob gs0 -- power 2, {1}{R}
+                legalBefore = Target.legalRecipients S.noSource spec gs
+                pumped = S.withEffect smallOid (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0)) gs
+                legalAfter = Target.legalRecipients S.noSource spec pumped
+             in do
+                  HU.assertBool "power 2 is illegal (below the PowerAtLeast 4 floor)" (not (Set.member (Recipient.ToCreature smallOid) legalBefore))
+                  HU.assertBool "pumped to power 4 becomes legal" (Set.member (Recipient.ToCreature smallOid) legalAfter)
     ]
 
 resolveTests :: Cards.Cards -> Tasty.TestTree
