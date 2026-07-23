@@ -6,8 +6,10 @@
 module Pawl.GameSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -23,6 +25,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
@@ -437,7 +440,35 @@ ruleTests cards =
               HU.assertEqual "bob took 3 from his own Bolt" (Just 17) (S.lifeOf S.bob after)
               HU.assertEqual "bob's Mountain (his resource) is tapped" 1 (S.tappedCount S.bob after)
               HU.assertEqual "CR 723.5a: alice's Mountain is untouched" 0 (S.tappedCount S.alice after)
-              HU.assertEqual "CR 723.5a: alice's hand is untouched" 0 (S.handSize S.alice after)
+              HU.assertEqual "CR 723.5a: alice's hand is untouched" 0 (S.handSize S.alice after),
+      HU.testCase "CR 727.1/727.2/727.4 gameplay: bob activates a restart and the game rebuilds from its own cards" $
+        -- bob controls the synthetic restart artifact and owns 8 cards total;
+        -- alice owns 8. Both start with reduced life on a populated board. bob
+        -- activates the artifact through the priority loop; it resolves, restarts
+        -- the game, and the result is a valid new game with bob as starter.
+        let g0 = Setup.emptyGame S.bothPlayers
+            (_restartId, g1) = S.addCreature (Cards.syntheticRestartPrinting cards) S.bob g0
+            (_aPiker, g2) = S.addCreature (Cards.pikerPrinting cards) S.alice g1
+            -- fill each owner's pool to >= 7 cards so opening hands draw without a
+            -- CR 727.3 loss (the restart artifact + 7 mountains = 8 for bob).
+            g3 = addManyG cards 7 S.bob (addManyG cards 7 S.alice g2)
+            gStart =
+              g3
+                { GameState.activePlayer = S.bob,
+                  GameState.phase = Phase.PrecombatMain,
+                  GameState.priority = Just S.bob
+                }
+            after = snd (Engine.runGamePure restartAnswer gStart Engine.priorityLoop)
+         in do
+              HU.assertEqual "CR 727.1a: bob is the new active player" S.bob (GameState.activePlayer after)
+              HU.assertEqual "CR 727.1a: the turn order begins with bob" (Just S.bob) (Maybe.listToMaybe (GameState.turnOrder after))
+              HU.assertEqual "both players reset to 20 life (alice)" (Just 20) (S.lifeOf S.alice after)
+              HU.assertEqual "both players reset to 20 life (bob)" (Just 20) (S.lifeOf S.bob after)
+              HU.assertEqual "CR 103.5: alice drew a 7-card opening hand" 7 (S.handSize S.alice after)
+              HU.assertEqual "CR 103.5: bob drew a 7-card opening hand" 7 (S.handSize S.bob after)
+              HU.assertEqual "CR 727.4: settled at the first untap step" Turn.firstPhase (GameState.phase after)
+              HU.assertEqual "CR 727.2: the battlefield is empty (every card returned to a library)" True (Set.null (GameState.battlefield after))
+              HU.assertEqual "the game did not end -- the new game is live" Nothing (GameState.result after)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
@@ -561,3 +592,22 @@ gateAnswer p = case p of
             [] -> A.Pass
           else A.Pass
   _ -> slaveAnswer p
+
+-- CR 727 gate strategy. Whoever has priority activates the only activation on the
+-- board -- the synthetic restart artifact (bob controls it) -- and otherwise
+-- passes. Once the artifact is sacrificed as a cost there is no further
+-- activation, so this fires exactly once; after the restart the artifact is in a
+-- library, so no player can activate anything and everyone passes to termination.
+-- Non-ChooseAction prompts (Shuffle during the rebuild, etc.) delegate to
+-- identityAnswer.
+restartAnswer :: Prompt.Prompt r -> r
+restartAnswer p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    case filter isActivateAction actions of
+      activation : _ -> activation
+      [] -> A.Pass
+  _ -> S.identityAnswer p
+
+addManyG :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+addManyG cards n pid gs =
+  List.foldl' (\g _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid g)) gs (replicate n ())

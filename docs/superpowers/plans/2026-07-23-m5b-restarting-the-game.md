@@ -637,7 +637,7 @@ The headline gate (CR 727.1/727.2/727.4). bob controls the `synthetic-restart` a
 - Consumes: `Engine.{runGamePure,priorityLoop}`, `Setup.emptyGame`, `S.addCreature`, `Cards.{syntheticRestartPrinting,pikerPrinting,mountainPrinting}`, `isActivateAction` (already in `GameSpec`), `S.identityAnswer`, `Turn.firstPhase`.
 - Produces: `restartAnswer :: Prompt.Prompt r -> r`.
 
-- [ ] **Step 1: Add the activation answerer**
+- [x] **Step 1: Add the activation answerer**
 
 Append to `source/test-suite/Pawl/GameSpec.hs` (next to the other answerers, e.g. after `gateAnswer`). Add `import qualified Data.List as List`, `import qualified Data.Set as Set`, `import qualified Data.Maybe as Maybe`, `import qualified Pawl.Turn as Turn`, `import qualified Pawl.Type.Object as Object` to the import group if not present:
 
@@ -668,7 +668,7 @@ restartAnswer p = case p of
 >
 > (If `S.PlayerId` is not exported by `Support`, import `Pawl.Type.PlayerId (PlayerId)` and use `PlayerId`.)
 
-- [ ] **Step 2: Add the gate test case to `ruleTests`**
+- [x] **Step 2: Add the gate test case to `ruleTests`**
 
 Insert into the `ruleTests` list in `source/test-suite/Pawl/GameSpec.hs` (comma-separated):
 
@@ -705,7 +705,7 @@ Insert into the `ruleTests` list in `source/test-suite/Pawl/GameSpec.hs` (comma-
 
 > `Phase.PrecombatMain` and the `Phase` import are already used by the M5a gate in this file. If `Set`/`Maybe`/`Turn`/`List` were not previously imported, they were added in Step 1.
 
-- [ ] **Step 3: Run the test to verify it fails first, then passes**
+- [x] **Step 3: Run the test to verify it fails first, then passes**
 
 Because the machinery is now built, this characterization gate is expected to **pass on first run**. To honor TDD for a gate over already-built code, first prove it has teeth:
 
@@ -722,7 +722,7 @@ Then a **falsification check** — temporarily break `restartGame`'s starting-pl
 
 > Do not leave the mutation in. If the gate does *not* fail under the mutation, the test is not exercising the starting-player rule — investigate before proceeding.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
