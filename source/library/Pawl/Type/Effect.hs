@@ -56,6 +56,10 @@ data Effect card
   | -- CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk (Rest in Peace's exact shape); a general exile-from-zone is future.
     ExileAllGraveyards
+  | -- CR 727.1/727.1a: restart the game. Targetless and game-wide (the
+    -- ExileAllGraveyards / BecomeMonarch shape); the starting player of the new
+    -- game is the resolving controller, so no target slot is needed.
+    RestartGame
   | -- CR 723.1: "you control target player during that player's next turn."
     -- Installs pending control keyed to the slot's chosen player, with the
     -- ability's controller as the decider. Mindslaver's exact shape.

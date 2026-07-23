@@ -572,6 +572,53 @@ resolveTests cards =
          in do
               HU.assertEqual "the first effect installed alice as bob's decider" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl afterAlice))
               HU.assertEqual "CR 723.1a: the later effect overwrites — bob's own control wins" (Just (Decider.MkDecider S.bob)) (Map.lookup S.bob (GameState.pendingControl afterBob)),
+      HU.testCase "CR 727.1a: resolving a RestartGame ability restarts with its controller as starting player" $
+        let g0 = Setup.emptyGame S.bothPlayers
+            -- alice owns a card on the battlefield; it must survive the restart.
+            -- aliceId only threads into the ability's Source.OfAbility below --
+            -- CR 400.7 mints a fresh id for this card on the opening draw's zone
+            -- change (Event.changeZone), so the post-restart check is ownership-
+            -- based (SetupSpec's CR 727.2 test uses the same idiom), not a
+            -- lookup by this specific pre-restart id.
+            (aliceId, g1) = S.addCreature (Cards.mountainPrinting cards) S.alice g0
+            -- bob owns 8 cards (enough for a full opening hand, no CR 727.3 loss).
+            g2 = addMany cards 8 S.bob g1
+            g3 = addMany cards 7 S.alice g2
+            -- Hand-build bob's ability object on the stack: one mode, effect
+            -- RestartGame, no targets. Object.owner = bob is the resolving
+            -- controller (Resolve.hs), which restartGame uses as the starter.
+            (abilId, g4) = Game.freshObjectId g3
+            (ts, g5) = Game.freshTimestamp g4
+            ability =
+              ActivatedAbility.MkActivatedAbility
+                { ActivatedAbility.cost =
+                    Cost.Type.MkCost
+                      { Cost.Type.mana = Just (ManaCost.MkManaCost []),
+                        Cost.Type.components = []
+                      },
+                  ActivatedAbility.modal =
+                    Modal.MkModal
+                      (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty))
+                      (ModeSelection.ChooseExactly 1)
+                }
+            abilObj =
+              Object.MkObject
+                { Object.owner = S.bob,
+                  Object.source = Source.OfAbility aliceId ability,
+                  Object.zone = Zone.Stack,
+                  Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
+                  Object.sickness = Sickness.Settled,
+                  Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+                  Object.counters = Map.empty,
+                  Object.timestamp = ts
+                }
+            g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
+            after = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
+         in do
+              HU.assertEqual "the game restarted with bob as the starting player (CR 727.1a)" S.bob (GameState.activePlayer after)
+              HU.assertEqual "alice's 8 cards all survived the restart, still hers (CR 727.2)" 8 (length (filter (\o -> Object.owner o == S.alice) (Map.elems (GameState.objects after))))
+              HU.assertEqual "the resolving ability object ceased to exist (not a card)" Nothing (Game.lookupObject abilId after),
       HU.testCase "CR 111 Dragon Fodder creates two 1/1 Goblin tokens" $
         let base = S.landsInPlay (Cards.mountainPrinting cards) 2
             (gs, spellId) = S.handOne (Cards.dragonFodderPrinting cards) base
@@ -597,6 +644,12 @@ resolveTests cards =
               -- The falsifier: a tag-blind Fog would also blunt this spell damage.
               HU.assertEqual "spell damage untouched (Noncombat)" (Just 2) (S.damageOf victim spell)
     ]
+
+-- Add n Mountains to pid's battlefield, discarding the ids (used to bulk up a
+-- pool of owned cards). replicate n () avoids a list comprehension (CLAUDE.md).
+addMany :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+addMany cards n pid gs =
+  List.foldl' (\g _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid g)) gs (replicate n ())
 
 -- Build a Mindslaver-shaped ControlPlayerNextTurn ability owned by `controller`,
 -- targeting `target`, put it on the stack, and resolve it. Returns the resulting

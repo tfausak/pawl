@@ -1151,6 +1151,7 @@ effectToJson e = case e of
   Effect.AddMana mt -> Json.tagged (Text.pack "AddMana") (Just (manaTypeToJson mt))
   Effect.Search f -> Json.tagged (Text.pack "Search") (Just (filterToJson f))
   Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
+  Effect.RestartGame -> nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
   Effect.Destroy s -> Json.tagged (Text.pack "Destroy") (Just (slotNameToJson s))
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
@@ -1186,6 +1187,7 @@ jsonToEffect value = do
     "AddMana" -> withValue mv (fmap Effect.AddMana . jsonToManaType)
     "Search" -> withValue mv (fmap Effect.Search . jsonToFilter)
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
+    "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
     "Destroy" -> withValue mv (fmap Effect.Destroy . jsonToSlotName)
     "Sacrifice" -> withValue mv (fmap Effect.Sacrifice . jsonToSlotName)

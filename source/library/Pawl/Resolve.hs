@@ -19,6 +19,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
+import qualified Pawl.Setup as Setup
 import qualified Pawl.Target as Target
 import Pawl.Type.AbilityName (AbilityName)
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
@@ -71,6 +72,7 @@ slotsOf effect = case effect of
   Effect.AddMana _ -> Set.empty
   Effect.Search _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
+  Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
   Effect.Destroy slot -> Set.singleton slot
   Effect.Sacrifice slot -> Set.singleton slot
@@ -108,6 +110,7 @@ readsX = any effectReadsX
       Effect.AddMana _ -> False
       Effect.Search _ -> False
       Effect.ExileAllGraveyards -> False
+      Effect.RestartGame -> False
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy _ -> False
       Effect.Sacrifice _ -> False
@@ -139,6 +142,7 @@ manaProduced effect = case effect of
   Effect.ChangeText _ -> Nothing
   Effect.Search _ -> Nothing
   Effect.ExileAllGraveyards -> Nothing
+  Effect.RestartGame -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.Destroy _ -> Nothing
   Effect.Sacrifice _ -> Nothing
@@ -170,6 +174,7 @@ searchesLibrary effect = case effect of
   Effect.ChangeText _ -> False
   Effect.AddMana _ -> False
   Effect.ExileAllGraveyards -> False
+  Effect.RestartGame -> False
   Effect.ControlPlayerNextTurn _ -> False
   Effect.Destroy _ -> False
   Effect.Sacrifice _ -> False
@@ -241,6 +246,7 @@ rewriteEffect pairs effect = case effect of
   Effect.AddMana _ -> effect
   Effect.Search _ -> effect
   Effect.ExileAllGraveyards -> effect
+  Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy _ -> effect
   Effect.Sacrifice _ -> effect
@@ -508,6 +514,11 @@ applyEffect source controller bound legality chosen effect = case effect of
     gs <- State.get
     let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Map.keys (GameState.players gs))
     Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) gyCards
+  -- CR 727.1/727.1a: restart the game. The starting player of the new game is
+  -- this ability's controller (CR 727.1a), which applyEffect already holds as
+  -- `controller`; the rebuild lives in Setup (game construction). The engine
+  -- reaches it through a generic opcode, never Karn's identity.
+  Effect.RestartGame -> Setup.restartGame controller
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

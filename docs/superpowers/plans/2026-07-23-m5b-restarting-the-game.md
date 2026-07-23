@@ -387,7 +387,7 @@ A **nullary** `Effect.RestartGame` opcode (targetless, game-wide — the `ExileA
 - Consumes: `Setup.restartGame`, the `applyEffect` `controller` argument.
 - Produces: `Effect.RestartGame :: Effect card`; JSON tag `"RestartGame"`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ResolveSpec.hs`, in the same `testGroup` list that holds the existing CR 723.1 installation test (the M5a `installControlBy` case). This resolves a hand-built ability whose only effect is `RestartGame`, owned by bob, on a board where alice owns a card — and asserts the game restarted with bob as the starting player and alice's card preserved. Reuse the file's existing ability-construction imports (it already imports `Object`, `Source`, `ActivatedAbility`, `Modal`, `Mode`, `Cost.Type`, `ManaCost`, `Binding`, `Zone`, `TapState`, `Sickness`, `Seq`, `Set`, `Engine`, `Stack`, `Game`, `GameState`); it needs `Effect` and `Setup` — add `import qualified Pawl.Setup as Setup` and confirm `import qualified Pawl.Type.Effect as Effect` are present, plus `import qualified Data.Maybe as Maybe`, `import qualified Pawl.Type.Object as Object`.
 
@@ -438,12 +438,14 @@ Add to `source/test-suite/Pawl/ResolveSpec.hs`, in the same `testGroup` list tha
 
 > `addMany`, `ModeSelection`, `ModeIndex`, `Mode`, `Modal` mirror the M5a `installControlBy` helper in this file — if any import is missing, add it aliased to its last component. `Binding.fromChoices` here supplies empty target/subtype maps, no X, and the single chosen mode (index 0), matching the M5a usage. If `addMany` is not visible from `SetupSpec`, define a local copy at the top of `ResolveSpec.hs` identical to Task 1's.
 
-- [ ] **Step 2: Run the test to verify it fails**
+> **Plan-bug fix applied during execution:** the "alice's card survived" line above (`Game.lookupObject aliceId after`) does not hold as written. CR 400.7 mints a fresh object id on the opening-hand draw's zone change (`Event.changeZone`); `aliceId` is the first fresh id allotted (the smallest), so it sorts first in `libraryOf`'s ascending `Map.keys` order and is drawn — never the one card left undrawn in the post-restart library. `SetupSpec.hs`'s own CR 727.2 test (`restartTests`, "every owned card returns to its owner…") already documents and works around this with an ownership-count assertion instead of a specific-id lookup. `ResolveSpec.hs`'s implementation follows the same idiom: `HU.assertEqual "alice's 8 cards all survived the restart, still hers (CR 727.2)" 8 (length (filter (\o -> Object.owner o == S.alice) (Map.elems (GameState.objects after))))`, replacing the `Just S.alice` / `Game.lookupObject aliceId after` line shown above. Per CLAUDE.md ("a test failing against correct code is a plan bug: fix the plan's test, not the engine"), the engine's CR 400.7 re-identification is untouched; only this assertion changed.
+
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20`
 Expected: **compile error** — `Effect.RestartGame` is not a constructor of `Effect`.
 
-- [ ] **Step 3: Add the `RestartGame` constructor**
+- [x] **Step 3: Add the `RestartGame` constructor**
 
 In `source/library/Pawl/Type/Effect.hs`, add a new constructor. Place it immediately after `ExileAllGraveyards` (line ~58) with a rules comment:
 
@@ -454,7 +456,7 @@ In `source/library/Pawl/Type/Effect.hs`, add a new constructor. Place it immedia
     RestartGame
 ```
 
-- [ ] **Step 4: Add the six `Resolve` dispatch arms and the `Setup` import**
+- [x] **Step 4: Add the six `Resolve` dispatch arms and the `Setup` import**
 
 In `source/library/Pawl/Resolve.hs`:
 
@@ -482,7 +484,7 @@ Then add the executor arm to `applyEffect` (next to the `Effect.ExileAllGraveyar
   Effect.RestartGame -> Setup.restartGame controller
 ```
 
-- [ ] **Step 5: Add the two `Codec` arms**
+- [x] **Step 5: Add the two `Codec` arms**
 
 In `source/library/Pawl/Codec.hs`:
 
@@ -498,7 +500,7 @@ In `source/library/Pawl/Codec.hs`:
     "RestartGame" -> Right Effect.RestartGame
 ```
 
-- [ ] **Step 6: Run the test to verify it passes**
+- [x] **Step 6: Run the test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/resolving a RestartGame ability/"'`
 Expected: **PASS** — warning-clean build (all `case effect of` sites now exhaustive), the resolution test green.
