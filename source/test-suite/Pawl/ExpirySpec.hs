@@ -365,7 +365,7 @@ monarchTests cards =
                 gs3 = S.withEvent (GameEvent.Moved entered (Projection.project jailer gs2)) gs2
                 afterEtb = resolveAll (settle gs3)
                 -- caster stays monarch across a turn boundary: exile holds.
-                heldExiled = S.settleSba afterEtb
+                heldExiled = settle afterEtb
                 -- an opponent (bob) takes the crown: the creature returns.
                 afterSteal = resolveAll (settle (S.withMonarch S.bob heldExiled))
              in do
