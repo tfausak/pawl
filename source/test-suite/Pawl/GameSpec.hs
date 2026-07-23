@@ -416,7 +416,28 @@ ruleTests cards =
                   GameState.activeControl = Just (Decider.MkDecider S.alice)
                 }
             after = S.runCombat controlCombatAnswer g0
-         in HU.assertEqual "alice took 2 from bob's Piker, declared by alice-as-bob" (Just 18) (S.lifeOf S.alice after)
+         in HU.assertEqual "alice took 2 from bob's Piker, declared by alice-as-bob" (Just 18) (S.lifeOf S.alice after),
+      HU.testCase "CR 723.5a: the controller spends only the controlled player's resources" $
+        -- bob (controlled by alice) and alice each have an untapped Mountain; bob
+        -- has a Bolt. Alice-as-bob casts bob's Bolt, paid from BOB's Mountain.
+        -- alice's Mountain and hand must be untouched.
+        let g0 = Setup.emptyGame S.bothPlayers
+            (_bMtn, g1) = S.addCreature (Cards.mountainPrinting cards) S.bob g0
+            (_aMtn, g2) = S.addCreature (Cards.mountainPrinting cards) S.alice g1
+            (_bBolt, g3) = handBobBolt cards g2
+            g4 =
+              g3
+                { GameState.activePlayer = S.bob,
+                  GameState.phase = Phase.PrecombatMain,
+                  GameState.priority = Just S.bob,
+                  GameState.activeControl = Just (Decider.MkDecider S.alice)
+                }
+            after = snd (Engine.runGamePure slaveAnswer g4 Engine.priorityLoop)
+         in do
+              HU.assertEqual "bob took 3 from his own Bolt" (Just 17) (S.lifeOf S.bob after)
+              HU.assertEqual "bob's Mountain (his resource) is tapped" 1 (S.tappedCount S.bob after)
+              HU.assertEqual "CR 723.5a: alice's Mountain is untouched" 0 (S.tappedCount S.alice after)
+              HU.assertEqual "CR 723.5a: alice's hand is untouched" 0 (S.handSize S.alice after)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
