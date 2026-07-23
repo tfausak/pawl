@@ -21,6 +21,8 @@ import qualified Pawl.Replacement as Replacement
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.CounterKind as CounterKind
 import Pawl.Type.DamageEvent (DamageEvent)
+import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamageKind as DamageKind
 import Pawl.Type.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import Pawl.Type.Game (Game)
@@ -35,6 +37,7 @@ import Pawl.Type.PendingTrigger (PendingTrigger)
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
 import Pawl.Type.StateCondition (StateCondition)
@@ -359,6 +362,26 @@ matchesTrigger bearer you cond event = case cond of
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
+  -- CR 510.1c / 509.1i: the bearer dealt COMBAT damage to a PLAYER (the trigger
+  -- pattern behind "whenever this creature deals combat damage to a player").
+  -- Combat damage already records a DamageDealt event, so the match is a filter
+  -- over the log, not new recording.
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> case event of
+    GameEvent.DamageDealt ev ->
+      DamageEvent.source ev == bearer
+        && DamageEvent.kind ev == DamageKind.Combat
+        && isPlayerRecipient (DamageEvent.target ev)
+    GameEvent.Moved _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+
+-- Whether a damage recipient is a player (CR 119.3): a total discriminator over
+-- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
+isPlayerRecipient :: Recipient.Recipient -> Bool
+isPlayerRecipient r = case r of
+  Recipient.ToPlayer _ -> True
+  Recipient.ToCreature _ -> False
+  Recipient.ToObject _ -> False
 
 -- CR 603.6a: "Each time an event puts one or more permanents onto the
 -- battlefield, all permanents on the battlefield (including the newcomers)
@@ -493,6 +516,7 @@ stateTriggers gs =
                 TriggerCondition.StateIs cond -> stateHolds ctrl oid cond gs && not (alreadyOnStack oid ab)
                 TriggerCondition.SelfEnters -> False
                 TriggerCondition.StepBegins _ _ -> False
+                TriggerCondition.SelfDealsCombatDamageToPlayer -> False
               pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab Map.empty
            in map pend (filter live (Projection.triggeredAbilitiesOf oid gs))
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))

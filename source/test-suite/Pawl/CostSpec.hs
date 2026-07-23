@@ -15,6 +15,7 @@ import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Cards as Cards
@@ -51,8 +52,10 @@ import qualified Pawl.Type.Payment as Payment
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Subtype as Subtype
@@ -500,5 +503,35 @@ crossCheckTests cards =
                     (Cast.castable S.alice fireblastThree (withPriority gsThree))
         ]
 
+-- Longtusk Cub, the P10 capstone: an energy trigger (CR 603.2 / 509-510) that
+-- feeds an energy-paid pump (CR 118 / 122.6). The ability is extracted via the
+-- file-local total `theAbility` (no partial functions); the card-characteristics
+-- case guards that the extraction sees a real ability.
+longtuskCubTests :: Cards.Cards -> Tasty.TestTree
+longtuskCubTests cards =
+  Tasty.testGroup
+    "LongtuskCub"
+    [ HU.testCase "Longtusk Cub is a {1}{G} 2/2 Cat with a pay-energy ability" $ do
+        HU.assertEqual "name" (Text.pack "Longtusk Cub") (Card.Type.name (Printing.card (Cards.longtuskCubPrinting cards)))
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (Printing.card (Cards.longtuskCubPrinting cards)))
+        HU.assertEqual "one activated ability" 1 (length (Card.Type.activatedAbilities (Printing.card (Cards.longtuskCubPrinting cards)))),
+      HU.testCase "CR 118.6 the pay-energy ability is payable at two energy, not at one, and grows the Cub" $
+        let (cubId, base) = S.addCreature (Cards.longtuskCubPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            ability = theAbility (Cards.longtuskCubPrinting cards)
+            withTwo = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice base
+            withOne = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice base
+            activated = S.runPure S.identityAnswer withTwo (Activate.activateAbility S.alice cubId ability)
+            resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+         in do
+              HU.assertBool "payable at two" (Activate.activatable S.alice cubId ability withTwo)
+              HU.assertBool "unpayable at one" (not (Activate.activatable S.alice cubId ability withOne))
+              HU.assertEqual "energy spent" 0 (S.playerCounterOf PlayerCounterKind.Energy S.alice activated)
+              HU.assertEqual "Cub grew a +1/+1 counter" (Just 1) (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject cubId resolved)),
+      HU.testCase "CR 603.2 Longtusk Cub gains two energy when it connects" $
+        let (gs, _, _) = S.combatBoardOf [Cards.longtuskCubPrinting cards] []
+            after = S.runCombat S.aggressiveAnswer gs
+         in HU.assertEqual "alice gained two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.Cost" [doorTests cards, greedTests cards, villageRitesTests cards, fireblastTests cards, crossCheckTests cards]
+tests cards = Tasty.testGroup "Pawl.Cost" [doorTests cards, greedTests cards, villageRitesTests cards, fireblastTests cards, crossCheckTests cards, longtuskCubTests cards]

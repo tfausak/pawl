@@ -772,6 +772,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.SelfEnters -> nullary (Text.pack "SelfEnters")
   TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array [phaseToJson p, turnScopeToJson s]))
   TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (stateConditionToJson c2))
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> nullary (Text.pack "SelfDealsCombatDamageToPlayer")
 
 jsonToTriggerCondition :: Value -> Either Text TriggerCondition.TriggerCondition
 jsonToTriggerCondition value = do
@@ -780,6 +781,7 @@ jsonToTriggerCondition value = do
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
     ("StepBegins", Just (Array [p, s])) -> TriggerCondition.StepBegins <$> jsonToPhase p <*> jsonToTurnScope s
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToStateCondition v
+    ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
 
 stateConditionToJson :: StateCondition.StateCondition -> Value

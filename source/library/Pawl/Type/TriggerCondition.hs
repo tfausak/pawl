@@ -22,4 +22,7 @@ data TriggerCondition
     -- resolved, has been countered, or has otherwise left the stack", which is why
     -- Pawl.Event derives armedness from the stack rather than storing it.
     StateIs StateCondition
+  | -- CR 603.2 / 509-510: the bearer dealt combat damage to a player. Rides P4's
+    -- event history -- combat damage already records a DamageDealt event.
+    SelfDealsCombatDamageToPlayer
   deriving (Eq, Ord, Show)

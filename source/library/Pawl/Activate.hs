@@ -120,7 +120,14 @@ activateAbility pid srcId ability = do
       if not (keysAgree && eachLegal)
         then State.put gs -- reject: the whole activation is a no-op
         else do
-          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.fromChoices chosen Map.empty Nothing chosenModes}) abilId (GameState.objects g)})
+          -- CR 113.7: bind the source permanent under the reserved self slot, so
+          -- an activated ability that refers to "this creature" (e.g. Longtusk
+          -- Cub's "put a +1/+1 counter on Longtusk Cub") resolves the reference
+          -- as a slot read -- exactly as Engine.placeOne does for a TRIGGERED
+          -- ability's source. srcId is the source permanent (Source.OfAbility),
+          -- which is what "this permanent" names. Additive: no existing activated
+          -- ability reads the self slot, so this cannot disturb them.
+          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen Map.empty Nothing chosenModes)}) abilId (GameState.objects g)})
           -- CR 601.2g/h via Pawl.Cost.pay: the mana window, then the components.
           -- activatable pre-checks payability, so within the source elision (#12)
           -- Unpaid is unreachable; reject-not-repair restores the whole

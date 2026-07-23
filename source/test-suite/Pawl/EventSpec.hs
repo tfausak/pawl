@@ -13,11 +13,17 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
@@ -172,5 +178,17 @@ tests cards =
               HU.assertEqual "no -1/-1 remains" (Just 0) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject oid after))
               -- Net P/T unchanged by annihilation: base 2/1 + net +1/+1 = 3/2.
               HU.assertEqual "power still 3" (Just 3) (Projection.powerOf oid after)
-              HU.assertEqual "toughness still 2" (Just 2) (Projection.toughnessOf oid after)
+              HU.assertEqual "toughness still 2" (Just 2) (Projection.toughnessOf oid after),
+      HU.testCase "CR 603.2 SelfDealsCombatDamageToPlayer matches the bearer's combat damage to a player" $
+        let bearer = ObjectId.MkObjectId 1
+            ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False DamageKind.Combat)
+         in HU.assertBool "matches" (Event.matchesTrigger bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev),
+      HU.testCase "it does not match combat damage to a creature" $
+        let bearer = ObjectId.MkObjectId 1
+            ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToCreature (ObjectId.MkObjectId 2)) 2 False False DamageKind.Combat)
+         in HU.assertBool "no match" (not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)),
+      HU.testCase "it does not match noncombat damage to a player" $
+        let bearer = ObjectId.MkObjectId 1
+            ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False DamageKind.Noncombat)
+         in HU.assertBool "no match" (not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev))
     ]
