@@ -91,6 +91,7 @@ slotsOf effect = case effect of
   Effect.AffectPlayers {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
+  Effect.ExileUntilMonarch slot -> Set.singleton slot
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -125,6 +126,7 @@ readsX = any effectReadsX
       Effect.AffectPlayers {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
+      Effect.ExileUntilMonarch _ -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -155,6 +157,7 @@ manaProduced effect = case effect of
   Effect.AffectPlayers {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
+  Effect.ExileUntilMonarch _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -185,6 +188,7 @@ searchesLibrary effect = case effect of
   Effect.AffectPlayers {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
+  Effect.ExileUntilMonarch _ -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -262,6 +266,8 @@ rewriteEffect pairs effect = case effect of
   Effect.CreateEmblem {} -> effect
   -- No rewritable land-type word.
   Effect.BecomeMonarch {} -> effect
+  -- No rewritable land-type word.
+  Effect.ExileUntilMonarch _ -> effect
 
 -- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
 -- 608.2c/700.2 -- an unchosen mode's effects never resolve), with every
@@ -704,6 +710,20 @@ applyEffect source controller bound legality chosen effect = case effect of
         -- overwritten (at most one at a time).
         State.modify' (\g -> g {GameState.monarch = Just p})
         State.modify' (Event.recordEvent (GameEvent.BecameMonarch p))
+  Effect.ExileUntilMonarch slot ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case recipientObject recipient of
+        Nothing -> pure ()
+        Just target -> do
+          -- CR 400.7: exile the target through the funnel; register the resulting
+          -- incarnation for return when an opponent of `controller` (CR 102.2)
+          -- becomes the monarch.
+          mNew <- Event.changeZoneReturning target Zone.Exile
+          case mNew of
+            Nothing -> pure ()
+            Just newId ->
+              State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId controller (GameState.exiledUntilMonarch g)})
+      _ -> pure ()
   Effect.Counter slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- CR 701.6a: the slot's target is a spell on the stack; counter it through

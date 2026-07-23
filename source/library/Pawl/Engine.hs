@@ -378,9 +378,10 @@ permute xs order =
 settleForPriority :: Game ()
 settleForPriority = do
   swept <- Expiry.sweepConditional
+  returned <- Monarch.returnExiledForMonarch
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
-  Monad.when (swept || acted || placed) settleForPriority
+  Monad.when (swept || returned || acted || placed) settleForPriority
 
 priorityLoop :: Game ()
 priorityLoop = do

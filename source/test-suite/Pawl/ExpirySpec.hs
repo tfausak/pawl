@@ -3,6 +3,7 @@
 -- and the two gate cards (Master Thief, Hag of Inner Weakness).
 module Pawl.ExpirySpec where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Cards as Cards
@@ -355,7 +356,25 @@ monarchTests cards =
                 dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False DamageKind.Noncombat
                 began = S.withEvent (GameEvent.DamageDealt dmg) gs0
                 after = resolveAll (settle began)
-             in HU.assertEqual "alice keeps the crown" (Just S.alice) (GameState.monarch after)
+             in HU.assertEqual "alice keeps the crown" (Just S.alice) (GameState.monarch after),
+          HU.testCase "CR 725 Palace Jailer: ETB makes the caster monarch and exiles an opponent's creature until an opponent takes the crown" $
+            let gs0 = Setup.emptyGame S.bothPlayers
+                (victim, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
+                (jailer, gs2) = S.addCreature (Cards.palaceJailerPrinting cards) S.alice gs1
+                entered = ZoneChange.MkZoneChange jailer Zone.Stack Zone.Battlefield
+                gs3 = S.withEvent (GameEvent.Moved entered (Projection.project jailer gs2)) gs2
+                afterEtb = resolveAll (settle gs3)
+                -- caster stays monarch across a turn boundary: exile holds.
+                heldExiled = S.settleSba afterEtb
+                -- an opponent (bob) takes the crown: the creature returns.
+                afterSteal = resolveAll (settle (S.withMonarch S.bob heldExiled))
+             in do
+                  HU.assertEqual "alice is monarch on ETB" (Just S.alice) (GameState.monarch afterEtb)
+                  HU.assertEqual "victim is exiled" 0 (length (filter (== victim) (Set.toList (GameState.battlefield afterEtb))))
+                  HU.assertBool "victim registered for return" (not (Map.null (GameState.exiledUntilMonarch afterEtb)))
+                  HU.assertBool "still exiled while alice stays monarch" (not (Map.null (GameState.exiledUntilMonarch heldExiled)))
+                  HU.assertEqual "a creature is back on the battlefield once bob is monarch" 1 (length (Game.zoneMembers Zone.Battlefield S.bob afterSteal))
+                  HU.assertEqual "return cleared the exile register" True (Map.null (GameState.exiledUntilMonarch afterSteal))
         ]
 
 -- Hag of Inner Weakness {2}{B} Creature -- Hag Warlock 2/2: "At the beginning of

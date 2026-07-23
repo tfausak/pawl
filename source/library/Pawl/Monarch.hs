@@ -1,5 +1,6 @@
 module Pawl.Monarch where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -7,6 +8,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import Pawl.Type.Binding (Binding)
@@ -143,3 +145,22 @@ placeInherent controller ability provided = do
             Object.timestamp = ts
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
+
+-- CR 725 (Palace Jailer): return every "exiled until an opponent becomes the
+-- monarch" object once an opponent of its controller is the monarch. Two-player
+-- (CR 102.2): an opponent is any player other than the controller, so an entry
+-- is due iff its controller is not the current monarch. Runs in the settle loop.
+returnExiledForMonarch :: Game Bool
+returnExiledForMonarch = do
+  gs <- State.get
+  case GameState.monarch gs of
+    Nothing -> pure False
+    Just m ->
+      let due = Map.keys (Map.filter (/= m) (GameState.exiledUntilMonarch gs))
+       in if null due
+            then pure False
+            else do
+              Monad.forM_ due $ \oid -> do
+                _ <- Event.changeZoneReturning oid Zone.Battlefield
+                State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g)})
+              pure True

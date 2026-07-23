@@ -190,4 +190,10 @@ data Effect card
     -- by the MonarchTarget (the resolving controller, or the controller of the
     -- ability's bound source). Setting the monarch emits GameEvent.BecameMonarch.
     BecomeMonarch MonarchTarget
+  | -- CR 725 (Palace Jailer): exile the slot's target UNTIL an opponent of the
+    -- effect's controller becomes the monarch. The exile is the usual targeted
+    -- move; the DURATION is the novelty -- the exiled incarnation is registered in
+    -- GameState.exiledUntilMonarch and returned by Pawl.Monarch's settle-loop
+    -- sweep. NOT MoveToZone: that has no duration and schedules no return.
+    ExileUntilMonarch SlotName
   deriving (Eq, Ord, Show)

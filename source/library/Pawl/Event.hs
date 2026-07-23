@@ -115,11 +115,20 @@ placeObject pid mkObj dest = do
 -- The single zone-change primitive (CR 400.7): the source object ceases; a NEW
 -- object with a fresh id is created in the destination, carrying owner and
 -- source forward and resetting per-incarnation state. No-op if the id is unknown.
+-- The Game () wrapper the ~30 existing callers use; changeZoneReturning below
+-- carries the same body but hands back the freshly-minted incarnation id, which
+-- Resolve's ExileUntilMonarch arm registers for its return sweep.
 changeZone :: ObjectId -> Zone -> Game ()
-changeZone oid requestedDest = do
+changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest)
+
+-- changeZone's body, returning the destination incarnation's id: Just newId on a
+-- completed move (CR 400.7 minted a fresh id), Nothing when the id is unknown or
+-- the CR 616.1 replacement loop cancelled the move (`resolved == Nothing`).
+changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
+changeZoneReturning oid requestedDest = do
   gs <- State.get
   case Game.lookupObject oid gs of
-    Nothing -> pure ()
+    Nothing -> pure Nothing
     Just obj -> do
       let pid = Object.owner obj
           fromZone = Object.zone obj
@@ -160,7 +169,7 @@ changeZone oid requestedDest = do
         -- CR 614.6: nothing survived the loop, so no zone change happens. No
         -- producer today -- no card in the pool cancels a zone change outright --
         -- but Maybe is what "the event does not happen" means on this path.
-        Nothing -> pure ()
+        Nothing -> pure Nothing
         Just settled -> do
           let dest = ZoneChange.to settled
               mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.timestamp = ts}
@@ -179,6 +188,7 @@ changeZone oid requestedDest = do
           -- what an enters trigger scans. Recorded LAST, so the entry loop's
           -- choices are locked in before any trigger or SBA can observe the object.
           State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId fromZone dest) snapshot))
+          pure (Just newId)
 
 -- The single destruction funnel (CR 701.8 / 702.12b): every destruction -- the
 -- Destroy opcode and the CR 704.5g/h state-based actions -- flows through here.

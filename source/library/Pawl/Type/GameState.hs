@@ -100,6 +100,11 @@ data GameState = MkGameState
     -- CR 725.1/725.3: the monarch, a single game-wide player designation (at most
     -- one at a time). Nothing until a player becomes the monarch. On GameState,
     -- not Player, because it is one designation, not a per-player counter.
-    monarch :: Maybe PlayerId
+    monarch :: Maybe PlayerId,
+    -- CR 725 (Palace Jailer): objects exiled "until an opponent becomes the
+    -- monarch", keyed by the exiled incarnation id to the effect's controller
+    -- (whose opponent taking the crown ends the exile). Not an Expiry: the Expiry
+    -- sweeps are delete-and-recompute and cannot perform the return zone change.
+    exiledUntilMonarch :: Map ObjectId PlayerId
   }
   deriving (Eq, Show)

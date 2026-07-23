@@ -617,8 +617,20 @@ m45p7CardTests cards =
               HU.assertEqual "no target slots" Map.empty (Card.allTargetSpecs c)
     ]
 
+m45p11CardTests :: Cards.Cards -> Tasty.TestTree
+m45p11CardTests cards =
+  let card = Printing.card
+   in Tasty.testGroup
+        "M4.5 P11"
+        [ HU.testCase "Palace Jailer is a {2}{W}{W} 2/2 Human Soldier with two ETB triggers" $ do
+            HU.assertEqual "name" (Text.pack "Palace Jailer") (Card.Type.name (card (Cards.palaceJailerPrinting cards)))
+            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (card (Cards.palaceJailerPrinting cards)))
+            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness (card (Cards.palaceJailerPrinting cards)))
+            HU.assertEqual "two triggered abilities" 2 (length (Card.Type.triggeredAbilities (card (Cards.palaceJailerPrinting cards))))
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
     "Card"
-    [cardTests cards, lintTests cards, m2aCardTests cards, m2bCardTests cards, m2cCardTests cards, basicLandTests cards, m3cCardTests cards, m3eCardTests cards, m4bCardTests cards, m45p6CardTests cards, m45p7CardTests cards]
+    [cardTests cards, lintTests cards, m2aCardTests cards, m2bCardTests cards, m2cCardTests cards, basicLandTests cards, m3cCardTests cards, m3eCardTests cards, m4bCardTests cards, m45p6CardTests cards, m45p7CardTests cards, m45p11CardTests cards]

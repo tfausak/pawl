@@ -82,6 +82,7 @@ data Cards = MkCards
     primalPlasmaPrinting :: Printing.Printing,
     doublingSeasonPrinting :: Printing.Printing,
     masterThiefPrinting :: Printing.Printing,
+    palaceJailerPrinting :: Printing.Printing,
     hagOfInnerWeaknessPrinting :: Printing.Printing,
     ruleOfLawPrinting :: Printing.Printing,
     thaliaPrinting :: Printing.Printing,
@@ -175,6 +176,7 @@ loadCards = do
   primalPlasmaPrinting_ <- loadPrinting "primal-plasma"
   doublingSeasonPrinting_ <- loadPrinting "doubling-season"
   masterThiefPrinting_ <- loadPrinting "master-thief"
+  palaceJailerPrinting_ <- loadPrinting "palace-jailer"
   hagOfInnerWeaknessPrinting_ <- loadPrinting "hag-of-inner-weakness"
   ruleOfLawPrinting_ <- loadPrinting "rule-of-law"
   thaliaPrinting_ <- loadPrinting "thalia-guardian-of-thraben"
@@ -258,6 +260,7 @@ loadCards = do
         primalPlasmaPrinting = primalPlasmaPrinting_,
         doublingSeasonPrinting = doublingSeasonPrinting_,
         masterThiefPrinting = masterThiefPrinting_,
+        palaceJailerPrinting = palaceJailerPrinting_,
         hagOfInnerWeaknessPrinting = hagOfInnerWeaknessPrinting_,
         ruleOfLawPrinting = ruleOfLawPrinting_,
         thaliaPrinting = thaliaPrinting_,
@@ -343,6 +346,7 @@ allPrintings cards =
     primalPlasmaPrinting cards,
     doublingSeasonPrinting cards,
     masterThiefPrinting cards,
+    palaceJailerPrinting cards,
     hagOfInnerWeaknessPrinting cards,
     ruleOfLawPrinting cards,
     thaliaPrinting cards,

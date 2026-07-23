@@ -193,7 +193,9 @@ tests cards =
           HU.testCase "CreateEmblem" $
             roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card (Cards.pikerPrinting cards))),
           HU.testCase "BecomeMonarch" $
-            roundTrip "e" Codec.effectToJson Codec.jsonToEffect (Effect.BecomeMonarch MonarchTarget.TheController)
+            roundTrip "e" Codec.effectToJson Codec.jsonToEffect (Effect.BecomeMonarch MonarchTarget.TheController),
+          HU.testCase "ExileUntilMonarch" $
+            roundTrip "eum" Codec.effectToJson Codec.jsonToEffect (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target")))
         ],
       Tasty.testGroup
         "player effects (P7)"
