@@ -28,7 +28,7 @@ data Filter
   | HasColor Color -- CR 105.2: the object's colours include this one.
   | HasSubtype Subtype -- CR 205.3: the object's subtypes include this one.
   | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
-  | ControlledBy PlayerRelation -- CR 109.5: controller relates thus to the perspective.
+  | ControlledBy PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | And [Filter]
   | Or [Filter]
   | Not Filter
