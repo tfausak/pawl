@@ -95,7 +95,7 @@ The two pure `GameState → GameState` halves of a subgame's lifecycle (CR 729.2
 - Consumes: `GameState.{objects,library,turnOrder,players,nextObjectId,nextTimestamp,…}`, `Object.{owner,source,zone,tapped,damage,sickness,bindings,counters}`, `Source.OfCard`, `startingLife`, `Player.{life,status,counters}`, `Status.Playing`, `Combat.emptyCombat`, `Turn.{firstPhase,laterPhases}`, `Zone.Library`, `TapState.Untapped`, `Sickness.Sick`.
 - Produces (used by Task 4): `subgameStateFrom :: GameState -> GameState`; `funnelBack :: GameState -> GameState -> GameState`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 At the top of `source/test-suite/Pawl/SetupSpec.hs` add to the import group (alphabetical among `Pawl.*`), any not already present:
 
@@ -200,12 +200,12 @@ tests cards = Tasty.testGroup "Setup" [setupTests cards, greenBlackSetupTests ca
 
 > The `funnelBack` case above uses `subgameStateFrom parent` itself as a stand-in "final subgame state" (its objects are exactly the parent's library cards, ids inherited). That is enough to prove card-return, survivor-preservation, and non-collision. Task 4's end-to-end test proves funnelBack against a *real* played-out subgame. `List`, `Map`, `Seq`, `Engine`, `Game`, `Monad`, `GameState` are already imported in `SetupSpec.hs`; add any missing from Step 1's list.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20`
 Expected: **compile error** — `Setup.subgameStateFrom` / `Setup.funnelBack` not in scope.
 
-- [ ] **Step 3: Implement `subgameStateFrom` and `funnelBack`**
+- [x] **Step 3: Implement `subgameStateFrom` and `funnelBack`**
 
 Append to `source/library/Pawl/Setup.hs` (after `restartGame`), and add `import qualified Data.Foldable as Foldable` and `import qualified Data.Set as Set` to the import group:
 
@@ -309,12 +309,12 @@ funnelBack finalSub parent =
 
 > `Maybe` is already imported by `Setup.hs` (used elsewhere); confirm `import qualified Data.Maybe as Maybe` is present. If `Player`/`Status`/`Turn`/`Combat` need their qualified imports, they are already present (M5b's `restartGame` uses all of them).
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/subgames .CR 729/"'`
 Expected: **PASS** (warning-clean build, both cases green).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -338,7 +338,7 @@ Add `Effect.PlaySubgame SlotName` and wire the *pure* halves: the five classifie
 **Interfaces:**
 - Produces: `Effect.PlaySubgame :: SlotName -> Effect card`; JSON tag `"PlaySubgame"`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/CodecSpec.hs`, in the effect round-trip group (near the other `jsonToEffect . effectToJson` assertions):
 
@@ -349,12 +349,12 @@ Add to `source/test-suite/Pawl/CodecSpec.hs`, in the effect round-trip group (ne
 
 > `Effect`, `SlotName`, `Text`, `Codec` are already imported in `CodecSpec.hs` (it round-trips many effects). If `Codec.effectToJson`/`jsonToEffect` are not directly exposed under those names, mirror the file's existing effect round-trip idiom exactly.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20`
 Expected: **compile error** — `Effect.PlaySubgame` is not a constructor.
 
-- [ ] **Step 3: Add the constructor**
+- [x] **Step 3: Add the constructor**
 
 In `source/library/Pawl/Type/Effect.hs`, add after `ExileUntilMonarch` (the current last constructor, ~line 202), before the `deriving`:
 
@@ -368,7 +368,7 @@ In `source/library/Pawl/Type/Effect.hs`, add after `ExileUntilMonarch` (the curr
     PlaySubgame SlotName
 ```
 
-- [ ] **Step 4: Add the five classifier arms and the `definedSlots` arm**
+- [x] **Step 4: Add the five classifier arms and the `definedSlots` arm**
 
 In `source/library/Pawl/Resolve.hs`:
 
@@ -411,7 +411,7 @@ In `source/library/Pawl/Resolve.hs`:
         _ -> Nothing
 ```
 
-- [ ] **Step 5: Add the placeholder executor arm**
+- [x] **Step 5: Add the placeholder executor arm**
 
 In `source/library/Pawl/Resolve.hs`, add to `applyEffect`'s `case effect of` (next to the `Effect.RestartGame` arm) a **placeholder** — the real subgame-running arm is Task 3, but the build needs exhaustiveness now:
 
@@ -422,7 +422,7 @@ In `source/library/Pawl/Resolve.hs`, add to `applyEffect`'s `case effect of` (ne
   Effect.PlaySubgame _ -> pure ()
 ```
 
-- [ ] **Step 6: Add the two `Codec` arms**
+- [x] **Step 6: Add the two `Codec` arms**
 
 In `source/library/Pawl/Codec.hs`:
 
@@ -438,12 +438,12 @@ In `source/library/Pawl/Codec.hs`:
     "PlaySubgame" -> withValue mv (fmap Effect.PlaySubgame . jsonToSlotName)
 ```
 
-- [ ] **Step 7: Run the test to verify it passes**
+- [x] **Step 7: Run the test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/PlaySubgame round-trips/"'`
 Expected: **PASS** — warning-clean build (all `case effect of` sites exhaustive), the round-trip green.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
@@ -468,7 +468,7 @@ Thread a `Game Result` runner down the spell path and give `PlaySubgame` its rea
 - Consumes: `applyEffect` executor site; `Binding`, `Recipient.ToPlayer`, `Result`.
 - Produces: `noSubgame :: Game Result`; `applyEffectWith :: Game Result -> ObjectId -> PlayerId -> Map SlotName (Subtype,Subtype) -> Map SlotName Bool -> Map SlotName Recipient -> Effect Card -> Game ()`; `resolveSpellWith :: Game Result -> ObjectId -> Game ()`; unchanged `applyEffect`/`resolveSpell` signatures.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `source/test-suite/Pawl/ResolveSpec.hs`, in the same `testGroup` list that holds the M5b `RestartGame` resolution test. It hand-builds a spell object on the stack whose chosen mode's effects are `[PlaySubgame "loser", DealDamage "loser" (Literal 3)]`, then runs `resolveSpellWith` with a stub runner that returns `Won alice` (no real subgame). The loser is bob; bob must lose 3 life. Add `import qualified Pawl.Type.Result as Result` if absent; the file already imports the ability/spell-construction machinery used by the M5b test (`Object`, `Source`, `Modal`, `Mode`, `ModeSelection`, `ModeIndex`, `Effect`, `Binding`, `Quantity.Type`, `Zone`, `TapState`, `Sickness`, `Seq`, `Map`, `Set`, `Engine`, `Game`, `GameState`, `Resolve`).
 
@@ -507,12 +507,12 @@ Add to `source/test-suite/Pawl/ResolveSpec.hs`, in the same `testGroup` list tha
 
 > **Card-construction note.** `Source.OfToken card` lets the test give the stack object a `Card` with arbitrary effects without a JSON file (the M4c token idiom; `Game.cardOf` returns a token's embedded card). If `Support` has no `instantCardWith` helper, build the `Card` inline the way the nearest existing `ResolveSpec` synthetic-card test does (a `Sorcery`/`Instant` `MkCard` with `spell = Modal.MkModal (Seq.singleton (Mode.MkMode <effects> <targetSpecs>)) (ModeSelection.ChooseExactly 1)`), and file the tiny helper under `Support` if it is reused. The **only** load-bearing part is that the stack object's chosen mode carries `[PlaySubgame slot, DealDamage slot (Literal 3)]`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20`
 Expected: **compile error** — `Resolve.resolveSpellWith` not in scope.
 
-- [ ] **Step 3: Add `noSubgame`, `bindLoserSlot`, and the imports**
+- [x] **Step 3: Add `noSubgame`, `bindLoserSlot`, and the imports**
 
 In `source/library/Pawl/Resolve.hs`, add to the import group:
 
@@ -543,7 +543,7 @@ bindLoserSlot holder slot loser gs =
 
 > `Binding` (the `Pawl.Type.Binding` module, for `empty`/`target`) and `Recipient` are already imported by `Resolve.hs` (it constructs recipients elsewhere). Confirm the aliases; `Binding.empty` is `Pawl.Type.Binding.empty`.
 
-- [ ] **Step 4: Split `applyEffect` into `applyEffectWith` + wrapper**
+- [x] **Step 4: Split `applyEffect` into `applyEffectWith` + wrapper**
 
 In `source/library/Pawl/Resolve.hs`, rename the executor. Change the header line
 
@@ -591,7 +591,7 @@ applyEffect = applyEffectWith noSubgame
 
 > `Maybe.listToMaybe`, `State.gets`, `State.modify'`, `filter`, `(/=)` are already in scope in `Resolve.hs`.
 
-- [ ] **Step 5: Split `resolveSpell` into `resolveSpellWith` + wrapper, with the per-effect binding re-read**
+- [x] **Step 5: Split `resolveSpell` into `resolveSpellWith` + wrapper, with the per-effect binding re-read**
 
 In `source/library/Pawl/Resolve.hs`, replace `resolveSpell`'s definition (lines ~298–338). Rename it to `resolveSpellWith` taking the runner, and change the effect fold from a snapshot `mapM_` into a per-effect loop that **re-reads** the source's live bindings (so a slot `PlaySubgame` binds mid-fold is visible to the next effect). Keep the fizzle logic and the pre-fold `legalSlot` closure exactly as they are. The changed body:
 
@@ -641,7 +641,7 @@ resolveSpell = resolveSpellWith noSubgame
 
 > Preserve the existing comments on `legalSlot`/`fizzles`/`effectController` from the original `resolveSpell` (CR 608.2b/405.4 citations) — copy them verbatim into `resolveSpellWith`; the snippet above abbreviates them. `Monad.forM_` is `Control.Monad.forM_` — already imported (Resolve uses `Monad.mapM_`).
 
-- [ ] **Step 6: Run the test to verify it passes**
+- [x] **Step 6: Run the test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/PlaySubgame binds the loser/"'`
 Expected: **PASS** — warning-clean; bob is at 17 life.
@@ -651,7 +651,7 @@ Then run the **full suite** once here (the per-effect re-read touches the hot sp
 Run: `cabal test`
 Expected: **all pass** — the re-read is behavior-preserving (no existing card reads a mid-resolution binding; target legality is unchanged). If any spell test reddened, the re-read changed target behavior — STOP and inspect `legalityNow` (it must equal the old `legality` for every targetSpec slot).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -677,7 +677,7 @@ Give the runner a body: construct the subgame (CR 729.2), run `startGameFromCard
 - Consumes: `Engine.playGame`, `Setup.{subgameStateFrom,startGameFromCards,funnelBack,shuffleLibrary}`, `Resolve.{resolveSpellWith,resolveTop}`.
 - Produces: `Stack.resolveTopWith :: Game Result -> Game ()`; unchanged `Stack.resolveTop`; `Engine.playSubgame :: Game Result`.
 
-- [ ] **Step 1: Split `Stack.resolveTop` into `resolveTopWith` + wrapper**
+- [x] **Step 1: Split `Stack.resolveTop` into `resolveTopWith` + wrapper**
 
 In `source/library/Pawl/Stack.hs`, change `resolveTop`'s definition (line ~30) to take a runner and forward it to the **spell** branch only; keep the ability branches on the bare (no-subgame) resolvers. Rename the header:
 
@@ -712,7 +712,7 @@ import Pawl.Type.Result (Result)
 
 > `Resolve` is already imported by `Stack.hs`; `Resolve.noSubgame`/`resolveSpellWith` come from Task 3.
 
-- [ ] **Step 2: Write the failing test (playSubgame end-to-end)**
+- [x] **Step 2: Write the failing test (playSubgame end-to-end)**
 
 Add to `source/test-suite/Pawl/GameSpec.hs`, in `ruleTests`. It builds a parent where alice's library has 8 Mountains and bob's has 3, runs `Engine.playSubgame` directly, and asserts the subgame result feeds back correctly: alice wins (bob decks on the opening draw, CR 729.3), and every card funnels back into a library (CR 729.5). Add `import qualified Pawl.Type.Result as Result` if absent. Reuse `addManyG` (already in `GameSpec.hs`) plus a local `poolToLibraryG` mirroring Task 1's helper.
 
@@ -746,12 +746,12 @@ poolToLibraryG pid gs =
 
 > `Object`, `Zone`, `List`, `Set`, `Seq`, `Map`, `Game`, `Engine`, `GameState` are imported in `GameSpec.hs` (M5a/M5b added most); add any missing. **Do not run yet** — `Engine.playSubgame` does not exist.
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20`
 Expected: **compile error** — `Engine.playSubgame` not in scope.
 
-- [ ] **Step 4: Implement `playSubgame` and wire `priorityLoop`**
+- [x] **Step 4: Implement `playSubgame` and wire `priorityLoop`**
 
 In `source/library/Pawl/Engine.hs`, add to the import group:
 
@@ -790,12 +790,12 @@ Then change `priorityLoop`'s resolve site. Find `Stack.resolveTop` in `priorityL
 
 > `State.runStateT` yields `Program Prompt (Result, GameState)`; `Trans.lift` lifts that base action into `Game`. `Setup` is already imported by `Engine`; `Monad`, `State`, `GameState` are in scope.
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/playSubgame runs a nested game/"'`
 Expected: **PASS** — alice wins, both libraries rebuilt, no main-game result.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -819,7 +819,7 @@ A labeled-synthetic `{0}` Sorcery (the `Landform` / `synthetic-restart` crutch) 
 **Interfaces:**
 - Produces: `Cards.syntheticSubgamePrinting :: Cards.Cards -> Printing.Printing`.
 
-- [ ] **Step 1: Create the card file**
+- [x] **Step 1: Create the card file**
 
 Write `data/cards/synthetic-subgame.json`:
 
@@ -857,7 +857,7 @@ Write `data/cards/synthetic-subgame.json`:
 
 > `manaCost: []` is a payable `{0}` (an *absent* `mana` on an ability is the unpayable case, CR 118.6 — but a spell's `manaCost: []` is a legal empty cost). `PlaySubgame` DEFINES `"loser"`; `DealDamage` READS it — the D4 lint accepts this because `Resolve.definedSlots` (Task 2) reports `"loser"`.
 
-- [ ] **Step 2: Register the printing at all four `Cards.hs` sites**
+- [x] **Step 2: Register the printing at all four `Cards.hs` sites**
 
 In `source/test-suite/Pawl/Cards.hs`:
 
@@ -885,14 +885,14 @@ In `source/test-suite/Pawl/Cards.hs`:
     syntheticSubgamePrinting cards,
 ```
 
-- [ ] **Step 3: Run the round-trip / D4-lint tests**
+- [x] **Step 3: Run the round-trip / D4-lint tests**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/round-trip/ || $0~/allPrintings/ || $0~/honest/ || $0~/declared target slot/"'`
 Expected: **PASS** — the printing parses, appears in `allPrintings`, JSON round-trips, and the D4 lint accepts the `PlaySubgame`-defined / `DealDamage`-read slot. If the D4 lint reddens, the `definedSlots` arm (Task 2 Step 4) is missing or wrong.
 
 > If unsure which suite owns these, run the full suite: `cabal test`. It must stay green.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -916,7 +916,7 @@ The first headline gate. alice casts the `synthetic-subgame` sorcery **through t
 - Consumes: `Engine.{runGamePure,priorityLoop}`, `Setup.emptyGame`, `S.addCreature`, `Cards.{syntheticSubgamePrinting,mountainPrinting}`, `isCastAction`, `poolToLibraryG`, `S.identityAnswer`.
 - Produces: `subgameAnswer :: Prompt.Prompt r -> r`.
 
-- [ ] **Step 1: Add the casting answerer**
+- [x] **Step 1: Add the casting answerer**
 
 Append to `source/test-suite/Pawl/GameSpec.hs` (next to the other answerers, e.g. after `restartAnswer`):
 
@@ -937,7 +937,7 @@ subgameAnswer p = case p of
   _ -> S.identityAnswer p
 ```
 
-- [ ] **Step 2: Add the gate test case to `ruleTests`**
+- [x] **Step 2: Add the gate test case to `ruleTests`**
 
 Insert into `ruleTests` (comma-separated). The sorcery is placed into alice's **hand** (a spell is cast from hand); bob's library is a 3-card pool (he decks in the subgame). A helper `handCard` puts a printing into a player's hand as a fresh object — use the file's existing hand-placement idiom (the M5a `handBobBolt` pattern) generalized, or inline the object construction:
 
@@ -995,7 +995,7 @@ handCard printing pid gs =
 
 > `Printing`, `Object`, `Source.OfCard`, `Zone.Hand`, `TapState`, `Sickness`, `Game.freshObjectId`/`freshTimestamp` are all imported in `GameSpec.hs` (M5a's `handBobBolt` uses them). If `handBobBolt` already generalizes to any printing, reuse it instead of adding `handCard`. `Phase.PrecombatMain` is used by the M5a/M5b gates in this file.
 
-- [ ] **Step 3: Run the gate, then prove it has teeth**
+- [x] **Step 3: Run the gate, then prove it has teeth**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/alice casts a subgame spell/"'`
 Expected: **PASS.**
@@ -1004,7 +1004,7 @@ Then a **falsification check** — temporarily break the loser derivation in `so
 
 > Do not leave the mutation in. If the gate does not fail under it, the follow-on is not reading the bound loser — investigate before proceeding.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -1027,7 +1027,7 @@ The subgame's cards return to their owners' main libraries and reshuffle (CR 729
 **Interfaces:**
 - Consumes: everything from Task 6 plus `Effect`/`GainPlayerCounters` machinery indirectly — here just set a counter on the parent player directly via `Player.counters` and assert it survives.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Insert into `ruleTests`. bob starts with a poison counter in the **main** game; after the subgame he still has exactly it (CR 729.4b: main-game counters are outside the subgame and untouched). Every owned card is back in a library and the main-game battlefield survivors are intact (CR 729.5). Add `import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind` if absent (poison's kind); confirm the kind constructor name against `Pawl.Type.PlayerCounterKind` (P10).
 
@@ -1052,14 +1052,14 @@ Insert into `ruleTests`. bob starts with a poison counter in the **main** game; 
 
 > **Do not use `error` in library code** — the `Map.findWithDefault (error "bob") …` above is test-only sugar for "bob is always present"; if hlint or the no-partial rule flags it in tests too, replace with `Maybe.fromMaybe 0 (fmap (Map.findWithDefault 0 PlayerCounterKind.Poison . Player.counters) (Map.lookup S.bob (GameState.players after)))`. Confirm `PlayerCounterKind.Poison`'s exact constructor name (P10's `Pawl.Type.PlayerCounterKind`); adjust if it differs.
 
-- [ ] **Step 2: Run the test to verify it passes; prove teeth**
+- [x] **Step 2: Run the test to verify it passes; prove teeth**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/cards funnel back/"'`
 Expected: **PASS.**
 
 Falsification: temporarily make `Setup.funnelBack` reset players (add `GameState.players = Map.map (\pl -> pl {Player.counters = Map.empty}) (GameState.players parent)` to its record update) — re-run and expect **FAIL** on the poison assertion (proving 729.4b is load-bearing: funnelBack must NOT touch the parent's players). **Revert** exactly, confirm the diff is empty, re-run: **PASS**.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
@@ -1082,7 +1082,7 @@ The go/no-go falsifier the whole milestone exists to survive: a subgame that its
 **Interfaces:**
 - Consumes: everything from Task 6.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Insert into `ruleTests`. The construction: alice's library is `[synthetic-subgame] ++ 7 Mountains` (8 cards, ≥7 so she does not deck); bob's library is 3 Mountains (decks at every level). In the level-1 subgame, alice draws the nested subgame sorcery in her opening hand and — via `subgameAnswer`, which casts any castable spell — casts it, spawning a level-2 sub-subgame where bob decks again; that unwinds, then bob decks in level 1, alice wins level 1, and the main-game follow-on hits bob for 3. The single load-bearing assertion is **termination with the right top-level outcome**: nesting completed without a stack field.
 
@@ -1127,14 +1127,14 @@ addToLibraryG cards n pid gs =
 
 > **Determinism caveat.** This scenario relies on alice drawing the nested sorcery into her level-1 opening hand. `startGameFromCards` shuffles via `Prompt.Shuffle`, and `S.identityAnswer` (which `subgameAnswer` delegates to) answers `Shuffle ids -> ids` — an **identity** shuffle — so the library order is deterministic and the nested sorcery's position is fixed. If the nested sorcery does not land in the opening 7 under the identity shuffle, adjust the library so it does (e.g. make it the first library object, or shrink alice's library to exactly 7 + the sorcery = 8 with the sorcery first). Verify by running; if the nested cast does not fire, the nested sorcery was not drawn — reorder, do not weaken the assertion.
 
-- [ ] **Step 2: Run the test — verify it terminates and passes; prove teeth**
+- [x] **Step 2: Run the test — verify it terminates and passes; prove teeth**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/a subgame nests a subgame/"'`
 Expected: **PASS** (and, critically, it **returns** — non-termination would hang the suite).
 
 Falsification: this gate's teeth are termination + the level-1 follow-on. To prove the nested cast actually happened (not just a flat subgame), temporarily point `subgameAnswer`'s cast branch at `A.Pass` (never cast): re-run and expect the level-1 follow-on assertion to change (bob no longer takes damage, since alice never casts anything anywhere) — confirming the assertions depend on the spell being cast at every level. **Revert** exactly.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
@@ -1155,7 +1155,7 @@ Per `CLAUDE.md` ("file the issue, cite it inline"), every M5c elision gets a Git
 - Create: GitHub issues in `tfausak/pawl`.
 - Modify: `source/library/Pawl/Setup.hs` (first-player elision comment), `source/library/Pawl/Resolve.hs` (ability-path + Result-widening + full-Shahrazad citations at the `PlaySubgame` arm).
 
-- [ ] **Step 1: Check for duplicates, then file the issues**
+- [x] **Step 1: Check for duplicates, then file the issues**
 
 ```bash
 gh issue list --repo tfausak/pawl --search "subgame"
@@ -1208,7 +1208,7 @@ gh issue create --repo tfausak/pawl \
   --body "Status: deferred, subsystem-blocked (not scheduled). Nontraditional/supplementary decks (729.2a/729.5a), Vanguard (729.2b/729.5b), Commander (729.2c/729.5c), and cards brought INTO a subgame from a main game plus the main-game leave-the-zone triggers they queue until the main game resumes (729.4a, 729.5 second sentence) all ride subsystems M5 does not build (nontraditional cards, Vanguard, Commander, outside-the-game). CR 723.4 subgame prompt tagging / game-context is an M7/interpreter concern (subgame prompts are untagged today). Cited at Setup.funnelBack / Engine.playSubgame."
 ```
 
-- [ ] **Step 2: Add the inline citations**
+- [x] **Step 2: Add the inline citations**
 
 In `source/library/Pawl/Setup.hs`, extend `subgameStateFrom`'s first-player comment to cite the elision issue (replace `#N1`):
 
@@ -1233,7 +1233,7 @@ In `source/library/Pawl/Engine.hs`, add one line at `playSubgame` citing the sub
 -- a subgame are subsystem-blocked (#N5).
 ```
 
-- [ ] **Step 3: Build (comment-only) and commit**
+- [x] **Step 3: Build (comment-only) and commit**
 
 ```bash
 cabal build all --enable-tests --enable-benchmarks
