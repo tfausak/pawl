@@ -8,6 +8,7 @@ import qualified Data.Ord as Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
@@ -187,11 +188,56 @@ affects source oid a partial gs =
           onBattlefield && hasType CardType.Creature && Set.member c (PC.colors partial)
 
 -- CR 205.4a: a basic land is one with the Basic supertype. Read from the printed
--- type line (supertypes are not projected at M3c).
+-- type line via printedSupertypes (supertypes are not projected at M3c).
 isBasic :: ObjectId -> GameState -> Bool
-isBasic oid gs = case Game.cardOf oid gs of
-  Nothing -> False
-  Just card -> Set.member Supertype.Basic (TypeLine.supertypes (Card.Type.typeLine card))
+isBasic oid gs = Set.member Supertype.Basic (printedSupertypes oid gs)
+
+-- CR 205.4a: supertypes are read from the printed type line (no modelled effect
+-- changes a supertype). Empty when the object has no underlying card.
+printedSupertypes :: ObjectId -> GameState -> Set Supertype.Supertype
+printedSupertypes oid gs = case Game.cardOf oid gs of
+  Nothing -> Set.empty
+  Just card -> TypeLine.supertypes (Card.Type.typeLine card)
+
+-- The characteristics view of a battlefield/stack object: its projection (CR 613
+-- layer system, so a colour-changer or type-changer is seen), its printed
+-- supertypes (supertypes are not projected -- CR 205.4a basic-ness is read from
+-- the printed type line), and its projected controller (CR 613.1b; Nothing when
+-- the id is unknown -- e.g. a source that has left the battlefield).
+viewOfObject :: ObjectId -> GameState -> Filter.View
+viewOfObject oid gs = viewOfCharacteristics oid (project oid gs) (controllerOf oid gs) gs
+
+-- The characteristics view of a PRINTED card off the battlefield (a card in a
+-- library/graveyard/hand being matched by a search). No projection exists off the
+-- battlefield, so every axis is read from the printed card: types/supertypes/
+-- subtypes from the type line, colours from baseColorsOf (devoid -> empty), and
+-- power/controller are Nothing (a card in a library has neither under the rules
+-- that matter here). This is what lets a Filter read an object's colour outside
+-- the battlefield without a projection that does not exist there.
+viewOfCard :: Card.Type.Card -> Filter.View
+viewOfCard card =
+  let typeLine = Card.Type.typeLine card
+   in Filter.MkView
+        { Filter.cardTypes = TypeLine.types typeLine,
+          Filter.supertypes = TypeLine.supertypes typeLine,
+          Filter.colors = baseColorsOf card,
+          Filter.subtypes = TypeLine.subtypes typeLine,
+          Filter.power = Nothing,
+          Filter.controller = Nothing
+        }
+
+-- Shared assembly: fill a View from a projection's characteristics plus the
+-- printed supertypes (not projected) and a supplied controller.
+viewOfCharacteristics :: ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> GameState -> Filter.View
+viewOfCharacteristics oid pc controller gs =
+  Filter.MkView
+    { Filter.cardTypes = PC.cardTypes pc,
+      Filter.supertypes = printedSupertypes oid gs,
+      Filter.colors = PC.colors pc,
+      Filter.subtypes = PC.subtypes pc,
+      Filter.power = PC.power pc,
+      Filter.controller = controller
+    }
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result -- the value the layer fold
 -- STARTS from. If the object carries a copy snapshot in its bindings (stamped as it

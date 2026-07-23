@@ -11,6 +11,7 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
@@ -36,6 +37,7 @@ import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
@@ -454,5 +456,19 @@ tests cards =
         let gs0 = Setup.emptyGame S.bothPlayers
             (pikerId, gs1) = S.addPiker cards S.alice gs0
             (cloneId, gs2) = S.addPiker cards S.alice gs1
-         in HU.assertEqual "excludes self, includes the other creature" [pikerId] (Replacement.legalCopyTargets Set.empty cloneId gs2)
+         in HU.assertEqual "excludes self, includes the other creature" [pikerId] (Replacement.legalCopyTargets Set.empty cloneId gs2),
+      HU.testCase "viewOfObject reads a projected creature's characteristics" $
+        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+            view = Projection.viewOfObject oid gs
+         in do
+              HU.assertBool "is a creature" (Set.member CardType.Creature (Filter.cardTypes view))
+              HU.assertEqual "controller" (Just S.alice) (Filter.controller view),
+      HU.testCase "viewOfCard reads a printed basic land's supertypes off the battlefield" $
+        let card = Printing.card (Cards.mountainPrinting cards)
+            view = Projection.viewOfCard card
+         in do
+              HU.assertBool "is a land" (Set.member CardType.Land (Filter.cardTypes view))
+              HU.assertBool "is basic" (Set.member Supertype.Basic (Filter.supertypes view))
+              HU.assertEqual "no power off battlefield" Nothing (Filter.power view)
+              HU.assertEqual "no controller off battlefield" Nothing (Filter.controller view)
     ]
