@@ -261,8 +261,7 @@ matchesController gs src rel oid = case rel of
 --
 -- PermanentCriterion is matched here AND in Pawl.Cost.matchesCriterion; the two
 -- are not shared because Pawl.Cost importing Pawl.Replacement would collide
--- with #72's queued fix (which needs Pawl.Replacement to consult costs) (#N).
--- Task 7 replaces this note.
+-- with #72's queued fix (which needs Pawl.Replacement to consult costs) (#111).
 matchesPermanent :: GameState -> PermanentCriterion.PermanentCriterion -> ObjectId -> Bool
 matchesPermanent gs crit oid = case crit of
   PermanentCriterion.AnyPermanent -> True

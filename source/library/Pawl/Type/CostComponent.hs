@@ -7,6 +7,8 @@ import Pawl.Type.PermanentCriterion (PermanentCriterion)
 -- permanents, sacrificing permanents, discarding cards, and so on." One
 -- component of a Pawl.Type.Cost, alongside its mana part.
 --
+-- Discard-as-cost and exile-from-a-zone components do not exist yet (#108).
+--
 -- The successor to Pawl.Type.AdditionalCost, whose two nullary inhabitants were
 -- named relative to that type ("Self"); here the object a cost is on is "This".
 --

@@ -148,6 +148,10 @@ data Prompt r where
   -- Asked ONLY when there is a choice -- more candidates than the count. Exactly
   -- as many as the count is forced, and where the rules leave nothing to ask,
   -- don't prompt.
+  --
+  -- Issued once per component and carries no record of what an earlier component
+  -- already consumed, so two Sacrifice components of one cost each see the full
+  -- candidate list (#112).
   ChooseSacrifices :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Natural -> Prompt (Set ObjectId)
   -- CR 601.2b: "If the spell has alternative or additional costs that will be
   -- paid as it's being cast ... the player announces their intentions to pay any

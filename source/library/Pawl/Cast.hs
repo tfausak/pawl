@@ -211,6 +211,8 @@ castSpell pid oid = do
               payment <- Cost.pay pid oid paidCost
               case payment of
                 Payment.Unpaid -> pure ()
+                -- Which of the candidate costs was paid is not recorded past
+                -- this point (#101); the chosen Cost is discarded once paid.
                 Payment.Paid -> do
                   Event.changeZone oid Zone.Stack
                   -- CR 601.2i: the spell has been cast. Emitted here, AFTER

@@ -118,7 +118,7 @@ data Card = MkCard
     -- CR 118.9c: this does not change the card's mana cost.
     --
     -- Printed-only: an effect that GRANTS an alternative cost has no carrier
-    -- here (#N). CR 118.9's first sentence is "Some SPELLS have alternative
+    -- here (#103). CR 118.9's first sentence is "Some SPELLS have alternative
     -- costs", so this lives on Card and never on ActivatedAbility -- a rules
     -- fact, not an elision.
     alternativeCosts :: [Cost],

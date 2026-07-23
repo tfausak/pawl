@@ -105,7 +105,7 @@ The load-bearing part of this task is §2.3 of the spec: `AbilityCost.mana`'s `N
 - Consumes: nothing from earlier tasks.
 - Produces: `CostComponent.CostComponent = TapThis | SacrificeThis`; `Cost.MkCost {mana :: Maybe ManaCost, components :: [CostComponent]}`; `ActivatedAbility.cost :: Cost`; `Codec.costToJson`/`jsonToCost`, `Codec.costComponentToJson`/`jsonToCostComponent`.
 
-- [ ] **Step 1: Write the failing codec tests**
+- [x] **Step 1: Write the failing codec tests**
 
 In `source/test-suite/Pawl/CodecSpec.hs`, **replace** the existing `AbilityCost` round-trip (currently at line ~230, reading `(AbilityCost.MkAbilityCost Nothing [AdditionalCost.TapSelf])`) with the group below, and swap the `Pawl.Type.AbilityCost as AbilityCost` / `Pawl.Type.AdditionalCost as AdditionalCost` imports for `Pawl.Type.Cost as Cost.Type` and `Pawl.Type.CostComponent as CostComponent`:
 
@@ -147,12 +147,12 @@ In `source/test-suite/Pawl/CodecSpec.hs`, **replace** the existing `AbilityCost`
 
 `Json.Object`/`Json.Array` are the `Pawl.Type.Json` constructors; `CodecSpec` already imports `Pawl.Json as J` and `Pawl.Type.Json` — use whichever alias the file already has for the `Value` constructors, adding the import if it has none.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Could not find module 'Pawl.Type.Cost'` (and `Pawl.Type.CostComponent`).
 
-- [ ] **Step 3: Create the two types and delete the two they replace**
+- [x] **Step 3: Create the two types and delete the two they replace**
 
 `source/library/Pawl/Type/CostComponent.hs`:
 
@@ -228,7 +228,7 @@ Then delete both retired modules:
 git rm source/library/Pawl/Type/AbilityCost.hs source/library/Pawl/Type/AdditionalCost.hs
 ```
 
-- [ ] **Step 4: Point `ActivatedAbility` at the new type**
+- [x] **Step 4: Point `ActivatedAbility` at the new type**
 
 `source/library/Pawl/Type/ActivatedAbility.hs` — replace the `AbilityCost` import and field:
 
@@ -246,7 +246,7 @@ data ActivatedAbility card = MkActivatedAbility
 
 Keep the module's existing comment, striking the phrase that named `AbilityCost` and replacing it with: an activation cost is a `Pawl.Type.Cost`, the same type a spell's cost takes (CR 118.1).
 
-- [ ] **Step 5: Replace the codec pair**
+- [x] **Step 5: Replace the codec pair**
 
 In `source/library/Pawl/Codec.hs`, delete `additionalCostToJson`/`jsonToAdditionalCost` (lines ~635–646) and `abilityCostToJson`/`jsonToAbilityCost` (lines ~1183–1195) together with the two now-unused imports, and add in their place:
 
@@ -289,7 +289,7 @@ jsonToCost value = do
 
 Import `Pawl.Type.Cost as Cost` and `Pawl.Type.CostComponent as CostComponent`. Update `activatedAbilityToJson`/`jsonToActivatedAbility` to call `costToJson`/`jsonToCost`.
 
-- [ ] **Step 6: Update `Pawl.Activate` mechanically**
+- [x] **Step 6: Update `Pawl.Activate` mechanically**
 
 This step is a rename only — `Pawl.Activate` keeps its own `canPayAdditional`/`payAdditional` and its `maybe True` mana reading until Task 2. In `source/library/Pawl/Activate.hs`, swap the two imports for `Pawl.Type.Cost as Cost` and `Pawl.Type.CostComponent as CostComponent`, then:
 
@@ -299,7 +299,7 @@ This step is a rename only — `Pawl.Activate` keeps its own `canPayAdditional`/
 - `activateAbility`: `let additional = Cost.components (ActivatedAbility.cost ability)` and `case Cost.mana (ActivatedAbility.cost ability) of`
 - `payAdditional`: retype to `ObjectId -> CostComponent.CostComponent -> Game ()`, same two arms
 
-- [ ] **Step 7: Migrate the seven card files**
+- [x] **Step 7: Migrate the seven card files**
 
 Two mechanical renames per ability cost: `additional` → `components`, `TapSelf`/`SacrificeSelf` → `TapThis`/`SacrificeThis`, and `mana: null` → `mana: []` (CR 118.6 → CR 118.5a, §2.3 of the spec).
 
@@ -313,7 +313,7 @@ git diff --stat data/cards/
 
 Expected: exactly seven files changed, and `git diff data/cards/` shows only `additional`→`components` blocks, the two tag renames, and four `null`→`[]` mana fields (evolving-wilds, llanowar-elves, prodigal-sorcerer, reliquary-tower).
 
-- [ ] **Step 8: Migrate the test fixtures**
+- [x] **Step 8: Migrate the test fixtures**
 
 Every fixture that built an `AbilityCost` must now build a `Cost`, **and every `Nothing` mana becomes `Just (ManaCost.MkManaCost [])`** — that is the §2.3 migration, not a cosmetic change. Swap the `Pawl.Type.AbilityCost`/`Pawl.Type.AdditionalCost` imports for `Pawl.Type.Cost as Cost.Type` (plus `Pawl.Type.CostComponent as CostComponent` where a component is named) in each file, then:
 
@@ -376,12 +376,12 @@ Every fixture that built an `AbilityCost` must now build a `Cost`, **and every `
                   HU.assertEqual "a real {0} mana cost, not an unpayable one (CR 118.5a/118.6)" (Just (ManaCost.MkManaCost [])) (Cost.Type.mana (ActivatedAbility.cost ab))
 ```
 
-- [ ] **Step 9: Run the build and the whole suite**
+- [x] **Step 9: Run the build and the whole suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, all green. `Pawl.CardsSpec`'s `checkFile` is the migration's assertion — it re-parses every committed file and compares it to the compiled card up to key order, so a mis-migrated file fails there.
 
-- [ ] **Step 10: Format, lint, and commit**
+- [x] **Step 10: Format, lint, and commit**
 
 ```bash
 git add source/library/Pawl source/test-suite/Pawl data/cards
@@ -416,7 +416,7 @@ Read **departures 1 and 2** at the top of this plan before writing any code in t
 - Consumes: `Cost.MkCost {mana, components}`, `CostComponent.TapThis`/`SacrificeThis` (Task 1).
 - Produces: `Payment.Payment = Paid | Unpaid`; `Pawl.Cost.costsFor :: ObjectId -> GameState -> [Cost]`, `total :: PlayerId -> ObjectId -> Cost -> GameState -> Cost`, `canPay :: PlayerId -> ObjectId -> Cost -> GameState -> Bool`, `canPayComponent :: PlayerId -> ObjectId -> CostComponent -> GameState -> Bool`, `pay :: PlayerId -> ObjectId -> Cost -> Game Payment`, `payComponent`, `requiresTapSymbol :: Cost -> Bool`, `substituteX :: Natural -> Cost -> Cost`, `hasVariable :: Cost -> Bool`, `unpayable :: Cost`, `firstOffered :: [Cost] -> Cost`; `Pawl.Cast.payableCost :: PlayerId -> ObjectId -> GameState -> Cost -> Bool`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `source/test-suite/Pawl/CostSpec.hs`:
 
@@ -548,12 +548,12 @@ runPureWith answer gs game = Engine.runGamePure answer gs game
 
 Wire `CostSpec` into `source/test-suite/Main.hs`: add `import qualified Pawl.CostSpec as CostSpec` and `CostSpec.tests cards,` to `testTree` (immediately after `CastSpec.tests cards,`).
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Could not find module 'Pawl.Type.Payment'`, plus `Not in scope: Cost.canPayComponent`, `Cost.canPay`, `Cost.requiresTapSymbol`, `Cost.pay`, `S.runPureWith`.
 
-- [ ] **Step 3: Create `Pawl.Type.Payment`**
+- [x] **Step 3: Create `Pawl.Type.Payment`**
 
 `source/library/Pawl/Type/Payment.hs`:
 
@@ -575,7 +575,7 @@ data Payment
   deriving (Eq, Show)
 ```
 
-- [ ] **Step 4: Rewrite `Pawl.Cost`**
+- [x] **Step 4: Rewrite `Pawl.Cost`**
 
 Replace the whole of `source/library/Pawl/Cost.hs` above `applyAdjustments` — `applyAdjustments` itself is P7's and is **not touched**, comment included. The module header comment becomes:
 
@@ -742,7 +742,7 @@ payComponent _ oid component = case component of
 
 `payComponent`'s first parameter is unused until Task 3 adds `PayLife`; name it `_` now and `pid` then.
 
-- [ ] **Step 5: Route `Pawl.Activate` through the door**
+- [x] **Step 5: Route `Pawl.Activate` through the door**
 
 In `source/library/Pawl/Activate.hs`, **delete** `canPayAdditional` and `payAdditional` outright, and:
 
@@ -798,7 +798,7 @@ and replace `activateAbility`'s whole payment tail (the `let additional = …` b
 
 Delete the now-unused `Pawl.Event`, `Pawl.Type.TapState` and `Control.Monad` imports if GHC reports them unused; keep everything still referenced.
 
-- [ ] **Step 6: Route `Pawl.Cast` through the door**
+- [x] **Step 6: Route `Pawl.Cast` through the door**
 
 In `source/library/Pawl/Cast.hs`, **delete** `costOf`, add `import Pawl.Type.Cost (Cost)`, and:
 
@@ -900,12 +900,12 @@ In `castSpell`, replace the opening `case costOf oid gs of … Just cost -> case
 
 Delete the now-unused `Pawl.Mana`, `Pawl.Type.ManaCost` and `Pawl.Type.ManaSymbol` imports if GHC reports them unused.
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. `Pawl.ActivateSpec`, `Pawl.ManaSpec`, `Pawl.CastSpec` and `Pawl.PlayerEffectSpec` are the behaviour-identity tripwires — every one of them exercises a path that now runs through `Pawl.Cost`.
 
-- [ ] **Step 8: Confirm the casing surface**
+- [x] **Step 8: Confirm the casing surface**
 
 Run:
 
@@ -915,7 +915,7 @@ grep -rln 'CostComponent\.\(TapThis\|SacrificeThis\)' source/library/ | grep -v 
 
 Expected: no output. `Pawl.Activate` must no longer name a component constructor.
 
-- [ ] **Step 9: Format, lint, and commit**
+- [x] **Step 9: Format, lint, and commit**
 
 ```bash
 git add source/library/Pawl source/test-suite/Pawl source/test-suite/Main.hs
@@ -954,7 +954,7 @@ The first component that carries a number, and the first paid from something oth
 - Consumes: `Cost.canPayComponent`, `Cost.payComponent`, `Cost.canPay` (Task 2).
 - Produces: `CostComponent.PayLife Natural`; `Cards.greedPrinting :: Cards -> Printing`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/CostSpec.hs`, add the group below and register it in `tests` (`Tasty.testGroup "Pawl.Cost" [doorTests cards, greedTests cards]`):
 
@@ -1037,12 +1037,12 @@ New imports for `CostSpec`: `Pawl.Action as Action`, `Pawl.Stack as Stack`, `Paw
 
 In `source/test-suite/Pawl/CodecSpec.hs`, extend the `"every CostComponent round-trips"` list with `CostComponent.PayLife 2`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Not in scope: data constructor 'CostComponent.PayLife'`, and `Cards.greedPrinting` is not a field of `Cards`.
 
-- [ ] **Step 3: Add the constructor**
+- [x] **Step 3: Add the constructor**
 
 In `source/library/Pawl/Type/CostComponent.hs`, after `SacrificeThis`:
 
@@ -1061,7 +1061,7 @@ In `source/library/Pawl/Type/CostComponent.hs`, after `SacrificeThis`:
 
 Add `import Numeric.Natural (Natural)`.
 
-- [ ] **Step 4: Add the codec arms**
+- [x] **Step 4: Add the codec arms**
 
 In `source/library/Pawl/Codec.hs`:
 
@@ -1080,7 +1080,7 @@ jsonToCostComponent value = do
     _ -> Left (Text.pack "unknown CostComponent: " <> t)
 ```
 
-- [ ] **Step 5: Add the payability and payment arms**
+- [x] **Step 5: Add the payability and payment arms**
 
 In `source/library/Pawl/Cost.hs`, `canPayComponent`:
 
@@ -1106,7 +1106,7 @@ and `payComponent` (whose first parameter becomes `pid`):
 
 `Player.life` is an `Integer`, so this subtraction is total.
 
-- [ ] **Step 6: Add the card file**
+- [x] **Step 6: Add the card file**
 
 `data/cards/greed.json` (write it, then normalize with `jq -S . data/cards/greed.json > tmp && mv tmp data/cards/greed.json`):
 
@@ -1202,16 +1202,16 @@ and `payComponent` (whose first parameter becomes `pid`):
 }
 ```
 
-- [ ] **Step 7: Register the printing**
+- [x] **Step 7: Register the printing**
 
 In `source/test-suite/Pawl/Cards.hs`: add `greedPrinting :: Printing.Printing` to the `Cards` record (keeping the field order the file already uses — append after `silencePrinting`), `greedPrinting_ <- loadPrinting "greed"` to `loadCards`, `greedPrinting = greedPrinting_,` to the record it builds, and `greedPrinting cards,` to `allPrintings`. Do **not** add it to any deck.
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. A missing `allPrintings` registration fails `Pawl.CardSpec`'s directory-agreement test, not the new group.
 
-- [ ] **Step 9: Format, lint, and commit**
+- [x] **Step 9: Format, lint, and commit**
 
 ```bash
 git add source/library/Pawl source/test-suite/Pawl data/cards/greed.json
@@ -1245,7 +1245,7 @@ The criterion-bearing component, the first cost prompt, and the first cost that 
 - Consumes: `Cost.costsFor`, `Cost.canPayComponent`, `Cost.payComponent`, `Cast.payableCost` (Task 2).
 - Produces: `CostComponent.Sacrifice Natural PermanentCriterion`; `PermanentCriterion.PermanentOfSubtype Subtype`; `Card.additionalCosts :: [CostComponent]`; `Prompt.ChooseSacrifices :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Natural -> Prompt (Set ObjectId)`; `Response.ChoseSacrifices (Set ObjectId)`; `Cost.matchesCriterion :: GameState -> PermanentCriterion -> ObjectId -> Bool`; `Cards.villageRitesPrinting`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/CostSpec.hs`, add the group below plus the two helpers, and register it in `tests`:
 
@@ -1402,12 +1402,12 @@ In `source/test-suite/Pawl/ReplaySpec.hs`, add to `combatReplayTests`:
               (Replay.defaultAnswer (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1)),
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Not in scope: data constructor 'CostComponent.Sacrifice'`, `'PermanentCriterion.PermanentOfSubtype'`, `'Prompt.ChooseSacrifices'`, `'Response.ChoseSacrifices'`, and `additionalCosts` is not a field of `Card`.
 
-- [ ] **Step 3: Add the two constructors**
+- [x] **Step 3: Add the two constructors**
 
 In `source/library/Pawl/Type/CostComponent.hs`:
 
@@ -1435,7 +1435,7 @@ In `source/library/Pawl/Type/PermanentCriterion.hs`:
 
 with `import Pawl.Type.Subtype (Subtype)`, and extend the module comment: the growth path it already describes, one constructor further along; P9 still merges it with `CardCriterion`.
 
-- [ ] **Step 4: Add the two prompt constructors and their transcript arms**
+- [x] **Step 4: Add the two prompt constructors and their transcript arms**
 
 `source/library/Pawl/Type/Prompt.hs`:
 
@@ -1484,7 +1484,7 @@ with `import Pawl.Type.Subtype (Subtype)`, and extend the module comment: the gr
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
 ```
 
-- [ ] **Step 5: Answer the new prompt in all eight interpreters**
+- [x] **Step 5: Answer the new prompt in all eight interpreters**
 
 Add the same arm to the five answerers in `source/test-suite/Pawl/Support.hs` (`identityAnswer`, `castAnswer`, `aggressiveAnswer`, `playLandAnswer`, and `randomAnswer` with `pure`) and the three in `source/benchmark/Main.hs` (`alwaysPass`, `castAnswer`, `fightAnswer`):
 
@@ -1497,7 +1497,7 @@ Add the same arm to the five answerers in `source/test-suite/Pawl/Support.hs` (`
   Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
 ```
 
-- [ ] **Step 6: Add `Card.additionalCosts` and its codec**
+- [x] **Step 6: Add `Card.additionalCosts` and its codec**
 
 `source/library/Pawl/Type/Card.hs`, after `castingPermissions`:
 
@@ -1569,7 +1569,7 @@ and the `Sacrifice` arms to the component codec:
       pure (CostComponent.Sacrifice count criterion)
 ```
 
-- [ ] **Step 7: Keep `Pawl.Replacement.matchesPermanent` total**
+- [x] **Step 7: Keep `Pawl.Replacement.matchesPermanent` total**
 
 `source/library/Pawl/Replacement.hs`:
 
@@ -1579,7 +1579,7 @@ and the `Sacrifice` arms to the component codec:
 
 Leave a comment at this site: `PermanentCriterion` is now matched here **and** in `Pawl.Cost.matchesCriterion`; the two are not shared because `Pawl.Cost` importing `Pawl.Replacement` would collide with #72's queued fix (which needs `Pawl.Replacement` to consult costs). Cite `(#N)` — Task 7 replaces it.
 
-- [ ] **Step 8: Add the payability and payment arms, and the criterion matcher**
+- [x] **Step 8: Add the payability and payment arms, and the criterion matcher**
 
 `source/library/Pawl/Cost.hs`:
 
@@ -1651,7 +1651,7 @@ Finally, teach `costsFor` about the new field:
        in [Cost.MkCost {Cost.mana = Card.manaCost card, Cost.components = Card.additionalCosts card}]
 ```
 
-- [ ] **Step 9: Add the card file and register the printing**
+- [x] **Step 9: Add the card file and register the printing**
 
 `data/cards/village-rites.json` (normalize with `jq -S .` afterwards):
 
@@ -1722,12 +1722,12 @@ Finally, teach `costsFor` about the new field:
 
 Register `villageRitesPrinting` in `source/test-suite/Pawl/Cards.hs` exactly as Greed was registered (record field, `loadPrinting "village-rites"`, record build, `allPrintings`). No deck.
 
-- [ ] **Step 10: Run the tests to verify they pass**
+- [x] **Step 10: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS.
 
-- [ ] **Step 11: Format, lint, and commit**
+- [x] **Step 11: Format, lint, and commit**
 
 ```bash
 git add source/library/Pawl source/test-suite/Pawl source/test-suite/Main.hs source/benchmark/Main.hs data/cards/village-rites.json
@@ -1765,7 +1765,7 @@ The seam. An alternative cost is *not* a different mana cost: Fireblast's contai
 - Consumes: `Cost.costsFor`, `Cast.payableCost`, `Cost.firstOffered`, `Cost.unpayable` (Tasks 2 and 4).
 - Produces: `Card.alternativeCosts :: [Cost]`; `Prompt.ChooseCost :: Decider -> PlayerId -> ObjectId -> [Cost] -> Prompt Cost`; `Response.ChoseCost Cost`; `Cards.fireblastPrinting`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/CostSpec.hs`, add the helper and the group, and register the group in `tests`:
 
@@ -1886,12 +1886,12 @@ In `source/test-suite/Pawl/ReplaySpec.hs`, add to `combatReplayTests`:
                   (Replay.defaultAnswer (Prompt.ChooseCost decider S.alice oid [printed, alternative])),
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL — `Not in scope: data constructor 'Prompt.ChooseCost'`, `'Response.ChoseCost'`, and `alternativeCosts` is not a field of `Card`.
 
-- [ ] **Step 3: Add `Card.alternativeCosts` and its codec**
+- [x] **Step 3: Add `Card.alternativeCosts` and its codec**
 
 `source/library/Pawl/Type/Card.hs`, after `additionalCosts`:
 
@@ -1940,7 +1940,7 @@ and in `jsonToCard`:
         CardT.alternativeCosts = alternativeCosts,
 ```
 
-- [ ] **Step 4: Add the `ChooseCost` prompt and its transcript arms**
+- [x] **Step 4: Add the `ChooseCost` prompt and its transcript arms**
 
 `source/library/Pawl/Type/Prompt.hs`:
 
@@ -1990,7 +1990,7 @@ with `import Pawl.Type.Cost (Cost)`.
 
 with `import qualified Pawl.Cost as Cost` in `Pawl.Replay`.
 
-- [ ] **Step 5: Answer the new prompt in all eight interpreters**
+- [x] **Step 5: Answer the new prompt in all eight interpreters**
 
 Add to the five answerers in `source/test-suite/Pawl/Support.hs` and the three in `source/benchmark/Main.hs` (importing `Pawl.Cost as Cost` in each file):
 
@@ -2003,7 +2003,7 @@ Add to the five answerers in `source/test-suite/Pawl/Support.hs` and the three i
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
 ```
 
-- [ ] **Step 6: Teach `costsFor` about the alternatives**
+- [x] **Step 6: Teach `costsFor` about the alternatives**
 
 `source/library/Pawl/Cost.hs`:
 
@@ -2022,7 +2022,7 @@ Add to the five answerers in `source/test-suite/Pawl/Support.hs` and the three i
        in printed : map withAdditional (Card.alternativeCosts card)
 ```
 
-- [ ] **Step 7: Issue the prompt in `Cast.castSpell`**
+- [x] **Step 7: Issue the prompt in `Cast.castSpell`**
 
 In `source/library/Pawl/Cast.hs`, replace Task 2's `case filter … of [] -> pure (); chosenCost : _ -> do` block opener with:
 
@@ -2043,7 +2043,7 @@ In `source/library/Pawl/Cast.hs`, replace Task 2's `case filter … of [] -> pur
 
 with the rest of the block (the `let sets = …` line onward) re-indented one level under it.
 
-- [ ] **Step 8: Add the card file and register the printing**
+- [x] **Step 8: Add the card file and register the printing**
 
 `data/cards/fireblast.json` (normalize with `jq -S .` afterwards):
 
@@ -2145,14 +2145,14 @@ with the rest of the block (the `let sets = …` line onward) re-indented one le
 
 Register `fireblastPrinting` in `source/test-suite/Pawl/Cards.hs` (record field, `loadPrinting "fireblast"`, record build, `allPrintings`). No deck.
 
-- [ ] **Step 9: Run the tests to verify they pass**
+- [x] **Step 9: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS.
 
 If the headline case's life assertion disagrees, **do not weaken it** — read what `S.identityAnswer`'s `ChooseTargets` picked (`Map.mapMaybe Set.lookupMin`, and `Recipient.ToCreature` sorts before `Recipient.ToPlayer`, with `alice = MkPlayerId 0` before `bob`) and correct the expected value to what the rules say that target's life should be, stating the correction in the completion note.
 
-- [ ] **Step 10: Format, lint, and commit**
+- [x] **Step 10: Format, lint, and commit**
 
 ```bash
 git add source/library/Pawl source/test-suite/Pawl source/benchmark/Main.hs data/cards/fireblast.json
@@ -2185,7 +2185,7 @@ Tests only. Both cross a P8 mechanism with an already-landed one: `PermanentOfSu
 **Interfaces:**
 - Consumes: everything from Tasks 1–5. Produces nothing new.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add the group and register it in `tests`:
 
@@ -2257,12 +2257,12 @@ crossCheckTests cards =
         ]
 ```
 
-- [ ] **Step 2: Run the tests**
+- [x] **Step 2: Run the tests**
 
 Run: `cabal test`
 Expected: PASS, if Tasks 4 and 5 are correct. A failure here is an **engine** bug: fix `Pawl.Cost` (or whatever the failure names) and say so in the completion note; never adjust an assertion to match the code.
 
-- [ ] **Step 3: Format, lint, and commit**
+- [x] **Step 3: Format, lint, and commit**
 
 ```bash
 git add source/test-suite/Pawl/CostSpec.hs
@@ -2290,7 +2290,7 @@ Every `(#N)` placeholder the earlier tasks left in the code is replaced here wit
 - Modify: every source file carrying a `(#N)` placeholder
 - Modify: `docs/progress.md`, `CLAUDE.md`, `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`
 
-- [ ] **Step 1: File the new issues**
+- [x] **Step 1: File the new issues**
 
 Run each `gh issue create` and record the number it prints. Labels come from CLAUDE.md's set: `elision`, `gap`, `rules-correctness`, `bug`, `expires:milestone`, `expires:card-driven`. The first twelve rows are the spec's §8 table; the last two are this plan's own findings.
 
@@ -2311,7 +2311,7 @@ Run each `gh issue create` and record the number it prints. Labels come from CLA
 | M | `PermanentCriterion` is matched at two sites | `elision`, `expires:milestone` | `Pawl.Cost.matchesCriterion` and `Pawl.Replacement.matchesPermanent` both case on the family. Sharing one would make `Pawl.Cost` import `Pawl.Replacement`, which becomes a module cycle the moment #72's CR 614.12b payable-cost check lands there. Four lines, the same shape `genericOf` already duplicates between `Pawl.Mana` and `Pawl.Cost`. Expires on **P9**, whose filter language merges `PermanentCriterion`, `CardCriterion` and `SpellCriterion` (siblings of #38/#39/#40). |
 | N | `Prompt.ChooseSacrifices` cannot express CR 118.10's per-component scoping | `gap`, `expires:card-driven` | The prompt offers the candidates for **one** component and is issued once per component, so two components of one cost each see the full candidate list. The payload would need to carry what an earlier component already consumed. The prompt-side face of E. Expires with E. |
 
-- [ ] **Step 2: Comment on #90 rather than re-filing it**
+- [x] **Step 2: Comment on #90 rather than re-filing it**
 
 Departure 1 changes what #90 says. Add a comment:
 
@@ -2319,7 +2319,7 @@ Departure 1 changes what #90 says. Add a comment:
 gh issue comment 90 --body "P8 deliberately did NOT give this a door. Routing an activated ability's cost through Pawl.Cost.total would be a rules REGRESSION, not a no-op: PlayerEffect.matchesSpell classifies an OBJECT, not a spell (SpellCriterion.NoncreatureSpell is 'not a creature card type on the projection'), so a noncreature PERMANENT matches it -- and Thalia, Guardian of Thraben would tax Mindslaver's {4} activation to {5}. Thalia taxes noncreature SPELLS. Pawl.Activate therefore calls Cost.canPay/Cost.pay on the ability's PRINTED cost, and Pawl.CostSpec pins the regression with a Thalia x Mindslaver case. Fixing this needs a spell-vs-ability discriminator on the criterion side (P7's surface), not a call-site change."
 ```
 
-- [ ] **Step 3: Sweep the `(#N)` placeholders**
+- [x] **Step 3: Sweep the `(#N)` placeholders**
 
 Run: `grep -rn '(#N)' source/`
 
@@ -2345,7 +2345,7 @@ Confirm (do not re-file): `#89` already covers the hand-projection reading in `c
 Run: `grep -rn '(#N)' source/`
 Expected: no output.
 
-- [ ] **Step 4: Verify the exit criterion mechanically**
+- [x] **Step 4: Verify the exit criterion mechanically**
 
 Run each and confirm the expected result:
 
@@ -2381,7 +2381,7 @@ cabal bench                                                             # three 
 
 **Watch the benchmark.** `Cast.castable` now walks `Cost.costsFor` per card in hand and runs `Cost.canPay` per candidate, and `Cost.canPay` calls `Mana.canPay` exactly where it did before. The added work is a list build and a `null`-components `all`, so the move should be within the suite's own run-to-run noise; if `cabal bench` shows more, say so plainly in the completion note rather than rounding it away. `#66` still makes all three benchmarks execute the identical game, so the aggregate is the only honest reading.
 
-- [ ] **Step 5: Append the `docs/progress.md` completion entry**
+- [x] **Step 5: Append the `docs/progress.md` completion entry**
 
 One entry, in the file's established voice, recording what P8 *established* — not what is left. It must state:
 
@@ -2396,18 +2396,18 @@ One entry, in the file's established voice, recording what P8 *established* — 
 - the final suite count, that the build is warning-clean on a from-scratch `cabal clean` build, and the benchmark comparison with `#66` noted;
 - the spec and plan paths, kept as reference.
 
-- [ ] **Step 6: Replace the `CLAUDE.md` status bullet**
+- [x] **Step 6: Replace the `CLAUDE.md` status bullet**
 
 **Replace, never append** — milestone history goes in `progress.md`. The new bullet says M0–M4h plus M4.5 P1–P8 are complete, that P8 closed the *payment* half of **GAP-Co** with Greed, Village Rites and Fireblast, and that **P9 (filters), P10 (player counters) and P11 (Command zone) remain, none blocking another**. Keep it to the same length as the bullet it replaces.
 
-- [ ] **Step 7: Update the umbrella spec**
+- [x] **Step 7: Update the umbrella spec**
 
 `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`:
 - §3's P8 row (line 111): mark it landed, with a pointer to `docs/superpowers/specs/2026-07-22-p8-cost-generalization-design.md`. **Correct the row's own gate-card guess** — it proposed "a pay-life ability + a flashback card"; flashback needs a `CastFromGraveyard` permission and a P5 replacement as well as a cost, so the alternative-cost seam landed on **Fireblast** instead, and flashback is deferred (issue A).
 - §4's ordering paragraph (line 219): P8 landed; **P9, P10 and P11 remain**, none blocking another.
 - The "Notes the phase specs must not lose" bullet on GAP-Co (§3, "GAP-Co is split across two phases"): record that **both halves are now closed** — modification by P7, payment by P8.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add docs/progress.md CLAUDE.md docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md source/library/Pawl
@@ -2426,13 +2426,13 @@ a cost, so the alternative-cost seam landed on Fireblast.
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 9: Close the milestone issue**
+- [x] **Step 9: Close the milestone issue**
 
 ```bash
 gh issue close 4 --comment "Landed. See docs/progress.md for the completion entry and docs/superpowers/plans/2026-07-22-p8-cost-generalization.md for the executed plan."
 ```
 
-- [ ] **Step 10: Confirm the plan is complete**
+- [x] **Step 10: Confirm the plan is complete**
 
 Run: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-22-p8-cost-generalization.md`
 Expected: `0`.

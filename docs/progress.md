@@ -1656,3 +1656,102 @@ its own gate card and spec, landed as it completes. Umbrella:
   move. Spec and plan kept as reference:
   `docs/superpowers/specs/2026-07-22-p7-player-effects-design.md` and
   `docs/superpowers/plans/2026-07-22-p7-player-effects.md`.
+- **M4.5 P8 is complete** (cost generalization and alternative costs, the
+  *payment* half of GAP-Co — and with P7's modification half, the whole of
+  GAP-Co is now closed). pawl has **one `Cost` type for spells and activated
+  abilities**: `{mana :: Maybe ManaCost, components :: [CostComponent]}`, where
+  the `Maybe` carries CR 118.6's own distinction — `Nothing` is an *unpayable*
+  cost ("this card has no mana cost"), `Just (MkManaCost [])` is a payable `{0}`
+  (Ornithopter) — in the type rather than inferred, and every existing ability
+  migrated `Nothing → Just (MkManaCost [])` across the card files and the
+  fixtures so the two are never conflated again. **Three gate cards, each
+  falsifying a different fixed point.** **Greed** ("{B}, Pay 2 life: Draw a
+  card") is CR 118.3's own worked example: a payability check that ignores the
+  *amount* passes at 20 life and at 1 alike, but the real check fails at 1 and —
+  the sharp case — at **2** life the payment is legal and *loses the game* (CR
+  704.5a), which is what proves paying life is a real life-total change and not
+  a flag. **Village Rites** ("As an additional cost to cast this spell,
+  sacrifice a creature") is CR 601.2f: the additional cost is folded **inside**
+  the total cost, so with no creature the spell is *not castable at all* — the
+  castability gate, not resolution, refuses it — and the payment runs through
+  `Event.sacrifice`, so Khabál Ghoul counts the creature that died. **Fireblast**
+  ("You may sacrifice two Mountains rather than pay this spell's mana cost")
+  casts a `{4}{R}{R}` spell from two **tapped** Mountains and an empty pool:
+  "castability is mana affordability" and "an alternative cost is a different
+  `ManaCost`" both die at once, because Fireblast's alternative is `Just []` — a
+  real, taxable `{0}`, not `Nothing`. **Two cross-checks cash the structural
+  bet**, and both passed on the first run with no engine change — which is what
+  validates the two feature tasks: **Blood Moon** proves
+  `PermanentCriterion.PermanentOfSubtype` reads the *projection* — a nonbasic
+  land that Blood Moon has made a Mountain may be sacrificed to Fireblast as one
+  — and **Thalia** proves the alternative's `Just []` is a genuine `{0}` a cost
+  increase can tax (CR 118.9d): Fireblast's free alternative still costs `{1}`
+  under Thalia. **The correction to the spec.** §2.9 claimed "ability costs
+  route through `Cost.total` too, nothing changes observably." That is false, and
+  the falsifier is already in the pool: `PlayerEffect.matchesSpell` classifies an
+  **object**, not a spell (`SpellCriterion.NoncreatureSpell` is "no creature card
+  type on the projection"), so a noncreature *permanent* matches it, and Thalia
+  would tax Mindslaver's `{4}` activation to `{5}` — Thalia taxes noncreature
+  **spells**. So `Pawl.Activate` pays the ability's **printed** cost, **#90 was
+  commented, not closed** (routing an ability cost through `total` is a
+  regression, not a no-op), and a Thalia × Mindslaver regression test in
+  `Pawl.CostSpec` pins it. **Added:** `Pawl.Type.Cost`, `Pawl.Type.CostComponent`
+  (`TapThis | SacrificeThis | PayLife Natural | Sacrifice Natural
+  PermanentCriterion` — `SacrificeThis` is deliberately not `Sacrifice 1 this`,
+  because CR 602.1a's self-referential cost offers no choice) and
+  `Pawl.Type.Payment` (`Paid | Unpaid`, the no-boolean-blindness door);
+  `Pawl.Cost` grew from one arithmetic step into the axis's **sole casing home**
+  — `costsFor`, `total` (now `Cost -> Cost`), `canPay`, `canPayComponent`, `pay`,
+  `payComponents`, `payComponent`, `requiresTapSymbol`, `substituteX`,
+  `hasVariable`, `matchesCriterion`, `sacrificeCandidates`, `unpayable`,
+  `firstOffered`; `Card.additionalCosts` and `Card.alternativeCosts`;
+  `PermanentCriterion.PermanentOfSubtype`; `Prompt.ChooseCost`/`ChooseSacrifices`
+  and their responses; `Pawl.Cast.payableCost`; three card files (Greed, Village
+  Rites, Fireblast); and `Pawl.CostSpec`. **Retired:** `Pawl.Type.AbilityCost`,
+  `Pawl.Type.AdditionalCost`, `Pawl.Cast.costOf`,
+  `Pawl.Activate.canPayAdditional`/`payAdditional`. **Six deliberate departures
+  from the spec:** (1) the correction above — ability costs are paid at printed
+  value, #90 commented; (2) `Cost.pay` is **transactional** — it captures the
+  entry state and restores it on `Unpaid`, because it spends mana and pays
+  earlier components before it reaches a `ChooseSacrifices` prompt, so a rejected
+  answer would otherwise leave lands tapped and a creature dead with no spell
+  cast; (3) `Cost` gained `substituteX`/`hasVariable`/`unpayable`/`firstOffered`,
+  which the spec did not name, to state the CR 601.2b X=0 floor once and give the
+  nine `ChooseCost` fallback sites one answer instead of nine copies; (4)
+  `PermanentCriterion` is matched at **two** sites — `Cost.matchesCriterion`
+  alongside `Replacement.matchesPermanent` — because sharing would make
+  `Pawl.Cost` import `Pawl.Replacement` and collide with #72's queued CR 614.12b
+  fix (filed as #111); (5) `Cost.costsFor` arrives whole and grows twice rather
+  than surviving as a discarded `Cast.costOf` intermediate; (6)
+  `Cast.payableCost` is a named predicate, not three copies of the same
+  `canPay ∘ total ∘ substituteX 0` chain. **Two prompts, each elided only when
+  forced:** `ChooseCost` is skipped when exactly one candidate is payable,
+  `ChooseSacrifices` when the candidates exactly equal the count — but three
+  payable Mountains and a count of two is a *real* choice and is asked. The one
+  genuine elision is CR 601.2h's payment order (#105), unobservable because no
+  component in this vocabulary changes another's payability. **A plan-test
+  correction, faithful not weakening:** Village Rites' "resolves" test asserted
+  the pre-sacrifice `ObjectId`s appear in the graveyard, but `Event.changeZone`
+  mints a **new** `ObjectId` per CR 400.7, so the assertion was corrected to a
+  count (`length pikers + 1`) — the same fact, checked the way the rules make it
+  checkable. **Tracking:** **closes #4** (M4.5 P8) and the *payment* half of
+  GAP-Co, which P7's spec left explicitly open; **#90 commented, not closed**;
+  #38/#39/#40 cited by #111 and **not** retired; **fourteen deferrals filed and
+  cited at their code sites** — #99 (a variable-`Quantity` life payment, filed
+  during the phase) plus #100 (flashback has no `CastFromGraveyard` carrier),
+  #101 (which cost was paid is not recorded), #102 (optional additional costs /
+  kicker), #103 (effect-granted alternative costs), #104 (CR 118.10 across two
+  components), #105 (CR 601.2h payment order), #106 (CR 118.13
+  hybrid/Phyrexian), #107 (CR 118.12 costs paid at resolution), #108 (discard-
+  and exile-as-cost components), #109 (CR 118.6a alternative on an unpayable
+  cost), #110 (CR 118.8c's "if able" exception), #111 (`PermanentCriterion`
+  matched at two sites) and #112 (`ChooseSacrifices`'s per-component scoping).
+  **Final suite 834/834**, warning-clean on a from-scratch `cabal clean` build,
+  `hooky run` clean. `cabal bench`: goldfish 11.4ms, casting 12.9ms, fighting
+  12.9ms against P7's 11.7/12.9/12.9 — #66 (pre-existing) still makes all three
+  benchmarks execute the identical game, so the aggregate is the only honest
+  reading, and it is **flat**: the phase's added work is a per-card `costsFor`
+  list build and a `null`-components `all`, inside the suite's own noise. Spec
+  and plan kept as reference:
+  `docs/superpowers/specs/2026-07-22-p8-cost-generalization-design.md` and
+  `docs/superpowers/plans/2026-07-22-p8-cost-generalization.md`.

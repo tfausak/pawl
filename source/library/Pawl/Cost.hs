@@ -129,7 +129,7 @@ requiresTapSymbol cost = elem CostComponent.TapThis (Cost.components cost)
 --
 -- The sibling of Pawl.Replacement.matchesPermanent, deliberately not shared with
 -- it: Pawl.Cost importing Pawl.Replacement would become a module cycle the
--- moment CR 614.12b's payable-cost check lands there (#N). P9's filter language
+-- moment CR 614.12b's payable-cost check lands there (#111). P9's filter language
 -- merges both.
 matchesCriterion :: GameState -> PermanentCriterion.PermanentCriterion -> ObjectId -> Bool
 matchesCriterion gs criterion oid = case criterion of
@@ -179,13 +179,13 @@ canPayComponent pid oid component gs = case component of
     Just player -> Player.life player >= toInteger n
   -- CR 701.21a: this player must control at least `n` matching permanents.
   -- CR 118.10's "each payment of a cost applies to only one spell, ability, or
-  -- effect" is not enforced across two components of ONE cost (#N).
+  -- effect" is not enforced across two components of ONE cost (#104).
   CostComponent.Sacrifice n criterion ->
     length (sacrificeCandidates pid criterion gs) >= fromIntegral n
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment. Components are
 -- paid in PRINTED order; CR 601.2h lets the player pay in any order, which is an
--- elision here (#N) -- no component in this vocabulary changes another's
+-- elision here (#105) -- no component in this vocabulary changes another's
 -- payability.
 --
 -- All or nothing. CR 601.2h: "Partial payments are not allowed." The entry state

@@ -8,8 +8,8 @@ import Numeric.Natural (Natural)
 -- "Choose two"/commands are ChooseExactly 2; "choose one or more" (escalate),
 -- pawprint "worth of modes" (CR 700.2i), and "same mode more than once" (CR 700.2d)
 -- are future constructors. A newtype for now; becomes `data` when a second
--- constructor (e.g. ChooseAtLeast, escalate/pawprint per CR 700.2d/700.2i) lands —
--- the same posture as `AbilityCost` in M3e. Do NOT add an hlint ignore.
+-- constructor (e.g. ChooseAtLeast, escalate/pawprint per CR 700.2d/700.2i) lands.
+-- Do NOT add an hlint ignore.
 newtype ModeSelection
   = ChooseExactly Natural
   deriving (Eq, Ord, Show)
