@@ -745,7 +745,7 @@ Per `CLAUDE.md` ("file the issue, cite it inline"), each thing M5b elides gets a
 
 **Interfaces:** none (comments + issues only).
 
-- [ ] **Step 1: Check for duplicates, then file the live-loop-reentry issue**
+- [x] **Step 1: Check for duplicates, then file the live-loop-reentry issue**
 
 ```bash
 gh issue list --repo tfausak/pawl --search "restart"
@@ -769,7 +769,7 @@ Expiry trigger: milestone/card-driven (fires with full Karn Liberated, or whenev
 
 Record the number `N1`.
 
-- [ ] **Step 2: File the full-Karn-Liberated issue**
+- [x] **Step 2: File the full-Karn-Liberated issue**
 
 ```bash
 gh issue create \
@@ -789,7 +789,7 @@ Expiry trigger: card-driven (Karn Liberated). Cited at the RestartGame arm in Pa
 
 Record the number `N2`.
 
-- [ ] **Step 3: Add the inline citation at the `RestartGame` arm**
+- [x] **Step 3: Add the inline citation at the `RestartGame` arm**
 
 In `source/library/Pawl/Resolve.hs`, extend the `RestartGame` arm's comment (from Task 3 Step 4) to cite both issues (replace `#N1`/`#N2` with the real numbers):
 
@@ -804,7 +804,7 @@ In `source/library/Pawl/Resolve.hs`, extend the `RestartGame` arm's comment (fro
   Effect.RestartGame -> Setup.restartGame controller
 ```
 
-- [ ] **Step 4: Build (comment-only) and commit**
+- [x] **Step 4: Build (comment-only) and commit**
 
 ```bash
 cabal build all --enable-tests --enable-benchmarks

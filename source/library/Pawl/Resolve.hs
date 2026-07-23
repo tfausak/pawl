@@ -518,6 +518,9 @@ applyEffect source controller bound legality chosen effect = case effect of
   -- this ability's controller (CR 727.1a), which applyEffect already holds as
   -- `controller`; the rebuild lives in Setup (game construction). The engine
   -- reaches it through a generic opcode, never Karn's identity.
+  -- Not implemented: live playGame re-entry after an in-game restart (#134);
+  -- the CR 727.5/727.5a exemption + put-onto-battlefield rider of full Karn
+  -- Liberated (#135), which retires the synthetic-restart gate.
   Effect.RestartGame -> Setup.restartGame controller
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
