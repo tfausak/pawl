@@ -38,6 +38,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
@@ -505,7 +506,42 @@ ruleTests cards =
               HU.assertEqual "alice, the winner, is untouched" (Just 20) (S.lifeOf S.alice after)
               HU.assertEqual "the subgame spell resolved and left the stack" [] (GameState.stack after)
               HU.assertEqual "the main game did not end" Nothing (GameState.result after)
-              HU.assertEqual "the subgame spell is gone from alice's hand (cast)" False (Maybe.isJust (Game.lookupObject spellId after) && elem spellId (Game.zoneMembers Zone.Hand S.alice after))
+              HU.assertEqual "the subgame spell is gone from alice's hand (cast)" False (Maybe.isJust (Game.lookupObject spellId after) && elem spellId (Game.zoneMembers Zone.Hand S.alice after)),
+      HU.testCase "CR 729.5/729.4b gameplay: cards funnel back, main-game board survives, main-game counters untouched" $
+        -- library pool built first, THEN the survivor is added to the battlefield --
+        -- poolToLibraryG sweeps every object a player owns onto their library, so a
+        -- survivor added before it would be swept in too and vanish from the board.
+        let g0 = Setup.emptyGame S.bothPlayers
+            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG cards 3 S.bob (addManyG cards 8 S.alice g0)))
+            -- a survivor on the main battlefield that must remain after the subgame
+            (survivorId, g2) = S.addCreature (Cards.mountainPrinting cards) S.alice g1
+            (_spellId, g3) = S.addHandCard (Cards.syntheticSubgamePrinting cards) S.alice g2
+            -- give bob a main-game poison counter (CR 729.4b: outside the subgame)
+            g4 =
+              g3
+                { GameState.players =
+                    Map.adjust
+                      (\pl -> pl {Player.counters = Map.insert PlayerCounterKind.Poison 1 (Player.counters pl)})
+                      S.bob
+                      (GameState.players g3)
+                }
+            gStart =
+              g4
+                { GameState.activePlayer = S.alice,
+                  GameState.phase = Phase.PrecombatMain,
+                  GameState.priority = Just S.alice
+                }
+            after = snd (Engine.runGamePure subgameAnswer gStart Engine.priorityLoop)
+            bobPoison =
+              maybe
+                0
+                (Map.findWithDefault 0 PlayerCounterKind.Poison . Player.counters)
+                (Map.lookup S.bob (GameState.players after))
+         in do
+              HU.assertEqual "CR 729.4b: bob's main-game poison counter is untouched by the subgame" 1 bobPoison
+              HU.assertEqual "CR 729.5: alice's library holds her 8 subgame cards again" 8 (length (Game.zoneMembers Zone.Library S.alice after))
+              HU.assertEqual "CR 729.5: bob's library holds his 3 subgame cards again" 3 (length (Game.zoneMembers Zone.Library S.bob after))
+              HU.assertEqual "the main-game survivor is still on the battlefield" True (Set.member survivorId (GameState.battlefield after))
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
