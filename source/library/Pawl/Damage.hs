@@ -17,6 +17,7 @@ import qualified Pawl.Replacement as Replacement
 import Pawl.Type.AttackTarget (AttackTarget)
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.Combat as Combat.Type
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import Pawl.Type.Game (Game)
@@ -27,6 +28,7 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
@@ -179,11 +181,25 @@ applyDamage events = do
   survivors <- fmap Maybe.catMaybes (Monad.mapM Replacement.resolveDamage events)
   let markOne g ev = case DamageEvent.target ev of
         Recipient.ToCreature oid ->
-          let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
-           in g {GameState.objects = Map.adjust hurt oid (GameState.objects g)}
+          if DamageEvent.dealtByInfect ev
+            then -- CR 120.3d / 702.90c: -1/-1 counters, no marked damage. Added
+            -- directly (not via Event.putCounters): this is a consequence of
+            -- a damage event that already ran the CR 616 replacement loop, so
+            -- a "would put -1/-1 from infect" CR 614 sub-replacement is out of
+            -- scope (#TBD-614-funnel).
+              let addMinus obj = obj {Object.counters = Map.insertWith (+) CounterKind.MinusOneMinusOne (DamageEvent.amount ev) (Object.counters obj)}
+               in g {GameState.objects = Map.adjust addMinus oid (GameState.objects g)}
+            else
+              let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
+               in g {GameState.objects = Map.adjust hurt oid (GameState.objects g)}
         Recipient.ToPlayer pid ->
-          let drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
-           in g {GameState.players = Map.adjust drain pid (GameState.players g)}
+          if DamageEvent.dealtByInfect ev
+            then -- CR 120.3b / 702.90b: poison counters, no life loss.
+              let poison player = player {Player.counters = Map.insertWith (+) PlayerCounterKind.Poison (DamageEvent.amount ev) (Player.counters player)}
+               in g {GameState.players = Map.adjust poison pid (GameState.players g)}
+            else
+              let drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
+               in g {GameState.players = Map.adjust drain pid (GameState.players g)}
         Recipient.ToObject _ -> g
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.

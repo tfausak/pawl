@@ -19,6 +19,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.DamagePattern as DamagePattern
@@ -33,6 +34,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
@@ -185,6 +187,28 @@ damageTests cards =
                 }
             dropped = Expiry.dropAtCleanup (S.addReplacement shield base)
          in HU.assertEqual "no replacements remain" [] (GameState.replacements dropped)
+    ]
+
+infectTests :: Cards.Cards -> Tasty.TestTree
+infectTests cards =
+  Tasty.testGroup
+    "Infect"
+    [ HU.testCase "CR 120.3b infect damage to a player becomes poison, not life loss" $
+        let (oid, gs0) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+            ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True DamageKind.Combat
+            after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
+         in do
+              HU.assertEqual "bob has three poison" 3 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+              HU.assertEqual "bob's life unchanged" (Just 20) (S.lifeOf S.bob after)
+              HU.assertEqual "the source's controller gains no poison" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
+      HU.testCase "CR 120.3d infect damage to a creature becomes -1/-1 counters, not marked damage" $
+        let (src, gs0) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+            (victim, gs1) = S.addPiker cards S.bob gs0
+            ev = DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False True DamageKind.Combat
+            after = S.runPure S.identityAnswer gs1 (Damage.applyDamage [ev])
+         in do
+              HU.assertEqual "two -1/-1 counters" (Just 2) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject victim after))
+              HU.assertEqual "no marked damage" (Just 0) (S.damageOf victim after)
     ]
 
 sbaBase :: GameState.GameState
@@ -509,5 +533,6 @@ tests cards =
       trampleDeathtouchTests cards,
       sbaTests,
       creatureSbaTests cards,
+      infectTests cards,
       m2cPropertyTests cards
     ]
