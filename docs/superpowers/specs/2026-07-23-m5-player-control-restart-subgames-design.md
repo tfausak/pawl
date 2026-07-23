@@ -100,7 +100,7 @@ number drives code (CLAUDE.md: never trust recalled Magic rules).
 |---|---|---|---|---|
 | **M5a ✅** | **723 Controlling Another Player** | **Mindslaver** at *gameplay level* → a naive "a player always decides for themselves" cannot make player A make every one of player B's choices for B's whole turn; and the small correctness points below each have their own micro-falsifier | Gameplay gate test for the **existing** whole-turn mechanism; **723.1a** last-created-effect-wins overwrite; **723.6** the controller can't force a concede; **723.5a** the controller spends only the controlled player's resources | 723.1 / 723.1a / 723.3 / 723.5 / 723.5a / 723.6 |
 | **M5b ✅** | **727 Restarting the Game** | **labeled-synthetic** "restart the game" effect (documented expiry → **Karn Liberated**) → restart is **not** `Setup.emptyGame` + `Setup.newGame`: it must rebuild from the current game's *actual cards* (ownership preserved, CR 727.2) and set the starting player to the restart's controller (CR 727.1a), which a fresh-setup path gets wrong | a `restartGame` routine; a shared **`startGameFromCards`** primitive (build per-player libraries from an existing object pool, not from `Deck` definitions); CR 727.4 finish-just-before-first-untap timing | 727.1 / 727.1a / 727.2 / 727.3 / 727.4 |
-| **M5c** | **729 Subgames** — *the M5 go/no-go* | **Shahrazad** → XMage calls it unimplementable (can't nest a game in a game); a mutable/IO-callback engine can't resume the parent. Falsifiers a naive design must survive: the subgame's outcome must feed the **parent** effect (729.1b), owned traditional cards must funnel **back** to the main library and reshuffle (729.5), and **Shahrazad-in-Shahrazad must nest arbitrarily** (729.6) | subgame = `runStateT playGame subState` run **inside** the resolving effect, sharing the `Program Prompt` interpreter; `startGameFromCards` from each player's **library only** (729.2); a generic **`PlaySubgame`** opcode binding the subgame outcome to a slot; funnel-back at subgame end (729.5) | 729.1 / 729.1a / 729.1b / 729.2 / 729.3 / 729.4 / 729.5 / 729.6 |
+| **M5c ✅** | **729 Subgames** — *the M5 go/no-go* | **Shahrazad** → XMage calls it unimplementable (can't nest a game in a game); a mutable/IO-callback engine can't resume the parent. Falsifiers a naive design must survive: the subgame's outcome must feed the **parent** effect (729.1b), owned traditional cards must funnel **back** to the main library and reshuffle (729.5), and **Shahrazad-in-Shahrazad must nest arbitrarily** (729.6) | subgame = `runStateT playGame subState` run **inside** the resolving effect, sharing the `Program Prompt` interpreter; `startGameFromCards` from each player's **library only** (729.2); a generic **`PlaySubgame`** opcode binding the subgame outcome to a slot; funnel-back at subgame end (729.5) | 729.1 / 729.1a / 729.1b / 729.2 / 729.3 / 729.4 / 729.5 / 729.6 |
 
 ### Notes the phase specs must not lose
 
@@ -267,6 +267,11 @@ parent, funnels cards back, and nests within itself (M5c). At that point
 design.md §3's "nightmares" are retired and the **closed half is functionally
 complete** for its flagged surface (M4.5 finished the axes; M5 finishes the
 rules-section nightmares that sit on them).
+
+**Exit criterion met.** M5a, M5b, and M5c each landed a passing gameplay-level
+gate (Mindslaver, the synthetic-restart artifact, the synthetic-subgame
+sorcery); **M5 is complete.** See `docs/progress.md`'s M5c entry for the
+distilled decision record.
 
 **Hand-off to M6 (the transpiler).** With control, restart, and subgames closed,
 the closed half has shape enough that M6's two inputs — LLM bulk translation of

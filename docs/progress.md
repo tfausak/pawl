@@ -1993,3 +1993,60 @@ its own gate card and spec, landed as it completes. Umbrella:
   (#135, card-driven), which retires the synthetic gate; CR 727.6 subgame-restart
   (rides M5c) and CR 727.2's outside-the-game cards (subsystem-blocked), noted in
   #135.
+
+- **M5c is complete** (Subgames — CR 729 — the M5 go/no-go, and the M5 exit).
+  **Gate: a labeled-synthetic "Synthetic Subgame" sorcery** (the `Landform` crutch;
+  documented expiry → **Shahrazad**, #139) whose one mode is
+  `[PlaySubgame "loser", DealDamage "loser" (Literal 3)]`. The decision it proves,
+  the day-one suspended-continuation bet (design.md §2.1/§3): **a subgame is a
+  function call.** `Engine.playSubgame` runs
+  `Trans.lift (runStateT (startGameFromCards >> playGame) sub0)` — the nested game
+  sequenced into the parent's `StateT GameState (Program Prompt)`, so its prompts
+  flow through the **same** `Program`/`Replay` fold the main game uses (untagged;
+  scripted interpreters and deterministic replay work unchanged — a
+  `Prompt.PlaySubgame` was **rejected** precisely because it would bypass
+  `Replay.record` and break determinism). The parent state sits untouched in the
+  outer frame while the subgame runs (CR 729.1a); **nesting (CR 729.6) is free
+  recursion** — each level's `priorityLoop` re-supplies the runner, no `GameState`
+  stack field. Its gate is a hand-verified 2-level nested run plus a durable
+  termination guard (`runGamePure` would simply not return if the recursion
+  looped): CR 729.1a's total isolation leaves no top-level-observable nesting
+  signal, so — unlike the other CR 729 gates — this is **not** a self-verifying
+  regression that would catch a level-2-only breakage; it is a genuine guard
+  against non-termination, and the free-recursion architecture (no depth field to
+  corrupt) makes a level-2-only regression implausible rather than impossible.
+  **Runner injection:** `playSubgame` lives in `Engine` (it needs
+  `playGame`) and is threaded **down** the spell path as a `Game Result` through
+  new `Stack.resolveTopWith` → `Resolve.resolveSpellWith` → `Resolve.applyEffectWith`
+  (bare names kept as `…With Resolve.noSubgame` wrappers, so **none** of the 105
+  `resolveTop` / 9 `applyEffect` existing call sites changed) — the inversion that
+  lets the bottom-layer resolver reach the top-layer loop without a cycle.
+  **Outcome plumbing (CR 729.1b):** `Effect.PlaySubgame SlotName` **defines** its
+  slot (the `Create` pattern, via `Resolve.definedSlots`), binding the derived
+  2-player loser (`ToPlayer`); a later `DealDamage` reads it — enabled by
+  `resolveSpellWith` **re-reading** the resolving object's bindings per effect
+  (target legality still fixed at resolution start; only a newly-*defined* reserved
+  slot, always vacuously legal, becomes visible), generalizing the mid-resolution
+  binding `Create` writes but nothing yet read. **Construction/teardown:**
+  `Setup.subgameStateFrom` (CR 729.2 — library cards only, players reset, id supply
+  **inherited** so subgame ids never collide at return) and `Setup.funnelBack`
+  (CR 729.5 — each owner's `OfCard` objects return to their main library, the
+  parent's non-library board untouched, ids merged collision-free, supplies advanced);
+  `playSubgame` reshuffles (`Prompt.Shuffle`). **Falls out for free:** CR 729.3
+  (a <7-card library decks in the subgame's opening draw → loses at the first SBA,
+  reusing the draw-from-empty path) and CR 729.4b (main-game player counters are
+  outside the subgame — `funnelBack` never touches the parent's players; subgame
+  counters cease when the subgame state is dropped). **Added:** `Setup.subgameStateFrom`/
+  `funnelBack`; `Engine.playSubgame`; one opcode `Effect.PlaySubgame SlotName`
+  (five classifier arms + a `definedSlots` arm + two `Codec` arms + `applyEffectWith`
+  executor + `noSubgame` + `bindLoserSlot`); the `resolveSpellWith`/`resolveTopWith`
+  runner-carrying variants; the `synthetic-subgame` card. **Deferred:** subgame
+  first-player RNG (#136, elision), ability-path subgames (#137), Result-widening for
+  multi-player non-winners (#138), full Shahrazad's half-life rider (#139,
+  card-driven), and the subsystem-blocked slices — nontraditional/Vanguard/Commander
+  movement, cards brought into a subgame, and subgame prompt tagging (#140).
+  **M5 exits here:** control (M5a), restart (M5b), and subgames (M5c) close
+  design.md §3's "nightmares"; the closed half is functionally complete for its
+  flagged surface. Spec (umbrella) and plan kept as reference:
+  `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`
+  and `docs/superpowers/plans/2026-07-23-m5c-subgames.md`.

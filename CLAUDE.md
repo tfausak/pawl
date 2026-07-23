@@ -72,8 +72,24 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   (CR 727.1a), settling just before the first untap step (CR 727.4); it
   introduces the shared `startGameFromCards` primitive that M5c reuses.
   Deferred: live `playGame` re-entry after an in-game restart, and full Karn
-  Liberated (CR 727.5/727.5a). **M5c (Subgames, CR 729 — the M5 go/no-go)
-  is the next phase to plan.** The umbrella spec is
+  Liberated (CR 727.5/727.5a). **M5c (Subgames, CR 729 — the M5 go/no-go) has
+  landed, and with it M5 is complete.** A labeled-synthetic "Synthetic Subgame"
+  sorcery (documented expiry → Shahrazad) drives a gameplay gate over a new
+  `Effect.PlaySubgame SlotName` opcode: a subgame is
+  `Trans.lift (runStateT (startGameFromCards >> playGame) sub0)` sequenced into
+  the resolving effect, sharing the one `Program`/`Replay` interpreter (a
+  `Prompt.PlaySubgame` was rejected for breaking replay); the runner is
+  injected down the spell path (`resolveTopWith`/`resolveSpellWith`/
+  `applyEffectWith`, bare names kept as `noSubgame` wrappers) since `Resolve`
+  sits below `Engine`. `PlaySubgame` defines a slot binding the derived loser
+  (CR 729.1b, read via a per-effect binding re-read in `resolveSpellWith`);
+  `Setup.subgameStateFrom`/`funnelBack` build from the library only (CR 729.2)
+  and return owned cards (CR 729.5) with an inherited id supply; nesting (CR
+  729.6) is free recursion. Deferred: subgame first-player RNG, ability-path
+  subgames, Result-widening, full Shahrazad, and the subsystem-blocked
+  movement slices. With control, restart, and subgames closed, **the closed
+  half is functionally complete for its flagged surface; M6 (the transpiler)
+  is next.** The umbrella spec is
   `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —
