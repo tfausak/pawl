@@ -541,7 +541,34 @@ ruleTests cards =
               HU.assertEqual "CR 729.4b: bob's main-game poison counter is untouched by the subgame" 1 bobPoison
               HU.assertEqual "CR 729.5: alice's library holds her 8 subgame cards again" 8 (length (Game.zoneMembers Zone.Library S.alice after))
               HU.assertEqual "CR 729.5: bob's library holds his 3 subgame cards again" 3 (length (Game.zoneMembers Zone.Library S.bob after))
-              HU.assertEqual "the main-game survivor is still on the battlefield" True (Set.member survivorId (GameState.battlefield after))
+              HU.assertEqual "the main-game survivor is still on the battlefield" True (Set.member survivorId (GameState.battlefield after)),
+      HU.testCase "CR 729.6 gameplay: a subgame nests a subgame; nesting terminates and the main game resumes" $
+        -- alice's MAIN-GAME library feeds level 1's library: one nested
+        -- synthetic-subgame sorcery + 13 Mountains (14 total). The level-1 opening
+        -- hand draws 7 (the sorcery + 6 Mountains), leaving exactly 7 Mountains in
+        -- her level-1 library -- enough that she does NOT deck when level 2's
+        -- opening hand draws from it (CR 729.2 pulls a subgame's library from its
+        -- parent's library). bob's library is exactly 7 Mountains: his level-1
+        -- opening hand consumes all seven (no immediate CR 704.5b loss -- every
+        -- draw still succeeds), leaving his level-1 library EMPTY, so he decks at
+        -- his own level-1 draw step (turn 2) -- real level-1 play, not an instant
+        -- SBA loss before anyone gets priority. Sized this way (rather than the
+        -- brief's flat "3 Mountains decks instantly") because an immediate deck-out
+        -- during subgame setup fires before ANY priorityLoop grants alice priority
+        -- (Sba.losesNow reads GameState.drewFromEmpty, set during the opening-hand
+        -- draw itself), which would leave alice no window to cast the nested
+        -- sorcery at all and collapse this gate to a flat (non-nested) subgame.
+        let g0 = Setup.emptyGame S.bothPlayers
+            (_nestedId, g1) = libraryCard (Cards.syntheticSubgamePrinting cards) S.alice g0
+            g2 = poolToLibraryG S.bob (addToLibraryG cards 13 S.alice (addManyG cards 7 S.bob g1))
+            (_spellId, g3) = S.addHandCard (Cards.syntheticSubgamePrinting cards) S.alice g2
+            gStart = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+            after = snd (Engine.runGamePure subgameAnswer gStart Engine.priorityLoop)
+         in do
+              -- If nesting had not terminated, runGamePure would not return.
+              HU.assertEqual "CR 729.6: the top-level main game resumed with no result" Nothing (GameState.result after)
+              HU.assertEqual "CR 729.1b: bob took 3 from the level-1 subgame's follow-on" (Just 17) (S.lifeOf S.bob after)
+              HU.assertEqual "the top-level subgame spell left the stack" [] (GameState.stack after)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
@@ -699,6 +726,25 @@ subgameAnswer p = case p of
 addManyG :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 addManyG cards n pid gs =
   List.foldl' (\g _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid g)) gs (replicate n ())
+
+-- Put one printing into a player's library as a fresh object; return its id.
+-- Mirrors S.addHandCard, then relocates hand -> library.
+libraryCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+libraryCard printing pid gs =
+  let (oid, gs1) = S.addHandCard printing pid gs
+      onLibrary o = o {Object.zone = Zone.Library}
+   in ( oid,
+        gs1
+          { GameState.objects = Map.adjust onLibrary oid (GameState.objects gs1),
+            GameState.hand = Map.adjust (Seq.filter (/= oid)) pid (GameState.hand gs1),
+            GameState.library = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.library gs1)
+          }
+      )
+
+-- Append n Mountains to a player's library.
+addToLibraryG :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+addToLibraryG cards n pid gs =
+  List.foldl' (\g _ -> snd (libraryCard (Cards.mountainPrinting cards) pid g)) gs (replicate n ())
 
 -- Move every object this player owns onto their library (mirror of
 -- SetupSpec.poolToLibrary, adapted to GameSpec's imports): used to craft a
