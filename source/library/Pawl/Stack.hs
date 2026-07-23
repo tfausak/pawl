@@ -14,21 +14,26 @@ import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Printing as Printing
+import Pawl.Type.Result (Result)
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.Zone as Zone
 
+-- The runner-aware resolve-the-top-of-stack: a resolving SPELL may play a subgame
+-- (CR 729), so the spell branch takes the injected runner; abilities do not (an
+-- ability-driven subgame is deferred). Engine.priorityLoop supplies playSubgame.
+--
 -- CR 608.3: a resolving permanent spell becomes a permanent on the battlefield;
 -- anything else resolves its effects and then goes to its owner's graveyard
--- (Resolve.resolveSpell -- the CR 608.2 executor).
+-- (Resolve.resolveSpellWith -- the CR 608.2 executor).
 --
 -- THE INVARIANT: this dispatches on a CLASSIFICATION -- is-it-a-permanent, read
 -- off the type line -- and never on the card's identity. There is no
 -- `case card of Piker -> ...` here and there must never be one; that is the
 -- fusion of the closed and open halves that sinks the project. The same shape as
 -- is-it-a-mana-ability. Zero opcodes.
-resolveTop :: Game ()
-resolveTop = do
+resolveTopWith :: Game Result -> Game ()
+resolveTopWith runSubgame = do
   gs <- State.get
   case GameState.stack gs of
     [] -> pure ()
@@ -40,7 +45,7 @@ resolveTop = do
         Source.OfCard printing ->
           if Card.isPermanent (Printing.card printing)
             then Event.changeZone oid Zone.Battlefield
-            else Resolve.resolveSpell oid
+            else Resolve.resolveSpellWith runSubgame oid
         -- A token is never on the stack (created onto the battlefield, never cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
         Source.OfAbility srcId ability -> do
@@ -80,3 +85,8 @@ resolveTop = do
           let chosen = Binding.modesOf (Object.bindings obj)
               modal = TriggeredAbility.modal ability
            in Resolve.resolveEffects oid oid (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)
+
+-- The no-subgame resolve-top (every existing caller and test): a resolving spell
+-- with a PlaySubgame effect would draw. Engine's live loop uses resolveTopWith.
+resolveTop :: Game ()
+resolveTop = resolveTopWith Resolve.noSubgame

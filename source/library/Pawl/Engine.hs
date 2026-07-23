@@ -417,7 +417,7 @@ priorityLoop = do
                       then case GameState.stack gs of
                         [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
                         _ -> do
-                          Stack.resolveTop
+                          Stack.resolveTopWith playSubgame
                           settleForPriority
                           State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (GameState.activePlayer g)})
                           loop
@@ -528,6 +528,25 @@ playGame =
             runStep
             loop
    in loop
+
+-- CR 729: play a subgame as a FUNCTION CALL. Construct the subgame from the
+-- parent's library cards (CR 729.2, subgameStateFrom), then run its setup and
+-- whole game as `runStateT (startGameFromCards >> playGame)` LIFTED into the
+-- parent's StateT -- so the subgame's prompts flow through the SAME Program
+-- interpreter and Replay fold (untagged; the design). The parent GameState sits
+-- untouched in the outer frame while the subgame runs (CR 729.1a). At the end,
+-- funnel each owner's cards back to their main-game library (CR 729.5) and
+-- reshuffle (Prompt.Shuffle). A subgame within a subgame (CR 729.6) is free: the
+-- nested playGame's own priorityLoop re-supplies playSubgame.
+playSubgame :: Game Result
+playSubgame = do
+  parent <- State.get
+  let sub0 = Setup.subgameStateFrom parent
+  (result, finalSub) <- Trans.lift (State.runStateT (Setup.startGameFromCards >> playGame) sub0)
+  State.modify' (Setup.funnelBack finalSub)
+  order <- State.gets GameState.turnOrder
+  Monad.forM_ order Setup.shuffleLibrary
+  pure result
 
 playFrom :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game Result
 playFrom matchup = do

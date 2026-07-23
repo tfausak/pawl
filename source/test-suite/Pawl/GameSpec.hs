@@ -473,7 +473,18 @@ ruleTests cards =
               HU.assertEqual "CR 103.5: bob drew a 7-card opening hand" 7 (S.handSize S.bob after)
               HU.assertEqual "CR 727.4: settled at the first untap step" Turn.firstPhase (GameState.phase after)
               HU.assertEqual "CR 727.2: the battlefield is empty (every card returned to a library)" True (Set.null (GameState.battlefield after))
-              HU.assertEqual "the game did not end -- the new game is live" Nothing (GameState.result after)
+              HU.assertEqual "the game did not end -- the new game is live" Nothing (GameState.result after),
+      HU.testCase "CR 729.2/729.3/729.5: playSubgame runs a nested game, bob decks, cards funnel back" $
+        let g0 = Setup.emptyGame S.bothPlayers
+            -- alice: 8 library cards; bob: 3 (fewer than seven -> loses, CR 729.3)
+            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG cards 3 S.bob (addManyG cards 8 S.alice g0)))
+            (result, after) = Engine.runGamePure S.identityAnswer g1 Engine.playSubgame
+            libCount pid = length (Game.zoneMembers Zone.Library pid after)
+         in do
+              HU.assertEqual "CR 729.3: bob has fewer than 7 cards, so alice wins the subgame" (Result.Won S.alice) result
+              HU.assertEqual "CR 729.5: alice's cards funnel back into her main-game library" 8 (libCount S.alice)
+              HU.assertEqual "CR 729.5: bob's cards funnel back into his main-game library" 3 (libCount S.bob)
+              HU.assertEqual "the main game resumes with no result recorded" Nothing (GameState.result after)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
@@ -616,3 +627,16 @@ restartAnswer p = case p of
 addManyG :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 addManyG cards n pid gs =
   List.foldl' (\g _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid g)) gs (replicate n ())
+
+-- Move every object this player owns onto their library (mirror of
+-- SetupSpec.poolToLibrary, adapted to GameSpec's imports): used to craft a
+-- pre-shuffled library of a known size for a subgame/restart gate.
+poolToLibraryG :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+poolToLibraryG pid gs =
+  let mine = Map.keys (Map.filter (\o -> Object.owner o == pid) (GameState.objects gs))
+      onLibrary o = o {Object.zone = Zone.Library}
+   in gs
+        { GameState.objects = List.foldl' (flip (Map.adjust onLibrary)) (GameState.objects gs) mine,
+          GameState.battlefield = Set.difference (GameState.battlefield gs) (Set.fromList mine),
+          GameState.library = Map.insert pid (Seq.fromList mine) (GameState.library gs)
+        }
