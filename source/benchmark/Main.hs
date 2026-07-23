@@ -27,11 +27,42 @@ isCreatureRecipient r = case r of
   Recipient.ToPlayer _ -> False
   Recipient.ToObject _ -> False
 
+-- Cast if anything is castable, else play a land, else pass. Mirrors the test
+-- suite's Pawl.Support.castAnswer. The land fallback is load-bearing: without it
+-- no land ever reaches the battlefield, so no mana ever exists, so
+-- Action.legalActions never offers a Cast and the filter is always empty -- which
+-- is how all three benchmarks came to execute the same goldfish game (#66).
+castElsePlay :: [Action.Action] -> Action.Action
+castElsePlay actions =
+  let isCast a = case a of
+        Action.Cast _ -> True
+        _ -> False
+      isPlay a = case a of
+        Action.Play _ -> True
+        _ -> False
+   in case filter isCast actions of
+        h : _ -> h
+        [] -> case filter isPlay actions of
+          h : _ -> h
+          [] -> Action.Pass
+
+-- CR 514.1 cleanup discard, answered from the END of the hand.
+--
+-- Also load-bearing for #66, and not interchangeable with taking the front. The
+-- hand is oldest-first, and a player may play only one land per turn (CR 305.2),
+-- so surplus lands pile up as the oldest cards held. Discarding from the front
+-- therefore pitches precisely the lands the script needs, and the board never
+-- develops even with the cast/play fallback above in place: measured over one
+-- match, front-discard yields 4 land plays and no combat, back-discard yields 72
+-- land plays and 66 declare-attackers prompts.
+discardNewest :: [a] -> Natural -> [a]
+discardNewest ids n = take (fromIntegral n) (reverse ids)
+
 alwaysPass :: Prompt.Prompt r -> r
 alwaysPass p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> Action.Pass
-  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -51,12 +82,12 @@ alwaysPass p = case p of
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
--- Casts when legal, otherwise passes: the benchmark that actually exercises the
--- stack, mana payment, and resolution.
+-- Plays lands and casts when legal, otherwise passes: the benchmark that actually
+-- exercises the stack, mana payment, and resolution.
 castAnswer :: Prompt.Prompt r -> r
 castAnswer p = case p of
   Prompt.Shuffle ids -> ids
-  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -64,13 +95,7 @@ castAnswer p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseAction _ _ actions ->
-    let isCast a = case a of
-          Action.Cast _ -> True
-          _ -> False
-     in case filter isCast actions of
-          h : _ -> h
-          [] -> Action.Pass
+  Prompt.ChooseAction _ _ actions -> castElsePlay actions
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
@@ -83,11 +108,11 @@ castAnswer p = case p of
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
--- Casts, attacks, and blocks: the benchmark that exercises combat.
+-- Plays lands, casts, attacks, and blocks: the benchmark that exercises combat.
 fightAnswer :: Prompt.Prompt r -> r
 fightAnswer p = case p of
   Prompt.Shuffle ids -> ids
-  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
@@ -97,13 +122,7 @@ fightAnswer p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseAction _ _ actions ->
-    let isCast a = case a of
-          Action.Cast _ -> True
-          _ -> False
-     in case filter isCast actions of
-          h : _ -> h
-          [] -> Action.Pass
+  Prompt.ChooseAction _ _ actions -> castElsePlay actions
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
