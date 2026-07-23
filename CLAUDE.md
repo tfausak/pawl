@@ -44,11 +44,10 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   has a beginning. P7 closed GAP-P and the *modification* half of GAP-Co, and
   with them the whole of Cluster 3**: player and rules-modifying continuous
   effects, which CR 613.10/613.11 put *outside* the layer system. **P8 closed
-  the *payment* half of GAP-Co** — one `Cost` for spells and abilities, the
-  CR 118.6 unpayable/`{0}` distinction in the type, and printed additional and
-  alternative costs — proved by Greed, Village Rites and Fireblast. **P9
-  (filters), P10 (player counters) and P11 (Command zone) remain, none blocking
-  another.** The umbrella spec is
+  the *payment* half of GAP-Co** — one `Cost` for spells and abilities, CR
+  118.6's unpayable/`{0}` distinction, and additional and alternative costs —
+  via Greed, Village Rites and Fireblast. **P9 (filters), P10 (player counters)
+  and P11 (Command zone) remain, none blocking another.** The umbrella spec is
   `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —
