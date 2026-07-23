@@ -56,6 +56,7 @@ import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
@@ -1110,6 +1111,7 @@ gameEventToJson e = case e of
   GameEvent.DamageDealt ev -> Json.tagged (Text.pack "DamageDealt") (Just (damageEventToJson ev))
   GameEvent.StepBegan p pid -> Json.tagged (Text.pack "StepBegan") (Just (Array [phaseToJson p, playerIdToJson pid]))
   GameEvent.SpellCast pid -> Json.tagged (Text.pack "SpellCast") (Just (playerIdToJson pid))
+  GameEvent.BecameMonarch pid -> Json.tagged (Text.pack "BecameMonarch") (Just (playerIdToJson pid))
 
 jsonToGameEvent :: Value -> Either Text GameEvent.GameEvent
 jsonToGameEvent value = do
@@ -1119,7 +1121,23 @@ jsonToGameEvent value = do
     ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> jsonToDamageEvent v
     ("StepBegan", Just (Array [p, pid])) -> GameEvent.StepBegan <$> jsonToPhase p <*> jsonToPlayerId pid
     ("SpellCast", Just v) -> GameEvent.SpellCast <$> jsonToPlayerId v
+    ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> jsonToPlayerId v
     _ -> Left (Text.pack "unknown GameEvent: " <> t)
+
+-- MonarchTarget ----------------------------------------------------------------
+
+monarchTargetToJson :: MonarchTarget.MonarchTarget -> Value
+monarchTargetToJson t = nullary . Text.pack $ case t of
+  MonarchTarget.TheController -> "TheController"
+  MonarchTarget.ControllerOfSource -> "ControllerOfSource"
+
+jsonToMonarchTarget :: Value -> Either Text MonarchTarget.MonarchTarget
+jsonToMonarchTarget =
+  decodeNullary
+    (Text.pack "MonarchTarget")
+    [ (Text.pack "TheController", MonarchTarget.TheController),
+      (Text.pack "ControllerOfSource", MonarchTarget.ControllerOfSource)
+    ]
 
 -- Effect ---------------------------------------------------------------------
 
@@ -1149,6 +1167,7 @@ effectToJson e = case e of
   Effect.ArmDelayedTrigger n -> Json.tagged (Text.pack "ArmDelayedTrigger") (Just (abilityNameToJson n))
   Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array [durationToJson d, playerScopeToJson s, playerEffectToJson pe]))
   Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (cardToJson c))
+  Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (monarchTargetToJson t))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
 jsonToEffect value = do
@@ -1204,6 +1223,7 @@ jsonToEffect value = do
       Just (Array [d, s, pe]) -> Effect.AffectPlayers <$> jsonToDuration d <*> jsonToPlayerScope s <*> jsonToPlayerEffect pe
       _ -> Left (Text.pack "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]")
     "CreateEmblem" -> withValue mv (fmap Effect.CreateEmblem . jsonToCard)
+    "BecomeMonarch" -> withValue mv (fmap Effect.BecomeMonarch . jsonToMonarchTarget)
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------

@@ -35,11 +35,13 @@ import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Effect as Effect
 import Pawl.Type.Game (Game)
+import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import Pawl.Type.ManaType (ManaType)
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
@@ -88,6 +90,7 @@ slotsOf effect = case effect of
   Effect.ArmDelayedTrigger _ -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
+  Effect.BecomeMonarch {} -> Set.empty
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -121,6 +124,7 @@ readsX = any effectReadsX
       Effect.ArmDelayedTrigger _ -> False
       Effect.AffectPlayers {} -> False
       Effect.CreateEmblem {} -> False
+      Effect.BecomeMonarch {} -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -150,6 +154,7 @@ manaProduced effect = case effect of
   Effect.ArmDelayedTrigger _ -> Nothing
   Effect.AffectPlayers {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
+  Effect.BecomeMonarch {} -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -179,6 +184,7 @@ searchesLibrary effect = case effect of
   Effect.ArmDelayedTrigger _ -> False
   Effect.AffectPlayers {} -> False
   Effect.CreateEmblem {} -> False
+  Effect.BecomeMonarch {} -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -254,6 +260,8 @@ rewriteEffect pairs effect = case effect of
   -- An emblem's embedded card carries no basic-land-type word here (as Create's
   -- token does not; spec section 8).
   Effect.CreateEmblem {} -> effect
+  -- No rewritable land-type word.
+  Effect.BecomeMonarch {} -> effect
 
 -- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
 -- 608.2c/700.2 -- an unchosen mode's effects never resolve), with every
@@ -678,6 +686,24 @@ applyEffect source controller bound legality chosen effect = case effect of
             }
     _ <- Event.placeObject controller mkObj Zone.Command
     pure ()
+  Effect.BecomeMonarch target -> do
+    gs <- State.get
+    let newMonarch = case target of
+          -- "you become the monarch."
+          MonarchTarget.TheController -> Just controller
+          -- CR 725.2: the controller of the ability's bound source (the damaging
+          -- creature), read from the reserved trigger-source slot.
+          MonarchTarget.ControllerOfSource ->
+            Map.lookup Binding.triggerSource chosen
+              >>= recipientObject
+              >>= (\o -> Projection.controllerOf o gs)
+    case newMonarch of
+      Nothing -> pure ()
+      Just p -> do
+        -- CR 725.3: the previous monarch ceases simply because `monarch` is
+        -- overwritten (at most one at a time).
+        State.modify' (\g -> g {GameState.monarch = Just p})
+        State.modify' (Event.recordEvent (GameEvent.BecameMonarch p))
   Effect.Counter slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- CR 701.6a: the slot's target is a spell on the stack; counter it through

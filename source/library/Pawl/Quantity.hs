@@ -88,6 +88,7 @@ died event = case event of
   GameEvent.DamageDealt _ -> False
   GameEvent.StepBegan _ _ -> False
   GameEvent.SpellCast _ -> False
+  GameEvent.BecameMonarch _ -> False
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
 -- ability supplies, recursing through Plus so 1+* becomes 1+<the count>.

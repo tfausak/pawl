@@ -6,6 +6,7 @@ import Pawl.Type.Duration (Duration)
 import Pawl.Type.Filter (Filter)
 import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.Modification (Modification)
+import Pawl.Type.MonarchTarget (MonarchTarget)
 import Pawl.Type.PlayerCounterKind (PlayerCounterKind)
 import Pawl.Type.PlayerEffect (PlayerEffect)
 import Pawl.Type.PlayerScope (PlayerScope)
@@ -185,4 +186,8 @@ data Effect card
     -- Card so the emblem reuses the whole ability pipeline. First-order: a data
     -- Card, tied to Card by Card's own instantiation, exactly as Create's is.
     CreateEmblem card
+  | -- CR 725: a player becomes the monarch. Targetless; the beneficiary is named
+    -- by the MonarchTarget (the resolving controller, or the controller of the
+    -- ability's bound source). Setting the monarch emits GameEvent.BecameMonarch.
+    BecomeMonarch MonarchTarget
   deriving (Eq, Ord, Show)

@@ -56,6 +56,7 @@ import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
@@ -190,7 +191,9 @@ tests cards =
           HU.testCase "GainPlayerCounters" $
             roundTrip "gpc" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters PlayerCounterKind.Energy (Quantity.Literal 2)),
           HU.testCase "CreateEmblem" $
-            roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card (Cards.pikerPrinting cards)))
+            roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card (Cards.pikerPrinting cards))),
+          HU.testCase "BecomeMonarch" $
+            roundTrip "e" Codec.effectToJson Codec.jsonToEffect (Effect.BecomeMonarch MonarchTarget.TheController)
         ],
       Tasty.testGroup
         "player effects (P7)"
@@ -472,6 +475,11 @@ tests cards =
             roundTrip "step" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice),
           HU.testCase "GameEvent.SpellCast round-trips" $
             roundTrip "ev" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.SpellCast S.alice),
+          HU.testCase "MonarchTarget" $ do
+            roundTrip "tc" Codec.monarchTargetToJson Codec.jsonToMonarchTarget MonarchTarget.TheController
+            roundTrip "cos" Codec.monarchTargetToJson Codec.jsonToMonarchTarget MonarchTarget.ControllerOfSource,
+          HU.testCase "GameEvent.BecameMonarch" $
+            roundTrip "bm" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.BecameMonarch S.alice),
           HU.testCase "TurnScope round-trips" $
             mapM_ (roundTrip "scope" Codec.turnScopeToJson Codec.jsonToTurnScope) [TurnScope.EachTurn, TurnScope.ControllersTurn],
           HU.testCase "TriggerCondition.StepBegins round-trips" $

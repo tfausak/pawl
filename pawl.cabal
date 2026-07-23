@@ -146,6 +146,7 @@ library
     Pawl.Type.ModeIndex
     Pawl.Type.ModeSelection
     Pawl.Type.Modification
+    Pawl.Type.MonarchTarget
     Pawl.Type.Object
     Pawl.Type.ObjectId
     Pawl.Type.Payment

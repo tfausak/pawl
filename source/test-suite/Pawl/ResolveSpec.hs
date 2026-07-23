@@ -54,6 +54,7 @@ import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -1134,6 +1135,18 @@ createEmblemTests cards =
               HU.assertEqual "owned by the resolver" [Just S.alice] (map (\oid -> fmap Object.owner (Game.lookupObject oid after)) emblems)
     ]
 
+becomeMonarchTests :: Cards.Cards -> Tasty.TestTree
+becomeMonarchTests cards =
+  Tasty.testGroup
+    "BecomeMonarch"
+    [ HU.testCase "CR 725 BecomeMonarch TheController makes the resolver the monarch" $
+        let (src, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            after = S.runPure S.identityAnswer gs0 (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.BecomeMonarch MonarchTarget.TheController))
+         in do
+              HU.assertEqual "alice is monarch" (Just S.alice) (GameState.monarch after)
+              HU.assertBool "a BecameMonarch event was recorded" (elem (GameEvent.BecameMonarch S.alice) (GameState.events after))
+    ]
+
 -- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
 -- (GainKeyword Haste) together end to end -- cast, resolve, attack, revert.
 actOfTreasonTests :: Cards.Cards -> Tasty.TestTree
@@ -1157,4 +1170,4 @@ actOfTreasonTests cards =
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards, gainControlTests cards, gainPlayerCountersTests cards, createEmblemTests cards, actOfTreasonTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards, gainControlTests cards, gainPlayerCountersTests cards, createEmblemTests cards, becomeMonarchTests cards, actOfTreasonTests cards]

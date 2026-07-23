@@ -67,6 +67,7 @@ movedOf event = case event of
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent
@@ -75,6 +76,7 @@ damageOf event = case event of
   GameEvent.Moved _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
 
 -- The caster an event describes, if it is a cast (CR 601.2i).
 castOf :: GameEvent -> Maybe PlayerId
@@ -83,6 +85,7 @@ castOf event = case event of
   GameEvent.Moved _ _ -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed.
 unscannedEvents :: GameState -> [GameEvent]
@@ -353,6 +356,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins wanted scope -> case event of
     GameEvent.StepBegan began active ->
@@ -362,6 +366,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
@@ -377,6 +382,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.

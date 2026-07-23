@@ -101,7 +101,9 @@ setupTests cards =
          in HU.assertEqual "empty" (Just Map.empty) (fmap Player.counters (Map.lookup S.alice (GameState.players gs))),
       HU.testCase "CR 400.1 a new game's command zone is empty" $
         let gs = Setup.emptyGame S.bothPlayers
-         in HU.assertEqual "empty command" mempty (GameState.command gs)
+         in HU.assertEqual "empty command" mempty (GameState.command gs),
+      HU.testCase "CR 725.1 a new game has no monarch" $
+        HU.assertEqual "no monarch" Nothing (GameState.monarch (Setup.emptyGame S.bothPlayers))
     ]
 
 greenBlackSetup :: Cards.Cards -> GameState.GameState

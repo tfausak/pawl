@@ -87,7 +87,8 @@ emptyGame order =
           GameState.drewFromEmpty = mempty,
           GameState.landPlayed = mempty,
           GameState.pendingControl = Map.empty,
-          GameState.activeControl = Nothing
+          GameState.activeControl = Nothing,
+          GameState.monarch = Nothing
         }
 
 createCard :: PlayerId -> Printing -> Game ObjectId

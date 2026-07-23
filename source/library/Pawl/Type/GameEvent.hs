@@ -46,4 +46,8 @@ data GameEvent
     -- cast a spell that was countered, you can't cast another spell during the
     -- same turn") is what fixes that.
     SpellCast PlayerId
+  | -- CR 725.1: a player became the monarch. What Palace Jailer's exile duration
+    -- keys off, and the substrate for any future "whenever a player becomes the
+    -- monarch" trigger.
+    BecameMonarch PlayerId
   deriving (Eq, Ord, Show)

@@ -96,6 +96,10 @@ data GameState = MkGameState
     -- Only the active player is ever controlled during their turn, so one Maybe
     -- suffices. Overwritten every turn start, so control ends at the next turn's
     -- beginning (CR 723.1).
-    activeControl :: Maybe Decider
+    activeControl :: Maybe Decider,
+    -- CR 725.1/725.3: the monarch, a single game-wide player designation (at most
+    -- one at a time). Nothing until a player becomes the monarch. On GameState,
+    -- not Player, because it is one designation, not a per-player counter.
+    monarch :: Maybe PlayerId
   }
   deriving (Eq, Show)

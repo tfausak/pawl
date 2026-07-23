@@ -802,6 +802,11 @@ withEvent event gs =
       GameState.damageScannedThrough = 0
     }
 
+-- Set the monarch directly, for tests that need the designation without
+-- resolving the effect that grants it.
+withMonarch :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+withMonarch pid gs = gs {GameState.monarch = Just pid}
+
 -- Seed a floating replacement directly into GameState (bypasses casting the
 -- spell that would install it; use when a test needs one active without a
 -- resolution).
@@ -969,7 +974,8 @@ oneMountainState cards ph =
           GameState.drewFromEmpty = mempty,
           GameState.landPlayed = mempty,
           GameState.pendingControl = Map.empty,
-          GameState.activeControl = Nothing
+          GameState.activeControl = Nothing,
+          GameState.monarch = Nothing
         }
 
 drawStep :: Game.Type.Game ()
