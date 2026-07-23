@@ -46,7 +46,9 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Exclusion as Exclusion
 import qualified Pawl.Type.Expiry as Expiry
+import qualified Pawl.Type.Filter as Filter
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
@@ -59,15 +61,18 @@ import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
@@ -884,6 +889,27 @@ handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 
 pikerCard :: Cards.Cards -> Card.Type.Card
 pikerCard cards = Printing.card (Cards.pikerPrinting cards)
+
+-- LABELED SYNTHETIC (expires when a real emblem source lands, see the P11 plan's
+-- deferral issue): an emblem's characteristics are only its abilities (CR 114.3),
+-- but pawl models no planeswalker/Ring to mint one, so tests use this fixture --
+-- an Elspeth-style anthem, "creatures you control get +1/+1". Built by overriding
+-- a vanilla card's static abilities; the residual printed fields are inert for a
+-- command-zone object (never projected as a permanent). (#TBD-emblem-source)
+anthemEmblemCard :: Cards.Cards -> Card.Type.Card
+anthemEmblemCard cards =
+  (Printing.card (Cards.pikerPrinting cards))
+    { Card.Type.staticAbilities =
+        [ StaticAbility.MkStaticAbility
+            { StaticAbility.affected =
+                Affected.Matching
+                  Exclusion.IncludesSource
+                  (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]),
+              StaticAbility.modification =
+                Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1)
+            }
+        ]
+    }
 
 -- The printings M2a adds, paired with the single keyword each must carry.
 m2aPrintings :: Cards.Cards -> [(Printing.Printing, Keyword.Keyword)]

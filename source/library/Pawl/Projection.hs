@@ -175,10 +175,12 @@ data Gathered = MkGathered
 -- membership test; a dynamic set is a Filter evaluated against the PARTIAL
 -- characteristics, so a layer-4 type change is visible to a later layer.
 -- ExcludesSource applies CR 305.2's "each other" (Opalescence does not animate
--- itself). The affected-set filter carries no perspective (no affected-set filter
--- references a player), so the View's controller is Nothing and its Context is
--- MkContext Nothing. Supertypes read from the printed type line (CR 205.4a; not
--- projected at M3c) via viewOfCharacteristics.
+-- itself). CR 109.5: an affected-set filter's "you" is the effect's SOURCE's
+-- controller (the perspective), which ControlledBy compares against the affected
+-- object's own controller (the View's controller) -- the emblem anthem's
+-- "creatures you control" is the first affected set to reference a player.
+-- Supertypes read from the printed type line (CR 205.4a; not projected at M3c)
+-- via viewOfCharacteristics.
 affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
 affects source oid a partial gs = case a of
   Affected.TheseObjects s -> Set.member oid s
@@ -186,9 +188,15 @@ affects source oid a partial gs = case a of
     let notExcluded = case exclusion of
           Exclusion.ExcludesSource -> oid /= source
           Exclusion.IncludesSource -> True
+        -- CR 109.5: "you" on a continuous effect is the effect's SOURCE's
+        -- controller; ControlledBy compares the affected object's controller to
+        -- it. controllerOf is a lean fold (owner overridden by SetController
+        -- effects) that never recurses into project, so calling it here cannot
+        -- loop.
+        perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
           && notExcluded
-          && Filter.matches (Filter.MkContext Nothing) (viewOfCharacteristics oid partial Nothing gs) f
+          && Filter.matches (Filter.MkContext perspective) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
 
 -- CR 205.4a: supertypes are read from the printed type line (no modelled effect
 -- changes a supertype). Empty when the object has no underlying card.
@@ -556,7 +564,28 @@ gather gs =
                  in map gatherOne (Card.Type.staticAbilities card)
               else []
       static_ = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
-   in stored ++ static_ ++ counterGathered gs
+      fromEmblem emblemId = case Game.lookupObject emblemId gs of
+        Nothing -> []
+        Just emblemObj -> case Game.cardOf emblemId gs of
+          Nothing -> []
+          Just card ->
+            -- CR 114.4 / 113.6: an emblem's abilities function in the command
+            -- zone. Its static ability's continuous effect shares the emblem's
+            -- entry timestamp (CR 613.7a). No liveness/text-change pass: nothing
+            -- in scope strips an emblem's abilities or rewrites land types.
+            map
+              ( \sa ->
+                  MkGathered
+                    { gSource = emblemId,
+                      gAffected = StaticAbility.affected sa,
+                      gLayer = layer (StaticAbility.modification sa),
+                      gTimestamp = Object.timestamp emblemObj,
+                      gModification = StaticAbility.modification sa
+                    }
+              )
+              (Card.Type.staticAbilities card)
+      emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
+   in stored ++ static_ ++ emblems ++ counterGathered gs
 
 -- CR 122.1a / 613.4c: a +1/+1 counter adds +1/+1 and a -1/-1 counter adds -1/-1,
 -- in layer 7c. Emit each battlefield object's counters as ONE synthetic 7c

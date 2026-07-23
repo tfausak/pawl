@@ -15,6 +15,7 @@ import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -23,6 +24,7 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Exclusion as Exclusion
 import qualified Pawl.Type.Expiry as Expiry
@@ -477,5 +479,22 @@ tests cards =
               HU.assertBool "is a land" (Set.member CardType.Land (Filter.cardTypes view))
               HU.assertBool "is basic" (Set.member Supertype.Basic (Filter.supertypes view))
               HU.assertEqual "no power off battlefield" Nothing (Filter.power view)
-              HU.assertEqual "no controller off battlefield" Nothing (Filter.controller view)
+              HU.assertEqual "no controller off battlefield" Nothing (Filter.controller view),
+      HU.testCase "CR 114.4 an emblem's anthem buffs the controller's creatures from the command zone" $
+        let (creature, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            withEmblem = S.runPure S.identityAnswer gs0 (Resolve.applyEffect creature S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard cards)))
+         in HU.assertEqual "piker is 2/1 -> 3/2" (Just 3) (Projection.powerOf creature withEmblem),
+      HU.testCase "CR 114.4 the anthem is scoped to the controller's creatures" $
+        let (mine, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            (theirs, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
+            withEmblem = S.runPure S.identityAnswer gs1 (Resolve.applyEffect mine S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard cards)))
+         in do
+              HU.assertEqual "alice's creature buffed" (Just 3) (Projection.powerOf mine withEmblem)
+              HU.assertEqual "bob's creature untouched" (Just 2) (Projection.powerOf theirs withEmblem),
+      HU.testCase "CR 114.5 the emblem survives a battlefield wipe and buffs a fresh token" $
+        let (creature, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            withEmblem = S.runPure S.identityAnswer gs0 (Resolve.applyEffect creature S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard cards)))
+            wiped = withEmblem {GameState.battlefield = mempty, GameState.objects = Map.filterWithKey (\oid _ -> Set.member oid (GameState.command withEmblem)) (GameState.objects withEmblem)}
+            (token, afterToken) = S.addCreature (Cards.pikerPrinting cards) S.alice wiped
+         in HU.assertEqual "emblem still buffs the new creature" (Just 3) (Projection.powerOf token afterToken)
     ]
