@@ -44,7 +44,18 @@
   "staticAbilities": [
     {
       "affected": {
-        "type": "AllCreatures"
+        "type": "Matching",
+        "value": {
+          "exclusion": {
+            "type": "IncludesSource"
+          },
+          "filter": {
+            "type": "HasCardType",
+            "value": {
+              "type": "Creature"
+            }
+          }
+        }
       },
       "modification": {
         "type": "LoseAllAbilities"
@@ -52,7 +63,18 @@
     },
     {
       "affected": {
-        "type": "AllCreatures"
+        "type": "Matching",
+        "value": {
+          "exclusion": {
+            "type": "IncludesSource"
+          },
+          "filter": {
+            "type": "HasCardType",
+            "value": {
+              "type": "Creature"
+            }
+          }
+        }
       },
       "modification": {
         "type": "SetBasePowerToughness",

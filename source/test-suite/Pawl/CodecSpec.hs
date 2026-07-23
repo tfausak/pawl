@@ -140,10 +140,13 @@ tests cards =
             roundTrip "m2" Codec.modificationToJson Codec.jsonToModification (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)),
           HU.testCase "ChangeSubtypeWord" $
             roundTrip "m3" Codec.modificationToJson Codec.jsonToModification (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island),
-          HU.testCase "AllCreatures" $
-            roundTrip "a1" Codec.affectedToJson Codec.jsonToAffected Affected.AllCreatures,
-          HU.testCase "TheseObjects" $
-            roundTrip "a2" Codec.affectedToJson Codec.jsonToAffected (Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1]))
+          HU.testCase "Affected round-trips (TheseObjects and Matching with both exclusions)" $
+            mapM_
+              (roundTrip "affected" Codec.affectedToJson Codec.jsonToAffected)
+              [ Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1, ObjectId.MkObjectId 2]),
+                Affected.Matching Exclusion.IncludesSource (Filter.Type.HasCardType CardType.Creature),
+                Affected.Matching Exclusion.ExcludesSource (Filter.Type.And [Filter.Type.HasCardType CardType.Enchantment, Filter.Type.Not (Filter.Type.HasSubtype Subtype.Mountain)])
+              ]
         ],
       Tasty.testGroup
         "effect"

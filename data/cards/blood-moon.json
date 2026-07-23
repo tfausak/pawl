@@ -35,7 +35,32 @@
   "staticAbilities": [
     {
       "affected": {
-        "type": "AllNonbasicLands"
+        "type": "Matching",
+        "value": {
+          "exclusion": {
+            "type": "IncludesSource"
+          },
+          "filter": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Land"
+                }
+              },
+              {
+                "type": "Not",
+                "value": {
+                  "type": "HasSupertype",
+                  "value": {
+                    "type": "Basic"
+                  }
+                }
+              }
+            ]
+          }
+        }
       },
       "modification": {
         "type": "SetLandSubtype",

@@ -24,7 +24,11 @@ import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Exclusion as Exclusion
 import qualified Pawl.Type.Expiry as Expiry
+-- Pawl.Type.Filter aliased Filter.Type: the evaluator Pawl.Filter already claims
+-- the alias Filter above (documented phase exception).
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Layer as Layer
@@ -308,7 +312,7 @@ tests cards =
             -- creatures. The grant reaches the land ONLY because the affected set
             -- is evaluated after layer 4.
             gs1 = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.AddCardType CardType.Creature) gs0
-            gs = withDynamicEffect Affected.AllCreatures (Timestamp.MkTimestamp 200) (Modification.GainKeyword Keyword.Flying) gs1
+            gs = withDynamicEffect (Affected.Matching Exclusion.IncludesSource (Filter.Type.HasCardType CardType.Creature)) (Timestamp.MkTimestamp 200) (Modification.GainKeyword Keyword.Flying) gs1
          in HU.assertBool "land gained flying because it became a creature" (Projection.hasKeyword Keyword.Flying landId gs),
       HU.testCase "CR 305.7/613.8 Blood Moon strips Urborg: Urborg is only a Mountain (Blood Moon older)" $
         let (_, urborgId, gs) = bloodMoonUrborg cards False
@@ -380,7 +384,7 @@ tests cards =
         -- applies to), so B applies first and the Piker WOULD gain Swamp. When the
         -- topological resolver lands, flip this assertion to assert the Swamp.
         let (pikerId, gs0) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
-            gsA = withDynamicEffect Affected.AllLands (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Swamp) gs0
+            gsA = withDynamicEffect (Affected.Matching Exclusion.IncludesSource (Filter.Type.HasCardType CardType.Land)) (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Swamp) gs0
             gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.AddCardType CardType.Land) gsA
          in HU.assertBool "timestamp-only: no Swamp yet (known-incomplete, tracked)" (not (Set.member Subtype.Swamp (Projection.subtypesOf pikerId gs))),
       HU.testCase "CR 614: Rest in Peace projects its graveyard->exile replacement" $

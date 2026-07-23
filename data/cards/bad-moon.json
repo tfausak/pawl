@@ -35,9 +35,28 @@
   "staticAbilities": [
     {
       "affected": {
-        "type": "CreaturesOfColor",
+        "type": "Matching",
         "value": {
-          "type": "Black"
+          "exclusion": {
+            "type": "IncludesSource"
+          },
+          "filter": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
+              },
+              {
+                "type": "HasColor",
+                "value": {
+                  "type": "Black"
+                }
+              }
+            ]
+          }
         }
       },
       "modification": {

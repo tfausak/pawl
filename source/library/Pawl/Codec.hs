@@ -923,22 +923,28 @@ withValue mv f = case mv of
 affectedToJson :: Affected.Affected -> Value
 affectedToJson a = case a of
   Affected.TheseObjects ids -> Json.tagged (Text.pack "TheseObjects") (Just (setTo objectIdToJson ids))
-  Affected.AllCreatures -> nullary (Text.pack "AllCreatures")
-  Affected.AllLands -> nullary (Text.pack "AllLands")
-  Affected.AllNonbasicLands -> nullary (Text.pack "AllNonbasicLands")
-  Affected.OtherNonAuraEnchantments -> nullary (Text.pack "OtherNonAuraEnchantments")
-  Affected.CreaturesOfColor c -> Json.tagged (Text.pack "CreaturesOfColor") (Just (colorToJson c))
+  Affected.Matching exclusion f ->
+    Json.tagged
+      (Text.pack "Matching")
+      ( Just
+          ( Object
+              [ (Text.pack "exclusion", exclusionToJson exclusion),
+                (Text.pack "filter", filterToJson f)
+              ]
+          )
+      )
 
 jsonToAffected :: Value -> Either Text Affected.Affected
 jsonToAffected value = do
   (t, mv) <- Json.tag value
   case Text.unpack t of
     "TheseObjects" -> withValue mv (fmap Affected.TheseObjects . setFrom jsonToObjectId)
-    "AllCreatures" -> Right Affected.AllCreatures
-    "AllLands" -> Right Affected.AllLands
-    "AllNonbasicLands" -> Right Affected.AllNonbasicLands
-    "OtherNonAuraEnchantments" -> Right Affected.OtherNonAuraEnchantments
-    "CreaturesOfColor" -> withValue mv (fmap Affected.CreaturesOfColor . jsonToColor)
+    "Matching" ->
+      withValue mv $ \v -> do
+        ps <- Json.asObject v
+        exclusion <- Json.field (Text.pack "exclusion") ps >>= jsonToExclusion
+        f <- Json.field (Text.pack "filter") ps >>= jsonToFilter
+        pure (Affected.Matching exclusion f)
     _ -> Left (Text.pack "unknown Affected: " <> t)
 
 recipientToJson :: Recipient.Recipient -> Value

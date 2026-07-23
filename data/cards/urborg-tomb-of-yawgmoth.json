@@ -21,7 +21,18 @@
   "staticAbilities": [
     {
       "affected": {
-        "type": "AllLands"
+        "type": "Matching",
+        "value": {
+          "exclusion": {
+            "type": "IncludesSource"
+          },
+          "filter": {
+            "type": "HasCardType",
+            "value": {
+              "type": "Land"
+            }
+          }
+        }
       },
       "modification": {
         "type": "AddLandSubtype",

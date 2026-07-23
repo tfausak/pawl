@@ -44,7 +44,18 @@
   "staticAbilities": [
     {
       "affected": {
-        "type": "OtherNonAuraEnchantments"
+        "type": "Matching",
+        "value": {
+          "exclusion": {
+            "type": "ExcludesSource"
+          },
+          "filter": {
+            "type": "HasCardType",
+            "value": {
+              "type": "Enchantment"
+            }
+          }
+        }
       },
       "modification": {
         "type": "AddCardType",
@@ -55,7 +66,18 @@
     },
     {
       "affected": {
-        "type": "OtherNonAuraEnchantments"
+        "type": "Matching",
+        "value": {
+          "exclusion": {
+            "type": "ExcludesSource"
+          },
+          "filter": {
+            "type": "HasCardType",
+            "value": {
+              "type": "Enchantment"
+            }
+          }
+        }
       },
       "modification": {
         "type": "SetBasePowerToughness",

@@ -18,6 +18,7 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.Exclusion as Exclusion
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Keyword (Keyword)
@@ -158,8 +159,8 @@ addPT base delta = case (base, delta) of
   (Just b, Nothing) -> Just b
   (Nothing, _) -> Nothing
 
--- A continuous effect ready to fold: its source (for OtherNonAuraEnchantments
--- self-exclusion), the set it affects, its layer, its timestamp, and the
+-- A continuous effect ready to fold: its source (for the Matching ExcludesSource
+-- self-exclusion, CR 305.2), the set it affects, its layer, its timestamp, and the
 -- modification. Projection-internal; not a domain type.
 data Gathered = MkGathered
   { gSource :: ObjectId,
@@ -170,27 +171,24 @@ data Gathered = MkGathered
   }
 
 -- CR 611.2c / 613: does the effect from `source` apply to `oid`, given the
--- partial projection built by the layers below this one? Fixed sets are a
--- membership test; dynamic sets read the PARTIAL type line, so a layer-4 type
--- change is visible to a later layer. Supertype (nonbasic) is read from the
--- printed type line -- no effect changes a supertype at M3c.
+-- PARTIAL projection built by the layers below this one? A fixed set is a
+-- membership test; a dynamic set is a Filter evaluated against the PARTIAL
+-- characteristics, so a layer-4 type change is visible to a later layer.
+-- ExcludesSource applies CR 305.2's "each other" (Opalescence does not animate
+-- itself). The affected-set filter carries no perspective (no affected-set filter
+-- references a player), so the View's controller is Nothing and its Context is
+-- MkContext Nothing. Supertypes read from the printed type line (CR 205.4a; not
+-- projected at M3c) via viewOfCharacteristics.
 affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
-affects source oid a partial gs =
-  let onBattlefield = Set.member oid (GameState.battlefield gs)
-      hasType t = Set.member t (PC.cardTypes partial)
-   in case a of
-        Affected.TheseObjects s -> Set.member oid s
-        Affected.AllCreatures -> onBattlefield && hasType CardType.Creature
-        Affected.AllLands -> onBattlefield && hasType CardType.Land
-        Affected.AllNonbasicLands -> onBattlefield && hasType CardType.Land && not (isBasic oid gs)
-        Affected.OtherNonAuraEnchantments -> onBattlefield && oid /= source && hasType CardType.Enchantment
-        Affected.CreaturesOfColor c ->
-          onBattlefield && hasType CardType.Creature && Set.member c (PC.colors partial)
-
--- CR 205.4a: a basic land is one with the Basic supertype. Read from the printed
--- type line via printedSupertypes (supertypes are not projected at M3c).
-isBasic :: ObjectId -> GameState -> Bool
-isBasic oid gs = Set.member Supertype.Basic (printedSupertypes oid gs)
+affects source oid a partial gs = case a of
+  Affected.TheseObjects s -> Set.member oid s
+  Affected.Matching exclusion f ->
+    let notExcluded = case exclusion of
+          Exclusion.ExcludesSource -> oid /= source
+          Exclusion.IncludesSource -> True
+     in Set.member oid (GameState.battlefield gs)
+          && notExcluded
+          && Filter.matches (Filter.MkContext Nothing) (viewOfCharacteristics oid partial Nothing gs) f
 
 -- CR 205.4a: supertypes are read from the printed type line (no modelled effect
 -- changes a supertype). Empty when the object has no underlying card.
