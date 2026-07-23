@@ -79,7 +79,7 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   not an effect. See §1 of the M2a spec before "fixing" this.
 - **Outstanding work is tracked in GitHub Issues** (`tfausak/pawl`). List with
   `gh issue list`; create with `gh issue create`; close with `gh issue close`.
-  Milestones are the unlanded phases (`M4.5 P6`…`P11`, `M5`–`M7`); the useful
+  Milestones are the unlanded phases (`M4.5 P11`, `M5`–`M7`); the useful
   labels are `elision`, `gap`, `rules-correctness`, `bug`, and the two expiry
   triggers `expires:milestone` and `expires:card-driven` — roughly half of
   pawl's deferrals fire when a *card* demands them and have no scheduled date,
