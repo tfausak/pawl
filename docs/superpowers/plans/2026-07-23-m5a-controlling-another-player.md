@@ -73,7 +73,7 @@ The headline gate (CR 723.1 / 723.3). Alice activates a **real** Mindslaver thro
 - Consumes: `Engine.runGamePure`, `Engine.priorityLoop`, `Engine.handoffTurn`, `Setup.emptyGame`, `S.addCreature`, `Cards.mindslaverPrinting`, `Cards.mountainPrinting`, `handBobBolt`, `isCastAction`, `slaveAnswer`, `Decide.deciderFor`, `GameState.{pendingControl,activeControl,activePlayer}`, `Decider.MkDecider`.
 - Produces (used by Tasks 2 & 4): `isActivateAction :: A.Action -> Bool`; `gateAnswer :: Prompt.Prompt r -> r`.
 
-- [ ] **Step 1: Add the `Decide` import**
+- [x] **Step 1: Add the `Decide` import**
 
 In the import group of `source/test-suite/Pawl/GameSpec.hs` (alphabetically near the other `Pawl.*` imports, e.g. just after `import qualified Pawl.Cost as Cost` on line 18), add:
 
@@ -81,7 +81,7 @@ In the import group of `source/test-suite/Pawl/GameSpec.hs` (alphabetically near
 import qualified Pawl.Decide as Decide
 ```
 
-- [ ] **Step 2: Add the activation helper and the gate answerer**
+- [x] **Step 2: Add the activation helper and the gate answerer**
 
 Append these two top-level definitions to `source/test-suite/Pawl/GameSpec.hs` (put them next to `slaveAnswer`, after line 437):
 
@@ -116,7 +116,7 @@ gateAnswer p = case p of
   _ -> slaveAnswer p
 ```
 
-- [ ] **Step 3: Add the gate test case to `ruleTests`**
+- [x] **Step 3: Add the gate test case to `ruleTests`**
 
 Insert this test into the `ruleTests` list in `source/test-suite/Pawl/GameSpec.hs`. Add a comma after the existing final element (the `"CR 723.3/723.5 ..."` case that currently ends the list at line 359, before the closing `]` on line 360), then add:
 
@@ -170,7 +170,7 @@ Insert this test into the `ruleTests` list in `source/test-suite/Pawl/GameSpec.h
               HU.assertEqual "active control cleared after bob's turn" Nothing (GameState.activeControl afterBob)
 ```
 
-- [ ] **Step 4: Build and run the gate test — expect PASS**
+- [x] **Step 4: Build and run the gate test — expect PASS**
 
 ```
 cabal build all --enable-tests --enable-benchmarks
@@ -178,7 +178,7 @@ cabal test --test-options='-p "$0~/Mindslaver hands alice bob/"'
 ```
 Expected: **PASS.** The substrate is already correct, so this characterization gate passes on first run. If it **fails**, the substrate has a real bug — STOP, do not weaken the test, investigate the control path (`deciderFor`, `handoffTurn`, the `ControlPlayerNextTurn` arm). A gate failing against supposedly-correct code is a genuine finding, not a test to relax.
 
-- [ ] **Step 5: Falsification check — prove the gate has teeth**
+- [x] **Step 5: Falsification check — prove the gate has teeth**
 
 Temporarily make control a no-op to confirm the gate actually exercises it. In `source/library/Pawl/Decide.hs`, change the body of `deciderFor` to ignore `activeControl`:
 
@@ -191,7 +191,7 @@ Expected: **FAIL** — with control neutered, alice never gets bob's `ChooseActi
 
 Then **revert** `Decide.hs` exactly (restore the two-line `case GameState.activeControl gs of ...` body) and re-run: expected **PASS**. Confirm `git diff source/library/Pawl/Decide.hs` is empty.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -215,7 +215,7 @@ CR 723.5's second example: "The controller of another player decides which of th
 - Consumes: `S.combatBoardOf`, `S.runCombat`, `S.lifeOf`, `slaveAnswer`, `Decider.MkDecider`, `GameState.{activePlayer,activeControl}`, `Prompt.{DeclareAttackers,AssignCombatDamage}`.
 - Produces: `controlCombatAnswer :: Prompt.Prompt r -> r`.
 
-- [ ] **Step 1: Add the combat answerer**
+- [x] **Step 1: Add the combat answerer**
 
 Append to `source/test-suite/Pawl/GameSpec.hs` (near the other answerers):
 
@@ -237,7 +237,7 @@ controlCombatAnswer p = case p of
   _ -> slaveAnswer p
 ```
 
-- [ ] **Step 2: Add the combat test case to `ruleTests`**
+- [x] **Step 2: Add the combat test case to `ruleTests`**
 
 Add (comma-separated) into `ruleTests`:
 
@@ -256,7 +256,7 @@ Add (comma-separated) into `ruleTests`:
          in HU.assertEqual "alice took 2 from bob's Piker, declared by alice-as-bob" (Just 18) (S.lifeOf S.alice after)
 ```
 
-- [ ] **Step 3: Build and run — expect PASS**
+- [x] **Step 3: Build and run — expect PASS**
 
 ```
 cabal build all --enable-tests --enable-benchmarks
@@ -264,11 +264,11 @@ cabal test --test-options='-p "$0~/alice declares bob.s attackers/"'
 ```
 Expected: **PASS.** If it fails, investigate combat's use of `deciderFor` in `Pawl.Combat` (`Combat.hs:191,219`) — do not weaken the test.
 
-- [ ] **Step 4: Falsification check**
+- [x] **Step 4: Falsification check**
 
 In `source/library/Pawl/Decide.hs`, neuter `deciderFor` as in Task 1 Step 5 (`deciderFor pid _gs = Decider.MkDecider pid`). Run the test: expected **FAIL** (attackers prompt now carries Decider = bob → `[]` → no attack → alice stays 20). Revert `Decide.hs`, re-run: expected **PASS**, `git diff` empty.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -294,7 +294,7 @@ CR 723.1a: "Multiple player-controlling effects that affect the same player over
 
 > **Before writing:** confirm `ResolveSpec.hs` already imports the constructors above by reading its import list and the existing installation test (lines ~527–565). It does — that test builds exactly this ability. If any import is missing, add it aliased to the last component.
 
-- [ ] **Step 1: Add the `installControlBy` helper**
+- [x] **Step 1: Add the `installControlBy` helper**
 
 Append to `source/test-suite/Pawl/ResolveSpec.hs` (top level, near the existing 723 test's helpers). The `Object.owner` is the resolving ability's controller (`Resolve.hs:368` uses `effectController = Object.owner obj`), so setting `owner = controller` installs `MkDecider controller`:
 
@@ -339,7 +339,7 @@ installControlBy controller target gs0 =
 
 > **Note:** `cards0` is whatever the surrounding test binds the loaded `Cards.Cards` to. In `ResolveSpec`, the tests are parameterized by a `cards` argument threaded from `tests :: Cards.Cards -> Tasty.TestTree`. Define `installControlBy` **inside** the relevant `let`/`where` of the test group so `cards` is in scope, or add a `Cards.Cards` parameter: `installControlBy :: Cards.Cards -> PlayerId -> PlayerId -> GameState -> GameState`. Prefer the explicit parameter (`installControlBy cards controller target gs0`) and pass `cards` at each call — it keeps the helper top-level and matches the file's other `cards`-taking helpers. Adjust the signature and the `Cards.mindslaverPrinting cards` reference accordingly. Verify `Object`, `TapState`, `Sickness`, `Set`, `Seq`, `Nothing` are imported (they are, in the existing installation test).
 
-- [ ] **Step 2: Add the overwrite test case**
+- [x] **Step 2: Add the overwrite test case**
 
 Add (comma-separated) into the same `testGroup` list that holds the existing 723.1 installation test in `ResolveSpec.hs`:
 
@@ -357,7 +357,7 @@ Add (comma-separated) into the same `testGroup` list that holds the existing 723
 
 > If `installControlBy` was kept parameterless per the `let`-scoped variant, drop the `cards` argument at both call sites.
 
-- [ ] **Step 3: Build and run — expect PASS**
+- [x] **Step 3: Build and run — expect PASS**
 
 ```
 cabal build all --enable-tests --enable-benchmarks
@@ -365,7 +365,7 @@ cabal test --test-options='-p "$0~/a second player-controlling effect overwrites
 ```
 Expected: **PASS** — `Map.insert` overwrites, and the second resolution is the last-created.
 
-- [ ] **Step 4: Falsification check**
+- [x] **Step 4: Falsification check**
 
 In `source/library/Pawl/Resolve.hs`, temporarily change the `ControlPlayerNextTurn` arm (line ~517) from `Map.insert` to insert-only-if-absent, so a second effect would NOT overwrite:
 
@@ -375,7 +375,7 @@ gs {GameState.pendingControl = Map.insertWith (\_new old -> old) target (Decider
 
 Run the test: expected **FAIL** (the first effect's alice would wrongly survive). This proves the test pins the overwrite semantics. **Revert** to the original `Map.insert ...` line, re-run: expected **PASS**, `git diff source/library/Pawl/Resolve.hs` empty.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -399,7 +399,7 @@ CR 723.5a: "The controller of another player can use only that player's resource
 - Consumes: `Setup.emptyGame`, `S.addCreature`, `Cards.mountainPrinting`, `handBobBolt`, `slaveAnswer`, `Engine.{runGamePure,priorityLoop}`, `GameState.{activePlayer,phase,priority,activeControl}`, `Decider.MkDecider`.
 - Produces: nothing new.
 
-- [ ] **Step 1: Add the resource-isolation test to `ruleTests`**
+- [x] **Step 1: Add the resource-isolation test to `ruleTests`**
 
 Add (comma-separated) into `ruleTests`:
 
@@ -427,7 +427,7 @@ Add (comma-separated) into `ruleTests`:
               HU.assertEqual "CR 723.5a: alice's hand is untouched" 0 (S.handSize S.alice after)
 ```
 
-- [ ] **Step 2: Build and run — expect PASS**
+- [x] **Step 2: Build and run — expect PASS**
 
 ```
 cabal build all --enable-tests --enable-benchmarks
@@ -435,11 +435,11 @@ cabal test --test-options='-p "$0~/spends only the controlled player.s resources
 ```
 Expected: **PASS** — `Mana.payCost S.bob` only ever taps bob's Mountain.
 
-- [ ] **Step 3: Falsification check**
+- [x] **Step 3: Falsification check**
 
 Confirm the negative assertion has teeth: temporarily change the test's cast target-payer would require an engine change, so instead verify by a data mutation — temporarily give alice's Mountain to bob is not it; simplest teeth check is to flip the assertion's expected value to `1` for alice's Mountain and confirm the test then **fails** (proving `tappedCount S.alice` is genuinely read and is `0`). Concretely: change `HU.assertEqual "CR 723.5a: alice's Mountain is untouched" 0` to `... 1`, run, see **FAIL**, then restore `0`, run, see **PASS**. (No library file is touched in this check; revert leaves `git diff` empty for `source/library`.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -462,7 +462,7 @@ CR 723.6: "The controller of another player can't make that player concede." Con
 
 **Interfaces:** none (comment + issue only).
 
-- [ ] **Step 1: File the deferral issue**
+- [x] **Step 1: File the deferral issue**
 
 Run (adjust wording only if a near-duplicate already exists — check `gh issue list --search "concede"` first):
 
@@ -486,7 +486,7 @@ Code-site guard: an inline note at Engine.priorityLoop's ChooseAction site cites
 
 Record the issue number `N` printed by the command; you need it for Step 2.
 
-- [ ] **Step 2: Add the inline guard comment in `Engine.hs`**
+- [x] **Step 2: Add the inline guard comment in `Engine.hs`**
 
 In `source/library/Pawl/Engine.hs`, immediately above line 405 (`let decider = Decide.deciderFor p gs` inside `priorityLoop`), add (replace `#N` with the issue number from Step 1):
 
@@ -500,14 +500,14 @@ In `source/library/Pawl/Engine.hs`, immediately above line 405 (`let decider = D
 
 (Match the existing indentation of the `let` — it sits inside the `Just p -> do` block.)
 
-- [ ] **Step 3: Build — expect warning-clean**
+- [x] **Step 3: Build — expect warning-clean**
 
 ```
 cabal build all --enable-tests --enable-benchmarks
 ```
 Expected: compiles clean (a comment cannot change behavior; this confirms indentation/placement did not break the layout).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -527,7 +527,7 @@ Land the phase per `docs/workflow.md`: full warning-clean build, full test suite
 **Files:**
 - Modify: `docs/progress.md` (append the M5a entry), `CLAUDE.md` (replace the status bullet), `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md` (tick M5a in the §3 table).
 
-- [ ] **Step 1: Definitive warning-clean build**
+- [x] **Step 1: Definitive warning-clean build**
 
 ```
 cabal clean
@@ -535,21 +535,21 @@ cabal build all --enable-tests --enable-benchmarks
 ```
 Expected: **no warnings, no errors** (clean build defeats incremental warning-hiding).
 
-- [ ] **Step 2: Full test suite green**
+- [x] **Step 2: Full test suite green**
 
 ```
 cabal test
 ```
 Expected: **all pass**, including the four new cases (Tasks 1–4). Do not proceed if anything is red.
 
-- [ ] **Step 3: Invariant + rules audit**
+- [x] **Step 3: Invariant + rules audit**
 
 Confirm by inspection (record findings in the commit body if anything is notable):
 - The engine core still never cases on Mindslaver's identity — 723 remains a `Decider` swap at `Decide.deciderFor`; the only new identity-casing is in **test** answerers (`isActivateAction` matches the `Activate` shape, not Mindslaver), which the invariant permits.
 - No prompt was elided: every controlled choice flowed through `ChooseAction`/`ChooseTargets`/`DeclareAttackers` to the controller's `Decider`.
 - Re-verify the CR numbers cited in the new comments/tests against `docs/rules.txt` (723.1 line 6159, 723.1a 6161, 723.3 6167, 723.5 6172, 723.5a 6176, 723.6 6182; 104.3a line 340). Delegate this to a cheap model if using subagents (Haiku, per `docs/workflow.md`).
 
-- [ ] **Step 4: Append the M5a completion entry to `docs/progress.md`**
+- [x] **Step 4: Append the M5a completion entry to `docs/progress.md`**
 
 Add after the M4.5 P11 entry (matching the surrounding bullet style):
 
@@ -583,7 +583,7 @@ Add after the M4.5 P11 entry (matching the surrounding bullet style):
 
 Replace `#N` with the Task 5 issue number.
 
-- [ ] **Step 5: Replace the `CLAUDE.md` status bullet**
+- [x] **Step 5: Replace the `CLAUDE.md` status bullet**
 
 In `CLAUDE.md`, the "Current work and tracking" first bullet currently ends "**M5 is the next milestone to plan.**" Update the status to reflect M5a landed and M5b next. Replace the final sentence(s) of that bullet — keep the M0–M4.5 history summary, but change the tail from the M4.5-complete framing to note M5 is underway with M5a done. Concretely, append/replace so it reads (adjust to fit the existing sentence flow — **replace, do not append a second status bullet**):
 
@@ -596,11 +596,11 @@ In `CLAUDE.md`, the "Current work and tracking" first bullet currently ends "**M
 
 Keep the existing pointers to `docs/progress.md` and the umbrella spec intact. Replace `#N`.
 
-- [ ] **Step 6: Tick M5a in the umbrella spec**
+- [x] **Step 6: Tick M5a in the umbrella spec**
 
 In `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`, mark the **M5a** row of the §3 phase table (line ~101) as landed — prefix the phase cell with a check, e.g. change `| **M5a** |` to `| **M5a ✅** |`, so the table shows the phase is done (per §6: "record its completion entry in docs/progress.md and tick the phase here").
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -611,7 +611,7 @@ git add -A
 git commit -m "docs(m5a): completion entry, CLAUDE.md status, umbrella tick"
 ```
 
-- [ ] **Step 8: Confirm the plan is fully executed**
+- [x] **Step 8: Confirm the plan is fully executed**
 
 ```
 grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-23-m5a-controlling-another-player.md
