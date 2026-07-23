@@ -1,9 +1,9 @@
 module Pawl.Type.Effect where
 
 import Pawl.Type.AbilityName (AbilityName)
-import Pawl.Type.CardCriterion (CardCriterion)
 import Pawl.Type.CounterKind (CounterKind)
 import Pawl.Type.Duration (Duration)
+import Pawl.Type.Filter (Filter)
 import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.Modification (Modification)
 import Pawl.Type.PlayerEffect (PlayerEffect)
@@ -44,10 +44,13 @@ data Effect card
     -- payment (CR 605.3b: a mana ability never uses the stack); Resolve.applyEffect
     -- never runs it. Read by Resolve.manaProduced (the "produces mana?" ABI bit).
     AddMana ManaType
-  | -- CR 701.23: search the controller's library for a card matching the
-    -- criterion, put it onto the battlefield tapped, then shuffle (Evolving
-    -- Wilds' exact shape; destination/tapped are baked in for now).
-    Search CardCriterion
+  | -- CR 701.23: search the controller's library for a card matching the Filter,
+    -- put it onto the battlefield tapped, then shuffle (Evolving Wilds' exact
+    -- shape; destination/tapped are baked in for now). The Filter is evaluated
+    -- over the PRINTED-card view (Projection.viewOfCard) -- a card in a library
+    -- has no projection. Evolving Wilds' "basic land card" (CR 701.23a / 205.4c)
+    -- is `And [HasCardType Land, HasSupertype Basic]`.
+    Search Filter
   | -- CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk (Rest in Peace's exact shape); a general exile-from-zone is future.
     ExileAllGraveyards

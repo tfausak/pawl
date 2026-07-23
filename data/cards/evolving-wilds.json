@@ -19,7 +19,21 @@
               {
                 "type": "Search",
                 "value": {
-                  "type": "BasicLandCard"
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    },
+                    {
+                      "type": "HasSupertype",
+                      "value": {
+                        "type": "Basic"
+                      }
+                    }
+                  ]
                 }
               }
             ],

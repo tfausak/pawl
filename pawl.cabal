@@ -99,7 +99,6 @@ library
     Pawl.Type.Binding
     Pawl.Type.CandidateId
     Pawl.Type.Card
-    Pawl.Type.CardCriterion
     Pawl.Type.CardType
     Pawl.Type.CastingPermission
     Pawl.Type.Color

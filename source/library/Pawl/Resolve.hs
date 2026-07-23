@@ -14,6 +14,7 @@ import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
@@ -25,8 +26,6 @@ import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CardCriterion as CardCriterion
-import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -52,10 +51,8 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Subtype (Subtype)
-import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TapState as TapState
 import Pawl.Type.TargetSpec (TargetSpec)
-import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 
 -- THE ONE LEGITIMATE HOME of `case effect of`: this module is the VM's opcode
@@ -172,14 +169,6 @@ searchesLibrary effect = case effect of
   Effect.GainControl _ _ -> False
   Effect.ArmDelayedTrigger _ -> False
   Effect.AffectPlayers {} -> False
-
--- CR 701.23a / 205.4c: does this card match the search criterion? BasicLandCard =
--- a Land with the Basic supertype.
-matchesCriterion :: CardCriterion.CardCriterion -> Card.Type.Card -> Bool
-matchesCriterion crit card = case crit of
-  CardCriterion.BasicLandCard ->
-    Set.member CardType.Land (TypeLine.types (Card.Type.typeLine card))
-      && Set.member Supertype.Basic (TypeLine.supertypes (Card.Type.typeLine card))
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -463,10 +452,14 @@ applyEffect source controller bound legality chosen effect = case effect of
   -- Mana.tapForMana at payment, never here. Reaching this arm means a mana ability
   -- was wrongly put on the stack -- an isManaAbility classification bug.
   Effect.AddMana _ -> pure ()
-  Effect.Search crit ->
-    let matches1 g oid = case Game.cardOf oid g of
+  Effect.Search filter_ ->
+    -- CR 701.23a: match each library card through the PRINTED-card view -- a card
+    -- in a library has no projection. The context has no perspective (CR 109.5): a
+    -- search filter never references a player, so ControlledBy is vacuously False.
+    let searchContext = Filter.MkContext Nothing
+        matches1 g oid = case Game.cardOf oid g of
           Nothing -> False
-          Just card -> matchesCriterion crit card
+          Just card -> Filter.matches searchContext (Projection.viewOfCard card) filter_
      in do
           gs <- State.get
           let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)

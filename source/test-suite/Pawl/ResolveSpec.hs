@@ -29,7 +29,6 @@ import qualified Pawl.Target as Target
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Cost as Cost.Type
@@ -71,6 +70,7 @@ import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Timestamp as Timestamp
@@ -447,7 +447,7 @@ resolveTests cards =
             ability =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search CardCriterion.BasicLandCard]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj =
@@ -461,13 +461,37 @@ resolveTests cards =
       HU.testCase "CR 701.23b Search may fail to find" $
         let base = Setup.emptyGame S.bothPlayers
             (_, g1) = S.addLibraryCard (Cards.mountainPrinting cards) S.alice base
-            ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search CardCriterion.BasicLandCard]) Map.empty)) (ModeSelection.ChooseExactly 1))
+            ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty ts
             g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
             resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
          in HU.assertEqual "nothing entered the battlefield" Set.empty (GameState.battlefield resolved),
+      HU.testCase "CR 701.23a Search (And [HasCardType Land, HasSupertype Basic]) offers a basic land, not a nonland" $
+        -- P9: the Search filter reads each library card through the PRINTED-card
+        -- view (Projection.viewOfCard) -- a card in a library has no projection.
+        -- With a Mountain (basic land) and a Piker (creature) both in the library,
+        -- only the Mountain is a candidate: findFirst fetches it while the Piker
+        -- stays put. The Piker is added SECOND, so it is the head of the library
+        -- (Support.addLibraryCard prepends); a filter that matched everything would
+        -- fetch the Piker and this test would fail.
+        let base = Setup.emptyGame S.bothPlayers
+            (_, g0) = S.addLibraryCard (Cards.mountainPrinting cards) S.alice base
+            (pikerId, g1) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice g0
+            ability =
+              ActivatedAbility.MkActivatedAbility
+                (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (abilId, g2) = Game.freshObjectId g1
+            (ts, g3) = Game.freshTimestamp g2
+            abilObj =
+              Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty ts
+            g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
+            resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
+         in do
+              HU.assertEqual "the basic land is offered and fetched to the battlefield" 1 (S.countOnBattlefieldByName (Text.pack "Mountain") S.alice resolved)
+              HU.assertBool "the nonland is not offered -- it remains in the library" (elem pikerId (Game.zoneMembers Zone.Library S.alice resolved)),
       HU.testCase "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $
         let g0 = Setup.emptyGame S.bothPlayers
             (ripId, g1) = S.addCreature (Cards.restInPeacePrinting cards) S.alice g0
@@ -561,6 +585,16 @@ resolveTests cards =
               HU.assertEqual "combat damage prevented (the cancel shape)" (Just 0) (S.damageOf victim combat)
               -- The falsifier: a tag-blind Fog would also blunt this spell damage.
               HU.assertEqual "spell damage untouched (Noncombat)" (Just 2) (S.damageOf victim spell)
+    ]
+
+-- CR 205.4c / 701.23a: a basic land card is one with the Land card type and the
+-- Basic supertype -- Evolving Wilds' search filter, the printed-card predicate
+-- that replaced CardCriterion.BasicLandCard.
+basicLandFilter :: Filter.Type.Filter
+basicLandFilter =
+  Filter.Type.And
+    [ Filter.Type.HasCardType CardType.Land,
+      Filter.Type.HasSupertype Supertype.Basic
     ]
 
 findFirst :: Prompt.Prompt r -> r

@@ -22,7 +22,6 @@ import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Binding as Binding
 import qualified Pawl.Type.Card as CardT
-import qualified Pawl.Type.CardCriterion as CardCriterion
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
@@ -819,16 +818,6 @@ jsonToCastingPermission =
     (Text.pack "CastingPermission")
     [(Text.pack "CastFromLibraryWhileSearching", CastingPermission.CastFromLibraryWhileSearching)]
 
-cardCriterionToJson :: CardCriterion.CardCriterion -> Value
-cardCriterionToJson c = nullary . Text.pack $ case c of
-  CardCriterion.BasicLandCard -> "BasicLandCard"
-
-jsonToCardCriterion :: Value -> Either Text CardCriterion.CardCriterion
-jsonToCardCriterion =
-  decodeNullary
-    (Text.pack "CardCriterion")
-    [(Text.pack "BasicLandCard", CardCriterion.BasicLandCard)]
-
 -- Newtypes -------------------------------------------------------------------
 
 slotNameToJson :: SlotName.SlotName -> Value
@@ -1138,7 +1127,7 @@ effectToJson e = case e of
   Effect.ModifyTarget d m s -> Json.tagged (Text.pack "ModifyTarget") (Just (Array [durationToJson d, modificationToJson m, slotNameToJson s]))
   Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (slotNameToJson s))
   Effect.AddMana mt -> Json.tagged (Text.pack "AddMana") (Just (manaTypeToJson mt))
-  Effect.Search c -> Json.tagged (Text.pack "Search") (Just (cardCriterionToJson c))
+  Effect.Search f -> Json.tagged (Text.pack "Search") (Just (filterToJson f))
   Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
   Effect.Destroy s -> Json.tagged (Text.pack "Destroy") (Just (slotNameToJson s))
@@ -1169,7 +1158,7 @@ jsonToEffect value = do
       _ -> Left (Text.pack "ModifyTarget expects [duration, modification, slot]")
     "ChangeText" -> withValue mv (fmap Effect.ChangeText . jsonToSlotName)
     "AddMana" -> withValue mv (fmap Effect.AddMana . jsonToManaType)
-    "Search" -> withValue mv (fmap Effect.Search . jsonToCardCriterion)
+    "Search" -> withValue mv (fmap Effect.Search . jsonToFilter)
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
     "Destroy" -> withValue mv (fmap Effect.Destroy . jsonToSlotName)
