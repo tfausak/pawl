@@ -9,15 +9,18 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -153,7 +156,63 @@ restartTests cards =
               HU.assertEqual "alice's library holds the remaining owned card" 1 (libSize S.alice)
               HU.assertEqual "bob's library holds the remaining owned card" 1 (libSize S.bob)
               HU.assertEqual "the battlefield is empty after the rebuild" True (Set.null (GameState.battlefield after))
-              HU.assertEqual "every rebuilt object is owned by alice or bob (ownership preserved)" True (all (\o -> Object.owner o == S.alice || Object.owner o == S.bob) (Map.elems (GameState.objects after)))
+              HU.assertEqual "every rebuilt object is owned by alice or bob (ownership preserved)" True (all (\o -> Object.owner o == S.alice || Object.owner o == S.bob) (Map.elems (GameState.objects after))),
+      HU.testCase "CR 727.1a: the starting player is the restart's controller, at the head of the turn order" $
+        -- Two restarts of the same board, controlled by different players: the
+        -- active player and the head of the turn order follow the controller.
+        let g0 = addMany cards 8 S.bob (addMany cards 8 S.alice (Setup.emptyGame S.bothPlayers))
+            byBob = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.bob))
+            byAlice = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.alice))
+         in do
+              HU.assertEqual "bob restarted: bob is the new active player" S.bob (GameState.activePlayer byBob)
+              HU.assertEqual "bob restarted: bob heads the turn order" (Just S.bob) (Maybe.listToMaybe (GameState.turnOrder byBob))
+              HU.assertEqual "alice restarted: alice is the new active player" S.alice (GameState.activePlayer byAlice)
+              HU.assertEqual "alice restarted: alice heads the turn order" (Just S.alice) (Maybe.listToMaybe (GameState.turnOrder byAlice)),
+      HU.testCase "CR 727.2: every owned card returns to its owner (library or hand), regardless of prior zone" $
+        -- alice owns 8 cards, one on the battlefield; bob owns 8, one moved to his
+        -- graveyard. CR 400.7 gives drawn cards FRESH ids (Event.changeZone mints a
+        -- new object on a zone change), so a specific pre-restart ObjectId need not
+        -- survive an opening draw -- CR 727.2 preserves OWNERSHIP, not object ids.
+        -- Assert on per-owner counts: after the restart every owned card is in that
+        -- owner's library or hand, none on the battlefield or in a graveyard, and
+        -- bob's graveyard card is proven to return by his count staying 8.
+        let g0 = Setup.emptyGame S.bothPlayers
+            (_aId, g1) = S.addCreature (Cards.mountainPrinting cards) S.alice g0
+            (bId, g2) = S.addCreature (Cards.mountainPrinting cards) S.bob g1
+            g3 = addMany cards 7 S.alice (addMany cards 7 S.bob g2)
+            -- move bob's card to his graveyard, to prove zone-independence.
+            g4 = snd (Engine.runGamePure S.identityAnswer g3 (Event.changeZone bId Zone.Graveyard))
+            after = snd (Engine.runGamePure S.identityAnswer g4 (Setup.restartGame S.alice))
+            ownedCount pid = length (filter (\o -> Object.owner o == pid) (Map.elems (GameState.objects after)))
+            libHandCount pid = length (Game.zoneMembers Zone.Library pid after) + length (Game.zoneMembers Zone.Hand pid after)
+         in do
+              HU.assertEqual "alice still owns all 8 of her cards" 8 (ownedCount S.alice)
+              HU.assertEqual "bob still owns all 8 of his cards (incl. the one from his graveyard)" 8 (ownedCount S.bob)
+              HU.assertEqual "all of alice's cards are in her library or hand" 8 (libHandCount S.alice)
+              HU.assertEqual "all of bob's cards are in his library or hand" 8 (libHandCount S.bob)
+              HU.assertEqual "no card is left on the battlefield" True (Set.null (GameState.battlefield after))
+              HU.assertEqual "no graveyard survives the restart" True (all null (Map.elems (GameState.graveyard after))),
+      HU.testCase "CR 727.4: the restart settles just before the first untap step, no priority, turn 1, life reset" $
+        let g0 = addMany cards 8 S.bob (addMany cards 8 S.alice (Setup.emptyGame S.bothPlayers))
+            after = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.bob))
+         in do
+              HU.assertEqual "phase is the first turn's untap step" Turn.firstPhase (GameState.phase after)
+              HU.assertEqual "no player holds priority" Nothing (GameState.priority after)
+              HU.assertEqual "it is turn 1" 1 (GameState.turnNumber after)
+              HU.assertEqual "the stack is empty" [] (GameState.stack after)
+              HU.assertEqual "alice is back to 20 life" (Just 20) (S.lifeOf S.alice after)
+              HU.assertEqual "bob is back to 20 life" (Just 20) (S.lifeOf S.bob after),
+      HU.testCase "CR 727.3: a player owning fewer than seven cards loses at the next SBA check" $
+        -- bob owns only 3 cards; drawing an opening hand of 7 draws from an empty
+        -- library, flagging drewFromEmpty, so the existing SBA path makes bob lose
+        -- and alice win. (In live play this fires at the first upkeep, CR 727.3;
+        -- here it is asserted at the next explicit SBA check.)
+        let g0 = addMany cards 3 S.bob (addMany cards 8 S.alice (Setup.emptyGame S.bothPlayers))
+            afterRestart = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.alice))
+            afterSba = snd (Engine.runGamePure S.identityAnswer afterRestart Engine.checkSba)
+         in do
+              HU.assertEqual "bob drew from an empty library during the opening draw" True (Set.member S.bob (GameState.drewFromEmpty afterRestart))
+              HU.assertEqual "CR 727.3: bob loses, alice wins at the SBA check" (Just (Result.Won S.alice)) (GameState.result afterSba)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

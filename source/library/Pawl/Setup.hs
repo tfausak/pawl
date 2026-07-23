@@ -175,3 +175,57 @@ startGameFromCards = do
   Monad.forM_ owners $ \pid -> do
     shuffleLibrary pid
     Monad.replicateM_ openingHand (Event.drawCard pid)
+
+-- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the
+-- cyclic order ("the game's default turn order begins with the starting player
+-- and proceeds clockwise"). Total: a `starter` not in the order leaves it as-is.
+rotateTo :: PlayerId -> [PlayerId] -> [PlayerId]
+rotateTo starter order = case break (== starter) order of
+  (before, after) -> after ++ before
+
+-- CR 727: restart the game in place. CR 727.1: the current game immediately ends
+-- and a new game begins per CR 103, with the CR 727.1a exception -- the starting
+-- player is `starter` (the controller of the restarting ability), so the turn
+-- order is rotated to begin with them. CR 727.2: every card returns to its
+-- owner's new library via startGameFromCards, built from the ACTUAL object pool
+-- (never emptyGame+newGame, which would lose the real cards and pick the wrong
+-- starting player). CR 727.4: the effect finishes resolving just before the first
+-- turn's untap step, with no player holding priority -- phase = firstPhase,
+-- priority = Nothing, turn 1. The object and timestamp id supplies are preserved
+-- so reused cards keep unique ids; startGameFromCards rebuilds objects and zones.
+restartGame :: PlayerId -> Game ()
+restartGame starter = do
+  State.modify' $ \gs ->
+    let resetPlayer player =
+          player
+            { Player.life = startingLife,
+              Player.status = Status.Playing,
+              Player.counters = Map.empty
+            }
+     in gs
+          { GameState.players = Map.map resetPlayer (GameState.players gs),
+            GameState.manaPool = Map.empty,
+            GameState.combat = Combat.emptyCombat,
+            GameState.events = Seq.empty,
+            GameState.scannedThrough = 0,
+            GameState.damageScannedThrough = 0,
+            GameState.delayedTriggers = Seq.empty,
+            GameState.continuousEffects = [],
+            GameState.replacements = [],
+            GameState.playerEffects = [],
+            GameState.turnOrder = rotateTo starter (GameState.turnOrder gs),
+            GameState.activePlayer = starter,
+            GameState.phase = Turn.firstPhase,
+            GameState.remaining = Turn.laterPhases,
+            GameState.priority = Nothing,
+            GameState.passes = 0,
+            GameState.turnNumber = 1,
+            GameState.result = Nothing,
+            GameState.drewFromEmpty = mempty,
+            GameState.landPlayed = mempty,
+            GameState.pendingControl = Map.empty,
+            GameState.activeControl = Nothing,
+            GameState.monarch = Nothing,
+            GameState.exiledUntilMonarch = Map.empty
+          }
+  startGameFromCards

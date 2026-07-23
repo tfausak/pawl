@@ -215,7 +215,7 @@ git commit -m "feat(m5b): startGameFromCards builds a game from an existing obje
 - Consumes: `startGameFromCards`, `startingLife`, `Player.{life,status,counters}`, `Status.Playing`, `Combat.emptyCombat`, `Turn.{firstPhase,laterPhases}`, all `GameState` transient fields.
 - Produces: `rotateTo :: PlayerId -> [PlayerId] -> [PlayerId]`; `restartGame :: PlayerId -> Game ()`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add these four cases to the `restartTests` list in `source/test-suite/Pawl/SetupSpec.hs` (comma-separated after the Task 1 case). They need `Pawl.Sba`, `Pawl.Type.Status`, `Pawl.Type.Result`, and `Data.Maybe` imported — add to the import group any of these not already present:
 
@@ -240,26 +240,29 @@ The cases:
               HU.assertEqual "bob restarted: bob heads the turn order" (Just S.bob) (Maybe.listToMaybe (GameState.turnOrder byBob))
               HU.assertEqual "alice restarted: alice is the new active player" S.alice (GameState.activePlayer byAlice)
               HU.assertEqual "alice restarted: alice heads the turn order" (Just S.alice) (Maybe.listToMaybe (GameState.turnOrder byAlice))
-    , HU.testCase "CR 727.2: every card returns to its owner's library, ownership preserved regardless of prior zone" $
-        -- alice's card starts on the battlefield; bob's starts in the graveyard.
-        -- After restart both are their owner's, in library or hand (drawn), never
-        -- on the battlefield or in a graveyard.
+    , HU.testCase "CR 727.2: every owned card returns to its owner (library or hand), regardless of prior zone" $
+        -- alice owns 8 cards, one on the battlefield; bob owns 8, one moved to his
+        -- graveyard. CR 400.7 gives drawn cards FRESH ids (Event.changeZone mints a
+        -- new object on a zone change), so a specific pre-restart ObjectId need not
+        -- survive an opening draw -- CR 727.2 preserves OWNERSHIP, not object ids.
+        -- Assert on per-owner counts: after the restart every owned card is in that
+        -- owner's library or hand, none on the battlefield or in a graveyard, and
+        -- bob's graveyard card is proven to return by his count staying 8.
         let g0 = Setup.emptyGame S.bothPlayers
-            (aId, g1) = S.addCreature (Cards.mountainPrinting cards) S.alice g0
+            (_aId, g1) = S.addCreature (Cards.mountainPrinting cards) S.alice g0
             (bId, g2) = S.addCreature (Cards.mountainPrinting cards) S.bob g1
             g3 = addMany cards 7 S.alice (addMany cards 7 S.bob g2)
             -- move bob's card to his graveyard, to prove zone-independence.
             g4 = snd (Engine.runGamePure S.identityAnswer g3 (Event.changeZone bId Zone.Graveyard))
             after = snd (Engine.runGamePure S.identityAnswer g4 (Setup.restartGame S.alice))
-            ownerOf oid = Object.owner <$> Game.lookupObject oid after
-            inLibOrHand pid oid =
-              elem oid (Game.zoneMembers Zone.Library pid after)
-                || elem oid (Game.zoneMembers Zone.Hand pid after)
+            ownedCount pid = length (filter (\o -> Object.owner o == pid) (Map.elems (GameState.objects after)))
+            libHandCount pid = length (Game.zoneMembers Zone.Library pid after) + length (Game.zoneMembers Zone.Hand pid after)
          in do
-              HU.assertEqual "alice's battlefield card is still owned by alice" (Just S.alice) (ownerOf aId)
-              HU.assertEqual "bob's graveyard card is still owned by bob" (Just S.bob) (ownerOf bId)
-              HU.assertEqual "alice's card is in alice's new library or hand" True (inLibOrHand S.alice aId)
-              HU.assertEqual "bob's card is in bob's new library or hand" True (inLibOrHand S.bob bId)
+              HU.assertEqual "alice still owns all 8 of her cards" 8 (ownedCount S.alice)
+              HU.assertEqual "bob still owns all 8 of his cards (incl. the one from his graveyard)" 8 (ownedCount S.bob)
+              HU.assertEqual "all of alice's cards are in her library or hand" 8 (libHandCount S.alice)
+              HU.assertEqual "all of bob's cards are in his library or hand" 8 (libHandCount S.bob)
+              HU.assertEqual "no card is left on the battlefield" True (Set.null (GameState.battlefield after))
               HU.assertEqual "no graveyard survives the restart" True (all null (Map.elems (GameState.graveyard after)))
     , HU.testCase "CR 727.4: the restart settles just before the first untap step, no priority, turn 1, life reset" $
         let g0 = addMany cards 8 S.bob (addMany cards 8 S.alice (Setup.emptyGame S.bothPlayers))
@@ -287,12 +290,12 @@ The cases:
 
 > `Engine.checkSba` is defined in `Pawl.Engine` (`checkSba = Sba.checkStateBasedActions`); import `Pawl.Sba` only if you prefer `Sba.checkStateBasedActions` directly. `Game.lookupObject`, `Game.zoneMembers`, `Map`, `Zone` are already imported.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20`
 Expected: **compile error** — `Setup.restartGame` (and `rotateTo`) not in scope.
 
-- [ ] **Step 3: Implement `rotateTo` and `restartGame`**
+- [x] **Step 3: Implement `rotateTo` and `restartGame`**
 
 Append to `source/library/Pawl/Setup.hs` (after `startGameFromCards`):
 
@@ -354,12 +357,12 @@ restartGame starter = do
 
 > This does not set `objects`/`library`/`hand`/`graveyard`/`battlefield`/`exile`/`command`/`stack` — `startGameFromCards` (called last) rebuilds all of them from the still-intact `objects`. `nextObjectId`/`nextTimestamp` are intentionally left untouched (preserved).
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/restart .CR 727/"'`
 Expected: **PASS** — all four cases green, warning-clean build.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
