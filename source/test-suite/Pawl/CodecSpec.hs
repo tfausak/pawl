@@ -498,6 +498,8 @@ tests cards =
               Codec.triggerConditionToJson
               Codec.jsonToTriggerCondition
               (TriggerCondition.StateIs (StateCondition.YouControlNo Subtype.Swamp)),
+          HU.testCase "CreatureDealtCombatDamageToMonarch" $
+            roundTrip "cd" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.CreatureDealtCombatDamageToMonarch,
           HU.testCase "CountSpec.CreaturesDiedThisTurn round-trips" $
             roundTrip "count" Codec.countSpecToJson Codec.jsonToCountSpec CountSpec.CreaturesDiedThisTurn,
           HU.testCase "AbilityName round-trips" $

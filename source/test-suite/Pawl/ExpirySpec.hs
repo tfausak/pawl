@@ -17,6 +17,8 @@ import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -29,6 +31,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.StateCondition as StateCondition
@@ -340,7 +343,19 @@ monarchTests cards =
                 -- alice is the active player; her end step is not bob's (the monarch).
                 began = S.withEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice) gs0
                 after = resolveAll (settle began)
-             in HU.assertEqual "bob did not draw on alice's end step" 0 (length (Game.zoneMembers Zone.Hand S.bob after))
+             in HU.assertEqual "bob did not draw on alice's end step" 0 (length (Game.zoneMembers Zone.Hand S.bob after)),
+          HU.testCase "CR 725.2 combat damage to the monarch hands the crown to the damager's controller" $
+            let (bobCreature, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
+                dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False DamageKind.Combat
+                began = S.withEvent (GameEvent.DamageDealt dmg) gs0
+                after = resolveAll (settle began)
+             in HU.assertEqual "bob took the crown" (Just S.bob) (GameState.monarch after),
+          HU.testCase "CR 725.2 noncombat damage to the monarch does not hand over the crown" $
+            let (bobCreature, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
+                dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False DamageKind.Noncombat
+                began = S.withEvent (GameEvent.DamageDealt dmg) gs0
+                after = resolveAll (settle began)
+             in HU.assertEqual "alice keeps the crown" (Just S.alice) (GameState.monarch after)
         ]
 
 -- Hag of Inner Weakness {2}{B} Creature -- Hag Warlock 2/2: "At the beginning of

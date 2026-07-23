@@ -8,8 +8,11 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import Pawl.Type.Binding (Binding)
 import Pawl.Type.Card (Card)
+import qualified Pawl.Type.DamageEvent as DamageEvent
+import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import Pawl.Type.Game (Game)
@@ -21,10 +24,12 @@ import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
+import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Phase as Phase
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
@@ -61,20 +66,37 @@ endStepDraw =
     (TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
     (Effect.Draw (Quantity.Literal 1))
 
+-- CR 725.2: "Whenever a creature deals combat damage to the monarch, its
+-- controller becomes the monarch." Controlled by the current monarch; makes a
+-- DIFFERENT player (the damager's controller) the monarch.
+crownSteal :: TriggeredAbility Card
+crownSteal =
+  oneEffect
+    TriggerCondition.CreatureDealtCombatDamageToMonarch
+    (Effect.BecomeMonarch MonarchTarget.ControllerOfSource)
+
 -- The monarch's inherent abilities, present only while there is a monarch.
 monarchAbilities :: [TriggeredAbility Card]
-monarchAbilities = [endStepDraw]
+monarchAbilities = [endStepDraw, crownSteal]
 
 -- CR 725.2: match one inherent ability against one event for the given monarch
 -- (who is the ability's controller), yielding the placed ability's binding
--- environment (empty for the draw; Task 6 adds the steal's damaging-creature
--- binding). Sourceless -- no bearer, so this is a dedicated matcher, not
--- Event.matchesTrigger. The GameState is unused by the draw's match but is the
--- seam the combat-damage steal will read.
+-- environment (empty for the draw; the damaging creature under the reserved
+-- trigger-source slot for the steal). Sourceless -- no bearer, so this is a
+-- dedicated matcher, not Event.matchesTrigger. The GameState is read by the
+-- steal arm (Projection.isCreatureOf), unused by the draw's match.
 inherentMatch :: PlayerId -> TriggerCondition -> GameState -> GameEvent -> Maybe (Map SlotName.SlotName Binding)
-inherentMatch monarch cond _gs event = case (cond, event) of
+inherentMatch monarch cond gs event = case (cond, event) of
   (TriggerCondition.StepBegins wanted scope, GameEvent.StepBegan began active)
     | began == wanted && scopeOk scope active -> Just Map.empty
+  -- CR 725.2: a creature dealt COMBAT damage to the monarch. Bind the damaging
+  -- creature under the reserved trigger-source slot so Effect.BecomeMonarch
+  -- ControllerOfSource reads it and crowns THAT creature's controller.
+  (TriggerCondition.CreatureDealtCombatDamageToMonarch, GameEvent.DamageDealt ev)
+    | DamageEvent.kind ev == DamageKind.Combat
+        && DamageEvent.target ev == Recipient.ToPlayer monarch
+        && Projection.isCreatureOf (DamageEvent.source ev) gs ->
+        Just (Binding.setTriggerSource (DamageEvent.source ev) Map.empty)
   _ -> Nothing
   where
     scopeOk s a = case s of

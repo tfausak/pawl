@@ -25,4 +25,8 @@ data TriggerCondition
   | -- CR 603.2 / 509-510: the bearer dealt combat damage to a player. Rides P4's
     -- event history -- combat damage already records a DamageDealt event.
     SelfDealsCombatDamageToPlayer
+  | -- CR 725.2: a creature dealt combat damage to the monarch. NOT bearer-scoped
+    -- (any creature); matched only via Pawl.Monarch.inherentMatch, never through a
+    -- card's bearer. Rides P4's DamageDealt history.
+    CreatureDealtCombatDamageToMonarch
   deriving (Eq, Ord, Show)

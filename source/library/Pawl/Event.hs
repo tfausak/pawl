@@ -383,6 +383,10 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
+  -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
+  -- an inherent ability of no object, so its real match lives in
+  -- Pawl.Monarch.inherentMatch, not here.
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -526,6 +530,7 @@ stateTriggers gs =
                 TriggerCondition.SelfEnters -> False
                 TriggerCondition.StepBegins _ _ -> False
                 TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+                TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
               pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab Map.empty
            in map pend (filter live (Projection.triggeredAbilitiesOf oid gs))
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))
