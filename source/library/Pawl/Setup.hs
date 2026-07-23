@@ -135,3 +135,43 @@ newGame matchup = Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
   createDeck pid deck
   shuffleLibrary pid
   Monad.replicateM_ openingHand (Event.drawCard pid)
+
+-- CR 727.2 / 729.2: build every player's library from an EXISTING object pool --
+-- each player's owned CARDS, wherever they currently sit -- then shuffle and draw
+-- opening hands (CR 103.5). This is deliberately NOT newGame: it reuses the real
+-- objects (ownership preserved, CR 727.2) instead of minting fresh ones from Deck
+-- definitions. Only Magic cards survive: an ability on the stack, a token, an
+-- emblem, or a trigger is not a card (CR 727.2 / 111.7) and ceases to exist.
+-- Shared by restart (CR 727) and, later, subgames (CR 729).
+startGameFromCards :: Game ()
+startGameFromCards = do
+  gs <- State.get
+  let owners = GameState.turnOrder gs
+      isCard obj = case Object.source obj of
+        Source.OfCard _ -> True
+        _ -> False
+      toLibraryCard obj =
+        obj
+          { Object.zone = Zone.Library,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Sick,
+            Object.bindings = Map.empty,
+            Object.counters = Map.empty
+          }
+      cards = Map.map toLibraryCard (Map.filter isCard (GameState.objects gs))
+      libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
+  State.put
+    gs
+      { GameState.objects = cards,
+        GameState.library = Map.fromList (map (\pid -> (pid, libraryOf pid)) owners),
+        GameState.hand = Map.empty,
+        GameState.graveyard = Map.empty,
+        GameState.battlefield = mempty,
+        GameState.exile = mempty,
+        GameState.command = mempty,
+        GameState.stack = []
+      }
+  Monad.forM_ owners $ \pid -> do
+    shuffleLibrary pid
+    Monad.replicateM_ openingHand (Event.drawCard pid)

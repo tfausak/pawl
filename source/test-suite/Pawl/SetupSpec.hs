@@ -2,8 +2,10 @@
 module Pawl.SetupSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
@@ -12,7 +14,9 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Player as Player
+import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
@@ -124,5 +128,33 @@ greenBlackSetupTests cards =
         HU.assertEqual "count" 120 (Game.objectCount (greenBlackSetup cards))
     ]
 
+-- Add n Mountains to pid's battlefield, discarding the ids (used to bulk up a
+-- pool of owned cards). replicate n () avoids a list comprehension (CLAUDE.md).
+addMany :: Cards.Cards -> Int -> PlayerId -> GameState.GameState -> GameState.GameState
+addMany cards n pid gs =
+  List.foldl' (\g _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid g)) gs (replicate n ())
+
+restartTests :: Cards.Cards -> Tasty.TestTree
+restartTests cards =
+  Tasty.testGroup
+    "restart (CR 727)"
+    [ HU.testCase "startGameFromCards: libraries are rebuilt from the existing owned cards, hands drawn" $
+        -- alice and bob each own 8 cards, all currently on the battlefield. After
+        -- startGameFromCards each has a 7-card hand and a 1-card library, the
+        -- battlefield is empty, and ownership is unchanged (CR 727.2 / 103.5).
+        let g0 = Setup.emptyGame S.bothPlayers
+            g1 = addMany cards 8 S.alice g0
+            g2 = addMany cards 8 S.bob g1
+            after = snd (Engine.runGamePure S.identityAnswer g2 Setup.startGameFromCards)
+            libSize pid = length (Game.zoneMembers Zone.Library pid after)
+         in do
+              HU.assertEqual "alice drew a 7-card opening hand" 7 (S.handSize S.alice after)
+              HU.assertEqual "bob drew a 7-card opening hand" 7 (S.handSize S.bob after)
+              HU.assertEqual "alice's library holds the remaining owned card" 1 (libSize S.alice)
+              HU.assertEqual "bob's library holds the remaining owned card" 1 (libSize S.bob)
+              HU.assertEqual "the battlefield is empty after the rebuild" True (Set.null (GameState.battlefield after))
+              HU.assertEqual "every rebuilt object is owned by alice or bob (ownership preserved)" True (all (\o -> Object.owner o == S.alice || Object.owner o == S.bob) (Map.elems (GameState.objects after)))
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Setup" [setupTests cards, greenBlackSetupTests cards, deckTests cards]
+tests cards = Tasty.testGroup "Setup" [setupTests cards, greenBlackSetupTests cards, deckTests cards, restartTests cards]

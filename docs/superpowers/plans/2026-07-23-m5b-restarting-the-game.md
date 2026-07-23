@@ -76,7 +76,7 @@ The reusable primitive (M5c's subgames call it verbatim). It rebuilds every play
 - Consumes: `GameState.{objects,turnOrder,…}`, `Object.{owner,source,zone,tapped,damage,sickness,bindings,counters}`, `Source.OfCard`, `Zone.Library`, `TapState.Untapped`, `Sickness.Sick`, `shuffleLibrary`, `openingHand`, `Event.drawCard`.
 - Produces (used by Task 2 and by M5c): `startGameFromCards :: Game ()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a `restartTests` group and wire it into `SetupSpec.tests`. First, at the top of `source/test-suite/Pawl/SetupSpec.hs` add these imports to the import group (alphabetical among the `Pawl.*` imports):
 
@@ -134,12 +134,12 @@ tests cards = Tasty.testGroup "Setup" [setupTests cards, greenBlackSetupTests ca
 
 > `S.PlayerId` may not be re-exported by `Support`; if the compiler cannot find it, import `Pawl.Type.PlayerId (PlayerId)` and write `PlayerId` in `addMany`'s signature instead. `Game.zoneMembers`, `GameState`, `Zone`, `Map` are already imported in `SetupSpec.hs`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20`
 Expected: **compile error** — `Setup.startGameFromCards` is not in scope (not yet defined).
 
-- [ ] **Step 3: Implement `startGameFromCards`**
+- [x] **Step 3: Implement `startGameFromCards`**
 
 Append to `source/library/Pawl/Setup.hs` (after `newGame`):
 
@@ -185,12 +185,12 @@ startGameFromCards = do
     Monad.replicateM_ openingHand (Event.drawCard pid)
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/startGameFromCards/"'`
 Expected: **PASS** (warning-clean build, the case passes).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
