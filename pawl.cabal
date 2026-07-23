@@ -72,6 +72,7 @@ library
     Pawl.Engine
     Pawl.Event
     Pawl.Expiry
+    Pawl.Filter
     Pawl.Game
     Pawl.Json
     Pawl.Mana
@@ -128,6 +129,7 @@ library
     Pawl.Type.EntryOption
     Pawl.Type.EntryRewrite
     Pawl.Type.Expiry
+    Pawl.Type.Filter
     Pawl.Type.Game
     Pawl.Type.GameEvent
     Pawl.Type.GameState
@@ -153,6 +155,7 @@ library
     Pawl.Type.Player
     Pawl.Type.PlayerEffect
     Pawl.Type.PlayerId
+    Pawl.Type.PlayerRelation
     Pawl.Type.PlayerScope
     Pawl.Type.PlayerStaticAbility
     Pawl.Type.Power
@@ -232,6 +235,7 @@ test-suite pawl-test-suite
     Pawl.DecideSpec
     Pawl.EventSpec
     Pawl.ExpirySpec
+    Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.JsonSpec
     Pawl.ManaSpec

@@ -14,6 +14,7 @@ import qualified Pawl.DamageSpec as DamageSpec
 import qualified Pawl.DecideSpec as DecideSpec
 import qualified Pawl.EventSpec as EventSpec
 import qualified Pawl.ExpirySpec as ExpirySpec
+import qualified Pawl.FilterSpec as FilterSpec
 import qualified Pawl.GameSpec as GameSpec
 import qualified Pawl.JsonSpec as JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
@@ -67,5 +68,6 @@ testTree cards =
       CopySpec.tests cards,
       ReplacementSpec.tests cards,
       ColorSpec.tests cards,
-      TriggerSpec.tests cards
+      TriggerSpec.tests cards,
+      FilterSpec.tests
     ]
