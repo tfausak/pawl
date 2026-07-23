@@ -260,6 +260,8 @@ tests cards =
                     CostComponent.PayLife 2,
                     CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)
                   ],
+              HU.testCase "PayEnergy" $
+                roundTrip "pe" Codec.costComponentToJson Codec.jsonToCostComponent (CostComponent.PayEnergy 2),
               HU.testCase "a Cost with a mana part and components round-trips" $
                 roundTrip
                   "cost"

@@ -36,6 +36,7 @@ import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Payment as Payment
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
@@ -182,6 +183,12 @@ canPayComponent pid oid component gs = case component of
   -- effect" is not enforced across two components of ONE cost (#104).
   CostComponent.Sacrifice n criterion ->
     length (sacrificeCandidates pid criterion gs) >= fromIntegral n
+  -- CR 107.14 / CR 118.6: payable only if the player has at least that many
+  -- energy counters. The bidirectional proof: GainPlayerCounters (P10 #37)
+  -- adds energy, this component spends it.
+  CostComponent.PayEnergy n -> case Map.lookup pid (GameState.players gs) of
+    Nothing -> False
+    Just player -> Map.findWithDefault 0 PlayerCounterKind.Energy (Player.counters player) >= n
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment. Components are
 -- paid in PRINTED order; CR 601.2h lets the player pay in any order, which is an
@@ -256,6 +263,19 @@ payComponent pid oid component = case component of
         Monad.mapM_ Event.sacrifice (Set.toAscList chosen)
         pure Payment.Paid
       else pure Payment.Unpaid
+  -- CR 107.14: paying energy removes that many energy counters from the
+  -- player. Natural subtraction is PARTIAL (it throws on underflow), so `left`
+  -- is guarded exactly like Cost.applyAdjustments's `lowered` -- the `have - n`
+  -- subtraction is only ever forced in the branch where `have >= n` already
+  -- holds. canPayComponent guarantees that at pay time in practice; the guard
+  -- keeps this function total regardless.
+  CostComponent.PayEnergy n -> do
+    let spend player =
+          let have = Map.findWithDefault 0 PlayerCounterKind.Energy (Player.counters player)
+              left = if have >= n then have - n else 0
+           in player {Player.counters = Map.insert PlayerCounterKind.Energy left (Player.counters player)}
+    State.modify' (\gs -> gs {GameState.players = Map.adjust spend pid (GameState.players gs)})
+    pure Payment.Paid
 
 -- The arithmetic half, pure and board-free.
 --

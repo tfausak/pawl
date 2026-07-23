@@ -11,6 +11,7 @@
 -- no mana in it at all).
 module Pawl.CostSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -49,6 +50,7 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Payment as Payment
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Response as Response
@@ -147,7 +149,24 @@ doorTests cards =
               HU.assertBool "two Mountains pay for two" (Cost.canPayComponent S.alice S.noSource two gs)
               HU.assertBool "but not for three" (not (Cost.canPayComponent S.alice S.noSource three gs))
               HU.assertBool "and not for an Island" (not (Cost.canPayComponent S.alice S.noSource islands gs))
-              HU.assertBool "and bob controls none of them" (not (Cost.canPayComponent S.bob S.noSource two gs))
+              HU.assertBool "and bob controls none of them" (not (Cost.canPayComponent S.bob S.noSource two gs)),
+      -- CR 118.6: unpayable below the count, payable at or above it -- the same
+      -- shape CR 118.3's Sacrifice test above takes, for the SPENT direction of
+      -- the player-counter substrate (P10 #37 GainPlayerCounters is the ADD
+      -- direction).
+      HU.testCase "CR 118.6 PayEnergy is unpayable below the count and payable at or above" $
+        let (oid, gs0) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+            two = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice gs0
+            one = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice gs0
+         in do
+              HU.assertBool "two energy pays PayEnergy 2" (Cost.canPayComponent S.alice oid (CostComponent.PayEnergy 2) two)
+              HU.assertBool "one energy cannot" (not (Cost.canPayComponent S.alice oid (CostComponent.PayEnergy 2) one)),
+      -- CR 107.14: paying energy removes exactly that many counters.
+      HU.testCase "CR 107.14 paying PayEnergy removes that many energy counters" $
+        let (oid, gs0) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+            three = S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice gs0
+            after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent S.alice oid (CostComponent.PayEnergy 2)))
+         in HU.assertEqual "one energy left" 1 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
     ]
 
 -- Greed {3}{B} Enchantment: "{B}, Pay 2 life: Draw a card."
