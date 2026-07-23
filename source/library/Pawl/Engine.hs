@@ -538,6 +538,11 @@ playGame =
 -- funnel each owner's cards back to their main-game library (CR 729.5) and
 -- reshuffle (Prompt.Shuffle). A subgame within a subgame (CR 729.6) is free: the
 -- nested playGame's own priorityLoop re-supplies playSubgame.
+-- Nesting terminates: subgameStateFrom draws each level's library from the
+-- PARENT level's library zone at cast time (CR 729.2), already reduced by the
+-- >= 7 cards its own opening hand consumed, so nesting depth is bounded by
+-- roughly |library| / 7 -- it cannot recurse forever (the CR 729.6 gate rests
+-- on this bound).
 -- Nontraditional/Vanguard/Commander subgame movement and cards brought into
 -- a subgame are subsystem-blocked (#140).
 playSubgame :: Game Result

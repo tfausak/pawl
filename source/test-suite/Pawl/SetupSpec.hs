@@ -1,7 +1,6 @@
 -- Covers Pawl.Setup and Pawl.Type.Deck: setup, deck composition, opening hands.
 module Pawl.SetupSpec where
 
-import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -272,8 +271,12 @@ subgameTests cards =
       HU.testCase "CR 729.5: funnelBack returns every owned subgame card to its owner's library, ids do not collide" $
         -- Parent: alice and bob each own 3 cards on the battlefield plus 2 in their
         -- library (so the parent has non-library objects that must SURVIVE, and
-        -- library objects that get REPLACED). finalSub mints its own objects with
-        -- ids above the parent's supply (as a real subgame would, CR 400.7).
+        -- library objects that get REPLACED). finalSub is a GENUINELY PLAYED
+        -- subgame -- Setup.startGameFromCards runs on sub0, shuffling each
+        -- player's 2-card library and drawing an opening hand (CR 103.5) -- so
+        -- Event.drawCard's changeZone mints fresh object ids above the parent's
+        -- supply for every card actually drawn (CR 400.7), the way a real
+        -- subgame would.
         let g0 = Setup.emptyGame S.bothPlayers
             g1 = poolToLibrary S.bob (poolToLibrary S.alice (addMany cards 5 S.bob (addMany cards 5 S.alice g0)))
             -- move 3 of each back onto the battlefield so the parent has survivors
@@ -287,19 +290,24 @@ subgameTests cards =
                       GameState.library = Map.insert pid (Seq.fromList keepLib) (GameState.library gg)
                     }
             parent = reBattlefield S.bob (reBattlefield S.alice g1)
-            -- a stand-in "final subgame state": 4 fresh cards per owner, ids above the parent supply
+            -- alice and bob each start the subgame with exactly 2 library cards;
+            -- startGameFromCards draws an opening hand (CR 103.5), so both draw
+            -- all 2 and record drewFromEmpty for the other 5 draw attempts --
+            -- irrelevant here, this test only checks funnelBack's bookkeeping,
+            -- not the CR 727.3/729.3 short-deck loss.
             sub0 = Setup.subgameStateFrom parent
-            (_, finalSub) = Engine.runGamePure S.identityAnswer sub0 (Monad.replicateM_ 0 (pure ()))
+            (_, finalSub) = Engine.runGamePure S.identityAnswer sub0 Setup.startGameFromCards
             after = Setup.funnelBack finalSub parent
             libCount pid = length (Game.zoneMembers Zone.Library pid after)
             battlefieldSurvivors = Set.size (GameState.battlefield after)
          in do
               -- alice/bob each still own all their cards, all in their library, none lost
-              HU.assertEqual "alice's library is rebuilt from her subgame cards" True (libCount S.alice > 0)
-              HU.assertEqual "bob's library is rebuilt from his subgame cards" True (libCount S.bob > 0)
+              HU.assertEqual "alice's library holds exactly her 2 subgame cards, returned" 2 (libCount S.alice)
+              HU.assertEqual "bob's library holds exactly his 2 subgame cards, returned" 2 (libCount S.bob)
               HU.assertEqual "the parent's non-library survivors are untouched (6 on the battlefield)" 6 battlefieldSurvivors
               HU.assertEqual "no object id collides (object count = survivors + returned cards)" (Map.size (GameState.objects after)) (battlefieldSurvivors + libCount S.alice + libCount S.bob)
-              HU.assertEqual "the id supply advanced to at least the subgame high-water mark" True (GameState.nextObjectId after >= GameState.nextObjectId finalSub)
+              HU.assertEqual "the subgame genuinely minted fresh ids (drawCard's changeZone, CR 400.7)" True (GameState.nextObjectId finalSub > GameState.nextObjectId sub0)
+              HU.assertEqual "the id supply advanced to exactly the subgame high-water mark" (GameState.nextObjectId finalSub) (GameState.nextObjectId after)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

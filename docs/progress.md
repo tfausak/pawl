@@ -2008,13 +2008,18 @@ its own gate card and spec, landed as it completes. Umbrella:
   `Replay.record` and break determinism). The parent state sits untouched in the
   outer frame while the subgame runs (CR 729.1a); **nesting (CR 729.6) is free
   recursion** — each level's `priorityLoop` re-supplies the runner, no `GameState`
-  stack field. Its gate is a hand-verified 2-level nested run plus a durable
-  termination guard (`runGamePure` would simply not return if the recursion
-  looped): CR 729.1a's total isolation leaves no top-level-observable nesting
-  signal, so — unlike the other CR 729 gates — this is **not** a self-verifying
-  regression that would catch a level-2-only breakage; it is a genuine guard
-  against non-termination, and the free-recursion architecture (no depth field to
-  corrupt) makes a level-2-only regression implausible rather than impossible.
+  stack field. Its gate is a 2-level nested run plus a termination guard
+  (`runGamePure` would simply not return if the recursion looped). CR 729.1a's
+  isolation means a subgame's *internal* choices leave no trace in the parent
+  `GameState` — but the interpreter **transcript** (`Pawl.Replay.record`'s
+  `[Response]` log) *is* a top-level observable, and it discriminates nesting
+  depth: each level's setup (`subgameStateFrom` → `startGameFromCards`) and
+  `playSubgame`'s CR 729.5 funnel-back each shuffle every player's library once,
+  so a flat (single-level) subgame gate contributes 4 `Response.Shuffled`
+  entries (2 setup + 2 funnel-back) and this 2-level gate contributes 8. The
+  gate asserts the measured count, so — like the other CR 729 gates — it **is**
+  a self-verifying regression: a level-2-only breakage collapses the count to 4
+  and the assertion catches it.
   **Runner injection:** `playSubgame` lives in `Engine` (it needs
   `playGame`) and is threaded **down** the spell path as a `Game Result` through
   new `Stack.resolveTopWith` → `Resolve.resolveSpellWith` → `Resolve.applyEffectWith`

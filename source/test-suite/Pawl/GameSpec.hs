@@ -23,6 +23,7 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
@@ -44,6 +45,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
@@ -506,7 +508,12 @@ ruleTests cards =
               HU.assertEqual "alice, the winner, is untouched" (Just 20) (S.lifeOf S.alice after)
               HU.assertEqual "the subgame spell resolved and left the stack" [] (GameState.stack after)
               HU.assertEqual "the main game did not end" Nothing (GameState.result after)
-              HU.assertEqual "the subgame spell is gone from alice's hand (cast)" False (Maybe.isJust (Game.lookupObject spellId after) && elem spellId (Game.zoneMembers Zone.Hand S.alice after)),
+              -- Casting routes through changeZone (CR 400.7), which mints a fresh
+              -- id and drops spellId entirely -- Game.lookupObject spellId after
+              -- is unconditionally Nothing, so that alone proves nothing about
+              -- alice's hand. The load-bearing check is that spellId's old
+              -- incarnation is not lingering in her hand's member list.
+              HU.assertEqual "the subgame spell's original id no longer sits in alice's hand (cast)" True (notElem spellId (Game.zoneMembers Zone.Hand S.alice after)),
       HU.testCase "CR 729.5/729.4b gameplay: cards funnel back, main-game board survives, main-game counters untouched" $
         -- library pool built first, THEN the survivor is added to the battlefield --
         -- poolToLibraryG sweeps every object a player owns onto their library, so a
@@ -558,17 +565,49 @@ ruleTests cards =
         -- (Sba.losesNow reads GameState.drewFromEmpty, set during the opening-hand
         -- draw itself), which would leave alice no window to cast the nested
         -- sorcery at all and collapse this gate to a flat (non-nested) subgame.
+        --
+        -- CR 729.1a's isolation means a subgame's INTERNAL choices leave no trace
+        -- in the parent's GameState -- but the interpreter TRANSCRIPT (every
+        -- Response, recorded by Pawl.Replay.record) is a top-level observable, and
+        -- it DOES discriminate nesting depth: each subgame level's setup
+        -- (subgameStateFrom -> startGameFromCards) shuffles every player's
+        -- library once, and playSubgame's CR 729.5 funnel-back reshuffles the
+        -- parent's library once per player -- 2 Response.Shuffled entries per
+        -- level, per funnel. A flat (single-level) subgame gate contributes 4
+        -- (2 setup + 2 funnel-back); this two-level gate contributes 8 (2 levels
+        -- x (2 setup + 2 funnel-back)), so asserting the count is a genuine
+        -- nesting regression test, not just a termination guard.
         let g0 = Setup.emptyGame S.bothPlayers
             (_nestedId, g1) = libraryCard (Cards.syntheticSubgamePrinting cards) S.alice g0
             g2 = poolToLibraryG S.bob (addToLibraryG cards 13 S.alice (addManyG cards 7 S.bob g1))
             (_spellId, g3) = S.addHandCard (Cards.syntheticSubgamePrinting cards) S.alice g2
             gStart = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
-            after = snd (Engine.runGamePure subgameAnswer gStart Engine.priorityLoop)
+            ((_, after), log_) = Replay.record subgameAnswer gStart Engine.priorityLoop
+            isShuffled r = case r of
+              Response.Shuffled _ -> True
+              _ -> False
+            shuffles = length (filter isShuffled log_)
          in do
-              -- If nesting had not terminated, runGamePure would not return.
+              -- If nesting had not terminated, runGamePure/Replay.record would not return.
               HU.assertEqual "CR 729.6: the top-level main game resumed with no result" Nothing (GameState.result after)
               HU.assertEqual "CR 729.1b: bob took 3 from the level-1 subgame's follow-on" (Just 17) (S.lifeOf S.bob after)
               HU.assertEqual "the top-level subgame spell left the stack" [] (GameState.stack after)
+              HU.assertEqual "CR 729.6: two nested subgame levels each shuffle on setup and funnel-back (measured; a flat gate yields 4)" 8 shuffles,
+      HU.testCase "a subgame replays deterministically (the reason Prompt.PlaySubgame was rejected, CR 729 / M0's determinism criterion)" $
+        -- A Prompt would run the subgame INSIDE the answer function, below
+        -- Replay.record's interposition point, so its inner choices could never
+        -- be recovered from the recorded transcript. Round-tripping this nested
+        -- gate's fixture through record -> replay and comparing the final
+        -- GameState (derives Eq) is the test that would fail if that design had
+        -- been taken instead.
+        let g0 = Setup.emptyGame S.bothPlayers
+            (_nestedId, g1) = libraryCard (Cards.syntheticSubgamePrinting cards) S.alice g0
+            g2 = poolToLibraryG S.bob (addToLibraryG cards 13 S.alice (addManyG cards 7 S.bob g1))
+            (_spellId, g3) = S.addHandCard (Cards.syntheticSubgamePrinting cards) S.alice g2
+            gStart = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+            ((_, after), log_) = Replay.record subgameAnswer gStart Engine.priorityLoop
+            (_, replayed) = Replay.replay log_ gStart Engine.priorityLoop
+         in HU.assertEqual "a subgame replays deterministically (the reason PlaySubgame is not a Prompt, CR 729 / M0 determinism)" after replayed
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree

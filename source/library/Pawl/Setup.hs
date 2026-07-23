@@ -137,6 +137,8 @@ newGame :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame matchup = Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
   createDeck pid deck
   shuffleLibrary pid
+  -- CR 103.4 mulligans are not implemented; the opening hand is always exactly
+  -- `openingHand` cards, unconditionally (#141).
   Monad.replicateM_ openingHand (Event.drawCard pid)
 
 -- CR 727.2 / 729.2: build every player's library from an EXISTING object pool --
@@ -177,6 +179,7 @@ startGameFromCards = do
       }
   Monad.forM_ owners $ \pid -> do
     shuffleLibrary pid
+    -- CR 103.4 mulligans are not implemented here either (#141).
     Monad.replicateM_ openingHand (Event.drawCard pid)
 
 -- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the
