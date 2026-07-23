@@ -6,7 +6,10 @@
       "value": [
         1,
         {
-          "type": "CreaturePermanent"
+          "type": "HasCardType",
+          "value": {
+            "type": "Creature"
+          }
         }
       ]
     }

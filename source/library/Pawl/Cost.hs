@@ -17,6 +17,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.PlayerEffect as PlayerEffect
@@ -25,6 +26,7 @@ import qualified Pawl.Type.Card as Card
 import Pawl.Type.Cost (Cost)
 import qualified Pawl.Type.Cost as Cost
 import qualified Pawl.Type.CostComponent as CostComponent
+import qualified Pawl.Type.Filter as Filter.Type
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -33,7 +35,6 @@ import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Payment as Payment
-import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Printing as Printing
@@ -123,26 +124,25 @@ hasVariable cost = case Cost.mana cost of
 requiresTapSymbol :: Cost -> Bool
 requiresTapSymbol cost = elem CostComponent.TapThis (Cost.components cost)
 
--- Which permanents a criterion admits, matched through the PROJECTION and never
+-- Which permanents a Filter admits, matched through the PROJECTION and never
 -- against printed characteristics: a card type is CR 613.1d layer 4 and a
--- subtype is layer 4 too, so Blood Moon changes the answer.
+-- subtype is layer 4 too, so Blood Moon changes the answer. A sacrifice cost
+-- frames no player, so the perspective is Nothing (its filters never reference
+-- one).
 --
--- The sibling of Pawl.Replacement.matchesPermanent, deliberately not shared with
--- it: Pawl.Cost importing Pawl.Replacement would become a module cycle the
--- moment CR 614.12b's payable-cost check lands there (#111). P9's filter language
--- merges both.
-matchesCriterion :: GameState -> PermanentCriterion.PermanentCriterion -> ObjectId -> Bool
-matchesCriterion gs criterion oid = case criterion of
-  PermanentCriterion.AnyPermanent -> True
-  PermanentCriterion.CreaturePermanent -> Projection.isCreatureOf oid gs
-  PermanentCriterion.PermanentOfSubtype subtype -> Set.member subtype (Projection.subtypesOf oid gs)
+-- The lower Pawl.Filter is the ONE matcher: Pawl.Replacement narrows its
+-- permanents through the same call, so there is no duplicate to keep in step and
+-- no Cost->Replacement cycle to avoid (#111).
+matchesFilter :: GameState -> Filter.Type.Filter -> ObjectId -> Bool
+matchesFilter gs filter_ oid =
+  Filter.matches (Filter.MkContext Nothing) (Projection.viewOfObject oid gs) filter_
 
--- The permanents this player may sacrifice for a criterion, ascending -- the
--- order ChooseSacrifices offers them in, which is what makes both the elision
--- test and the transcript fallback deterministic.
-sacrificeCandidates :: PlayerId -> PermanentCriterion.PermanentCriterion -> GameState -> [ObjectId]
-sacrificeCandidates pid criterion gs =
-  List.sort (filter (matchesCriterion gs criterion) (Projection.controls pid gs))
+-- The permanents this player may sacrifice for a Filter, ascending -- the order
+-- ChooseSacrifices offers them in, which is what makes both the elision test and
+-- the transcript fallback deterministic.
+sacrificeCandidates :: PlayerId -> Filter.Type.Filter -> GameState -> [ObjectId]
+sacrificeCandidates pid filter_ gs =
+  List.sort (filter (matchesFilter gs filter_) (Projection.controls pid gs))
 
 -- CR 118.3: "A player can't pay a cost without having the necessary resources to
 -- pay it fully." The mana part AND every component, measured against the CURRENT

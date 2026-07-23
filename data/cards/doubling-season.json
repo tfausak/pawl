@@ -39,7 +39,8 @@
       "value": [
         {
           "onWhat": {
-            "type": "AnyPermanent"
+            "type": "And",
+            "value": []
           },
           "whichKind": null,
           "whose": {

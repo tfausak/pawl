@@ -29,6 +29,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
@@ -45,12 +46,12 @@ import qualified Pawl.Type.DamageRewrite as DamageRewrite
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
+import qualified Pawl.Type.Filter as Filter.Type
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.ProjectedCharacteristics as PC
@@ -257,20 +258,18 @@ matchesController gs src rel oid = case rel of
   ControllerRelation.Anyones -> True
   ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
 
--- Which permanents a pattern admits. P9 generalizes this.
+-- Which permanents a pattern admits, matched through the lower Pawl.Filter over
+-- the PROJECTED view: creature-ness (CR 205.2b / 300.2 / 613.1d, so an
+-- Opalescence'd enchantment counts) and subtype membership (CR 205.3, so Blood
+-- Moon is seen) are the projected questions the Filter's atoms already answer. A
+-- replacement's pattern frames no player, so the perspective is Nothing.
 --
--- PermanentCriterion is matched here AND in Pawl.Cost.matchesCriterion; the two
--- are not shared because Pawl.Cost importing Pawl.Replacement would collide
--- with #72's queued fix (which needs Pawl.Replacement to consult costs) (#111).
-matchesPermanent :: GameState -> PermanentCriterion.PermanentCriterion -> ObjectId -> Bool
-matchesPermanent gs crit oid = case crit of
-  PermanentCriterion.AnyPermanent -> True
-  -- CR 205.2b / 300.2 / 613.1d: creature-ness is the PROJECTED question, so an
-  -- Opalescence'd enchantment counts.
-  PermanentCriterion.CreaturePermanent -> Projection.isCreatureOf oid gs
-  -- CR 205.3: subtype membership, read through the projection so a
-  -- type-changing effect (Blood Moon) is seen.
-  PermanentCriterion.PermanentOfSubtype s -> Set.member s (Projection.subtypesOf oid gs)
+-- Pawl.Cost narrows its sacrifice candidates through the SAME call, so there is
+-- no duplicate matcher to keep in step and no Cost->Replacement cycle to avoid
+-- (#111).
+matchesPermanent :: GameState -> Filter.Type.Filter -> ObjectId -> Bool
+matchesPermanent gs filter_ oid =
+  Filter.matches (Filter.MkContext Nothing) (Projection.viewOfObject oid gs) filter_
 
 -- CR 614.16: apply a scaling to a count. "That many plus one" and "twice that
 -- many" are the same operation with different data.

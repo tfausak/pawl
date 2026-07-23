@@ -37,7 +37,10 @@
       "value": [
         {
           "onWhat": {
-            "type": "CreaturePermanent"
+            "type": "HasCardType",
+            "value": {
+              "type": "Creature"
+            }
           },
           "whichKind": {
             "type": "PlusOnePlusOne"

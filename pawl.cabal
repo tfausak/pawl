@@ -150,7 +150,6 @@ library
     Pawl.Type.ObjectId
     Pawl.Type.Payment
     Pawl.Type.PendingTrigger
-    Pawl.Type.PermanentCriterion
     Pawl.Type.Phase
     Pawl.Type.Player
     Pawl.Type.PlayerEffect

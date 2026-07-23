@@ -8,7 +8,7 @@
           "value": [
             2,
             {
-              "type": "PermanentOfSubtype",
+              "type": "HasSubtype",
               "value": {
                 "type": "Mountain"
               }

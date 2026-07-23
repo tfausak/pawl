@@ -35,6 +35,7 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Combat as Combat
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CounterKind as CounterKind
@@ -43,6 +44,9 @@ import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.Expiry as Expiry
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator module Pawl.Filter may later be imported and must not collide.
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -175,7 +179,23 @@ tests cards =
   Tasty.localOption (Tasty.mkTimeout 5000000) $
     Tasty.testGroup
       "Pawl.Replacement"
-      [ -- NOT a CR 614.5 test: this does not exercise the applied set at all. After
+      [ -- P9: a pattern's permanent match runs through the lower Pawl.Filter over
+        -- the PROJECTED view, the same evaluator Pawl.Cost narrows sacrifices with
+        -- (#111 retired). CR 205.2b/300.2/613.1d: creature-ness is projected; the
+        -- trivial filter And [] matches every permanent (what AnyPermanent was).
+        HU.testCase "CR 614.1 matchesPermanent narrows a permanent through Filter.matches" $
+          let base = S.landsInPlay (Cards.swampPrinting cards) 1
+              (piker, g1) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+              land = case Set.toList (GameState.battlefield base) of
+                oid : _ -> Just oid
+                [] -> Nothing
+           in case land of
+                Nothing -> HU.assertFailure "fixture did not build a land"
+                Just landId -> do
+                  HU.assertBool "the creature matches HasCardType Creature" (Replacement.matchesPermanent g1 (Filter.Type.HasCardType CardType.Creature) piker)
+                  HU.assertBool "the land does not match HasCardType Creature" (not (Replacement.matchesPermanent g1 (Filter.Type.HasCardType CardType.Creature) landId))
+                  HU.assertBool "the trivial filter matches the land too" (Replacement.matchesPermanent g1 (Filter.Type.And []) landId),
+        -- NOT a CR 614.5 test: this does not exercise the applied set at all. After
         -- the first Rest in Peace redirects the event to Exile, the SECOND Rest in
         -- Peace's pattern (whenDestination = Graveyard) no longer matches the
         -- rewritten event, so `applies` alone -- not CR 614.5's applied-set --

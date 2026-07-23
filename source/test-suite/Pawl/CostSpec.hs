@@ -35,6 +35,9 @@ import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator module Pawl.Filter may later be imported and must not collide.
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
@@ -44,7 +47,6 @@ import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Payment as Payment
-import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.Printing as Printing
@@ -138,9 +140,9 @@ doorTests cards =
       -- CR 701.21a: enough controlled permanents matching the criterion.
       HU.testCase "CR 118.3 a Sacrifice component counts matching permanents this player controls" $
         let gs = S.mountainsInPlay cards 2
-            two = CostComponent.Sacrifice 2 (PermanentCriterion.PermanentOfSubtype Subtype.Mountain)
-            three = CostComponent.Sacrifice 3 (PermanentCriterion.PermanentOfSubtype Subtype.Mountain)
-            islands = CostComponent.Sacrifice 1 (PermanentCriterion.PermanentOfSubtype Subtype.Island)
+            two = CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)
+            three = CostComponent.Sacrifice 3 (Filter.Type.HasSubtype Subtype.Mountain)
+            islands = CostComponent.Sacrifice 1 (Filter.Type.HasSubtype Subtype.Island)
          in do
               HU.assertBool "two Mountains pay for two" (Cost.canPayComponent S.alice S.noSource two gs)
               HU.assertBool "but not for three" (not (Cost.canPayComponent S.alice S.noSource three gs))

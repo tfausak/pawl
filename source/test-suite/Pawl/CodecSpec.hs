@@ -57,7 +57,6 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
@@ -253,7 +252,7 @@ tests cards =
                   [ CostComponent.TapThis,
                     CostComponent.SacrificeThis,
                     CostComponent.PayLife 2,
-                    CostComponent.Sacrifice 2 (PermanentCriterion.PermanentOfSubtype Subtype.Mountain)
+                    CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)
                   ],
               HU.testCase "a Cost with a mana part and components round-trips" $
                 roundTrip
@@ -281,13 +280,9 @@ tests cards =
                       "unpayable"
                       (Right Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})
                       (Codec.jsonToCost value),
-              HU.testCase "every PermanentCriterion round-trips" $
-                mapM_
-                  (roundTrip "criterion" Codec.permanentCriterionToJson Codec.jsonToPermanentCriterion)
-                  [PermanentCriterion.AnyPermanent, PermanentCriterion.CreaturePermanent, PermanentCriterion.PermanentOfSubtype Subtype.Mountain],
               HU.testCase "a Card carrying an additional cost round-trips" $
                 let base = Printing.card (Cards.lightningBoltPrinting cards)
-                    c = base {CardT.additionalCosts = [CostComponent.Sacrifice 1 PermanentCriterion.CreaturePermanent]}
+                    c = base {CardT.additionalCosts = [CostComponent.Sacrifice 1 (Filter.Type.HasCardType CardType.Creature)]}
                  in roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
               -- Byte-stability: an empty list must not appear in the rendered JSON,
               -- or every committed card file changes. The posture colorIndicator,
@@ -304,7 +299,7 @@ tests cards =
                     alt =
                       Cost.Type.MkCost
                         { Cost.Type.mana = Just (ManaCost.MkManaCost []),
-                          Cost.Type.components = [CostComponent.Sacrifice 2 (PermanentCriterion.PermanentOfSubtype Subtype.Mountain)]
+                          Cost.Type.components = [CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)]
                         }
                     c = base {CardT.alternativeCosts = [alt]}
                  in roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
@@ -331,7 +326,7 @@ tests cards =
                     CounterPattern.MkCounterPattern
                       { CounterPattern.whichKind = Just CounterKind.PlusOnePlusOne,
                         CounterPattern.whose = ControllerRelation.Yours,
-                        CounterPattern.onWhat = PermanentCriterion.CreaturePermanent
+                        CounterPattern.onWhat = Filter.Type.HasCardType CardType.Creature
                       }
                     (Scaling.AddMore 1)
              in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
@@ -368,7 +363,7 @@ tests cards =
                     CounterPattern.MkCounterPattern
                       { CounterPattern.whichKind = Nothing,
                         CounterPattern.whose = ControllerRelation.Anyones,
-                        CounterPattern.onWhat = PermanentCriterion.AnyPermanent
+                        CounterPattern.onWhat = Filter.Type.And []
                       }
                     (Scaling.Multiply 2)
              in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re))

@@ -57,7 +57,6 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerId as PlayerId
@@ -496,24 +495,6 @@ jsonToFilter value = do
     ("Not", Just v) -> Filter.Not <$> jsonToFilter v
     _ -> Left (Text.pack "unknown Filter: " <> t)
 
--- Tagged rather than bare-nullary: this family grows a payload-carrying
--- constructor (PermanentOfSubtype), so the decoder is written against
--- Json.tag and only gains arms.
-permanentCriterionToJson :: PermanentCriterion.PermanentCriterion -> Value
-permanentCriterionToJson c = case c of
-  PermanentCriterion.AnyPermanent -> nullary (Text.pack "AnyPermanent")
-  PermanentCriterion.CreaturePermanent -> nullary (Text.pack "CreaturePermanent")
-  PermanentCriterion.PermanentOfSubtype s -> Json.tagged (Text.pack "PermanentOfSubtype") (Just (subtypeToJson s))
-
-jsonToPermanentCriterion :: Value -> Either Text PermanentCriterion.PermanentCriterion
-jsonToPermanentCriterion value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("AnyPermanent", _) -> Right PermanentCriterion.AnyPermanent
-    ("CreaturePermanent", _) -> Right PermanentCriterion.CreaturePermanent
-    ("PermanentOfSubtype", Just v) -> fmap PermanentCriterion.PermanentOfSubtype (jsonToSubtype v)
-    _ -> Left (Text.pack "unknown PermanentCriterion: " <> t)
-
 playerScopeToJson :: PlayerScope.PlayerScope -> Value
 playerScopeToJson s = nullary . Text.pack $ case s of
   PlayerScope.You -> "You"
@@ -647,7 +628,7 @@ counterPatternToJson p =
   Object
     [ (Text.pack "whichKind", maybeTo counterKindToJson (CounterPattern.whichKind p)),
       (Text.pack "whose", controllerRelationToJson (CounterPattern.whose p)),
-      (Text.pack "onWhat", permanentCriterionToJson (CounterPattern.onWhat p))
+      (Text.pack "onWhat", filterToJson (CounterPattern.onWhat p))
     ]
 
 jsonToCounterPattern :: Value -> Either Text CounterPattern.CounterPattern
@@ -655,7 +636,7 @@ jsonToCounterPattern value = do
   ps <- Json.asObject value
   k <- Json.field (Text.pack "whichKind") ps >>= maybeFrom jsonToCounterKind
   w <- Json.field (Text.pack "whose") ps >>= jsonToControllerRelation
-  o <- Json.field (Text.pack "onWhat") ps >>= jsonToPermanentCriterion
+  o <- Json.field (Text.pack "onWhat") ps >>= jsonToFilter
   pure
     CounterPattern.MkCounterPattern
       { CounterPattern.whichKind = k,
@@ -691,7 +672,7 @@ costComponentToJson c = case c of
   CostComponent.TapThis -> nullary (Text.pack "TapThis")
   CostComponent.SacrificeThis -> nullary (Text.pack "SacrificeThis")
   CostComponent.PayLife n -> Json.tagged (Text.pack "PayLife") (Just (natTo n))
-  CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array [natTo n, permanentCriterionToJson c_]))
+  CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array [natTo n, filterToJson c_]))
 
 jsonToCostComponent :: Value -> Either Text CostComponent.CostComponent
 jsonToCostComponent value = do
@@ -702,8 +683,8 @@ jsonToCostComponent value = do
     ("PayLife", Just v) -> fmap CostComponent.PayLife (natFrom v)
     ("Sacrifice", Just (Array [n, c_])) -> do
       count <- natFrom n
-      criterion <- jsonToPermanentCriterion c_
-      pure (CostComponent.Sacrifice count criterion)
+      filter_ <- jsonToFilter c_
+      pure (CostComponent.Sacrifice count filter_)
     _ -> Left (Text.pack "unknown CostComponent: " <> t)
 
 poolToJson :: Pool.Pool -> Value
