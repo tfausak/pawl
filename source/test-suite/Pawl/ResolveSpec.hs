@@ -563,6 +563,15 @@ resolveTests cards =
               HU.assertEqual "promoted on bob's turn" (Just (Decider.MkDecider S.alice)) (GameState.activeControl bobsTurn)
               HU.assertEqual "bob's decisions route to alice" (Decider.MkDecider S.alice) (Decide.deciderFor S.bob bobsTurn)
               HU.assertEqual "control expired after bob's turn" (Decider.MkDecider S.bob) (Decide.deciderFor S.bob afterBob),
+      HU.testCase "CR 723.1a: a second player-controlling effect overwrites the first (last created wins)" $
+        let base = Setup.emptyGame S.bothPlayers
+            -- First: alice controls bob.
+            afterAlice = installControlBy cards S.alice S.bob base
+            -- Then: bob controls bob (CR 723.9 self-control), created LATER.
+            afterBob = installControlBy cards S.bob S.bob afterAlice
+         in do
+              HU.assertEqual "the first effect installed alice as bob's decider" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl afterAlice))
+              HU.assertEqual "CR 723.1a: the later effect overwrites — bob's own control wins" (Just (Decider.MkDecider S.bob)) (Map.lookup S.bob (GameState.pendingControl afterBob)),
       HU.testCase "CR 111 Dragon Fodder creates two 1/1 Goblin tokens" $
         let base = S.landsInPlay (Cards.mountainPrinting cards) 2
             (gs, spellId) = S.handOne (Cards.dragonFodderPrinting cards) base
@@ -588,6 +597,43 @@ resolveTests cards =
               -- The falsifier: a tag-blind Fog would also blunt this spell damage.
               HU.assertEqual "spell damage untouched (Noncombat)" (Just 2) (S.damageOf victim spell)
     ]
+
+-- Build a Mindslaver-shaped ControlPlayerNextTurn ability owned by `controller`,
+-- targeting `target`, put it on the stack, and resolve it. Returns the resulting
+-- state. Object.owner is the resolving ability's controller (Resolve.hs), so this
+-- installs pendingControl[target] = MkDecider controller.
+installControlBy :: Cards.Cards -> PlayerId.PlayerId -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+installControlBy cards controller target gs0 =
+  let (srcId, gs1) = S.addCreature (Cards.mindslaverPrinting cards) controller gs0
+      slot = SlotName.MkSlotName (Text.pack "target")
+      ability =
+        ActivatedAbility.MkActivatedAbility
+          { ActivatedAbility.cost =
+              Cost.Type.MkCost
+                { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
+                  Cost.Type.components = [CostComponent.TapThis, CostComponent.SacrificeThis]
+                },
+            ActivatedAbility.modal =
+              Modal.MkModal
+                (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing Exclusion.IncludesSource))))
+                (ModeSelection.ChooseExactly 1)
+          }
+      (abilId, gs2) = Game.freshObjectId gs1
+      (ts, gs3) = Game.freshTimestamp gs2
+      abilObj =
+        Object.MkObject
+          { Object.owner = controller,
+            Object.source = Source.OfAbility srcId ability,
+            Object.zone = Zone.Stack,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled,
+            Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer target)) Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+            Object.counters = Map.empty,
+            Object.timestamp = ts
+          }
+      gs4 = gs3 {GameState.objects = Map.insert abilId abilObj (GameState.objects gs3), GameState.stack = abilId : GameState.stack gs3}
+   in snd (Engine.runGamePure S.identityAnswer gs4 Stack.resolveTop)
 
 -- CR 205.4c / 701.23a: a basic land card is one with the Land card type and the
 -- Basic supertype -- Evolving Wilds' search filter, the printed-card predicate
