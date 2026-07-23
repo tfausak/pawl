@@ -1,0 +1,23 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [{ "type": "Infect" }],
+  "manaCost": [
+    { "type": "OfType", "value": { "type": "Colored", "value": { "type": "Green" } } }
+  ],
+  "name": "Glistener Elf",
+  "power": { "type": "Literal", "value": 1 },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [{ "effects": [], "targetSpecs": [] }],
+    "selection": { "type": "ChooseExactly", "value": 1 }
+  },
+  "staticAbilities": [],
+  "toughness": { "type": "Literal", "value": 1 },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [{ "type": "Warrior" }, { "type": "Phyrexian" }, { "type": "Elf" }],
+    "supertypes": [],
+    "types": [{ "type": "Creature" }]
+  }
+}

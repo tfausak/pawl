@@ -99,6 +99,12 @@ m2aCardTests cards =
             HU.assertEqual "cost" (redCost [ManaSymbol.Generic 2, red]) (Card.Type.manaCost (card (Cards.goblinChariotPrinting cards)))
             HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (card (Cards.goblinChariotPrinting cards)))
             HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness (card (Cards.goblinChariotPrinting cards))),
+          HU.testCase "Glistener Elf is a {G} 1/1 Phyrexian Elf Warrior with infect" $ do
+            HU.assertEqual "name" (Text.pack "Glistener Elf") (Card.Type.name (card (Cards.glistenerElfPrinting cards)))
+            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power (card (Cards.glistenerElfPrinting cards)))
+            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness (card (Cards.glistenerElfPrinting cards)))
+            HU.assertBool "has infect" (elem Keyword.Infect (Card.Type.keywords (card (Cards.glistenerElfPrinting cards))))
+            HU.assertEqual "subtypes" (Set.fromList [Subtype.Phyrexian, Subtype.Elf, Subtype.Warrior]) (TypeLine.subtypes (Card.Type.typeLine (card (Cards.glistenerElfPrinting cards)))),
           HU.testCase "all five are creatures and none is a land" $
             HU.assertBool "creatures" $
               all

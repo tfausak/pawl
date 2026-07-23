@@ -23,6 +23,7 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Recipient as Recipient
@@ -36,13 +37,18 @@ stillPlaying gs =
   let isPlaying entry = Player.status (snd entry) == Status.Playing
    in map fst (filter isPlaying (Map.toList (GameState.players gs)))
 
--- CR 704.5a (life <= 0) and CR 704.5b (drawing from an empty library).
+-- CR 704.5a (life <= 0), CR 704.5b (drawing from an empty library), and CR
+-- 704.5c (ten or more poison counters). Two-Headed Giant's shared-poison variant
+-- (CR 704.6b / 810) is out of scope (design.md §6).
 losesNow :: GameState -> PlayerId -> Bool
 losesNow gs pid = case Map.lookup pid (GameState.players gs) of
   Nothing -> False
   Just player ->
     Player.status player == Status.Playing
-      && (Player.life player <= 0 || Set.member pid (GameState.drewFromEmpty gs))
+      && ( Player.life player <= 0
+             || Set.member pid (GameState.drewFromEmpty gs)
+             || Map.findWithDefault 0 PlayerCounterKind.Poison (Player.counters player) >= 10
+         )
 
 depart :: PlayerId -> GameState -> GameState
 depart pid gs =

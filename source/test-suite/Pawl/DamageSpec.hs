@@ -208,7 +208,24 @@ infectTests cards =
             after = S.runPure S.identityAnswer gs1 (Damage.applyDamage [ev])
          in do
               HU.assertEqual "two -1/-1 counters" (Just 2) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject victim after))
-              HU.assertEqual "no marked damage" (Just 0) (S.damageOf victim after)
+              HU.assertEqual "no marked damage" (Just 0) (S.damageOf victim after),
+      HU.testCase "CR 702.90 Glistener Elf poisons an unblocked player, drains no life" $
+        let (gs, _, _) = S.combatBoardOf [Cards.glistenerElfPrinting cards] []
+            after = S.fightWith S.aggressiveAnswer gs
+         in do
+              HU.assertEqual "bob has one poison" 1 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+              HU.assertEqual "bob's life unchanged" (Just 20) (S.lifeOf S.bob after)
+              HU.assertEqual "alice (controller) has no poison" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
+      HU.testCase "CR 702.90c Glistener Elf shrinks and kills a blocker with -1/-1 counters" $
+        let (gs, _, blockers) = S.combatBoardOf [Cards.glistenerElfPrinting cards] [Cards.pikerPrinting cards]
+            fought = S.fightWith S.aggressiveAnswer gs
+            settled = S.settleSba fought
+         in case blockers of
+              [] -> HU.assertFailure "fixture should have a blocker"
+              blocker : _ -> do
+                HU.assertEqual "one -1/-1 counter before SBA" (Just 1) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject blocker fought))
+                HU.assertEqual "no marked damage on the blocker" (Just 0) (S.damageOf blocker fought)
+                HU.assertEqual "blocker buried by 704.5f" 1 (length (Game.zoneMembers Zone.Graveyard S.bob settled))
     ]
 
 sbaBase :: GameState.GameState
@@ -229,7 +246,15 @@ sbaTests =
          in HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result (S.settleSba gs)),
       HU.testCase "simultaneous last departures draw" $
         let after = S.settleSba sbaBase {GameState.drewFromEmpty = Set.fromList [S.alice, S.bob]}
-         in HU.assertEqual "draw" (Just Result.Drawn) (GameState.result after)
+         in HU.assertEqual "draw" (Just Result.Drawn) (GameState.result after),
+      HU.testCase "CR 704.5c ten poison counters lose the game" $
+        let gs = S.addPlayerCounter PlayerCounterKind.Poison 10 S.bob (Setup.emptyGame S.bothPlayers)
+            after = S.settleSba gs
+         in HU.assertEqual "bob lost" (Just (Status.Departed Departure.Lost)) (fmap Player.status (Map.lookup S.bob (GameState.players after))),
+      HU.testCase "CR 704.5c nine poison counters do not" $
+        let gs = S.addPlayerCounter PlayerCounterKind.Poison 9 S.bob (Setup.emptyGame S.bothPlayers)
+            after = S.settleSba gs
+         in HU.assertEqual "bob still playing" (Just Status.Playing) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
     ]
 
 damageEventTests :: Cards.Cards -> Tasty.TestTree
