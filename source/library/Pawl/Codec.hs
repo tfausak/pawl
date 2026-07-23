@@ -1148,6 +1148,7 @@ effectToJson e = case e of
   Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array [durationToJson d, slotNameToJson s]))
   Effect.ArmDelayedTrigger n -> Json.tagged (Text.pack "ArmDelayedTrigger") (Just (abilityNameToJson n))
   Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array [durationToJson d, playerScopeToJson s, playerEffectToJson pe]))
+  Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (cardToJson c))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
 jsonToEffect value = do
@@ -1202,6 +1203,7 @@ jsonToEffect value = do
     "AffectPlayers" -> case mv of
       Just (Array [d, s, pe]) -> Effect.AffectPlayers <$> jsonToDuration d <*> jsonToPlayerScope s <*> jsonToPlayerEffect pe
       _ -> Left (Text.pack "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]")
+    "CreateEmblem" -> withValue mv (fmap Effect.CreateEmblem . jsonToCard)
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
 -- Records & abilities --------------------------------------------------------

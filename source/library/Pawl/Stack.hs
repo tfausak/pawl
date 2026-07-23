@@ -70,3 +70,13 @@ resolveTop = do
               let chosen = Binding.modesOf (Object.bindings obj)
                   modal = TriggeredAbility.modal ability
                in Resolve.resolveEffects oid srcId (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)
+        -- CR 114.5: an emblem is never on the stack (created into the command
+        -- zone, never cast). Drop it, like a token.
+        Source.OfEmblem _ -> State.put gs {GameState.stack = rest}
+        Source.OfInherentTrigger _ ability ->
+          -- CR 725.2: an inherent monarch ability has no source object and no
+          -- intervening "if" (intervening = Nothing); resolve its effects
+          -- directly. Object.owner is the monarch (baked at placement) -- "you".
+          let chosen = Binding.modesOf (Object.bindings obj)
+              modal = TriggeredAbility.modal ability
+           in Resolve.resolveEffects oid oid (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)

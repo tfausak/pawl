@@ -1120,6 +1120,20 @@ gainPlayerCountersTests cards =
          in HU.assertEqual "alice has two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
     ]
 
+createEmblemTests :: Cards.Cards -> Tasty.TestTree
+createEmblemTests cards =
+  Tasty.testGroup
+    "CreateEmblem"
+    [ HU.testCase "CR 114.2 CreateEmblem puts an emblem in the command zone under the resolver" $
+        let (src, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            act = Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (Printing.card (Cards.pikerPrinting cards)))
+            after = S.runPure S.identityAnswer gs0 act
+            emblems = filter (\oid -> fmap Object.zone (Game.lookupObject oid after) == Just Zone.Command) (Set.toList (GameState.command after))
+         in do
+              HU.assertEqual "one emblem in command" 1 (Set.size (GameState.command after))
+              HU.assertEqual "owned by the resolver" [Just S.alice] (map (\oid -> fmap Object.owner (Game.lookupObject oid after)) emblems)
+    ]
+
 -- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
 -- (GainKeyword Haste) together end to end -- cast, resolve, attack, revert.
 actOfTreasonTests :: Cards.Cards -> Tasty.TestTree
@@ -1143,4 +1157,4 @@ actOfTreasonTests cards =
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards, gainControlTests cards, gainPlayerCountersTests cards, actOfTreasonTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards, gainControlTests cards, gainPlayerCountersTests cards, createEmblemTests cards, actOfTreasonTests cards]

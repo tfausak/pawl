@@ -3,6 +3,7 @@ module Pawl.Type.Source where
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.Card (Card)
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Printing (Printing)
 import Pawl.Type.TriggeredAbility (TriggeredAbility)
 
@@ -24,4 +25,14 @@ data Source
     -- plus the ability. Travels with the object so it resolves even if the source
     -- leaves (CR 603.3d).
     OfTrigger ObjectId (TriggeredAbility Card)
+  | -- CR 114: an emblem -- an object in the command zone whose only
+    -- characteristics are its abilities (CR 114.3). Its characteristics ARE a
+    -- Card (like OfToken), so Game.cardOf reads it with no special case; unlike a
+    -- token it is never a permanent (CR 114.5) and never on the battlefield.
+    -- Owned and controlled by the player who created it (CR 114.2 / 109.4c).
+    OfEmblem Card
+  | -- CR 725.2: a triggered ability with no object source, controlled by a
+    -- specific player baked in at trigger time (like DelayedTrigger's controller).
+    -- The monarch's two inherent abilities are the only customers.
+    OfInherentTrigger PlayerId (TriggeredAbility Card)
   deriving (Eq, Ord, Show)

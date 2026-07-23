@@ -179,4 +179,10 @@ data Effect card
     -- its controller (CR 109.5, baked in -- the source may be in a graveyard by
     -- the time anyone asks), a fresh timestamp, and Expiry.arm's answer.
     AffectPlayers Duration PlayerScope PlayerEffect
+  | -- CR 114.2: "[you] get an emblem with [abilities]." Puts an emblem owned and
+    -- controlled by the resolving controller into the command zone. Targetless
+    -- (the beneficiary is always the resolving controller); the abilities ride a
+    -- Card so the emblem reuses the whole ability pipeline. First-order: a data
+    -- Card, tied to Card by Card's own instantiation, exactly as Create's is.
+    CreateEmblem card
   deriving (Eq, Ord, Show)

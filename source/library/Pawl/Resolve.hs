@@ -51,6 +51,7 @@ import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import Pawl.Type.SlotName (SlotName)
+import qualified Pawl.Type.Source as Source
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.TapState as TapState
 import Pawl.Type.TargetSpec (TargetSpec)
@@ -86,6 +87,7 @@ slotsOf effect = case effect of
   Effect.GainControl _ slot -> Set.singleton slot
   Effect.ArmDelayedTrigger _ -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
+  Effect.CreateEmblem {} -> Set.empty
 
 -- D4 (the value half): does any of these effects read X? A card that reads X
 -- must declare {X} in its cost (the lint), the same reads-equal-declares contract
@@ -118,6 +120,7 @@ readsX = any effectReadsX
       Effect.GainControl _ _ -> False
       Effect.ArmDelayedTrigger _ -> False
       Effect.AffectPlayers {} -> False
+      Effect.CreateEmblem {} -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
 -- classification (design.md risk register). Read by Mana.isManaAbility to keep
@@ -146,6 +149,7 @@ manaProduced effect = case effect of
   Effect.GainControl _ _ -> Nothing
   Effect.ArmDelayedTrigger _ -> Nothing
   Effect.AffectPlayers {} -> Nothing
+  Effect.CreateEmblem {} -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -174,6 +178,7 @@ searchesLibrary effect = case effect of
   Effect.GainControl _ _ -> False
   Effect.ArmDelayedTrigger _ -> False
   Effect.AffectPlayers {} -> False
+  Effect.CreateEmblem {} -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
 -- must bind at cast (CR 612). Casing on Effect is Resolve's charter; Cast asks
@@ -246,6 +251,9 @@ rewriteEffect pairs effect = case effect of
   Effect.ArmDelayedTrigger _ -> effect
   -- A player effect carries no basic-land-type word for CR 612 to rewrite.
   Effect.AffectPlayers {} -> effect
+  -- An emblem's embedded card carries no basic-land-type word here (as Create's
+  -- token does not; spec section 8).
+  Effect.CreateEmblem {} -> effect
 
 -- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
 -- 608.2c/700.2 -- an unchosen mode's effects never resolve), with every
@@ -651,6 +659,25 @@ applyEffect source controller bound legality chosen effect = case effect of
                   ActivePlayerEffect.effect = playerEffect
                 }
          in gs1 {GameState.playerEffects = active : GameState.playerEffects gs1}
+  Effect.CreateEmblem card -> do
+    -- CR 114.2 / 613.7a: the emblem enters the command zone under the resolving
+    -- controller; its entry timestamp is what the projection reads when ordering
+    -- its static ability's continuous effect. Inert per-incarnation fields (it is
+    -- never tapped/damaged/countered): harmless, nothing reads them here.
+    let mkObj ts =
+          Object.MkObject
+            { Object.owner = controller,
+              Object.source = Source.OfEmblem card,
+              Object.zone = Zone.Command,
+              Object.tapped = TapState.Untapped,
+              Object.damage = 0,
+              Object.sickness = Sickness.Settled,
+              Object.bindings = Map.empty,
+              Object.counters = Map.empty,
+              Object.timestamp = ts
+            }
+    _ <- Event.placeObject controller mkObj Zone.Command
+    pure ()
   Effect.Counter slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- CR 701.6a: the slot's target is a spell on the stack; counter it through

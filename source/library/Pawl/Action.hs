@@ -26,6 +26,8 @@ playableLands pid gs =
           Source.OfToken card -> Card.isLand card
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
+          Source.OfEmblem _ -> False
+          Source.OfInherentTrigger _ _ -> False
         Nothing -> False
    in filter isLandObject (Game.zoneMembers Zone.Hand pid gs)
 

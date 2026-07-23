@@ -391,6 +391,8 @@ namedIs wanted mo = case mo of
     Source.OfToken card -> Card.Type.name card == wanted
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False
+    Source.OfEmblem _ -> False
+    Source.OfInherentTrigger _ _ -> False
   Nothing -> False
 
 -- The controller's strategy: when asked to decide for bob (the CONTROLLED player,

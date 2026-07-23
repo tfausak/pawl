@@ -83,6 +83,8 @@ humilityTimestamp cards gs =
           Source.OfToken _ -> False
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
+          Source.OfEmblem _ -> False
+          Source.OfInherentTrigger _ _ -> False
       hums = filter isHum (Set.toList (GameState.battlefield gs))
       stampOf oid = fmap Object.timestamp (Game.lookupObject oid gs)
    in case Maybe.mapMaybe stampOf hums of

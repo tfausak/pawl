@@ -732,6 +732,8 @@ creaturesInPlay pid gs =
           Source.OfToken card -> Card.isCreature card
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
+          Source.OfEmblem _ -> False
+          Source.OfInherentTrigger _ _ -> False
    in length (filter isCreatureObject (Game.zoneMembers Zone.Battlefield pid gs))
 
 countByName :: Text.Text -> PlayerId.PlayerId -> GameState.GameState -> Int
@@ -743,6 +745,8 @@ countByName wanted pid gs =
           Source.OfToken card -> Card.Type.name card == wanted
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
+          Source.OfEmblem _ -> False
+          Source.OfInherentTrigger _ _ -> False
       inLibrary = filter named (Game.zoneMembers Zone.Library pid gs)
       inHand = filter named (Game.zoneMembers Zone.Hand pid gs)
    in length inLibrary + length inHand
@@ -757,6 +761,8 @@ countOnBattlefieldByName wanted pid gs =
           Source.OfToken card -> Card.Type.name card == wanted
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
+          Source.OfEmblem _ -> False
+          Source.OfInherentTrigger _ _ -> False
    in length (filter named (Game.zoneMembers Zone.Battlefield pid gs))
 
 damageOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural.Natural

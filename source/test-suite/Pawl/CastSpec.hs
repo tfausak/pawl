@@ -151,7 +151,9 @@ stackTests cards =
                       HU.assertBool "creature" (Card.isCreature (Printing.card printing))
                     Source.OfToken _ -> HU.assertFailure "expected a card source"
                     Source.OfAbility _ _ -> HU.assertFailure "expected a card source"
-                    Source.OfTrigger _ _ -> HU.assertFailure "expected a card source",
+                    Source.OfTrigger _ _ -> HU.assertFailure "expected a card source"
+                    Source.OfEmblem _ -> HU.assertFailure "expected a card source"
+                    Source.OfInherentTrigger _ _ -> HU.assertFailure "expected a card source",
       HU.testCase "resolving conserves objects" $
         HU.assertEqual
           "conserved"
@@ -239,7 +241,9 @@ castTests cards =
                       HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name (Printing.card printing))
                     Source.OfToken _ -> HU.assertFailure "expected a card source"
                     Source.OfAbility _ _ -> HU.assertFailure "expected a card source"
-                    Source.OfTrigger _ _ -> HU.assertFailure "expected a card source",
+                    Source.OfTrigger _ _ -> HU.assertFailure "expected a card source"
+                    Source.OfEmblem _ -> HU.assertFailure "expected a card source"
+                    Source.OfInherentTrigger _ _ -> HU.assertFailure "expected a card source",
       HU.testCase "CR 117.1a a Bolt is castable outside a main phase" $
         let (gs, oid) = S.boltInHand cards 1 (Phase.Beginning BeginningStep.Upkeep)
          in HU.assertBool "instant speed" (Cast.castable S.alice oid gs),
@@ -548,6 +552,8 @@ nameOnStack wanted gs oid = case Game.lookupObject oid gs of
     Source.OfToken card -> Card.Type.name card == wanted
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False
+    Source.OfEmblem _ -> False
+    Source.OfInherentTrigger _ _ -> False
   Nothing -> False
 
 castPanglacial :: Prompt.Prompt r -> r

@@ -94,6 +94,8 @@ cardOf oid gs = case lookupObject oid gs of
     Source.OfToken card -> Just card
     Source.OfAbility _ _ -> Nothing
     Source.OfTrigger _ _ -> Nothing
+    Source.OfEmblem card -> Just card
+    Source.OfInherentTrigger _ _ -> Nothing
 
 -- CR 112.1: a spell is a card on the stack. This asks the object's zone AND its
 -- KIND (its Source) -- a classification like isPermanent (Stack.resolveTop), never
@@ -109,3 +111,5 @@ isSpell oid gs = case lookupObject oid gs of
       Source.OfToken _ -> False
       Source.OfAbility _ _ -> False
       Source.OfTrigger _ _ -> False
+      Source.OfEmblem _ -> False
+      Source.OfInherentTrigger _ _ -> False

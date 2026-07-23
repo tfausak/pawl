@@ -39,6 +39,8 @@ castsNamed cards name s =
           Source.OfToken card -> Card.Type.name card == name
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False
+          Source.OfEmblem _ -> False
+          Source.OfInherentTrigger _ _ -> False
       inGrave pid = any named (Game.zoneMembers Zone.Graveyard pid gs)
    in any inGrave [S.alice, S.bob]
 
@@ -53,6 +55,8 @@ cardBackedCount gs =
         Source.OfToken _ -> False
         Source.OfAbility _ _ -> False
         Source.OfTrigger _ _ -> False
+        Source.OfEmblem _ -> False
+        Source.OfInherentTrigger _ _ -> False
    in length (filter fromCard (Map.elems (GameState.objects gs)))
 
 propertyTests :: Cards.Cards -> Tasty.TestTree

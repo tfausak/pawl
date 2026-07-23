@@ -188,7 +188,9 @@ tests cards =
               Codec.jsonToEffect
               (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells),
           HU.testCase "GainPlayerCounters" $
-            roundTrip "gpc" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters PlayerCounterKind.Energy (Quantity.Literal 2))
+            roundTrip "gpc" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters PlayerCounterKind.Energy (Quantity.Literal 2)),
+          HU.testCase "CreateEmblem" $
+            roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card (Cards.pikerPrinting cards)))
         ],
       Tasty.testGroup
         "player effects (P7)"

@@ -87,6 +87,8 @@ costsFor oid gs = case Game.lookupObject oid gs of
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
     Source.OfTrigger _ _ -> []
+    Source.OfEmblem _ -> []
+    Source.OfInherentTrigger _ _ -> []
 
 -- CR 601.2f: "The total cost is the mana cost or alternative cost (as determined
 -- in rule 601.2b), plus all additional costs and cost increases, and minus all
