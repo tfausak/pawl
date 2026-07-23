@@ -484,7 +484,28 @@ ruleTests cards =
               HU.assertEqual "CR 729.3: bob has fewer than 7 cards, so alice wins the subgame" (Result.Won S.alice) result
               HU.assertEqual "CR 729.5: alice's cards funnel back into her main-game library" 8 (libCount S.alice)
               HU.assertEqual "CR 729.5: bob's cards funnel back into his main-game library" 3 (libCount S.bob)
-              HU.assertEqual "the main game resumes with no result recorded" Nothing (GameState.result after)
+              HU.assertEqual "the main game resumes with no result recorded" Nothing (GameState.result after),
+      HU.testCase "CR 729.1b/729.3 gameplay: alice casts a subgame spell, bob decks, bob takes 3" $
+        -- alice has the {0} subgame sorcery in hand and an 8-card library; bob has
+        -- a 3-card library (decks in the subgame, CR 729.3). alice casts through
+        -- the priority loop; the subgame resolves alice the winner; the follow-on
+        -- DealDamage hits bob (the loser) for 3.
+        let g0 = Setup.emptyGame S.bothPlayers
+            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG cards 3 S.bob (addManyG cards 8 S.alice g0)))
+            (spellId, g2) = S.addHandCard (Cards.syntheticSubgamePrinting cards) S.alice g1
+            gStart =
+              g2
+                { GameState.activePlayer = S.alice,
+                  GameState.phase = Phase.PrecombatMain,
+                  GameState.priority = Just S.alice
+                }
+            after = snd (Engine.runGamePure subgameAnswer gStart Engine.priorityLoop)
+         in do
+              HU.assertEqual "CR 729.1b: bob (the subgame loser) took 3 from the follow-on DealDamage" (Just 17) (S.lifeOf S.bob after)
+              HU.assertEqual "alice, the winner, is untouched" (Just 20) (S.lifeOf S.alice after)
+              HU.assertEqual "the subgame spell resolved and left the stack" [] (GameState.stack after)
+              HU.assertEqual "the main game did not end" Nothing (GameState.result after)
+              HU.assertEqual "the subgame spell is gone from alice's hand (cast)" False (Maybe.isJust (Game.lookupObject spellId after) && elem spellId (Game.zoneMembers Zone.Hand S.alice after))
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
@@ -621,6 +642,21 @@ restartAnswer p = case p of
   Prompt.ChooseAction _ _ actions ->
     case filter isActivateAction actions of
       activation : _ -> activation
+      [] -> A.Pass
+  _ -> S.identityAnswer p
+
+-- CR 729 gate strategy. Whoever has priority casts the only castable spell on the
+-- board -- the synthetic subgame sorcery ({0}, in alice's hand) -- and otherwise
+-- passes. Inside the subgame the libraries are Mountains (lands are PLAYED, not
+-- cast), so no cast is available there and everyone passes to termination (bob
+-- decks). Because subgame prompts are UNTAGGED, the same answerer serves both
+-- games. Non-ChooseAction prompts (Shuffle during setup, etc.) delegate to
+-- identityAnswer.
+subgameAnswer :: Prompt.Prompt r -> r
+subgameAnswer p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    case filter isCastAction actions of
+      cast : _ -> cast
       [] -> A.Pass
   _ -> S.identityAnswer p
 
