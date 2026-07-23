@@ -1,14 +1,15 @@
 module Pawl.Type.CountSpec where
 
 -- What a Quantity.Count counts. A first-order, analyzable classification, never
--- a predicate function -- the TargetSpec.WallTarget posture: one hand-carved
--- variant per card, specific before general.
+-- a predicate function -- one hand-carved variant per card, specific before
+-- general.
 --
 -- Deliberately its own type rather than flat arms on Quantity: Quantity is a
 -- small, closed numeric-tower type (CR 107.3, 208.2), and card-shaped growth
--- belongs somewhere P9's criterion/filter language can retire WHOLESALE.
+-- belongs somewhere the count/compare phase can retire WHOLESALE.
 --
--- Retired wholesale by P9's criterion/filter language (#39).
+-- P9 built the per-object Filter this will reuse; the aggregation-and-threshold
+-- concept is deferred to that later count/compare phase (#39).
 --
 -- The first two inhabitants read only zone membership and PRINTED card types, and
 -- CreaturesDiedThisTurn reads only the event log's own snapshots -- never the LIVE

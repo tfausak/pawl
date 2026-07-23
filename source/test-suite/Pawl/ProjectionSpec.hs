@@ -303,7 +303,7 @@ tests cards =
          in do
               HU.assertEqual "power = mana value" (Just 2) (Projection.powerOf oid gs)
               HU.assertEqual "toughness = mana value" (Just 2) (Projection.toughnessOf oid gs),
-      HU.testCase "CR 613 affected-set reads the partial: a layer-4 creature-add is seen by a layer-6 AllCreatures grant" $
+      HU.testCase "CR 613 affected-set reads the partial: a layer-4 creature-add is seen by a layer-6 Matching (HasCardType Creature) grant" $
         let gs0 = S.landsInPlay (Cards.forestPrinting cards) 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
@@ -371,6 +371,7 @@ tests cards =
             (_, g1) = S.addCreature (Cards.opalescencePrinting cards) S.alice base
             (humilityId, gs) = S.addCreature (Cards.humilityPrinting cards) S.alice g1
          in HU.assertEqual "Humility's 1/1 7b wins" (Just 1) (Projection.powerOf humilityId gs),
+      -- Opalescence's non-Aura qualifier is unenforced; Aura subtype unmodeled (#114)
       HU.testCase "CR 305.2 Opalescence is not itself a creature (\"each other\")" $
         let base = Setup.emptyGame S.bothPlayers
             (opalId, g1) = S.addCreature (Cards.opalescencePrinting cards) S.alice base
@@ -378,7 +379,7 @@ tests cards =
          in HU.assertBool "Opalescence stays a non-creature enchantment" (not (Projection.isCreatureOf opalId gs)),
       HU.testCase "CR 613.7 within layer 4, timestamp order (EXPIRES at CR 613.8b, #11)" $
         -- A Piker made a Land by B (layer 4, TheseObjects), and A = AddLandSubtype
-        -- Swamp over AllLands (layer 4). With A OLDER than B, timestamp order applies
+        -- Swamp over Matching (HasCardType Land) (layer 4). With A OLDER than B, timestamp order applies
         -- A before B, so A does not yet see the Piker as a land and adds no Swamp.
         -- The CR 613.8b-correct answer is that A depends on B (B changes what A
         -- applies to), so B applies first and the Piker WOULD gain Swamp. When the

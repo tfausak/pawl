@@ -331,8 +331,9 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 --     READERS: under CR 613.3, devoid applies at the START of layer 5, so at
 --     layers 2, 3 and 4 the CR says a devoid object with {B} in its mana cost is
 --     still black, while this seed-based implementation already says colourless.
---     Affected.CreaturesOfColor (this phase) makes that gap expressible open-half
---     data TODAY: a card pairing {"affected": {"CreaturesOfColor": ...}} with a
+--     A Matching Exclusion (And [HasCardType Creature, HasColor c]) affected set
+--     (this phase's Affected/Filter) makes that gap expressible open-half data
+--     TODAY: a card pairing {"affected": {"type":"Matching", ...}} with a
 --     layer-4 AddCardType, a layer-3 ChangeSubtypeWord, or a layer-2 SetController
 --     would have its affected set evaluated against PC.colors with devoid already
 --     applied, which is the wrong answer per 613.3. No card in the pool does

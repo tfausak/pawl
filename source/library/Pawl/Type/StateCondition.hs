@@ -8,12 +8,13 @@ import Pawl.Type.Subtype (Subtype)
 -- trigger event occurs, CR 608.2a again on resolution), and a "for as long as"
 -- duration (CR 611.2b, Pawl.Expiry.arm and Pawl.Expiry.sweepConditional).
 --
--- Hand-carved, one variant per card -- the TargetSpec.WallTarget and CountSpec
--- posture, specific before general. Only Pawl.Event may case on it, and it reads
--- the PROJECTION: a subtype is CR 613 layer 4 and control is layer 2, so a card
+-- Hand-carved, one variant per card -- the same specific-before-general posture
+-- CountSpec shares. Only Pawl.Event may case on it, and it reads the
+-- PROJECTION: a subtype is CR 613 layer 4 and control is layer 2, so a card
 -- that changed either must change the answer.
 --
--- Retired wholesale by P9's criterion/filter language (#38).
+-- P9 built the per-object Filter this will reuse; the count/compare concept
+-- (scope + aggregation + threshold) is deferred to a later phase (#38).
 data StateCondition
   = -- CR 603.8: Barbarian Outcast, "you control no Swamps". Scoped to the
     -- ABILITY's controller (CR 603.3a), not to the board.

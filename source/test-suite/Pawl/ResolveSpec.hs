@@ -151,7 +151,7 @@ targetTests cards =
       -- CR 115.1a / 700.2c: "target Wall" (Chaos Charm) restricts CreatureTarget to
       -- creatures whose PROJECTED subtypes include Wall. Wall of Stone (a real 0/8
       -- Creature - Wall, M4g) is the Wall; a Piker is the non-Wall control.
-      HU.testCase "CR 115.1a / 700.2c WallTarget offers a Wall creature but not a non-Wall creature" $
+      HU.testCase "CR 115.1a / 700.2c \"target Wall\" offers a Wall creature but not a non-Wall creature" $
         let (wallId, base) = S.addCreature (Cards.wallOfStonePrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             (pikerId, gs) = S.addPiker cards S.alice base
             slot = SlotName.MkSlotName (Text.pack "target")

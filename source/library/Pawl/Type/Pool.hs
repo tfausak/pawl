@@ -11,5 +11,5 @@ data Pool
   | AnyTarget -- CR 115.4: creatures + players (planeswalkers/battles absent).
   | Permanents -- CR 110.1: permanents on the battlefield (ToObject).
   | Spells -- CR 112.1: spells on the stack (ToObject).
-  | SpellsAndPermanents -- CR 115: stack objects + battlefield permanents (ToObject).
+  | SpellsAndPermanents -- CR 115: spells on the stack + battlefield permanents (ToObject).
   deriving (Eq, Ord, Show)

@@ -537,7 +537,8 @@ addHandCard printing pid gs =
       )
 
 -- Humility on the battlefield under bob's control (it is not a creature, so
--- AllCreatures does not touch it). Returns the updated state.
+-- a Matching (HasCardType Creature) affected set does not touch it). Returns
+-- the updated state.
 withHumility :: Cards.Cards -> GameState.GameState -> GameState.GameState
 withHumility cards gs = snd (addCreature (Cards.humilityPrinting cards) bob gs)
 
