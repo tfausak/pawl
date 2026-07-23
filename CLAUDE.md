@@ -61,7 +61,13 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   umbrella spec is
   `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`; the
   distilled per-phase entries (gate cards, decisions, opcodes) are in
-  `docs/progress.md`. **M5 is the next milestone to plan.**
+  `docs/progress.md`. **M5 is now underway: M5a (Controlling Another Player,
+  CR 723) has landed** — a gameplay-level Mindslaver gate over the
+  already-built `Decider` substrate, plus the 723.1a/723.5a edges and the
+  723.6 concede deferral (concede is unbuilt, #133). **M5b (Restarting the
+  Game, CR 727) is the next phase to plan** (introduces
+  `startGameFromCards`). The umbrella spec is
+  `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —
   lives in `docs/progress.md`. It records what each milestone *established*,

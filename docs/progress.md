@@ -1939,3 +1939,31 @@ its own gate card and spec, landed as it completes. Umbrella:
   one of each in the same batch; no pool card produces the collision yet).
   **Tracking:** closes #7 (M4.5 P11, the umbrella) — **M4.5 is complete**.
   Spec: `docs/superpowers/specs/2026-07-23-p11-command-zone-emblems-monarch-design.md`.
+
+## M5 (phased)
+
+- **M5a is complete** (Controlling Another Player — CR 723 — the first M5 phase;
+  a *close-out* of the `Decider` bet placed on day one and wired through M4a, not
+  a new axis). **Gate: Mindslaver** at gameplay level — alice activates a real
+  Mindslaver through the driver loop targeting bob, the engine installs pending
+  control (CR 723.1), promotes it on bob's turn (`Engine.handoffTurn`), alice
+  makes bob's action/mode/target choices (and, in a sibling test, bob's combat
+  attackers, CR 723.5) for bob's turn, and control lapses at the following turn
+  boundary. The decisions it proves: **723 is an indirection, already built** —
+  the substrate (`Pawl.Type.Decider`, `Decide.deciderFor`, `pendingControl`/
+  `activeControl`, `Effect.ControlPlayerNextTurn`, the `handoffTurn` promotion)
+  needed no change; M5a adds proof and edges, not machinery. The three edges:
+  **723.1a** — player-controlling effects overwrite, last created wins, because a
+  resolution-created continuous effect's creation time is its resolution time, so
+  last-created = last-`Map.insert` on `pendingControl` (asserted with two effects
+  at the same target, distinct controllers); **723.5a** — cost payment debits only
+  the controlled player's resources (already true by construction: `Cost.pay pid`/
+  `Mana.payCost pid`; the negative half — the controller's own Mountain and hand
+  untouched — is now asserted); **723.6** — the controller cannot make the
+  controlled player concede: concede is unbuilt, deferred as a new player-action
+  axis (#133), with a durable guard comment at `Engine.priorityLoop`'s
+  `ChooseAction` site stating concede must read the true player, never the
+  `Decider`. **Added:** nothing in the library — zero new types, opcodes, or
+  prompts; four gameplay/resolution tests (`GameSpec`, `ResolveSpec`) and one
+  guard comment. **Deferred:** concede (#133); 723.2 limited-duration control
+  (Word of Command, Opposition Agent; card-driven).
