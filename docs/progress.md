@@ -1967,3 +1967,29 @@ its own gate card and spec, landed as it completes. Umbrella:
   prompts; four gameplay/resolution tests (`GameSpec`, `ResolveSpec`) and one
   guard comment. **Deferred:** concede (#133); 723.2 limited-duration control
   (Word of Command, Opposition Agent; card-driven).
+
+- **M5b is complete** (Restarting the Game — CR 727 — the second M5 phase;
+  the lower-risk of the two game-lifecycle phases, and the one that introduces
+  the primitive M5c reuses). **Gate: a labeled-synthetic "Restart" artifact**
+  (the `Landform` crutch pattern; documented expiry → **Karn Liberated**, #135)
+  whose activated ability's only effect is the new nullary `Effect.RestartGame`
+  opcode. At gameplay level, bob activates it through the real priority loop; it
+  resolves to `Setup.restartGame controller` and rebuilds the single `GameState`
+  slot. The decision it proves: **restart is replace-in-place, not fresh setup**
+  — `startGameFromCards` rebuilds every player's library from the *actual object
+  pool* (each owner's `Source.OfCard` objects, wherever they sat; non-cards
+  cease), ownership preserved (CR 727.2), and the starting player is the
+  *restart's controller* (CR 727.1a), rotated to the head of the turn order (CR
+  103) — both of which `Setup.emptyGame` + `Setup.newGame` would get wrong. The
+  edges: **727.4** — the effect settles just before the first untap step (phase
+  `Beginning Untap`, no priority, turn 1); **727.3** — a player owning fewer than
+  seven cards draws from an empty library and loses at the next SBA check, reusing
+  the existing draw-from-empty path. **Added:** `Setup.startGameFromCards`
+  (reused verbatim by M5c) and `Setup.restartGame`/`rotateTo`; one nullary
+  `Effect.RestartGame` opcode (six `Resolve` dispatch arms + two `Codec` arms +
+  the `applyEffect` executor calling `Setup.restartGame`); the `synthetic-restart`
+  card. **Deferred:** live `playGame` re-entry after an in-game restart (#134);
+  full Karn Liberated's CR 727.5/727.5a exemption + put-onto-battlefield rider
+  (#135, card-driven), which retires the synthetic gate; CR 727.6 subgame-restart
+  (rides M5c) and CR 727.2's outside-the-game cards (subsystem-blocked), noted in
+  #135.

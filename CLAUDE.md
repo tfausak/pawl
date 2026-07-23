@@ -65,8 +65,15 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   CR 723) has landed** — a gameplay-level Mindslaver gate over the
   already-built `Decider` substrate, plus the 723.1a/723.5a edges and the
   723.6 concede deferral (concede is unbuilt, #133). **M5b (Restarting the
-  Game, CR 727) is the next phase to plan** (introduces
-  `startGameFromCards`). The umbrella spec is
+  Game, CR 727) has landed** — a labeled-synthetic "Restart" artifact drives
+  a gameplay-level gate over a new nullary `Effect.RestartGame` opcode that
+  resolves to `Setup.restartGame`, rebuilding the game in place from its
+  actual cards (CR 727.2) with the restart's controller as starting player
+  (CR 727.1a), settling just before the first untap step (CR 727.4); it
+  introduces the shared `startGameFromCards` primitive that M5c reuses.
+  Deferred: live `playGame` re-entry after an in-game restart, and full Karn
+  Liberated (CR 727.5/727.5a). **M5c (Subgames, CR 729 — the M5 go/no-go)
+  is the next phase to plan.** The umbrella spec is
   `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —

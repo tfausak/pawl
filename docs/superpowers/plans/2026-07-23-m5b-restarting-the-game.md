@@ -507,7 +507,7 @@ Expected: **PASS** — warning-clean build (all `case effect of` sites now exhau
 
 If the build reports an **import cycle** between `Pawl.Resolve` and `Pawl.Setup`, STOP — this plan verified there is none (Setup and its deps do not import Resolve). A cycle means an unrelated import was added; do not paper over it by moving `restartGame`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -825,7 +825,7 @@ Land the phase per `docs/workflow.md`: definitive warning-clean build, full test
 **Files:**
 - Modify: `docs/progress.md` (append the M5b entry), `CLAUDE.md` (replace the status bullet), `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md` (tick M5b in the §3 table).
 
-- [ ] **Step 1: Definitive warning-clean build**
+- [x] **Step 1: Definitive warning-clean build**
 
 ```bash
 cabal clean
@@ -833,21 +833,21 @@ cabal build all --enable-tests --enable-benchmarks
 ```
 Expected: **no warnings, no errors** (a clean build defeats incremental warning-hiding — the `RestartGame` arms in unchanged-looking modules are re-checked).
 
-- [ ] **Step 2: Full test suite green**
+- [x] **Step 2: Full test suite green**
 
 ```bash
 cabal test
 ```
 Expected: **all pass**, including the Task 1–5 additions. Do not proceed if anything is red.
 
-- [ ] **Step 3: Invariant + rules audit**
+- [x] **Step 3: Invariant + rules audit**
 
 Confirm by inspection (note anything material in the commit body):
 - **Invariant 1:** `Pawl.Resolve` still cases only on the `RestartGame` *classification*; there is no `case … Karn` or card-identity match. `restartGame`/`startGameFromCards` read `Source.OfCard` (a classification), never a card name.
 - **Invariant 2:** no choice was elided — the starting player is fixed by CR 727.1a (the controller), not prompted; shuffles remain `Prompt.Shuffle`. The two deferrals carry expiry-tagged issues (Task 6) cited inline.
 - **Rules re-check** against `docs/rules.txt`: CR 727.1 (6248), 727.1a (6250), 727.2 (6252), 727.3 (6255), 727.4 (6257), 727.5/727.5a (6259/6261), 727.6 (6263); CR 103.5 opening hands (296). Delegate this citation pass to a cheap model if using subagents (Haiku, per `docs/workflow.md`).
 
-- [ ] **Step 4: Append the M5b completion entry to `docs/progress.md`**
+- [x] **Step 4: Append the M5b completion entry to `docs/progress.md`**
 
 Add after the M5a entry (matching the surrounding bullet style):
 
@@ -881,7 +881,7 @@ Add after the M5a entry (matching the surrounding bullet style):
 
 Replace `#N1`/`#N2` with the Task 6 issue numbers.
 
-- [ ] **Step 5: Replace the `CLAUDE.md` status bullet**
+- [x] **Step 5: Replace the `CLAUDE.md` status bullet**
 
 In `CLAUDE.md`, the "Current work and tracking" first bullet currently ends with the M5a-landed / "M5b … is the next phase to plan" framing. **Replace** the tail (do not append a second status bullet) so it reads that M5b has landed and M5c is next — keeping the M0–M5a history summary intact:
 
@@ -898,7 +898,7 @@ In `CLAUDE.md`, the "Current work and tracking" first bullet currently ends with
 
 Keep the existing pointers to `docs/progress.md` and the umbrella spec intact.
 
-- [ ] **Step 6: Tick M5b in the umbrella spec**
+- [x] **Step 6: Tick M5b in the umbrella spec**
 
 In `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`, mark the **M5b** row of the §3 phase table as landed: change `| **M5b** |` to `| **M5b ✅** |` (per §6: record the completion in `progress.md` and tick the phase here).
 
