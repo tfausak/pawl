@@ -16,6 +16,7 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
+import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -356,7 +357,54 @@ ruleTests cards =
          in do
               HU.assertEqual "bob took 3 from his own Bolt" (Just 17) (S.lifeOf S.bob after)
               HU.assertEqual "bob's Bolt is in bob's graveyard" 1 boltInBobGrave
-              HU.assertEqual "the Mountain (bob's) is tapped" 1 (S.tappedCount S.bob after)
+              HU.assertEqual "the Mountain (bob's) is tapped" 1 (S.tappedCount S.bob after),
+      HU.testCase "CR 723.1/723.3 gameplay: Mindslaver hands alice bob's whole turn, then control lapses" $
+        -- Alice activates a REAL Mindslaver through the driver loop at bob, the
+        -- engine promotes control on bob's turn, alice casts bob's Bolt at bob
+        -- (bob's own resource), and control ends at the following turn boundary.
+        let g0 = Setup.emptyGame S.bothPlayers
+            (_msId, g1) = S.addCreature (Cards.mindslaverPrinting cards) S.alice g0
+            -- {4} for Mindslaver's activation: four untapped Mountains for alice.
+            (_a1, g2) = S.addCreature (Cards.mountainPrinting cards) S.alice g1
+            (_a2, g3) = S.addCreature (Cards.mountainPrinting cards) S.alice g2
+            (_a3, g4) = S.addCreature (Cards.mountainPrinting cards) S.alice g3
+            (_a4, g5) = S.addCreature (Cards.mountainPrinting cards) S.alice g4
+            -- bob's own resources for his controlled turn: a Mountain and a Bolt.
+            (_bMtn, g6) = S.addCreature (Cards.mountainPrinting cards) S.bob g5
+            (_bBolt, g7) = handBobBolt cards g6
+            gStart =
+              g7
+                { GameState.activePlayer = S.alice,
+                  GameState.phase = Phase.PrecombatMain,
+                  GameState.priority = Just S.alice
+                }
+            -- Alice's turn: activate Mindslaver at bob; the ability resolves and
+            -- installs pending control for bob (CR 723.1).
+            afterActivation = snd (Engine.runGamePure gateAnswer gStart Engine.priorityLoop)
+            -- Handoff to bob's turn promotes pendingControl -> activeControl.
+            bobsTurn = snd (Engine.runGamePure gateAnswer afterActivation Engine.handoffTurn)
+            -- Bob's controlled main phase: alice decides, casting bob's Bolt at bob.
+            bobMain = bobsTurn {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+            bobPlayed = snd (Engine.runGamePure gateAnswer bobMain Engine.priorityLoop)
+            -- Next handoff (bob -> alice) clears control (CR 723.1: ends at the
+            -- beginning of the next turn).
+            afterBob = snd (Engine.runGamePure gateAnswer bobPlayed Engine.handoffTurn)
+            boltInBobGrave =
+              length
+                ( filter
+                    (namedIs (Text.pack "Lightning Bolt"))
+                    (map (\i -> Game.lookupObject i bobPlayed) (Game.zoneMembers Zone.Graveyard S.bob bobPlayed))
+                )
+         in do
+              HU.assertEqual "CR 723.1: control pending for bob after activation" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl afterActivation))
+              HU.assertEqual "CR 723.1: promoted to active control on bob's turn" (Just (Decider.MkDecider S.alice)) (GameState.activeControl bobsTurn)
+              HU.assertEqual "CR 723.3: bob is still the active player while controlled" S.bob (GameState.activePlayer bobsTurn)
+              HU.assertEqual "CR 723.5: bob's decisions route to alice" (Decider.MkDecider S.alice) (Decide.deciderFor S.bob bobsTurn)
+              HU.assertEqual "alice's whole-turn choice moved bob's life" (Just 17) (S.lifeOf S.bob bobPlayed)
+              HU.assertEqual "bob's Bolt went to bob's graveyard" 1 boltInBobGrave
+              HU.assertEqual "bob's Mountain (his resource) is tapped" 1 (S.tappedCount S.bob bobPlayed)
+              HU.assertEqual "CR 723.1: control lapses at the next turn" (Decider.MkDecider S.bob) (Decide.deciderFor S.bob afterBob)
+              HU.assertEqual "active control cleared after bob's turn" Nothing (GameState.activeControl afterBob)
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
@@ -435,3 +483,32 @@ isCastAction :: A.Action -> Bool
 isCastAction a = case a of
   A.Cast _ -> True
   _ -> False
+
+-- Is this a legal-action Activate? On the gate board (a Mindslaver plus basic
+-- lands, whose mana abilities are intrinsic and never surface as activated
+-- abilities) the ONLY Activate action is Mindslaver's, so "the first Activate"
+-- is unambiguously Mindslaver's control ability.
+isActivateAction :: A.Action -> Bool
+isActivateAction a = case a of
+  A.Activate _ _ -> True
+  _ -> False
+
+-- CR 723 gate strategy. Alice, deciding for herself, fires Mindslaver (the only
+-- activation on the board) at bob; once she is bob's decider (CR 723.5, the
+-- prompt's Decider is alice while player is bob) she casts bob's Bolt; otherwise
+-- pass. Non-ChooseAction prompts (targets, modes, shuffle, ...) delegate to
+-- slaveAnswer, which targets bob. A naive engine ignoring control would send
+-- bob's ChooseAction with Decider = bob; the else-branch would pass, bob would
+-- keep 20 life, and the gate would fail -- the falsifier.
+gateAnswer :: Prompt.Prompt r -> r
+gateAnswer p = case p of
+  Prompt.ChooseAction (Decider.MkDecider d) player actions ->
+    case filter isActivateAction actions of
+      activation : _ -> activation
+      [] ->
+        if player == S.bob && d == S.alice
+          then case filter isCastAction actions of
+            h : _ -> h
+            [] -> A.Pass
+          else A.Pass
+  _ -> slaveAnswer p
