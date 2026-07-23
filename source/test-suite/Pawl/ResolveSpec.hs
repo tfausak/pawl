@@ -43,6 +43,7 @@ import qualified Pawl.Type.Exclusion as Exclusion
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 import qualified Pawl.Type.Filter as Filter.Type
+import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -619,6 +620,57 @@ resolveTests cards =
               HU.assertEqual "the game restarted with bob as the starting player (CR 727.1a)" S.bob (GameState.activePlayer after)
               HU.assertEqual "alice's 8 cards all survived the restart, still hers (CR 727.2)" 8 (length (filter (\o -> Object.owner o == S.alice) (Map.elems (GameState.objects after))))
               HU.assertEqual "the resolving ability object ceased to exist (not a card)" Nothing (Game.lookupObject abilId after),
+      HU.testCase "CR 729.1b: PlaySubgame binds the loser, a later DealDamage reads it (mid-resolution binding visible)" $
+        let g0 = Setup.emptyGame S.bothPlayers
+            slot = SlotName.MkSlotName (Text.pack "loser")
+            -- a stub runner: no real subgame, just report alice won -> loser = bob.
+            stubRunner :: Game Result.Result
+            stubRunner = pure (Result.Won S.alice)
+            -- hand-build alice's spell on the stack: one chosen mode (index 0),
+            -- effects [PlaySubgame slot, DealDamage slot (Literal 3)], no targets.
+            (spellId, g1) = Game.freshObjectId g0
+            (ts, g2) = Game.freshTimestamp g1
+            -- a minimal synthetic card whose spell has the two effects above;
+            -- mirrors the file's existing synthetic-card idiom (CR 612 test above).
+            card =
+              Card.Type.MkCard
+                { Card.Type.name = Text.pack "Subgame Test Spell",
+                  Card.Type.manaCost = Nothing,
+                  Card.Type.typeLine = Card.Type.typeLine (Printing.card (Cards.lightningBoltPrinting cards)),
+                  Card.Type.power = Nothing,
+                  Card.Type.toughness = Nothing,
+                  Card.Type.keywords = Set.empty,
+                  Card.Type.colorIndicator = Set.empty,
+                  Card.Type.staticAbilities = [],
+                  Card.Type.spell =
+                    Modal.MkModal
+                      (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage slot (Quantity.Literal 3)]) Map.empty))
+                      (ModeSelection.ChooseExactly 1),
+                  Card.Type.activatedAbilities = [],
+                  Card.Type.replacementEffects = [],
+                  Card.Type.triggeredAbilities = [],
+                  Card.Type.delayedAbilities = Map.empty,
+                  Card.Type.castingPermissions = [],
+                  Card.Type.characteristicPT = Nothing,
+                  Card.Type.playerAbilities = [],
+                  Card.Type.additionalCosts = [],
+                  Card.Type.alternativeCosts = []
+                }
+            spellObj =
+              Object.MkObject
+                { Object.owner = S.alice,
+                  Object.source = Source.OfToken card,
+                  Object.zone = Zone.Stack,
+                  Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
+                  Object.sickness = Sickness.Settled,
+                  Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+                  Object.counters = Map.empty,
+                  Object.timestamp = ts
+                }
+            g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
+            after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
+         in HU.assertEqual "bob (the derived loser) lost 3 life to the follow-on DealDamage" (Just 17) (S.lifeOf S.bob after),
       HU.testCase "CR 111 Dragon Fodder creates two 1/1 Goblin tokens" $
         let base = S.landsInPlay (Cards.mountainPrinting cards) 2
             (gs, spellId) = S.handOne (Cards.dragonFodderPrinting cards) base

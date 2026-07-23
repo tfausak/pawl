@@ -96,6 +96,12 @@ you = SlotName.MkSlotName (Text.pack "you")
 toObject :: ObjectId -> Binding
 toObject oid = Binding.empty {Binding.target = Just (Recipient.ToObject oid)}
 
+-- A binding that names one player and nothing else -- CR 729.1b's subgame
+-- loser, bound by Pawl.Resolve's bindLoserSlot. Mirrors toObject, but the
+-- recipient is a player (ToPlayer), not an object.
+toPlayer :: PlayerId -> Binding
+toPlayer pid = Binding.empty {Binding.target = Just (Recipient.ToPlayer pid)}
+
 -- Bind an object under the reserved triggerSource slot. A dedicated
 -- single-purpose slot, so this insert never clobbers another binding (setCopy's
 -- posture).

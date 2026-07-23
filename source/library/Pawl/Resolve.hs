@@ -3,6 +3,7 @@ module Pawl.Resolve where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -52,6 +53,8 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity.Type
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
+import Pawl.Type.Result (Result)
+import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Sickness as Sickness
 import Pawl.Type.SlotName (SlotName)
 import qualified Pawl.Type.Source as Source
@@ -304,8 +307,15 @@ effectsOf oid gs = case Game.lookupObject oid gs of
 -- run in order (CR 608.2c), each skipping a slot whose target is illegal
 -- (illegal targets are unaffected; other parts still happen), and the spell
 -- goes to its owner's graveyard as the final part of resolution (CR 608.2n).
-resolveSpell :: ObjectId -> Game ()
-resolveSpell oid = do
+-- CR 608.2b/608.2c, extended for CR 729.1b: resolve a spell, re-reading the
+-- resolving object's bindings before EACH effect so a slot DEFINED mid-resolution
+-- (PlaySubgame's loser; a Create's minted token) is visible to a later effect.
+-- Target-slot legality is still fixed at the START of resolution (the pre-fold
+-- `gs`); only newly-defined reserved slots (never targets) newly appear, and a
+-- reserved slot is vacuously legal (legalSlot's Nothing branch). `runSubgame` is
+-- the injected nested-game runner.
+resolveSpellWith :: Game Result -> ObjectId -> Game ()
+resolveSpellWith runSubgame oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure ()
@@ -343,8 +353,20 @@ resolveSpell oid = do
                 -- rather than trusting the frozen owner outright, the same
                 -- shape an ability's controller recompute used to take (#83).
                 let effectController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-                Monad.mapM_ (applyEffect oid effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) (effectsOf oid gs)
+                Monad.forM_ (effectsOf oid gs) $ \eff -> do
+                  -- Re-read the live bindings for THIS effect: a prior PlaySubgame
+                  -- may have bound its loser slot. Target legality is recomputed
+                  -- with the same pre-fold `legalSlot` (targets unchanged; the new
+                  -- reserved slot is vacuously legal).
+                  bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
+                  let chosenNow = Binding.targetsOf bindingsNow
+                      legalityNow = Map.mapWithKey legalSlot chosenNow
+                  applyEffectWith runSubgame oid effectController (Binding.subtypesOf bindingsNow) legalityNow chosenNow eff
                 Event.changeZone oid Zone.Graveyard
+
+-- The no-subgame spell resolver (Stack's default path and every direct caller).
+resolveSpell :: ObjectId -> Game ()
+resolveSpell = resolveSpellWith noSubgame
 
 -- CR 608.2: the executor shared by an activated ability (M3e) and a triggered
 -- ability (M3f) on the stack. Re-validate filled slots (CR 608.2b), fold
@@ -416,8 +438,11 @@ cease abilId gs =
 -- `controller` is the controller of the resolving spell/ability -- who searches
 -- their own library (CR 701.23), never the effect `source` (for an ability, the
 -- source permanent may already be sacrificed as a cost).
-applyEffect :: ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
-applyEffect source controller bound legality chosen effect = case effect of
+-- The subgame-runner-aware executor. `runSubgame` is the injected Game Result
+-- that PLAYS a nested game (Engine.playSubgame); the bare applyEffect below
+-- passes noSubgame. Only the PlaySubgame arm consults it.
+applyEffectWith :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
+applyEffectWith runSubgame source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity -> do
     gs <- State.get
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -531,10 +556,19 @@ applyEffect source controller bound legality chosen effect = case effect of
   -- the CR 727.5/727.5a exemption + put-onto-battlefield rider of full Karn
   -- Liberated (#135), which retires the synthetic-restart gate.
   Effect.RestartGame -> Setup.restartGame controller
-  -- CR 729.1: play a subgame. Wired to the injected runner in resolveSpellWith
-  -- (Task 3); the bare applyEffect path is the no-subgame default (an ability
-  -- that plays a subgame is deferred). Placeholder no-op until Task 3.
-  Effect.PlaySubgame _ -> pure ()
+  -- CR 729.1/729.5: run the nested game to completion (the runner does the
+  -- construction, play, funnel-back, and reshuffle); then bind its outcome.
+  -- CR 729.1b: the loser is the 2-player derivation from the Result; a Drawn
+  -- subgame binds nothing (the follow-on then no-ops). Multi-player "each
+  -- player who doesn't win" and a widened Result are deferred.
+  Effect.PlaySubgame slot -> do
+    result <- runSubgame
+    order <- State.gets GameState.turnOrder
+    case result of
+      Result.Won winner -> case List.find (/= winner) order of
+        Just loser -> State.modify' (bindLoserSlot source slot loser)
+        Nothing -> pure ()
+      Result.Drawn -> pure ()
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -827,6 +861,11 @@ applyEffect source controller bound legality chosen effect = case effect of
                     }
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
 
+-- The no-subgame executor (the ability path and every direct caller): a
+-- PlaySubgame resolves as a draw here (see noSubgame).
+applyEffect :: ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
+applyEffect = applyEffectWith noSubgame
+
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.
 -- `holder` is the effect SOURCE, which is the resolving spell itself for a
@@ -850,6 +889,21 @@ applyEffect source controller bound legality chosen effect = case effect of
 bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
 bindSlot holder slot target gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
+   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+
+-- The default runner for every resolution that is NOT a subgame-bearing spell:
+-- there is no nested game, so a PlaySubgame effect resolves as a draw and binds
+-- nothing. The ability path (resolveEffects) and every direct test caller take
+-- this; a subgame played from an ABILITY is deferred (no gate card needs one).
+noSubgame :: Game Result
+noSubgame = pure Result.Drawn
+
+-- CR 729.1b: bind the subgame's derived loser (a player) into `slot` on the
+-- resolving object, so a later effect (DealDamage) can read it. Mirrors bindSlot,
+-- but the recipient is a player (ToPlayer), not an object.
+bindLoserSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
+bindLoserSlot holder slot loser gs =
+  let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer loser) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
