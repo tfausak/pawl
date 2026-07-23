@@ -30,6 +30,7 @@ data Keyword
   | Trample -- 702.19
   | Vigilance -- 702.20
   | Fear -- 702.36
+  | Infect -- 702.90
   | Devoid -- 702.114
   deriving (Eq, Ord, Show)
 

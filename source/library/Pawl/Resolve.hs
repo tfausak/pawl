@@ -385,7 +385,7 @@ applyEffect source controller bound legality chosen effect = case effect of
             -- The applied effect IS the event (the M3a spec, section 4):
             -- constructing this DamageEvent and funneling it is the whole
             -- application. CR 120.3e / 120.3a live in applyDamage.
-            Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n) (Projection.hasKeyword Keyword.Deathtouch source gs) DamageKind.Noncombat]
+            Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n) (Projection.hasKeyword Keyword.Deathtouch source gs) (Projection.hasKeyword Keyword.Infect source gs) DamageKind.Noncombat]
       _ -> pure ()
   Effect.ModifyTarget duration modification slot ->
     State.modify' $ \gs ->

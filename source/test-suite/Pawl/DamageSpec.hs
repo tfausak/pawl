@@ -112,7 +112,7 @@ creatureSbaTests cards =
             -- A real 2/1 Piker (bob's) is the damage source; alice's 1/1 token takes 2.
             (srcId, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob base
             (tokId, gs2) = S.addToken goblinCard S.alice gs1
-            damaged = S.runPure S.identityAnswer gs2 (Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False DamageKind.Combat])
+            damaged = S.runPure S.identityAnswer gs2 (Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False False DamageKind.Combat])
             settled = S.settleSba damaged
          in do
               HU.assertEqual "the token is gone from the battlefield" 0 (S.creaturesInPlay S.alice settled)
@@ -122,7 +122,7 @@ creatureSbaTests cards =
             (victim, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice base -- 2/1
             shielded = S.addRegenShield victim gs0
             -- 2 combat damage is lethal to a 2/1; the shield replaces the CR 704.5g destruction.
-            damaged = S.runPure S.identityAnswer shielded (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat])
+            damaged = S.runPure S.identityAnswer shielded (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Combat])
             settled = S.settleSba damaged
          in do
               HU.assertEqual "survived (regenerated)" True (Set.member victim (GameState.battlefield settled))
@@ -167,8 +167,8 @@ damageTests cards =
                   ActiveReplacement.uses = Uses.Unlimited
                 }
             withShield = S.addReplacement shield gs0
-            combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat])
-            spell = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat])
+            combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Combat])
+            spell = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Noncombat])
          in do
               HU.assertEqual "combat damage prevented -- none marked" (Just 0) (S.damageOf victim combat)
               HU.assertEqual "combat damage prevented -- no event recorded" [] (S.damageEventsOf combat)
@@ -220,9 +220,9 @@ damageEventTests cards =
               (a : _, b : _) -> do
                 HU.assertEqual "two events" 2 (length events)
                 HU.assertBool "attacker hit blocker for 2" $
-                  elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2 False DamageKind.Combat) events
+                  elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2 False False DamageKind.Combat) events
                 HU.assertBool "blocker hit attacker for 2" $
-                  elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False DamageKind.Combat) events
+                  elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False False DamageKind.Combat) events
               _ -> HU.assertFailure "fixture should have one creature per side",
       HU.testCase "an unblocked 2/1 emits a ToPlayer event" $
         let (gs, mine, _) = S.combatBoard cards 1 0
@@ -231,7 +231,7 @@ damageEventTests cards =
               a : _ ->
                 HU.assertEqual
                   "one player event"
-                  [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False DamageKind.Combat]
+                  [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False False DamageKind.Combat]
                   (S.damageEventsOf after)
               _ -> HU.assertFailure "fixture should have an attacker"
     ]

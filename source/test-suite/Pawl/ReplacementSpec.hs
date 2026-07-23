@@ -238,8 +238,8 @@ tests cards =
               -- this assertion (Fog prevents a whole batch, not just one event) does
               -- not need.
               batch =
-                [ DamageEvent.MkDamageEvent victimA (Recipient.ToCreature victimA) 2 False DamageKind.Combat,
-                  DamageEvent.MkDamageEvent victimB (Recipient.ToCreature victimB) 2 False DamageKind.Combat
+                [ DamageEvent.MkDamageEvent victimA (Recipient.ToCreature victimA) 2 False False DamageKind.Combat,
+                  DamageEvent.MkDamageEvent victimB (Recipient.ToCreature victimB) 2 False False DamageKind.Combat
                 ]
               after = S.runPure S.identityAnswer resolved (Damage.applyDamage batch)
            in do

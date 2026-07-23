@@ -578,8 +578,8 @@ resolveTests cards =
             (gs1, fogId) = S.handOne (Cards.fogPrinting cards) gs0
             cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice fogId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-            combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Combat])
-            spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False DamageKind.Noncombat])
+            combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Combat])
+            spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Noncombat])
          in do
               HU.assertEqual "Fog installed one replacement" 1 (length (GameState.replacements resolved))
               HU.assertEqual "combat damage prevented (the cancel shape)" (Just 0) (S.damageOf victim combat)
@@ -802,7 +802,7 @@ indestructibleTests cards =
         let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             -- Zero marked damage (so 704.5g is silent) plus a deathtouch event isolates
             -- the 704.5h path; indestructible must guard it too (CR 700.4).
-            wounded = S.withEvent (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True DamageKind.Combat)) gs
+            wounded = S.withEvent (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True False DamageKind.Combat)) gs
             after = S.settleSba wounded
          in HU.assertEqual "Myr survives deathtouch" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $

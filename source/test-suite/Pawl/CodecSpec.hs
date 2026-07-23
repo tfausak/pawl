@@ -99,6 +99,8 @@ tests cards =
             mapM_ (roundTrip "color" Codec.colorToJson Codec.jsonToColor) [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green],
           HU.testCase "Keyword" $
             roundTrip "kw" Codec.keywordToJson Codec.jsonToKeyword Keyword.Trample,
+          HU.testCase "Keyword.Infect" $
+            roundTrip "infect" Codec.keywordToJson Codec.jsonToKeyword Keyword.Infect,
           HU.testCase "PlayerCounterKind" $ do
             roundTrip "energy" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Energy
             roundTrip "poison" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Poison,
@@ -457,7 +459,7 @@ tests cards =
               "damage"
               Codec.gameEventToJson
               Codec.jsonToGameEvent
-              (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True DamageKind.Combat)),
+              (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True False DamageKind.Combat)),
           HU.testCase "GameEvent.StepBegan round-trips" $
             roundTrip "step" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice),
           HU.testCase "GameEvent.SpellCast round-trips" $

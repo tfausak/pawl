@@ -315,6 +315,7 @@ keywordToJson k = nullary . Text.pack $ case k of
   Keyword.Trample -> "Trample"
   Keyword.Vigilance -> "Vigilance"
   Keyword.Fear -> "Fear"
+  Keyword.Infect -> "Infect"
   Keyword.Devoid -> "Devoid"
 
 jsonToKeyword :: Value -> Either Text Keyword.Keyword
@@ -332,6 +333,7 @@ jsonToKeyword =
       (Text.pack "Trample", Keyword.Trample),
       (Text.pack "Vigilance", Keyword.Vigilance),
       (Text.pack "Fear", Keyword.Fear),
+      (Text.pack "Infect", Keyword.Infect),
       (Text.pack "Devoid", Keyword.Devoid)
     ]
 
@@ -996,6 +998,7 @@ damageEventToJson ev =
       (Text.pack "target", recipientToJson (DamageEvent.target ev)),
       (Text.pack "amount", natTo (DamageEvent.amount ev)),
       (Text.pack "dealtByDeathtouch", Json.jBool (DamageEvent.dealtByDeathtouch ev)),
+      (Text.pack "dealtByInfect", Json.jBool (DamageEvent.dealtByInfect ev)),
       (Text.pack "kind", damageKindToJson (DamageEvent.kind ev))
     ]
 
@@ -1006,6 +1009,7 @@ jsonToDamageEvent value = do
   t <- Json.field (Text.pack "target") ps >>= jsonToRecipient
   a <- Json.field (Text.pack "amount") ps >>= natFrom
   d <- Json.field (Text.pack "dealtByDeathtouch") ps >>= jsonToBoolDefault False
+  i <- Json.field (Text.pack "dealtByInfect") ps >>= jsonToBoolDefault False
   k <- Json.field (Text.pack "kind") ps >>= jsonToDamageKind
   pure
     DamageEvent.MkDamageEvent
@@ -1013,6 +1017,7 @@ jsonToDamageEvent value = do
         DamageEvent.target = t,
         DamageEvent.amount = a,
         DamageEvent.dealtByDeathtouch = d,
+        DamageEvent.dealtByInfect = i,
         DamageEvent.kind = k
       }
 
