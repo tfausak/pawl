@@ -902,7 +902,7 @@ Keep the existing pointers to `docs/progress.md` and the umbrella spec intact.
 
 In `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`, mark the **M5b** row of the §3 phase table as landed: change `| **M5b** |` to `| **M5b ✅** |` (per §6: record the completion in `progress.md` and tick the phase here).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -913,7 +913,7 @@ git add -A
 git commit -m "docs(m5b): completion entry, CLAUDE.md status, umbrella tick"
 ```
 
-- [ ] **Step 8: Confirm the plan is fully executed**
+- [x] **Step 8: Confirm the plan is fully executed**
 
 ```bash
 grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-23-m5b-restarting-the-game.md
