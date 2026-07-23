@@ -29,7 +29,12 @@
           {
             "slot": "target",
             "spec": {
-              "type": "SpellOrPermanentTarget"
+              "pool": {
+                "type": "SpellsAndPermanents"
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]

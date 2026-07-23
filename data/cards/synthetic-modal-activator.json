@@ -29,7 +29,12 @@
               {
                 "slot": "creature",
                 "spec": {
-                  "type": "CreatureTarget"
+                  "pool": {
+                    "type": "Creatures"
+                  },
+                  "exclusion": {
+                    "type": "IncludesSource"
+                  }
                 }
               }
             ]
@@ -54,7 +59,12 @@
               {
                 "slot": "creature",
                 "spec": {
-                  "type": "CreatureTarget"
+                  "pool": {
+                    "type": "Creatures"
+                  },
+                  "exclusion": {
+                    "type": "IncludesSource"
+                  }
                 }
               }
             ]

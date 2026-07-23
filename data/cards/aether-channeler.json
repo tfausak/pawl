@@ -124,7 +124,21 @@
               {
                 "slot": "permanent",
                 "spec": {
-                  "type": "NonlandPermanentTarget"
+                  "pool": {
+                    "type": "Permanents"
+                  },
+                  "filter": {
+                    "type": "Not",
+                    "value": {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    }
+                  },
+                  "exclusion": {
+                    "type": "ExcludesSource"
+                  }
                 }
               }
             ]

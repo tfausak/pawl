@@ -23,9 +23,14 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Type.Exclusion as Exclusion
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator module Pawl.Filter may later be imported and must not collide.
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
@@ -33,6 +38,7 @@ import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Sickness as Sickness
@@ -182,7 +188,7 @@ tests cards =
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.GainControl (Duration.ForAsLongAs StateCondition.YouControlSource) targetSlot]
-                      (Map.singleton targetSlot TargetSpec.ArtifactTarget)
+                      (Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource))
                 }
             activated = snd (Engine.runGamePure S.identityAnswer g2 (Activate.activateAbility S.alice srcId ability))
             -- Control of the SOURCE CREATURE (not the ability object) moves to bob
@@ -218,7 +224,7 @@ tests cards =
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.GainControl (Duration.ForAsLongAs StateCondition.YouControlSource) targetSlot]
-                      (Map.singleton targetSlot TargetSpec.ArtifactTarget)
+                      (Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource))
                 }
             -- Control of the SOURCE CREATURE moves to bob BEFORE activation.
             taken = S.giveControl srcId S.bob g1

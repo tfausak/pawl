@@ -40,6 +40,7 @@ import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
+import qualified Pawl.Type.Exclusion as Exclusion
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
 -- evaluator module Pawl.Filter is not imported here today, but the alias
 -- convention is fixed project-wide so a later import never collides.
@@ -62,6 +63,7 @@ import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
@@ -386,7 +388,7 @@ tests cards =
                   ( Seq.fromList
                       [ Mode.MkMode
                           (Seq.fromList [Effect.DealDamage (SlotName.MkSlotName (Text.pack "creature")) (Quantity.Literal 1)])
-                          (Map.singleton (SlotName.MkSlotName (Text.pack "creature")) TargetSpec.CreatureTarget)
+                          (Map.singleton (SlotName.MkSlotName (Text.pack "creature")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource))
                       ]
                   )
                   (ModeSelection.ChooseExactly 1)
@@ -399,10 +401,18 @@ tests cards =
                   (const False)
                   (Codec.jsonToModal (Json.Object [(Text.pack "modes", Json.Array []), (Text.pack "selection", Codec.modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
               ),
-          HU.testCase "TargetSpec.ArtifactTarget round-trips" $
-            HU.assertEqual "preserved" (Right TargetSpec.ArtifactTarget) (Codec.jsonToTargetSpec (Codec.targetSpecToJson TargetSpec.ArtifactTarget)),
-          HU.testCase "TargetSpec.OpponentCreatureTarget round-trips" $
-            HU.assertEqual "preserved" (Right TargetSpec.OpponentCreatureTarget) (Codec.jsonToTargetSpec (Codec.targetSpecToJson TargetSpec.OpponentCreatureTarget))
+          -- P9: TargetSpec is now Pool + Maybe Filter + Exclusion. Cover a bare
+          -- pool (Nothing filter, omitted key), a filtered pool, and the
+          -- ExcludesSource value that carries "another".
+          HU.testCase "TargetSpec bare pool round-trips" $
+            let spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource
+             in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec)),
+          HU.testCase "TargetSpec filtered pool round-trips" $
+            let spec = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource
+             in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec)),
+          HU.testCase "TargetSpec ExcludesSource round-trips" $
+            let spec = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource
+             in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec))
         ],
       Tasty.testGroup
         "honesty round-trip over allPrintings"
@@ -421,7 +431,7 @@ tests cards =
                     (Card.allEffects card)
                   HU.assertEqual
                     "target spec"
-                    (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) TargetSpec.SpellTarget)
+                    (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.MkTargetSpec Pool.Spells Nothing Exclusion.IncludesSource))
                     (Card.allTargetSpecs card)
         ],
       Tasty.testGroup

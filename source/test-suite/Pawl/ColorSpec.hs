@@ -17,11 +17,16 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Exclusion as Exclusion
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator module Pawl.Filter may later be imported and must not collide.
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TargetSpec as TargetSpec
@@ -134,7 +139,7 @@ tests cards =
         let gs0 = Setup.emptyGame S.bothPlayers
             (ratsId, withRats) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice gs0
             (pikerId, gs) = S.addPiker cards S.alice withRats
-            legal = Target.legalRecipients S.noSource TargetSpec.NonblackCreatureTarget gs
+            legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource) gs
          in do
               HU.assertBool "the red Piker is legal" (Set.member (Recipient.ToCreature pikerId) legal)
               HU.assertBool "the black Rats are not" (not (Set.member (Recipient.ToCreature ratsId) legal)),
@@ -142,7 +147,7 @@ tests cards =
         -- FALSIFIER, reader (a) half.
         let gs0 = Setup.emptyGame S.bothPlayers
             (droneId, gs) = S.addCreature (Cards.devoidDronePrinting cards) S.alice gs0
-            legal = Target.legalRecipients S.noSource TargetSpec.NonblackCreatureTarget gs
+            legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource) gs
          in HU.assertBool "colourless is nonblack" (Set.member (Recipient.ToCreature droneId) legal),
       HU.testCase "Doom Blade destroys a devoid creature whose mana cost is black" $
         let base = S.landsInPlay (Cards.swampPrinting cards) 2
@@ -168,7 +173,7 @@ tests cards =
               HU.assertEqual "after: out of Bad Moon's set, back to 1 power" (Just 1) (Projection.powerOf ratsId after)
               HU.assertBool
                 "after: a legal Doom Blade target"
-                (Set.member (Recipient.ToCreature ratsId) (Target.legalRecipients S.noSource TargetSpec.NonblackCreatureTarget after)),
+                (Set.member (Recipient.ToCreature ratsId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource) after)),
       HU.testCase "Aphotic Wisps makes a creature black, the mirror of Crimson Wisps" $
         let base = S.landsInPlay (Cards.swampPrinting cards) 1
             (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice base
@@ -182,7 +187,7 @@ tests cards =
               HU.assertBool "gained fear" (Projection.hasKeyword Keyword.Fear pikerId after)
               HU.assertBool
                 "no longer a legal Doom Blade target"
-                (not (Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients S.noSource TargetSpec.NonblackCreatureTarget after))),
+                (not (Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource) after))),
       HU.testCase "CR 608.2b Doom Blade fizzles when its target becomes black in response" $
         -- The fizzle is only reachable through a colour change, and Aphotic Wisps
         -- is the one card in the pool that makes something BLACK.

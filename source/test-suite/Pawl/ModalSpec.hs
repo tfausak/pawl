@@ -22,8 +22,13 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Type.Exclusion as Exclusion
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator module Pawl.Filter may later be imported and must not collide.
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -33,6 +38,7 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
@@ -181,7 +187,7 @@ forcedTests cards =
          in HU.assertEqual "alice at 17 (Bolt resolved, forced/unprompted mode selection)" (Just 17) (S.lifeOf S.alice after)
     ]
 
--- M4h task 1: TargetSpec.NonlandPermanentTarget + Target.selfExcludes /
+-- M4h task 1: (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource) + Target.selfExcludes /
 -- legalSetsExcluding. No consumer is wired yet (that's a later M4h task) --
 -- this proves the spec and the CR "another" exclusion helper in isolation.
 nonlandPermanentTargetTests :: Cards.Cards -> Tasty.TestTree
@@ -190,14 +196,14 @@ nonlandPermanentTargetTests cards =
     "M4h NonlandPermanentTarget"
     [ HU.testCase "NonlandPermanentTarget excludes lands (CR 109.2/110.4)" $
         let gs = S.boardWithCreatureArtifactLand cards
-            got = Target.legalRecipients S.noSource TargetSpec.NonlandPermanentTarget gs
+            got = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource) gs
          in HU.assertEqual
               "two nonland permanents, no land"
               (Set.fromList [Recipient.ToObject (S.creatureId gs), Recipient.ToObject (S.artifactId gs)])
               got,
       HU.testCase "legalSetsExcluding drops the source (CR \"another\")" $
         let gs = S.boardWithCreatureArtifactLand cards
-            specs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) TargetSpec.NonlandPermanentTarget
+            specs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource)
             got = Target.legalSetsExcluding (S.creatureId gs) specs gs
          in HU.assertEqual
               "source excluded from its own set"

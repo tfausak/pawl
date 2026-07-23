@@ -38,7 +38,29 @@
           {
             "slot": "target",
             "spec": {
-              "type": "CreatureOrEnchantmentTarget"
+              "pool": {
+                "type": "Permanents"
+              },
+              "filter": {
+                "type": "Or",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Enchantment"
+                    }
+                  }
+                ]
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]

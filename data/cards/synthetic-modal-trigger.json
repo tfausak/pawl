@@ -54,7 +54,21 @@
               {
                 "slot": "x",
                 "spec": {
-                  "type": "NonlandPermanentTarget"
+                  "pool": {
+                    "type": "Permanents"
+                  },
+                  "filter": {
+                    "type": "Not",
+                    "value": {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    }
+                  },
+                  "exclusion": {
+                    "type": "ExcludesSource"
+                  }
                 }
               }
             ]
@@ -75,7 +89,21 @@
               {
                 "slot": "x",
                 "spec": {
-                  "type": "NonlandPermanentTarget"
+                  "pool": {
+                    "type": "Permanents"
+                  },
+                  "filter": {
+                    "type": "Not",
+                    "value": {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    }
+                  },
+                  "exclusion": {
+                    "type": "ExcludesSource"
+                  }
                 }
               }
             ]

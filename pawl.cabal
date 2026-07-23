@@ -128,6 +128,7 @@ library
     Pawl.Type.EndingStep
     Pawl.Type.EntryOption
     Pawl.Type.EntryRewrite
+    Pawl.Type.Exclusion
     Pawl.Type.Expiry
     Pawl.Type.Filter
     Pawl.Type.Game
@@ -158,6 +159,7 @@ library
     Pawl.Type.PlayerRelation
     Pawl.Type.PlayerScope
     Pawl.Type.PlayerStaticAbility
+    Pawl.Type.Pool
     Pawl.Type.Power
     Pawl.Type.Printing
     Pawl.Type.Program

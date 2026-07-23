@@ -37,7 +37,12 @@
           {
             "slot": "target",
             "spec": {
-              "type": "AnyTarget"
+              "pool": {
+                "type": "AnyTarget"
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]

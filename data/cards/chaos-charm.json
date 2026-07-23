@@ -29,7 +29,18 @@
           {
             "slot": "wall",
             "spec": {
-              "type": "WallTarget"
+              "pool": {
+                "type": "Creatures"
+              },
+              "filter": {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Wall"
+                }
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]
@@ -51,7 +62,12 @@
           {
             "slot": "creature",
             "spec": {
-              "type": "CreatureTarget"
+              "pool": {
+                "type": "Creatures"
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]
@@ -78,7 +94,12 @@
           {
             "slot": "creature",
             "spec": {
-              "type": "CreatureTarget"
+              "pool": {
+                "type": "Creatures"
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]

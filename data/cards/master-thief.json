@@ -75,7 +75,18 @@
               {
                 "slot": "target",
                 "spec": {
-                  "type": "ArtifactTarget"
+                  "pool": {
+                    "type": "Permanents"
+                  },
+                  "filter": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Artifact"
+                    }
+                  },
+                  "exclusion": {
+                    "type": "IncludesSource"
+                  }
                 }
               }
             ]

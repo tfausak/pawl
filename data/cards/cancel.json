@@ -42,7 +42,12 @@
           {
             "slot": "spell",
             "spec": {
-              "type": "SpellTarget"
+              "pool": {
+                "type": "Spells"
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]

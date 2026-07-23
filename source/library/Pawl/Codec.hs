@@ -44,6 +44,7 @@ import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
+import qualified Pawl.Type.Exclusion as Exclusion
 import qualified Pawl.Type.Filter as Filter
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.Json (Value (Array, Boolean, Null, Object))
@@ -64,6 +65,7 @@ import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
@@ -705,38 +707,64 @@ jsonToCostComponent value = do
       pure (CostComponent.Sacrifice count criterion)
     _ -> Left (Text.pack "unknown CostComponent: " <> t)
 
+poolToJson :: Pool.Pool -> Value
+poolToJson p = nullary . Text.pack $ case p of
+  Pool.Creatures -> "Creatures"
+  Pool.Players -> "Players"
+  Pool.AnyTarget -> "AnyTarget"
+  Pool.Permanents -> "Permanents"
+  Pool.Spells -> "Spells"
+  Pool.SpellsAndPermanents -> "SpellsAndPermanents"
+
+jsonToPool :: Value -> Either Text Pool.Pool
+jsonToPool =
+  decodeNullary
+    (Text.pack "Pool")
+    [ (Text.pack "Creatures", Pool.Creatures),
+      (Text.pack "Players", Pool.Players),
+      (Text.pack "AnyTarget", Pool.AnyTarget),
+      (Text.pack "Permanents", Pool.Permanents),
+      (Text.pack "Spells", Pool.Spells),
+      (Text.pack "SpellsAndPermanents", Pool.SpellsAndPermanents)
+    ]
+
+exclusionToJson :: Exclusion.Exclusion -> Value
+exclusionToJson e = nullary . Text.pack $ case e of
+  Exclusion.IncludesSource -> "IncludesSource"
+  Exclusion.ExcludesSource -> "ExcludesSource"
+
+jsonToExclusion :: Value -> Either Text Exclusion.Exclusion
+jsonToExclusion =
+  decodeNullary
+    (Text.pack "Exclusion")
+    [ (Text.pack "IncludesSource", Exclusion.IncludesSource),
+      (Text.pack "ExcludesSource", Exclusion.ExcludesSource)
+    ]
+
+-- The product shape: {"pool": <pool>, "filter": <filter | omitted>,
+-- "exclusion": <exclusion>}. The filter key is omitted when Nothing (a bare
+-- "target creature" narrows nothing), mirroring how optional fields are encoded
+-- elsewhere.
 targetSpecToJson :: TargetSpec.TargetSpec -> Value
-targetSpecToJson t = nullary . Text.pack $ case t of
-  TargetSpec.AnyTarget -> "AnyTarget"
-  TargetSpec.CreatureTarget -> "CreatureTarget"
-  TargetSpec.SpellOrPermanentTarget -> "SpellOrPermanentTarget"
-  TargetSpec.LandTarget -> "LandTarget"
-  TargetSpec.PlayerTarget -> "PlayerTarget"
-  TargetSpec.CreatureOrEnchantmentTarget -> "CreatureOrEnchantmentTarget"
-  TargetSpec.SpellTarget -> "SpellTarget"
-  TargetSpec.WallTarget -> "WallTarget"
-  TargetSpec.NonlandPermanentTarget -> "NonlandPermanentTarget"
-  TargetSpec.NonblackCreatureTarget -> "NonblackCreatureTarget"
-  TargetSpec.ArtifactTarget -> "ArtifactTarget"
-  TargetSpec.OpponentCreatureTarget -> "OpponentCreatureTarget"
+targetSpecToJson (TargetSpec.MkTargetSpec pool restriction exclusion) =
+  let base =
+        [ (Text.pack "pool", poolToJson pool),
+          (Text.pack "exclusion", exclusionToJson exclusion)
+        ]
+      withFilter = case restriction of
+        Nothing -> base
+        Just f -> base <> [(Text.pack "filter", filterToJson f)]
+   in Object withFilter
 
 jsonToTargetSpec :: Value -> Either Text TargetSpec.TargetSpec
-jsonToTargetSpec =
-  decodeNullary
-    (Text.pack "TargetSpec")
-    [ (Text.pack "AnyTarget", TargetSpec.AnyTarget),
-      (Text.pack "CreatureTarget", TargetSpec.CreatureTarget),
-      (Text.pack "SpellOrPermanentTarget", TargetSpec.SpellOrPermanentTarget),
-      (Text.pack "LandTarget", TargetSpec.LandTarget),
-      (Text.pack "PlayerTarget", TargetSpec.PlayerTarget),
-      (Text.pack "CreatureOrEnchantmentTarget", TargetSpec.CreatureOrEnchantmentTarget),
-      (Text.pack "SpellTarget", TargetSpec.SpellTarget),
-      (Text.pack "WallTarget", TargetSpec.WallTarget),
-      (Text.pack "NonlandPermanentTarget", TargetSpec.NonlandPermanentTarget),
-      (Text.pack "NonblackCreatureTarget", TargetSpec.NonblackCreatureTarget),
-      (Text.pack "ArtifactTarget", TargetSpec.ArtifactTarget),
-      (Text.pack "OpponentCreatureTarget", TargetSpec.OpponentCreatureTarget)
-    ]
+jsonToTargetSpec value = do
+  ps <- Json.asObject value
+  pool <- Json.field (Text.pack "pool") ps >>= jsonToPool
+  exclusion <- Json.field (Text.pack "exclusion") ps >>= jsonToExclusion
+  restriction <- case Json.optField (Text.pack "filter") ps of
+    Nothing -> Right Nothing
+    Just v -> Just <$> jsonToFilter v
+  pure (TargetSpec.MkTargetSpec pool restriction exclusion)
 
 turnScopeToJson :: TurnScope.TurnScope -> Value
 turnScopeToJson s = nullary . Text.pack $ case s of

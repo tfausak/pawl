@@ -39,7 +39,12 @@
           {
             "slot": "target",
             "spec": {
-              "type": "PlayerTarget"
+              "pool": {
+                "type": "Players"
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]

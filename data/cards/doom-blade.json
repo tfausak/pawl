@@ -33,7 +33,21 @@
           {
             "slot": "target",
             "spec": {
-              "type": "NonblackCreatureTarget"
+              "pool": {
+                "type": "Creatures"
+              },
+              "filter": {
+                "type": "Not",
+                "value": {
+                  "type": "HasColor",
+                  "value": {
+                    "type": "Black"
+                  }
+                }
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]

@@ -40,7 +40,18 @@
           {
             "slot": "target",
             "spec": {
-              "type": "LandTarget"
+              "pool": {
+                "type": "Permanents"
+              },
+              "filter": {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Land"
+                }
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]

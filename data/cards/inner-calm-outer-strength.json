@@ -55,7 +55,12 @@
           {
             "slot": "target",
             "spec": {
-              "type": "CreatureTarget"
+              "pool": {
+                "type": "Creatures"
+              },
+              "exclusion": {
+                "type": "IncludesSource"
+              }
             }
           }
         ]
