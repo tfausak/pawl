@@ -42,6 +42,7 @@ import Pawl.Type.ManaType (ManaType)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
@@ -80,6 +81,7 @@ slotsOf effect = case effect of
   Effect.Replace {} -> Set.empty
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ _ slot -> Set.singleton slot
+  Effect.GainPlayerCounters {} -> Set.empty
   Effect.Untap slot -> Set.singleton slot
   Effect.GainControl _ slot -> Set.singleton slot
   Effect.ArmDelayedTrigger _ -> Set.empty
@@ -111,6 +113,7 @@ readsX = any effectReadsX
       Effect.Replace {} -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
+      Effect.GainPlayerCounters _ quantity -> quantity == Quantity.Type.X
       Effect.Untap _ -> False
       Effect.GainControl _ _ -> False
       Effect.ArmDelayedTrigger _ -> False
@@ -138,6 +141,7 @@ manaProduced effect = case effect of
   Effect.Replace {} -> Nothing
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
+  Effect.GainPlayerCounters {} -> Nothing
   Effect.Untap _ -> Nothing
   Effect.GainControl _ _ -> Nothing
   Effect.ArmDelayedTrigger _ -> Nothing
@@ -165,6 +169,7 @@ searchesLibrary effect = case effect of
   Effect.Replace {} -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
+  Effect.GainPlayerCounters {} -> False
   Effect.Untap _ -> False
   Effect.GainControl _ _ -> False
   Effect.ArmDelayedTrigger _ -> False
@@ -234,6 +239,8 @@ rewriteEffect pairs effect = case effect of
   -- No rewritable land-type word.
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
+  -- No rewritable land-type word.
+  Effect.GainPlayerCounters {} -> effect
   Effect.Untap _ -> effect
   Effect.GainControl _ _ -> effect
   Effect.ArmDelayedTrigger _ -> effect
@@ -663,6 +670,25 @@ applyEffect source controller bound legality chosen effect = case effect of
           -- (Hardened Scales, Doubling Season) get their opportunity.
           Just n -> Monad.when (n > 0) (Event.putCounters target kind (fromInteger n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
+  Effect.GainPlayerCounters kind quantity -> do
+    gs <- State.get
+    case Quantity.evaluate gs source (Just controller) quantity of
+      Just n
+        | n > 0 ->
+            -- CR 122 / 107.14: the resolving controller gains n counters of
+            -- kind, directly on the player record -- targetless, unlike
+            -- PutCounters' funnel through a slot.
+            State.modify'
+              ( \g ->
+                  g
+                    { GameState.players =
+                        Map.adjust
+                          (\p -> p {Player.counters = Map.insertWith (+) kind (fromInteger n) (Player.counters p)})
+                          controller
+                          (GameState.players g)
+                    }
+              )
+      _ -> pure ()
   Effect.Untap slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

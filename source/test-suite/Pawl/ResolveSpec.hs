@@ -58,6 +58,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.Pool as Pool
@@ -1108,6 +1109,17 @@ gainControlTests cards =
               HU.assertEqual "control reverts after cleanup" (Just S.bob) (Projection.controllerOf oid (Expiry.dropAtCleanup after))
     ]
 
+gainPlayerCountersTests :: Cards.Cards -> Tasty.TestTree
+gainPlayerCountersTests cards =
+  Tasty.testGroup
+    "GainPlayerCounters"
+    [ HU.testCase "CR 107.14 GainPlayerCounters gives the resolving controller energy" $
+        let (src, gs0) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+            act = Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.GainPlayerCounters PlayerCounterKind.Energy (Quantity.Literal 2))
+            after = S.runPure S.identityAnswer gs0 act
+         in HU.assertEqual "alice has two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
+    ]
+
 -- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
 -- (GainKeyword Haste) together end to end -- cast, resolve, attack, revert.
 actOfTreasonTests :: Cards.Cards -> Tasty.TestTree
@@ -1131,4 +1143,4 @@ actOfTreasonTests cards =
     ]
 
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards, gainControlTests cards, actOfTreasonTests cards]
+tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards, gainControlTests cards, gainPlayerCountersTests cards, actOfTreasonTests cards]

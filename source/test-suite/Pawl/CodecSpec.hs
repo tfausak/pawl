@@ -184,7 +184,9 @@ tests cards =
               "e6"
               Codec.effectToJson
               Codec.jsonToEffect
-              (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells)
+              (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells),
+          HU.testCase "GainPlayerCounters" $
+            roundTrip "gpc" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters PlayerCounterKind.Energy (Quantity.Literal 2))
         ],
       Tasty.testGroup
         "player effects (P7)"

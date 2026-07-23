@@ -6,6 +6,7 @@ import Pawl.Type.Duration (Duration)
 import Pawl.Type.Filter (Filter)
 import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.Modification (Modification)
+import Pawl.Type.PlayerCounterKind (PlayerCounterKind)
 import Pawl.Type.PlayerEffect (PlayerEffect)
 import Pawl.Type.PlayerScope (PlayerScope)
 import Pawl.Type.Quantity (Quantity)
@@ -143,6 +144,11 @@ data Effect card
     -- many (reused from M4a; a future X-counter card rides ChooseX). The counter's
     -- P/T effect is applied by the projection (CR 122.1a / 613.4c), not here.
     PutCounters CounterKind Quantity SlotName
+  | -- CR 122 / 107.14: the resolving controller ("you") gains N counters of a
+    -- player-counter kind. Targetless, like Draw. Subsumes any self-scoped
+    -- player counter (energy, experience, rad) without a new opcode. A TARGETED
+    -- player-counter effect needs a recipient and is deferred (#TBD-targeted).
+    GainPlayerCounters PlayerCounterKind Quantity
   | -- CR 701.26b: untap the slot's target permanent. Single-target (Act of
     -- Treason's "untap that creature"); mass/conditional untap is future.
     Untap SlotName

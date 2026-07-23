@@ -1137,6 +1137,7 @@ effectToJson e = case e of
   Effect.Create q c (Just s) -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c, slotNameToJson s]))
   Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array [durationToJson d, usesToJson u, replacementEffectToJson re]))
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
+  Effect.GainPlayerCounters k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array [playerCounterKindToJson k, quantityToJson q]))
   Effect.Untap s -> Json.tagged (Text.pack "Untap") (Just (slotNameToJson s))
   Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array [durationToJson d, slotNameToJson s]))
   Effect.ArmDelayedTrigger n -> Json.tagged (Text.pack "ArmDelayedTrigger") (Just (abilityNameToJson n))
@@ -1185,6 +1186,9 @@ jsonToEffect value = do
     "PutCounters" -> case mv of
       Just (Array [k, q, s]) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s
       _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")
+    "GainPlayerCounters" -> case mv of
+      Just (Array [k, q]) -> Effect.GainPlayerCounters <$> jsonToPlayerCounterKind k <*> jsonToQuantity q
+      _ -> Left (Text.pack "GainPlayerCounters expects [playerCounterKind, quantity]")
     "Untap" -> withValue mv (fmap Effect.Untap . jsonToSlotName)
     "GainControl" -> case mv of
       Just (Array [d, s]) -> Effect.GainControl <$> jsonToDuration d <*> jsonToSlotName s
