@@ -402,6 +402,10 @@ priorityLoop = do
             case GameState.priority gs of
               Nothing -> pure ()
               Just p -> do
+                -- CR 723.6: concede is not implemented — there is no Concede
+                -- action or concede channel. When it is added it must read the
+                -- true player `p`, never `decider`: a controller cannot concede
+                -- on the controlled player's behalf (CR 104.3a). (#133)
                 let decider = Decide.deciderFor p gs
                     actions = Action.legalActions p gs
                 chosen <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
