@@ -14,8 +14,12 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Cost as Cost.Type
+import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.EntryOption as EntryOption
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
@@ -97,7 +101,19 @@ combatReplayTests =
             HU.assertEqual
               "the ascending prefix"
               (Set.singleton oid)
-              (Replay.defaultAnswer (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1))
+              (Replay.defaultAnswer (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1)),
+          HU.testCase "ChooseCost records and replays a Cost" $
+            let printed = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []
+                alternative = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.SacrificeThis]
+                p = Prompt.ChooseCost decider S.alice oid [printed, alternative]
+             in HU.assertEqual "round trip" (Just alternative) (Replay.decode p (Replay.encode p alternative)),
+          HU.testCase "defaultAnswer takes the first offered cost (the printed one)" $
+            let printed = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []
+                alternative = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.SacrificeThis]
+             in HU.assertEqual
+                  "the printed one"
+                  printed
+                  (Replay.defaultAnswer (Prompt.ChooseCost decider S.alice oid [printed, alternative]))
         ]
 
 replayTests :: Cards.Cards -> Tasty.TestTree

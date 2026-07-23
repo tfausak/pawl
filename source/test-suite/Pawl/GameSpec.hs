@@ -15,6 +15,7 @@ import qualified Pawl.Action as Action
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -286,6 +287,7 @@ recordingAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> pure (map fromIntegral (take (length sources) [0 :: Int ..]))
   Prompt.ChooseReplacement {} -> pure 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
+  Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
@@ -425,6 +427,7 @@ slaveAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of

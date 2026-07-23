@@ -22,6 +22,7 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
+import qualified Pawl.Cost as Cost
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -126,6 +127,7 @@ identityAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -161,6 +163,7 @@ castAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -189,6 +192,7 @@ aggressiveAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
@@ -221,6 +225,7 @@ playLandAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -285,6 +290,7 @@ randomAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> pure (map fromIntegral (take (length sources) [0 :: Int ..]))
   Prompt.ChooseReplacement {} -> pure 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
+  Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
 
 -- Total index into a list; the engine always offers at least Pass, so the
 -- fallback is unreachable in practice but keeps this free of partial functions.

@@ -172,11 +172,17 @@ castSpell pid oid = do
       -- legal modes makes the whole cast a no-op, guarding every step below.
       Monad.when (Set.isSubsetOf chosenModes legal && Set.size chosenModes == fromIntegral count) $ do
         -- CR 601.2b: the cost to be paid is announced after the modes and
-        -- before X and targets. One candidate today, so nothing is asked; the
-        -- prompt arrives with alternative costs.
-        case filter (payableCost pid oid gs) (Cost.costsFor oid gs) of
-          [] -> pure ()
-          chosenCost : _ -> do
+        -- before X and targets. Only PAYABLE candidates are offered (CR
+        -- 118.9b makes an alternative optional, so a player who can afford both
+        -- is really choosing); one payable candidate is forced and unprompted.
+        -- Reject-not-repair: an answer outside the offered set makes the whole
+        -- cast a no-op.
+        let payable = filter (payableCost pid oid gs) (Cost.costsFor oid gs)
+        Monad.unless (null payable) $ do
+          chosenCost <- case payable of
+            [only] -> pure only
+            _ -> Trans.lift (Program.prompt (Prompt.ChooseCost decider pid oid payable))
+          Monad.when (elem chosenCost payable) $ do
             let sets = Target.legalSetsExcluding oid (Card.modesTargetSpecs chosenModes card) gs
             mAmount <-
               if Cost.hasVariable chosenCost

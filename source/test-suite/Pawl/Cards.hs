@@ -89,7 +89,8 @@ data Cards = MkCards
     reliquaryTowerPrinting :: Printing.Printing,
     silencePrinting :: Printing.Printing,
     greedPrinting :: Printing.Printing,
-    villageRitesPrinting :: Printing.Printing
+    villageRitesPrinting :: Printing.Printing,
+    fireblastPrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -178,6 +179,7 @@ loadCards = do
   silencePrinting_ <- loadPrinting "silence"
   greedPrinting_ <- loadPrinting "greed"
   villageRitesPrinting_ <- loadPrinting "village-rites"
+  fireblastPrinting_ <- loadPrinting "fireblast"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -255,7 +257,8 @@ loadCards = do
         reliquaryTowerPrinting = reliquaryTowerPrinting_,
         silencePrinting = silencePrinting_,
         greedPrinting = greedPrinting_,
-        villageRitesPrinting = villageRitesPrinting_
+        villageRitesPrinting = villageRitesPrinting_,
+        fireblastPrinting = fireblastPrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -335,7 +338,8 @@ allPrintings cards =
     reliquaryTowerPrinting cards,
     silencePrinting cards,
     greedPrinting cards,
-    villageRitesPrinting cards
+    villageRitesPrinting cards,
+    fireblastPrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck

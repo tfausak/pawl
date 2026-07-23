@@ -18,6 +18,7 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -352,6 +353,7 @@ discardLastAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 lastN :: Int -> [a] -> [a]
 lastN n xs = drop (length xs - n) xs
@@ -537,6 +539,7 @@ castFirstOption p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
@@ -571,3 +574,4 @@ castPanglacial p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates

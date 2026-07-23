@@ -6,6 +6,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
+import Pawl.Type.Cost (Cost)
 import Pawl.Type.Decider (Decider)
 import Pawl.Type.EntryOption (EntryOption)
 import Pawl.Type.ModeIndex (ModeIndex)
@@ -148,3 +149,14 @@ data Prompt r where
   -- as many as the count is forced, and where the rules leave nothing to ask,
   -- don't prompt.
   ChooseSacrifices :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Natural -> Prompt (Set ObjectId)
+  -- CR 601.2b: "If the spell has alternative or additional costs that will be
+  -- paid as it's being cast ... the player announces their intentions to pay any
+  -- or all of those costs." Issued after the modes and before X and targets, at
+  -- 601.2b's own position. The ObjectId is the spell; the [Cost] is the PAYABLE
+  -- candidates (the engine pre-filters: each candidate from Pawl.Cost.costsFor,
+  -- run through total, then tested with canPay at the CR 601.2b X=0 floor).
+  --
+  -- CR 118.9b makes an alternative cost optional, so a player who can afford both
+  -- is genuinely choosing. Asked ONLY when two or more candidates are payable;
+  -- one is forced, and where the rules leave nothing to ask, don't prompt.
+  ChooseCost :: Decider -> PlayerId -> ObjectId -> [Cost] -> Prompt Cost

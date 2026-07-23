@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
+import Pawl.Type.Cost (Cost)
 import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Recipient (Recipient)
@@ -48,4 +49,7 @@ data Response
   | -- CR 701.21a: the permanents a player chose to sacrifice to pay a cost,
     -- serialized so a DecisionLog replays the payment deterministically.
     ChoseSacrifices (Set ObjectId)
+  | -- CR 601.2b: the cost a caster announced they would pay, serialized so a
+    -- DecisionLog replays an alternative-cost cast deterministically.
+    ChoseCost Cost
   deriving (Eq, Show)

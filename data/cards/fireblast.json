@@ -1,0 +1,93 @@
+{
+  "activatedAbilities": [],
+  "alternativeCosts": [
+    {
+      "components": [
+        {
+          "type": "Sacrifice",
+          "value": [
+            2,
+            {
+              "type": "PermanentOfSubtype",
+              "value": {
+                "type": "Mountain"
+              }
+            }
+          ]
+        }
+      ],
+      "mana": []
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 4
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Fireblast",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "DealDamage",
+            "value": [
+              "target",
+              {
+                "type": "Literal",
+                "value": 4
+              }
+            ]
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "target",
+            "spec": {
+              "type": "AnyTarget"
+            }
+          }
+        ]
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}

@@ -6,6 +6,7 @@ module Pawl.Replay where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Pawl.Cost as Cost
 import qualified Pawl.Type.Action as Action
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
@@ -38,6 +39,7 @@ encode p answer = case p of
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
+  Prompt.ChooseCost {} -> Response.ChoseCost answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -100,6 +102,9 @@ decode p response = case p of
   Prompt.ChooseSacrifices {} -> case response of
     Response.ChoseSacrifices ids -> Just ids
     _ -> Nothing
+  Prompt.ChooseCost {} -> case response of
+    Response.ChoseCost cost -> Just cost
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -161,6 +166,11 @@ defaultAnswer p = case p of
   -- a legal answer whenever the prompt was legal to ask, and the least eventful
   -- fallback when a transcript runs short.
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  -- The first offered candidate is the PRINTED cost (Pawl.Cost.costsFor puts it
+  -- first) -- the least eventful fallback when a transcript runs short, since it
+  -- sacrifices nothing. Cost.firstOffered keeps this total for the empty list the
+  -- engine never produces.
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

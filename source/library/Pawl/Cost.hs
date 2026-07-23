@@ -72,7 +72,16 @@ costsFor oid gs = case Game.lookupObject oid gs of
   Just obj -> case Object.source obj of
     Source.OfCard printing ->
       let card = Printing.card printing
-       in [Cost.MkCost {Cost.mana = Card.manaCost card, Cost.components = Card.additionalCosts card}]
+          printed = Cost.MkCost {Cost.mana = Card.manaCost card, Cost.components = Card.additionalCosts card}
+          -- CR 118.9d in one line: "If an alternative cost is being paid to cast
+          -- a spell, any additional costs, cost increases, and cost reductions
+          -- that affect that spell are applied to that alternative cost." An
+          -- alternative replaces only the MANA cost; every additional cost still
+          -- applies. The increases and reductions are Pawl.Cost.total's job,
+          -- called on whichever candidate is chosen.
+          withAdditional alternative =
+            alternative {Cost.components = Cost.components alternative ++ Card.additionalCosts card}
+       in printed : map withAdditional (Card.alternativeCosts card)
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
     Source.OfTrigger _ _ -> []

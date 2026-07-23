@@ -168,7 +168,8 @@ cardTests cards =
                   Card.Type.castingPermissions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
-                  Card.Type.additionalCosts = []
+                  Card.Type.additionalCosts = [],
+                  Card.Type.alternativeCosts = []
                 }
          in do
               HU.assertBool "not a permanent" (not (Card.isPermanent card))

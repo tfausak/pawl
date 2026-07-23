@@ -7,6 +7,7 @@ import Pawl.Type.AbilityName (AbilityName)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.CastingPermission (CastingPermission)
 import Pawl.Type.Color (Color)
+import Pawl.Type.Cost (Cost)
 import Pawl.Type.CostComponent (CostComponent)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
@@ -100,6 +101,27 @@ data Card = MkCard
     -- CR 118.8d: this does not change the card's mana cost. Card.manaCost, and
     -- every reader of mana value, is unaffected.
     additionalCosts :: [CostComponent],
+    -- CR 118.9: this card's printed alternative costs -- "a cost listed in a
+    -- spell's text ... that its controller MAY pay rather than paying the
+    -- spell's mana cost" (Fireblast). Empty for every other printing.
+    --
+    -- A LIST because a card may print more than one, not because more than one
+    -- may be paid: CR 118.9a says "only one alternative cost can be applied to
+    -- any one spell as it's being cast", which is what makes
+    -- Pawl.Cost.costsFor's list a list of CANDIDATES the caster picks from.
+    --
+    -- Each carries its OWN mana part, which is how CR 118.6a's second sentence
+    -- ("if an alternative cost is applied to an unpayable cost ... the
+    -- alternative cost may be paid") falls out of the shape. Fireblast's is
+    -- Just [] -- a real, taxable {0}, not Nothing.
+    --
+    -- CR 118.9c: this does not change the card's mana cost.
+    --
+    -- Printed-only: an effect that GRANTS an alternative cost has no carrier
+    -- here (#N). CR 118.9's first sentence is "Some SPELLS have alternative
+    -- costs", so this lives on Card and never on ActivatedAbility -- a rules
+    -- fact, not an elision.
+    alternativeCosts :: [Cost],
     -- CR 604.1/604.2 / 611.1: this card's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary
     -- Tower). The sibling of staticAbilities on the axis CR 613.10/613.11 put

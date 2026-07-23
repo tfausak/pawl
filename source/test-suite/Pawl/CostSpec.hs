@@ -13,6 +13,7 @@ module Pawl.CostSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Cards as Cards
@@ -28,6 +29,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CounterKind as CounterKind
@@ -37,6 +39,8 @@ import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Payment as Payment
@@ -230,6 +234,13 @@ wasAskedToSacrifice responses =
         _ -> False
    in any isSacrifice responses
 
+wasAskedToChooseCost :: [Response.Response] -> Bool
+wasAskedToChooseCost responses =
+  let isCost r = case r of
+        Response.ChoseCost _ -> True
+        _ -> False
+   in any isCost responses
+
 -- Village Rites {B} Instant: "As an additional cost to cast this spell,
 -- sacrifice a creature. Draw two cards."
 --
@@ -332,5 +343,75 @@ isCastOf oid a = case a of
   Action.Type.Cast o -> o == oid
   _ -> False
 
+-- Fireblast {4}{R}{R} Instant: "You may sacrifice two Mountains rather than pay
+-- this spell's mana cost. Fireblast deals 4 damage to any target."
+--
+-- Scryfall returned no rulings for this card.
+fireblastTests :: Cards.Cards -> Tasty.TestTree
+fireblastTests cards =
+  let -- alice controls `n` Mountains (all tapped when `tap` is True) and holds
+      -- one Fireblast, with priority in her own precombat main phase.
+      board n tap =
+        let base = S.landsInPlay (Cards.mountainPrinting cards) n
+            tapAll gs = List.foldl' (flip S.tapObject) gs (Set.toList (GameState.battlefield gs))
+            tapped = if tap then tapAll base else base
+            (fireblast, gs1) = S.addHandCard (Cards.fireblastPrinting cards) S.alice tapped
+         in ( fireblast,
+              gs1
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+   in Tasty.testGroup
+        "Fireblast"
+        [ -- The headline test: the printed cost is unaffordable and the spell is
+          -- castable anyway. Kills "castability is mana affordability" and "an
+          -- alternative cost is a different ManaCost" at once.
+          HU.testCase "CR 118.9 two TAPPED Mountains and an empty pool still cast it, and it deals 4" $
+            let (fireblast, gs) = board 2 True
+                cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice fireblast)
+                resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+             in do
+                  HU.assertBool "castable" (Cast.castable S.alice fireblast gs)
+                  HU.assertEqual "both Mountains sacrificed" 0 (length (Game.zoneMembers Zone.Battlefield S.alice resolved))
+                  HU.assertEqual "alice took 4 (identityAnswer targets the lowest recipient)" (Just 16) (S.lifeOf S.alice resolved),
+          -- CR 118.9b: an alternative cost is optional, so a player who can
+          -- afford both is really choosing.
+          HU.testCase "CR 118.9b both costs payable raises ChooseCost; one payable elides it" $
+            let (both, sixUntapped) = board 6 False
+                (onlyAlternative, twoTapped) = board 2 True
+                askedBoth = answersFor S.identityAnswer sixUntapped (Cast.castSpell S.alice both)
+                askedOne = answersFor S.identityAnswer twoTapped (Cast.castSpell S.alice onlyAlternative)
+             in do
+                  HU.assertBool "asked when both are payable" (wasAskedToChooseCost askedBoth)
+                  HU.assertBool "not asked when only one is" (not (wasAskedToChooseCost askedOne)),
+          -- CR 118.9a: "Only one alternative cost can be applied to any one spell
+          -- as it's being cast" -- the list-of-candidates shape itself. The
+          -- printed cost is offered FIRST.
+          HU.testCase "CR 118.9a costsFor offers the printed cost first, then each alternative" $
+            let (fireblast, gs) = board 2 True
+                candidates = Cost.costsFor fireblast gs
+                red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+             in do
+                  HU.assertEqual "two candidates" 2 (length candidates)
+                  HU.assertEqual
+                    "the printed one first"
+                    [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, red, red]), Just (ManaCost.MkManaCost [])]
+                    (map Cost.Type.mana candidates),
+          -- CR 701.21a again, on the alternative's own component.
+          HU.testCase "CR 701.21a three Mountains raise ChooseSacrifices; exactly two elide it" $
+            let (three, threeMountains) = board 3 True
+                (two, twoMountains) = board 2 True
+                askedThree = answersFor S.identityAnswer threeMountains (Cast.castSpell S.alice three)
+                askedTwo = answersFor S.identityAnswer twoMountains (Cast.castSpell S.alice two)
+             in do
+                  HU.assertBool "asked with three" (wasAskedToSacrifice askedThree)
+                  HU.assertBool "not asked with exactly two" (not (wasAskedToSacrifice askedTwo)),
+          HU.testCase "CR 118.3 one Mountain pays neither cost" $
+            let (fireblast, gs) = board 1 True
+             in HU.assertBool "not castable" (not (Cast.castable S.alice fireblast gs))
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.Cost" [doorTests cards, greedTests cards, villageRitesTests cards]
+tests cards = Tasty.testGroup "Pawl.Cost" [doorTests cards, greedTests cards, villageRitesTests cards, fireblastTests cards]

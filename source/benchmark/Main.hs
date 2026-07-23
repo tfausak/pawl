@@ -6,6 +6,7 @@ import qualified Data.Set as Set
 import qualified Data.Text.IO as TextIO
 import Numeric.Natural (Natural)
 import qualified Pawl.Codec as Codec
+import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Json as Json
 import qualified Pawl.Setup as Setup
@@ -48,6 +49,7 @@ alwaysPass p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 -- Casts when legal, otherwise passes: the benchmark that actually exercises the
 -- stack, mana payment, and resolution.
@@ -79,6 +81,7 @@ castAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 -- Casts, attacks, and blocks: the benchmark that exercises combat.
 fightAnswer :: Prompt.Prompt r -> r
@@ -111,6 +114,7 @@ fightAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
 
 -- Two players, seeded from the benchmark's argument.
 playersFrom :: Natural -> NonEmpty.NonEmpty PlayerId

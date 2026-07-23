@@ -273,7 +273,23 @@ tests cards =
                       HU.assertEqual "the fixture really has none" [] (CardT.additionalCosts base)
                       case J.asObject (Codec.cardToJson base) of
                         Left err -> HU.assertFailure (Text.unpack err)
-                        Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "additionalCosts") (map fst pairs))
+                        Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "additionalCosts") (map fst pairs)),
+              HU.testCase "a Card carrying an alternative cost round-trips" $
+                let base = Printing.card (Cards.lightningBoltPrinting cards)
+                    alt =
+                      Cost.Type.MkCost
+                        { Cost.Type.mana = Just (ManaCost.MkManaCost []),
+                          Cost.Type.components = [CostComponent.Sacrifice 2 (PermanentCriterion.PermanentOfSubtype Subtype.Mountain)]
+                        }
+                    c = base {CardT.alternativeCosts = [alt]}
+                 in roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
+              HU.testCase "an empty alternativeCosts list is omitted from the JSON" $
+                let base = Printing.card (Cards.lightningBoltPrinting cards)
+                 in do
+                      HU.assertEqual "the fixture really has none" [] (CardT.alternativeCosts base)
+                      case J.asObject (Codec.cardToJson base) of
+                        Left err -> HU.assertFailure (Text.unpack err)
+                        Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "alternativeCosts") (map fst pairs))
             ],
           HU.testCase "a ZoneChangeR replacement round-trips" $
             let re =
