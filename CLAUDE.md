@@ -52,8 +52,14 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   per-card variants and the `CardCriterion`/`PermanentCriterion`/
   `SpellCriterion`/`Affected`-dynamic-set family — via Doom Blade, Terror and
   Reprisal (#40 closed; #38/#39 re-scoped, not closed, to a deferred
-  count/compare phase). **P10 (player counters) and P11 (Command zone)
-  remain, neither blocking the other.** The umbrella spec is
+  count/compare phase). **P10 closed GAP-C** — a player-counter substrate
+  (`Player.counters`, `PlayerCounterKind`) disjoint from object counters,
+  with poison and energy as its first two customers: infect as a deal-time
+  classification bit (`DamageEvent.dealtByInfect`) diverting `Damage`'s
+  existing recipient-branch fold, and energy as a bidirectional counter
+  gained by `Effect.GainPlayerCounters` and spent by `CostComponent.PayEnergy`
+  — via Glistener Elf and Longtusk Cub. **P11 (Command zone) is the one
+  remaining M4.5 phase.** The umbrella spec is
   `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —

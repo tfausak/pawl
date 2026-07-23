@@ -362,7 +362,7 @@ matchesTrigger bearer you cond event = case cond of
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
-  -- CR 510.1c / 509.1i: the bearer dealt COMBAT damage to a PLAYER (the trigger
+  -- CR 510.1b / 510.2: the bearer dealt COMBAT damage to a PLAYER (the trigger
   -- pattern behind "whenever this creature deals combat damage to a player").
   -- Combat damage already records a DamageDealt event, so the match is a filter
   -- over the log, not new recording.
@@ -375,7 +375,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
 
--- Whether a damage recipient is a player (CR 119.3): a total discriminator over
+-- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
 isPlayerRecipient :: Recipient.Recipient -> Bool
 isPlayerRecipient r = case r of

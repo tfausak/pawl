@@ -1819,3 +1819,53 @@ its own gate card and spec, landed as it completes. Umbrella:
   `docs/superpowers/specs/2026-07-22-p9-target-filter-predicate-language-design.md`
   and
   `docs/superpowers/plans/2026-07-22-p9-target-filter-predicate-language.md`.
+
+- **M4.5 P10 is complete** (player-counter substrate + poison + energy,
+  GAP-C). **Gates: Glistener Elf** (`{G}` Creature — Phyrexian Elf Warrior,
+  "Infect.") and **Longtusk Cub** (`{1}{G}` Creature — Cat, "Whenever Longtusk
+  Cub deals combat damage to a player, you get {E}{E}. Pay {E}{E}: Put a
+  +1/+1 counter on Longtusk Cub."). The decision it
+  proves: **a player-counter substrate disjoint from object counters** —
+  poison and energy live on `Player`, not on any `Object`, so a wholesale
+  player loss (CR 704.5c's ten-or-more-poison SBA) and a spendable player
+  resource are both representable without a fictional "player object"; **infect
+  is a deal-time classification bit, not a rewritten damage event** —
+  `DamageEvent.dealtByInfect :: Bool` mirrors the established
+  `dealtByDeathtouch :: Bool` idiom, and `Damage.applyDamage`'s `markOne`
+  fold — already branching on `Recipient` (creature vs. player) — grows one
+  more branch per recipient (mark damage vs. `-1/-1` counters to a creature;
+  life loss vs. poison counters to a player) reading the bit; the CR 616
+  replacement loop and everything upstream of it is untouched; and **energy
+  is a bidirectional player counter** — the same
+  `PlayerCounterKind` that poison uses is gained by an effect and spent by a
+  cost, so no separate "energy pool" type was needed. **Added:**
+  `Pawl.Type.PlayerCounterKind` (`Poison | Energy`, distinct from
+  `Pawl.Type.CounterKind` — CR 122.1's marker sits on either "an object or
+  player", and pawl keeps those two placements as separate types rather than
+  one shared vocabulary); `Player.counters :: Map PlayerCounterKind Natural`;
+  `Keyword.Infect` (702.90, ordered after
+  `Fear`/before `Devoid`); `DamageEvent.dealtByInfect`; `Effect.GainPlayerCounters
+  PlayerCounterKind Quantity` (targetless, CR 107.14's "you" reading, subsumes
+  energy/experience/rad without a new opcode per kind);
+  `CostComponent.PayEnergy Natural`; `TriggerCondition.SelfDealsCombatDamageToPlayer`
+  (CR 510.1b/510.2, filtered from the existing `DamageDealt` event log, no new
+  recording); and the poison-at-ten SBA (CR 704.5c) beside the life-total-loss
+  SBA in `Pawl.Sba`. **One incidental fix surfaced by Longtusk Cub's own
+  activated ability:** `Activate.activateAbility` now binds the source
+  permanent under the reserved self slot before resolving (CR 113.7), so "put
+  a +1/+1 counter on Longtusk Cub" resolves as a slot read exactly as
+  `Engine.placeOne` already does for a triggered ability's source — additive,
+  since no existing activated ability read the self slot before. **Nine
+  deferrals filed at close-out**, each `expires:card-driven`: the counter→
+  layer-6 ability-granting path (#116, rest of GAP-C); toxic, CR 702.164
+  (#117); poisonous, CR 702.70 (#118); proliferate, CR 701.27 (#119); a
+  targeted player-counter effect (#120, cited at `Effect.GainPlayerCounters`);
+  a variable energy cost (#121, cited at `CostComponent.PayEnergy`); the CR
+  614 player-counter replacement funnel (#122, cited at `Damage.applyDamage`'s
+  infect arm — energy and poison are both added directly today, with no
+  replacement-effect opportunity for a doubler); experience/rad counters
+  (#123); and mana of any color (#124, the mechanism that blocked Aether Hub
+  as the energy gate card, unrelated to counters). Two-Headed Giant poison
+  sharing (CR 704.6b/810) stays out of scope, no issue filed. **Tracking:**
+  closes #6 (M4.5 P10); #116–#124 are the phase's nine live deferrals. Spec:
+  `docs/superpowers/specs/2026-07-23-p10-player-counters-design.md`.

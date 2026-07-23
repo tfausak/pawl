@@ -147,7 +147,7 @@ data Effect card
   | -- CR 122 / 107.14: the resolving controller ("you") gains N counters of a
     -- player-counter kind. Targetless, like Draw. Subsumes any self-scoped
     -- player counter (energy, experience, rad) without a new opcode. A TARGETED
-    -- player-counter effect needs a recipient and is deferred (#TBD-targeted).
+    -- player-counter effect needs a recipient (#120).
     GainPlayerCounters PlayerCounterKind Quantity
   | -- CR 701.26b: untap the slot's target permanent. Single-target (Act of
     -- Treason's "untap that creature"); mass/conditional untap is future.

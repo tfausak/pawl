@@ -11,9 +11,10 @@ module Pawl.Type.Keyword where
 -- "fixing" this into a classification.
 --
 -- Constructors are ordered by RULE NUMBER, not by arrival, so this type stays
--- diffable against rule 702 itself. Twelve, because twelve have consumers -- P3a
--- adds Fear (702.36, a colour-and-artifact blocking restriction) and Devoid
--- (702.114, a characteristic-defining ability that makes an object colourless).
+-- diffable against rule 702 itself. Each constructor below has a consumer --
+-- P3a adds Fear (702.36, a colour-and-artifact blocking restriction) and
+-- Devoid (702.114, a characteristic-defining ability that makes an object
+-- colourless); P10 adds Infect (702.90, a deal-time damage-diversion bit).
 --
 -- Grows a parameterized constructor at the punchlist: Landwalk Subtype (702.14),
 -- and later Protection Quality (702.16) and Ward Cost (702.21). A `data`, not an

@@ -186,7 +186,7 @@ applyDamage events = do
             -- directly (not via Event.putCounters): this is a consequence of
             -- a damage event that already ran the CR 616 replacement loop, so
             -- a "would put -1/-1 from infect" CR 614 sub-replacement is out of
-            -- scope (#TBD-614-funnel).
+            -- scope (#122).
               let addMinus obj = obj {Object.counters = Map.insertWith (+) CounterKind.MinusOneMinusOne (DamageEvent.amount ev) (Object.counters obj)}
                in g {GameState.objects = Map.adjust addMinus oid (GameState.objects g)}
             else

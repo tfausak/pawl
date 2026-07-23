@@ -49,6 +49,7 @@ data CostComponent
   | -- CR 107.14 / 118: pay N energy counters. Energy-specific, not a general
     -- PayPlayerCounters -- energy is the only player counter ever spent as a
     -- cost. A Natural, not a Quantity: a cost has no binding environment at CR
-    -- 601.2f time, and no card pays a variable amount of energy (#TBD-variable).
+    -- 601.2f time, and a variable-amount energy cost is not representable
+    -- (#121).
     PayEnergy Natural
   deriving (Eq, Ord, Show)
