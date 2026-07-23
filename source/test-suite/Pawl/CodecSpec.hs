@@ -225,7 +225,11 @@ tests cards =
             [ HU.testCase "every CostComponent round-trips" $
                 mapM_
                   (roundTrip "component" Codec.costComponentToJson Codec.jsonToCostComponent)
-                  [CostComponent.TapThis, CostComponent.SacrificeThis, CostComponent.PayLife 2],
+                  [ CostComponent.TapThis,
+                    CostComponent.SacrificeThis,
+                    CostComponent.PayLife 2,
+                    CostComponent.Sacrifice 2 (PermanentCriterion.PermanentOfSubtype Subtype.Mountain)
+                  ],
               HU.testCase "a Cost with a mana part and components round-trips" $
                 roundTrip
                   "cost"
@@ -251,7 +255,25 @@ tests cards =
                  in HU.assertEqual
                       "unpayable"
                       (Right Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})
-                      (Codec.jsonToCost value)
+                      (Codec.jsonToCost value),
+              HU.testCase "every PermanentCriterion round-trips" $
+                mapM_
+                  (roundTrip "criterion" Codec.permanentCriterionToJson Codec.jsonToPermanentCriterion)
+                  [PermanentCriterion.AnyPermanent, PermanentCriterion.CreaturePermanent, PermanentCriterion.PermanentOfSubtype Subtype.Mountain],
+              HU.testCase "a Card carrying an additional cost round-trips" $
+                let base = Printing.card (Cards.lightningBoltPrinting cards)
+                    c = base {CardT.additionalCosts = [CostComponent.Sacrifice 1 PermanentCriterion.CreaturePermanent]}
+                 in roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
+              -- Byte-stability: an empty list must not appear in the rendered JSON,
+              -- or every committed card file changes. The posture colorIndicator,
+              -- delayedAbilities and playerAbilities already take.
+              HU.testCase "an empty additionalCosts list is omitted from the JSON" $
+                let base = Printing.card (Cards.lightningBoltPrinting cards)
+                 in do
+                      HU.assertEqual "the fixture really has none" [] (CardT.additionalCosts base)
+                      case J.asObject (Codec.cardToJson base) of
+                        Left err -> HU.assertFailure (Text.unpack err)
+                        Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "additionalCosts") (map fst pairs))
             ],
           HU.testCase "a ZoneChangeR replacement round-trips" $
             let re =

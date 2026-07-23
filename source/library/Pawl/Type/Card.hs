@@ -7,6 +7,7 @@ import Pawl.Type.AbilityName (AbilityName)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.CastingPermission (CastingPermission)
 import Pawl.Type.Color (Color)
+import Pawl.Type.CostComponent (CostComponent)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
 import Pawl.Type.Modal (Modal)
@@ -87,6 +88,18 @@ data Card = MkCard
     -- permission functions in the library (CR 113.6), where the CR 613 layer
     -- system does not reach. Empty for all but Panglacial Wurm.
     castingPermissions :: [CastingPermission],
+    -- CR 118.8: this card's printed additional costs -- "a cost listed in a
+    -- spell's rules text ... that its controller must pay at the same time they
+    -- pay the spell's mana cost" (Village Rites). Empty for every other
+    -- printing.
+    --
+    -- Read DIRECTLY from the card and never through the projection, the
+    -- castingPermissions precedent: a cost is consulted while the object is in
+    -- hand, where the CR 613 layer system does not reach.
+    --
+    -- CR 118.8d: this does not change the card's mana cost. Card.manaCost, and
+    -- every reader of mana value, is unaffected.
+    additionalCosts :: [CostComponent],
     -- CR 604.1/604.2 / 611.1: this card's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary
     -- Tower). The sibling of staticAbilities on the axis CR 613.10/613.11 put

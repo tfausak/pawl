@@ -11,11 +11,17 @@
 -- no mana in it at all).
 module Pawl.CostSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Cards as Cards
+import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
+import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
+import qualified Pawl.Game as Game
+import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -24,14 +30,25 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
+import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Departure as Departure
+import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Game as Game.Type
+import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Payment as Payment
+import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Status as Status
+import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -113,7 +130,18 @@ doorTests cards =
             (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay S.alice S.noSource (Cost.Type.MkCost Nothing []))
          in do
               HU.assertEqual "Unpaid" Payment.Unpaid outcome
-              HU.assertEqual "no land tapped" 0 (S.tappedCount S.alice after)
+              HU.assertEqual "no land tapped" 0 (S.tappedCount S.alice after),
+      -- CR 701.21a: enough controlled permanents matching the criterion.
+      HU.testCase "CR 118.3 a Sacrifice component counts matching permanents this player controls" $
+        let gs = S.mountainsInPlay cards 2
+            two = CostComponent.Sacrifice 2 (PermanentCriterion.PermanentOfSubtype Subtype.Mountain)
+            three = CostComponent.Sacrifice 3 (PermanentCriterion.PermanentOfSubtype Subtype.Mountain)
+            islands = CostComponent.Sacrifice 1 (PermanentCriterion.PermanentOfSubtype Subtype.Island)
+         in do
+              HU.assertBool "two Mountains pay for two" (Cost.canPayComponent S.alice S.noSource two gs)
+              HU.assertBool "but not for three" (not (Cost.canPayComponent S.alice S.noSource three gs))
+              HU.assertBool "and not for an Island" (not (Cost.canPayComponent S.alice S.noSource islands gs))
+              HU.assertBool "and bob controls none of them" (not (Cost.canPayComponent S.bob S.noSource two gs))
     ]
 
 -- Greed {3}{B} Enchantment: "{B}, Pay 2 life: Draw a card."
@@ -189,5 +217,120 @@ greedTests cards =
               (not (Cost.requiresTapSymbol (ActivatedAbility.cost (theAbility (Cards.greedPrinting cards)))))
         ]
 
+-- Every answer the engine asked for, in order -- so a test can assert that a
+-- prompt WAS raised (the engine did not decide) or was NOT (the choice was
+-- forced and correctly elided). The Pawl.ReplacementSpec shape.
+answersFor :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> [Response.Response]
+answersFor answer gs game = snd (Replay.record answer gs game)
+
+wasAskedToSacrifice :: [Response.Response] -> Bool
+wasAskedToSacrifice responses =
+  let isSacrifice r = case r of
+        Response.ChoseSacrifices _ -> True
+        _ -> False
+   in any isSacrifice responses
+
+-- Village Rites {B} Instant: "As an additional cost to cast this spell,
+-- sacrifice a creature. Draw two cards."
+--
+-- Its one ruling: "You must sacrifice exactly one creature to cast this spell;
+-- you can't cast it without sacrificing a creature, and you can't sacrifice
+-- additional creatures."
+villageRitesTests :: Cards.Cards -> Tasty.TestTree
+villageRitesTests cards =
+  let -- alice controls one untapped Swamp and `n` Pikers, holds one Village
+      -- Rites, and has three cards in her library so the draw is never a CR
+      -- 121.3 loss.
+      board :: Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+      board n =
+        let base = S.landsInPlay (Cards.swampPrinting cards) 1
+            addPiker (ids, gs) _ = let (oid, gs') = S.addPiker cards S.alice gs in (ids ++ [oid], gs')
+            (pikers, withPikers) = List.foldl' addPiker ([], base) [1 .. n]
+            (rites, gs1) = S.addHandCard (Cards.villageRitesPrinting cards) S.alice withPikers
+            (_, gs2) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice gs1
+            (_, gs3) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice gs2
+            (_, gs4) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice gs3
+         in ( rites,
+              pikers,
+              gs4
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+   in Tasty.testGroup
+        "Village Rites"
+        [ HU.testCase "CR 118.8 the additional cost is paid and the spell resolves" $
+            let (rites, pikers, gs) = board 1
+                cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice rites)
+                resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+             in do
+                  HU.assertEqual "no creature left on the battlefield" 0 (S.creaturesInPlay S.alice resolved)
+                  -- Plan-bug fix: CR 400.7 gives the sacrificed permanent a NEW
+                  -- object id in the graveyard (Pawl.Event.changeZone), so the
+                  -- brief's own membership check (the OLD battlefield id inside
+                  -- Zone.Graveyard) is unsatisfiable by construction -- it fails
+                  -- even against correct code, matching Pawl.TriggerSpec's own
+                  -- "a sacrificed permanent goes to its owner's graveyard" (a
+                  -- COUNT, never an id match). Counting preserves the assertion's
+                  -- intent (a Piker was sacrificed into the graveyard). The +1 is
+                  -- Village Rites itself: CR 608.2n, as the final part of an
+                  -- instant's resolution the spell is put into its owner's
+                  -- graveyard.
+                  HU.assertEqual
+                    "the sacrificed Piker(s) and the resolved instant are now in alice's graveyard"
+                    (length pikers + 1)
+                    (length (Game.zoneMembers Zone.Graveyard S.alice resolved))
+                  HU.assertEqual "two cards drawn" 2 (S.handSize S.alice resolved),
+          -- The ruling's second clause, and CR 601.2f's placement of an
+          -- additional cost INSIDE the total cost: an implementation that pays
+          -- additional costs after announcement offers this cast.
+          HU.testCase "CR 601.2f with no creature to sacrifice the spell is not castable" $
+            let (rites, _, gs) = board 0
+             in do
+                  HU.assertBool "not castable" (not (Cast.castable S.alice rites gs))
+                  HU.assertEqual "and not offered" [] (filter (isCastOf rites) (Action.legalActions S.alice gs)),
+          -- The cost payment went through Event.sacrifice, the CR 701.21 funnel,
+          -- so the turn history saw it. A direct zone poke passes both cases
+          -- above and fails this one. The settle/resolve shape is
+          -- Pawl.TriggerSpec's historyTests, verbatim.
+          HU.testCase "CR 608.2i Khabál Ghoul counts a creature sacrificed to pay a cost" $
+            let (rites, _, gs0) = board 1
+                (ghoul, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice gs0
+                cast = S.runPure S.identityAnswer gs1 (Cast.castSpell S.alice rites)
+                endStep = Phase.Ending EndingStep.EndStep
+                beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+                settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+                resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
+                atEnd = resolveAll (settle (beginEndStep (settle cast)))
+                counters = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject ghoul atEnd)
+             in HU.assertEqual "one +1/+1 counter for the sacrificed Piker" 1 counters,
+          -- CR 701.21a lets the player choose which of their permanents dies, so
+          -- two candidates is a real choice; one is not, and where the rules
+          -- leave nothing to ask, don't prompt.
+          HU.testCase "CR 701.21a two creatures raise ChooseSacrifices; one elides it" $
+            let (ritesTwo, _, twoPikers) = board 2
+                (ritesOne, _, onePiker) = board 1
+                askedTwo = answersFor S.identityAnswer twoPikers (Cast.castSpell S.alice ritesTwo)
+                askedOne = answersFor S.identityAnswer onePiker (Cast.castSpell S.alice ritesOne)
+             in do
+                  HU.assertBool "asked with two" (wasAskedToSacrifice askedTwo)
+                  HU.assertBool "not asked with one" (not (wasAskedToSacrifice askedOne)),
+          -- CR 115.1 makes a target only what the word "target" names: a
+          -- sacrifice choice is not one, so it must not travel as a target.
+          HU.testCase "CR 115.1 the sacrifice choice is not a target choice" $
+            let (rites, _, gs) = board 2
+                asked = answersFor S.identityAnswer gs (Cast.castSpell S.alice rites)
+                isTargets r = case r of
+                  Response.ChoseTargets _ -> True
+                  _ -> False
+             in HU.assertBool "no ChooseTargets was raised" (not (any isTargets asked))
+        ]
+
+isCastOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+isCastOf oid a = case a of
+  Action.Type.Cast o -> o == oid
+  _ -> False
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.Cost" [doorTests cards, greedTests cards]
+tests cards = Tasty.testGroup "Pawl.Cost" [doorTests cards, greedTests cards, villageRitesTests cards]

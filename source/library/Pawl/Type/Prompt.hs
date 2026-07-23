@@ -133,3 +133,18 @@ data Prompt r where
   -- as values: with one there is nothing to choose, and among equal values every
   -- order yields the same board (each still gets its own CR 614.5 opportunity).
   ChooseReplacement :: Decider -> PlayerId -> [ObjectId] -> Prompt Natural
+  -- CR 701.21a: which permanents to sacrifice to pay a cost. The ObjectId is the
+  -- spell being cast or the permanent whose ability is being activated; the
+  -- [ObjectId] is the payer's permanents matching the component's criterion (the
+  -- engine pre-filters, in ascending order); the Natural is how many. The answer
+  -- is a Set because one permanent cannot be sacrificed twice for one payment.
+  --
+  -- Deliberately NOT Prompt.ChooseTargets or the TargetSpec machinery: CR 115.1
+  -- makes a target only what the word "target" names, and conflating the two
+  -- would let shroud, hexproof and "becomes the target" triggers observe a
+  -- sacrifice choice. Its shape mirrors ChooseDiscard (candidates plus a count).
+  --
+  -- Asked ONLY when there is a choice -- more candidates than the count. Exactly
+  -- as many as the count is forced, and where the rules leave nothing to ask,
+  -- don't prompt.
+  ChooseSacrifices :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Natural -> Prompt (Set ObjectId)

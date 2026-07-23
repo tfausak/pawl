@@ -258,12 +258,20 @@ matchesController gs src rel oid = case rel of
   ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
 
 -- Which permanents a pattern admits. P9 generalizes this.
+--
+-- PermanentCriterion is matched here AND in Pawl.Cost.matchesCriterion; the two
+-- are not shared because Pawl.Cost importing Pawl.Replacement would collide
+-- with #72's queued fix (which needs Pawl.Replacement to consult costs) (#N).
+-- Task 7 replaces this note.
 matchesPermanent :: GameState -> PermanentCriterion.PermanentCriterion -> ObjectId -> Bool
 matchesPermanent gs crit oid = case crit of
   PermanentCriterion.AnyPermanent -> True
   -- CR 205.2b / 300.2 / 613.1d: creature-ness is the PROJECTED question, so an
   -- Opalescence'd enchantment counts.
   PermanentCriterion.CreaturePermanent -> Projection.isCreatureOf oid gs
+  -- CR 205.3: subtype membership, read through the projection so a
+  -- type-changing effect (Blood Moon) is seen.
+  PermanentCriterion.PermanentOfSubtype s -> Set.member s (Projection.subtypesOf oid gs)
 
 -- CR 614.16: apply a scaling to a count. "That many plus one" and "twice that
 -- many" are the same operation with different data.

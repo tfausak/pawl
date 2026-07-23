@@ -285,6 +285,7 @@ recordingAnswer p = case p of
   Prompt.ChooseEntryOption {} -> pure 0
   Prompt.OrderTriggers _ _ sources -> pure (map fromIntegral (take (length sources) [0 :: Int ..]))
   Prompt.ChooseReplacement {} -> pure 0
+  Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
@@ -423,6 +424,7 @@ slaveAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of

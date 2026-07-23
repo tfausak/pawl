@@ -450,18 +450,23 @@ jsonToControllerRelation =
       (Text.pack "Anyones", ControllerRelation.Anyones)
     ]
 
+-- Tagged rather than bare-nullary: this family grows a payload-carrying
+-- constructor (PermanentOfSubtype), so the decoder is written against
+-- Json.tag and only gains arms.
 permanentCriterionToJson :: PermanentCriterion.PermanentCriterion -> Value
-permanentCriterionToJson c = nullary . Text.pack $ case c of
-  PermanentCriterion.AnyPermanent -> "AnyPermanent"
-  PermanentCriterion.CreaturePermanent -> "CreaturePermanent"
+permanentCriterionToJson c = case c of
+  PermanentCriterion.AnyPermanent -> nullary (Text.pack "AnyPermanent")
+  PermanentCriterion.CreaturePermanent -> nullary (Text.pack "CreaturePermanent")
+  PermanentCriterion.PermanentOfSubtype s -> Json.tagged (Text.pack "PermanentOfSubtype") (Just (subtypeToJson s))
 
 jsonToPermanentCriterion :: Value -> Either Text PermanentCriterion.PermanentCriterion
-jsonToPermanentCriterion =
-  decodeNullary
-    (Text.pack "PermanentCriterion")
-    [ (Text.pack "AnyPermanent", PermanentCriterion.AnyPermanent),
-      (Text.pack "CreaturePermanent", PermanentCriterion.CreaturePermanent)
-    ]
+jsonToPermanentCriterion value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("AnyPermanent", _) -> Right PermanentCriterion.AnyPermanent
+    ("CreaturePermanent", _) -> Right PermanentCriterion.CreaturePermanent
+    ("PermanentOfSubtype", Just v) -> fmap PermanentCriterion.PermanentOfSubtype (jsonToSubtype v)
+    _ -> Left (Text.pack "unknown PermanentCriterion: " <> t)
 
 playerScopeToJson :: PlayerScope.PlayerScope -> Value
 playerScopeToJson s = nullary . Text.pack $ case s of
@@ -640,6 +645,7 @@ costComponentToJson c = case c of
   CostComponent.TapThis -> nullary (Text.pack "TapThis")
   CostComponent.SacrificeThis -> nullary (Text.pack "SacrificeThis")
   CostComponent.PayLife n -> Json.tagged (Text.pack "PayLife") (Just (natTo n))
+  CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array [natTo n, permanentCriterionToJson c_]))
 
 jsonToCostComponent :: Value -> Either Text CostComponent.CostComponent
 jsonToCostComponent value = do
@@ -648,6 +654,10 @@ jsonToCostComponent value = do
     ("TapThis", _) -> Right CostComponent.TapThis
     ("SacrificeThis", _) -> Right CostComponent.SacrificeThis
     ("PayLife", Just v) -> fmap CostComponent.PayLife (natFrom v)
+    ("Sacrifice", Just (Array [n, c_])) -> do
+      count <- natFrom n
+      criterion <- jsonToPermanentCriterion c_
+      pure (CostComponent.Sacrifice count criterion)
     _ -> Left (Text.pack "unknown CostComponent: " <> t)
 
 targetSpecToJson :: TargetSpec.TargetSpec -> Value
@@ -1472,6 +1482,10 @@ cardToJson c =
                then []
                else [(Text.pack "playerAbilities", listTo playerStaticAbilityToJson (CardT.playerAbilities c))]
            )
+        ++ ( if null (CardT.additionalCosts c)
+               then []
+               else [(Text.pack "additionalCosts", listTo costComponentToJson (CardT.additionalCosts c))]
+           )
     )
 
 getOpt :: Text -> [(Text, Value)] -> Value
@@ -1518,6 +1532,7 @@ jsonToCard value = do
   characteristicPT <- maybeFrom jsonToQuantity (getOpt (Text.pack "characteristicPT") ps)
   delayed <- mapFromDefault jsonToDelayedAbilities (getOpt (Text.pack "delayedAbilities") ps)
   playerAbilities <- listFromDefault jsonToPlayerStaticAbility (getOpt (Text.pack "playerAbilities") ps)
+  additionalCosts <- listFromDefault jsonToCostComponent (getOpt (Text.pack "additionalCosts") ps)
   pure
     CardT.MkCard
       { CardT.name = name,
@@ -1535,7 +1550,8 @@ jsonToCard value = do
         CardT.colorIndicator = colorIndicator,
         CardT.characteristicPT = characteristicPT,
         CardT.delayedAbilities = delayed,
-        CardT.playerAbilities = playerAbilities
+        CardT.playerAbilities = playerAbilities,
+        CardT.additionalCosts = additionalCosts
       }
 
 printingToJson :: Printing.Printing -> Value

@@ -167,7 +167,8 @@ cardTests cards =
                   Card.Type.delayedAbilities = Map.empty,
                   Card.Type.castingPermissions = [],
                   Card.Type.characteristicPT = Nothing,
-                  Card.Type.playerAbilities = []
+                  Card.Type.playerAbilities = [],
+                  Card.Type.additionalCosts = []
                 }
          in do
               HU.assertBool "not a permanent" (not (Card.isPermanent card))

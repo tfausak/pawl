@@ -45,4 +45,7 @@ data Response
   | -- CR 616.1: the index of the replacement effect a player chose to apply next,
     -- serialized so a DecisionLog replays a replacement race deterministically.
     ChoseReplacement Natural
+  | -- CR 701.21a: the permanents a player chose to sacrifice to pay a cost,
+    -- serialized so a DecisionLog replays the payment deterministically.
+    ChoseSacrifices (Set ObjectId)
   deriving (Eq, Show)

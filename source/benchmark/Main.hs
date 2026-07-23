@@ -47,6 +47,7 @@ alwaysPass p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
 
 -- Casts when legal, otherwise passes: the benchmark that actually exercises the
 -- stack, mana payment, and resolution.
@@ -77,6 +78,7 @@ castAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
 
 -- Casts, attacks, and blocks: the benchmark that exercises combat.
 fightAnswer :: Prompt.Prompt r -> r
@@ -108,6 +110,7 @@ fightAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
 
 -- Two players, seeded from the benchmark's argument.
 playersFrom :: Natural -> NonEmpty.NonEmpty PlayerId

@@ -37,6 +37,7 @@ encode p answer = case p of
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
+  Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -96,6 +97,9 @@ decode p response = case p of
   Prompt.ChooseReplacement {} -> case response of
     Response.ChoseReplacement n -> Just n
     _ -> Nothing
+  Prompt.ChooseSacrifices {} -> case response of
+    Response.ChoseSacrifices ids -> Just ids
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -153,6 +157,10 @@ defaultAnswer p = case p of
   -- CR 616.1: index 0 is always a legal answer (the bucket is non-empty when this
   -- is asked), and is the least eventful fallback when a transcript runs short.
   Prompt.ChooseReplacement {} -> 0
+  -- The first `count` candidates, which the engine offers in ascending order --
+  -- a legal answer whenever the prompt was legal to ask, and the least eventful
+  -- fallback when a transcript runs short.
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

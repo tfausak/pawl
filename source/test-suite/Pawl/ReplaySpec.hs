@@ -88,7 +88,16 @@ combatReplayTests =
             HU.assertEqual
               "identity permutation"
               [0, 1 :: Natural.Natural]
-              (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice [oid, ObjectId.MkObjectId 8]))
+              (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice [oid, ObjectId.MkObjectId 8])),
+          HU.testCase "ChooseSacrifices records and replays a Set ObjectId" $
+            let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
+                answer = Set.singleton (ObjectId.MkObjectId 8)
+             in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
+          HU.testCase "defaultAnswer sacrifices the first `count` offered, in order" $
+            HU.assertEqual
+              "the ascending prefix"
+              (Set.singleton oid)
+              (Replay.defaultAnswer (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1))
         ]
 
 replayTests :: Cards.Cards -> Tasty.TestTree

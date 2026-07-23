@@ -1,6 +1,7 @@
 module Pawl.Type.CostComponent where
 
 import Numeric.Natural (Natural)
+import Pawl.Type.PermanentCriterion (PermanentCriterion)
 
 -- CR 601.2f's list of what a cost's non-mana part can be: "paying mana, tapping
 -- permanents, sacrificing permanents, discarding cards, and so on." One
@@ -34,4 +35,13 @@ data CostComponent
     -- environment, which a cost has no access to at CR 601.2f time, and no card
     -- in the pool pays a variable amount of life (#99).
     PayLife Natural
+  | -- CR 701.21a / CR 601.2f's "sacrificing permanents": sacrifice this many
+    -- permanents matching the criterion (Village Rites' one creature,
+    -- Fireblast's two Mountains). The player chooses which (CR 701.21a), so this
+    -- is a prompt and never an engine pick.
+    --
+    -- The criterion is matched against the PROJECTION, never a printed
+    -- characteristic: Blood Moon makes a nonbasic land a Mountain, and it may be
+    -- sacrificed as one.
+    Sacrifice Natural PermanentCriterion
   deriving (Eq, Ord, Show)

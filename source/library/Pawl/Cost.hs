@@ -8,10 +8,14 @@
 -- "pay it", and read one classification (requiresTapSymbol) for CR 302.6.
 module Pawl.Cost where
 
+import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
@@ -29,9 +33,12 @@ import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Payment as Payment
+import qualified Pawl.Type.PermanentCriterion as PermanentCriterion
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Zone as Zone
@@ -65,7 +72,7 @@ costsFor oid gs = case Game.lookupObject oid gs of
   Just obj -> case Object.source obj of
     Source.OfCard printing ->
       let card = Printing.card printing
-       in [Cost.MkCost {Cost.mana = Card.manaCost card, Cost.components = []}]
+       in [Cost.MkCost {Cost.mana = Card.manaCost card, Cost.components = Card.additionalCosts card}]
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
     Source.OfTrigger _ _ -> []
@@ -107,6 +114,27 @@ hasVariable cost = case Cost.mana cost of
 requiresTapSymbol :: Cost -> Bool
 requiresTapSymbol cost = elem CostComponent.TapThis (Cost.components cost)
 
+-- Which permanents a criterion admits, matched through the PROJECTION and never
+-- against printed characteristics: a card type is CR 613.1d layer 4 and a
+-- subtype is layer 4 too, so Blood Moon changes the answer.
+--
+-- The sibling of Pawl.Replacement.matchesPermanent, deliberately not shared with
+-- it: Pawl.Cost importing Pawl.Replacement would become a module cycle the
+-- moment CR 614.12b's payable-cost check lands there (#N). P9's filter language
+-- merges both.
+matchesCriterion :: GameState -> PermanentCriterion.PermanentCriterion -> ObjectId -> Bool
+matchesCriterion gs criterion oid = case criterion of
+  PermanentCriterion.AnyPermanent -> True
+  PermanentCriterion.CreaturePermanent -> Projection.isCreatureOf oid gs
+  PermanentCriterion.PermanentOfSubtype subtype -> Set.member subtype (Projection.subtypesOf oid gs)
+
+-- The permanents this player may sacrifice for a criterion, ascending -- the
+-- order ChooseSacrifices offers them in, which is what makes both the elision
+-- test and the transcript fallback deterministic.
+sacrificeCandidates :: PlayerId -> PermanentCriterion.PermanentCriterion -> GameState -> [ObjectId]
+sacrificeCandidates pid criterion gs =
+  List.sort (filter (matchesCriterion gs criterion) (Projection.controls pid gs))
+
 -- CR 118.3: "A player can't pay a cost without having the necessary resources to
 -- pay it fully." The mana part AND every component, measured against the CURRENT
 -- state -- before any part of the cost is paid. That is CR-correct rather than
@@ -140,6 +168,11 @@ canPayComponent pid oid component gs = case component of
   CostComponent.PayLife n -> case Map.lookup pid (GameState.players gs) of
     Nothing -> False
     Just player -> Player.life player >= toInteger n
+  -- CR 701.21a: this player must control at least `n` matching permanents.
+  -- CR 118.10's "each payment of a cost applies to only one spell, ability, or
+  -- effect" is not enforced across two components of ONE cost (#N).
+  CostComponent.Sacrifice n criterion ->
+    length (sacrificeCandidates pid criterion gs) >= fromIntegral n
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment. Components are
 -- paid in PRINTED order; CR 601.2h lets the player pay in any order, which is an
@@ -192,6 +225,28 @@ payComponent pid oid component = case component of
   CostComponent.PayLife n -> do
     State.modify' (\gs -> gs {GameState.players = Map.adjust (\p -> p {Player.life = Player.life p - toInteger n}) pid (GameState.players gs)})
     pure Payment.Paid
+  -- CR 701.21a: the player chooses which of their permanents dies, so this is a
+  -- prompt. Elided only when forced -- exactly as many candidates as the count.
+  -- Three payable Mountains and a count of two is a real choice and IS asked:
+  -- Mountains differ in tap state, counters and attached auras, so "they are all
+  -- the same" is not a claim this engine may make.
+  --
+  -- Reject-not-repair: an answer that is not a size-`n` subset of the offered
+  -- candidates makes the whole payment Unpaid, which pay's restore turns into a
+  -- no-op.
+  CostComponent.Sacrifice n criterion -> do
+    gs <- State.get
+    let candidates = sacrificeCandidates pid criterion gs
+        decider = Decide.deciderFor pid gs
+    chosen <-
+      if length candidates <= fromIntegral n
+        then pure (Set.fromList candidates)
+        else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider pid oid candidates n))
+    if Set.isSubsetOf chosen (Set.fromList candidates) && Set.size chosen == fromIntegral n
+      then do
+        Monad.mapM_ Event.sacrifice (Set.toAscList chosen)
+        pure Payment.Paid
+      else pure Payment.Unpaid
 
 -- The arithmetic half, pure and board-free.
 --
