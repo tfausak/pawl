@@ -712,9 +712,11 @@ restartAnswer p = case p of
 -- board -- the synthetic subgame sorcery ({0}, in alice's hand) -- and otherwise
 -- passes. Inside the subgame the libraries are Mountains (lands are PLAYED, not
 -- cast), so no cast is available there and everyone passes to termination (bob
--- decks). Because subgame prompts are UNTAGGED, the same answerer serves both
--- games. Non-ChooseAction prompts (Shuffle during setup, etc.) delegate to
--- identityAnswer.
+-- decks) -- except the CR 729.6 nested gate, where the level-1 subgame's
+-- library also holds a castable nested synthetic-subgame sorcery, and the same
+-- cast-if-available strategy descends into it. Because subgame prompts are
+-- UNTAGGED, the same answerer serves every level. Non-ChooseAction prompts
+-- (Shuffle during setup, etc.) delegate to identityAnswer.
 subgameAnswer :: Prompt.Prompt r -> r
 subgameAnswer p = case p of
   Prompt.ChooseAction _ _ actions ->

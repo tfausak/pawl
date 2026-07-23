@@ -538,6 +538,8 @@ playGame =
 -- funnel each owner's cards back to their main-game library (CR 729.5) and
 -- reshuffle (Prompt.Shuffle). A subgame within a subgame (CR 729.6) is free: the
 -- nested playGame's own priorityLoop re-supplies playSubgame.
+-- Nontraditional/Vanguard/Commander subgame movement and cards brought into
+-- a subgame are subsystem-blocked (#140).
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get

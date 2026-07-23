@@ -242,9 +242,8 @@ restartGame starter = do
 -- cleared, exactly as restartGame does, EXCEPT the object/timestamp id supplies,
 -- which are INHERITED from the parent so every object the subgame mints (CR 400.7)
 -- gets an id above every parent id -- funnelBack relies on that for non-collision.
--- CR 729.2's "randomly determine which player goes first" is elided to the head of
--- the turn order (pawl has no first-player randomness prompt; the Setup.emptyGame
--- posture), filed with a named expiry.
+-- CR 729.2's "randomly determine which player goes first" is elided to the
+-- head of the turn order (pawl has no first-player randomness prompt) (#136).
 subgameStateFrom :: GameState -> GameState
 subgameStateFrom parent =
   let libIds =

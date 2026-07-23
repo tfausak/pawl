@@ -560,7 +560,10 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- construction, play, funnel-back, and reshuffle); then bind its outcome.
   -- CR 729.1b: the loser is the 2-player derivation from the Result; a Drawn
   -- subgame binds nothing (the follow-on then no-ops). Multi-player "each
-  -- player who doesn't win" and a widened Result are deferred.
+  -- player who doesn't win" and a widened Result are deferred (#138); this
+  -- arm runs only on the SPELL path -- an ability-driven subgame is deferred
+  -- (#137). The fixed follow-on stands in for Shahrazad's half-life rider
+  -- (#139), which retires the synthetic gate.
   Effect.PlaySubgame slot -> do
     result <- runSubgame
     order <- State.gets GameState.turnOrder
@@ -871,14 +874,19 @@ applyEffect = applyEffectWith noSubgame
 -- `holder` is the effect SOURCE, which is the resolving spell itself for a
 -- spell and the source PERMANENT for an ability -- the same object
 -- ArmDelayedTrigger captures from (`Game.lookupObject source gs` there), so the
--- two always agree. This does NOT make the slot visible to a later effect of
--- the same fold: applyEffect's `chosen` parameter is a snapshot taken once
--- before the fold starts, so a later Sacrifice/Destroy/etc. reading the same
--- slot still sees the pre-Create value (Nothing). Only ArmDelayedTrigger sees
--- it, because it re-reads Object.bindings from LIVE GameState rather than from
--- `chosen`. A spell-mode effect that tried to read a dangling Create slot would
--- be caught loudly by the D4 lint (declared slots == read slots) rather than
--- silently no-op, so this gap is a documentation defect, not a latent one.
+-- two always agree. Whether this makes the slot visible to a later effect of
+-- the same fold now depends on the path: on the SPELL path, resolveSpellWith
+-- re-reads Object.bindings before EACH effect, so a later Sacrifice/Destroy/
+-- etc. reading the same slot DOES see the mid-fold value (this is exactly what
+-- lets PlaySubgame's derived loser reach a follow-on DealDamage). On the
+-- ABILITY path, resolveEffects still folds applyEffect over a `chosen`
+-- snapshot taken once before the fold starts, so a later Sacrifice/Destroy/
+-- etc. there still sees the pre-Create value (Nothing). Only ArmDelayedTrigger
+-- sees it on either path, because it re-reads Object.bindings from LIVE
+-- GameState rather than from `chosen`. A spell-mode effect that tried to read
+-- a dangling Create slot would be caught loudly by the D4 lint (declared slots
+-- == read slots) rather than silently no-op, so this gap is a documentation
+-- defect, not a latent one.
 --
 -- For an ABILITY, `holder`/`source` is the source PERMANENT, not the ability
 -- object on the stack -- so a delayed ability armed by a triggered or activated
