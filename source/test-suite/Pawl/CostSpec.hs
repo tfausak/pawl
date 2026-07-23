@@ -413,5 +413,71 @@ fireblastTests cards =
              in HU.assertBool "not castable" (not (Cast.castable S.alice fireblast gs))
         ]
 
+-- The two cross-checks: Fireblast's alternative cost against the projection
+-- (Blood Moon, CR 613 layer 4) and against P7's cost modification (Thalia, CR
+-- 118.9d).
+crossCheckTests :: Cards.Cards -> Tasty.TestTree
+crossCheckTests cards =
+  let withPriority gs =
+        gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+   in Tasty.testGroup
+        "CrossChecks"
+        [ -- Blood Moon: "Nonbasic lands are Mountains." Evolving Wilds is a
+          -- nonbasic land, so layer 4 makes it a Mountain and it may be
+          -- sacrificed to Fireblast's alternative. The pair is what
+          -- discriminates: WITHOUT Blood Moon the same board has one Mountain
+          -- and the spell is not castable.
+          --
+          -- Blood Moon affects only NONBASIC lands, which is why the second
+          -- permanent is Evolving Wilds and not an Island.
+          HU.testCase "CR 613.1d PermanentOfSubtype reads the projection, not the printed type line" $
+            let base = S.landsInPlay (Cards.mountainPrinting cards) 1
+                (wilds, gs1) = S.addCreature (Cards.evolvingWildsPrinting cards) S.alice base
+                (fireblast, gs2) = S.addHandCard (Cards.fireblastPrinting cards) S.alice gs1
+                withoutMoon = withPriority gs2
+                (_, gs3) = S.addCreature (Cards.bloodMoonPrinting cards) S.alice gs2
+                withMoon = withPriority gs3
+                cast = S.runPure S.identityAnswer withMoon (Cast.castSpell S.alice fireblast)
+             in do
+                  HU.assertBool
+                    "without Blood Moon, Evolving Wilds is not a Mountain and one Mountain is not two"
+                    (not (Cast.castable S.alice fireblast withoutMoon))
+                  HU.assertBool "with Blood Moon it is castable" (Cast.castable S.alice fireblast withMoon)
+                  HU.assertBool "and Evolving Wilds was sacrificed as a Mountain" (not (Set.member wilds (GameState.battlefield cast))),
+          -- CR 118.9d: "If an alternative cost is being paid to cast a spell,
+          -- any additional costs, cost increases, and cost reductions that
+          -- affect that spell are applied to that alternative cost." Fireblast
+          -- is an instant, so Thalia's noncreature tax reaches it, and the
+          -- alternative's ABSENT mana component is a real, taxable {0} raised to
+          -- {1}. This is the test that requires Just [] rather than Nothing.
+          HU.testCase "CR 118.9d Thalia raises the alternative cost's {0} to {1}" $
+            let tapAll gs = List.foldl' (flip S.tapObject) gs (Set.toList (GameState.battlefield gs))
+                twoTapped = tapAll (S.landsInPlay (Cards.mountainPrinting cards) 2)
+                (_, taxedTwo) = S.addCreature (Cards.thaliaPrinting cards) S.alice twoTapped
+                (fireblastTwo, gsTwo) = S.addHandCard (Cards.fireblastPrinting cards) S.alice taxedTwo
+                -- The same board plus one UNTAPPED Mountain, which can pay the {1}.
+                (_, threeMountains) = S.addCreature (Cards.mountainPrinting cards) S.alice twoTapped
+                (_, taxedThree) = S.addCreature (Cards.thaliaPrinting cards) S.alice threeMountains
+                (fireblastThree, gsThree) = S.addHandCard (Cards.fireblastPrinting cards) S.alice taxedThree
+                alternativeOf oid gs = case Cost.costsFor oid gs of
+                  _ : alt : _ -> Just (Cost.Type.mana (Cost.total S.alice oid alt gs))
+                  _ -> Nothing
+             in do
+                  HU.assertEqual
+                    "the alternative's {0} is taxed to {1}"
+                    (Just (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])))
+                    (alternativeOf fireblastTwo (withPriority gsTwo))
+                  HU.assertBool
+                    "with nothing untapped the taxed alternative is unpayable, so Fireblast is not castable"
+                    (not (Cast.castable S.alice fireblastTwo (withPriority gsTwo)))
+                  HU.assertBool
+                    "a third, untapped Mountain pays the {1} and it is castable again"
+                    (Cast.castable S.alice fireblastThree (withPriority gsThree))
+        ]
+
 tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.Cost" [doorTests cards, greedTests cards, villageRitesTests cards, fireblastTests cards]
+tests cards = Tasty.testGroup "Pawl.Cost" [doorTests cards, greedTests cards, villageRitesTests cards, fireblastTests cards, crossCheckTests cards]
