@@ -46,8 +46,14 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   effects, which CR 613.10/613.11 put *outside* the layer system. **P8 closed
   the *payment* half of GAP-Co** — one `Cost` for spells and abilities, CR
   118.6's unpayable/`{0}` distinction, and additional and alternative costs —
-  via Greed, Village Rites and Fireblast. **P9 (filters), P10 (player counters)
-  and P11 (Command zone) remain, none blocking another.** The umbrella spec is
+  via Greed, Village Rites and Fireblast. **P9 closed GAP-F** — one
+  `Pawl.Type.Filter` predicate language, evaluated by `Pawl.Filter.matches`
+  across both the projection and the printed card, subsumes `TargetSpec`'s
+  per-card variants and the `CardCriterion`/`PermanentCriterion`/
+  `SpellCriterion`/`Affected`-dynamic-set family — via Doom Blade, Terror and
+  Reprisal (#40 closed; #38/#39 re-scoped, not closed, to a deferred
+  count/compare phase). **P10 (player counters) and P11 (Command zone)
+  remain, neither blocking the other.** The umbrella spec is
   `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —

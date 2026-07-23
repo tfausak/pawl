@@ -1755,3 +1755,67 @@ its own gate card and spec, landed as it completes. Umbrella:
   and plan kept as reference:
   `docs/superpowers/specs/2026-07-22-p8-cost-generalization-design.md` and
   `docs/superpowers/plans/2026-07-22-p8-cost-generalization.md`.
+- **M4.5 P9 is complete** (the target-filter predicate language, GAP-F). The
+  decision it proves: **one first-order, non-recursive predicate language,
+  `Pawl.Type.Filter`, subsumes the whole hand-carved classification family** —
+  `Pawl.Type.TargetSpec`'s per-card variants, `CardCriterion`,
+  `PermanentCriterion`, `SpellCriterion`, and `Affected`'s dynamic sets — and
+  does it across BOTH projected (battlefield/stack) and printed (off-battlefield)
+  subjects through one identity-blind evaluator, `Pawl.Filter.matches ::
+  Context -> View -> Filter -> Bool`. `Filter` (`HasCardType`, `HasSupertype`,
+  `HasColor`, `HasSubtype`, `PowerAtLeast Integer`, `ControlledBy
+  PlayerRelation`, plus `And`/`Or`/`Not`) cases only on characteristics, never
+  on an effect's identity — the same legitimate act as casing on a `CardType`.
+  **Three gate cards, each a different pool of `TargetSpec`.** **Doom Blade**
+  (`{1}{B}` "Destroy target nonblack creature") — `MkTargetSpec Creatures (Just
+  (Not (HasColor Black))) IncludesSource` replaces the old
+  `NonblackCreatureTarget`. **Terror** (`{1}{B}` "Destroy target nonartifact,
+  nonblack creature. It can't be regenerated.") — `And [Not (HasCardType
+  Artifact), Not (HasColor Black)]`, the first two-atom `And` a real card needs.
+  **Reprisal** (`{1}{W}` "Destroy target creature with power 4 or greater. It
+  can't be regenerated.") — `PowerAtLeast 4` against the projection, not the
+  printed card, so a pumped 2/2 is a legal target and an unpumped one is not.
+  **Two non-target cross-checks**, proving the same evaluator covers printed-card
+  search and the cost-generalization phase's `PermanentCriterion`: the basic-land
+  search (`Effect.Search` now carries a `Filter`, matched via the new
+  `Projection.viewOfCard :: Card -> Filter.View` builder for off-battlefield
+  cards, whose `power`/`controller` are vacuously `Nothing`) and Fireblast's
+  sacrifice-two-Mountains alternative cost (P8's `PermanentCriterion`, now a
+  `Filter`, matched against the live projection so a Blood-Moon'd nonbasic land
+  still qualifies as a Mountain). **`TargetSpec` is now `MkTargetSpec Pool
+  (Maybe Filter) Exclusion`** — a closed `Pool` (CR 115's candidate-kind enum,
+  unchanged), an optional `Filter` (`Nothing` = the whole pool, e.g. bare
+  "target creature"), and `Exclusion` (`IncludesSource`/`ExcludesSource`, CR
+  601.2c's "another") carrying self-exclusion as a slot property rather than a
+  `Filter` atom — closing #40. `Affected`'s dynamic sets are now `Matching
+  Exclusion Filter`, re-derived each projection against the partial
+  characteristics accumulated through the layers already applied; **self-
+  exclusion is PRESERVED**, not dropped — a plan correction made during
+  execution, since `opalescence.json` is a live producer and its "each other"
+  self-exclusion test (`ProjectionSpec.hs`, "Opalescence is not itself a
+  creature") would have regressed had the exclusion been elided. **Added:**
+  `Pawl.Type.Filter`, `Pawl.Type.Pool`, `Pawl.Type.Exclusion`,
+  `Pawl.Type.PlayerRelation`; the `Pawl.Filter` evaluator (`View`, `Context`,
+  `matches`); `Projection.viewOfObject`/`viewOfCard`. **Retired outright** (no
+  compat shims): `Pawl.Type.CardCriterion`, `Pawl.Type.PermanentCriterion`,
+  `Pawl.Type.SpellCriterion`, and the old per-card `TargetSpec` variants
+  (`NonblackCreatureTarget`, `WallTarget`, `ArtifactTarget`,
+  `OpponentCreatureTarget`, …) and `Affected` constructors (`AllCreatures`,
+  `AllLands`, `AllNonbasicLands`, `CreaturesOfColor`, `OtherNonAuraEnchantments`).
+  **Regeneration** (Terror's/Reprisal's "It can't be regenerated" clause) is out
+  of scope — pawl has no regeneration shield yet — filed and cited at the gate
+  test (#113), the same precedent P8's cross-checks set. **#38/#39
+  re-scoped, not closed**: `StateCondition` and `CountSpec` keep a second
+  concept, scope + aggregation + threshold comparison, that `Filter` does not
+  reach; their expiry moves off "milestone P9" onto the deferred count/compare
+  phase. **One new deferral filed during close-out**: Opalescence's Oracle text
+  is "each other NON-AURA enchantment", but `Aura` is not a modelled `Subtype`
+  and the retired `OtherNonAuraEnchantments` arm never enforced it either, so
+  the qualifier stays unenforced and unreachable until Aura exists (#114).
+  **Tracking:** closes #5 (M4.5 P9) and #40 (`TargetSpec` family retired); #111
+  (`PermanentCriterion` matched at two sites) closes as a side effect of the
+  merge into one `Filter`; #38/#39 commented, not closed; #113/#114 are the
+  phase's two live deferrals. Spec and plan kept as reference:
+  `docs/superpowers/specs/2026-07-22-p9-target-filter-predicate-language-design.md`
+  and
+  `docs/superpowers/plans/2026-07-22-p9-target-filter-predicate-language.md`.
