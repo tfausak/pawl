@@ -35,32 +35,33 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 
 ## Current work and tracking
 
-- **Status: M0–M4h are complete** — the closed-half milestones M0–M3g, the
-  M3.5 cards-as-data interstitial, and the whole of M4 (M4a–M4g plus the
-  M4h fast-follow). **M4.5 (phased) is in progress: P1–P3b closed Cluster 1**
-  (every sublayer of the layer system has a producer), **P4 opened Cluster 2**
-  (the event-history substrate), **P5 closed its second phase (the monadic
-  replacement path and CR 616), and P6 closed GAP-D — a stored duration now
-  has a beginning. P7 closed GAP-P and the *modification* half of GAP-Co, and
-  with them the whole of Cluster 3**: player and rules-modifying continuous
-  effects, which CR 613.10/613.11 put *outside* the layer system. **P8 closed
-  the *payment* half of GAP-Co** — one `Cost` for spells and abilities, CR
-  118.6's unpayable/`{0}` distinction, and additional and alternative costs —
-  via Greed, Village Rites and Fireblast. **P9 closed GAP-F** — one
-  `Pawl.Type.Filter` predicate language, evaluated by `Pawl.Filter.matches`
-  across both the projection and the printed card, subsumes `TargetSpec`'s
-  per-card variants and the `CardCriterion`/`PermanentCriterion`/
-  `SpellCriterion`/`Affected`-dynamic-set family — via Doom Blade, Terror and
-  Reprisal (#40 closed; #38/#39 re-scoped, not closed, to a deferred
-  count/compare phase). **P10 closed GAP-C** — a player-counter substrate
-  (`Player.counters`, `PlayerCounterKind`) disjoint from object counters,
-  with poison and energy as its first two customers: infect as a deal-time
-  classification bit (`DamageEvent.dealtByInfect`) diverting `Damage`'s
-  existing recipient-branch fold, and energy as a bidirectional counter
-  gained by `Effect.GainPlayerCounters` and spent by `CostComponent.PayEnergy`
-  — via Glistener Elf and Longtusk Cub. **P11 (Command zone) is the one
-  remaining M4.5 phase.** The umbrella spec is
-  `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`.
+- **Status: M0–M4.5 are complete.** The closed-half milestones M0–M3g, the
+  M3.5 cards-as-data interstitial, the whole of M4 (M4a–M4g plus the M4h
+  fast-follow), and now all eleven phases of M4.5 have landed: P1–P3b closed
+  Cluster 1 (every sublayer of the layer system has a producer); P4 opened
+  Cluster 2 (the event-history substrate); P5 closed the monadic replacement
+  path and CR 616; P6 closed GAP-D (a stored duration now has a beginning);
+  P7 closed GAP-P and the *modification* half of GAP-Co, closing Cluster 3
+  (player and rules-modifying continuous effects, which CR 613.10/613.11 put
+  *outside* the layer system); P8 closed the *payment* half of GAP-Co (one
+  `Cost` for spells and abilities, CR 118.6's unpayable/`{0}` distinction,
+  and additional and alternative costs); P9 closed GAP-F (one
+  `Pawl.Type.Filter` predicate language subsuming `TargetSpec`'s per-card
+  variants and the `CardCriterion`/`PermanentCriterion`/`SpellCriterion`/
+  `Affected`-dynamic-set family); P10 closed GAP-C (a player-counter
+  substrate, `Player.counters`/`PlayerCounterKind`, disjoint from object
+  counters, with poison and energy as its first two customers); and **P11
+  closed GAP-Z and the monarch customer of GAP-S** — a seventh zone
+  (`Zone.Command`) whose residents' static abilities function off the
+  battlefield (an emblem's anthem), and the monarch as a game-wide
+  designation (`GameState.monarch`) with two sourceless inherent triggers
+  (`Source.OfInherentTrigger`), via Palace Jailer. **Every closed-half gap
+  axis the census flagged now has a type-system axis and a real (or
+  sanctioned labeled-synthetic) gate card with a passing test.** The
+  umbrella spec is
+  `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`; the
+  distilled per-phase entries (gate cards, decisions, opcodes) are in
+  `docs/progress.md`. **M5 is the next milestone to plan.**
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —
   lives in `docs/progress.md`. It records what each milestone *established*,
@@ -79,7 +80,7 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   not an effect. See §1 of the M2a spec before "fixing" this.
 - **Outstanding work is tracked in GitHub Issues** (`tfausak/pawl`). List with
   `gh issue list`; create with `gh issue create`; close with `gh issue close`.
-  Milestones are the unlanded phases (`M4.5 P11`, `M5`–`M7`); the useful
+  Milestones are the unlanded phases (`M5`–`M7`); the useful
   labels are `elision`, `gap`, `rules-correctness`, `bug`, and the two expiry
   triggers `expires:milestone` and `expires:card-driven` — roughly half of
   pawl's deferrals fire when a *card* demands them and have no scheduled date,

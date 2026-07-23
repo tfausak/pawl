@@ -1869,3 +1869,73 @@ its own gate card and spec, landed as it completes. Umbrella:
   sharing (CR 704.6b/810) stays out of scope, no issue filed. **Tracking:**
   closes #6 (M4.5 P10); #116–#124 are the phase's nine live deferrals. Spec:
   `docs/superpowers/specs/2026-07-23-p10-player-counters-design.md`.
+
+- **M4.5 P11 is complete** (the command zone, emblems, and the monarch — GAP-Z
+  and the monarch customer of GAP-S — **closing M4.5**). **Gates: Palace
+  Jailer** (`{2}{W}{W}` Creature — Human Soldier, "When Palace Jailer enters
+  the battlefield, you become the monarch. When Palace Jailer enters the
+  battlefield, exile target creature an opponent controls until an opponent
+  becomes the monarch.") and a **labeled synthetic emblem source**
+  (`S.anthemEmblemCard`, Support.hs — pawl models no planeswalker or the Ring
+  to mint a real one; #125). The decisions it proves: **the command zone is a
+  seventh zone whose residents' static abilities function *from* the zone,
+  off the battlefield** — the projection's uniform static-ability walk grows
+  one more gather pass over `GameState.command`, the same walk it already
+  runs over permanents, so an emblem's anthem folds into layer 7c without the
+  layer system or the projection's battlefield-only assumptions changing;
+  **the monarch is a single game-wide designation, not a per-player
+  counter** — `GameState.monarch :: Maybe PlayerId` sits beside (not inside)
+  `Player`, because CR 725.3 makes at most one player the monarch at a time,
+  the opposite shape from P10's per-player counter map; **the monarch's two
+  CR 725.2 triggers are genuinely sourceless** — `Source.OfInherentTrigger
+  PlayerId (TriggeredAbility Card)` parallels the existing `DelayedTrigger`
+  pattern (a controller baked in, no live object), and the trigger scanner
+  synthesizes both abilities purely from `monarch = Just p`'s *presence*,
+  never from casing on a card; and **exile-until-a-designation-changes needs
+  a dedicated carrier, not an `Expiry`** — P6's `Expiry` sweeps are
+  delete-and-recompute only (dropping a stored effect so the next projection
+  reverts it), and no sweep performs a zone change, so a physically-exiled
+  permanent cannot be recomputed back onto the battlefield; Palace Jailer's
+  return instead uses `GameState.exiledUntilMonarch` + `Effect.ExileUntilMonarch`
+  + `Monarch.returnExiledForMonarch`, wired into `settleForPriority`, with the
+  observable duration ("until an opponent becomes the monarch") matching the
+  spec even though the mechanism is a dedicated carrier rather than the
+  spec's proposed `Expiry` condition. **Added:** `Zone.Command`;
+  `GameState.command :: Set ObjectId`, `GameState.monarch :: Maybe PlayerId`,
+  `GameState.exiledUntilMonarch`; `Source.OfEmblem Card`,
+  `Source.OfInherentTrigger PlayerId (TriggeredAbility Card)`;
+  `Effect.CreateEmblem Card`, `Effect.BecomeMonarch MonarchTarget`,
+  `Effect.ExileUntilMonarch`; `Pawl.Type.MonarchTarget` (`TheController` |
+  `ControllerOfSource`, CR 725.2's two distinct "who becomes the monarch"
+  readings — pawl has no general player-spec for effects yet, so this is the
+  minimal two-constructor shape the phase needs); `GameEvent.BecameMonarch
+  PlayerId`; `TriggerCondition.CreatureDealtCombatDamageToMonarch` (not
+  bearer-scoped, unlike P10's `SelfDealsCombatDamageToPlayer` — it matches
+  any creature whose combat damage recipient is the current monarch, riding
+  P4's existing `DamageDealt` event history); `Pawl.Monarch` (the inherent
+  trigger scanner and placement, and the exile-return sweep); and the
+  projection's command-zone gather pass plus a source's-controller
+  perspective for `Projection.affects` (the emblem's anthem is the first
+  affected-set filter to read a player's control, so `affects` gained a real
+  perspective argument where it previously hard-coded `Nothing`). **Eight
+  deferrals filed at close-out:** the synthetic emblem source itself (#125,
+  cited at its fixture); `GameState`/`Object`/`Source` serialization (#126 —
+  no codec exists for any of the three today, the same wall P10 hit for
+  `Player.counters`); command-zone casting and the CR 903.8 Commander tax
+  (#127, no gate card); CR 725.4 monarch reassignment when a player leaves
+  the game (#128, related to #87, both blocked on real multiplayer support
+  and both leaning on the project-wide two-player `Opponent` assumption, CR
+  102.2); CR 725.5's no-monarch no-op (#129, unexercised — Palace Jailer
+  always establishes a monarch before its own duration is checked); the rest
+  of the GAP-S backlog — day/night, the Ring/Ring-bearer, initiative,
+  venture, speed, experience/rad counters (#130, census §3.4); the other
+  command-zone residents CR 309–315 name — dungeon, plane, scheme, vanguard,
+  conspiracy, and their format variants under CR 408.3 (#131, each its own
+  subsystem or format); and, found during the phase's review, an APNAP
+  ordering gap between the monarch's inherent triggers and normal pending
+  triggers (#132 — `Engine.placePendingTriggers` places `inherent` triggers
+  unconditionally after the APNAP-`orderPending`-ed normal batch, so CR
+  603.3b's own-order choice cannot interleave the two when a player controls
+  one of each in the same batch; no pool card produces the collision yet).
+  **Tracking:** closes #7 (M4.5 P11, the umbrella) — **M4.5 is complete**.
+  Spec: `docs/superpowers/specs/2026-07-23-p11-command-zone-emblems-monarch-design.md`.

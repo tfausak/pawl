@@ -895,12 +895,11 @@ handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 pikerCard :: Cards.Cards -> Card.Type.Card
 pikerCard cards = Printing.card (Cards.pikerPrinting cards)
 
--- LABELED SYNTHETIC (expires when a real emblem source lands, see the P11 plan's
--- deferral issue): an emblem's characteristics are only its abilities (CR 114.3),
--- but pawl models no planeswalker/Ring to mint one, so tests use this fixture --
--- an Elspeth-style anthem, "creatures you control get +1/+1". Built by overriding
--- a vanilla card's static abilities; the residual printed fields are inert for a
--- command-zone object (never projected as a permanent). (#TBD-emblem-source)
+-- LABELED SYNTHETIC: an emblem's characteristics are only its abilities (CR
+-- 114.3), but pawl models no planeswalker/Ring to mint one, so tests use this
+-- fixture -- an Elspeth-style anthem, "creatures you control get +1/+1". Built
+-- by overriding a vanilla card's static abilities; the residual printed fields
+-- are inert for a command-zone object (never projected as a permanent). (#125)
 anthemEmblemCard :: Cards.Cards -> Card.Type.Card
 anthemEmblemCard cards =
   (Printing.card (Cards.pikerPrinting cards))
