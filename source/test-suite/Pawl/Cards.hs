@@ -43,6 +43,7 @@ data Cards = MkCards
     restInPeacePrinting :: Printing.Printing,
     plainsPrinting :: Printing.Printing,
     mindslaverPrinting :: Printing.Printing,
+    syntheticRestartPrinting :: Printing.Printing,
     panglacialWurmPrinting :: Printing.Printing,
     blazePrinting :: Printing.Printing,
     darksteelMyrPrinting :: Printing.Printing,
@@ -137,6 +138,7 @@ loadCards = do
   restInPeacePrinting_ <- loadPrinting "rest-in-peace"
   plainsPrinting_ <- loadPrinting "plains"
   mindslaverPrinting_ <- loadPrinting "mindslaver"
+  syntheticRestartPrinting_ <- loadPrinting "synthetic-restart"
   panglacialWurmPrinting_ <- loadPrinting "panglacial-wurm"
   blazePrinting_ <- loadPrinting "blaze"
   darksteelMyrPrinting_ <- loadPrinting "darksteel-myr"
@@ -221,6 +223,7 @@ loadCards = do
         restInPeacePrinting = restInPeacePrinting_,
         plainsPrinting = plainsPrinting_,
         mindslaverPrinting = mindslaverPrinting_,
+        syntheticRestartPrinting = syntheticRestartPrinting_,
         panglacialWurmPrinting = panglacialWurmPrinting_,
         blazePrinting = blazePrinting_,
         darksteelMyrPrinting = darksteelMyrPrinting_,
@@ -307,6 +310,7 @@ allPrintings cards =
     restInPeacePrinting cards,
     plainsPrinting cards,
     mindslaverPrinting cards,
+    syntheticRestartPrinting cards,
     panglacialWurmPrinting cards,
     blazePrinting cards,
     darksteelMyrPrinting cards,

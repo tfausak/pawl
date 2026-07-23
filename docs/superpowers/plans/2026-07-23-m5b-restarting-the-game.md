@@ -531,7 +531,7 @@ A labeled-synthetic artifact (the `Landform` crutch pattern) with an activated a
 **Interfaces:**
 - Produces: `Cards.syntheticRestartPrinting :: Cards.Cards -> Printing.Printing`.
 
-- [ ] **Step 1: Create the card file**
+- [x] **Step 1: Create the card file**
 
 Write `data/cards/synthetic-restart.json`:
 
@@ -578,7 +578,7 @@ Write `data/cards/synthetic-restart.json`:
 }
 ```
 
-- [ ] **Step 2: Register the printing at all four `Cards.hs` sites**
+- [x] **Step 2: Register the printing at all four `Cards.hs` sites**
 
 In `source/test-suite/Pawl/Cards.hs`:
 
@@ -606,14 +606,14 @@ In `source/test-suite/Pawl/Cards.hs`:
     syntheticRestartPrinting cards,
 ```
 
-- [ ] **Step 3: Run the round-trip / honesty tests to verify the card loads and encodes**
+- [x] **Step 3: Run the round-trip / honesty tests to verify the card loads and encodes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p "$0~/round-trip/ || $0~/allPrintings/ || $0~/honest/"'`
 Expected: **PASS** — the new printing parses, appears in `allPrintings`, and JSON round-trips (this is the codec arms' TDD gate). If any round-trip case fails, the `RestartGame` codec arm (Task 3 Step 5) or the card JSON is wrong — fix it, do not skip the card.
 
 > If unsure which suite owns the round-trip, run the full suite: `cabal test`. It must stay green.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
