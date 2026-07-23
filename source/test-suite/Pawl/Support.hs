@@ -912,6 +912,7 @@ oneMountainState cards ph =
           GameState.graveyard = Map.empty,
           GameState.battlefield = mempty,
           GameState.exile = mempty,
+          GameState.command = mempty,
           GameState.stack = [],
           GameState.players = Map.empty,
           GameState.manaPool = Map.empty,

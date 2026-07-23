@@ -98,7 +98,10 @@ setupTests cards =
               HU.assertEqual "the result is the run's result" (Just result) (GameState.result final),
       HU.testCase "CR 122.1 a new player starts with no counters" $
         let gs = Setup.emptyGame S.bothPlayers
-         in HU.assertEqual "empty" (Just Map.empty) (fmap Player.counters (Map.lookup S.alice (GameState.players gs)))
+         in HU.assertEqual "empty" (Just Map.empty) (fmap Player.counters (Map.lookup S.alice (GameState.players gs))),
+      HU.testCase "CR 400.1 a new game's command zone is empty" $
+        let gs = Setup.emptyGame S.bothPlayers
+         in HU.assertEqual "empty command" mempty (GameState.command gs)
     ]
 
 greenBlackSetup :: Cards.Cards -> GameState.GameState

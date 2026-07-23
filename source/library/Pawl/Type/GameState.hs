@@ -27,6 +27,10 @@ data GameState = MkGameState
     graveyard :: Map PlayerId (Seq ObjectId),
     battlefield :: Set ObjectId,
     exile :: Set ObjectId,
+    -- CR 400.1: the command zone -- a shared collection (not per-player), keyed
+    -- into `objects` like `battlefield`/`exile`. Emblems live here; their static
+    -- abilities are gathered live by the projection (Pawl.Projection.gather).
+    command :: Set ObjectId,
     stack :: [ObjectId],
     players :: Map PlayerId Player,
     -- CR 106.4. Absent from the map means an empty pool.

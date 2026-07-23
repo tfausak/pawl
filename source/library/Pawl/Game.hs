@@ -47,6 +47,7 @@ zoneMembers zone pid gs =
         Zone.Graveyard -> perPlayer (GameState.graveyard gs)
         Zone.Battlefield -> ownedShared (GameState.battlefield gs)
         Zone.Exile -> ownedShared (GameState.exile gs)
+        Zone.Command -> ownedShared (GameState.command gs)
         Zone.Stack -> filter ownedBy (GameState.stack gs)
 
 -- CR 701.19a: if a permanent is attacking or blocking, remove it from combat.
@@ -70,6 +71,7 @@ removeFromZones pid oid gs =
       GameState.graveyard = Map.adjust (Seq.filter (/= oid)) pid (GameState.graveyard gs),
       GameState.battlefield = Set.delete oid (GameState.battlefield gs),
       GameState.exile = Set.delete oid (GameState.exile gs),
+      GameState.command = Set.delete oid (GameState.command gs),
       GameState.stack = filter (/= oid) (GameState.stack gs)
     }
 
@@ -80,6 +82,7 @@ insertIntoZone zone pid oid gs = case zone of
   Zone.Graveyard -> gs {GameState.graveyard = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.graveyard gs)}
   Zone.Battlefield -> gs {GameState.battlefield = Set.insert oid (GameState.battlefield gs)}
   Zone.Exile -> gs {GameState.exile = Set.insert oid (GameState.exile gs)}
+  Zone.Command -> gs {GameState.command = Set.insert oid (GameState.command gs)}
   Zone.Stack -> gs {GameState.stack = oid : GameState.stack gs}
 
 -- The card an object is a copy of. Nothing when the id is unknown.

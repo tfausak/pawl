@@ -62,6 +62,7 @@ emptyGame order =
           GameState.graveyard = Map.empty,
           GameState.battlefield = mempty,
           GameState.exile = mempty,
+          GameState.command = mempty,
           GameState.stack = [],
           GameState.players = Map.fromList (map newPlayer order_),
           GameState.manaPool = Map.empty,

@@ -349,6 +349,7 @@ zoneToJson z = nullary . Text.pack $ case z of
   Zone.Battlefield -> "Battlefield"
   Zone.Stack -> "Stack"
   Zone.Exile -> "Exile"
+  Zone.Command -> "Command"
 
 jsonToZone :: Value -> Either Text Zone.Zone
 jsonToZone =
@@ -359,7 +360,8 @@ jsonToZone =
       (Text.pack "Graveyard", Zone.Graveyard),
       (Text.pack "Battlefield", Zone.Battlefield),
       (Text.pack "Stack", Zone.Stack),
-      (Text.pack "Exile", Zone.Exile)
+      (Text.pack "Exile", Zone.Exile),
+      (Text.pack "Command", Zone.Command)
     ]
 
 beginningStepToJson :: BeginningStep.BeginningStep -> Value

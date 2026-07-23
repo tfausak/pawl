@@ -261,6 +261,9 @@ sacrifice oid = do
       Zone.Graveyard -> pure ()
       Zone.Stack -> pure ()
       Zone.Exile -> pure ()
+      -- CR 408.1: a command-zone object is not a permanent, so it is never
+      -- sacrificed.
+      Zone.Command -> pure ()
 
 -- CR 111.2: create `n` tokens with the given effect-defined characteristics under
 -- `controller`'s control (its owner, CR 111.2), summoning-sick (CR 302.6). A token

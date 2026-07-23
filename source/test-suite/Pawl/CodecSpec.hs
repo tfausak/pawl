@@ -106,6 +106,8 @@ tests cards =
             roundTrip "poison" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Poison,
           HU.testCase "Zone" $
             roundTrip "zone" Codec.zoneToJson Codec.jsonToZone Zone.Graveyard,
+          HU.testCase "Zone.Command" $
+            roundTrip "command" Codec.zoneToJson Codec.jsonToZone Zone.Command,
           HU.testCase "unknown tag fails" $
             HU.assertBool "left" (either (const True) (const False) (Codec.jsonToColor (Json.Object [])))
         ],
