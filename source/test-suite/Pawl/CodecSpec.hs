@@ -58,6 +58,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
@@ -98,6 +99,9 @@ tests cards =
             mapM_ (roundTrip "color" Codec.colorToJson Codec.jsonToColor) [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green],
           HU.testCase "Keyword" $
             roundTrip "kw" Codec.keywordToJson Codec.jsonToKeyword Keyword.Trample,
+          HU.testCase "PlayerCounterKind" $ do
+            roundTrip "energy" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Energy
+            roundTrip "poison" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Poison,
           HU.testCase "Zone" $
             roundTrip "zone" Codec.zoneToJson Codec.jsonToZone Zone.Graveyard,
           HU.testCase "unknown tag fails" $

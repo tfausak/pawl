@@ -51,7 +51,8 @@ emptyGame order =
         ( pid,
           Player.MkPlayer
             { Player.life = startingLife,
-              Player.status = Status.Playing
+              Player.status = Status.Playing,
+              Player.counters = Map.empty
             }
         )
    in GameState.MkGameState

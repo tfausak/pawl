@@ -58,6 +58,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
@@ -187,6 +188,19 @@ jsonToCounterKind =
     (Text.pack "CounterKind")
     [ (Text.pack "PlusOnePlusOne", CounterKind.PlusOnePlusOne),
       (Text.pack "MinusOneMinusOne", CounterKind.MinusOneMinusOne)
+    ]
+
+playerCounterKindToJson :: PlayerCounterKind.PlayerCounterKind -> Value
+playerCounterKindToJson k = nullary . Text.pack $ case k of
+  PlayerCounterKind.Energy -> "Energy"
+  PlayerCounterKind.Poison -> "Poison"
+
+jsonToPlayerCounterKind :: Value -> Either Text PlayerCounterKind.PlayerCounterKind
+jsonToPlayerCounterKind =
+  decodeNullary
+    (Text.pack "PlayerCounterKind")
+    [ (Text.pack "Energy", PlayerCounterKind.Energy),
+      (Text.pack "Poison", PlayerCounterKind.Poison)
     ]
 
 countSpecToJson :: CountSpec.CountSpec -> Value

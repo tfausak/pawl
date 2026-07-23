@@ -152,6 +152,7 @@ library
     Pawl.Type.PendingTrigger
     Pawl.Type.Phase
     Pawl.Type.Player
+    Pawl.Type.PlayerCounterKind
     Pawl.Type.PlayerEffect
     Pawl.Type.PlayerId
     Pawl.Type.PlayerRelation

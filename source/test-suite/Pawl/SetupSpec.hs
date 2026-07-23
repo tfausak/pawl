@@ -12,6 +12,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
@@ -94,7 +95,10 @@ setupTests cards =
          in do
               HU.assertBool "has a result" (Maybe.isJust (GameState.result final))
               HU.assertEqual "both players have a life total" 2 (Map.size (GameState.players final))
-              HU.assertEqual "the result is the run's result" (Just result) (GameState.result final)
+              HU.assertEqual "the result is the run's result" (Just result) (GameState.result final),
+      HU.testCase "CR 122.1 a new player starts with no counters" $
+        let gs = Setup.emptyGame S.bothPlayers
+         in HU.assertEqual "empty" (Just Map.empty) (fmap Player.counters (Map.lookup S.alice (GameState.players gs)))
     ]
 
 greenBlackSetup :: Cards.Cards -> GameState.GameState

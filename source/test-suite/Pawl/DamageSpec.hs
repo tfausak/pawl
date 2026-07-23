@@ -201,7 +201,7 @@ sbaTests =
         let after = S.settleSba sbaBase {GameState.drewFromEmpty = Set.singleton S.alice}
          in HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result after),
       HU.testCase "life <= 0 loses" $
-        let gs = sbaBase {GameState.players = Map.insert S.alice (Player.MkPlayer {Player.life = 0, Player.status = Status.Playing}) (GameState.players sbaBase)}
+        let gs = sbaBase {GameState.players = Map.insert S.alice (Player.MkPlayer {Player.life = 0, Player.status = Status.Playing, Player.counters = Map.empty}) (GameState.players sbaBase)}
          in HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result (S.settleSba gs)),
       HU.testCase "simultaneous last departures draw" $
         let after = S.settleSba sbaBase {GameState.drewFromEmpty = Set.fromList [S.alice, S.bob]}
