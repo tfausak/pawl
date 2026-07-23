@@ -16,7 +16,7 @@ by whichever source fits the subject's zone: a projected battlefield/stack objec
 (`Projection.viewOfObject`) or a printed card off the battlefield
 (`Projection.viewOfCard`). `TargetSpec` becomes a closed `Pool` + an open
 `Maybe Filter` + a self-exclusion flag; the three criterions collapse to `Filter`;
-`Affected`'s dynamic sets become `Matching Filter`.
+`Affected`'s dynamic sets become `Matching Exclusion Filter`.
 
 **Tech Stack:** Haskell 2010 (GHC 9.14.1, no extensions beyond `GADTs`/`RankNTypes`
 in the suspension core and `NamedFieldPuns` where it clarifies), `tasty`
@@ -117,7 +117,7 @@ these:
 - `source/library/Pawl/Type/TargetSpec.hs` — from a 12-constructor enum to
   `data TargetSpec = MkTargetSpec Pool (Maybe Filter) Exclusion`.
 - `source/library/Pawl/Type/Affected.hs` — from six constructors to
-  `TheseObjects (Set ObjectId) | Matching Filter`.
+  `TheseObjects (Set ObjectId) | Matching Exclusion Filter`.
 - `source/library/Pawl/Type/Effect.hs` — `Search` carries `Filter`, not
   `CardCriterion`.
 - `source/library/Pawl/Target.hs` — `legalRecipients`/`selfExcludes` over the new
@@ -1357,144 +1357,208 @@ git commit -m "feat(m4.5-p9): spell cost-adjustment matches through Filter"
 
 ---
 
-## Task 9: `Affected` dynamic sets → `Matching Filter`
+## Task 9: `Affected` dynamic sets → `Matching Exclusion Filter`
+
+> **PLAN CORRECTION (2026-07-22, during execution):** The spec §4c and this
+> plan's original draft assumed a 2-arm `Affected = TheseObjects | Matching Filter`
+> and claimed `OtherNonAuraEnchantments` "has no live producer and no behavioural
+> test," so its `oid /= source` self-exclusion could be dropped and issue-tracked.
+> **That premise is false.** `data/cards/opalescence.json` is a live producer, and
+> `ProjectionSpec.hs:370` ("CR 305.2 Opalescence is not itself a creature ('each
+> other')") asserts `not (Projection.isCreatureOf opalId gs)` — a behavioural test
+> that depends on the self-exclusion. Dropping it would regress Opalescence and
+> break that test. The other "dynamic" arms are ALSO live cards: `humility.json`
+> (AllCreatures), `urborg-tomb-of-yawgmoth.json` (AllLands), `blood-moon.json`
+> (AllNonbasicLands), `bad-moon.json` (CreaturesOfColor). So this task **preserves
+> self-exclusion** by carrying an `Exclusion` (reused from Task 4's
+> `Pawl.Type.Exclusion`) inside the `Matching` arm — `Matching Exclusion Filter` —
+> which keeps the type finite/analyzable, reuses the existing self-exclusion
+> vocabulary, and preserves every card's behaviour exactly. **No deferral issue is
+> filed** (nothing is deferred; behaviour is preserved).
 
 **Files:**
-- Modify: `source/library/Pawl/Type/Affected.hs` (two arms)
+- Modify: `source/library/Pawl/Type/Affected.hs` (two arms; the `Matching` arm
+  carries `Exclusion` + `Filter`)
 - Modify: `source/library/Pawl/Projection.hs` (`affects` rewritten to
-  `Filter.matches`; the self-exclusion of `OtherNonAuraEnchantments` is retired —
-  see the design note)
+  `Filter.matches`, keeping the `source` param to apply `ExcludesSource`)
 - Modify: `source/library/Pawl/Codec.hs` (`affectedToJson`/`jsonToAffected`)
-- Test: `source/test-suite/Pawl/ProjectionSpec.hs`, `CodecSpec.hs`,
-  `source/test-suite/Pawl/Support.hs` (the six-arm helper at ~375-380)
+- Modify: the FIVE producer card JSON files — `humility.json`,
+  `urborg-tomb-of-yawgmoth.json`, `blood-moon.json`, `bad-moon.json`,
+  `opalescence.json` (opalescence has TWO effects, both carrying the affected set)
+- Test: `source/test-suite/Pawl/ProjectionSpec.hs` (esp. the Opalescence
+  self-exclusion test at :370 — MUST stay green), `CodecSpec.hs`,
+  `source/test-suite/Pawl/Support.hs`, and any of `DamageSpec`/`ExpirySpec`/
+  `CombatSpec` that build `Affected` values
 
 **Interfaces:**
-- Produces: `Affected = TheseObjects (Set ObjectId) | Matching Filter`
+- Consumes: `Pawl.Type.Exclusion.Exclusion = IncludesSource | ExcludesSource`
+  (from Task 4); `Filter.matches`; `Projection.viewOfCharacteristics`.
+- Produces: `Affected = TheseObjects (Set ObjectId) | Matching Exclusion Filter`
   (`Eq, Ord, Show`); `Projection.affects` evaluates `Matching` against the partial
-  projection via `Filter.matches`.
+  projection via `Filter.matches`, applying `oid /= source` when `ExcludesSource`.
 
-**Design note (self-exclusion):** the spec's 2-arm `Affected` cannot carry the
-"each other" flag that `OtherNonAuraEnchantments` used (`oid /= source` in the old
-`affects`). That variant has **no live producer and no behavioural test** (only
-tests/codec exercise it). So it migrates to `Matching (And [HasCardType
-Enchantment, Not (HasSubtype Aura)])` *without* self-exclusion, and the deferral is
-issue-tracked (Step 5). Only untested, producerless behaviour changes. `CreaturesOfColor`/`AllNonbasicLands`/`AllLands` likewise have no live card producer;
-`AllCreatures` and `TheseObjects` are the ones tests build.
+- [ ] **Step 1: Confirm the producers and the self-exclusion test**
 
-- [ ] **Step 1: Write the failing tests**
+Run `grep -rln 'Affected' source/ data/` and confirm the five producer cards above
+and the Opalescence self-exclusion test at `ProjectionSpec.hs:370`. `Read` that
+test — it asserts `not (Projection.isCreatureOf opalId gs)` after adding
+Opalescence to the battlefield. This test is your primary regression guard for the
+`ExcludesSource` path; it must stay green.
 
-In `ProjectionSpec.hs`, assert `Matching (HasCardType Creature)` applies to
-battlefield creatures against the partial projection (reuse the existing
-`AllCreatures` anthem/continuous-effect test, re-expressed). In `CodecSpec.hs`,
-round-trip `Matching` values (a plain atom and a nested `And`/`Not`) plus
-`TheseObjects`.
+- [ ] **Step 2: Write the failing codec test**
+
+In `CodecSpec.hs`, round-trip `Matching` values covering both exclusions (a plain
+atom `IncludesSource`, and an `ExcludesSource` with a nested `And`/`Not`) plus
+`TheseObjects`:
 
 ```haskell
     -- CodecSpec
-    HU.testCase "Affected round-trips (TheseObjects and Matching)" $
+    HU.testCase "Affected round-trips (TheseObjects and Matching with both exclusions)" $
       mapM_
         (roundTrip "affected" Codec.affectedToJson Codec.jsonToAffected)
         [ Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1, ObjectId.MkObjectId 2]),
-          Affected.Matching (Filter.HasCardType CardType.Creature),
-          Affected.Matching (Filter.And [Filter.HasCardType CardType.Land, Filter.Not (Filter.HasSupertype Supertype.Basic)])
+          Affected.Matching Exclusion.IncludesSource (Filter.HasCardType CardType.Creature),
+          Affected.Matching Exclusion.ExcludesSource (Filter.And [Filter.HasCardType CardType.Enchantment, Filter.Not (Filter.HasSubtype Subtype.Aura)])
         ]
 ```
 
-- [ ] **Step 2: Run to verify failure**
+Add imports for `Pawl.Type.Exclusion as Exclusion`, `Pawl.Type.Subtype as Subtype`
+if not already present.
+
+- [ ] **Step 3: Run to verify failure**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
-Expected: FAIL — `Affected.Matching` not found; the six-arm patterns are non-exhaustive.
+Expected: FAIL — `Affected.Matching` arity mismatch / not found; the six-arm
+patterns are non-exhaustive.
 
-- [ ] **Step 3: Reshape `Pawl.Type.Affected`**
+- [ ] **Step 4: Reshape `Pawl.Type.Affected`**
 
 ```haskell
 module Pawl.Type.Affected where
 
 import Data.Set (Set)
+import Pawl.Type.Exclusion (Exclusion)
 import Pawl.Type.Filter (Filter)
 import Pawl.Type.ObjectId (ObjectId)
 
 -- Which objects a continuous effect applies to.
 data Affected
   = TheseObjects (Set ObjectId) -- CR 611.2c: locked at begin -- a fixed id set, NOT a predicate.
-  | Matching Filter -- dynamic: any object matching, re-derived each projection against the PARTIAL projection (CR 613: layers apply in order).
+  | Matching Exclusion Filter -- dynamic: any object matching the Filter, re-derived each projection against the PARTIAL projection (CR 613: layers apply in order). The Exclusion carries "each other" (CR 305.2 / Opalescence): ExcludesSource drops the effect's own source.
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Rewrite `Projection.affects`**
+- [ ] **Step 5: Rewrite `Projection.affects` (keeping the `source` parameter)**
 
 `Read source/library/Pawl/Projection.hs:155-195` (the `Gathered` record, `affects`,
-`isBasic`) and `:340-355` (`affectsBase`) and `:596-612` (`projectFrom`'s call).
+`isBasic`), `:340-355` (`affectsBase`), and `:596-655` (`projectFrom`'s call). The
+`source`/`gSource` machinery STAYS — it now feeds the `ExcludesSource` case.
 Replace the six-arm `affects` body:
 
 ```haskell
--- CR 611.2c / 613: does the effect apply to `oid`, given the partial projection
--- built by the layers below this one? A fixed set is a membership test; a dynamic
--- set is a Filter evaluated against the PARTIAL characteristics, so a layer-4 type
--- change is visible to a later layer. The affected-set filter carries no
--- perspective (no affected-set filter references a player).
-affects :: ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
-affects oid a partial gs = case a of
+-- CR 611.2c / 613: does the effect from `source` apply to `oid`, given the partial
+-- projection built by the layers below this one? A fixed set is a membership test;
+-- a dynamic set is a Filter evaluated against the PARTIAL characteristics, so a
+-- layer-4 type change is visible to a later layer. ExcludesSource applies CR 305.2's
+-- "each other" (Opalescence does not animate itself). The affected-set filter
+-- carries no perspective (no affected-set filter references a player).
+affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
+affects source oid a partial gs = case a of
   Affected.TheseObjects s -> Set.member oid s
-  Affected.Matching f ->
+  Affected.Matching exclusion f ->
     Set.member oid (GameState.battlefield gs)
+      && notExcluded exclusion
       && Filter.matches (Filter.MkContext Nothing) (viewOfCharacteristics oid partial Nothing gs) f
+  where
+    notExcluded Exclusion.ExcludesSource = oid /= source
+    notExcluded Exclusion.IncludesSource = True
 ```
 
-The `source`/`gSource` argument existed *only* for `OtherNonAuraEnchantments`
-self-exclusion (per the module's own comment); drop it from `affects` and its two
-call sites (`projectFrom` ~604, `affectsBase` ~350). If `gSource` on `Gathered`
-becomes wholly unused after this, remove the field and its `gather`/
-`counterGathered` producers; if any other reader remains, leave it. Verify with
-`grep -n gSource source/library/Pawl/Projection.hs` before deleting. Keep the
-`isBasic`/`printedSupertypes` unification from Task 3 (still used elsewhere, or now
-dead — remove `isBasic` if `affects` was its only caller).
+Keep the `affects source oid a ...` argument order matching the existing signature
+and both call sites (`projectFrom` and `affectsBase`) unchanged in how they pass
+`source`. Import `Pawl.Type.Exclusion as Exclusion`. The `isBasic`/`printedSupertypes`
+unification from Task 3 stays if still used; if `affects` was `isBasic`'s only caller
+and the `Matching` collapse removed that call, remove `isBasic` (grep first).
+(Note: `where` here binds a two-clause helper; the project prefers a `let`/`case`,
+so you may instead inline `case exclusion of Exclusion.ExcludesSource -> oid /= source; Exclusion.IncludesSource -> True` — match the module's local style.)
 
-- [ ] **Step 5: File the Opalescence self-exclusion issue and update the fixture**
+- [ ] **Step 6: Migrate the five producer cards and the test fixtures**
 
-```bash
-gh issue create --title "Affected 'each other' self-exclusion not carried by Matching Filter" \
-  --label gap --label expires:card-driven \
-  --body "M4.5 P9 collapses Affected's dynamic sets to `Matching Filter`, which has no home for the 'other'/self-exclusion the old OtherNonAuraEnchantments arm applied (oid /= source). No card produces a self-excluding affected set today (Opalescence is unimplemented and this arm had no behavioural test). Reintroduce self-exclusion for affected sets when a producer (Opalescence) forces it — likely a slot-style Exclusion on the continuous effect, mirroring TargetSpec's Exclusion."
-```
+Each card's `Affected` tag migrates (the affected value lives inside a
+`Modification`/continuous-effect on a static ability). Map:
 
-Update the six-arm helper in `source/test-suite/Pawl/Support.hs` (~375-380) and any
-test constructing `AllCreatures`/`AllLands`/etc. to the `Matching <Filter>` form per
-spec §4c (`AllCreatures` → `Matching (HasCardType Creature)`; `AllLands` →
-`Matching (HasCardType Land)`; `AllNonbasicLands` → `Matching (And [HasCardType
-Land, Not (HasSupertype Basic)])`; `CreaturesOfColor c` → `Matching (And
-[HasCardType Creature, HasColor c])`; `OtherNonAuraEnchantments` → `Matching (And
-[HasCardType Enchantment, Not (HasSubtype Aura)])`).
+| Old `Affected` tag | New `Matching` value (JSON below) |
+|---|---|
+| `{"type":"AllCreatures"}` | `Matching IncludesSource (HasCardType Creature)` |
+| `{"type":"AllLands"}` | `Matching IncludesSource (HasCardType Land)` |
+| `{"type":"AllNonbasicLands"}` | `Matching IncludesSource (And [HasCardType Land, Not (HasSupertype Basic)])` |
+| `{"type":"CreaturesOfColor","value":<color>}` | `Matching IncludesSource (And [HasCardType Creature, HasColor <color>])` |
+| `{"type":"OtherNonAuraEnchantments"}` | `Matching ExcludesSource (And [HasCardType Enchantment, Not (HasSubtype Aura)])` |
 
-- [ ] **Step 6: Update the codec**
+The JSON shape for the `Matching` arm follows the codec chosen in Step 7 — e.g.
+`{"type":"Matching","value":{"exclusion":{"type":"IncludesSource"},"filter":<filter JSON>}}`.
+Producer files: `humility.json` (AllCreatures), `urborg-tomb-of-yawgmoth.json`
+(AllLands), `blood-moon.json` (AllNonbasicLands), `bad-moon.json` (CreaturesOfColor
+— confirm the colour in the file, it is Black), `opalescence.json`
+(OtherNonAuraEnchantments — **two occurrences**, both `ExcludesSource`). Confirm the
+inner atom tags against an already-migrated card. The all-cards load is the safety
+net. Then update every Haskell test fixture that builds an `Affected` value in
+`Support.hs`, `ProjectionSpec.hs`, `CodecSpec.hs`, `DamageSpec.hs`, `ExpirySpec.hs`,
+`CombatSpec.hs` (grep `Affected\.` across the test suite) to the `Matching Exclusion
+Filter` form per the table (`TheseObjects` stays).
+
+- [ ] **Step 7: Update the codec**
+
+The `Matching` arm now carries two payloads (an `Exclusion` and a `Filter`), so
+encode them in a nested object (mirroring the product shape used for `TargetSpec`):
 
 ```haskell
 affectedToJson :: Affected.Affected -> Value
 affectedToJson a = case a of
   Affected.TheseObjects ids -> Json.tagged (Text.pack "TheseObjects") (Just (setTo objectIdToJson ids))
-  Affected.Matching f -> Json.tagged (Text.pack "Matching") (Just (filterToJson f))
+  Affected.Matching exclusion f ->
+    Json.tagged
+      (Text.pack "Matching")
+      ( Just
+          ( Object
+              [ (Text.pack "exclusion", exclusionToJson exclusion),
+                (Text.pack "filter", filterToJson f)
+              ]
+          )
+      )
 
 jsonToAffected :: Value -> Either Text Affected.Affected
 jsonToAffected value = do
   (t, mv) <- Json.tag value
   case Text.unpack t of
     "TheseObjects" -> withValue mv (fmap Affected.TheseObjects . setFrom jsonToObjectId)
-    "Matching" -> withValue mv (fmap Affected.Matching . jsonToFilter)
+    "Matching" ->
+      withValue mv $ \v -> do
+        ps <- Json.asObject v
+        exclusion <- Json.field (Text.pack "exclusion") ps >>= jsonToExclusion
+        f <- Json.field (Text.pack "filter") ps >>= jsonToFilter
+        pure (Affected.Matching exclusion f)
     _ -> Left (Text.pack "unknown Affected: " <> t)
 ```
 
-- [ ] **Step 7: Run to verify pass, then full suite**
+Use the module's real `Object`/`Json.asObject`/`Json.field` names (the same ones
+Task 4's `jsonToTargetSpec` used). `exclusionToJson`/`jsonToExclusion` already exist
+from Task 4.
+
+- [ ] **Step 8: Run to verify pass, then full suite**
 
 Run: `cabal test --test-options='-p "Projection"'`, `-p "Codec"`, then
 `cabal clean && cabal build all --enable-tests --enable-benchmarks && cabal test`.
-Expected: green, warning-clean. Pay attention to `DamageSpec`/`ExpirySpec`/
-`CombatSpec`/`ProjectionSpec` which build `Affected` values (survey Task-2 report).
+Expected: green, warning-clean. **The Opalescence self-exclusion test
+(`ProjectionSpec.hs:370`) MUST stay green** — it is the proof the `ExcludesSource`
+path is preserved. Also watch `DamageSpec`/`ExpirySpec`/`CombatSpec`/`PowerToughnessSpec`
+(the last has Opalescence-mana-value tests) which build or exercise `Affected` values.
 
-- [ ] **Step 8: Format, lint, commit**
+- [ ] **Step 9: Format, lint, commit**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
-git commit -m "feat(m4.5-p9): Affected dynamic sets collapse to Matching Filter"
+git commit -m "feat(m4.5-p9): Affected dynamic sets become Matching Exclusion Filter"
 ```
 
 ---
@@ -1532,7 +1596,7 @@ Confirm each clause of spec §8 holds:
 - `Pawl.Type.TargetSpec` is `Pool + Maybe Filter + Exclusion`, no per-card variant.
 - `CardCriterion`, `PermanentCriterion`, `SpellCriterion` modules are gone:
   `ls source/library/Pawl/Type/ | grep -iE 'CardCriterion|PermanentCriterion|SpellCriterion'` returns nothing.
-- `Affected`'s dynamic sets are `Matching Filter`.
+- `Affected`'s dynamic sets are `Matching Exclusion Filter`.
 - #40 closed, #38/#39 re-scoped.
 
 Run the definitive checks:
@@ -1569,7 +1633,7 @@ the P9 analogue of P8's #4. Close it last, once the exit criterion holds and the
 completion is recorded:
 
 ```bash
-gh issue close 5 --comment "Closed by M4.5 P9: the Filter predicate language ships with Doom Blade / Terror / Reprisal as gates. TargetSpec family retired (#40 closed); CardCriterion / PermanentCriterion / SpellCriterion merged into Filter; Affected dynamic sets are Matching Filter; off-battlefield characteristics read the printed card via viewOfCard. #38/#39 re-scoped to the deferred count/compare phase, not closed."
+gh issue close 5 --comment "Closed by M4.5 P9: the Filter predicate language ships with Doom Blade / Terror / Reprisal as gates. TargetSpec family retired (#40 closed); CardCriterion / PermanentCriterion / SpellCriterion merged into Filter; Affected dynamic sets are Matching Exclusion Filter (self-exclusion preserved via Exclusion); off-battlefield characteristics read the printed card via viewOfCard. #38/#39 re-scoped to the deferred count/compare phase, not closed."
 ```
 
 ---
@@ -1589,7 +1653,7 @@ gh issue close 5 --comment "Closed by M4.5 P9: the Filter predicate language shi
   Task 4. #40 closed → Task 4 Step 10.
 - §4b three criterions → `Filter` → Tasks 6 (`CardCriterion`), 7
   (`PermanentCriterion`), 8 (`SpellCriterion`).
-- §4c `Affected` dynamic → `Matching Filter` → Task 9.
+- §4c `Affected` dynamic → `Matching Exclusion Filter` → Task 9 (PLAN-CORRECTED: self-exclusion preserved, not dropped — Opalescence is a live producer with a self-exclusion test).
 - §5 gate cards + two non-target tests → Task 5 (Terror/Reprisal), Task 6
   (basic-land search), Task 7 (Fireblast permanent criterion); Doom Blade preserved
   through Task 4 (ColorSpec) and re-tested in Task 5.
@@ -1610,14 +1674,19 @@ gh issue close 5 --comment "Closed by M4.5 P9: the Filter predicate language shi
   dependency one-way and avoids a `Filter` ↔ `Projection` cycle. `Context` drops
   the unused `source` field (self-exclusion is never a `Filter` atom, so `matches`
   never reads it) — YAGNI + newtype rules.
-- `Affected` self-exclusion is retired with an issue (Task 9) rather than preserved,
-  because a 2-arm `Affected` cannot carry it and the arm has no producer/test.
+- `Affected` self-exclusion is PRESERVED (Task 9, plan-corrected during execution):
+  the `Matching` arm carries `Exclusion` (`Matching Exclusion Filter`, reusing Task
+  4's `Pawl.Type.Exclusion`). The original draft's plan to drop it and file a
+  deferral issue rested on a false premise — `opalescence.json` is a live producer
+  and `ProjectionSpec.hs:370` tests the "each other" self-exclusion — so dropping it
+  would regress a real card and break a test. Reusing `Exclusion` keeps the type
+  finite and preserves every affected-set's behaviour exactly; no issue is filed.
 
 **Type consistency check:** `MkTargetSpec Pool (Maybe Filter) Exclusion`,
 `Filter.matches :: Context -> View -> Filter -> Bool`, `Filter.MkContext (Maybe
 PlayerId)`, `Filter.MkView {cardTypes,supertypes,colors,subtypes,power,controller}`,
 `Projection.viewOfObject :: ObjectId -> GameState -> Filter.View`,
-`Projection.viewOfCard :: Card -> Filter.View`, `Affected.Matching Filter`,
+`Projection.viewOfCard :: Card -> Filter.View`, `Affected.Matching Exclusion Filter`,
 `Effect.Search Filter` — used identically across all tasks.
 
 **Placeholder scan:** the only intentionally-abbreviated spots are board-setup
