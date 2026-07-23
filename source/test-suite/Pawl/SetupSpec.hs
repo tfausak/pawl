@@ -18,6 +18,7 @@ import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Result as Result
@@ -193,15 +194,24 @@ restartTests cards =
               HU.assertEqual "no card is left on the battlefield" True (Set.null (GameState.battlefield after))
               HU.assertEqual "no graveyard survives the restart" True (all null (Map.elems (GameState.graveyard after))),
       HU.testCase "CR 727.4: the restart settles just before the first untap step, no priority, turn 1, life reset" $
+        -- Knock bob down to 5 life and give him 3 poison counters before the
+        -- restart, so the "back to 20 life / no counters" assertions below are
+        -- load-bearing -- Setup.emptyGame already starts players at 20 life with
+        -- no counters, so without this mutation the assertions would pass even
+        -- if resetPlayer did nothing.
         let g0 = addMany cards 8 S.bob (addMany cards 8 S.alice (Setup.emptyGame S.bothPlayers))
-            after = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.bob))
+            g1 = S.addPlayerCounter PlayerCounterKind.Poison 3 S.bob g0
+            g2 = g1 {GameState.players = Map.adjust (\p -> p {Player.life = 5}) S.bob (GameState.players g1)}
+            after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.restartGame S.bob))
          in do
               HU.assertEqual "phase is the first turn's untap step" Turn.firstPhase (GameState.phase after)
               HU.assertEqual "no player holds priority" Nothing (GameState.priority after)
               HU.assertEqual "it is turn 1" 1 (GameState.turnNumber after)
               HU.assertEqual "the stack is empty" [] (GameState.stack after)
               HU.assertEqual "alice is back to 20 life" (Just 20) (S.lifeOf S.alice after)
-              HU.assertEqual "bob is back to 20 life" (Just 20) (S.lifeOf S.bob after),
+              HU.assertEqual "bob is back to 20 life" (Just 20) (S.lifeOf S.bob after)
+              HU.assertEqual "CR 103.4/727.1: bob's life reset to 20" (Just 20) (S.lifeOf S.bob after)
+              HU.assertEqual "bob's poison counters cleared on restart" 0 (S.playerCounterOf PlayerCounterKind.Poison S.bob after),
       HU.testCase "CR 727.3: a player owning fewer than seven cards loses at the next SBA check" $
         -- bob owns only 3 cards; drawing an opening hand of 7 draws from an empty
         -- library, flagging drewFromEmpty, so the existing SBA path makes bob lose

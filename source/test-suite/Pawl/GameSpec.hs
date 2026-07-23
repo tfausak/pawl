@@ -456,7 +456,12 @@ ruleTests cards =
               g3
                 { GameState.activePlayer = S.bob,
                   GameState.phase = Phase.PrecombatMain,
-                  GameState.priority = Just S.bob
+                  GameState.priority = Just S.bob,
+                  -- Knock both players to 8 life so "both players reset to 20
+                  -- life" below is load-bearing: Setup.emptyGame already starts
+                  -- players at 20, so without this reduction the assertions
+                  -- would pass even if resetPlayer did nothing.
+                  GameState.players = Map.adjust (\p -> p {Player.life = 8}) S.alice (Map.adjust (\p -> p {Player.life = 8}) S.bob (GameState.players g3))
                 }
             after = snd (Engine.runGamePure restartAnswer gStart Engine.priorityLoop)
          in do
