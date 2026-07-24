@@ -85,6 +85,7 @@ library
     Pawl.PlayerEffect
     Pawl.Projection
     Pawl.Quantity
+    Pawl.Registry
     Pawl.Replacement
     Pawl.Replay
     Pawl.Resolve
@@ -180,6 +181,7 @@ library
     Pawl.Type.ProposedEvent
     Pawl.Type.Quantity
     Pawl.Type.Recipient
+    Pawl.Type.Registry
     Pawl.Type.ReplacementBucket
     Pawl.Type.ReplacementCandidate
     Pawl.Type.ReplacementEffect
@@ -262,6 +264,7 @@ test-suite pawl-test-suite
     Pawl.PowerToughnessSpec
     Pawl.ProjectionSpec
     Pawl.PropertySpec
+    Pawl.RegistrySpec
     Pawl.ReplacementSpec
     Pawl.ReplaySpec
     Pawl.ResolveSpec

@@ -27,6 +27,7 @@ import qualified Pawl.PlayerEffectSpec as PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
+import qualified Pawl.RegistrySpec as RegistrySpec
 import qualified Pawl.ReplacementSpec as ReplacementSpec
 import qualified Pawl.ReplaySpec as ReplaySpec
 import qualified Pawl.ResolveSpec as ResolveSpec
@@ -77,5 +78,6 @@ testTree cards =
       ReplacementSpec.tests cards,
       ColorSpec.tests cards,
       TriggerSpec.tests cards,
-      FilterSpec.tests
+      FilterSpec.tests,
+      RegistrySpec.tests
     ]
