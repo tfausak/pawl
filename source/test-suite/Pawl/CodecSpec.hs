@@ -78,7 +78,6 @@ import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
@@ -200,13 +199,13 @@ tests cards =
              in HU.assertEqual "PlaySubgame round-trips" (Right e) (Codec.jsonToEffect (Codec.effectToJson e))
         ],
       Tasty.testGroup
-        "duration + state condition"
+        "duration + condition"
         [ HU.testCase "Duration.UntilYourNextTurn round-trips" $
             HU.assertEqual "preserved" (Right Duration.UntilYourNextTurn) (Codec.jsonToDuration (Codec.durationToJson Duration.UntilYourNextTurn)),
-          HU.testCase "StateCondition.YouControlSource round-trips" $
-            HU.assertEqual "preserved" (Right StateCondition.YouControlSource) (Codec.jsonToStateCondition (Codec.stateConditionToJson StateCondition.YouControlSource)),
+          HU.testCase "S.youControlSource round-trips as a Condition" $
+            HU.assertEqual "preserved" (Right S.youControlSource) (Codec.jsonToCondition (Codec.conditionToJson S.youControlSource)),
           HU.testCase "Duration.ForAsLongAs round-trips with its condition" $
-            let d = Duration.ForAsLongAs StateCondition.YouControlSource
+            let d = Duration.ForAsLongAs S.youControlSource
              in HU.assertEqual "preserved" (Right d) (Codec.jsonToDuration (Codec.durationToJson d))
         ],
       Tasty.testGroup
@@ -507,16 +506,16 @@ tests cards =
               Codec.triggerConditionToJson
               Codec.jsonToTriggerCondition
               (TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn),
-          HU.testCase "StateCondition round-trips" $
+          HU.testCase "Barbarian Outcast / Sarcomancy shaped Conditions round-trip" $
             mapM_
-              (roundTrip "state" Codec.stateConditionToJson Codec.jsonToStateCondition)
-              [StateCondition.YouControlNo Subtype.Swamp, StateCondition.NoPermanentsOfSubtype Subtype.Zombie],
+              (roundTrip "condition" Codec.conditionToJson Codec.jsonToCondition)
+              [youControlNoSwamps, noZombiesOnBattlefield],
           HU.testCase "TriggerCondition.StateIs round-trips" $
             roundTrip
               "cond"
               Codec.triggerConditionToJson
               Codec.jsonToTriggerCondition
-              (TriggerCondition.StateIs (StateCondition.YouControlNo Subtype.Swamp)),
+              (TriggerCondition.StateIs youControlNoSwamps),
           HU.testCase "CreatureDealtCombatDamageToMonarch" $
             roundTrip "cd" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.CreatureDealtCombatDamageToMonarch,
           HU.testCase "AbilityName round-trips" $
@@ -561,7 +560,7 @@ tests cards =
                   TriggeredAbility.MkTriggeredAbility
                     { TriggeredAbility.condition = TriggerCondition.SelfEnters,
                       TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
-                      TriggeredAbility.intervening = Just (StateCondition.NoPermanentsOfSubtype Subtype.Zombie)
+                      TriggeredAbility.intervening = Just noZombiesOnBattlefield
                     }
              in roundTrip "ta" Codec.triggeredAbilityToJson Codec.jsonToTriggeredAbility ability
         ],
@@ -626,3 +625,30 @@ zeroSwamps =
     (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
     (Filter.Type.HasSubtype Subtype.Swamp)
     Aggregation.Objects
+
+-- Barbarian Outcast's migrated StateIs (retired StateCondition.YouControlNo
+-- Swamp -- CR 603.8): "you control no Swamps" as a Count of exactly 0.
+youControlNoSwamps :: Condition.Type.Condition
+youControlNoSwamps =
+  Condition.Type.MkCondition
+    ( Count.Type.MkCount
+        (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+        (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
+        Aggregation.Objects
+    )
+    Comparison.Exactly
+    (Quantity.Literal 0)
+
+-- Sarcomancy's migrated intervening "if" (retired
+-- StateCondition.NoPermanentsOfSubtype Zombie -- CR 603.4): ANY player's
+-- Zombies, unlike youControlNoSwamps's ControlledBy conjunct.
+noZombiesOnBattlefield :: Condition.Type.Condition
+noZombiesOnBattlefield =
+  Condition.Type.MkCondition
+    ( Count.Type.MkCount
+        (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+        (Filter.Type.HasSubtype Subtype.Zombie)
+        Aggregation.Objects
+    )
+    Comparison.Exactly
+    (Quantity.Literal 0)

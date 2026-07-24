@@ -43,7 +43,6 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
@@ -187,7 +186,7 @@ tests cards =
                 { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
                   ActivatedAbility.modal =
                     singleModeAbility
-                      [Effect.GainControl (Duration.ForAsLongAs StateCondition.YouControlSource) targetSlot]
+                      [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) targetSlot]
                       (Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource))
                 }
             activated = snd (Engine.runGamePure S.identityAnswer g2 (Activate.activateAbility S.alice srcId ability))
@@ -223,7 +222,7 @@ tests cards =
                 { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
                   ActivatedAbility.modal =
                     singleModeAbility
-                      [Effect.GainControl (Duration.ForAsLongAs StateCondition.YouControlSource) targetSlot]
+                      [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) targetSlot]
                       (Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource))
                 }
             -- Control of the SOURCE CREATURE moves to bob BEFORE activation.

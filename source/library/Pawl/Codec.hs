@@ -80,7 +80,6 @@ import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
@@ -427,7 +426,7 @@ durationToJson d = case d of
   Duration.UntilEndOfTurn -> nullary (Text.pack "UntilEndOfTurn")
   Duration.Indefinite -> nullary (Text.pack "Indefinite")
   Duration.UntilYourNextTurn -> nullary (Text.pack "UntilYourNextTurn")
-  Duration.ForAsLongAs c -> Json.tagged (Text.pack "ForAsLongAs") (Just (stateConditionToJson c))
+  Duration.ForAsLongAs c -> Json.tagged (Text.pack "ForAsLongAs") (Just (conditionToJson c))
 
 jsonToDuration :: Value -> Either Text Duration.Duration
 jsonToDuration value = do
@@ -436,7 +435,7 @@ jsonToDuration value = do
     ("UntilEndOfTurn", _) -> Right Duration.UntilEndOfTurn
     ("Indefinite", _) -> Right Duration.Indefinite
     ("UntilYourNextTurn", _) -> Right Duration.UntilYourNextTurn
-    ("ForAsLongAs", Just v) -> Duration.ForAsLongAs <$> jsonToStateCondition v
+    ("ForAsLongAs", Just v) -> Duration.ForAsLongAs <$> jsonToCondition v
     _ -> Left (Text.pack "unknown Duration: " <> t)
 
 usesToJson :: Uses.Uses -> Value
@@ -856,7 +855,7 @@ triggerConditionToJson :: TriggerCondition.TriggerCondition -> Value
 triggerConditionToJson c = case c of
   TriggerCondition.SelfEnters -> nullary (Text.pack "SelfEnters")
   TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array [phaseToJson p, turnScopeToJson s]))
-  TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (stateConditionToJson c2))
+  TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (conditionToJson c2))
   TriggerCondition.SelfDealsCombatDamageToPlayer -> nullary (Text.pack "SelfDealsCombatDamageToPlayer")
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
 
@@ -866,25 +865,10 @@ jsonToTriggerCondition value = do
   case (Text.unpack t, mv) of
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
     ("StepBegins", Just (Array [p, s])) -> TriggerCondition.StepBegins <$> jsonToPhase p <*> jsonToTurnScope s
-    ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToStateCondition v
+    ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToCondition v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
-
-stateConditionToJson :: StateCondition.StateCondition -> Value
-stateConditionToJson c = case c of
-  StateCondition.YouControlNo s -> Json.tagged (Text.pack "YouControlNo") (Just (subtypeToJson s))
-  StateCondition.NoPermanentsOfSubtype s -> Json.tagged (Text.pack "NoPermanentsOfSubtype") (Just (subtypeToJson s))
-  StateCondition.YouControlSource -> nullary (Text.pack "YouControlSource")
-
-jsonToStateCondition :: Value -> Either Text StateCondition.StateCondition
-jsonToStateCondition value = do
-  (t, mv) <- Json.tag value
-  case (Text.unpack t, mv) of
-    ("YouControlNo", Just v) -> StateCondition.YouControlNo <$> jsonToSubtype v
-    ("NoPermanentsOfSubtype", Just v) -> StateCondition.NoPermanentsOfSubtype <$> jsonToSubtype v
-    ("YouControlSource", _) -> Right StateCondition.YouControlSource
-    _ -> Left (Text.pack "unknown StateCondition: " <> t)
 
 castingPermissionToJson :: CastingPermission.CastingPermission -> Value
 castingPermissionToJson c = nullary . Text.pack $ case c of
@@ -1462,7 +1446,7 @@ triggeredAbilityToJson ta =
       ]
         <> ( case TriggeredAbility.intervening ta of
                Nothing -> []
-               Just c -> [(Text.pack "intervening", stateConditionToJson c)]
+               Just c -> [(Text.pack "intervening", conditionToJson c)]
            )
     )
 
@@ -1471,7 +1455,7 @@ jsonToTriggeredAbility value = do
   ps <- Json.asObject value
   c <- Json.field (Text.pack "condition") ps >>= jsonToTriggerCondition
   m <- Json.field (Text.pack "modal") ps >>= jsonToModal
-  i <- maybeFrom jsonToStateCondition (getOpt (Text.pack "intervening") ps)
+  i <- maybeFrom jsonToCondition (getOpt (Text.pack "intervening") ps)
   pure
     TriggeredAbility.MkTriggeredAbility
       { TriggeredAbility.condition = c,

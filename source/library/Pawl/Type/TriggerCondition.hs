@@ -1,7 +1,7 @@
 module Pawl.Type.TriggerCondition where
 
+import Pawl.Type.Condition (Condition)
 import Pawl.Type.Phase (Phase)
-import Pawl.Type.StateCondition (StateCondition)
 import Pawl.Type.TurnScope (TurnScope)
 
 -- CR 603.2: the pattern that fires a triggered ability. Only Pawl.Event may case
@@ -21,7 +21,7 @@ data TriggerCondition
     -- when an event occurs. "It doesn't trigger again until the ability has
     -- resolved, has been countered, or has otherwise left the stack", which is why
     -- Pawl.Event derives armedness from the stack rather than storing it.
-    StateIs StateCondition
+    StateIs Condition
   | -- CR 603.2 / 509-510: the bearer dealt combat damage to a player. Rides P4's
     -- event history -- combat damage already records a DamageDealt event.
     SelfDealsCombatDamageToPlayer

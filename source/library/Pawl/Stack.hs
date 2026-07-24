@@ -5,9 +5,12 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Condition as Condition
 import qualified Pawl.Event as Event
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import Pawl.Type.Game (Game)
@@ -69,7 +72,7 @@ resolveTopWith runSubgame = do
           -- controller (Engine.placeOne stamps it), which is who "you" means.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Event.stateHolds (Object.owner obj) srcId cond gs) ->
+              | not (Condition.holds (\o -> Just (Projection.viewOfObject o gs)) (Filter.MkContext (Just (Object.owner obj)) (Just srcId)) gs srcId cond) ->
                   State.modify' (Resolve.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)

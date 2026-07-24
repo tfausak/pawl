@@ -15,6 +15,8 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Condition as Condition
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
@@ -40,8 +42,6 @@ import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
-import Pawl.Type.StateCondition (StateCondition)
-import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import Pawl.Type.TriggerCondition (TriggerCondition)
@@ -465,27 +465,6 @@ eventTriggers events gs =
          in fmap pend (filter fires abilities)
    in concatMap (\event -> concatMap (forOne event) onBattlefield) events
 
--- CR 603.8 / 603.4 / 611.2b: is this state condition currently true, for an
--- ability or effect whose controller is `you` and whose source object is
--- `source`? Reads the PROJECTION -- a subtype is CR 613 layer 4 and control is
--- layer 2, so Blood Moon and Act of Treason both change the answer. This
--- module is the sole home of casing on StateCondition; the two subtype arms
--- ignore `source`.
-stateHolds :: PlayerId -> ObjectId -> StateCondition -> GameState -> Bool
-stateHolds you source cond gs =
-  let hasSubtype subtype oid = Set.member subtype (Projection.subtypesOf oid gs)
-   in case cond of
-        -- CR 109.5: "you" on a triggered ability's condition means the
-        -- ability's controller (at the time it triggered) -- so "you control"
-        -- is that player's projected-controlled permanents.
-        StateCondition.YouControlNo subtype -> not (any (hasSubtype subtype) (Projection.controls you gs))
-        -- Any player's -- the whole battlefield.
-        StateCondition.NoPermanentsOfSubtype subtype -> not (any (hasSubtype subtype) (Set.toList (GameState.battlefield gs)))
-        -- CR 611.2b / 613.1b / 400.7: the source object is still on the
-        -- battlefield AND its projected controller is `you`.
-        StateCondition.YouControlSource ->
-          Set.member source (GameState.battlefield gs) && Projection.controllerOf source gs == Just you
-
 -- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
 -- is currently TRUE and which has no instance already on the stack.
 --
@@ -537,11 +516,15 @@ stateTriggers gs =
       forOne oid = case Projection.controllerOf oid gs of
         Nothing -> []
         -- CR 603.3a: a triggered ability is controlled by whoever controls
-        -- its source; CR 109.5 is what makes "you" in the condition (e.g.
-        -- YouControlNo's "you control no Swamps") mean that same controller.
+        -- its source; CR 109.5 is what makes "you" in the condition mean that
+        -- same controller. Outside the layer fold, so the ViewOf is the FULL
+        -- projection (Pawl.Condition's spec, unbounded -- unlike the
+        -- layer-bounded one Pawl.Projection hands the fold itself).
         Just ctrl ->
           let live ab = case TriggeredAbility.condition ab of
-                TriggerCondition.StateIs cond -> stateHolds ctrl oid cond gs && not (alreadyOnStack oid ab)
+                TriggerCondition.StateIs cond ->
+                  Condition.holds (\o -> Just (Projection.viewOfObject o gs)) (Filter.MkContext (Just ctrl) (Just oid)) gs oid cond
+                    && not (alreadyOnStack oid ab)
                 TriggerCondition.SelfEnters -> False
                 TriggerCondition.StepBegins _ _ -> False
                 TriggerCondition.SelfDealsCombatDamageToPlayer -> False
@@ -602,4 +585,10 @@ interveningHolds :: GameState -> PendingTrigger -> Bool
 interveningHolds gs pending =
   case TriggeredAbility.intervening (PendingTrigger.ability pending) of
     Nothing -> True
-    Just cond -> stateHolds (PendingTrigger.controller pending) (PendingTrigger.source pending) cond gs
+    Just cond ->
+      Condition.holds
+        (\o -> Just (Projection.viewOfObject o gs))
+        (Filter.MkContext (Just (PendingTrigger.controller pending)) (Just (PendingTrigger.source pending)))
+        gs
+        (PendingTrigger.source pending)
+        cond

@@ -66,6 +66,7 @@ library
     Pawl.Cast
     Pawl.Codec
     Pawl.Combat
+    Pawl.Condition
     Pawl.Cost
     Pawl.Count
     Pawl.Damage
@@ -190,7 +191,6 @@ library
     Pawl.Type.Sickness
     Pawl.Type.SlotName
     Pawl.Type.Source
-    Pawl.Type.StateCondition
     Pawl.Type.StaticAbility
     Pawl.Type.Status
     Pawl.Type.Subtype
@@ -242,6 +242,7 @@ test-suite pawl-test-suite
     Pawl.CodecSpec
     Pawl.ColorSpec
     Pawl.CombatSpec
+    Pawl.ConditionSpec
     Pawl.CopySpec
     Pawl.CoreSpec
     Pawl.CostSpec

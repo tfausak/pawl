@@ -45,10 +45,25 @@
       "condition": {
         "type": "StateIs",
         "value": {
-          "type": "YouControlNo",
-          "value": {
-            "type": "Swamp"
-          }
+          "type": "Condition",
+          "value": [
+            {
+              "type": "Count",
+              "value": [
+                { "type": "InZone", "value": [ { "type": "Battlefield" }, { "type": "EachPlayer" } ] },
+                {
+                  "type": "And",
+                  "value": [
+                    { "type": "HasSubtype", "value": { "type": "Swamp" } },
+                    { "type": "ControlledBy", "value": { "type": "You" } }
+                  ]
+                },
+                { "type": "Objects" }
+              ]
+            },
+            { "type": "Exactly" },
+            { "type": "Literal", "value": 0 }
+          ]
         }
       },
       "modal": {

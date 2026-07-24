@@ -122,10 +122,19 @@
         ]
       },
       "intervening": {
-        "type": "NoPermanentsOfSubtype",
-        "value": {
-          "type": "Zombie"
-        }
+        "type": "Condition",
+        "value": [
+          {
+            "type": "Count",
+            "value": [
+              { "type": "InZone", "value": [ { "type": "Battlefield" }, { "type": "EachPlayer" } ] },
+              { "type": "HasSubtype", "value": { "type": "Zombie" } },
+              { "type": "Objects" }
+            ]
+          },
+          { "type": "Exactly" },
+          { "type": "Literal", "value": 0 }
+        ]
       },
       "modal": {
         "modes": [

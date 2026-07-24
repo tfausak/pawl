@@ -47,7 +47,6 @@ import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
@@ -508,7 +507,7 @@ m45p6CardTests cards =
                     [m] -> do
                       HU.assertEqual
                         "one GainControl effect with a conditional duration"
-                        [Effect.GainControl (Duration.ForAsLongAs StateCondition.YouControlSource) slot]
+                        [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) slot]
                         (Foldable.toList (Mode.effects m))
                       HU.assertEqual
                         "one ArtifactTarget slot"

@@ -373,8 +373,8 @@ stateTriggerTests cards =
                 (_, gs1) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice settledFirst
                 settledBoth = settle gs1
              in HU.assertEqual "two instances, one per source" 2 (length (triggerIds settledBoth)),
-          -- M-4 (review): stateHolds reads the PROJECTION -- CR 613 layer 4 for a
-          -- subtype -- not Card.typeLine. Pin it with no real Swamp card
+          -- M-4 (review): the state trigger's Condition.holds reads the PROJECTION
+          -- -- CR 613 layer 4 for a subtype -- not Card.typeLine. Pin it with no real Swamp card
           -- anywhere: alice controls only a Mountain, so the Outcast triggers;
           -- adding an AddLandSubtype Swamp modification (the Urborg shape) to
           -- that same Mountain must turn the trigger off.
@@ -390,8 +390,8 @@ stateTriggerTests cards =
              in do
                   HU.assertEqual "no real Swamp yet: triggers" 1 (length (triggerIds before))
                   HU.assertEqual "projected Swamp subtype (still a Mountain card): stops triggering" 0 (length (triggerIds after)),
-          -- M-4 (review): stateHolds reads projected CONTROL -- CR 613 layer 2 --
-          -- not Object.owner. Pin it: bob owns and controls the only Swamp, so
+          -- M-4 (review): the state trigger's Condition.holds reads projected
+          -- CONTROL -- CR 613 layer 2 -- not Object.owner. Pin it: bob owns and controls the only Swamp, so
           -- alice's Outcast triggers; giving alice control of bob's Swamp (a
           -- layer-2 SetController effect, S.giveControl) must turn it off even
           -- though bob still OWNS that Swamp.

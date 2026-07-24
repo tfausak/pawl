@@ -9,7 +9,9 @@ module Pawl.Expiry where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Pawl.Event as Event
+import qualified Pawl.Condition as Condition
+import qualified Pawl.Filter as Filter
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
@@ -39,7 +41,7 @@ arm controller source duration gs = case duration of
   Duration.Indefinite -> Just Expiry.Never
   Duration.UntilYourNextTurn -> Just (Expiry.AtTurnOf controller)
   Duration.ForAsLongAs cond ->
-    if Event.stateHolds controller source cond gs
+    if Condition.holds (\o -> Just (Projection.viewOfObject o gs)) (Filter.MkContext (Just controller) (Just source)) gs source cond
       then Just (Expiry.While controller cond)
       else Nothing
 
@@ -86,7 +88,7 @@ sweepConditional :: Game Bool
 sweepConditional = do
   gs <- State.get
   let survives source expiry = case expiry of
-        Expiry.While you cond -> Event.stateHolds you source cond gs
+        Expiry.While you cond -> Condition.holds (\o -> Just (Projection.viewOfObject o gs)) (Filter.MkContext (Just you) (Just source)) gs source cond
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         Expiry.AtTurnOf _ -> True

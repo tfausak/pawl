@@ -38,12 +38,16 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.Comparison as Comparison
 import qualified Pawl.Type.Concession as Concession
+import qualified Pawl.Type.Condition as Condition.Type
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.Count as Count.Type
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Deck as Deck
@@ -65,6 +69,7 @@ import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.Printing as Printing
@@ -74,6 +79,7 @@ import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.RestartSignal as RestartSignal
+import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
@@ -407,6 +413,21 @@ giveControl oid pid gs =
         { GameState.continuousEffects = eff : GameState.continuousEffects g1,
           GameState.objects = Map.adjust settle oid (GameState.objects g1)
         }
+
+-- CR 611.2b's Master Thief shape: "for as long as you control this creature",
+-- as an ordinary count. Shared by Pawl.ExpirySpec, Pawl.CardSpec,
+-- Pawl.ActivateSpec and Pawl.PlayerEffectSpec -- the retired
+-- StateCondition.YouControlSource's one replacement value.
+youControlSource :: Condition.Type.Condition
+youControlSource =
+  Condition.Type.MkCondition
+    ( Count.Type.MkCount
+        (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+        (Filter.Type.And [Filter.Type.IsSource, Filter.Type.ControlledBy PlayerRelation.You])
+        Aggregation.Objects
+    )
+    Comparison.Exactly
+    (Quantity.Literal 1)
 
 addPiker :: Cards.Cards -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addPiker cards = addCreature (Cards.pikerPrinting cards)

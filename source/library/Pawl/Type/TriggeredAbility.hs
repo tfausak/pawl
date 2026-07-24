@@ -1,7 +1,7 @@
 module Pawl.Type.TriggeredAbility where
 
+import Pawl.Type.Condition (Condition)
 import Pawl.Type.Modal (Modal)
-import Pawl.Type.StateCondition (StateCondition)
 import Pawl.Type.TriggerCondition (TriggerCondition)
 
 -- CR 603.1 / 700.2b / 603.3c: "[condition], [effect]", now modal-capable. Card-free/
@@ -15,6 +15,6 @@ data TriggeredAbility card = MkTriggeredAbility
     -- occurs (the ability does not trigger AT ALL if it is false) and checked
     -- AGAIN on resolution (CR 608.2a removes the ability from the stack if it has
     -- become false). Nothing for every ability without one.
-    intervening :: Maybe StateCondition
+    intervening :: Maybe Condition
   }
   deriving (Eq, Ord, Show)

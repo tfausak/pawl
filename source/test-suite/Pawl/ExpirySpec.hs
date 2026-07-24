@@ -7,9 +7,11 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Cards as Cards
+import qualified Pawl.Condition as Condition
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
@@ -35,7 +37,6 @@ import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
-import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
@@ -140,11 +141,18 @@ whileEffect src target you gs =
         ContinuousEffect.MkContinuousEffect
           { ContinuousEffect.source = src,
             ContinuousEffect.timestamp = ts,
-            ContinuousEffect.expiry = Expiry.Type.While you StateCondition.YouControlSource,
+            ContinuousEffect.expiry = Expiry.Type.While you S.youControlSource,
             ContinuousEffect.modification = Modification.SetController you,
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+
+-- Event.stateHolds's retired (you, source, cond, gs) shape, over the FULL
+-- projection (outside the layer fold, per Pawl.Condition's spec) and the one
+-- Condition S.youControlSource replaces StateCondition.YouControlSource with.
+holdsYouControlSource :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> Bool
+holdsYouControlSource you source gs =
+  Condition.holds (\o -> Just (Projection.viewOfObject o gs)) (Filter.MkContext (Just you) (Just source)) gs source S.youControlSource
 
 -- The OTHER carrier's shape of whileEffect: a floating replacement whose expiry
 -- is a live condition over `src`. The effect payload is irrelevant to what this
@@ -159,7 +167,7 @@ whileReplacement src you gs =
           { ActiveReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
             ActiveReplacement.source = src,
             ActiveReplacement.timestamp = ts,
-            ActiveReplacement.expiry = Expiry.Type.While you StateCondition.YouControlSource,
+            ActiveReplacement.expiry = Expiry.Type.While you S.youControlSource,
             ActiveReplacement.uses = Uses.Unlimited
           }
    in S.addReplacement active gs1
@@ -175,28 +183,28 @@ conditionalTests cards =
         "Conditional"
         [ HU.testCase "CR 611.2b YouControlSource holds while the source is controlled" $
             let (srcId, _, gs) = board
-             in HU.assertBool "holds" (Event.stateHolds S.alice srcId StateCondition.YouControlSource gs),
+             in HU.assertBool "holds" (holdsYouControlSource S.alice srcId gs),
           HU.testCase "CR 613.1b it stops holding when another player gains control of the source" $
             let (srcId, _, gs) = board
                 stolen = S.giveControl srcId S.bob gs
-             in HU.assertBool "no longer holds" (not (Event.stateHolds S.alice srcId StateCondition.YouControlSource stolen)),
+             in HU.assertBool "no longer holds" (not (holdsYouControlSource S.alice srcId stolen)),
           HU.testCase "CR 400.7 it stops holding when the source leaves the battlefield" $
             let (srcId, _, gs) = board
                 gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
-             in HU.assertBool "no longer holds" (not (Event.stateHolds S.alice srcId StateCondition.YouControlSource gone)),
+             in HU.assertBool "no longer holds" (not (holdsYouControlSource S.alice srcId gone)),
           HU.testCase "CR 611.2b arm returns Nothing when the condition is already false" $
             let (srcId, _, gs) = board
                 gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
              in HU.assertEqual
                   "never starts"
                   Nothing
-                  (Expiry.arm S.alice srcId (Duration.ForAsLongAs StateCondition.YouControlSource) gone),
+                  (Expiry.arm S.alice srcId (Duration.ForAsLongAs S.youControlSource) gone),
           HU.testCase "CR 611.2b arm returns a While when the condition holds now" $
             let (srcId, _, gs) = board
              in HU.assertEqual
                   "starts"
-                  (Just (Expiry.Type.While S.alice StateCondition.YouControlSource))
-                  (Expiry.arm S.alice srcId (Duration.ForAsLongAs StateCondition.YouControlSource) gs),
+                  (Just (Expiry.Type.While S.alice S.youControlSource))
+                  (Expiry.arm S.alice srcId (Duration.ForAsLongAs S.youControlSource) gs),
           HU.testCase "CR 611.2b the sweep DELETES the effect once the condition fails" $
             let (srcId, targetId, gs) = board
                 gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
@@ -288,8 +296,8 @@ masterThiefTests cards =
                   HU.assertEqual "and was never re-Sicked" (Just Sickness.Settled) (fmap Object.sickness (Game.lookupObject myr after)),
           -- Ruling: "If Master Thief ceases to be under your control before its
           -- ability resolves, you won't gain control of the targeted artifact at
-          -- all." Falsifies the CONTROL half of Event.stateHolds's YouControlSource
-          -- conjunct (CR 611.2b/613.1b/400.7): Master Thief stays on the
+          -- all." Falsifies the CONTROL half of S.youControlSource's
+          -- ControlledBy conjunct (CR 611.2b/613.1b/400.7): Master Thief stays on the
           -- battlefield the whole time -- only its controller changes -- so this
           -- case cannot pass for the "left the battlefield" reason the sibling
           -- case above covers. End to end through the real pipeline (CR 113.8:

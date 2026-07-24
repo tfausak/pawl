@@ -41,7 +41,6 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.PlayerScope as PlayerScope
-import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -472,7 +471,7 @@ reliquaryTowerTests cards =
         ]
 
 -- Seed a stored player effect keyed to a REAL battlefield object, not
--- S.addPlayerEffect's stand-in id 998 -- so a StateCondition.YouControlSource
+-- S.addPlayerEffect's stand-in id 998 -- so a S.youControlSource condition
 -- check has something to genuinely hold or fail against. Mirrors
 -- ExpirySpec's whileEffect, adapted to ActivePlayerEffect.
 addPlayerEffectAt ::
@@ -515,7 +514,7 @@ storedTests cards =
       conditional =
         addPlayerEffectAt
           srcId
-          (Expiry.Type.While S.alice StateCondition.YouControlSource)
+          (Expiry.Type.While S.alice S.youControlSource)
           PlayerScope.Opponents
           PlayerEffect.Type.CantCastSpells
           S.alice

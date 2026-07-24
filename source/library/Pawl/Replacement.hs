@@ -1,6 +1,6 @@
 -- CR 616.1's loop: the SOLE home of casing on ProposedEvent and
 -- ReplacementEffect, a fourth sole-casing home beside Pawl.Resolve (Effect),
--- Pawl.Event (TriggerCondition / StateCondition) and Pawl.Projection
+-- Pawl.Event (TriggerCondition) and Pawl.Projection
 -- (Modification). Pawl.Codec also cases on ReplacementEffect, but only as the
 -- JSON data boundary, never to decide game behaviour.
 --
