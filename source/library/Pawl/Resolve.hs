@@ -445,7 +445,7 @@ applyEffectWith :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Subt
 applyEffectWith runSubgame source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity -> do
     gs <- State.get
-    let viewOf o = Just (Projection.viewOfObject o gs)
+    let viewOf = Projection.fullView gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Quantity.evaluate viewOf context gs source quantity of
@@ -612,7 +612,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Draw quantity -> do
     gs <- State.get
-    let viewOf o = Just (Projection.viewOfObject o gs)
+    let viewOf = Projection.fullView gs
         context = Filter.MkContext (Just controller) (Just source)
     case Quantity.evaluate viewOf context gs source quantity of
       Just n
@@ -623,7 +623,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Mill slot quantity -> do
     gs <- State.get
-    let viewOf o = Just (Projection.viewOfObject o gs)
+    let viewOf = Projection.fullView gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
@@ -639,7 +639,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Discard slot quantity -> do
     gs <- State.get
-    let viewOf o = Just (Projection.viewOfObject o gs)
+    let viewOf = Projection.fullView gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
@@ -664,7 +664,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Create quantity card mSlot -> do
     gs <- State.get
-    let viewOf o = Just (Projection.viewOfObject o gs)
+    let viewOf = Projection.fullView gs
         context = Filter.MkContext (Just controller) (Just source)
     case Quantity.evaluate viewOf context gs source quantity of
       Just n
@@ -808,7 +808,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.PutCounters kind quantity slot -> do
     gs <- State.get
-    let viewOf o = Just (Projection.viewOfObject o gs)
+    let viewOf = Projection.fullView gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of
@@ -821,7 +821,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
   Effect.GainPlayerCounters kind quantity -> do
     gs <- State.get
-    let viewOf o = Just (Projection.viewOfObject o gs)
+    let viewOf = Projection.fullView gs
         context = Filter.MkContext (Just controller) (Just source)
     case Quantity.evaluate viewOf context gs source quantity of
       Just n

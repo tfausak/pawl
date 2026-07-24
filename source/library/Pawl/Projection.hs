@@ -226,6 +226,23 @@ printedSupertypes oid gs = case Game.cardOf oid gs of
 viewOfObject :: ObjectId -> GameState -> Filter.View
 viewOfObject oid gs = viewOfCharacteristics oid (project oid gs) (controllerOf oid gs) gs
 
+-- The ViewOf for callers OUTSIDE the CR 613 layer fold: a full projection of
+-- every object, layers fully applied. This is what every count wants once the
+-- fold itself has finished -- static abilities' Filters, cost/replacement
+-- filtering, expiry conditions, and the like all read the settled state.
+--
+-- `viewUpTo`, right below, is its bounded counterpart for callers INSIDE the
+-- fold, where a count must see candidates only through the layers already
+-- applied (CR 613.1-613.10 apply layers in order; a count evaluated mid-layer
+-- must not see the effects of layers still to come). Picking the wrong one is
+-- not a type error -- both are `Count.ViewOf` -- so it is a SILENT wrong
+-- answer: a count fed `viewUpTo` outside the fold under-reads (misses layers
+-- that already settled), and a count fed `fullView` inside the fold over-reads
+-- (sees layers that have not applied yet). Always reach for this by name
+-- rather than re-deriving the lambda at the call site.
+fullView :: GameState -> Count.ViewOf
+fullView gs oid = Just (viewOfObject oid gs)
+
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
 -- candidates projected through the layers BEFORE that one. Off-battlefield
 -- candidates have no projection at all (gather walks the battlefield only), so
@@ -473,7 +490,7 @@ freezeQuantities gs oid you m =
   --
   -- CR 608.2h / 611.2d: read the CURRENT state through the real projection --
   -- `oid` is the source, `you` its controller, matching the doc above.
-  let viewOf o = Just (viewOfObject o gs)
+  let viewOf = fullView gs
       context = Filter.MkContext you (Just oid)
       freeze q = maybe q Quantity.Type.Literal $ Quantity.evaluate viewOf context gs oid q
    in case m of

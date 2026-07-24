@@ -72,7 +72,7 @@ resolveTopWith runSubgame = do
           -- controller (Engine.placeOne stamps it), which is who "you" means.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (\o -> Just (Projection.viewOfObject o gs)) (Filter.MkContext (Just (Object.owner obj)) (Just srcId)) gs srcId cond) ->
+              | not (Condition.holds (Projection.fullView gs) (Filter.MkContext (Just (Object.owner obj)) (Just srcId)) gs srcId cond) ->
                   State.modify' (Resolve.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)

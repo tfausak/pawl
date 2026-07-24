@@ -148,7 +148,7 @@ quantityTests cards =
           ),
       HU.testCase "Count CardsInYourHand is Nothing with no 'you'" $
         let gs = Setup.emptyGame S.bothPlayers
-            viewOf o = Just (Projection.viewOfObject o gs)
+            viewOf = Projection.fullView gs
          in HU.assertEqual
               "no player"
               Nothing
@@ -161,7 +161,7 @@ quantityTests cards =
               ),
       HU.testCase "Count CardsInYourHand counts that player's hand" $
         let (gs, _) = S.handOne (Cards.pikerPrinting cards) (Setup.emptyGame S.bothPlayers)
-            viewOf o = Just (Projection.viewOfObject o gs)
+            viewOf = Projection.fullView gs
          in HU.assertEqual
               "one card"
               (Just 1)
@@ -171,8 +171,8 @@ quantityTests cards =
             (_, one) = S.addGraveyardCard (Cards.pikerPrinting cards) S.alice gs0
             (_, two) = S.addGraveyardCard (Cards.warMammothPrinting cards) S.bob one
             (_, three) = S.addGraveyardCard (Cards.lightningBoltPrinting cards) S.alice two
-            viewOfTwo o = Just (Projection.viewOfObject o two)
-            viewOfThree o = Just (Projection.viewOfObject o three)
+            viewOfTwo = Projection.fullView two
+            viewOfThree = Projection.fullView three
          in do
               HU.assertEqual
                 "two creatures in two graveyards is one type"

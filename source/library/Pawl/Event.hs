@@ -523,7 +523,7 @@ stateTriggers gs =
         Just ctrl ->
           let live ab = case TriggeredAbility.condition ab of
                 TriggerCondition.StateIs cond ->
-                  Condition.holds (\o -> Just (Projection.viewOfObject o gs)) (Filter.MkContext (Just ctrl) (Just oid)) gs oid cond
+                  Condition.holds (Projection.fullView gs) (Filter.MkContext (Just ctrl) (Just oid)) gs oid cond
                     && not (alreadyOnStack oid ab)
                 TriggerCondition.SelfEnters -> False
                 TriggerCondition.StepBegins _ _ -> False
@@ -587,7 +587,7 @@ interveningHolds gs pending =
     Nothing -> True
     Just cond ->
       Condition.holds
-        (\o -> Just (Projection.viewOfObject o gs))
+        (Projection.fullView gs)
         (Filter.MkContext (Just (PendingTrigger.controller pending)) (Just (PendingTrigger.source pending)))
         gs
         (PendingTrigger.source pending)
