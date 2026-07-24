@@ -1,14 +1,17 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Damage and Pawl.Sba: the damage funnel, deathtouch, trample, and
 -- state-based actions. ((m2cPropertyTests cards) is deterministic fixture coverage, not
 -- QuickCheck properties.)
 module Pawl.DamageSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Cards as Cards
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -27,6 +30,7 @@ import qualified Pawl.Type.DamageRewrite as DamageRewrite
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Expiry as Expiry.Type
+import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
@@ -481,6 +485,91 @@ trampleTests cards =
               HU.assertEqual "one Ogre took all 3 and died, the other lived" 1 (S.creaturesInPlay S.bob after)
     ]
 
+-- #29: a blocker declared in the declare blockers step can be gone by the combat
+-- damage step -- since M3a the pool has instant-speed removal. CR 509.1h keeps the
+-- attacker BLOCKED (the combat map is the record and is deliberately not mutated,
+-- #28), but CR 510.1c assigns damage only to the creatures CURRENTLY blocking it.
+-- Removal happens between declareBlockers and dealCombatDamage, which is exactly
+-- when a Murder resolves.
+killBlockerMidCombat :: ObjectId.ObjectId -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+killBlockerMidCombat victim answer gs =
+  S.runPure answer gs $ do
+    Combat.declareAttackers S.alice
+    Combat.declareBlockers
+    Event.destroy victim
+    Monad.void Damage.dealCombatDamage
+
+-- Every DamageDealt event in the history addressed to `oid`, however much.
+damageEventsTo :: ObjectId.ObjectId -> GameState.GameState -> [DamageEvent.DamageEvent]
+damageEventsTo oid gs =
+  let pick ev = case ev of
+        GameEvent.DamageDealt de ->
+          if DamageEvent.target de == Recipient.ToCreature oid then [de] else []
+        _ -> []
+   in concatMap pick (GameState.events gs)
+
+-- Sinks the whole assignment into the first creature recipient offered. This is
+-- the discriminating answer for #29: if the engine still offers a departed
+-- blocker, the damage lands on the ghost and evaporates, so any assertion about
+-- where the damage really went fails. An answer that routes by threshold (like
+-- tramplingAnswer) would pass either way, because a departed blocker's threshold
+-- computes to 0.
+dumpOntoFirstCreature :: Prompt.Prompt r -> r
+dumpOntoFirstCreature p = case p of
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    case filter S.isCreatureRecipient (Map.keys thresholds) of
+      r : _ -> Map.singleton r n
+      [] -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+departedBlockerTests :: Cards.Cards -> Tasty.TestTree
+departedBlockerTests cards =
+  Tasty.testGroup
+    "Departed blockers (#29)"
+    [ HU.testCase "CR 702.19d a trampler whose only blocker left assigns everything to the player" $
+        -- War Mammoth (3/3 trample) is blocked by a Piker (2/1); the Piker is
+        -- destroyed before damage. "As though all blocking creatures have been
+        -- assigned lethal damage" -- so all 3 hit bob, and there is nothing left
+        -- to choose. dumpOntoFirstCreature sinks everything into a creature
+        -- recipient if one is offered, so an offered ghost shows up as bob
+        -- taking nothing.
+        let (gs, _, theirs) = S.combatBoardOf [Cards.warMammothPrinting cards] [Cards.pikerPrinting cards]
+         in case theirs of
+              blocker : _ ->
+                let after = S.settleSba (killBlockerMidCombat blocker dumpOntoFirstCreature gs)
+                 in do
+                      HU.assertEqual "bob took all 3" (Just 17) (S.lifeOf S.bob after)
+                      HU.assertEqual "nothing was addressed to the departed blocker" [] (damageEventsTo blocker after)
+              [] -> HU.assertFailure "fixture did not build a blocker",
+      HU.testCase "CR 510.1c a non-trampler whose only blocker left assigns no combat damage" $
+        -- A Piker (2/1) blocked by a Piker that then dies. "If no creatures are
+        -- currently blocking it ... it assigns no combat damage." bob is untouched
+        -- either way, so the observable is the history: the engine must not record
+        -- a DamageDealt addressed to a creature that is not there.
+        let (gs, _, theirs) = S.combatBoardOf [Cards.pikerPrinting cards] [Cards.pikerPrinting cards]
+         in case theirs of
+              blocker : _ ->
+                let after = S.settleSba (killBlockerMidCombat blocker S.aggressiveAnswer gs)
+                 in do
+                      HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after)
+                      HU.assertEqual "no phantom damage event" [] (damageEventsTo blocker after)
+              [] -> HU.assertFailure "fixture did not build a blocker",
+      HU.testCase "CR 510.1c a partly-departed block assigns only among the survivors" $
+        -- War Mammoth (3/3 trample) blocked by two Ogre Sentries (3/3); one dies
+        -- before damage. One live blocker with lethal exactly 3 leaves nothing to
+        -- divide, so this is forced: all 3 onto the survivor, which then dies.
+        -- With the ghost still in the list the assignment is a free division and
+        -- the whole 3 can sink into it, leaving the survivor untouched.
+        let (gs, _, theirs) = S.combatBoardOf [Cards.warMammothPrinting cards] [Cards.ogreSentryPrinting cards, Cards.ogreSentryPrinting cards]
+         in case theirs of
+              dead : _ : _ ->
+                let after = S.settleSba (killBlockerMidCombat dead dumpOntoFirstCreature gs)
+                 in do
+                      HU.assertEqual "the surviving Ogre took the full 3 and died" 0 (S.creaturesInPlay S.bob after)
+                      HU.assertEqual "bob untouched (3 power, 3 lethal, no excess)" (Just 20) (S.lifeOf S.bob after)
+              _ -> HU.assertFailure "fixture did not build two blockers"
+    ]
+
 -- Grant deathtouch to `oid` the way Serpent's Gift does: a stored continuous
 -- effect over just that object. Timestamp is arbitrary (no competing layer-6
 -- effect in these fixtures).
@@ -555,6 +644,7 @@ tests cards =
       deathtouchTests cards,
       assignmentLegalityTests,
       trampleTests cards,
+      departedBlockerTests cards,
       trampleDeathtouchTests cards,
       sbaTests,
       creatureSbaTests cards,

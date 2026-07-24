@@ -93,43 +93,63 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
         let power :: Natural
             power = fromInteger p
             trample = Projection.hasKeyword Keyword.Trample attacker gs
-        case Set.toList (Combat.blockersOf attacker gs) of
-          -- CR 510.1b: unblocked, so it hits what it is attacking.
-          [] -> case target of
-            AttackTarget.OfPlayer defender ->
-              pure [DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer defender) power (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat]
-          -- CR 510.1c / 702.19b: a single blocker with no trample -- or trample but
-          -- no power past its threshold -- is forced: all onto the blocker. A single
-          -- trample blocker WITH excess fails this guard and falls to the prompt arm.
-          [blocker]
-            | not trample || power <= blockerThreshold gs attacker blocker ->
-                pure [DamageEvent.MkDamageEvent attacker (Recipient.ToCreature blocker) power (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat]
-          blockers -> case Projection.controllerOf attacker gs of
-            Nothing -> pure []
-            -- CR 702.19b: the excess is assigned "as its controller chooses," so the
-            -- chooser is the attacker's controller. Banding (CR 702.22j) inverts
-            -- that -- the DEFENDING player chooses -- and is not implemented (#32).
-            -- See the M2c spec, sections 4 and 8.
-            Just pid -> do
-              let decider = Decide.deciderFor pid gs
-                  thresholdOf b = if trample then blockerThreshold gs attacker b else 0
-                  blockerEntries = map (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
-                  defenderEntry = case target of
-                    AttackTarget.OfPlayer defender ->
-                      if trample then [(Recipient.ToPlayer defender, 0 :: Natural)] else []
-                  thresholds = Map.fromList (blockerEntries ++ defenderEntry)
-              chosen <-
-                Trans.lift
-                  (Program.prompt (Prompt.AssignCombatDamage decider pid attacker thresholds power))
-              -- CR 510.1e / 702.19b: reject-not-repair (NOT the CR 733 human-error
-              -- rewind). An illegal answer assigns nothing. See the M2c spec, §4.
-              let toEvent (recipient, n) = DamageEvent.MkDamageEvent attacker recipient n (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat
-                  positive (_, n) = n > 0
-              pure
-                ( if legalAssignment thresholds power chosen
-                    then map toEvent (filter positive (Map.toList chosen))
-                    else []
-                )
+        let recorded = Combat.blockersOf attacker gs
+            -- CR 510.1c: damage goes only to the creatures CURRENTLY blocking.
+            -- The recorded set is deliberately NOT pruned when a blocker leaves --
+            -- CR 509.1h keeps the attacker blocked, and that map IS the record of
+            -- blocked-ness (#28) -- so the liveness filter belongs here, at
+            -- assignment, and nowhere else. Same predicate dealCombatDamage uses
+            -- to decide which creatures assign.
+            onBattlefield oid = case Game.lookupObject oid gs of
+              Just obj -> Object.zone obj == Zone.Battlefield
+              Nothing -> False
+            toDefender :: [DamageEvent.DamageEvent]
+            toDefender = case target of
+              AttackTarget.OfPlayer defender ->
+                [DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer defender) power (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat]
+        if Set.null recorded
+          then -- CR 510.1b: never blocked, so it hits what it is attacking.
+            pure toDefender
+          else case filter onBattlefield (Set.toList recorded) of
+            -- Blocked, but nothing is blocking it now. CR 702.19d: a trampler
+            -- assigns everything to the defending player, "as though all blocking
+            -- creatures have been assigned lethal damage". CR 510.1c: anything
+            -- else assigns no combat damage at all -- not damage addressed to an
+            -- object that is not there, which would still be recorded in the
+            -- CR 608.2i history even though marking it is a no-op.
+            [] -> pure (if trample then toDefender else [])
+            -- CR 510.1c / 702.19b: a single blocker with no trample -- or trample but
+            -- no power past its threshold -- is forced: all onto the blocker. A single
+            -- trample blocker WITH excess fails this guard and falls to the prompt arm.
+            [blocker]
+              | not trample || power <= blockerThreshold gs attacker blocker ->
+                  pure [DamageEvent.MkDamageEvent attacker (Recipient.ToCreature blocker) power (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat]
+            blockers -> case Projection.controllerOf attacker gs of
+              Nothing -> pure []
+              -- CR 702.19b: the excess is assigned "as its controller chooses," so the
+              -- chooser is the attacker's controller. Banding (CR 702.22j) inverts
+              -- that -- the DEFENDING player chooses -- and is not implemented (#32).
+              -- See the M2c spec, sections 4 and 8.
+              Just pid -> do
+                let decider = Decide.deciderFor pid gs
+                    thresholdOf b = if trample then blockerThreshold gs attacker b else 0
+                    blockerEntries = map (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
+                    defenderEntry = case target of
+                      AttackTarget.OfPlayer defender ->
+                        if trample then [(Recipient.ToPlayer defender, 0 :: Natural)] else []
+                    thresholds = Map.fromList (blockerEntries ++ defenderEntry)
+                chosen <-
+                  Trans.lift
+                    (Program.prompt (Prompt.AssignCombatDamage decider pid attacker thresholds power))
+                -- CR 510.1e / 702.19b: reject-not-repair (NOT the CR 733 human-error
+                -- rewind). An illegal answer assigns nothing. See the M2c spec, §4.
+                let toEvent (recipient, n) = DamageEvent.MkDamageEvent attacker recipient n (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat
+                    positive (_, n) = n > 0
+                pure
+                  ( if legalAssignment thresholds power chosen
+                      then map toEvent (filter positive (Map.toList chosen))
+                      else []
+                  )
 
 -- CR 510.1d: a blocking creature assigns its damage to the creature it blocks.
 blockerAssignment :: GameState -> (ObjectId, Set.Set ObjectId) -> [DamageEvent.DamageEvent]
