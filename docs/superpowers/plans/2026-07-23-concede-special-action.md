@@ -90,13 +90,14 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Status as Status
 import qualified Data.Map.Strict as Map
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-statusOf :: S.PlayerIdAlias -> GameState.GameState -> Maybe Status.Status
+statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
 
 tests :: Tasty.TestTree
@@ -122,8 +123,6 @@ tests =
          in HU.assertEqual "only bob remains" [S.bob] (Departure.stillPlaying after)
     ]
 ```
-
-`S.PlayerIdAlias` is a placeholder for the real type — use `PlayerId.PlayerId`, importing `qualified Pawl.Type.PlayerId as PlayerId`. Replace the two occurrences accordingly.
 
 Wire it into `source/test-suite/Main.hs`: add `import qualified Pawl.DepartureSpec` alongside the other spec imports, and add `Pawl.DepartureSpec.tests` to the `testTree` list. Match the exact style of the neighbouring entries — read the file first.
 
@@ -274,8 +273,8 @@ Expected: no warnings, and **935 tests pass** (931 before, plus the 4 new `Depar
 - [ ] **Step 8: Commit**
 
 ```bash
-git add -A source/ pawl.cabal
-hooky fix && git add -A source/ pawl.cabal && hooky run
+git add <the exact files this task touched> pawl.cabal
+hooky fix && git add <the exact files this task touched> pawl.cabal && hooky run
 git commit -m "refactor(departure): extract Pawl.Departure from Pawl.Sba (#133)
 
 Leaving the game is not always a state-based action: CR 104.3b (life <= 0) is
@@ -444,8 +443,8 @@ Expected: no warnings; **937 tests pass** (935 plus the 2 new `ReplaySpec` cases
 - [ ] **Step 9: Commit**
 
 ```bash
-git add -A source/ pawl.cabal
-hooky fix && git add -A source/ pawl.cabal && hooky run
+git add <the exact files this task touched> pawl.cabal
+hooky fix && git add <the exact files this task touched> pawl.cabal && hooky run
 git commit -m "feat(concede): the Concession channel -- prompt, response, replay (#133)
 
 Prompt.Concede carries a PlayerId and NO Decider. It is the only constructor in
@@ -626,8 +625,8 @@ Expected: three benchmarks that still differ from each other. Prompt volume roug
 - [ ] **Step 6: Commit**
 
 ```bash
-git add -A source/
-hooky fix && git add -A source/ && hooky run
+git add <the exact files this task touched>
+hooky fix && git add <same explicit paths> && hooky run
 git commit -m "feat(concede): poll the concede channel at every priority grant (#133)
 
 CR 104.3a: a player may concede at any priority they hold. The ask is keyed to
@@ -699,8 +698,8 @@ Expected: no warnings, 941 tests pass, and the step count reaches `0`.
 - [ ] **Step 5: Commit and close**
 
 ```bash
-git add -A source/ docs/
-hooky fix && git add -A source/ docs/ && hooky run
+git add <the exact files this task touched>
+hooky fix && git add <the exact files this task touched> && hooky run
 git commit -m "docs(concede): file the \"at any time\" elision, mark the spec implemented (#133)"
 gh issue close 133 --comment "Implemented across the four tasks of docs/superpowers/plans/2026-07-23-concede-special-action.md. Prompt.Concede carries no Decider, which makes the CR 723.6 violation unrepresentable rather than something a comment warns about; the central test is a Mindslaver-controlled player conceding themselves while their controller answers every other prompt for them. Departure machinery extracted to Pawl.Departure because CR 104.3a is immediate where CR 104.3b is a state-based action. The \"at any time\" narrowing is filed separately with the SBA race recorded."
 ```
@@ -713,6 +712,5 @@ gh issue close 133 --comment "Implemented across the four tasks of docs/superpow
 
 **Known soft spots for the implementer:**
 
-- Task 1 Step 1's test file uses `S.PlayerIdAlias` as a stand-in; Step 1 says to substitute the real `PlayerId.PlayerId`. Do not leave it.
 - Task 3 Step 3 requires re-indenting a large block. Build before testing.
 - Test counts (935 / 937 / 941) assume the suite is at 931 when Task 1 begins. If it is not, the deltas (+4, +2, +4) still hold.
