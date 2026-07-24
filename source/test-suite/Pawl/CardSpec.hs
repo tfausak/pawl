@@ -302,6 +302,12 @@ triggeredAbilityCounts ability =
 -- triggered ability's intervening clause, and a ForAsLongAs duration), and
 -- every effect (spell, activated, triggered, delayed), recursing into a
 -- minted token or emblem.
+--
+-- This traversal is hand-maintained, not derived, so it is NOT enforced
+-- exhaustive by -Werror the way the Zone/Effect/Modification cases inside it
+-- are: a NEW Card field, or a new CostComponent/PlayerEffect arm, that can carry
+-- a Quantity or Count would bypass this lint silently. When you add a field that
+-- can hold either, add it here.
 cardCounts :: Card.Type.Card -> [Count.Type.Count]
 cardCounts card =
   concatMap quantityCounts (Maybe.maybeToList (Card.Type.characteristicPT card))

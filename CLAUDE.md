@@ -35,63 +35,43 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 
 ## Current work and tracking
 
-- **Status: M0–M4.5 are complete.** The closed-half milestones M0–M3g, the
-  M3.5 cards-as-data interstitial, the whole of M4 (M4a–M4g plus the M4h
-  fast-follow), and now all eleven phases of M4.5 have landed: P1–P3b closed
-  Cluster 1 (every sublayer of the layer system has a producer); P4 opened
-  Cluster 2 (the event-history substrate); P5 closed the monadic replacement
-  path and CR 616; P6 closed GAP-D (a stored duration now has a beginning);
-  P7 closed GAP-P and the *modification* half of GAP-Co, closing Cluster 3
-  (player and rules-modifying continuous effects, which CR 613.10/613.11 put
-  *outside* the layer system); P8 closed the *payment* half of GAP-Co (one
-  `Cost` for spells and abilities, CR 118.6's unpayable/`{0}` distinction,
-  and additional and alternative costs); P9 closed GAP-F (one
-  `Pawl.Type.Filter` predicate language subsuming `TargetSpec`'s per-card
-  variants and the `CardCriterion`/`PermanentCriterion`/`SpellCriterion`/
-  `Affected`-dynamic-set family); P10 closed GAP-C (a player-counter
-  substrate, `Player.counters`/`PlayerCounterKind`, disjoint from object
-  counters, with poison and energy as its first two customers); and **P11
-  closed GAP-Z and the monarch customer of GAP-S** — a seventh zone
-  (`Zone.Command`) whose residents' static abilities function off the
-  battlefield (an emblem's anthem), and the monarch as a game-wide
-  designation (`GameState.monarch`) with two sourceless inherent triggers
-  (`Source.OfInherentTrigger`), via Palace Jailer. **Every closed-half gap
-  axis the census flagged now has a type-system axis and a real (or
-  sanctioned labeled-synthetic) gate card with a passing test.** The
-  umbrella spec is
-  `docs/superpowers/specs/2026-07-20-m4.5-closed-half-gaps-design.md`; the
-  distilled per-phase entries (gate cards, decisions, opcodes) are in
-  `docs/progress.md`. **M5 is now underway: M5a (Controlling Another Player,
-  CR 723) has landed** — a gameplay-level Mindslaver gate over the
-  already-built `Decider` substrate, plus the 723.1a/723.5a edges and the
-  723.6 concede deferral (concede is unbuilt, #133). **M5b (Restarting the
-  Game, CR 727) has landed** — a labeled-synthetic "Restart" artifact drives
-  a gameplay-level gate over a new nullary `Effect.RestartGame` opcode that
-  resolves to `Setup.restartGame`, rebuilding the game in place from its
-  actual cards (CR 727.2) with the restart's controller as starting player
-  (CR 727.1a), settling just before the first untap step (CR 727.4); it
-  introduces the shared `startGameFromCards` primitive that M5c reuses.
-  Deferred: live `playGame` re-entry after an in-game restart, and full Karn
-  Liberated (CR 727.5/727.5a). **M5c (Subgames, CR 729 — the M5 go/no-go) has
-  landed, and with it M5 is complete.** A labeled-synthetic "Synthetic Subgame"
-  sorcery (documented expiry → Shahrazad) drives a gameplay gate over a new
-  `Effect.PlaySubgame SlotName` opcode: a subgame is
-  `Trans.lift (runStateT (startGameFromCards >> playGame) sub0)` sequenced into
-  the resolving effect, sharing the one `Program`/`Replay` interpreter (a
-  `Prompt.PlaySubgame` was rejected for breaking replay); the runner is
-  injected down the spell path (`resolveTopWith`/`resolveSpellWith`/
-  `applyEffectWith`, bare names kept as `noSubgame` wrappers) since `Resolve`
-  sits below `Engine`. `PlaySubgame` defines a slot binding the derived loser
-  (CR 729.1b, read via a per-effect binding re-read in `resolveSpellWith`);
-  `Setup.subgameStateFrom`/`funnelBack` build from the library only (CR 729.2)
-  and return owned cards (CR 729.5) with an inherited id supply; nesting (CR
-  729.6) is free recursion; CR 729.2's random first player is a real roll
-  (`Prompt.RandomFirstPlayer`, answered by the interpreter). Deferred:
-  ability-path subgames, Result-widening, full Shahrazad, and the
-  subsystem-blocked movement slices. With control, restart, and subgames closed, **the closed
-  half is functionally complete for its flagged surface; M6 (the transpiler)
-  is next.** The umbrella spec is
-  `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`.
+- **Status: M0–M5 and the M5.5 count/compare interstitial are complete.** The
+  closed-half milestones M0–M3g, the M3.5 cards-as-data interstitial, the whole
+  of M4 (M4a–M4h), all eleven phases of M4.5 (the closed-half gap census: the
+  layer system, event history, replacement/CR 616, durations, player and
+  rules-modifying continuous effects, cost generalization, the `Pawl.Type.Filter`
+  predicate language, player counters, and the command zone + emblems + monarch),
+  and all of M5 (Controlling Another Player CR 723 via Mindslaver, Restarting the
+  Game CR 727, Subgames CR 729 — a subgame is
+  `Trans.lift (runStateT (startGameFromCards >> playGame) sub0)`, a function call
+  where XMage needs a second engine) have landed, plus the mulligan gap-closure
+  (CR 103.5). **M5.5 (count/compare) is the newest and closes out the closed
+  half's flagged surface.** It collapses the two hand-carved per-card types
+  `StateCondition` and `CountSpec` into one `Count = MkCount Scope Filter
+  Aggregation`, with a single-constructor `Condition = MkCondition Count
+  Comparison Quantity`. Its load-bearing proof: a count can read the CR 613
+  layer-system projection without a module cycle or non-termination — `Pawl.Count`
+  owns the fold parameterized by an injected `ViewOf = ObjectId -> Maybe
+  Filter.View` (so it never imports `Pawl.Projection`), and inside the layer fold
+  `Projection.viewUpTo` supplies candidates projected through the layers already
+  applied (`projectUpTo bound = projectWith (< bound)`), a strictly-decreasing
+  bound that terminates by construction and is a deliberate **approximation** of
+  CR 613.8 (#157). Gate cards: **Nightmare** (a `*/*` CDA counting Swamps you
+  control — reads subtype at layer 4 and control at layer 2, so Urborg and Blood
+  Moon, both in the pool, are real falsifiers) and **Sudden Impact** (a count
+  whose perspective is the *target* player, not "you"). `Filter` gained the
+  context-relative `IsSource` atom (so CR 611.2b's "for as long as you control
+  this" is `count{battlefield, IsSource ∧ ControlledBy You} == 1` and `Condition`
+  needs no escape hatch); M4.5's #34 was fixed in passing (a static ability's
+  count reads the source's controller, a CDA the object's own). **The closed half
+  is now functionally complete for its flagged surface; M6 (the transpiler) is
+  next** — count/compare landed here precisely because it is one of the highest-
+  frequency constructs in the oracle corpus, so M6 translates it rather than
+  discovering it. The umbrella specs are
+  `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`
+  and `docs/superpowers/specs/2026-07-24-m5.5-count-compare-design.md`; the
+  distilled per-milestone entries (gate cards, decisions, opcodes) are in
+  `docs/progress.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —
   lives in `docs/progress.md`. It records what each milestone *established*,

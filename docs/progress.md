@@ -2094,3 +2094,56 @@ its own gate card and spec, landed as it completes. Umbrella:
   CR 103.2a/b sideboards and companions (#150, card-driven). Spec and plan:
   `docs/superpowers/specs/2026-07-24-mulligans-cr-103-5-design.md` and
   `docs/superpowers/plans/2026-07-24-mulligans-cr-103-5.md`.
+
+- **M5.5 (Count/compare) is complete** (the interstitial before M6, lettered like
+  M3.5/M4.5; issue-driven from #38/#39, whose deferral M4.5 P9 §7 left
+  unscheduled). **What it establishes:** one `Count = MkCount Scope Filter
+  Aggregation` — a scope, a per-object `Filter` (P9's), and an aggregation —
+  replaces the two hand-carved per-card types `StateCondition` and `CountSpec`
+  wholesale, and a single-constructor `Condition = MkCondition Count Comparison
+  Quantity` compares a count to a `Quantity` threshold. **The load-bearing
+  decision it proved:** a count can read the CR 613 layer-system projection
+  without a module cycle or non-termination. `Pawl.Count` owns the fold,
+  parameterized by an injected `ViewOf = ObjectId -> Maybe Filter.View`, so it
+  never imports `Pawl.Projection` (which imports `Pawl.Quantity`, which imports
+  `Pawl.Count`); inside the layer fold, `Projection.viewUpTo` supplies candidates
+  projected through the layers **already applied** (`projectUpTo bound =
+  projectWith (< bound)`), so a count at layer L sees `< L`, a nested count at
+  K < L sees `< K`, the bound strictly decreases and `Layer` is finite —
+  termination by construction. That bound is a terminating **approximation** of
+  CR 613.8, exact whenever a count reads layers earlier than its consumer's and
+  under-reading a count over its own layer or later (#157). **Gate cards:**
+  **Nightmare** (`*/*` CDA = the number of Swamps you control; its count reads
+  subtype at layer 4 and control at layer 2, so Urborg — every land a Swamp —
+  raises it and Blood Moon — nonbasic Swamp stripped — lowers it; both already in
+  the pool, so both are real falsifiers) and **Sudden Impact** (damage to a target
+  player = cards in **that player's** hand; set against Inner Calm Outer Strength's
+  identical zone count reading the *resolving controller's* hand, one `Count`
+  shape serves two perspectives — which is what retires a constructor named
+  `CardsInYourHand`). **Filter gained one atom:** `IsSource`, context-relative in
+  the same way `ControlledBy` is (the value carries no id; the answer comes from
+  the `Context`'s new `source` field), so CR 611.2b's "for as long as you control
+  this creature" is the ordinary count `count{battlefield, IsSource ∧ ControlledBy
+  You} == 1` and `Condition` needs no escape-hatch constructor (CR 400.7 makes it
+  robust: a permanent that dies and returns is a new id). **Fixed along the way:**
+  M4.5's #34 — a static ability's player-scoped count now reads the **source's**
+  controller (CR 109.5, `applyModification` builds its context from the gathered
+  candidate's `gSource`), while a characteristic-defining ability keeps the
+  object's own controller (CR 604.3a(3), `applyCharacteristicPT`). **Added:**
+  `Pawl.Type.{Count,Scope,PlayerRef,EventShape,Aggregation,Comparison,Condition}`,
+  `Pawl.Count`, `Pawl.Condition`, `Projection.{projectWith,projectUpTo,viewUpTo,
+  fullView}`, `Filter.IsSource` + the two-field `Filter.Context`, and the
+  `Subtype` pair Nightmare/Horse; **deleted:** `Pawl.Type.StateCondition`,
+  `Pawl.Type.CountSpec`, `Event.stateHolds`, `Quantity.{countOf,
+  typesInAllGraveyards,died}`. Suite 952 → 984. **Deferred:** the CR 613.8
+  approximation (#157); `Comparison.AtLeast`/`AtMost` have no producer, awaiting
+  the first nonzero threshold, which likely also forces a conditional `Effect`
+  arm (#158); an `InSlot` count stored in an `Expiry.While` outlives its slot
+  (#159); non-battlefield count candidates read printed characteristics, the
+  surviving half of the closed #41 (#160); a shared zone paired with a
+  non-`EachPlayer` ref is lint-enforced, not type-enforced (#161); `EventShape`
+  has only `MovedBetween` (#162); `Exclusion` is not re-expressed as `Not
+  IsSource` (#163, a cleanup, no card drives it). Also filed: a printed-P/T
+  `Count` would evaluate to 0 rather than Nothing through the seed view (#156).
+  Spec and plan: `docs/superpowers/specs/2026-07-24-m5.5-count-compare-design.md`
+  and `docs/superpowers/plans/2026-07-24-m5.5-count-compare.md`.

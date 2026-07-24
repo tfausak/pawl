@@ -453,6 +453,28 @@ Keep this claim scoped to true subgames (729). Restarting (727) is *not* the sam
 
 Do 732 and 733 eventually. Nobody plans for them; everybody needs them.
 
+### M5.5 — Count/compare (the interstitial before the transpiler)
+
+An interstitial, lettered like M3.5 and M4.5: not a new rules nightmare, but the
+last piece of vocabulary the transpiler cannot do without. M4.5 P9 built a
+per-object predicate (`Pawl.Type.Filter`) and deliberately stopped short of the
+layer above it — a **scope** (which objects, over which zones, from whose
+perspective), an **aggregation** (how many; how many distinct card types), and a
+**comparison to a threshold**. Two hand-carved per-card types stood in for that
+layer: `StateCondition` (the boolean customer — state triggers, intervening
+"if", "for as long as") and `CountSpec` (the numeric customer, `Quantity.Count`).
+M5.5 collapses both into one `Count = MkCount Scope Filter Aggregation`, with a
+single-constructor `Condition = MkCondition Count Comparison Quantity`.
+
+The reason it precedes M6 rather than waiting for a card to force it: count/
+compare is one of the highest-frequency constructs in the oracle corpus (`"the
+number of"`, `"for each"`, `"if you control"` run into the thousands of distinct
+strings), so the transpiler hits it on day one. Sequencing it here means M6
+translates it, rather than discovering it needs building. Its gate cards —
+Nightmare (a count that reads the CR 613 projection, falsified by Urborg and
+Blood Moon) and Sudden Impact (a count whose perspective is the *target*, not
+"you") — retire the last per-card constructors in the closed half.
+
 ### M6 — The transpiler
 
 Only now, once the DSL has shape. Two inputs:
