@@ -157,9 +157,22 @@ precisely — live in `Pawl.Support`, `Pawl.CastSpec`, `Pawl.GameSpec`,
 `Pawl.ReplaySpec`, and the benchmark's `Main.hs`.
 
 Prompt volume roughly doubles — the benchmark games issue 650–1800 `ChooseAction`
-prompts — and replay logs grow accordingly. This is the honest price. Conceding
-is a *distinguishable* option, so pawl's own invariant forbids eliding the ask;
-only the set of points at which it is offered may be narrowed, which is §7.
+prompts — and replay logs grow accordingly. That doubling is real and is the
+honest price for the *log*: every priority grant now writes both a `Concede`
+and a `ChooseAction` entry, so a persisted transcript is measurably larger.
+Conceding is a *distinguishable* option, so pawl's own invariant forbids eliding
+the ask; only the set of points at which it is offered may be narrowed, which is
+§7.
+
+It is, however, **not** a wall-clock price. Measured with `cabal bench`
+before and after this change: goldfish/casting/fighting went from
+11.6 / 95.4 / 17.9 ms to 11.6 / 90.4 / 17.8 ms — no measurable regression
+(the "after" numbers are, if anything, noise-level *faster*). Constructing a
+`Prompt.Concede` is one extra GADT allocation per priority grant against
+`Action.legalActions`'s own recomputation, which already dominates the cost of
+a priority grant; doubling the prompt *count* does not double the *work*, and
+the honest price named above is paid in log size and prompt volume, not in
+running time.
 
 **Reversibility.** The cost above is sunk into the *channel*, not the
 *frequency*, and the two are worth keeping apart. Every item in the list — the

@@ -650,14 +650,48 @@ concedeTests cards =
         -- alice controls bob (Mindslaver). Every ChooseAction for bob is answered
         -- by alice. The concede ask is NOT: it reaches bob, and bob takes it.
         -- If Prompt.Concede carried a Decider, this would be alice's call.
-        let gs =
-              (Setup.emptyGame S.bothPlayers)
-                { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.bob,
-                  GameState.activeControl = Just (Decider.MkDecider S.alice)
-                }
-            after = S.runPure (concedeAnswer S.bob) gs Engine.runStep
+        --
+        -- The premise -- that alice genuinely IS bob's decider for this run -- is
+        -- not merely set up, it is OBSERVED: bob is given a land to play so a real
+        -- Prompt.ChooseAction fires for him before he concedes, and the answerer
+        -- records the Decider that prompt actually carried. A silent regression in
+        -- Decide.deciderFor (activeControl stops being honoured) would make this
+        -- record MkDecider bob instead, and the test would catch it even though
+        -- the headline outcome (bob departs Conceded, alice wins) would still hold.
+        let (mountainOid, gs) =
+              S.addHandCard
+                (Cards.mountainPrinting cards)
+                S.bob
+                ( (Setup.emptyGame S.bothPlayers)
+                    { GameState.phase = Phase.PrecombatMain,
+                      GameState.activePlayer = S.bob,
+                      GameState.activeControl = Just (Decider.MkDecider S.alice)
+                    }
+                )
+            -- (deciders seen for bob's ChooseAction, PlayerIds seen for Concede).
+            -- Bob's first Concede ask answers Continues so the ChooseAction below
+            -- fires and gets recorded; he plays the land (which keeps priority
+            -- with him, CR 305.3 style timing aside -- Engine.priorityLoop simply
+            -- re-loops with `priority = Just p` after a Play), and only on the
+            -- SECOND Concede ask -- now with a recorded ChooseAction in hand --
+            -- does he actually concede.
+            answer :: Prompt.Prompt r -> State.State ([Decider.Decider], [PlayerId.PlayerId]) r
+            answer p = case p of
+              Prompt.ChooseAction decider pid _ ->
+                if pid == S.bob
+                  then do
+                    State.modify' (\(ds, cs) -> (ds ++ [decider], cs))
+                    pure (A.Play mountainOid)
+                  else pure (S.identityAnswer p)
+              Prompt.Concede asked -> do
+                (_, asksSoFar) <- State.get
+                State.modify' (\(ds, cs) -> (ds, cs ++ [asked]))
+                pure (if null asksSoFar then Concession.Continues else Concession.Concedes)
+              _ -> pure (S.identityAnswer p)
+            ((_, after), (deciders, concedeAsks)) = State.runState (Engine.runGame answer gs Engine.runStep) ([], [])
          in do
+              HU.assertEqual "bob's ChooseAction carried alice as decider (bob genuinely is controlled)" [Decider.MkDecider S.alice] deciders
+              HU.assertEqual "every Concede ask reached bob himself, not his controller" [S.bob, S.bob] concedeAsks
               HU.assertEqual "bob left by his own concession" (Just (Status.Departed Departure.Conceded)) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
               HU.assertEqual "alice wins" (Just (Result.Won S.alice)) (GameState.result after),
       HU.testCase "CR 104.3a concede does not use the stack: a spell on it never resolves" $
