@@ -268,7 +268,8 @@ matchesController gs src rel oid = case rel of
 -- (#111).
 matchesPermanent :: GameState -> Filter.Type.Filter -> ObjectId -> Bool
 matchesPermanent gs filter_ oid =
-  Filter.matches (Filter.MkContext Nothing) (Projection.viewOfObject oid gs) filter_
+  -- No source in scope at this site.
+  Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_
 
 -- CR 614.16: apply a scaling to a count. "That many plus one" and "twice that
 -- many" are the same operation with different data.

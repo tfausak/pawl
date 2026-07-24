@@ -138,7 +138,8 @@ requiresTapSymbol cost = elem CostComponent.TapThis (Cost.components cost)
 -- no Cost->Replacement cycle to avoid (#111).
 matchesFilter :: GameState -> Filter.Type.Filter -> ObjectId -> Bool
 matchesFilter gs filter_ oid =
-  Filter.matches (Filter.MkContext Nothing) (Projection.viewOfObject oid gs) filter_
+  -- No source in scope at this site.
+  Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_
 
 -- The permanents this player may sacrifice for a Filter, ascending -- the order
 -- ChooseSacrifices offers them in, which is what makes both the elision test and

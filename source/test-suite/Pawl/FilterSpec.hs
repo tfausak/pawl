@@ -9,6 +9,7 @@ import qualified Pawl.Type.Color as Color
 -- already claims the alias Filter (a documented exception to alias-to-last-
 -- component, per the M4.5 P9 plan's global constraints).
 import qualified Pawl.Type.Filter as Filter.Type
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.Subtype as Subtype
@@ -24,7 +25,8 @@ blackCreature =
       Filter.colors = Set.singleton Color.Black,
       Filter.subtypes = Set.singleton Subtype.Zombie,
       Filter.power = Just 2,
-      Filter.controller = Just (PlayerId.MkPlayerId 0)
+      Filter.controller = Just (PlayerId.MkPlayerId 0),
+      Filter.identity = Just (ObjectId.MkObjectId 7)
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -36,17 +38,18 @@ devoidBigCreature =
       Filter.colors = Set.empty,
       Filter.subtypes = Set.empty,
       Filter.power = Just 5,
-      Filter.controller = Nothing
+      Filter.controller = Nothing,
+      Filter.identity = Nothing
     }
 
 self :: Filter.Context
-self = Filter.MkContext (Just (PlayerId.MkPlayerId 0))
+self = Filter.MkContext (Just (PlayerId.MkPlayerId 0)) Nothing
 
 other :: Filter.Context
-other = Filter.MkContext (Just (PlayerId.MkPlayerId 1))
+other = Filter.MkContext (Just (PlayerId.MkPlayerId 1)) Nothing
 
 noPerspective :: Filter.Context
-noPerspective = Filter.MkContext Nothing
+noPerspective = Filter.MkContext Nothing Nothing
 
 tests :: Tasty.TestTree
 tests =
@@ -84,5 +87,35 @@ tests =
       HU.testCase "ControlledBy is False when the object has no controller" $
         HU.assertBool "no controller" (not (Filter.matches self devoidBigCreature (Filter.Type.ControlledBy PlayerRelation.Opponent))),
       HU.testCase "ControlledBy is False when the context has no perspective" $
-        HU.assertBool "no perspective" (not (Filter.matches noPerspective blackCreature (Filter.Type.ControlledBy PlayerRelation.You)))
+        HU.assertBool "no perspective" (not (Filter.matches noPerspective blackCreature (Filter.Type.ControlledBy PlayerRelation.You))),
+      Tasty.testGroup
+        "IsSource"
+        [ HU.testCase "matches the context's source"
+            . HU.assertBool "is the source"
+            $ Filter.matches
+              (Filter.MkContext (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7)))
+              blackCreature
+              Filter.Type.IsSource,
+          HU.testCase "does not match a different object"
+            . HU.assertBool "not the source"
+            . not
+            $ Filter.matches
+              (Filter.MkContext (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 8)))
+              blackCreature
+              Filter.Type.IsSource,
+          HU.testCase "no source in context is vacuously false"
+            . HU.assertBool "no source"
+            . not
+            $ Filter.matches
+              (Filter.MkContext (Just (PlayerId.MkPlayerId 0)) Nothing)
+              blackCreature
+              Filter.Type.IsSource,
+          HU.testCase "no identity in view is vacuously false"
+            . HU.assertBool "no identity"
+            . not
+            $ Filter.matches
+              (Filter.MkContext (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7)))
+              devoidBigCreature
+              Filter.Type.IsSource
+        ]
     ]

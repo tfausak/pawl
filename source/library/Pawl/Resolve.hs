@@ -525,7 +525,8 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     -- CR 701.23a: match each library card through the PRINTED-card view -- a card
     -- in a library has no projection. The context has no perspective (CR 109.5): a
     -- search filter never references a player, so ControlledBy is vacuously False.
-    let searchContext = Filter.MkContext Nothing
+    -- No source in scope at this site.
+    let searchContext = Filter.MkContext Nothing Nothing
         matches1 g oid = case Game.cardOf oid g of
           Nothing -> False
           Just card -> Filter.matches searchContext (Projection.viewOfCard card) filter_

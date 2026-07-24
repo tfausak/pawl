@@ -196,7 +196,7 @@ affects source oid a partial gs = case a of
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
           && notExcluded
-          && Filter.matches (Filter.MkContext perspective) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
+          && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
 
 -- CR 205.4a: supertypes are read from the printed type line (no modelled effect
 -- changes a supertype). Empty when the object has no underlying card.
@@ -229,7 +229,11 @@ viewOfCard card =
           Filter.colors = baseColorsOf card,
           Filter.subtypes = TypeLine.subtypes typeLine,
           Filter.power = Nothing,
-          Filter.controller = Nothing
+          Filter.controller = Nothing,
+          -- A printed card off the battlefield is not an object, so it has no
+          -- identity for IsSource to compare -- the same vacuous posture power
+          -- and controller already take here.
+          Filter.identity = Nothing
         }
 
 -- Shared assembly: fill a View from a projection's characteristics plus the
@@ -242,7 +246,8 @@ viewOfCharacteristics oid pc controller gs =
       Filter.colors = PC.colors pc,
       Filter.subtypes = PC.subtypes pc,
       Filter.power = PC.power pc,
-      Filter.controller = controller
+      Filter.controller = controller,
+      Filter.identity = Just oid
     }
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result -- the value the layer fold

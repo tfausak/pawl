@@ -45,7 +45,7 @@ import qualified Pawl.Type.Zone as Zone
 legalRecipients :: ObjectId -> TargetSpec -> GameState -> Set Recipient
 legalRecipients source spec gs =
   let TargetSpec.MkTargetSpec pool restriction _ = spec
-      context = Filter.MkContext (Projection.controllerOf source gs)
+      context = Filter.MkContext (Projection.controllerOf source gs) (Just source)
       keep recipient = case recipient of
         Recipient.ToPlayer _ -> True -- CR 115: a Filter ranges over objects; it never narrows a player.
         Recipient.ToCreature oid -> narrows oid

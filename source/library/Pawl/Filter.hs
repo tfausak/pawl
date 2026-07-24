@@ -4,6 +4,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Filter as Filter
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.Subtype as Subtype
@@ -21,16 +22,20 @@ data View = MkView
     colors :: Set.Set Color.Color,
     subtypes :: Set.Set Subtype.Subtype,
     power :: Maybe Integer,
-    controller :: Maybe PlayerId.PlayerId
+    controller :: Maybe PlayerId.PlayerId,
+    -- Which object this view is OF. Nothing for a printed card off the
+    -- battlefield, which is not an object -- so IsSource is vacuously False
+    -- there, the same posture power and controller already take.
+    identity :: Maybe ObjectId.ObjectId
   }
   deriving (Eq, Show)
 
--- The perspective the match is relative to: who counts as "you" (CR 109.5). For a
--- target it is the targeting source's controller; for a continuous effect's set,
--- the effect's controller; Nothing when no player frames the match (an
--- off-battlefield search, whose filters never reference a player).
-newtype Context = MkContext
-  { perspective :: Maybe PlayerId.PlayerId
+-- The perspective the match is relative to: who counts as "you" (CR 109.5), and
+-- which object the surrounding effect comes from. Both are Nothing when no
+-- player and no source frame the match (an off-battlefield search).
+data Context = MkContext
+  { perspective :: Maybe PlayerId.PlayerId,
+    source :: Maybe ObjectId.ObjectId
   }
   deriving (Eq, Show)
 
@@ -49,6 +54,9 @@ matches context view predicate = case predicate of
     (Just c, Just p) -> case relation of
       PlayerRelation.You -> c == p
       PlayerRelation.Opponent -> c /= p
+    _ -> False
+  Filter.IsSource -> case (identity view, source context) of
+    (Just oid, Just src) -> oid == src
     _ -> False
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
