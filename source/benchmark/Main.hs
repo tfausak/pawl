@@ -3,12 +3,10 @@
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.Text.IO as TextIO
 import Numeric.Natural (Natural)
-import qualified Pawl.Codec as Codec
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
-import qualified Pawl.Json as Json
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Type.Action as Action
 import qualified Pawl.Type.Concession as Concession
@@ -16,9 +14,9 @@ import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Registry as Registry.Type
 import Pawl.Type.Result (Result)
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Test.Tasty.Bench as Bench
@@ -175,29 +173,20 @@ fighting deck n =
    in fst (Engine.runMatchPure fightAnswer (Setup.mirror deck players))
 {-# NOINLINE fighting #-}
 
--- Load one card from its committed JSON file, failing loudly (in IO, never
--- `error` in pure code) on a missing or malformed file.
-loadPrinting :: String -> IO Printing.Printing
-loadPrinting slug = do
-  contents <- TextIO.readFile ("data/cards/" <> slug <> ".json")
-  case Json.parse contents >>= Codec.jsonToPrinting of
-    Right p -> pure p
-    Left err -> ioError (userError ("card " <> slug <> ": " <> show err))
-
--- The redDeck recipe (slug -> count), loaded from files -- the proof that
--- files -> parse -> a real game works end-to-end. Duplicated here rather than
--- shared through a compiled card module (the non-scalable path design rejects).
-loadRedDeck :: IO Deck.Deck
-loadRedDeck = do
-  mountain <- loadPrinting "mountain"
-  piker <- loadPrinting "goblin-piker"
-  maiden <- loadPrinting "bird-maiden"
-  bolt <- loadPrinting "lightning-bolt"
+-- The redDeck recipe (name -> count), loaded from the registry -- the proof
+-- that files -> parse -> a real game works end-to-end.
+loadRedDeck :: Registry.Type.Registry -> IO Deck.Deck
+loadRedDeck registry = do
+  mountain <- Registry.printing registry "Mountain"
+  piker <- Registry.printing registry "Goblin Piker"
+  maiden <- Registry.printing registry "Bird Maiden"
+  bolt <- Registry.printing registry "Lightning Bolt"
   pure (Deck.MkDeck (Map.fromList [(mountain, 36), (piker, 12), (maiden, 8), (bolt, 4)]))
 
 main :: IO ()
 main = do
-  deck <- loadRedDeck
+  registry <- Registry.new "data/cards"
+  deck <- loadRedDeck registry
   Bench.defaultMain
     [ Bench.bench "goldfish 2p" $ Bench.whnf (goldfish deck) 0,
       Bench.bench "casting 2p" $ Bench.whnf (casting deck) 0,

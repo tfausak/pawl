@@ -280,7 +280,6 @@ benchmark pawl-benchmark
   build-depends:
     containers,
     tasty-bench ^>=0.5.1,
-    text ^>=2.1.3,
 
   hs-source-dirs: source/benchmark
   main-is: Main.hs
