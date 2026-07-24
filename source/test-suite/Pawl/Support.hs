@@ -31,6 +31,7 @@ import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
@@ -77,6 +78,7 @@ import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.RestartSignal as RestartSignal
 import qualified Pawl.Type.Scope as Scope
@@ -91,6 +93,7 @@ import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
+import qualified System.Directory as Directory
 import qualified System.Random as Random
 
 alice, bob :: PlayerId.PlayerId
@@ -429,9 +432,6 @@ youControlSource =
     Comparison.Exactly
     (Quantity.Literal 1)
 
-addPiker :: Cards.Cards -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
-addPiker cards = addCreature (Cards.pikerPrinting cards)
-
 -- Does a stored continuous effect target `target` specifically? Used to tell
 -- "nothing was stored FOR THIS OBJECT" apart from an unrelated entry already
 -- in play (S.giveControl's own AtCleanup SetController on the object whose
@@ -479,12 +479,12 @@ noSource = ObjectId.MkObjectId 999
 -- (creature), a Mindslaver (a Legendary Artifact -- nonland, non-creature),
 -- and a Mountain (land). Three permanents so a nonland-permanent legal set can
 -- be distinguished from both "all permanents" and "creatures only".
-boardWithCreatureArtifactLand :: Cards.Cards -> GameState.GameState
-boardWithCreatureArtifactLand cards =
+boardWithCreatureArtifactLand :: Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
+boardWithCreatureArtifactLand creature artifact land =
   let gs0 = Setup.emptyGame bothPlayers
-      (_, gs1) = addPiker cards alice gs0
-      (_, gs2) = addCreature (Cards.mindslaverPrinting cards) alice gs1
-      (_, gs3) = addCreature (Cards.mountainPrinting cards) alice gs2
+      (_, gs1) = addCreature creature alice gs0
+      (_, gs2) = addCreature artifact alice gs1
+      (_, gs3) = addCreature land alice gs2
    in gs3
 
 -- The creature on a `boardWithCreatureArtifactLand` board.
@@ -606,8 +606,8 @@ addHandCard printing pid gs =
 -- Humility on the battlefield under bob's control (it is not a creature, so
 -- a Matching (HasCardType Creature) affected set does not touch it). Returns
 -- the updated state.
-withHumility :: Cards.Cards -> GameState.GameState -> GameState.GameState
-withHumility cards gs = snd (addCreature (Cards.humilityPrinting cards) bob gs)
+withHumility :: Printing.Printing -> GameState.GameState -> GameState.GameState
+withHumility humility gs = snd (addCreature humility bob gs)
 
 -- The "target" slot's TargetSpec, read straight out of a JSON-loaded printing's
 -- spell (Modal.allTargetSpecs, keyed by SlotName) -- so a gate test exercises
@@ -643,10 +643,6 @@ landsInPlay land n =
               }
    in List.foldl' add (Setup.emptyGame bothPlayers) [1 .. n]
 
--- alice controls n untapped Mountains on the battlefield, nothing else.
-mountainsInPlay :: Cards.Cards -> Int -> GameState.GameState
-mountainsInPlay cards = landsInPlay (Cards.mountainPrinting cards)
-
 -- Put one card of a printing into alice's hand in a main phase with priority.
 handOne :: Printing.Printing -> GameState.GameState -> (GameState.GameState, ObjectId.ObjectId)
 handOne printing base =
@@ -675,15 +671,15 @@ handOne printing base =
       )
 
 -- alice has n untapped Mountains in play and one Piker in hand, in a chosen phase.
-pikerInHand :: Cards.Cards -> Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
-pikerInHand cards n ph =
-  let base = mountainsInPlay cards n
+pikerInHand :: Printing.Printing -> Printing.Printing -> Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
+pikerInHand land piker n ph =
+  let base = landsInPlay land n
       (oid, gs1) = Game.freshObjectId base
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = alice,
-            Object.source = Source.OfCard (Cards.pikerPrinting cards),
+            Object.source = Source.OfCard piker,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
@@ -703,9 +699,9 @@ pikerInHand cards n ph =
    in (gs3, oid)
 
 -- alice has n untapped Mountains in play and one Lightning Bolt in hand.
-boltInHand :: Cards.Cards -> Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
-boltInHand cards n ph =
-  let (gs, oid) = handOne (Cards.lightningBoltPrinting cards) (mountainsInPlay cards n)
+boltInHand :: Printing.Printing -> Printing.Printing -> Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
+boltInHand land bolt n ph =
+  let (gs, oid) = handOne bolt (landsInPlay land n)
    in (gs {GameState.phase = ph}, oid)
 
 -- alice is active with one Settled creature per printing in `mine`; bob defends
@@ -741,8 +737,8 @@ combatBoardOf mine theirs =
 
 -- alice is active with `a` Settled Pikers; bob defends with `b` Settled Pikers.
 -- Returns the attackers' ids and the blockers' ids alongside the state.
-combatBoard :: Cards.Cards -> Int -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
-combatBoard cards a b = combatBoardOf (replicate a (Cards.pikerPrinting cards)) (replicate b (Cards.pikerPrinting cards))
+combatBoard :: Printing.Printing -> Int -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+combatBoard piker a b = combatBoardOf (replicate a piker) (replicate b piker)
 
 -- Attack with everything, block per the given plan, then deal damage.
 fightWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
@@ -953,17 +949,14 @@ tappedCount pid gs =
 handSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 
-pikerCard :: Cards.Cards -> Card.Type.Card
-pikerCard cards = Printing.card (Cards.pikerPrinting cards)
-
 -- LABELED SYNTHETIC: an emblem's characteristics are only its abilities (CR
 -- 114.3), but pawl models no planeswalker/Ring to mint one, so tests use this
 -- fixture -- an Elspeth-style anthem, "creatures you control get +1/+1". Built
 -- by overriding a vanilla card's static abilities; the residual printed fields
 -- are inert for a command-zone object (never projected as a permanent). (#125)
-anthemEmblemCard :: Cards.Cards -> Card.Type.Card
-anthemEmblemCard cards =
-  (Printing.card (Cards.pikerPrinting cards))
+anthemEmblemCard :: Printing.Printing -> Card.Type.Card
+anthemEmblemCard piker =
+  (Printing.card piker)
     { Card.Type.staticAbilities =
         [ StaticAbility.MkStaticAbility
             { StaticAbility.affected =
@@ -976,24 +969,25 @@ anthemEmblemCard cards =
         ]
     }
 
--- The printings M2a adds, paired with the single keyword each must carry.
-m2aPrintings :: Cards.Cards -> [(Printing.Printing, Keyword.Keyword)]
-m2aPrintings cards =
-  [ (Cards.birdMaidenPrinting cards, Keyword.Flying),
-    (Cards.nimbleBirdstickerPrinting cards, Keyword.Reach),
-    (Cards.ogreSentryPrinting cards, Keyword.Defender),
-    (Cards.windseekerCentaurPrinting cards, Keyword.Vigilance),
-    (Cards.goblinChariotPrinting cards, Keyword.Haste)
+-- The cards M2a adds, paired with the single keyword each must carry. Named
+-- rather than loaded here so Pawl.Support stays pure: the caller loads them.
+m2aKeywords :: [(String, Keyword.Keyword)]
+m2aKeywords =
+  [ ("Bird Maiden", Keyword.Flying),
+    ("Nimble Birdsticker", Keyword.Reach),
+    ("Ogre Sentry", Keyword.Defender),
+    ("Windseeker Centaur", Keyword.Vigilance),
+    ("Goblin Chariot", Keyword.Haste)
   ]
 
 -- A GameState with a single Mountain in alice's hand, in a chosen phase.
-oneMountainState :: Cards.Cards -> Phase.Phase -> GameState.GameState
-oneMountainState cards ph =
+oneMountainState :: Printing.Printing -> Phase.Phase -> GameState.GameState
+oneMountainState mountain ph =
   let oid = ObjectId.MkObjectId 0
       obj =
         Object.MkObject
           { Object.owner = alice,
-            Object.source = Source.OfCard (Cards.mountainPrinting cards),
+            Object.source = Source.OfCard mountain,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
@@ -1046,13 +1040,13 @@ drawStep = Engine.runTurnBasedActions (Phase.Beginning BeginningStep.DrawStep)
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer
 -- (lookupMin prefers ToCreature over ToPlayer, and the Piker is the only
 -- creature). Returns (pre-cast state, post-cast state, Bolt's hand id).
-boltAtBobsPiker :: Cards.Cards -> (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
-boltAtBobsPiker cards =
-  let (_, withPiker) = addPiker cards bob (mountainsInPlay cards 1)
-      (gs, oid) = handOne (Cards.lightningBoltPrinting cards) withPiker
+boltAtBobsPiker :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
+boltAtBobsPiker piker land bolt =
+  let (_, withPiker) = addCreature piker bob (landsInPlay land 1)
+      (gs, oid) = handOne bolt withPiker
    in (gs, snd (Engine.runGamePure identityAnswer gs (Cast.castSpell alice oid)), oid)
 
--- The single creature bob controls in a fixture built by (addPiker cards).
+-- The single creature bob controls in a fixture built by (addCreature piker bob).
 pikerOf :: GameState.GameState -> ObjectId.ObjectId
 pikerOf gs = case Game.zoneMembers Zone.Battlefield bob gs of
   oid : _ -> oid
@@ -1106,3 +1100,17 @@ stubView table oid =
                 Filter.identity = Just o
               }
         [] -> Nothing
+
+-- Every card file in a registry's root, by slug. The corpus-wide checks need
+-- the directory listing rather than a hand-kept list: a file nobody loads is
+-- exactly the file a hand-kept list forgets.
+corpusSlugs :: Registry.Type.Registry -> IO [String]
+corpusSlugs registry = do
+  entries <- Directory.listDirectory (Registry.Type.root registry)
+  let stem name = take (length name - 5) name
+  pure (List.sort (fmap stem (filter (List.isSuffixOf ".json") entries)))
+
+allPrintings :: Registry.Type.Registry -> IO [Printing.Printing]
+allPrintings registry = do
+  slugs <- corpusSlugs registry
+  mapM (Registry.printing registry) slugs

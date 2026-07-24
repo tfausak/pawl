@@ -510,7 +510,7 @@ storedTests cards =
           base
       -- A real permanent on the battlefield, so the effect's condition can
       -- genuinely hold rather than being false by construction.
-      (srcId, withSrc) = S.addPiker cards S.alice base
+      (srcId, withSrc) = S.addCreature (Cards.pikerPrinting cards) S.alice base
       conditional =
         addPlayerEffectAt
           srcId

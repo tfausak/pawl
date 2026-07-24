@@ -106,9 +106,9 @@ manaTests cards =
         HU.assertEqual "island" (Just (ManaType.Colored Color.Blue)) (Mana.subtypeMana Subtype.Island)
         HU.assertEqual "plains" (Just (ManaType.Colored Color.White)) (Mana.subtypeMana Subtype.Plains),
       HU.testCase "an empty pool starts empty" $
-        HU.assertEqual "empty" 0 (poolSize S.alice (S.mountainsInPlay cards 2)),
+        HU.assertEqual "empty" 0 (poolSize S.alice (S.landsInPlay (Cards.mountainPrinting cards) 2)),
       HU.testCase "tapping a Mountain taps it and adds one red unit" $
-        let gs = S.mountainsInPlay cards 1
+        let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
               [] -> HU.assertFailure "fixture should have one Mountain"
               oid : _ -> do
@@ -119,19 +119,19 @@ manaTests cards =
                   (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red}])
                   (Mana.poolOf S.alice after),
       HU.testCase "two Mountains can pay {1}{R}" $
-        HU.assertBool "affordable" (Mana.canPay S.alice pikerCost (S.mountainsInPlay cards 2)),
+        HU.assertBool "affordable" (Mana.canPay S.alice pikerCost (S.landsInPlay (Cards.mountainPrinting cards) 2)),
       HU.testCase "one Mountain cannot pay {1}{R}" $
-        HU.assertBool "unaffordable" (not (Mana.canPay S.alice pikerCost (S.mountainsInPlay cards 1))),
+        HU.assertBool "unaffordable" (not (Mana.canPay S.alice pikerCost (S.landsInPlay (Cards.mountainPrinting cards) 1))),
       HU.testCase "no Mountains cannot pay {1}{R}" $
-        HU.assertBool "unaffordable" (not (Mana.canPay S.alice pikerCost (S.mountainsInPlay cards 0))),
+        HU.assertBool "unaffordable" (not (Mana.canPay S.alice pikerCost (S.landsInPlay (Cards.mountainPrinting cards) 0))),
       HU.testCase "paying {1}{R} taps exactly two of three Mountains and leaves no float" $
-        case Mana.payCost S.alice pikerCost (S.mountainsInPlay cards 3) of
+        case Mana.payCost S.alice pikerCost (S.landsInPlay (Cards.mountainPrinting cards) 3) of
           Nothing -> HU.assertFailure "three Mountains should pay {1}{R}"
           Just after -> do
             HU.assertEqual "tapped" 2 (S.tappedCount S.alice after)
             HU.assertEqual "no float" 0 (poolSize S.alice after),
       HU.testCase "CR 500.4 mana pools empty" $
-        let gs = S.mountainsInPlay cards 1
+        let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
               [] -> HU.assertFailure "fixture should have one Mountain"
               oid : _ ->

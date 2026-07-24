@@ -207,7 +207,7 @@ tests cards =
         HU.testCase "CR 614.1a a redirect that no longer matches its own pattern cannot re-fire" $
           let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
               (_, g1) = S.addCreature (Cards.restInPeacePrinting cards) S.alice g0
-              (piker, g2) = S.addPiker cards S.bob g1
+              (piker, g2) = S.addCreature (Cards.pikerPrinting cards) S.bob g1
               after = S.runPure S.identityAnswer g2 (Event.changeZone piker Zone.Graveyard)
            in do
                 HU.assertEqual "not in a graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
@@ -215,12 +215,12 @@ tests cards =
         HU.testCase "CR 616.1 value-equal candidates elide the prompt (nothing to choose)" $
           let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
               (_, g1) = S.addCreature (Cards.restInPeacePrinting cards) S.alice g0
-              (piker, g2) = S.addPiker cards S.bob g1
+              (piker, g2) = S.addCreature (Cards.pikerPrinting cards) S.bob g1
               asked = answersFor S.identityAnswer g2 (Event.changeZone piker Zone.Graveyard)
            in HU.assertBool "no ChooseReplacement was raised" (not (wasAskedToReplace asked)),
         HU.testCase "CR 614.1a a move whose destination the pattern misses is untouched" $
           let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-              (piker, g1) = S.addPiker cards S.bob g0
+              (piker, g1) = S.addCreature (Cards.pikerPrinting cards) S.bob g0
               -- Rest in Peace watches graveyard-bound moves only; a bounce to hand
               -- is not one, so the loop finds no candidate and the move stands.
               after = S.runPure S.identityAnswer g1 (Event.changeZone piker Zone.Hand)
@@ -340,7 +340,7 @@ tests cards =
                 _ -> HU.assertFailure "fixture did not build both sides",
         HU.testCase "CR 707.5 declining the copy leaves a 0/0 that dies (CR 704.5f)" $
           let base = S.landsInPlay (Cards.islandPrinting cards) 4
-              (_, withPiker) = S.addPiker cards S.alice base
+              (_, withPiker) = S.addCreature (Cards.pikerPrinting cards) S.alice base
               (gs, cloneId) = S.handOne (Cards.clonePrinting cards) withPiker
               -- S.identityAnswer declines ChooseCopyTarget (Clone's own "may").
               resolved = S.runPure S.identityAnswer gs (Cast.castSpell S.alice cloneId >> Stack.resolveTop >> Engine.settleForPriority)
@@ -348,7 +348,7 @@ tests cards =
            in HU.assertEqual "the 0/0 Clone is gone" [] named,
         HU.testCase "CR 614.12a the copy choice is locked in BEFORE the enters event exists" $
           let base = S.landsInPlay (Cards.islandPrinting cards) 4
-              (piker, withPiker) = S.addPiker cards S.alice base
+              (piker, withPiker) = S.addCreature (Cards.pikerPrinting cards) S.alice base
               (gs, cloneId) = S.handOne (Cards.clonePrinting cards) withPiker
               -- No settle: the choice must already be made when resolveTop returns.
               resolved = S.runPure (copyOf piker) gs (Cast.castSpell S.alice cloneId >> Stack.resolveTop)
@@ -426,7 +426,7 @@ tests cards =
         -- option, seeded via S.addReplacement) rather than a synthetic card
         -- file: no printed card in the pool has a single-option choice.
         HU.testCase "CR 208.2b a single-option ChoiceOf is not a choice and must not prompt" $
-          let (piker, g1) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+          let (piker, g1) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
               (ts, g2) = Game.freshTimestamp g1
               onlyOption = EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}
               active =

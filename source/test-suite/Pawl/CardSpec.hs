@@ -122,7 +122,12 @@ m2aCardTests cards =
             . HU.assertBool "creatures"
             $ all
               (\(p, _) -> Card.isCreature (card p) && not (Card.isLand (card p)))
-              (S.m2aPrintings cards)
+              [ (Cards.birdMaidenPrinting cards, Keyword.Flying),
+                (Cards.nimbleBirdstickerPrinting cards, Keyword.Reach),
+                (Cards.ogreSentryPrinting cards, Keyword.Defender),
+                (Cards.windseekerCentaurPrinting cards, Keyword.Vigilance),
+                (Cards.goblinChariotPrinting cards, Keyword.Haste)
+              ]
         ]
 
 cardTests :: Cards.Cards -> Tasty.TestTree
@@ -146,26 +151,26 @@ cardTests cards =
         HU.assertEqual "power" Nothing (Card.Type.power (Printing.card (Cards.mountainPrinting cards)))
         HU.assertEqual "toughness" Nothing (Card.Type.toughness (Printing.card (Cards.mountainPrinting cards))),
       HU.testCase "Piker printing is named Goblin Piker" $
-        HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name (S.pikerCard cards)),
+        HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.Type.name (Printing.card (Cards.pikerPrinting cards))),
       HU.testCase "Piker costs {1}{R}" $
         HU.assertEqual
           "cost"
           (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]))
-          (Card.Type.manaCost (S.pikerCard cards)),
+          (Card.Type.manaCost (Printing.card (Cards.pikerPrinting cards))),
       HU.testCase "Piker is a 2/1" $ do
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (S.pikerCard cards))
-        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness (S.pikerCard cards)),
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power (Printing.card (Cards.pikerPrinting cards)))
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness (Printing.card (Cards.pikerPrinting cards))),
       HU.testCase "Piker is a Goblin Warrior" $
         HU.assertEqual
           "subtypes"
           (Set.fromList [Subtype.Goblin, Subtype.Warrior])
-          (TypeLine.subtypes (Card.Type.typeLine (S.pikerCard cards))),
+          (TypeLine.subtypes (Card.Type.typeLine (Printing.card (Cards.pikerPrinting cards)))),
       HU.testCase "Piker is a creature and not a land" $ do
-        HU.assertBool "creature" (Card.isCreature (S.pikerCard cards))
-        HU.assertBool "not land" (not (Card.isLand (S.pikerCard cards))),
+        HU.assertBool "creature" (Card.isCreature (Printing.card (Cards.pikerPrinting cards)))
+        HU.assertBool "not land" (not (Card.isLand (Printing.card (Cards.pikerPrinting cards)))),
       -- CR 110.1: the classification resolution turns on. Never card identity.
       HU.testCase "CR 110.1 both a Piker and a Mountain are permanents" $ do
-        HU.assertBool "piker" (Card.isPermanent (S.pikerCard cards))
+        HU.assertBool "piker" (Card.isPermanent (Printing.card (Cards.pikerPrinting cards)))
         HU.assertBool "mountain" (Card.isPermanent (Printing.card (Cards.mountainPrinting cards))),
       HU.testCase "CR 110.1 an instant is not a permanent type" $
         let instantLine =
@@ -199,7 +204,7 @@ cardTests cards =
               HU.assertBool "not a permanent" (not (Card.isPermanent card))
               HU.assertBool "an instant" (Card.isInstant card),
       HU.testCase "a Piker is not an instant" $
-        HU.assertBool "creature" (not (Card.isInstant (S.pikerCard cards)))
+        HU.assertBool "creature" (not (Card.isInstant (Printing.card (Cards.pikerPrinting cards))))
     ]
 
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested

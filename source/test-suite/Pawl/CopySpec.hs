@@ -66,7 +66,7 @@ tests cards =
     "Copy"
     [ HU.testCase "Clone copies a creature and projects its P/T (CR 707.2)" $
         let gs0 = Setup.emptyGame S.bothPlayers
-            (pikerId, board) = S.addPiker cards S.alice gs0
+            (pikerId, board) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
             resolved = resolveAndSettle copyNewest staged
          in case cloneOnBattlefield resolved of
@@ -83,7 +83,7 @@ tests cards =
          in HU.assertEqual "the 0/0 Clone is gone (state-based action)" Nothing (cloneOnBattlefield resolved),
       HU.testCase "Clone copies base P/T, not a counter-boosted P/T (CR 707.2 falsifier)" $
         let gs0 = Setup.emptyGame S.bothPlayers
-            (pikerId, board0) = S.addPiker cards S.alice gs0
+            (pikerId, board0) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             -- Put a +1/+1 counter on the Piker: projected 3/2, base 2/1.
             board = S.addCounter CounterKind.PlusOnePlusOne 1 pikerId board0
             (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
@@ -107,7 +107,7 @@ tests cards =
                   (not (null (Projection.abilitiesOf cloneId resolved))),
       HU.testCase "a copy of a copy resolves to the underlying creature (self-reference)" $
         let gs0 = Setup.emptyGame S.bothPlayers
-            (_, board) = S.addPiker cards S.alice gs0
+            (_, board) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             (_, stagedA) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
             afterA = resolveAndSettle copyNewest stagedA
             (_, stagedB) = S.spellOnStack (Cards.clonePrinting cards) S.alice afterA
@@ -121,7 +121,7 @@ tests cards =
                 HU.assertBool "the copy-of-a-copy is a creature" (Projection.isCreatureOf bId afterB),
       HU.testCase "a copy survives its source leaving the battlefield (CR 707.5 lock)" $
         let gs0 = Setup.emptyGame S.bothPlayers
-            (pikerId, board) = S.addPiker cards S.alice gs0
+            (pikerId, board) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board
             resolved = resolveAndSettle copyNewest staged
             afterKill = S.runPure S.identityAnswer resolved (Event.destroy pikerId)

@@ -52,7 +52,7 @@ tests cards =
          in HU.assertEqual "black" (Set.singleton Color.Black) (Projection.colorsOf ratsId gs),
       HU.testCase "CR 202.2 a generic-plus-red cost is red, and generic contributes nothing" $
         let gs0 = Setup.emptyGame S.bothPlayers
-            (pikerId, gs) = S.addPiker cards S.alice gs0
+            (pikerId, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
          in HU.assertEqual "red" (Set.singleton Color.Red) (Projection.colorsOf pikerId gs),
       HU.testCase "CR 202.2b an object with no coloured mana symbols is colourless" $
         let gs0 = Setup.emptyGame S.bothPlayers
@@ -89,7 +89,7 @@ tests cards =
         let gs0 = Setup.emptyGame S.bothPlayers
             (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice gs0
             (ratsId, withRats) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice withMoon
-            (pikerId, gs) = S.addPiker cards S.alice withRats
+            (pikerId, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice withRats
          in do
               HU.assertEqual "the black Rats are 2/2" (Just 2) (Projection.powerOf ratsId gs)
               HU.assertEqual "the red Piker is unchanged at 2" (Just 2) (Projection.powerOf pikerId gs)
@@ -106,7 +106,7 @@ tests cards =
       HU.testCase "CR 613 a layer-5 colour change moves a creature INTO Bad Moon's set" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice gs0
-            (pikerId, board) = S.addPiker cards S.alice withMoon
+            (pikerId, board) = S.addCreature (Cards.pikerPrinting cards) S.alice withMoon
             gs = S.withEffect pikerId (Modification.SetColor (Set.singleton Color.Black)) board
          in HU.assertEqual "the now-black Piker is 3/2" (Just 3) (Projection.powerOf pikerId gs),
       HU.testCase "CR 111.3 a token's colour comes from the effect that created it" $
@@ -120,7 +120,7 @@ tests cards =
         -- (proven: even after Step 3's data fix, the empty-binding path still
         -- makes zero tokens). This needs a real cast, mirroring ResolveSpec's
         -- "CR 111 Dragon Fodder creates two 1/1 Goblin tokens".
-        let base = S.mountainsInPlay cards 2
+        let base = S.landsInPlay (Cards.mountainPrinting cards) 2
             (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice base
             (gs, spellId) = S.handOne (Cards.dragonFodderPrinting cards) withMoon
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
@@ -138,7 +138,7 @@ tests cards =
       HU.testCase "CR 115.1a a black creature is not a legal 'target nonblack creature'" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (ratsId, withRats) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice gs0
-            (pikerId, gs) = S.addPiker cards S.alice withRats
+            (pikerId, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice withRats
             legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource) gs
          in do
               HU.assertBool "the red Piker is legal" (Set.member (Recipient.ToCreature pikerId) legal)
@@ -177,7 +177,7 @@ tests cards =
       HU.testCase "Aphotic Wisps makes a creature black, the mirror of Crimson Wisps" $
         let base = S.landsInPlay (Cards.swampPrinting cards) 1
             (_, withMoon) = S.addCreature (Cards.badMoonPrinting cards) S.alice base
-            (pikerId, board) = S.addPiker cards S.alice withMoon
+            (pikerId, board) = S.addCreature (Cards.pikerPrinting cards) S.alice withMoon
             (gs, awId) = S.handOne (Cards.aphoticWispsPrinting cards) board
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice awId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)

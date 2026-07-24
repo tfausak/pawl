@@ -123,7 +123,7 @@ cleanupTests cards =
               HU.assertEqual "one survives" [Expiry.Type.Never] (fmap ContinuousEffect.expiry (GameState.continuousEffects after)),
       HU.testCase "CR 514.2 the same sweep drops an AtCleanup floating replacement" $
         let gs0 = Setup.emptyGame S.bothPlayers
-            (oid, gs1) = S.addPiker cards S.alice gs0
+            (oid, gs1) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             shielded = S.addRegenShield oid gs1
             after = Expiry.dropAtCleanup shielded
          in do
@@ -176,7 +176,7 @@ conditionalTests :: Cards.Cards -> Tasty.TestTree
 conditionalTests cards =
   let board =
         let gs0 = Setup.emptyGame S.bothPlayers
-            (srcId, gs1) = S.addPiker cards S.alice gs0
+            (srcId, gs1) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             (targetId, gs2) = S.addCreature (Cards.warMammothPrinting cards) S.bob gs1
          in (srcId, targetId, whileEffect srcId targetId S.alice gs2)
    in Tasty.testGroup

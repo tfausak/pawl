@@ -73,7 +73,7 @@ objectFactTests cards =
   Tasty.testGroup
     "ObjectFacts"
     [ HU.testCase "a Piker's power and toughness are 2 and 1" $
-        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
          in do
               HU.assertEqual "power" (Just 2) (Projection.powerOf oid gs)
               HU.assertEqual "toughness" (Just 1) (Projection.toughnessOf oid gs),
@@ -87,7 +87,7 @@ objectFactTests cards =
       HU.testCase "CR 112.1 isSpell is True for a spell on the stack, False off it" $
         let base = Setup.emptyGame S.bothPlayers
             (spellId, gs1) = S.spellOnStack (Cards.pikerPrinting cards) S.alice base
-            (permId, gs2) = S.addPiker cards S.bob gs1
+            (permId, gs2) = S.addCreature (Cards.pikerPrinting cards) S.bob gs1
             tokenCard = Printing.card (Cards.pikerPrinting cards)
             (tokId, gs3) = S.addToken tokenCard S.bob gs2
          in do
@@ -95,14 +95,14 @@ objectFactTests cards =
               HU.assertBool "a battlefield permanent is not a spell" (not (Game.isSpell permId gs3))
               HU.assertBool "a token is not a spell" (not (Game.isSpell tokId gs3)),
       HU.testCase "a Mountain has no power or toughness" $
-        let gs = S.mountainsInPlay cards 1
+        let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
               [] -> HU.assertFailure "fixture should have one Mountain"
               oid : _ -> do
                 HU.assertEqual "power" Nothing (Projection.powerOf oid gs)
                 HU.assertEqual "toughness" Nothing (Projection.toughnessOf oid gs),
       HU.testCase "controllerOf is the owner while nothing can change control" $
-        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual "controller" (Just S.bob) (Projection.controllerOf oid gs),
       HU.testCase "an unknown id has no facts" $
         let gs = Setup.emptyGame S.bothPlayers
@@ -114,7 +114,7 @@ objectFactTests cards =
 
 gameTests :: Cards.Cards -> Tasty.TestTree
 gameTests cards =
-  let after = S.runPure S.identityAnswer (S.oneMountainState cards Phase.PrecombatMain) (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
+  let after = S.runPure S.identityAnswer (S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain) (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
    in Tasty.testGroup
         "Game"
         [ HU.testCase "changeZone preserves object count" $
@@ -141,7 +141,7 @@ gameTests cards =
               )
               (Game.lookupObject (ObjectId.MkObjectId 1) after),
           HU.testCase "CR 400.7 changeZone forgets a spell's bindings" $
-            let base = S.oneMountainState cards Phase.PrecombatMain
+            let base = S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain
                 slot = SlotName.MkSlotName (Text.pack "target")
                 stamped =
                   base
@@ -155,7 +155,7 @@ gameTests cards =
                 landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
              in HU.assertEqual "reset" [Map.empty] (fmap Object.bindings landed),
           HU.testCase "CR 400.7 changeZone resets a word-swap binding" $
-            let base = S.oneMountainState cards Phase.PrecombatMain
+            let base = S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain
                 slot = SlotName.MkSlotName (Text.pack "target")
                 stamped =
                   base
@@ -169,7 +169,7 @@ gameTests cards =
                 newObj = Game.lookupObject (ObjectId.MkObjectId 1) moved
              in HU.assertEqual "reset to empty" (Just Map.empty) (fmap Object.bindings newObj),
           HU.testCase "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $
-            let (oid, gs) = S.addPiker cards S.bob (S.mountainsInPlay cards 1)
+            let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (S.landsInPlay (Cards.mountainPrinting cards) 1)
                 before = GameState.nextTimestamp gs
                 movedState = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
                 movedId = case Game.zoneMembers Zone.Graveyard S.bob movedState of
@@ -184,7 +184,7 @@ gameTests cards =
           HU.testCase "a fresh game has no continuous effects" $
             HU.assertEqual "empty" [] (GameState.continuousEffects (Setup.emptyGame S.bothPlayers)),
           HU.testCase "a vanilla printing declares no static abilities" $
-            HU.assertEqual "empty" [] (Card.Type.staticAbilities (S.pikerCard cards))
+            HU.assertEqual "empty" [] (Card.Type.staticAbilities (Printing.card (Cards.pikerPrinting cards)))
         ]
 
 actionTests :: Cards.Cards -> Tasty.TestTree
@@ -192,13 +192,13 @@ actionTests cards =
   Tasty.testGroup
     "Action"
     [ HU.testCase "a land in hand is playable in a main phase" $
-        HU.assertBool "play" (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice (S.oneMountainState cards Phase.PrecombatMain)),
+        HU.assertBool "play" (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice (S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain)),
       HU.testCase "passing is always legal" $
-        HU.assertBool "pass" (A.Pass `elem` Action.legalActions S.alice (S.oneMountainState cards Phase.PrecombatMain)),
+        HU.assertBool "pass" (A.Pass `elem` Action.legalActions S.alice (S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain)),
       HU.testCase "no land play outside a main phase" $
-        HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice (S.oneMountainState cards (Phase.Beginning BeginningStep.Upkeep))),
+        HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice (S.oneMountainState (Cards.mountainPrinting cards) (Phase.Beginning BeginningStep.Upkeep))),
       HU.testCase "no second land after one is played" $
-        let gs = (S.oneMountainState cards Phase.PrecombatMain) {GameState.landPlayed = Set.singleton S.alice}
+        let gs = (S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain) {GameState.landPlayed = Set.singleton S.alice}
          in HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice gs)
     ]
 
@@ -314,7 +314,7 @@ recordingAnswer p = case p of
 -- [alice, bob] and both players are in the players map.
 askedPlayers :: Cards.Cards -> [PlayerId.PlayerId]
 askedPlayers cards =
-  let (gs, _) = S.pikerInHand cards 3 Phase.PrecombatMain
+  let (gs, _) = S.pikerInHand (Cards.mountainPrinting cards) (Cards.pikerPrinting cards) 3 Phase.PrecombatMain
    in State.execState
         (Program.foldProgramM recordingAnswer (State.runStateT Engine.priorityLoop gs))
         []
@@ -327,7 +327,7 @@ ruleTests cards =
         -- With a spell on the stack, everyone passing must RESOLVE it and keep
         -- the step alive. Under M0's rule the step would simply end with the
         -- spell still sitting on the stack.
-        let (gs, oid) = S.pikerInHand cards 3 Phase.PrecombatMain
+        let (gs, oid) = S.pikerInHand (Cards.mountainPrinting cards) (Cards.pikerPrinting cards) 3 Phase.PrecombatMain
             steps = do
               Cast.castSpell S.alice oid
               Engine.priorityLoop

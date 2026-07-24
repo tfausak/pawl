@@ -80,16 +80,16 @@ gateTests cards =
   Tasty.testGroup
     "Gate"
     [ HU.testCase "CR 608.2c mode 1 (damage) deals 1 to the chosen creature" $
-        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
-            (pikerOid, gs1) = S.addPiker cards S.bob gs0
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.landsInPlay (Cards.mountainPrinting cards) 1)
+            (pikerOid, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
             answer :: Prompt.Prompt r -> r
             answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
             cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
             after = snd (Engine.runGamePure answer cast Stack.resolveTop)
          in HU.assertEqual "1 damage marked" (Just 1) (S.damageOf pikerOid after),
       HU.testCase "CR 608.2c mode 2 (haste) grants haste to the chosen (summoning-sick) creature" $
-        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
-            (creatureId, gs1) = S.addPiker cards S.alice gs0
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.landsInPlay (Cards.mountainPrinting cards) 1)
+            (creatureId, gs1) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             sick = gs1 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) creatureId (GameState.objects gs1)}
             answer :: Prompt.Prompt r -> r
             answer = chooseModeAt (ModeIndex.MkModeIndex 2) (Recipient.ToCreature creatureId)
@@ -97,7 +97,7 @@ gateTests cards =
             after = snd (Engine.runGamePure answer cast Stack.resolveTop)
          in HU.assertBool "projected keywords include Haste" (Projection.hasKeyword Keyword.Haste creatureId after),
       HU.testCase "CR 608.2c mode 0 (destroy Wall) destroys the chosen Wall" $
-        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.landsInPlay (Cards.mountainPrinting cards) 1)
             (wallId, gs1) = S.addCreature (Cards.wallOfStonePrinting cards) S.bob gs0
             answer :: Prompt.Prompt r -> r
             answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToCreature wallId)
@@ -118,8 +118,8 @@ falsifierTests cards =
   Tasty.testGroup
     "Falsifier"
     [ HU.testCase "CR 700.2c/601.2c castable via the damage/haste modes with no Wall on the board" $
-        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
-            (_, gs1) = S.addPiker cards S.bob gs0
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.landsInPlay (Cards.mountainPrinting cards) 1)
+            (_, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
          in do
               HU.assertBool "castable" (Cast.castable S.alice oid gs1)
               HU.assertEqual
@@ -135,8 +135,8 @@ onlyChosenModeTests cards =
   Tasty.testGroup
     "OnlyChosenModeTargets"
     [ HU.testCase "casting the damage mode binds the 'creature' slot, never 'wall'" $
-        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
-            (pikerOid, gs1) = S.addPiker cards S.bob gs0
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.landsInPlay (Cards.mountainPrinting cards) 1)
+            (pikerOid, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
             answer :: Prompt.Prompt r -> r
             answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
             cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
@@ -156,8 +156,8 @@ fizzleTests cards =
   Tasty.testGroup
     "Fizzle"
     [ HU.testCase "CR 608.2b the damage mode fizzles when its only target leaves before resolution" $
-        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.mountainsInPlay cards 1)
-            (pikerOid, gs1) = S.addPiker cards S.bob gs0
+        let (gs0, oid) = S.handOne (Cards.chaosCharmPrinting cards) (S.landsInPlay (Cards.mountainPrinting cards) 1)
+            (pikerOid, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
             answer :: Prompt.Prompt r -> r
             answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
             cast = snd (Engine.runGamePure answer gs1 (Cast.castSpell S.alice oid))
@@ -181,7 +181,7 @@ forcedTests cards =
         -- shape as ResolveSpec's "CR 120.3a a Bolt at a player drains life
         -- without marking"). The point of this test is that ChooseModes is never
         -- reached at all -- if it were, neverAskModes's error would fire.
-        let (gs0, oid) = S.boltInHand cards 1 Phase.PrecombatMain
+        let (gs0, oid) = S.boltInHand (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards) 1 Phase.PrecombatMain
             cast = snd (Engine.runGamePure neverAskModes gs0 (Cast.castSpell S.alice oid))
             after = snd (Engine.runGamePure neverAskModes cast Stack.resolveTop)
          in HU.assertEqual "alice at 17 (Bolt resolved, forced/unprompted mode selection)" (Just 17) (S.lifeOf S.alice after)
@@ -195,14 +195,14 @@ nonlandPermanentTargetTests cards =
   Tasty.testGroup
     "M4h NonlandPermanentTarget"
     [ HU.testCase "NonlandPermanentTarget excludes lands (CR 109.2/110.4)" $
-        let gs = S.boardWithCreatureArtifactLand cards
+        let gs = S.boardWithCreatureArtifactLand (Cards.pikerPrinting cards) (Cards.mindslaverPrinting cards) (Cards.mountainPrinting cards)
             got = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource) gs
          in HU.assertEqual
               "two nonland permanents, no land"
               (Set.fromList [Recipient.ToObject (S.creatureId gs), Recipient.ToObject (S.artifactId gs)])
               got,
       HU.testCase "legalSetsExcluding drops the source (CR \"another\")" $
-        let gs = S.boardWithCreatureArtifactLand cards
+        let gs = S.boardWithCreatureArtifactLand (Cards.pikerPrinting cards) (Cards.mindslaverPrinting cards) (Cards.mountainPrinting cards)
             specs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource)
             got = Target.legalSetsExcluding (S.creatureId gs) specs gs
          in HU.assertEqual
@@ -249,9 +249,9 @@ activationModalTests cards =
     [ HU.testCase "activating a modal ability prompts the mode; only the chosen mode resolves" $
         case Card.Type.activatedAbilities (Printing.card (Cards.syntheticModalActivatedPrinting cards)) of
           [ability] ->
-            let gs0 = S.mountainsInPlay cards 1
+            let gs0 = S.landsInPlay (Cards.mountainPrinting cards) 1
                 (srcId, gs1) = S.addCreature (Cards.syntheticModalActivatedPrinting cards) S.alice gs0
-                (victimId, gs2) = S.addPiker cards S.bob gs1
+                (victimId, gs2) = S.addCreature (Cards.pikerPrinting cards) S.bob gs1
                 answer :: Prompt.Prompt r -> r
                 answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToCreature victimId)
                 activated = snd (Engine.runGamePure answer gs2 (Activate.activateAbility S.alice srcId ability))
@@ -265,9 +265,9 @@ activationModalTests cards =
       HU.testCase "CR 608.2b the chosen mode fizzles when its only target leaves before resolution" $
         case Card.Type.activatedAbilities (Printing.card (Cards.syntheticModalActivatedPrinting cards)) of
           [ability] ->
-            let gs0 = S.mountainsInPlay cards 1
+            let gs0 = S.landsInPlay (Cards.mountainPrinting cards) 1
                 (srcId, gs1) = S.addCreature (Cards.syntheticModalActivatedPrinting cards) S.alice gs0
-                (victimId, gs2) = S.addPiker cards S.bob gs1
+                (victimId, gs2) = S.addCreature (Cards.pikerPrinting cards) S.bob gs1
                 answer :: Prompt.Prompt r -> r
                 answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToCreature victimId)
                 activated = snd (Engine.runGamePure answer gs2 (Activate.activateAbility S.alice srcId ability))
@@ -320,7 +320,7 @@ triggerModalTests cards =
                     _ -> HU.assertFailure "expected exactly one new (Bird token) permanent",
           HU.testCase "bounce mode ({1}) returns another nonland permanent to its owner's hand (CR 601.2c)" $
             let (_, gs1) = etb S.alice (Setup.emptyGame S.bothPlayers)
-                (victimId, gs2) = S.addPiker cards S.bob gs1
+                (victimId, gs2) = S.addCreature (Cards.pikerPrinting cards) S.bob gs1
                 answer :: Prompt.Prompt r -> r
                 answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToObject victimId)
                 placed = snd (Engine.runGamePure answer gs2 Engine.placePendingTriggers)
@@ -381,7 +381,7 @@ triggerModalTests cards =
           -- exercise this path -- spec sec 9).
           HU.testCase "no legal mode removes the trigger from the stack (CR 603.3c)" $
             let smtPrinting = Cards.syntheticModalTriggerPrinting cards
-                gs0 = S.mountainsInPlay cards 2
+                gs0 = S.landsInPlay (Cards.mountainPrinting cards) 2
                 (smtId, gs1) = S.addCreature smtPrinting S.alice gs0
                 entered = ZoneChange.MkZoneChange smtId Zone.Stack Zone.Battlefield
                 gs2 = S.withEvent (GameEvent.Moved entered (Projection.project smtId gs1)) gs1

@@ -110,7 +110,7 @@ skipTests cards =
         -- bob holds a castable Bolt; nobody attacks. The blockers and damage
         -- steps are still dropped -- the priority windows an instant would use
         -- in them do not exist (CR 500.11: proceed as though they don't).
-        let (base, _) = S.boltInHand cards 1 (Phase.Combat CombatStep.DeclareAttackers)
+        let (base, _) = S.boltInHand (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards) 1 (Phase.Combat CombatStep.DeclareAttackers)
             armed = base {GameState.activePlayer = S.bob}
             after = snd (Engine.runGamePure S.identityAnswer armed (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers)))
             remaining = foldr (:) [] (GameState.remaining after)

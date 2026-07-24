@@ -78,7 +78,7 @@ logTests cards =
       -- LEFT. Re-deriving from the printed card would be wrong for an animated
       -- land and impossible for a token (CR 111.1).
       HU.testCase "CR 608.2h a Moved event snapshots the object it moved" $
-        let (piker, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (piker, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             expected = Projection.project piker gs
             after = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
          in case Foldable.toList (GameState.events after) of
@@ -95,7 +95,7 @@ logTests cards =
               HU.assertBool "the damage events are still recorded" (not (null (S.damageEventsOf after))),
       HU.testCase "CR 117.5 the trigger scan advances its watermark but keeps the record" $
         let (_, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            (piker, gs1) = S.addPiker cards S.bob gs
+            (piker, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs
             moved = S.runPure S.identityAnswer gs1 (Event.changeZone piker Zone.Hand)
             scanned = snd (Engine.runGamePure S.identityAnswer moved Engine.placePendingTriggers)
          in do
@@ -104,7 +104,7 @@ logTests cards =
       -- The turn is the log's scope (CR 608.2i). Clearing at cleanup would be
       -- wrong: cleanup is still part of THIS turn.
       HU.testCase "the log and both watermarks are cleared at turn handoff" $
-        let (piker, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (piker, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             moved = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
             after = snd (Engine.runGamePure S.identityAnswer moved Engine.handoffTurn)
          in do
@@ -168,7 +168,7 @@ scanTests cards =
       -- Peace is on the battlefield and a DIFFERENT object entered.
       HU.testCase "CR 603.6a a SelfEnters trigger does not fire on another object's entry" $
         let (_, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            (piker, gs1) = S.addPiker cards S.bob gs0
+            (piker, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
             entered = ZoneChange.MkZoneChange piker Zone.Stack Zone.Battlefield
             gs2 = S.withEvent (GameEvent.Moved entered (Projection.project piker gs1)) gs1
          in HU.assertEqual "no trigger" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2))),
@@ -237,7 +237,7 @@ sacrificeTests cards =
   Tasty.testGroup
     "Sacrifice"
     [ HU.testCase "CR 701.21a a sacrificed permanent goes to its owner's graveyard" $
-        let (piker, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (piker, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
          in do
               HU.assertEqual "off the battlefield" 0 (S.creaturesInPlay S.bob after)
@@ -248,7 +248,7 @@ sacrificeTests cards =
       -- and alice controls (S.giveControl installs the layer-2 SetController
       -- effect), so the result must land in bob's graveyard, not alice's.
       HU.testCase "CR 701.21a a sacrifice lands in the OWNER's graveyard even when a different player controls it" $
-        let (piker, gs0) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (piker, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             gs = S.giveControl piker S.alice gs0
             after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
          in do
@@ -262,7 +262,7 @@ sacrificeTests cards =
             after = S.runPure S.identityAnswer gs (Event.sacrifice myr)
          in HU.assertEqual "gone from the battlefield" 0 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 701.21a sacrificing neither consults nor consumes a regeneration shield" $
-        let (piker, gs0) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (piker, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             gs = S.addRegenShield piker gs0
             after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
          in do
@@ -379,7 +379,7 @@ stateTriggerTests cards =
           -- adding an AddLandSubtype Swamp modification (the Urborg shape) to
           -- that same Mountain must turn the trigger off.
           HU.testCase "CR 613 layer 4: an added Swamp subtype (no real Swamp card) suppresses the trigger" $
-            let gs0 = S.mountainsInPlay cards 1
+            let gs0 = S.landsInPlay (Cards.mountainPrinting cards) 1
                 mountainId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
                   i : _ -> i
                   [] -> ObjectId.MkObjectId 999
@@ -435,8 +435,8 @@ historyTests cards =
           -- step's trigger ever exists, and must still be counted.
           HU.testCase "CR 608.2i deaths the trigger scan already passed are still counted" $
             let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-                (p1, gs1) = S.addPiker cards S.bob gs0
-                (p2, gs2) = S.addPiker cards S.bob gs1
+                (p1, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
+                (p2, gs2) = S.addCreature (Cards.pikerPrinting cards) S.bob gs1
                 dead = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs2 (Event.destroy p1)) (Event.destroy p2)
                 scanned = settle dead
                 atEnd = resolveAll (settle (beginEndStep scanned))
@@ -454,7 +454,7 @@ historyTests cards =
              in HU.assertEqual "the token is counted" 1 (countersOn ghoul atEnd),
           HU.testCase "a creature that left the battlefield for HAND did not die (CR 700.4)" $
             let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-                (p1, gs1) = S.addPiker cards S.bob gs0
+                (p1, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
                 bounced = S.runPure S.identityAnswer gs1 (Event.changeZone p1 Zone.Hand)
                 atEnd = resolveAll (settle (beginEndStep bounced))
              in HU.assertEqual "a bounce is not a death" 0 (countersOn ghoul atEnd),
@@ -468,7 +468,7 @@ historyTests cards =
           -- a regression gate on the ruling, pinned ahead of that signature
           -- ever gaining one.
           HU.testCase "CR 608.2i a creature that died before the Ghoul entered is still counted" $
-            let (p1, gs0) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+            let (p1, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
                 dead = S.runPure S.identityAnswer gs0 (Event.destroy p1)
                 (ghoul, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (settle dead)
                 atEnd = resolveAll (settle (beginEndStep gs1))
@@ -476,7 +476,7 @@ historyTests cards =
           -- CR 608.2i: the history's scope is ONE turn.
           HU.testCase "the count resets at turn handoff, not at the trigger scan" $
             let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-                (p1, gs1) = S.addPiker cards S.bob gs0
+                (p1, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
                 dead = S.runPure S.identityAnswer gs1 (Event.destroy p1)
                 nextTurn = snd (Engine.runGamePure S.identityAnswer dead Engine.handoffTurn)
                 atEnd = resolveAll (settle (beginEndStep nextTurn))

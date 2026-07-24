@@ -35,7 +35,7 @@ tests cards =
     "Pawl.Event"
     [ HU.testCase "CR 614: with Rest in Peace out, a creature sent to the graveyard is exiled" $
         let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            (piker, g1) = S.addPiker cards S.bob g0
+            (piker, g1) = S.addCreature (Cards.pikerPrinting cards) S.bob g0
             after = S.runPure S.identityAnswer g1 (Event.changeZone piker Zone.Graveyard)
             inExile = Set.size (GameState.exile after)
             gyCount = length (Game.zoneMembers Zone.Graveyard S.bob after)
@@ -44,13 +44,13 @@ tests cards =
               HU.assertEqual "one object in exile" 1 inExile,
       HU.testCase "CR 603.2g: the emitted event records the RESOLVED destination (exile)" $
         let (_, g0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            (piker, g1) = S.addPiker cards S.bob g0
+            (piker, g1) = S.addCreature (Cards.pikerPrinting cards) S.bob g0
             after = S.runPure S.identityAnswer g1 (Event.changeZone piker Zone.Graveyard)
          in case S.zoneChangesOf after of
               zc : _ -> HU.assertEqual "event says exile" Zone.Exile (ZoneChange.to zc)
               [] -> HU.assertFailure "expected an emitted zone change",
       HU.testCase "without Rest in Peace, a creature goes to the graveyard" $
-        let (piker, g1) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (piker, g1) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             after = S.runPure S.identityAnswer g1 (Event.changeZone piker Zone.Graveyard)
          in HU.assertEqual "in graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
       HU.testCase "CR 608.2n: a resolving spell is exiled from the stack under Rest in Peace" $

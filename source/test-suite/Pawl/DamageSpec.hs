@@ -58,20 +58,20 @@ creatureSbaTests cards =
   Tasty.testGroup
     "CreatureSba"
     [ HU.testCase "CR 704.5g a creature with lethal damage is destroyed" $
-        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             after = S.settleSba (S.markDamage oid 1 gs)
          in do
               HU.assertEqual "off the battlefield" [] (Game.zoneMembers Zone.Battlefield S.alice after)
               HU.assertEqual "in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       HU.testCase "CR 704.5g damage below toughness is not lethal" $
-        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             -- A Piker is 2/1, so 0 marked damage is survivable and 1 is not.
             after = S.settleSba (S.markDamage oid 0 gs)
          in HU.assertEqual "still there" 1 (length (Game.zoneMembers Zone.Battlefield S.alice after)),
       HU.testCase "CR 704.5g a Mountain with damage marked is not destroyed" $
         -- Not a creature: 704.5f/g do not apply. This is the classification
         -- doing its job -- the check never asks WHICH card it is.
-        let gs = S.mountainsInPlay cards 1
+        let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
               [] -> HU.assertFailure "fixture should have one Mountain"
               oid : _ ->
@@ -80,7 +80,7 @@ creatureSbaTests cards =
                   1
                   (length (Game.zoneMembers Zone.Battlefield S.alice (S.settleSba (S.markDamage oid 5 gs)))),
       HU.testCase "a destroyed creature conserves objects" $
-        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             marked = S.markDamage oid 1 gs
          in HU.assertEqual
               "conserved"
@@ -90,7 +90,7 @@ creatureSbaTests cards =
       -- creature to the graveyard" property: two 2/1 Pikers trade in combat and
       -- both die to the CR 704.5g state-based action.
       HU.testCase "a creature dies in a played-out combat" $
-        let (gs, _, _) = S.combatBoard cards 1 1
+        let (gs, _, _) = S.combatBoard (Cards.pikerPrinting cards) 1 1
             after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "attacker died" 0 (S.creaturesInPlay S.alice after)
@@ -144,18 +144,18 @@ damageTests cards =
   Tasty.testGroup
     "Damage"
     [ HU.testCase "a permanent starts with no damage marked" $
-        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual "none" (Just 0) (S.damageOf oid gs),
       HU.testCase "CR 514.2 marked damage is removed" $
-        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual "removed" (Just 0) (S.damageOf oid (Damage.removeAllDamage (S.markDamage oid 1 gs))),
       HU.testCase "CR 514.2 damage wears off at the cleanup step" $
-        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             marked = S.markDamage oid 1 gs
             after = snd (Engine.runGamePure S.identityAnswer marked (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
          in HU.assertEqual "worn off" (Just 0) (S.damageOf oid after),
       HU.testCase "CR 400.7 a new object carries no damage forward" $
-        let (oid, gs) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             marked = S.markDamage oid 1 gs
             after = S.runPure S.identityAnswer marked (Event.changeZone oid Zone.Graveyard)
          in case Game.zoneMembers Zone.Graveyard S.alice after of
@@ -198,7 +198,7 @@ infectTests cards =
   Tasty.testGroup
     "Infect"
     [ HU.testCase "CR 120.3b infect damage to a player becomes poison, not life loss" $
-        let (oid, gs0) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True DamageKind.Combat
             after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
          in do
@@ -206,8 +206,8 @@ infectTests cards =
               HU.assertEqual "bob's life unchanged" (Just 20) (S.lifeOf S.bob after)
               HU.assertEqual "the source's controller gains no poison" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
       HU.testCase "CR 120.3d infect damage to a creature becomes -1/-1 counters, not marked damage" $
-        let (src, gs0) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
-            (victim, gs1) = S.addPiker cards S.bob gs0
+        let (src, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            (victim, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
             ev = DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False True DamageKind.Combat
             after = S.runPure S.identityAnswer gs1 (Damage.applyDamage [ev])
          in do
@@ -266,7 +266,7 @@ damageEventTests cards =
   Tasty.testGroup
     "DamageEvent"
     [ HU.testCase "a blocked 2/1 trade emits both damage events" $
-        let (gs, mine, theirs) = S.combatBoard cards 1 1
+        let (gs, mine, theirs) = S.combatBoard (Cards.pikerPrinting cards) 1 1
             after = S.fightWith S.aggressiveAnswer gs
             events = S.damageEventsOf after
          in case (mine, theirs) of
@@ -278,7 +278,7 @@ damageEventTests cards =
                   elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False False DamageKind.Combat) events
               _ -> HU.assertFailure "fixture should have one creature per side",
       HU.testCase "an unblocked 2/1 emits a ToPlayer event" $
-        let (gs, mine, _) = S.combatBoard cards 1 0
+        let (gs, mine, _) = S.combatBoard (Cards.pikerPrinting cards) 1 0
             after = S.fightWith S.aggressiveAnswer gs
          in case mine of
               a : _ ->
@@ -327,7 +327,7 @@ deathtouchTests cards =
         -- Under Humility the Rat loses deathtouch (layer 6); its combat-damage
         -- event's bit is false -- asserted directly on the event, not via a kill.
         let (gs0, rats, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
-            gs = S.withHumility cards gs0
+            gs = S.withHumility (Cards.humilityPrinting cards) gs0
             fought = S.fightWith S.aggressiveAnswer gs
             ratId = case rats of r : _ -> r; [] -> ObjectId.MkObjectId 999
             ratBit = any (\ev -> DamageEvent.source ev == ratId && DamageEvent.dealtByDeathtouch ev) (S.damageEventsOf fought)

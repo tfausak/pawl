@@ -95,7 +95,7 @@ targetTests cards =
   Tasty.testGroup
     "Target"
     [ HU.testCase "CR 115.4 AnyTarget offers every creature and every playing player" $
-        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual
               "creature and both players"
               (Set.fromList [Recipient.ToCreature oid, Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])
@@ -106,7 +106,7 @@ targetTests cards =
               "bob gone"
               (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource) gs))),
       HU.testCase "CR 608.2b a creature that left its zone is no longer legal" $
-        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
          in do
               HU.assertBool "legal while fielded" (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource) gs)
@@ -119,7 +119,7 @@ targetTests cards =
               (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]))
               (Target.legalSets S.noSource specs gs),
       HU.testCase "CR 115.4 CreatureTarget offers creatures but no players" $
-        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertEqual
               "just the creature"
               (Set.singleton (Recipient.ToCreature oid))
@@ -129,25 +129,25 @@ targetTests cards =
           "nothing to target"
           (Set.null (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource) (Setup.emptyGame S.bothPlayers))),
       HU.testCase "CR 608.2b a creature that left is no longer a legal CreatureTarget" $
-        let (oid, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
          in do
               HU.assertBool "legal while fielded" (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource) gs)
               HU.assertBool "illegal once moved" (not (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource) gone)),
       HU.testCase "CR 115 SpellOrPermanentTarget offers battlefield permanents and stack spells" $
-        let (permId, gs) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (permId, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertBool
               "the permanent is a legal object target"
               (Set.member (Recipient.ToObject permId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.SpellsAndPermanents Nothing Exclusion.IncludesSource) gs)),
       HU.testCase "CR 115 SpellTarget offers a stack spell but not a battlefield permanent" $
-        let (permId, base) = S.addPiker cards S.bob (Setup.emptyGame S.bothPlayers)
+        let (permId, base) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             (spellId, gs) = S.spellOnStack (Cards.lightningBoltPrinting cards) S.alice base
             legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Spells Nothing Exclusion.IncludesSource) gs
          in do
               HU.assertBool "the stack spell is a legal target" (Set.member (Recipient.ToObject spellId) legal)
               HU.assertBool "the battlefield permanent is not a legal target" (not (Set.member (Recipient.ToObject permId) legal)),
       HU.testCase "LandTarget offers a land as an object target, not a creature or player" $
-        let gs = S.mountainsInPlay cards 1
+        let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
@@ -163,7 +163,7 @@ targetTests cards =
       -- Creature - Wall, M4g) is the Wall; a Piker is the non-Wall control.
       HU.testCase "CR 115.1a / 700.2c \"target Wall\" offers a Wall creature but not a non-Wall creature" $
         let (wallId, base) = S.addCreature (Cards.wallOfStonePrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-            (pikerId, gs) = S.addPiker cards S.alice base
+            (pikerId, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice base
             slot = SlotName.MkSlotName (Text.pack "target")
             legal = Map.findWithDefault Set.empty slot (Target.legalSets S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)) Exclusion.IncludesSource)) gs)
          in do
@@ -172,14 +172,14 @@ targetTests cards =
       HU.testCase "CR 115.1a ArtifactTarget is the battlefield's projected artifacts" $
         -- boardWithCreatureArtifactLand: alice has a Piker, a Mindslaver
         -- (Legendary Artifact) and a Mountain.
-        let gs = S.boardWithCreatureArtifactLand cards
+        let gs = S.boardWithCreatureArtifactLand (Cards.pikerPrinting cards) (Cards.mindslaverPrinting cards) (Cards.mountainPrinting cards)
             legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource) gs
          in do
               HU.assertEqual "exactly the artifact" (Set.singleton (Recipient.ToObject (S.artifactId gs))) legal
               HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) legal)),
       HU.testCase "CR 115.1a / 109.5 OpponentCreatureTarget excludes the source's controller's creatures" $
         let gs0 = Setup.emptyGame S.bothPlayers
-            (mine, gs1) = S.addPiker cards S.alice gs0
+            (mine, gs1) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             (theirs, gs2) = S.addCreature (Cards.warMammothPrinting cards) S.bob gs1
             legal = Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent)) Exclusion.IncludesSource) gs2
          in do
@@ -187,7 +187,7 @@ targetTests cards =
               HU.assertBool "not the source's controller's own" (not (Set.member (Recipient.ToCreature mine) legal)),
       HU.testCase "CR 613.1b OpponentCreatureTarget follows PROJECTED control, not ownership" $
         let gs0 = Setup.emptyGame S.bothPlayers
-            (mine, gs1) = S.addPiker cards S.alice gs0
+            (mine, gs1) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             (theirs, gs2) = S.addCreature (Cards.warMammothPrinting cards) S.bob gs1
             (alsoTheirs, gs3) = S.addCreature (Cards.typhoidRatsPrinting cards) S.bob gs2
             -- alice steals one of bob's creatures: it stops being "a creature an
@@ -209,7 +209,7 @@ targetTests cards =
       HU.testCase "P9 Creatures + Not (HasColor Black) excludes a black creature" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (blackOid, gs1) = S.addCreature (Cards.typhoidRatsPrinting cards) S.bob gs0
-            (plainOid, gs) = S.addPiker cards S.alice gs1
+            (plainOid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice gs1
             spec = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource
             legal = Target.legalRecipients S.noSource spec gs
          in do
@@ -218,7 +218,7 @@ targetTests cards =
       HU.testCase "P9 Creatures + Nothing narrows nothing" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (blackOid, gs1) = S.addCreature (Cards.typhoidRatsPrinting cards) S.bob gs0
-            (plainOid, gs) = S.addPiker cards S.alice gs1
+            (plainOid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice gs1
             spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource
             expectedAllCreatures = Set.fromList [Recipient.ToCreature blackOid, Recipient.ToCreature plainOid]
          in HU.assertEqual "all creatures legal" expectedAllCreatures (Target.legalRecipients S.noSource spec gs),
@@ -241,7 +241,7 @@ targetTests cards =
             let gs0 = Setup.emptyGame S.bothPlayers
                 (blackOid, gs1) = S.addCreature (Cards.typhoidRatsPrinting cards) S.bob gs0
                 (artifactOid, gs2) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob gs1
-                (plainOid, gs) = S.addPiker cards S.alice gs2
+                (plainOid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice gs2
                 legal = Target.legalRecipients S.noSource spec gs
              in do
                   HU.assertBool "black creature illegal" (not (Set.member (Recipient.ToCreature blackOid) legal))
@@ -252,7 +252,7 @@ targetTests cards =
           Nothing -> HU.assertFailure "Reprisal's printing carries no 'target' slot"
           Just spec ->
             let gs0 = Setup.emptyGame S.bothPlayers
-                (smallOid, gs) = S.addPiker cards S.bob gs0 -- power 2, {1}{R}
+                (smallOid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0 -- power 2, {1}{R}
                 legalBefore = Target.legalRecipients S.noSource spec gs
                 pumped = S.withEffect smallOid (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0)) gs
                 legalAfter = Target.legalRecipients S.noSource spec pumped
@@ -277,32 +277,32 @@ resolveTests cards =
               [DamageKind.Noncombat]
               (fmap DamageEvent.kind (S.damageEventsOf resolved)),
       HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $
-        let (_, cast, _) = S.boltAtBobsPiker cards
+        let (_, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
             after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
          in do
               HU.assertEqual "stack empty" 0 (length (GameState.stack after))
               HU.assertEqual "no creature survives" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "Piker in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
       HU.testCase "CR 608.2n the resolved Bolt is in its owner's graveyard" $
-        let (_, cast, _) = S.boltAtBobsPiker cards
+        let (_, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "one card" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       HU.testCase "CR 120.3a a Bolt at a player drains life without marking" $
         -- No creature on the battlefield, so identityAnswer's lookupMin picks
         -- ToPlayer alice: a self-Bolt, which is legal Magic.
-        let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
+        let (gs, oid) = S.boltInHand (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards) 1 Phase.PrecombatMain
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "seventeen" (Just 17) (S.lifeOf S.alice after),
       HU.testCase "the resolved damage flows through the event funnel" $
-        let (_, cast, _) = S.boltAtBobsPiker cards
+        let (_, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "one event of amount 3" [3] (fmap DamageEvent.amount (S.damageEventsOf after)),
       HU.testCase "resolving a Bolt conserves objects" $
-        let (_, cast, _) = S.boltAtBobsPiker cards
+        let (_, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
          in HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))),
       HU.testCase "CR 608.2b a Bolt whose only target died fizzles" $
-        let (base, cast, _) = S.boltAtBobsPiker cards
+        let (base, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
             -- Kill the Piker while the Bolt is on the stack, as Bolt B will in
             -- the integration test, then check state-based actions.
             dead = S.settleSba (S.markDamage (S.pikerOf base) 3 cast)
@@ -312,14 +312,14 @@ resolveTests cards =
               HU.assertEqual "no damage was dealt" [] (S.damageEventsOf after)
               HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after),
       HU.testCase "CR 608.2b a fizzled spell applies none of its effects" $
-        let (base, cast, _) = S.boltAtBobsPiker cards
+        let (base, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
             dead = S.settleSba (S.markDamage (S.pikerOf base) 3 cast)
             after = snd (Engine.runGamePure S.identityAnswer dead Stack.resolveTop)
          in HU.assertEqual "life totals unchanged" (Just 20) (S.lifeOf S.alice after),
       -- The deterministic successor to the retired "instants happen" property: a
       -- Bolt cast in a game and resolved ends in its owner's graveyard.
       HU.testCase "a cast Bolt reaches its owner's graveyard" $
-        let (_, cast, _) = S.boltAtBobsPiker cards
+        let (_, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
          in HU.assertEqual "one card in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       HU.testCase "CR 612 slotsOf and textChangeSlots find a ChangeText slot" $
@@ -710,7 +710,7 @@ resolveTests cards =
         -- THE FALSIFIER for a perspective baked into the count: Alice holds
         -- five and Bob holds two, and Bob takes two. A count whose "you" were
         -- the resolving controller (Alice) would deal five instead.
-        let gs0 = S.mountainsInPlay cards 4
+        let gs0 = S.landsInPlay (Cards.mountainPrinting cards) 4
             fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard (Cards.pikerPrinting cards) pid g)) g0 [1 .. (n :: Int)]
             gs1 = fill S.alice 5 (fill S.bob 2 gs0)
             (spellId, gs2) = S.addHandCard (Cards.suddenImpactPrinting cards) S.alice gs1
@@ -721,7 +721,7 @@ resolveTests cards =
       HU.testCase "CR 608.2h the number is read as the effect is applied, not as the spell is cast" $
         -- Bob's hand grows AFTER Sudden Impact is on the stack and BEFORE it
         -- resolves; the damage follows the hand size at resolution.
-        let gs0 = S.mountainsInPlay cards 4
+        let gs0 = S.landsInPlay (Cards.mountainPrinting cards) 4
             fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard (Cards.pikerPrinting cards) pid g)) g0 [1 .. (n :: Int)]
             gs1 = fill S.bob 2 gs0
             (spellId, gs2) = S.addHandCard (Cards.suddenImpactPrinting cards) S.alice gs1
@@ -833,7 +833,7 @@ boltAnswer p = case p of
 -- LIFO: B kills the Piker, the mid-loop SBA buries it, A fizzles.
 twoBoltState :: Cards.Cards -> GameState.GameState
 twoBoltState cards =
-  let (_, withPiker) = S.addPiker cards S.bob (S.mountainsInPlay cards 2)
+  let (_, withPiker) = S.addCreature (Cards.pikerPrinting cards) S.bob (S.landsInPlay (Cards.mountainPrinting cards) 2)
       (gs1, _oid1) = S.handOne (Cards.lightningBoltPrinting cards) withPiker
       (oid2, gs2) = Game.freshObjectId gs1
       obj =
@@ -951,8 +951,8 @@ fizzleTests cards =
       -- per-slot legality check already no-ops it either way).
       HU.testCase "CR 608.2b the reserved trigger-source slot does not rescue a fizzle: the targetless Draw after the ability's only real target dies does not run" $
         let base0 = Setup.emptyGame S.bothPlayers
-            (source, base1) = S.addPiker cards S.alice base0
-            (victim, base2) = S.addPiker cards S.bob base1
+            (source, base1) = S.addCreature (Cards.pikerPrinting cards) S.alice base0
+            (victim, base2) = S.addCreature (Cards.pikerPrinting cards) S.bob base1
             (_, base3) = S.addLibraryCard (Cards.forestPrinting cards) S.alice base2
             handBefore = S.handSize S.alice base3
             targetSlot = SlotName.MkSlotName (Text.pack "target")
@@ -974,7 +974,7 @@ fizzleTests cards =
             after = snd (Engine.runGamePure S.identityAnswer gone run)
          in HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
       HU.testCase "CR 704.5a a Bolt can end the game mid-step" $
-        let (gs, oid) = S.boltInHand cards 1 Phase.PrecombatMain
+        let (gs, oid) = S.boltInHand (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards) 1 Phase.PrecombatMain
             lowBob =
               gs {GameState.players = Map.adjust (\pl -> pl {Player.life = 3}) S.bob (GameState.players gs)}
             atBob :: Prompt.Prompt r -> r
@@ -1088,7 +1088,7 @@ zoneChangeTests cards =
          in HU.assertEqual "the shielded creature survived Murder" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 400.7 Unsummon returns a creature to its owner's hand" $
         let base = S.landsInPlay (Cards.islandPrinting cards) 1
-            (_, withPiker) = S.addPiker cards S.bob base
+            (_, withPiker) = S.addCreature (Cards.pikerPrinting cards) S.bob base
             (gs, spellId) = S.handOne (Cards.unsummonPrinting cards) withPiker
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -1108,7 +1108,7 @@ zoneChangeTests cards =
               HU.assertEqual "it is in bob's hand" 1 (length (Game.zoneMembers Zone.Hand S.bob after)),
       HU.testCase "CR 701.13 Angelic Edict exiles a target creature" $
         let base = S.landsInPlay (Cards.plainsPrinting cards) 5
-            (_, withPiker) = S.addPiker cards S.bob base
+            (_, withPiker) = S.addCreature (Cards.pikerPrinting cards) S.bob base
             (gs, spellId) = S.handOne (Cards.angelicEdictPrinting cards) withPiker
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -1318,7 +1318,7 @@ gainPlayerCountersTests cards =
   Tasty.testGroup
     "GainPlayerCounters"
     [ HU.testCase "CR 107.14 GainPlayerCounters gives the resolving controller energy" $
-        let (src, gs0) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (src, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             act = Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.GainPlayerCounters PlayerCounterKind.Energy (Quantity.Literal 2))
             after = S.runPure S.identityAnswer gs0 act
          in HU.assertEqual "alice has two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)

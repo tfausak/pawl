@@ -95,7 +95,7 @@ doorTests cards =
       -- CR 118.6 vs CR 118.5a: the distinction the Maybe carries. Nothing is an
       -- unpayable cost; an empty ManaCost is {0} and is payable.
       HU.testCase "CR 118.6 an unpayable cost can never be paid" $
-        let gs = S.mountainsInPlay cards 5
+        let gs = S.landsInPlay (Cards.mountainPrinting cards) 5
          in HU.assertBool
               "Nothing is unpayable"
               (not (Cost.canPay S.alice S.noSource (Cost.Type.MkCost Nothing []) gs)),
@@ -108,7 +108,7 @@ doorTests cards =
       -- additional cost is imposed, the cost is still unpayable." total maps over
       -- the Maybe, so there is no special case to get wrong.
       HU.testCase "CR 118.6a Thalia's increase leaves an unpayable cost unpayable" $
-        let base = S.mountainsInPlay cards 5
+        let base = S.landsInPlay (Cards.mountainPrinting cards) 5
             (_, gs) = S.addCreature (Cards.thaliaPrinting cards) S.alice base
             (bolt, withBolt) = S.addHandCard (Cards.lightningBoltPrinting cards) S.alice gs
          in HU.assertEqual
@@ -129,7 +129,7 @@ doorTests cards =
       -- must still afford Mindslaver's printed {4}; a fifth would be needed if
       -- the tax wrongly reached the activation (#90).
       HU.testCase "CR 613.11 Thalia does not tax a noncreature permanent's activated ability" $
-        let base = S.mountainsInPlay cards 4
+        let base = S.landsInPlay (Cards.mountainPrinting cards) 4
             (slaver, gs1) = S.addCreature (Cards.mindslaverPrinting cards) S.alice base
             (_, gs2) = S.addCreature (Cards.thaliaPrinting cards) S.alice gs1
          in HU.assertBool
@@ -137,14 +137,14 @@ doorTests cards =
               (Activate.activatable S.alice slaver (theAbility (Cards.mindslaverPrinting cards)) gs2),
       -- Departure 2: an Unpaid payment is a complete no-op, never a partial one.
       HU.testCase "CR 118.6 paying an unpayable cost changes nothing" $
-        let gs = S.mountainsInPlay cards 3
+        let gs = S.landsInPlay (Cards.mountainPrinting cards) 3
             (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay S.alice S.noSource (Cost.Type.MkCost Nothing []))
          in do
               HU.assertEqual "Unpaid" Payment.Unpaid outcome
               HU.assertEqual "no land tapped" 0 (S.tappedCount S.alice after),
       -- CR 701.21a: enough controlled permanents matching the criterion.
       HU.testCase "CR 118.3 a Sacrifice component counts matching permanents this player controls" $
-        let gs = S.mountainsInPlay cards 2
+        let gs = S.landsInPlay (Cards.mountainPrinting cards) 2
             two = CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)
             three = CostComponent.Sacrifice 3 (Filter.Type.HasSubtype Subtype.Mountain)
             islands = CostComponent.Sacrifice 1 (Filter.Type.HasSubtype Subtype.Island)
@@ -158,7 +158,7 @@ doorTests cards =
       -- the player-counter substrate (P10 #37 GainPlayerCounters is the ADD
       -- direction).
       HU.testCase "CR 118.6 PayEnergy is unpayable below the count and payable at or above" $
-        let (oid, gs0) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             two = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice gs0
             one = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice gs0
          in do
@@ -166,7 +166,7 @@ doorTests cards =
               HU.assertBool "one energy cannot" (not (Cost.canPayComponent S.alice oid (CostComponent.PayEnergy 2) one)),
       -- CR 107.14: paying energy removes exactly that many counters.
       HU.testCase "CR 107.14 paying PayEnergy removes that many energy counters" $
-        let (oid, gs0) = S.addPiker cards S.alice (Setup.emptyGame S.bothPlayers)
+        let (oid, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
             three = S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice gs0
             after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent S.alice oid (CostComponent.PayEnergy 2)))
          in HU.assertEqual "one energy left" 1 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
@@ -279,7 +279,7 @@ villageRitesTests cards =
       board :: Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
       board n =
         let base = S.landsInPlay (Cards.swampPrinting cards) 1
-            addPiker (ids, gs) _ = let (oid, gs') = S.addPiker cards S.alice gs in (ids <> [oid], gs')
+            addPiker (ids, gs) _ = let (oid, gs') = S.addCreature (Cards.pikerPrinting cards) S.alice gs in (ids <> [oid], gs')
             (pikers, withPikers) = List.foldl' addPiker ([], base) [1 .. n]
             (rites, gs1) = S.addHandCard (Cards.villageRitesPrinting cards) S.alice withPikers
             (_, gs2) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice gs1

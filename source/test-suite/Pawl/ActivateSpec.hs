@@ -124,10 +124,10 @@ tests cards =
          in HU.assertBool "land ability offered despite sickness" (any isActivate (Action.legalActions S.alice g2)),
       HU.testCase "CR 613/602 a Humility'd Prodigal Sorcerer's ability is not offered" $
         let (_, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            gs = (S.withHumility cards g0) {GameState.priority = Just S.alice}
+            gs = (S.withHumility (Cards.humilityPrinting cards) g0) {GameState.priority = Just S.alice}
          in HU.assertBool "no Activate under Humility" (not (any isActivate (Action.legalActions S.alice gs))),
       HU.testCase "CR 602.1b: an activation with a mana cost needs the mana" $
-        let gs = S.mountainsInPlay cards 1
+        let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
             (srcId, gs1) = S.addCreature (Cards.pikerPrinting cards) S.alice gs
             costlyAbility =
               ActivatedAbility.MkActivatedAbility

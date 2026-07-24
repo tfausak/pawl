@@ -47,12 +47,12 @@ combatDamageTests cards =
   Tasty.testGroup
     "CombatDamage"
     [ HU.testCase "CR 510.1b an unblocked attacker damages the defending player" $
-        let (gs, _, _) = S.combatBoard cards 1 0
+        let (gs, _, _) = S.combatBoard (Cards.pikerPrinting cards) 1 0
             after = S.fightWith S.aggressiveAnswer gs
          in -- A Piker is a 2/1, and bob starts at 20.
             HU.assertEqual "bob took 2" (Just 18) (S.lifeOf S.bob after),
       HU.testCase "CR 509 a blocked attacker does not damage the player" $
-        let (gs, _, _) = S.combatBoard cards 1 1
+        let (gs, _, _) = S.combatBoard (Cards.pikerPrinting cards) 1 1
             after = S.fightWith S.aggressiveAnswer gs
          in HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after),
       HU.testCase "CR 510.1c a single blocker takes all the damage, unprompted" $
@@ -61,7 +61,7 @@ combatDamageTests cards =
         -- power), so it is rejected and the blocker takes 0 -- and the assertion
         -- below fails. That is why this proves "unprompted" without an `error`,
         -- which the no-partial-functions rule forbids anyway.
-        let (gs, _, theirs) = S.combatBoard cards 1 1
+        let (gs, _, theirs) = S.combatBoard (Cards.pikerPrinting cards) 1 1
             noAssign :: Prompt.Prompt r -> r
             noAssign p = case p of
               Prompt.AssignCombatDamage {} -> Map.empty
@@ -73,13 +73,13 @@ combatDamageTests cards =
       HU.testCase "CR 510.2 a 2/1 trade kills BOTH creatures" $
         -- The simultaneity test. Sequential damage kills only one, because the
         -- blocker would be in the graveyard before it dealt its damage.
-        let (gs, _, _) = S.combatBoard cards 1 1
+        let (gs, _, _) = S.combatBoard (Cards.pikerPrinting cards) 1 1
             after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
          in do
               HU.assertEqual "alice's is dead" 0 (S.creaturesInPlay S.alice after)
               HU.assertEqual "bob's is dead" 0 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 510.1c a free division of 2 across two blockers kills both" $
-        let (gs, _, theirs) = S.combatBoard cards 1 2
+        let (gs, _, theirs) = S.combatBoard (Cards.pikerPrinting cards) 1 2
             split :: Prompt.Prompt r -> r
             split p = case p of
               Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (fmap (\r -> (r, 1)) (filter S.isCreatureRecipient (Map.keys thresholds)))
@@ -89,7 +89,7 @@ combatDamageTests cards =
               HU.assertEqual "both blockers dead" 0 (S.creaturesInPlay S.bob after)
               HU.assertEqual "expected two blockers" 2 (length theirs),
       HU.testCase "CR 510.1c the same 2 damage on one blocker kills only it" $
-        let (gs, _, _) = S.combatBoard cards 1 2
+        let (gs, _, _) = S.combatBoard (Cards.pikerPrinting cards) 1 2
             dump :: Prompt.Prompt r -> r
             dump p = case p of
               Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -102,7 +102,7 @@ combatDamageTests cards =
       HU.testCase "CR 510.1e an illegal division is rejected and deals nothing" $
         -- Not a reachable game state: this is the engine's defense against a
         -- broken interpreter. See the spec, section 3.
-        let (gs, _, _) = S.combatBoard cards 1 2
+        let (gs, _, _) = S.combatBoard (Cards.pikerPrinting cards) 1 2
             cheat :: Prompt.Prompt r -> r
             cheat p = case p of
               Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (fmap (\r -> (r, 99)) (filter S.isCreatureRecipient (Map.keys thresholds)))
@@ -125,13 +125,13 @@ declareTests cards =
   Tasty.testGroup
     "Declare"
     [ HU.testCase "CR 508.1f declaring an attacker taps it" $
-        let (gs, mine, _) = S.combatBoard cards 1 1
+        let (gs, mine, _) = S.combatBoard (Cards.pikerPrinting cards) 1 1
             after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
          in do
               HU.assertEqual "one attacker" mine (declaredAttackers after)
               HU.assertEqual "tapped" 1 (S.tappedCount S.alice after),
       HU.testCase "CR 508.1 attackers attack the defending player" $
-        let (gs, mine, _) = S.combatBoard cards 1 1
+        let (gs, mine, _) = S.combatBoard (Cards.pikerPrinting cards) 1 1
             after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
          in case mine of
               [] -> HU.assertFailure "fixture should have an attacker"
@@ -142,7 +142,7 @@ declareTests cards =
                   (Map.lookup oid (Combat.Type.attackers (GameState.combat after))),
       HU.testCase "an illegal attacker in the answer is dropped" $
         -- The interpreter names bob's creature. It is not alice's to attack with.
-        let (gs, _, theirs) = S.combatBoard cards 1 1
+        let (gs, _, theirs) = S.combatBoard (Cards.pikerPrinting cards) 1 1
             liar :: Prompt.Prompt r -> r
             liar p = case p of
               Prompt.DeclareAttackers {} -> theirs
@@ -150,7 +150,7 @@ declareTests cards =
             after = snd (Engine.runGamePure liar gs (Combat.declareAttackers S.alice))
          in HU.assertEqual "nothing attacks" [] (declaredAttackers after),
       HU.testCase "CR 509.1 a blocker is recorded against the attacker it blocks" $
-        let (gs, mine, theirs) = S.combatBoard cards 1 1
+        let (gs, mine, theirs) = S.combatBoard (Cards.pikerPrinting cards) 1 1
             steps = do
               Combat.declareAttackers S.alice
               Combat.declareBlockers
@@ -160,7 +160,7 @@ declareTests cards =
               attacker : _ ->
                 HU.assertEqual "blocked by bob's creature" (Set.fromList theirs) (Combat.blockersOf attacker after),
       HU.testCase "an unblocked attacker has no blockers" $
-        let (gs, mine, _) = S.combatBoard cards 1 0
+        let (gs, mine, _) = S.combatBoard (Cards.pikerPrinting cards) 1 0
             steps = do
               Combat.declareAttackers S.alice
               Combat.declareBlockers
@@ -171,7 +171,7 @@ declareTests cards =
       HU.testCase "no legal attackers means no prompt and no attacks" $
         -- combatBoard 0 1 gives alice nothing. A prompt here would be the engine
         -- asking a question with exactly one answer.
-        let (gs, _, _) = S.combatBoard cards 0 1
+        let (gs, _, _) = S.combatBoard (Cards.pikerPrinting cards) 0 1
             after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
          in HU.assertEqual "nothing attacks" [] (declaredAttackers after),
       -- The end-to-end summoning sickness scenario the spec names: a creature
@@ -179,7 +179,7 @@ declareTests cards =
       -- controller's untap step has settled it. The halves are tested in Tasks 1
       -- and 4; this proves they compose.
       HU.testCase "CR 302.6 a creature cannot attack the turn it arrives, and can after untapping" $
-        let (gs, _, _) = S.combatBoard cards 1 1
+        let (gs, _, _) = S.combatBoard (Cards.pikerPrinting cards) 1 1
             arrived = justArrived gs
             sameTurn = snd (Engine.runGamePure S.aggressiveAnswer arrived (Combat.declareAttackers S.alice))
             nextTurn =
@@ -471,52 +471,52 @@ combatLegalityTests cards =
   Tasty.testGroup
     "CombatLegality"
     [ HU.testCase "a Settled untapped creature may attack" $
-        let (gs, mine, _) = S.combatBoard cards 1 0
+        let (gs, mine, _) = S.combatBoard (Cards.pikerPrinting cards) 1 0
          in case mine of
               [] -> HU.assertFailure "fixture should have an attacker"
               oid : _ -> HU.assertBool "may attack" (Combat.canAttack S.alice oid gs),
       HU.testCase "CR 302.6 a summoning sick creature may not attack" $
-        let (gs, mine, _) = S.combatBoard cards 1 0
+        let (gs, mine, _) = S.combatBoard (Cards.pikerPrinting cards) 1 0
          in case mine of
               [] -> HU.assertFailure "fixture should have an attacker"
               oid : _ ->
                 let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
                  in HU.assertBool "may not attack" (not (Combat.canAttack S.alice oid sick)),
       HU.testCase "CR 508.1a a tapped creature may not attack" $
-        let (gs, mine, _) = S.combatBoard cards 1 0
+        let (gs, mine, _) = S.combatBoard (Cards.pikerPrinting cards) 1 0
          in case mine of
               [] -> HU.assertFailure "fixture should have an attacker"
               oid : _ ->
                 let tapped = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
                  in HU.assertBool "may not attack" (not (Combat.canAttack S.alice oid tapped)),
       HU.testCase "a land may not attack" $
-        let gs = (S.mountainsInPlay cards 1) {GameState.activePlayer = S.alice}
+        let gs = (S.landsInPlay (Cards.mountainPrinting cards) 1) {GameState.activePlayer = S.alice}
          in case Game.zoneMembers Zone.Battlefield S.alice gs of
               [] -> HU.assertFailure "fixture should have one Mountain"
               oid : _ -> HU.assertBool "may not attack" (not (Combat.canAttack S.alice oid gs)),
       HU.testCase "you may not attack with a creature you do not control" $
-        let (gs, _, theirs) = S.combatBoard cards 1 1
+        let (gs, _, theirs) = S.combatBoard (Cards.pikerPrinting cards) 1 1
          in case theirs of
               [] -> HU.assertFailure "fixture should have a blocker"
               oid : _ -> HU.assertBool "not alice's" (not (Combat.canAttack S.alice oid gs)),
       -- CR 302.6 restricts attacking and tap abilities. It says NOTHING about
       -- blocking, and getting this wrong is the classic beginner bug.
       HU.testCase "CR 302.6 a summoning sick creature MAY block" $
-        let (gs, _, theirs) = S.combatBoard cards 1 1
+        let (gs, _, theirs) = S.combatBoard (Cards.pikerPrinting cards) 1 1
          in case theirs of
               [] -> HU.assertFailure "fixture should have a blocker"
               oid : _ ->
                 let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
                  in HU.assertBool "may block" (Combat.canBlock S.bob oid sick),
       HU.testCase "CR 509.1a a tapped creature may not block" $
-        let (gs, _, theirs) = S.combatBoard cards 1 1
+        let (gs, _, theirs) = S.combatBoard (Cards.pikerPrinting cards) 1 1
          in case theirs of
               [] -> HU.assertFailure "fixture should have a blocker"
               oid : _ ->
                 let tapped = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
                  in HU.assertBool "may not block" (not (Combat.canBlock S.bob oid tapped)),
       HU.testCase "legalAttackers lists exactly the active player's creatures" $
-        let (gs, mine, _) = S.combatBoard cards 2 3
+        let (gs, mine, _) = S.combatBoard (Cards.pikerPrinting cards) 2 3
          in HU.assertEqual "two" mine (Combat.legalAttackers S.alice gs),
       HU.testCase "CR 508.1a a player can attack with a creature they control but do not own" $
         let (oid, base) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
@@ -525,10 +525,10 @@ combatLegalityTests cards =
               HU.assertBool "alice may attack with it" (elem oid (Combat.legalAttackers S.alice gs0))
               HU.assertBool "bob may not (not the controller, not active)" (notElem oid (Combat.legalAttackers S.bob gs0)),
       HU.testCase "the defending player is the non-active player" $
-        let (gs, _, _) = S.combatBoard cards 1 1
+        let (gs, _, _) = S.combatBoard (Cards.pikerPrinting cards) 1 1
          in HU.assertEqual "bob defends" [S.bob] (Combat.defendingPlayers gs),
       HU.testCase "combat starts empty and clears" $
-        let (gs, mine, _) = S.combatBoard cards 1 0
+        let (gs, mine, _) = S.combatBoard (Cards.pikerPrinting cards) 1 0
             busy = case mine of
               [] -> gs
               oid : _ ->
@@ -557,14 +557,21 @@ keywordTests cards =
               HU.assertBool "hasKeyword" (Projection.hasKeyword keyword oid gs)
    in Tasty.testGroup
         "Keyword"
-        ( fmap carriesOnly (S.m2aPrintings cards)
+        ( fmap
+            carriesOnly
+            [ (Cards.birdMaidenPrinting cards, Keyword.Flying),
+              (Cards.nimbleBirdstickerPrinting cards, Keyword.Reach),
+              (Cards.ogreSentryPrinting cards, Keyword.Defender),
+              (Cards.windseekerCentaurPrinting cards, Keyword.Vigilance),
+              (Cards.goblinChariotPrinting cards, Keyword.Haste)
+            ]
             <> [ HU.testCase "a Piker has no keywords" $
-                   let (oid, gs) = S.addPiker cards S.alice gs0
+                   let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
                     in do
                          HU.assertEqual "none" Set.empty (Projection.keywordsOf oid gs)
                          HU.assertBool "no flying" (not (Projection.hasKeyword Keyword.Flying oid gs)),
                  HU.testCase "a Mountain has no keywords" $
-                   let gs = S.mountainsInPlay cards 1
+                   let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
                     in case Game.zoneMembers Zone.Battlefield S.alice gs of
                          [] -> HU.assertFailure "fixture should have one Mountain"
                          oid : _ -> HU.assertEqual "none" Set.empty (Projection.keywordsOf oid gs),

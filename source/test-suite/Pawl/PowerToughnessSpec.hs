@@ -61,7 +61,7 @@ tests cards =
               HU.assertEqual "no seeded toughness" Nothing (PC.toughness seeded),
       HU.testCase "an ordinary card has no CDA" $
         let gs0 = Setup.emptyGame S.bothPlayers
-            (pikerId, gs) = S.addPiker cards S.alice gs0
+            (pikerId, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
          in HU.assertEqual "none" Nothing (PC.characteristicPT (Projection.baseCharacteristics pikerId gs)),
       HU.testCase "CR 613.4a Tarmogoyf's P/T is recomputed, not fixed at entry" $
         -- THE FALSIFIER for evaluating a printed * once, at the seed or at entry:
@@ -118,7 +118,7 @@ tests cards =
         let gs0 = Setup.emptyGame S.bothPlayers
             (_, withBolt) = S.addGraveyardCard (Cards.lightningBoltPrinting cards) S.alice gs0
             (goyfId, board) = S.addCreature (Cards.tarmogoyfPrinting cards) S.alice withBolt
-            gs = S.withHumility cards board
+            gs = S.withHumility (Cards.humilityPrinting cards) board
          in do
               HU.assertEqual "1 power" (Just 1) (Projection.powerOf goyfId gs)
               HU.assertEqual "1 toughness" (Just 1) (Projection.toughnessOf goyfId gs),
@@ -127,7 +127,7 @@ tests cards =
         -- through P/T -- the only channel through which it IS observable today.
         let gs0 = Setup.emptyGame S.bothPlayers
             (goyfId, board) = S.addCreature (Cards.tarmogoyfPrinting cards) S.alice gs0
-            gs = S.withHumility cards board
+            gs = S.withHumility (Cards.humilityPrinting cards) board
          in HU.assertEqual "no CDA survives layer 6" Nothing (PC.characteristicPT (Projection.project goyfId gs)),
       HU.testCase "CR 608.2h a resolved pump is FROZEN and does not shrink with the hand" $
         -- THE FALSIFIER for re-evaluating a stored quantity: CR 608.2h says the
@@ -135,7 +135,7 @@ tests cards =
         -- resolves the pump with two cards left in hand (+2/+2), then casts one of
         -- them -- her hand is now one card, and the pump must NOT follow it down.
         let base = S.landsInPlay (Cards.forestPrinting cards) 4
-            (pikerId, board) = S.addPiker cards S.alice base
+            (pikerId, board) = S.addCreature (Cards.pikerPrinting cards) S.alice base
             -- handOne FIRST (it replaces the hand and sets up the phase), then
             -- addHandCard for the extras.
             (h1, icId) = S.handOne (Cards.innerCalmPrinting cards) board
@@ -184,7 +184,7 @@ tests cards =
         -- would read the wrong player. Alice holds two cards after casting; bob
         -- holds none, and it is bob's creature being pumped.
         let base = S.landsInPlay (Cards.forestPrinting cards) 4
-            (bobsPiker, board) = S.addPiker cards S.bob base
+            (bobsPiker, board) = S.addCreature (Cards.pikerPrinting cards) S.bob base
             (h1, icId) = S.handOne (Cards.innerCalmPrinting cards) board
             (_, h2) = S.addHandCard (Cards.giantGrowthPrinting cards) S.alice h1
             (_, gs) = S.addHandCard (Cards.forestPrinting cards) S.alice h2
@@ -247,7 +247,7 @@ tests cards =
         -- Goblin Piker is 2/1. Correct: 7c gives 4/1, 7d switches to 1/4.
         -- Timestamp-ordered: switch gives 1/2, then the pump gives 3/2.
         let gs0 = Setup.emptyGame S.bothPlayers
-            (pikerId, board) = S.addPiker cards S.alice gs0
+            (pikerId, board) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             switched = S.withEffect pikerId Modification.SwitchPowerToughness board
             gs = S.withEffect pikerId (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 0)) switched
          in do
@@ -255,7 +255,7 @@ tests cards =
               HU.assertEqual "toughness is the pumped power" (Just 4) (Projection.toughnessOf pikerId gs),
       HU.testCase "CR 613.4d 2021-03-19 two switches return the object to normal" $
         let gs0 = Setup.emptyGame S.bothPlayers
-            (pikerId, board) = S.addPiker cards S.alice gs0
+            (pikerId, board) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
             once = S.withEffect pikerId Modification.SwitchPowerToughness board
             twice = S.withEffect pikerId Modification.SwitchPowerToughness once
          in do
@@ -408,7 +408,7 @@ tests cards =
             (_, g1) = S.addCreature (Cards.swampPrinting cards) S.alice gs0
             (_, g2) = S.addCreature (Cards.swampPrinting cards) S.alice g1
             (nightId, g3) = S.addCreature (Cards.nightmarePrinting cards) S.alice g2
-            gs = S.withHumility cards g3
+            gs = S.withHumility (Cards.humilityPrinting cards) g3
          in do
               HU.assertEqual "no CDA survives layer 6" Nothing (PC.characteristicPT (Projection.project nightId gs))
               HU.assertEqual "1 power" (Just 1) (Projection.powerOf nightId gs)
