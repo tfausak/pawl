@@ -152,6 +152,28 @@ prompts — and replay logs grow accordingly. This is the honest price. Concedin
 is a *distinguishable* option, so pawl's own invariant forbids eliding the ask;
 only the set of points at which it is offered may be narrowed, which is §7.
 
+**Reversibility.** The cost above is sunk into the *channel*, not the
+*frequency*, and the two are worth keeping apart. Every item in the list — the
+GADT arm, `Response`, both `Codec` arms, all three `Replay` arms, the arm in each
+answer function — is frequency-independent: an answer function does not care
+whether it is called six times or six hundred. The frequency lives at exactly one
+site, the poll in `Engine.priorityLoop`. Narrowing it later (only when the player
+is controlled, only at certain steps) is moving or guarding that one call, and
+nothing else changes. What is *not* cheap is deleting `Prompt.Concede` and
+folding concede back into `ChooseAction`, which re-touches everything and reopens
+the CR 723.6 hole — but that is the one outcome this design exists to prevent, so
+the irreversibility points the right way.
+
+One caveat with a deadline: `Replay.replay` is **positional**, consuming
+`[Response]` in order. Reducing the frequency later invalidates any transcript
+recorded at the old frequency — the engine would ask fewer prompts than the log
+has entries, and `decode` failing on a mismatched entry falls through to
+`defaultAnswer` rather than resyncing. That costs nothing today, because nothing
+persists a transcript (#126: no `GameState` / `Object` / `Source` codec) and
+CLAUDE.md disclaims API stability. It becomes a real migration cost once a
+save/replay feature ships. Tuning the volume is therefore free before #126 lands
+and not after.
+
 ## 7. The one elision: "at any time" becomes "at each priority grant"
 
 A player may want to concede while an **opponent** holds priority: they have
