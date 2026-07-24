@@ -10,7 +10,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Count as Count
@@ -23,6 +22,7 @@ import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -74,6 +74,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.Sickness as Sickness
@@ -90,27 +91,28 @@ import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-targetTests :: Cards.Cards -> Tasty.TestTree
-targetTests cards =
+targetTests :: Registry.Type.Registry -> Tasty.TestTree
+targetTests registry =
   Tasty.testGroup
     "Target"
-    [ HU.testCase "CR 115.4 AnyTarget offers every creature and every playing player" $
-        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-         in HU.assertEqual
-              "creature and both players"
-              (Set.fromList [Recipient.ToCreature oid, Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])
-              (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource) gs),
+    [ HU.testCase "CR 115.4 AnyTarget offers every creature and every playing player" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual
+          "creature and both players"
+          (Set.fromList [Recipient.ToCreature oid, Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])
+          (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource) gs),
       HU.testCase "a departed player is not a legal target" $
         let gs = Departure.depart Departure.Type.Lost S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertBool
               "bob gone"
               (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource) gs))),
-      HU.testCase "CR 608.2b a creature that left its zone is no longer legal" $
-        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+      HU.testCase "CR 608.2b a creature that left its zone is no longer legal" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
             gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
-         in do
-              HU.assertBool "legal while fielded" (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource) gs)
-              HU.assertBool "illegal once moved" (not (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource) gone)),
+        HU.assertBool "legal while fielded" (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource) gs)
+        HU.assertBool "illegal once moved" (not (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource) gone)),
       HU.testCase "legalSets maps each slot to its legal recipients" $
         let specs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource)
             gs = Setup.emptyGame S.bothPlayers
@@ -118,42 +120,45 @@ targetTests cards =
               "one slot, two players"
               (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]))
               (Target.legalSets S.noSource specs gs),
-      HU.testCase "CR 115.4 CreatureTarget offers creatures but no players" $
-        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-         in HU.assertEqual
-              "just the creature"
-              (Set.singleton (Recipient.ToCreature oid))
-              (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource) gs),
+      HU.testCase "CR 115.4 CreatureTarget offers creatures but no players" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual
+          "just the creature"
+          (Set.singleton (Recipient.ToCreature oid))
+          (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource) gs),
       HU.testCase "CR 601.2c CreatureTarget has an empty legal set with no creatures" $
         HU.assertBool
           "nothing to target"
           (Set.null (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource) (Setup.emptyGame S.bothPlayers))),
-      HU.testCase "CR 608.2b a creature that left is no longer a legal CreatureTarget" $
-        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+      HU.testCase "CR 608.2b a creature that left is no longer a legal CreatureTarget" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
             gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
-         in do
-              HU.assertBool "legal while fielded" (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource) gs)
-              HU.assertBool "illegal once moved" (not (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource) gone)),
-      HU.testCase "CR 115 SpellOrPermanentTarget offers battlefield permanents and stack spells" $
-        let (permId, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-         in HU.assertBool
-              "the permanent is a legal object target"
-              (Set.member (Recipient.ToObject permId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.SpellsAndPermanents Nothing Exclusion.IncludesSource) gs)),
-      HU.testCase "CR 115 SpellTarget offers a stack spell but not a battlefield permanent" $
-        let (permId, base) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-            (spellId, gs) = S.spellOnStack (Cards.lightningBoltPrinting cards) S.alice base
+        HU.assertBool "legal while fielded" (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource) gs)
+        HU.assertBool "illegal once moved" (not (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource) gone)),
+      HU.testCase "CR 115 SpellOrPermanentTarget offers battlefield permanents and stack spells" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (permId, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        HU.assertBool
+          "the permanent is a legal object target"
+          (Set.member (Recipient.ToObject permId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.SpellsAndPermanents Nothing Exclusion.IncludesSource) gs)),
+      HU.testCase "CR 115 SpellTarget offers a stack spell but not a battlefield permanent" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (permId, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+            (spellId, gs) = S.spellOnStack lightningBolt S.alice base
             legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Spells Nothing Exclusion.IncludesSource) gs
-         in do
-              HU.assertBool "the stack spell is a legal target" (Set.member (Recipient.ToObject spellId) legal)
-              HU.assertBool "the battlefield permanent is not a legal target" (not (Set.member (Recipient.ToObject permId) legal)),
-      HU.testCase "LandTarget offers a land as an object target, not a creature or player" $
-        let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
+        HU.assertBool "the stack spell is a legal target" (Set.member (Recipient.ToObject spellId) legal)
+        HU.assertBool "the battlefield permanent is not a legal target" (not (Set.member (Recipient.ToObject permId) legal)),
+      HU.testCase "LandTarget offers a land as an object target, not a creature or player" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let gs = S.landsInPlay mountain 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
-         in do
-              HU.assertBool "the land is legal" (Set.member (Recipient.ToObject landId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land)) Exclusion.IncludesSource) gs))
-              HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land)) Exclusion.IncludesSource) gs))),
+        HU.assertBool "the land is legal" (Set.member (Recipient.ToObject landId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land)) Exclusion.IncludesSource) gs))
+        HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land)) Exclusion.IncludesSource) gs))),
       HU.testCase "CR 115: PlayerTarget is exactly the players still in the game" $
         let gs = Setup.emptyGame S.bothPlayers
             expected = Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]
@@ -161,67 +166,76 @@ targetTests cards =
       -- CR 115.1a / 700.2c: "target Wall" (Chaos Charm) restricts CreatureTarget to
       -- creatures whose PROJECTED subtypes include Wall. Wall of Stone (a real 0/8
       -- Creature - Wall, M4g) is the Wall; a Piker is the non-Wall control.
-      HU.testCase "CR 115.1a / 700.2c \"target Wall\" offers a Wall creature but not a non-Wall creature" $
-        let (wallId, base) = S.addCreature (Cards.wallOfStonePrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-            (pikerId, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+      HU.testCase "CR 115.1a / 700.2c \"target Wall\" offers a Wall creature but not a non-Wall creature" $ do
+        wallOfStone <- Registry.printing registry "Wall of Stone"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (wallId, base) = S.addCreature wallOfStone S.bob (Setup.emptyGame S.bothPlayers)
+            (pikerId, gs) = S.addCreature piker S.alice base
             slot = SlotName.MkSlotName (Text.pack "target")
             legal = Map.findWithDefault Set.empty slot (Target.legalSets S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)) Exclusion.IncludesSource)) gs)
-         in do
-              HU.assertBool "the Wall is legal" (Set.member (Recipient.ToCreature wallId) legal)
-              HU.assertBool "the non-Wall creature is not legal" (not (Set.member (Recipient.ToCreature pikerId) legal)),
-      HU.testCase "CR 115.1a ArtifactTarget is the battlefield's projected artifacts" $
+        HU.assertBool "the Wall is legal" (Set.member (Recipient.ToCreature wallId) legal)
+        HU.assertBool "the non-Wall creature is not legal" (not (Set.member (Recipient.ToCreature pikerId) legal)),
+      HU.testCase "CR 115.1a ArtifactTarget is the battlefield's projected artifacts" $ do
         -- boardWithCreatureArtifactLand: alice has a Piker, a Mindslaver
         -- (Legendary Artifact) and a Mountain.
-        let gs = S.boardWithCreatureArtifactLand (Cards.pikerPrinting cards) (Cards.mindslaverPrinting cards) (Cards.mountainPrinting cards)
+        piker <- Registry.printing registry "Goblin Piker"
+        mindslaver <- Registry.printing registry "Mindslaver"
+        mountain <- Registry.printing registry "Mountain"
+        let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
             legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource) gs
-         in do
-              HU.assertEqual "exactly the artifact" (Set.singleton (Recipient.ToObject (S.artifactId gs))) legal
-              HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) legal)),
-      HU.testCase "CR 115.1a / 109.5 OpponentCreatureTarget excludes the source's controller's creatures" $
+        HU.assertEqual "exactly the artifact" (Set.singleton (Recipient.ToObject (S.artifactId gs))) legal
+        HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) legal)),
+      HU.testCase "CR 115.1a / 109.5 OpponentCreatureTarget excludes the source's controller's creatures" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
         let gs0 = Setup.emptyGame S.bothPlayers
-            (mine, gs1) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
-            (theirs, gs2) = S.addCreature (Cards.warMammothPrinting cards) S.bob gs1
+            (mine, gs1) = S.addCreature piker S.alice gs0
+            (theirs, gs2) = S.addCreature warMammoth S.bob gs1
             legal = Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent)) Exclusion.IncludesSource) gs2
-         in do
-              HU.assertEqual "only the opponent's creature" (Set.singleton (Recipient.ToCreature theirs)) legal
-              HU.assertBool "not the source's controller's own" (not (Set.member (Recipient.ToCreature mine) legal)),
-      HU.testCase "CR 613.1b OpponentCreatureTarget follows PROJECTED control, not ownership" $
+        HU.assertEqual "only the opponent's creature" (Set.singleton (Recipient.ToCreature theirs)) legal
+        HU.assertBool "not the source's controller's own" (not (Set.member (Recipient.ToCreature mine) legal)),
+      HU.testCase "CR 613.1b OpponentCreatureTarget follows PROJECTED control, not ownership" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        typhoidRats <- Registry.printing registry "Typhoid Rats"
         let gs0 = Setup.emptyGame S.bothPlayers
-            (mine, gs1) = S.addCreature (Cards.pikerPrinting cards) S.alice gs0
-            (theirs, gs2) = S.addCreature (Cards.warMammothPrinting cards) S.bob gs1
-            (alsoTheirs, gs3) = S.addCreature (Cards.typhoidRatsPrinting cards) S.bob gs2
+            (mine, gs1) = S.addCreature piker S.alice gs0
+            (theirs, gs2) = S.addCreature warMammoth S.bob gs1
+            (alsoTheirs, gs3) = S.addCreature typhoidRats S.bob gs2
             -- alice steals one of bob's creatures: it stops being "a creature an
             -- opponent controls" for alice's source, and becomes one for bob's.
             stolen = S.giveControl theirs S.alice gs3
-         in do
-              HU.assertEqual
-                "for alice's source, only the creature still under bob's control"
-                (Set.singleton (Recipient.ToCreature alsoTheirs))
-                (Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent)) Exclusion.IncludesSource) stolen)
-              HU.assertEqual
-                "for bob's source, the two alice now controls"
-                (Set.fromList [Recipient.ToCreature mine, Recipient.ToCreature theirs])
-                (Target.legalRecipients alsoTheirs (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent)) Exclusion.IncludesSource) stolen),
+        HU.assertEqual
+          "for alice's source, only the creature still under bob's control"
+          (Set.singleton (Recipient.ToCreature alsoTheirs))
+          (Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent)) Exclusion.IncludesSource) stolen)
+        HU.assertEqual
+          "for bob's source, the two alice now controls"
+          (Set.fromList [Recipient.ToCreature mine, Recipient.ToCreature theirs])
+          (Target.legalRecipients alsoTheirs (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent)) Exclusion.IncludesSource) stolen),
       -- P9 (#40): the reshaped TargetSpec = Pool + Maybe Filter + Exclusion
       -- reproduces the retired hand-carved specs as data. A black creature
       -- (Typhoid Rats, {B}) and a nonblack one (Goblin Piker, {1}{R}) exercise
       -- the Not (HasColor Black) filter that WAS NonblackCreatureTarget.
-      HU.testCase "P9 Creatures + Not (HasColor Black) excludes a black creature" $
+      HU.testCase "P9 Creatures + Not (HasColor Black) excludes a black creature" $ do
+        typhoidRats <- Registry.printing registry "Typhoid Rats"
+        piker <- Registry.printing registry "Goblin Piker"
         let gs0 = Setup.emptyGame S.bothPlayers
-            (blackOid, gs1) = S.addCreature (Cards.typhoidRatsPrinting cards) S.bob gs0
-            (plainOid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice gs1
+            (blackOid, gs1) = S.addCreature typhoidRats S.bob gs0
+            (plainOid, gs) = S.addCreature piker S.alice gs1
             spec = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource
             legal = Target.legalRecipients S.noSource spec gs
-         in do
-              HU.assertBool "black creature illegal" (not (Set.member (Recipient.ToCreature blackOid) legal))
-              HU.assertBool "nonblack creature legal" (Set.member (Recipient.ToCreature plainOid) legal),
-      HU.testCase "P9 Creatures + Nothing narrows nothing" $
+        HU.assertBool "black creature illegal" (not (Set.member (Recipient.ToCreature blackOid) legal))
+        HU.assertBool "nonblack creature legal" (Set.member (Recipient.ToCreature plainOid) legal),
+      HU.testCase "P9 Creatures + Nothing narrows nothing" $ do
+        typhoidRats <- Registry.printing registry "Typhoid Rats"
+        piker <- Registry.printing registry "Goblin Piker"
         let gs0 = Setup.emptyGame S.bothPlayers
-            (blackOid, gs1) = S.addCreature (Cards.typhoidRatsPrinting cards) S.bob gs0
-            (plainOid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice gs1
+            (blackOid, gs1) = S.addCreature typhoidRats S.bob gs0
+            (plainOid, gs) = S.addCreature piker S.alice gs1
             spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource
             expectedAllCreatures = Set.fromList [Recipient.ToCreature blackOid, Recipient.ToCreature plainOid]
-         in HU.assertEqual "all creatures legal" expectedAllCreatures (Target.legalRecipients S.noSource spec gs),
+        HU.assertEqual "all creatures legal" expectedAllCreatures (Target.legalRecipients S.noSource spec gs),
       HU.testCase "P9 selfExcludes reads the Exclusion field, not the Pool or Filter" $ do
         HU.assertBool
           "ExcludesSource excludes"
@@ -234,101 +248,130 @@ targetTests cards =
       -- regeneration shield to suppress), so that clause is a no-op and is
       -- omitted from data/cards/{terror,reprisal}.json -- regeneration clause
       -- omitted; not modelled (#113).
-      HU.testCase "Terror: And of Not(HasColor Black) and Not(HasCardType Artifact) excludes black and artifact creatures" $
-        case S.spellTargetSpec (Cards.terrorPrinting cards) of
+      HU.testCase "Terror: And of Not(HasColor Black) and Not(HasCardType Artifact) excludes black and artifact creatures" $ do
+        terror <- Registry.printing registry "Terror"
+        typhoidRats <- Registry.printing registry "Typhoid Rats"
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        piker <- Registry.printing registry "Goblin Piker"
+        case S.spellTargetSpec terror of
           Nothing -> HU.assertFailure "Terror's printing carries no 'target' slot"
-          Just spec ->
+          Just spec -> do
             let gs0 = Setup.emptyGame S.bothPlayers
-                (blackOid, gs1) = S.addCreature (Cards.typhoidRatsPrinting cards) S.bob gs0
-                (artifactOid, gs2) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob gs1
-                (plainOid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice gs2
+                (blackOid, gs1) = S.addCreature typhoidRats S.bob gs0
+                (artifactOid, gs2) = S.addCreature darksteelMyr S.bob gs1
+                (plainOid, gs) = S.addCreature piker S.alice gs2
                 legal = Target.legalRecipients S.noSource spec gs
-             in do
-                  HU.assertBool "black creature illegal" (not (Set.member (Recipient.ToCreature blackOid) legal))
-                  HU.assertBool "artifact creature illegal" (not (Set.member (Recipient.ToCreature artifactOid) legal))
-                  HU.assertBool "nonblack, nonartifact creature legal" (Set.member (Recipient.ToCreature plainOid) legal),
-      HU.testCase "Reprisal: PowerAtLeast 4 legality tracks a projected power pump" $
-        case S.spellTargetSpec (Cards.reprisalPrinting cards) of
+            HU.assertBool "black creature illegal" (not (Set.member (Recipient.ToCreature blackOid) legal))
+            HU.assertBool "artifact creature illegal" (not (Set.member (Recipient.ToCreature artifactOid) legal))
+            HU.assertBool "nonblack, nonartifact creature legal" (Set.member (Recipient.ToCreature plainOid) legal),
+      HU.testCase "Reprisal: PowerAtLeast 4 legality tracks a projected power pump" $ do
+        reprisal <- Registry.printing registry "Reprisal"
+        piker <- Registry.printing registry "Goblin Piker"
+        case S.spellTargetSpec reprisal of
           Nothing -> HU.assertFailure "Reprisal's printing carries no 'target' slot"
-          Just spec ->
+          Just spec -> do
             let gs0 = Setup.emptyGame S.bothPlayers
-                (smallOid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0 -- power 2, {1}{R}
+                (smallOid, gs) = S.addCreature piker S.bob gs0 -- power 2, {1}{R}
                 legalBefore = Target.legalRecipients S.noSource spec gs
                 pumped = S.withEffect smallOid (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0)) gs
                 legalAfter = Target.legalRecipients S.noSource spec pumped
-             in do
-                  HU.assertBool "power 2 is illegal (below the PowerAtLeast 4 floor)" (not (Set.member (Recipient.ToCreature smallOid) legalBefore))
-                  HU.assertBool "pumped to power 4 becomes legal" (Set.member (Recipient.ToCreature smallOid) legalAfter)
+            HU.assertBool "power 2 is illegal (below the PowerAtLeast 4 floor)" (not (Set.member (Recipient.ToCreature smallOid) legalBefore))
+            HU.assertBool "pumped to power 4 becomes legal" (Set.member (Recipient.ToCreature smallOid) legalAfter)
     ]
 
-resolveTests :: Cards.Cards -> Tasty.TestTree
-resolveTests cards =
+resolveTests :: Registry.Type.Registry -> Tasty.TestTree
+resolveTests registry =
   Tasty.testGroup
     "Resolve"
-    [ HU.testCase "CR 608 a resolved spell's damage is Noncombat" $
-        let base = S.landsInPlay (Cards.mountainPrinting cards) 1
-            (_target, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
-            (gs1, spellId) = S.handOne (Cards.lightningBoltPrinting cards) gs0
+    [ HU.testCase "CR 608 a resolved spell's damage is Noncombat" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let base = S.landsInPlay mountain 1
+            (_target, gs0) = S.addCreature piker S.bob base
+            (gs1, spellId) = S.handOne lightningBolt gs0
             cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice spellId))
             -- resolveTop applies the damage but does NOT run SBAs, so the event persists.
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in HU.assertEqual
-              "the Bolt's damage event is Noncombat"
-              [DamageKind.Noncombat]
-              (fmap DamageEvent.kind (S.damageEventsOf resolved)),
-      HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $
-        let (_, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
+        HU.assertEqual
+          "the Bolt's damage event is Noncombat"
+          [DamageKind.Noncombat]
+          (fmap DamageEvent.kind (S.damageEventsOf resolved)),
+      HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (_, cast, _) = S.boltAtBobsPiker piker mountain lightningBolt
             after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
-         in do
-              HU.assertEqual "stack empty" 0 (length (GameState.stack after))
-              HU.assertEqual "no creature survives" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "Piker in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
-      HU.testCase "CR 608.2n the resolved Bolt is in its owner's graveyard" $
-        let (_, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
+        HU.assertEqual "stack empty" 0 (length (GameState.stack after))
+        HU.assertEqual "no creature survives" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "Piker in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 608.2n the resolved Bolt is in its owner's graveyard" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (_, cast, _) = S.boltAtBobsPiker piker mountain lightningBolt
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in HU.assertEqual "one card" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
-      HU.testCase "CR 120.3a a Bolt at a player drains life without marking" $
+        HU.assertEqual "one card" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 120.3a a Bolt at a player drains life without marking" $ do
         -- No creature on the battlefield, so identityAnswer's lookupMin picks
         -- ToPlayer alice: a self-Bolt, which is legal Magic.
-        let (gs, oid) = S.boltInHand (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards) 1 Phase.PrecombatMain
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in HU.assertEqual "seventeen" (Just 17) (S.lifeOf S.alice after),
-      HU.testCase "the resolved damage flows through the event funnel" $
-        let (_, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
+        HU.assertEqual "seventeen" (Just 17) (S.lifeOf S.alice after),
+      HU.testCase "the resolved damage flows through the event funnel" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (_, cast, _) = S.boltAtBobsPiker piker mountain lightningBolt
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in HU.assertEqual "one event of amount 3" [3] (fmap DamageEvent.amount (S.damageEventsOf after)),
-      HU.testCase "resolving a Bolt conserves objects" $
-        let (_, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
-         in HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))),
-      HU.testCase "CR 608.2b a Bolt whose only target died fizzles" $
-        let (base, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
+        HU.assertEqual "one event of amount 3" [3] (fmap DamageEvent.amount (S.damageEventsOf after)),
+      HU.testCase "resolving a Bolt conserves objects" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (_, cast, _) = S.boltAtBobsPiker piker mountain lightningBolt
+        HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))),
+      HU.testCase "CR 608.2b a Bolt whose only target died fizzles" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (base, cast, _) = S.boltAtBobsPiker piker mountain lightningBolt
             -- Kill the Piker while the Bolt is on the stack, as Bolt B will in
             -- the integration test, then check state-based actions.
             dead = S.settleSba (S.markDamage (S.pikerOf base) 3 cast)
             after = snd (Engine.runGamePure S.identityAnswer dead Stack.resolveTop)
-         in do
-              HU.assertEqual "Bolt in the graveyard, unresolved" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
-              HU.assertEqual "no damage was dealt" [] (S.damageEventsOf after)
-              HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after),
-      HU.testCase "CR 608.2b a fizzled spell applies none of its effects" $
-        let (base, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
+        HU.assertEqual "Bolt in the graveyard, unresolved" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+        HU.assertEqual "no damage was dealt" [] (S.damageEventsOf after)
+        HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after),
+      HU.testCase "CR 608.2b a fizzled spell applies none of its effects" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (base, cast, _) = S.boltAtBobsPiker piker mountain lightningBolt
             dead = S.settleSba (S.markDamage (S.pikerOf base) 3 cast)
             after = snd (Engine.runGamePure S.identityAnswer dead Stack.resolveTop)
-         in HU.assertEqual "life totals unchanged" (Just 20) (S.lifeOf S.alice after),
+        HU.assertEqual "life totals unchanged" (Just 20) (S.lifeOf S.alice after),
       -- The deterministic successor to the retired "instants happen" property: a
       -- Bolt cast in a game and resolved ends in its owner's graveyard.
-      HU.testCase "a cast Bolt reaches its owner's graveyard" $
-        let (_, cast, _) = S.boltAtBobsPiker (Cards.pikerPrinting cards) (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards)
+      HU.testCase "a cast Bolt reaches its owner's graveyard" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (_, cast, _) = S.boltAtBobsPiker piker mountain lightningBolt
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in HU.assertEqual "one card in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
-      HU.testCase "CR 612 slotsOf and textChangeSlots find a ChangeText slot" $
+        HU.assertEqual "one card in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 612 slotsOf and textChangeSlots find a ChangeText slot" $ do
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
         let slot = SlotName.MkSlotName (Text.pack "target")
             card =
               Card.Type.MkCard
                 { Card.Type.name = Text.pack "T",
                   Card.Type.manaCost = Nothing,
-                  Card.Type.typeLine = Card.Type.typeLine (Printing.card (Cards.lightningBoltPrinting cards)),
+                  Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
                   Card.Type.power = Nothing,
                   Card.Type.toughness = Nothing,
                   Card.Type.keywords = Set.empty,
@@ -348,17 +391,18 @@ resolveTests cards =
                   Card.Type.additionalCosts = [],
                   Card.Type.alternativeCosts = []
                 }
-         in do
-              HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))
-              HU.assertEqual "textChangeSlots" [slot] (Resolve.textChangeSlots card),
+        HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))
+        HU.assertEqual "textChangeSlots" [slot] (Resolve.textChangeSlots card),
       HU.testCase "CR 605 manaProduced reads AddMana, nothing else" $ do
         HU.assertEqual "add mana" (Just (ManaType.Colored Color.Green)) (Resolve.manaProduced (Effect.AddMana (ManaType.Colored Color.Green)))
         HU.assertEqual "damage produces no mana" Nothing (Resolve.manaProduced (Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1))),
-      HU.testCase "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $
+      HU.testCase "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $ do
         -- The target is a Forest, so the assertion {Mountain} proves the rewrite:
         -- un-rewritten the effect is SetLandSubtype Swamp -> {Swamp}; rewritten
         -- (Swamp -> Mountain) it is SetLandSubtype Mountain -> {Mountain}.
-        let base = S.landsInPlay (Cards.forestPrinting cards) 1
+        forest <- Registry.printing registry "Forest"
+        landform <- Registry.printing registry "Landform"
+        let base = S.landsInPlay forest 1
             targetLand = case Game.zoneMembers Zone.Battlefield S.alice base of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
@@ -367,7 +411,7 @@ resolveTests cards =
             landformObj =
               Object.MkObject
                 { Object.owner = S.alice,
-                  Object.source = Source.OfCard (Cards.landformPrinting cards),
+                  Object.source = Source.OfCard landform,
                   Object.zone = Zone.Stack,
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
@@ -389,18 +433,19 @@ resolveTests cards =
             -- Landform spell (stored on the Landform's id).
             hacked = S.withEffectAt landformId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Swamp Subtype.Mountain) g2
             after = snd (Engine.runGamePure S.identityAnswer hacked (Resolve.resolveSpell landformId))
-         in do
-              -- Landform's own subtype does not matter; its EFFECT was rewritten to
-              -- SetLandSubtype Mountain, so the target land ends up a Mountain.
-              HU.assertEqual "target land became Mountain, not Swamp" (Set.singleton Subtype.Mountain) (Projection.subtypesOf targetLand after),
-      HU.testCase "CR 400.7 hacking Blood Moon on the stack is lost when it resolves" $
+        -- Landform's own subtype does not matter; its EFFECT was rewritten to
+        -- SetLandSubtype Mountain, so the target land ends up a Mountain.
+        HU.assertEqual "target land became Mountain, not Swamp" (Set.singleton Subtype.Mountain) (Projection.subtypesOf targetLand after),
+      HU.testCase "CR 400.7 hacking Blood Moon on the stack is lost when it resolves" $ do
+        urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+        bloodMoon <- Registry.printing registry "Blood Moon"
         let base = Setup.emptyGame S.bothPlayers
-            (nonbasicId, g1) = S.addCreature (Cards.urborgPrinting cards) S.alice base
+            (nonbasicId, g1) = S.addCreature urborg S.alice base
             (bloodMoonSpellId, g2) = Game.freshObjectId g1
             bmObj =
               Object.MkObject
                 { Object.owner = S.alice,
-                  Object.source = Source.OfCard (Cards.bloodMoonPrinting cards),
+                  Object.source = Source.OfCard bloodMoon,
                   Object.zone = Zone.Stack,
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
@@ -416,12 +461,13 @@ resolveTests cards =
                 }
             hacked = S.withEffectAt bloodMoonSpellId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g3
             after = snd (Engine.runGamePure S.identityAnswer hacked Stack.resolveTop)
-         in -- Blood Moon entered as a NEW object; the hack (locked to the spell id)
-            -- no longer names it, so nonbasic lands are Mountains, not Islands.
-            HU.assertEqual "hack lost: nonbasic land is Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf nonbasicId after),
-      HU.testCase "CR 608.2n a resolving ability deals its damage and ceases" $
-        let (srcId, g0) = S.addCreature (Cards.prodigalSorcererPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            ability = case Card.Type.activatedAbilities (Printing.card (Cards.prodigalSorcererPrinting cards)) of
+        -- Blood Moon entered as a NEW object; the hack (locked to the spell id)
+        -- no longer names it, so nonbasic lands are Mountains, not Islands.
+        HU.assertEqual "hack lost: nonbasic land is Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf nonbasicId after),
+      HU.testCase "CR 608.2n a resolving ability deals its damage and ceases" $ do
+        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+        let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+            ability = case Card.Type.activatedAbilities (Printing.card prodigalSorcerer) of
               ab : _ -> ab
               [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g1) = Game.freshObjectId g0
@@ -445,15 +491,15 @@ resolveTests cards =
                   GameState.stack = abilId : GameState.stack g2
                 }
             resolved = snd (Engine.runGamePure S.identityAnswer g3 Stack.resolveTop)
-         in do
-              HU.assertEqual "bob took 1" (Just 19) (S.lifeOf S.bob resolved)
-              HU.assertEqual "ability object gone" Nothing (Game.lookupObject abilId resolved)
-              HU.assertEqual "stack empty" [] (GameState.stack resolved),
-      HU.testCase "CR 701.23 Search fetches a basic land to the battlefield tapped" $
+        HU.assertEqual "bob took 1" (Just 19) (S.lifeOf S.bob resolved)
+        HU.assertEqual "ability object gone" Nothing (Game.lookupObject abilId resolved)
+        HU.assertEqual "stack empty" [] (GameState.stack resolved),
+      HU.testCase "CR 701.23 Search fetches a basic land to the battlefield tapped" $ do
         -- The fetched card gets a NEW object id (CR 400.7 changeZone), so assert by
         -- count/tapped-count, never by the library incarnation's id.
+        mountain <- Registry.printing registry "Mountain"
         let base = Setup.emptyGame S.bothPlayers
-            (_, g1) = S.addLibraryCard (Cards.mountainPrinting cards) S.alice base
+            (_, g1) = S.addLibraryCard mountain S.alice base
             ability =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
@@ -464,21 +510,21 @@ resolveTests cards =
               Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty ts
             g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
             resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
-         in do
-              HU.assertEqual "one permanent on the battlefield" 1 (length (Game.zoneMembers Zone.Battlefield S.alice resolved))
-              HU.assertEqual "it is tapped" 1 (S.tappedCount S.alice resolved)
-              HU.assertEqual "library empty" [] (Game.zoneMembers Zone.Library S.alice resolved),
-      HU.testCase "CR 701.23b Search may fail to find" $
+        HU.assertEqual "one permanent on the battlefield" 1 (length (Game.zoneMembers Zone.Battlefield S.alice resolved))
+        HU.assertEqual "it is tapped" 1 (S.tappedCount S.alice resolved)
+        HU.assertEqual "library empty" [] (Game.zoneMembers Zone.Library S.alice resolved),
+      HU.testCase "CR 701.23b Search may fail to find" $ do
+        mountain <- Registry.printing registry "Mountain"
         let base = Setup.emptyGame S.bothPlayers
-            (_, g1) = S.addLibraryCard (Cards.mountainPrinting cards) S.alice base
+            (_, g1) = S.addLibraryCard mountain S.alice base
             ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty ts
             g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
             resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
-         in HU.assertEqual "nothing entered the battlefield" Set.empty (GameState.battlefield resolved),
-      HU.testCase "CR 701.23a Search (And [HasCardType Land, HasSupertype Basic]) offers a basic land, not a nonland" $
+        HU.assertEqual "nothing entered the battlefield" Set.empty (GameState.battlefield resolved),
+      HU.testCase "CR 701.23a Search (And [HasCardType Land, HasSupertype Basic]) offers a basic land, not a nonland" $ do
         -- P9: the Search filter reads each library card through the PRINTED-card
         -- view (Projection.viewOfCard) -- a card in a library has no projection.
         -- With a Mountain (basic land) and a Piker (creature) both in the library,
@@ -486,9 +532,11 @@ resolveTests cards =
         -- stays put. The Piker is added SECOND, so it is the head of the library
         -- (Support.addLibraryCard prepends); a filter that matched everything would
         -- fetch the Piker and this test would fail.
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
         let base = Setup.emptyGame S.bothPlayers
-            (_, g0) = S.addLibraryCard (Cards.mountainPrinting cards) S.alice base
-            (pikerId, g1) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice g0
+            (_, g0) = S.addLibraryCard mountain S.alice base
+            (pikerId, g1) = S.addLibraryCard piker S.alice g0
             ability =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
@@ -499,13 +547,14 @@ resolveTests cards =
               Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 Sickness.Settled (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty ts
             g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
             resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
-         in do
-              HU.assertEqual "the basic land is offered and fetched to the battlefield" 1 (S.countOnBattlefieldByName (Text.pack "Mountain") S.alice resolved)
-              HU.assertBool "the nonland is not offered -- it remains in the library" (elem pikerId (Game.zoneMembers Zone.Library S.alice resolved)),
-      HU.testCase "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $
+        HU.assertEqual "the basic land is offered and fetched to the battlefield" 1 (S.countOnBattlefieldByName (Text.pack "Mountain") S.alice resolved)
+        HU.assertBool "the nonland is not offered -- it remains in the library" (elem pikerId (Game.zoneMembers Zone.Library S.alice resolved)),
+      HU.testCase "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        piker <- Registry.printing registry "Goblin Piker"
         let g0 = Setup.emptyGame S.bothPlayers
-            (ripId, g1) = S.addCreature (Cards.restInPeacePrinting cards) S.alice g0
-            (deadId, g2) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob g1
+            (ripId, g1) = S.addCreature restInPeace S.alice g0
+            (deadId, g2) = S.addLibraryCard piker S.bob g1
             -- move the Piker into bob's graveyard
             g3 = S.runPure S.identityAnswer g2 (Event.changeZone deadId Zone.Graveyard)
             ability =
@@ -529,12 +578,12 @@ resolveTests cards =
                 }
             g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
             resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
-         in do
-              HU.assertEqual "bob's graveyard is empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
-              HU.assertEqual "ability ceased" Nothing (Game.lookupObject abilId resolved),
-      HU.testCase "CR 723.1: Mindslaver's ability installs pending control, promoted next turn" $
+        HU.assertEqual "bob's graveyard is empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
+        HU.assertEqual "ability ceased" Nothing (Game.lookupObject abilId resolved),
+      HU.testCase "CR 723.1: Mindslaver's ability installs pending control, promoted next turn" $ do
+        mindslaver <- Registry.printing registry "Mindslaver"
         let g0 = Setup.emptyGame S.bothPlayers
-            (srcId, g1) = S.addCreature (Cards.mindslaverPrinting cards) S.alice g0
+            (srcId, g1) = S.addCreature mindslaver S.alice g0
             slot = SlotName.MkSlotName (Text.pack "target")
             ability =
               ActivatedAbility.MkActivatedAbility
@@ -566,21 +615,21 @@ resolveTests cards =
             resolved = snd (Engine.runGamePure S.identityAnswer g4 Stack.resolveTop)
             bobsTurn = snd (Engine.runGamePure S.identityAnswer resolved Engine.handoffTurn)
             afterBob = snd (Engine.runGamePure S.identityAnswer bobsTurn Engine.handoffTurn)
-         in do
-              HU.assertEqual "control pending for bob" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl resolved))
-              HU.assertEqual "promoted on bob's turn" (Just (Decider.MkDecider S.alice)) (GameState.activeControl bobsTurn)
-              HU.assertEqual "bob's decisions route to alice" (Decider.MkDecider S.alice) (Decide.deciderFor S.bob bobsTurn)
-              HU.assertEqual "control expired after bob's turn" (Decider.MkDecider S.bob) (Decide.deciderFor S.bob afterBob),
-      HU.testCase "CR 723.1a: a second player-controlling effect overwrites the first (last created wins)" $
+        HU.assertEqual "control pending for bob" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl resolved))
+        HU.assertEqual "promoted on bob's turn" (Just (Decider.MkDecider S.alice)) (GameState.activeControl bobsTurn)
+        HU.assertEqual "bob's decisions route to alice" (Decider.MkDecider S.alice) (Decide.deciderFor S.bob bobsTurn)
+        HU.assertEqual "control expired after bob's turn" (Decider.MkDecider S.bob) (Decide.deciderFor S.bob afterBob),
+      HU.testCase "CR 723.1a: a second player-controlling effect overwrites the first (last created wins)" $ do
+        mindslaver <- Registry.printing registry "Mindslaver"
         let base = Setup.emptyGame S.bothPlayers
             -- First: alice controls bob.
-            afterAlice = installControlBy cards S.alice S.bob base
+            afterAlice = installControlBy mindslaver S.alice S.bob base
             -- Then: bob controls bob (CR 723.9 self-control), created LATER.
-            afterBob = installControlBy cards S.bob S.bob afterAlice
-         in do
-              HU.assertEqual "the first effect installed alice as bob's decider" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl afterAlice))
-              HU.assertEqual "CR 723.1a: the later effect overwrites — bob's own control wins" (Just (Decider.MkDecider S.bob)) (Map.lookup S.bob (GameState.pendingControl afterBob)),
-      HU.testCase "CR 727.1a: resolving a RestartGame ability restarts with its controller as starting player" $
+            afterBob = installControlBy mindslaver S.bob S.bob afterAlice
+        HU.assertEqual "the first effect installed alice as bob's decider" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl afterAlice))
+        HU.assertEqual "CR 723.1a: the later effect overwrites — bob's own control wins" (Just (Decider.MkDecider S.bob)) (Map.lookup S.bob (GameState.pendingControl afterBob)),
+      HU.testCase "CR 727.1a: resolving a RestartGame ability restarts with its controller as starting player" $ do
+        mountain <- Registry.printing registry "Mountain"
         let g0 = Setup.emptyGame S.bothPlayers
             -- alice owns a card on the battlefield; it must survive the restart.
             -- aliceId only threads into the ability's Source.OfAbility below --
@@ -588,10 +637,10 @@ resolveTests cards =
             -- change (Event.changeZone), so the post-restart check is ownership-
             -- based (SetupSpec's CR 727.2 test uses the same idiom), not a
             -- lookup by this specific pre-restart id.
-            (aliceId, g1) = S.addCreature (Cards.mountainPrinting cards) S.alice g0
+            (aliceId, g1) = S.addCreature mountain S.alice g0
             -- bob owns 8 cards (enough for a full opening hand, no CR 727.3 loss).
-            g2 = addMany cards 8 S.bob g1
-            g3 = addMany cards 7 S.alice g2
+            g2 = addMany mountain 8 S.bob g1
+            g3 = addMany mountain 7 S.alice g2
             -- Hand-build bob's ability object on the stack: one mode, effect
             -- RestartGame, no targets. Object.owner = bob is the resolving
             -- controller (Resolve.hs), which restartGame uses as the starter.
@@ -623,11 +672,11 @@ resolveTests cards =
                 }
             g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
             after = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
-         in do
-              HU.assertEqual "the game restarted with bob as the starting player (CR 727.1a)" S.bob (GameState.activePlayer after)
-              HU.assertEqual "alice's 8 cards all survived the restart, still hers (CR 727.2)" 8 (length (filter (\o -> Object.owner o == S.alice) (Map.elems (GameState.objects after))))
-              HU.assertEqual "the resolving ability object ceased to exist (not a card)" Nothing (Game.lookupObject abilId after),
-      HU.testCase "CR 729.1b: PlaySubgame binds the loser, a later DealDamage reads it (mid-resolution binding visible)" $
+        HU.assertEqual "the game restarted with bob as the starting player (CR 727.1a)" S.bob (GameState.activePlayer after)
+        HU.assertEqual "alice's 8 cards all survived the restart, still hers (CR 727.2)" 8 (length (filter (\o -> Object.owner o == S.alice) (Map.elems (GameState.objects after))))
+        HU.assertEqual "the resolving ability object ceased to exist (not a card)" Nothing (Game.lookupObject abilId after),
+      HU.testCase "CR 729.1b: PlaySubgame binds the loser, a later DealDamage reads it (mid-resolution binding visible)" $ do
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
         let g0 = Setup.emptyGame S.bothPlayers
             slot = SlotName.MkSlotName (Text.pack "loser")
             -- a stub runner: no real subgame, just report alice won -> loser = bob.
@@ -643,7 +692,7 @@ resolveTests cards =
               Card.Type.MkCard
                 { Card.Type.name = Text.pack "Subgame Test Spell",
                   Card.Type.manaCost = Nothing,
-                  Card.Type.typeLine = Card.Type.typeLine (Printing.card (Cards.lightningBoltPrinting cards)),
+                  Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
                   Card.Type.power = Nothing,
                   Card.Type.toughness = Nothing,
                   Card.Type.keywords = Set.empty,
@@ -677,91 +726,101 @@ resolveTests cards =
                 }
             g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
             after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
-         in HU.assertEqual "bob (the derived loser) lost 3 life to the follow-on DealDamage" (Just 17) (S.lifeOf S.bob after),
-      HU.testCase "CR 111 Dragon Fodder creates two 1/1 Goblin tokens" $
-        let base = S.landsInPlay (Cards.mountainPrinting cards) 2
-            (gs, spellId) = S.handOne (Cards.dragonFodderPrinting cards) base
+        HU.assertEqual "bob (the derived loser) lost 3 life to the follow-on DealDamage" (Just 17) (S.lifeOf S.bob after),
+      HU.testCase "CR 111 Dragon Fodder creates two 1/1 Goblin tokens" $ do
+        mountain <- Registry.printing registry "Mountain"
+        dragonFodder <- Registry.printing registry "Dragon Fodder"
+        let base = S.landsInPlay mountain 2
+            (gs, spellId) = S.handOne dragonFodder base
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in do
-              -- Two Goblin tokens exist (count == 2 proves two distinct objects). The
-              -- battlefield also holds alice's 2 Mountains, so filter by name/creature.
-              HU.assertEqual "two Goblin tokens on the battlefield" 2 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after)
-              HU.assertEqual "alice controls two creatures (the tokens)" 2 (S.creaturesInPlay S.alice after)
-              HU.assertEqual "Dragon Fodder went to the graveyard (CR 608.2n)" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
-      HU.testCase "CR 615 Fog prevents combat damage but not spell damage (the gate)" $
-        let base = S.landsInPlay (Cards.forestPrinting cards) 1
-            (victim, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob base
-            (gs1, fogId) = S.handOne (Cards.fogPrinting cards) gs0
+        -- Two Goblin tokens exist (count == 2 proves two distinct objects). The
+        -- battlefield also holds alice's 2 Mountains, so filter by name/creature.
+        HU.assertEqual "two Goblin tokens on the battlefield" 2 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after)
+        HU.assertEqual "alice controls two creatures (the tokens)" 2 (S.creaturesInPlay S.alice after)
+        HU.assertEqual "Dragon Fodder went to the graveyard (CR 608.2n)" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 615 Fog prevents combat damage but not spell damage (the gate)" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        fog <- Registry.printing registry "Fog"
+        let base = S.landsInPlay forest 1
+            (victim, gs0) = S.addCreature piker S.bob base
+            (gs1, fogId) = S.handOne fog gs0
             cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice fogId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
             combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Combat])
             spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Noncombat])
-         in do
-              HU.assertEqual "Fog installed one replacement" 1 (length (GameState.replacements resolved))
-              HU.assertEqual "combat damage prevented (the cancel shape)" (Just 0) (S.damageOf victim combat)
-              -- The falsifier: a tag-blind Fog would also blunt this spell damage.
-              HU.assertEqual "spell damage untouched (Noncombat)" (Just 2) (S.damageOf victim spell),
+        HU.assertEqual "Fog installed one replacement" 1 (length (GameState.replacements resolved))
+        HU.assertEqual "combat damage prevented (the cancel shape)" (Just 0) (S.damageOf victim combat)
+        -- The falsifier: a tag-blind Fog would also blunt this spell damage.
+        HU.assertEqual "spell damage untouched (Noncombat)" (Just 2) (S.damageOf victim spell),
       -- Sudden Impact: "deals damage to target player equal to the number of
       -- cards in THAT player's hand." Cast through the real path (Cast.castSpell
       -- + resolveTop), not S.spellOnStack -- that helper sets Object.bindings =
       -- Map.empty and so does not fill the target slot the InSlot count reads.
-      HU.testCase "Sudden Impact reads the TARGET's hand, not the caster's" $
+      HU.testCase "Sudden Impact reads the TARGET's hand, not the caster's" $ do
         -- THE FALSIFIER for a perspective baked into the count: Alice holds
         -- five and Bob holds two, and Bob takes two. A count whose "you" were
         -- the resolving controller (Alice) would deal five instead.
-        let gs0 = S.landsInPlay (Cards.mountainPrinting cards) 4
-            fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard (Cards.pikerPrinting cards) pid g)) g0 [1 .. (n :: Int)]
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        suddenImpact <- Registry.printing registry "Sudden Impact"
+        let gs0 = S.landsInPlay mountain 4
+            fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard piker pid g)) g0 [1 .. (n :: Int)]
             gs1 = fill S.alice 5 (fill S.bob 2 gs0)
-            (spellId, gs2) = S.addHandCard (Cards.suddenImpactPrinting cards) S.alice gs1
+            (spellId, gs2) = S.addHandCard suddenImpact S.alice gs1
             cast = snd (Engine.runGamePure atBobAnswer gs2 (Cast.castSpell S.alice spellId))
             before = S.lifeOf S.bob cast
             after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
-         in HU.assertEqual "two damage" (fmap (subtract 2) before) (S.lifeOf S.bob after),
-      HU.testCase "CR 608.2h the number is read as the effect is applied, not as the spell is cast" $
+        HU.assertEqual "two damage" (fmap (subtract 2) before) (S.lifeOf S.bob after),
+      HU.testCase "CR 608.2h the number is read as the effect is applied, not as the spell is cast" $ do
         -- Bob's hand grows AFTER Sudden Impact is on the stack and BEFORE it
         -- resolves; the damage follows the hand size at resolution.
-        let gs0 = S.landsInPlay (Cards.mountainPrinting cards) 4
-            fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard (Cards.pikerPrinting cards) pid g)) g0 [1 .. (n :: Int)]
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        suddenImpact <- Registry.printing registry "Sudden Impact"
+        let gs0 = S.landsInPlay mountain 4
+            fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard piker pid g)) g0 [1 .. (n :: Int)]
             gs1 = fill S.bob 2 gs0
-            (spellId, gs2) = S.addHandCard (Cards.suddenImpactPrinting cards) S.alice gs1
+            (spellId, gs2) = S.addHandCard suddenImpact S.alice gs1
             cast = snd (Engine.runGamePure atBobAnswer gs2 (Cast.castSpell S.alice spellId))
-            (_, cast1) = S.addHandCard (Cards.pikerPrinting cards) S.bob cast
+            (_, cast1) = S.addHandCard piker S.bob cast
             before = S.lifeOf S.bob cast1
             after = snd (Engine.runGamePure atBobAnswer cast1 Stack.resolveTop)
-         in HU.assertEqual "three damage" (fmap (subtract 3) before) (S.lifeOf S.bob after),
-      HU.testCase "the same count with Relative You reads the caster's hand" $
+        HU.assertEqual "three damage" (fmap (subtract 3) before) (S.lifeOf S.bob after),
+      HU.testCase "the same count with Relative You reads the caster's hand" $ do
         -- The direct contrast: the SAME Count shape (InZone Hand, Objects) that
         -- Sudden Impact scopes with PlayerRef.InSlot also serves Inner Calm,
         -- Outer Strength's PlayerRef.Relative You -- one shape, two
         -- perspectives, neither welded into a constructor.
+        piker <- Registry.printing registry "Goblin Piker"
         let gs0 = Setup.emptyGame S.bothPlayers
-            fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard (Cards.pikerPrinting cards) pid g)) g0 [1 .. (n :: Int)]
+            fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard piker pid g)) g0 [1 .. (n :: Int)]
             gs = fill S.alice 5 (fill S.bob 2 gs0)
             yourHand =
               Count.Type.MkCount
                 (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
                 (Filter.Type.And [])
                 Aggregation.Objects
-         in HU.assertEqual
-              "Alice's five"
-              (Just 5)
-              (Count.evaluate (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.MkContext (Just S.alice) Nothing) gs yourHand)
+        HU.assertEqual
+          "Alice's five"
+          (Just 5)
+          (Count.evaluate (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.MkContext (Just S.alice) Nothing) gs yourHand)
     ]
 
 -- Add n Mountains to pid's battlefield, discarding the ids (used to bulk up a
 -- pool of owned cards). replicate n () avoids a list comprehension (CLAUDE.md).
-addMany :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-addMany cards n pid gs =
-  List.foldl' (\g _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid g)) gs (replicate n ())
+addMany :: Printing.Printing -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+addMany mountain n pid gs =
+  List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs (replicate n ())
 
 -- Build a Mindslaver-shaped ControlPlayerNextTurn ability owned by `controller`,
 -- targeting `target`, put it on the stack, and resolve it. Returns the resulting
 -- state. Object.owner is the resolving ability's controller (Resolve.hs), so this
 -- installs pendingControl[target] = MkDecider controller.
-installControlBy :: Cards.Cards -> PlayerId.PlayerId -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-installControlBy cards controller target gs0 =
-  let (srcId, gs1) = S.addCreature (Cards.mindslaverPrinting cards) controller gs0
+installControlBy :: Printing.Printing -> PlayerId.PlayerId -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+installControlBy mindslaver controller target gs0 =
+  let (srcId, gs1) = S.addCreature mindslaver controller gs0
       slot = SlotName.MkSlotName (Text.pack "target")
       ability =
         ActivatedAbility.MkActivatedAbility
@@ -831,15 +890,15 @@ boltAnswer p = case p of
 -- her main phase. boltAnswer casts both (CR 117.3c keeps priority), both
 -- target the Piker (the only creature), and the priority loop resolves them
 -- LIFO: B kills the Piker, the mid-loop SBA buries it, A fizzles.
-twoBoltState :: Cards.Cards -> GameState.GameState
-twoBoltState cards =
-  let (_, withPiker) = S.addCreature (Cards.pikerPrinting cards) S.bob (S.landsInPlay (Cards.mountainPrinting cards) 2)
-      (gs1, _oid1) = S.handOne (Cards.lightningBoltPrinting cards) withPiker
+twoBoltState :: Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
+twoBoltState piker mountain lightningBolt =
+  let (_, withPiker) = S.addCreature piker S.bob (S.landsInPlay mountain 2)
+      (gs1, _oid1) = S.handOne lightningBolt withPiker
       (oid2, gs2) = Game.freshObjectId gs1
       obj =
         Object.MkObject
           { Object.owner = S.alice,
-            Object.source = Source.OfCard (Cards.lightningBoltPrinting cards),
+            Object.source = Source.OfCard lightningBolt,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
@@ -856,11 +915,11 @@ twoBoltState cards =
 
 -- alice has 3 Islands and Cancel in hand; a `victim` spell (bob's) sits on the
 -- stack. Returns (victimId, state after alice casts Cancel at it and it resolves).
-cancelVictim :: Cards.Cards -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-cancelVictim cards victim =
-  let base = S.landsInPlay (Cards.islandPrinting cards) 3
+cancelVictim :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+cancelVictim island cancel victim =
+  let base = S.landsInPlay island 3
       (victimId, onStack) = S.spellOnStack victim S.bob base
-      (gs, cancelId) = S.handOne (Cards.cancelPrinting cards) onStack
+      (gs, cancelId) = S.handOne cancel onStack
       cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice cancelId))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (victimId, resolved)
@@ -882,12 +941,12 @@ handAppend printing pid gs =
 -- casts Cancel A at the Piker, then Cancel B at the Piker (CR 117.3c keeps
 -- priority). Stack [B, A, Piker]; resolveTop LIFO: B counters the Piker, then A --
 -- its only target gone -- fizzles (CR 608.2b).
-racingCounters :: Cards.Cards -> GameState.GameState
-racingCounters cards =
-  let base = S.landsInPlay (Cards.islandPrinting cards) 6
-      (victimId, onStack) = S.spellOnStack (Cards.pikerPrinting cards) S.bob base
-      (gs1, cancelA) = S.handOne (Cards.cancelPrinting cards) onStack
-      (cancelB, gs2) = handAppend (Cards.cancelPrinting cards) S.alice gs1
+racingCounters :: Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
+racingCounters island piker cancel =
+  let base = S.landsInPlay island 6
+      (victimId, onStack) = S.spellOnStack piker S.bob base
+      (gs1, cancelA) = S.handOne cancel onStack
+      (cancelB, gs2) = handAppend cancel S.alice gs1
       atVictim :: Prompt.Prompt r -> r
       atVictim p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject victimId)) sets
@@ -898,47 +957,56 @@ racingCounters cards =
       r2 = snd (Engine.runGamePure atVictim r1 Stack.resolveTop) -- A fizzles
    in r2
 
-counterTests :: Cards.Cards -> Tasty.TestTree
-counterTests cards =
+counterTests :: Registry.Type.Registry -> Tasty.TestTree
+counterTests registry =
   Tasty.testGroup
     "Counter"
-    [ HU.testCase "CR 701.6 Cancel counters a spell into its owner's graveyard" $
-        let (_victimId, resolved) = cancelVictim cards (Cards.pikerPrinting cards)
-         in do
-              HU.assertEqual "victim countered into bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
-              HU.assertEqual "victim never resolved onto the battlefield" 0 (S.creaturesInPlay S.bob resolved)
-              HU.assertEqual "Cancel in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice resolved))
-              HU.assertEqual "stack empty" 0 (length (GameState.stack resolved)),
-      HU.testCase "CR 608.2b a Cancel whose target already left the stack fizzles" $
-        let after = racingCounters cards
-         in do
-              HU.assertEqual "the Piker moved exactly once, to bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
-              HU.assertEqual "both Cancels in alice's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after))
-              HU.assertEqual "the Piker never hit the battlefield" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "stack cleared" 0 (length (GameState.stack after)),
-      HU.testCase "CR 614 Cancel under Rest in Peace exiles the countered spell" $
-        let (_, ripOut) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (S.landsInPlay (Cards.islandPrinting cards) 3)
-            (_victimId, onStack) = S.spellOnStack (Cards.pikerPrinting cards) S.bob ripOut
-            (gs, cancelId) = S.handOne (Cards.cancelPrinting cards) onStack
+    [ HU.testCase "CR 701.6 Cancel counters a spell into its owner's graveyard" $ do
+        island <- Registry.printing registry "Island"
+        cancel <- Registry.printing registry "Cancel"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (_victimId, resolved) = cancelVictim island cancel piker
+        HU.assertEqual "victim countered into bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
+        HU.assertEqual "victim never resolved onto the battlefield" 0 (S.creaturesInPlay S.bob resolved)
+        HU.assertEqual "Cancel in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice resolved))
+        HU.assertEqual "stack empty" 0 (length (GameState.stack resolved)),
+      HU.testCase "CR 608.2b a Cancel whose target already left the stack fizzles" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        cancel <- Registry.printing registry "Cancel"
+        let after = racingCounters island piker cancel
+        HU.assertEqual "the Piker moved exactly once, to bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertEqual "both Cancels in alice's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+        HU.assertEqual "the Piker never hit the battlefield" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "stack cleared" 0 (length (GameState.stack after)),
+      HU.testCase "CR 614 Cancel under Rest in Peace exiles the countered spell" $ do
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        cancel <- Registry.printing registry "Cancel"
+        let (_, ripOut) = S.addCreature restInPeace S.alice (S.landsInPlay island 3)
+            (_victimId, onStack) = S.spellOnStack piker S.bob ripOut
+            (gs, cancelId) = S.handOne cancel onStack
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice cancelId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in do
-              HU.assertEqual "the countered spell is not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
-              HU.assertEqual "the countered spell is exiled" 1 (length (Game.zoneMembers Zone.Exile S.bob resolved))
+        HU.assertEqual "the countered spell is not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
+        HU.assertEqual "the countered spell is exiled" 1 (length (Game.zoneMembers Zone.Exile S.bob resolved))
     ]
 
-fizzleTests :: Cards.Cards -> Tasty.TestTree
-fizzleTests cards =
+fizzleTests :: Registry.Type.Registry -> Tasty.TestTree
+fizzleTests registry =
   Tasty.testGroup
     "Fizzle"
-    [ HU.testCase "CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles" $
-        let after = snd (Engine.runGamePure boltAnswer (twoBoltState cards) Engine.priorityLoop)
-         in do
-              HU.assertEqual "stack cleared" 0 (length (GameState.stack after))
-              HU.assertEqual "Piker dead" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "both Bolts in alice's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after))
-              HU.assertEqual "the Piker in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
-              HU.assertEqual "bob's life untouched: the fizzled Bolt hit nothing" (Just 20) (S.lifeOf S.bob after),
+    [ HU.testCase "CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let after = snd (Engine.runGamePure boltAnswer (twoBoltState piker mountain lightningBolt) Engine.priorityLoop)
+        HU.assertEqual "stack cleared" 0 (length (GameState.stack after))
+        HU.assertEqual "Piker dead" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "both Bolts in alice's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+        HU.assertEqual "the Piker in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertEqual "bob's life untouched: the fizzled Bolt hit nothing" (Just 20) (S.lifeOf S.bob after),
       -- CR 608.2b pins the `targeted` restriction Task 3 added (Resolve.hs's
       -- resolveEffects/resolveSpell): a reserved slot (Binding.triggerSource)
       -- is vacuously legal, since CR 608.2b is about TARGETS and a reserved
@@ -949,15 +1017,17 @@ fizzleTests cards =
       -- fizzle happened: with a single spec'd slot alone, fizzling and
       -- resolving-with-the-slot-skipped are indistinguishable (Destroy's own
       -- per-slot legality check already no-ops it either way).
-      HU.testCase "CR 608.2b the reserved trigger-source slot does not rescue a fizzle: the targetless Draw after the ability's only real target dies does not run" $
+      HU.testCase "CR 608.2b the reserved trigger-source slot does not rescue a fizzle: the targetless Draw after the ability's only real target dies does not run" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        forest <- Registry.printing registry "Forest"
         let base0 = Setup.emptyGame S.bothPlayers
-            (source, base1) = S.addCreature (Cards.pikerPrinting cards) S.alice base0
-            (victim, base2) = S.addCreature (Cards.pikerPrinting cards) S.bob base1
-            (_, base3) = S.addLibraryCard (Cards.forestPrinting cards) S.alice base2
+            (source, base1) = S.addCreature piker S.alice base0
+            (victim, base2) = S.addCreature piker S.bob base1
+            (_, base3) = S.addLibraryCard forest S.alice base2
             handBefore = S.handSize S.alice base3
             targetSlot = SlotName.MkSlotName (Text.pack "target")
             specs = Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource)
-            (abilId, base4) = S.spellOnStack (Cards.pikerPrinting cards) S.alice base3
+            (abilId, base4) = S.spellOnStack piker S.alice base3
             -- Mirrors Engine.placeOne's own construction: a real chosen
             -- target under `targetSlot`, plus the reserved self slot every
             -- placed trigger carries (Binding.setTriggerSource).
@@ -972,9 +1042,11 @@ fizzleTests cards =
             gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
             run = Resolve.resolveEffects abilId source [Effect.Destroy targetSlot, Effect.Draw (Quantity.Literal 1)] specs
             after = snd (Engine.runGamePure S.identityAnswer gone run)
-         in HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
-      HU.testCase "CR 704.5a a Bolt can end the game mid-step" $
-        let (gs, oid) = S.boltInHand (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards) 1 Phase.PrecombatMain
+        HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
+      HU.testCase "CR 704.5a a Bolt can end the game mid-step" $ do
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
             lowBob =
               gs {GameState.players = Map.adjust (\pl -> pl {Player.life = 3}) S.bob (GameState.players gs)}
             atBob :: Prompt.Prompt r -> r
@@ -987,55 +1059,56 @@ fizzleTests cards =
                   [] -> A.Pass
               _ -> S.identityAnswer p
             after = snd (Engine.runGamePure atBob lowBob Engine.priorityLoop)
-         in do
-              HU.assertEqual "alice wins" (Just (Result.Won S.alice)) (GameState.result after)
-              HU.assertEqual "the loop released priority" Nothing (GameState.priority after)
+        HU.assertEqual "alice wins" (Just (Result.Won S.alice)) (GameState.result after)
+        HU.assertEqual "the loop released priority" Nothing (GameState.priority after)
     ]
 
-indestructibleTests :: Cards.Cards -> Tasty.TestTree
-indestructibleTests cards =
+indestructibleTests :: Registry.Type.Registry -> Tasty.TestTree
+indestructibleTests registry =
   Tasty.testGroup
     "Indestructible"
-    [ HU.testCase "CR 704.5g an indestructible creature survives lethal marked damage" $
-        let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+    [ HU.testCase "CR 704.5g an indestructible creature survives lethal marked damage" $ do
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        let (myrId, gs) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
             -- Myr is 0/1; 3 marked damage is lethal (704.5g) but indestructible saves it.
             after = S.settleSba (S.markDamage myrId 3 gs)
-         in do
-              HU.assertEqual "Myr still on the battlefield" 1 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "Myr not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
-      HU.testCase "CR 704.5h an indestructible creature survives deathtouch" $
-        let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual "Myr still on the battlefield" 1 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "Myr not in the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 704.5h an indestructible creature survives deathtouch" $ do
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        let (myrId, gs) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
             -- Zero marked damage (so 704.5g is silent) plus a deathtouch event isolates
             -- the 704.5h path; indestructible must guard it too (CR 700.4).
             wounded = S.withEvent (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True False DamageKind.Combat)) gs
             after = S.settleSba wounded
-         in HU.assertEqual "Myr survives deathtouch" 1 (S.creaturesInPlay S.bob after),
-      HU.testCase "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $
-        let (myrId, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual "Myr survives deathtouch" 1 (S.creaturesInPlay S.bob after),
+      HU.testCase "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $ do
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        let (myrId, gs) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
             -- A real -1/-1 counter drops Myr (0/1) to 0/0 (CR 122.1a); 704.5f is a
             -- put-into-graveyard, not a destroy, so indestructible does not apply
             -- (Myr's own reminder text).
             zeroed = S.addCounter CounterKind.MinusOneMinusOne 1 myrId gs
             after = S.settleSba zeroed
-         in do
-              HU.assertEqual "Myr left the battlefield" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "Myr in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
-      HU.testCase "CR 704.5f regeneration does NOT save a creature with toughness <= 0" $
-        let (victim, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers) -- 2/1
+        HU.assertEqual "Myr left the battlefield" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "Myr in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 704.5f regeneration does NOT save a creature with toughness <= 0" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (victim, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers) -- 2/1
         -- A real -1/-1 counter drops the toughness to 0 (CR 122.1a); 704.5f is a
         -- put-into-graveyard, not a destruction, so a regeneration shield cannot
         -- save it.
             zeroed = S.addCounter CounterKind.MinusOneMinusOne 1 victim gs
             shielded = S.addRegenShield victim zeroed
             after = S.settleSba shielded
-         in HU.assertEqual "died despite the shield (704.5f is not a destruction)" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "died despite the shield (704.5f is not a destruction)" 0 (S.creaturesInPlay S.bob after)
     ]
 
 -- alice controls `n` Swamps and holds `printing` in a main phase with priority;
 -- bob controls one `foe`. Returns (foe's id, post-cast-and-resolve state).
-castBlackRemovalAt :: Cards.Cards -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-castBlackRemovalAt cards printing foe =
-  let base = S.landsInPlay (Cards.swampPrinting cards) 3
+castBlackRemovalAt :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+castBlackRemovalAt swamp printing foe =
+  let base = S.landsInPlay swamp 3
       (foeId, withFoe) = S.addCreature foe S.bob base
       (gs, spellId) = S.handOne printing withFoe
       cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
@@ -1061,120 +1134,149 @@ handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
               GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
             }
 
-zoneChangeTests :: Cards.Cards -> Tasty.TestTree
-zoneChangeTests cards =
+zoneChangeTests :: Registry.Type.Registry -> Tasty.TestTree
+zoneChangeTests registry =
   Tasty.testGroup
     "ZoneChange"
-    [ HU.testCase "CR 701.8 Murder destroys a normal creature into its owner's graveyard" $
-        let (_, after) = castBlackRemovalAt cards (Cards.murderPrinting cards) (Cards.pikerPrinting cards)
-         in do
-              HU.assertEqual "no creature survives" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "Piker in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
-      HU.testCase "CR 700.4 Murder does nothing to an indestructible creature (destroy /= move)" $
-        let (_, after) = castBlackRemovalAt cards (Cards.murderPrinting cards) (Cards.darksteelMyrPrinting cards)
-         in do
-              -- The falsifier: modelling Destroy as MoveToZone slot Graveyard would
-              -- bury the Myr. It stays; the spell still resolved and was buried.
-              HU.assertEqual "Myr still on the battlefield" 1 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "bob's graveyard empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
-              HU.assertEqual "Murder in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
-      HU.testCase "CR 701.19a Murder is replaced by regeneration" $
-        let base = S.landsInPlay (Cards.swampPrinting cards) 3
-            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+    [ HU.testCase "CR 701.8 Murder destroys a normal creature into its owner's graveyard" $ do
+        swamp <- Registry.printing registry "Swamp"
+        murder <- Registry.printing registry "Murder"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (_, after) = castBlackRemovalAt swamp murder piker
+        HU.assertEqual "no creature survives" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "Piker in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 700.4 Murder does nothing to an indestructible creature (destroy /= move)" $ do
+        swamp <- Registry.printing registry "Swamp"
+        murder <- Registry.printing registry "Murder"
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        let (_, after) = castBlackRemovalAt swamp murder darksteelMyr
+        -- The falsifier: modelling Destroy as MoveToZone slot Graveyard would
+        -- bury the Myr. It stays; the spell still resolved and was buried.
+        HU.assertEqual "Myr still on the battlefield" 1 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "bob's graveyard empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertEqual "Murder in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 701.19a Murder is replaced by regeneration" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        murder <- Registry.printing registry "Murder"
+        let base = S.landsInPlay swamp 3
+            (victim, withFoe) = S.addCreature piker S.bob base
             shielded = S.addRegenShield victim withFoe
-            (gs, spellId) = S.handOne (Cards.murderPrinting cards) shielded
+            (gs, spellId) = S.handOne murder shielded
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
-         in HU.assertEqual "the shielded creature survived Murder" 1 (S.creaturesInPlay S.bob after),
-      HU.testCase "CR 400.7 Unsummon returns a creature to its owner's hand" $
-        let base = S.landsInPlay (Cards.islandPrinting cards) 1
-            (_, withPiker) = S.addCreature (Cards.pikerPrinting cards) S.bob base
-            (gs, spellId) = S.handOne (Cards.unsummonPrinting cards) withPiker
+        HU.assertEqual "the shielded creature survived Murder" 1 (S.creaturesInPlay S.bob after),
+      HU.testCase "CR 400.7 Unsummon returns a creature to its owner's hand" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        unsummon <- Registry.printing registry "Unsummon"
+        let base = S.landsInPlay island 1
+            (_, withPiker) = S.addCreature piker S.bob base
+            (gs, spellId) = S.handOne unsummon withPiker
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in do
-              HU.assertEqual "no creature on the battlefield" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "a card in bob's hand (its owner)" 1 (S.handSize S.bob after)
-              HU.assertEqual "Unsummon in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
-      HU.testCase "CR 701.19a regeneration does not save a bounced creature" $
-        let base = S.landsInPlay (Cards.islandPrinting cards) 1
-            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+        HU.assertEqual "no creature on the battlefield" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "a card in bob's hand (its owner)" 1 (S.handSize S.bob after)
+        HU.assertEqual "Unsummon in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      HU.testCase "CR 701.19a regeneration does not save a bounced creature" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        unsummon <- Registry.printing registry "Unsummon"
+        let base = S.landsInPlay island 1
+            (victim, withFoe) = S.addCreature piker S.bob base
             shielded = S.addRegenShield victim withFoe
-            (gs, spellId) = S.handOne (Cards.unsummonPrinting cards) shielded
+            (gs, spellId) = S.handOne unsummon shielded
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in do
-              HU.assertEqual "the creature left the battlefield (bounce is not a destruction)" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "it is in bob's hand" 1 (length (Game.zoneMembers Zone.Hand S.bob after)),
-      HU.testCase "CR 701.13 Angelic Edict exiles a target creature" $
-        let base = S.landsInPlay (Cards.plainsPrinting cards) 5
-            (_, withPiker) = S.addCreature (Cards.pikerPrinting cards) S.bob base
-            (gs, spellId) = S.handOne (Cards.angelicEdictPrinting cards) withPiker
+        HU.assertEqual "the creature left the battlefield (bounce is not a destruction)" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "it is in bob's hand" 1 (length (Game.zoneMembers Zone.Hand S.bob after)),
+      HU.testCase "CR 701.13 Angelic Edict exiles a target creature" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        angelicEdict <- Registry.printing registry "Angelic Edict"
+        let base = S.landsInPlay plains 5
+            (_, withPiker) = S.addCreature piker S.bob base
+            (gs, spellId) = S.handOne angelicEdict withPiker
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in do
-              HU.assertEqual "no creature on the battlefield" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
-      HU.testCase "CR 115 Angelic Edict may exile an enchantment (non-creature permanent)" $
-        let base = S.landsInPlay (Cards.plainsPrinting cards) 5
+        HU.assertEqual "no creature on the battlefield" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
+      HU.testCase "CR 115 Angelic Edict may exile an enchantment (non-creature permanent)" $ do
+        plains <- Registry.printing registry "Plains"
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        angelicEdict <- Registry.printing registry "Angelic Edict"
+        let base = S.landsInPlay plains 5
             -- bob controls only Rest in Peace (an enchantment, not a creature), so
             -- it is the single legal CreatureOrEnchantmentTarget.
-            (ripId, withRip) = S.addCreature (Cards.restInPeacePrinting cards) S.bob base
-            (gs, spellId) = S.handOne (Cards.angelicEdictPrinting cards) withRip
+            (ripId, withRip) = S.addCreature restInPeace S.bob base
+            (gs, spellId) = S.handOne angelicEdict withRip
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in do
-              HU.assertEqual "the enchantment left the battlefield" Nothing (Game.lookupObject ripId after)
-              HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
-      HU.testCase "CR 120 Divination draws its controller two cards" $
-        let base = S.landsInPlay (Cards.islandPrinting cards) 3
-            (_, g1) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice base
-            (_, g2) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice g1
-            (gs, spellId) = S.handOne (Cards.divinationPrinting cards) g2
+        HU.assertEqual "the enchantment left the battlefield" Nothing (Game.lookupObject ripId after)
+        HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
+      HU.testCase "CR 120 Divination draws its controller two cards" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        divination <- Registry.printing registry "Divination"
+        let base = S.landsInPlay island 3
+            (_, g1) = S.addLibraryCard piker S.alice base
+            (_, g2) = S.addLibraryCard piker S.alice g1
+            (gs, spellId) = S.handOne divination g2
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in do
-              HU.assertEqual "two cards drawn to hand" 2 (S.handSize S.alice after)
-              HU.assertEqual "library emptied" [] (Game.zoneMembers Zone.Library S.alice after),
-      HU.testCase "CR 121.3 a Draw that outruns the library records the loss" $
-        let base = S.landsInPlay (Cards.islandPrinting cards) 3
-            (_, g1) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice base
-            (gs, spellId) = S.handOne (Cards.divinationPrinting cards) g1
+        HU.assertEqual "two cards drawn to hand" 2 (S.handSize S.alice after)
+        HU.assertEqual "library emptied" [] (Game.zoneMembers Zone.Library S.alice after),
+      HU.testCase "CR 121.3 a Draw that outruns the library records the loss" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        divination <- Registry.printing registry "Divination"
+        let base = S.landsInPlay island 3
+            (_, g1) = S.addLibraryCard piker S.alice base
+            (gs, spellId) = S.handOne divination g1
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after)),
-      HU.testCase "CR 701.17 Tome Scour mills five from a target player's library" $
-        let base = S.landsInPlay (Cards.islandPrinting cards) 1
-            withLib = List.foldl' (\g _ -> snd (S.addLibraryCard (Cards.pikerPrinting cards) S.bob g)) base [1 .. (6 :: Int)]
-            (gs, spellId) = S.handOne (Cards.tomeScourPrinting cards) withLib
+        HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after)),
+      HU.testCase "CR 701.17 Tome Scour mills five from a target player's library" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        tomeScour <- Registry.printing registry "Tome Scour"
+        let base = S.landsInPlay island 1
+            withLib = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.bob g)) base [1 .. (6 :: Int)]
+            (gs, spellId) = S.handOne tomeScour withLib
             cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
-         in do
-              HU.assertEqual "five milled to graveyard" 5 (length (Game.zoneMembers Zone.Graveyard S.bob after))
-              HU.assertEqual "one card left in library" 1 (length (Game.zoneMembers Zone.Library S.bob after)),
-      HU.testCase "CR 701.17b milling a short library mills fewer with no loss" $
-        let base = S.landsInPlay (Cards.islandPrinting cards) 1
-            (_, g1) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob base
-            (_, g2) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob g1
-            (gs, spellId) = S.handOne (Cards.tomeScourPrinting cards) g2
+        HU.assertEqual "five milled to graveyard" 5 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertEqual "one card left in library" 1 (length (Game.zoneMembers Zone.Library S.bob after)),
+      HU.testCase "CR 701.17b milling a short library mills fewer with no loss" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        tomeScour <- Registry.printing registry "Tome Scour"
+        let base = S.landsInPlay island 1
+            (_, g1) = S.addLibraryCard piker S.bob base
+            (_, g2) = S.addLibraryCard piker S.bob g1
+            (gs, spellId) = S.handOne tomeScour g2
             cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
             after = S.settleSba (snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop))
-         in do
-              HU.assertEqual "two milled" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
-              HU.assertBool "bob did not lose (milling is not drawing)" (not (Set.member S.bob (GameState.drewFromEmpty after))),
-      HU.testCase "CR 701.9 Mind Rot discards two chosen cards from a hand of three" $
-        let base = S.landsInPlay (Cards.swampPrinting cards) 3
-            withHand = handCards (Cards.pikerPrinting cards) S.bob 3 base
-            (gs, spellId) = S.handOne (Cards.mindRotPrinting cards) withHand
+        HU.assertEqual "two milled" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertBool "bob did not lose (milling is not drawing)" (not (Set.member S.bob (GameState.drewFromEmpty after))),
+      HU.testCase "CR 701.9 Mind Rot discards two chosen cards from a hand of three" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        mindRot <- Registry.printing registry "Mind Rot"
+        let base = S.landsInPlay swamp 3
+            withHand = handCards piker S.bob 3 base
+            (gs, spellId) = S.handOne mindRot withHand
             cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
-         in do
-              HU.assertEqual "one card left in bob's hand" 1 (S.handSize S.bob after)
-              HU.assertEqual "two cards in bob's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
-      HU.testCase "CR 609.3 a forced full-hand discard is not prompted" $
-        let base = S.landsInPlay (Cards.swampPrinting cards) 3
-            withHand = handCards (Cards.pikerPrinting cards) S.bob 2 base
-            (gs, spellId) = S.handOne (Cards.mindRotPrinting cards) withHand
+        HU.assertEqual "one card left in bob's hand" 1 (S.handSize S.bob after)
+        HU.assertEqual "two cards in bob's graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      HU.testCase "CR 609.3 a forced full-hand discard is not prompted" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        mindRot <- Registry.printing registry "Mind Rot"
+        let base = S.landsInPlay swamp 3
+            withHand = handCards piker S.bob 2 base
+            (gs, spellId) = S.handOne mindRot withHand
             -- Answer ChooseDiscard with [] so a prompt would discard nothing;
             -- aim the spell at bob.
             noDiscard q = case q of
@@ -1183,99 +1285,110 @@ zoneChangeTests cards =
               _ -> S.identityAnswer q
             cast = snd (Engine.runGamePure noDiscard gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure noDiscard cast Stack.resolveTop)
-         in do
-              -- Elision (hand == count): the whole hand is discarded without asking (#63).
-              HU.assertEqual "bob's hand emptied" 0 (S.handSize S.bob after)
-              HU.assertEqual "both cards discarded" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        -- Elision (hand == count): the whole hand is discarded without asking (#63).
+        HU.assertEqual "bob's hand emptied" 0 (S.handSize S.bob after)
+        HU.assertEqual "both cards discarded" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
     ]
 
-drawCardTests :: Cards.Cards -> Tasty.TestTree
-drawCardTests cards =
+drawCardTests :: Registry.Type.Registry -> Tasty.TestTree
+drawCardTests registry =
   Tasty.testGroup
     "DrawCard"
-    [ HU.testCase "CR 121.2 drawCard moves the top library card to hand" $
+    [ HU.testCase "CR 121.2 drawCard moves the top library card to hand" $ do
+        piker <- Registry.printing registry "Goblin Piker"
         let base = Setup.emptyGame S.bothPlayers
-            (_, withCard) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice base
+            (_, withCard) = S.addLibraryCard piker S.alice base
             after = S.runPure S.identityAnswer withCard (Event.drawCard S.alice)
-         in do
-              HU.assertEqual "one card in hand" 1 (S.handSize S.alice after)
-              HU.assertEqual "library empty" [] (Game.zoneMembers Zone.Library S.alice after),
+        HU.assertEqual "one card in hand" 1 (S.handSize S.alice after)
+        HU.assertEqual "library empty" [] (Game.zoneMembers Zone.Library S.alice after),
       HU.testCase "CR 121.3 drawing from an empty library records the failed draw" $
         let after = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Event.drawCard S.alice)
          in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after))
     ]
 
-countersTests :: Cards.Cards -> Tasty.TestTree
-countersTests cards =
+countersTests :: Registry.Type.Registry -> Tasty.TestTree
+countersTests registry =
   Tasty.testGroup
     "Counters"
-    [ HU.testCase "CR 122.6 Battlegrowth puts a +1/+1 counter (gate)" $
+    [ HU.testCase "CR 122.6 Battlegrowth puts a +1/+1 counter (gate)" $ do
         -- alice casts Battlegrowth on bob's Piker (2/1). After resolution the Piker
         -- is 3/2 and carries one +1/+1 counter.
-        let base = S.landsInPlay (Cards.forestPrinting cards) 1
-            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
-            (gs, spellId) = S.handOne (Cards.battlegrowthPrinting cards) withFoe
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        battlegrowth <- Registry.printing registry "Battlegrowth"
+        let base = S.landsInPlay forest 1
+            (victim, withFoe) = S.addCreature piker S.bob base
+            (gs, spellId) = S.handOne battlegrowth withFoe
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in do
-              HU.assertEqual "power 3" (Just 3) (Projection.powerOf victim after)
-              HU.assertEqual "toughness 2" (Just 2) (Projection.toughnessOf victim after),
-      HU.testCase "CR 122 counter persists through cleanup (vs Giant Growth wearing off)" $
+        HU.assertEqual "power 3" (Just 3) (Projection.powerOf victim after)
+        HU.assertEqual "toughness 2" (Just 2) (Projection.toughnessOf victim after),
+      HU.testCase "CR 122 counter persists through cleanup (vs Giant Growth wearing off)" $ do
         -- After a cleanup step, the +1/+1 counter is still on the Piker.
-        let base = S.landsInPlay (Cards.forestPrinting cards) 1
-            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
-            (gs, spellId) = S.handOne (Cards.battlegrowthPrinting cards) withFoe
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        battlegrowth <- Registry.printing registry "Battlegrowth"
+        let base = S.landsInPlay forest 1
+            (victim, withFoe) = S.addCreature piker S.bob base
+            (gs, spellId) = S.handOne battlegrowth withFoe
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
             afterCleanup = Expiry.dropAtCleanup resolved
-         in do
-              HU.assertEqual "still 3/2 after cleanup" (Just 3) (Projection.powerOf victim afterCleanup)
-              HU.assertEqual "still 3/2 after cleanup" (Just 2) (Projection.toughnessOf victim afterCleanup),
-      HU.testCase "CR 122.6 Instill Infection puts a -1/-1 counter and draws" $
+        HU.assertEqual "still 3/2 after cleanup" (Just 3) (Projection.powerOf victim afterCleanup)
+        HU.assertEqual "still 3/2 after cleanup" (Just 2) (Projection.toughnessOf victim afterCleanup),
+      HU.testCase "CR 122.6 Instill Infection puts a -1/-1 counter and draws" $ do
         -- alice casts Instill Infection on bob's Piker; Piker becomes 1/0 and dies
         -- (704.5f); alice draws a card.
-        let base = S.landsInPlay (Cards.swampPrinting cards) 4
-            (_, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        instillInfection <- Registry.printing registry "Instill Infection"
+        forest <- Registry.printing registry "Forest"
+        let base = S.landsInPlay swamp 4
+            (_, withFoe) = S.addCreature piker S.bob base
             -- Baseline before Instill Infection itself enters alice's hand: casting
             -- moves that same card from hand to the stack, so measuring after it is
             -- already there would net the draw against the spell's own departure.
             handBefore = S.handSize S.alice withFoe
-            (gs0, spellId) = S.handOne (Cards.instillInfectionPrinting cards) withFoe
+            (gs0, spellId) = S.handOne instillInfection withFoe
             -- put a card in alice's library so the draw has something to find.
-            (_, gs) = S.addLibraryCard (Cards.forestPrinting cards) S.alice gs0
+            (_, gs) = S.addLibraryCard forest S.alice gs0
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
-         in do
-              HU.assertEqual "Piker died to the -1/-1 counter (704.5f)" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "alice drew a card" (handBefore + 1) (S.handSize S.alice after),
-      HU.testCase "CR 704.5q both counter kinds on one creature annihilate; net 2/1 survives" $
+        HU.assertEqual "Piker died to the -1/-1 counter (704.5f)" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "alice drew a card" (handBefore + 1) (S.handSize S.alice after),
+      HU.testCase "CR 704.5q both counter kinds on one creature annihilate; net 2/1 survives" $ do
         -- Both counters on the same creature (placed directly); the SBA removes both.
-        let base = S.landsInPlay (Cards.forestPrinting cards) 5
-            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        let base = S.landsInPlay forest 5
+            (victim, withFoe) = S.addCreature piker S.alice base
             gs1 = S.addCounter CounterKind.PlusOnePlusOne 1 victim withFoe
             gs2 = S.addCounter CounterKind.MinusOneMinusOne 1 victim gs1
             after = S.settleSba gs2
-         in do
-              HU.assertEqual "creature survives (net 2/1)" 1 (S.creaturesInPlay S.alice after)
-              HU.assertEqual "no counters remain" Map.empty (maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject victim after)),
-      HU.testCase "CR 122.2 Unsummon removes a counter-bearing creature's counters" $
-        let base = S.landsInPlay (Cards.islandPrinting cards) 1
-            (victim, withFoe) = S.addCreature (Cards.pikerPrinting cards) S.bob base
+        HU.assertEqual "creature survives (net 2/1)" 1 (S.creaturesInPlay S.alice after)
+        HU.assertEqual "no counters remain" Map.empty (maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject victim after)),
+      HU.testCase "CR 122.2 Unsummon removes a counter-bearing creature's counters" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        unsummon <- Registry.printing registry "Unsummon"
+        let base = S.landsInPlay island 1
+            (victim, withFoe) = S.addCreature piker S.bob base
             withCounter = S.addCounter CounterKind.PlusOnePlusOne 1 victim withFoe
-            (gs, spellId) = S.handOne (Cards.unsummonPrinting cards) withCounter
+            (gs, spellId) = S.handOne unsummon withCounter
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
             -- Total (no `head`): expect exactly one bounced card in hand, empty counters.
             handCounters = fmap (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h after)) (Game.zoneMembers Zone.Hand S.bob after)
-         in HU.assertEqual "the bounced incarnation in hand has no counters" [Map.empty] handCounters
+        HU.assertEqual "the bounced incarnation in hand has no counters" [Map.empty] handCounters
     ]
 
-untapTests :: Cards.Cards -> Tasty.TestTree
-untapTests cards =
+untapTests :: Registry.Type.Registry -> Tasty.TestTree
+untapTests registry =
   Tasty.testGroup
     "Untap"
-    [ HU.testCase "CR 701.26b Untap untaps the slot's target" $
-        let (oid, base0) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+    [ HU.testCase "CR 701.26b Untap untaps the slot's target" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, base0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
             base = S.tapObject oid base0
             slot = SlotName.MkSlotName (Text.pack "target")
             run =
@@ -1287,15 +1400,16 @@ untapTests cards =
                 (Map.singleton slot (Recipient.ToCreature oid))
                 (Effect.Untap slot)
             after = snd (Engine.runGamePure S.identityAnswer base run)
-         in HU.assertEqual "target is untapped" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject oid after))
+        HU.assertEqual "target is untapped" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject oid after))
     ]
 
-gainControlTests :: Cards.Cards -> Tasty.TestTree
-gainControlTests cards =
+gainControlTests :: Registry.Type.Registry -> Tasty.TestTree
+gainControlTests registry =
   Tasty.testGroup
     "GainControl"
-    [ HU.testCase "GainControl gives the source's controller control until end of turn and re-Sicks (CR 302.6)" $
-        let (oid, base) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+    [ HU.testCase "GainControl gives the source's controller control until end of turn and re-Sicks (CR 302.6)" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
             slot = SlotName.MkSlotName (Text.pack "target")
             -- Apply as though a spell alice controls (controller = alice) resolved it.
             run =
@@ -1307,70 +1421,72 @@ gainControlTests cards =
                 (Map.singleton slot (Recipient.ToCreature oid))
                 (Effect.GainControl Duration.UntilEndOfTurn slot)
             after = snd (Engine.runGamePure S.identityAnswer base run)
-         in do
-              HU.assertEqual "alice now controls it" (Just S.alice) (Projection.controllerOf oid after)
-              HU.assertEqual "it is summoning sick for the new controller" (Just Sickness.Sick) (fmap Object.sickness (Game.lookupObject oid after))
-              HU.assertEqual "control reverts after cleanup" (Just S.bob) (Projection.controllerOf oid (Expiry.dropAtCleanup after))
+        HU.assertEqual "alice now controls it" (Just S.alice) (Projection.controllerOf oid after)
+        HU.assertEqual "it is summoning sick for the new controller" (Just Sickness.Sick) (fmap Object.sickness (Game.lookupObject oid after))
+        HU.assertEqual "control reverts after cleanup" (Just S.bob) (Projection.controllerOf oid (Expiry.dropAtCleanup after))
     ]
 
-gainPlayerCountersTests :: Cards.Cards -> Tasty.TestTree
-gainPlayerCountersTests cards =
+gainPlayerCountersTests :: Registry.Type.Registry -> Tasty.TestTree
+gainPlayerCountersTests registry =
   Tasty.testGroup
     "GainPlayerCounters"
-    [ HU.testCase "CR 107.14 GainPlayerCounters gives the resolving controller energy" $
-        let (src, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+    [ HU.testCase "CR 107.14 GainPlayerCounters gives the resolving controller energy" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
             act = Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.GainPlayerCounters PlayerCounterKind.Energy (Quantity.Literal 2))
             after = S.runPure S.identityAnswer gs0 act
-         in HU.assertEqual "alice has two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
+        HU.assertEqual "alice has two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
     ]
 
-createEmblemTests :: Cards.Cards -> Tasty.TestTree
-createEmblemTests cards =
+createEmblemTests :: Registry.Type.Registry -> Tasty.TestTree
+createEmblemTests registry =
   Tasty.testGroup
     "CreateEmblem"
-    [ HU.testCase "CR 114.2 CreateEmblem puts an emblem in the command zone under the resolver" $
-        let (src, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            act = Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (Printing.card (Cards.pikerPrinting cards)))
+    [ HU.testCase "CR 114.2 CreateEmblem puts an emblem in the command zone under the resolver" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            act = Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (Printing.card piker))
             after = S.runPure S.identityAnswer gs0 act
             emblems = filter (\oid -> fmap Object.zone (Game.lookupObject oid after) == Just Zone.Command) (Set.toList (GameState.command after))
-         in do
-              HU.assertEqual "one emblem in command" 1 (Set.size (GameState.command after))
-              HU.assertEqual "owned by the resolver" [Just S.alice] (fmap (\oid -> fmap Object.owner (Game.lookupObject oid after)) emblems)
+        HU.assertEqual "one emblem in command" 1 (Set.size (GameState.command after))
+        HU.assertEqual "owned by the resolver" [Just S.alice] (fmap (\oid -> fmap Object.owner (Game.lookupObject oid after)) emblems)
     ]
 
-becomeMonarchTests :: Cards.Cards -> Tasty.TestTree
-becomeMonarchTests cards =
+becomeMonarchTests :: Registry.Type.Registry -> Tasty.TestTree
+becomeMonarchTests registry =
   Tasty.testGroup
     "BecomeMonarch"
-    [ HU.testCase "CR 725 BecomeMonarch TheController makes the resolver the monarch" $
-        let (src, gs0) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+    [ HU.testCase "CR 725 BecomeMonarch TheController makes the resolver the monarch" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
             after = S.runPure S.identityAnswer gs0 (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.BecomeMonarch MonarchTarget.TheController))
-         in do
-              HU.assertEqual "alice is monarch" (Just S.alice) (GameState.monarch after)
-              HU.assertBool "a BecameMonarch event was recorded" (elem (GameEvent.BecameMonarch S.alice) (GameState.events after))
+        HU.assertEqual "alice is monarch" (Just S.alice) (GameState.monarch after)
+        HU.assertBool "a BecameMonarch event was recorded" (elem (GameEvent.BecameMonarch S.alice) (GameState.events after))
     ]
 
 -- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
 -- (GainKeyword Haste) together end to end -- cast, resolve, attack, revert.
-actOfTreasonTests :: Cards.Cards -> Tasty.TestTree
-actOfTreasonTests cards =
+actOfTreasonTests :: Registry.Type.Registry -> Tasty.TestTree
+actOfTreasonTests registry =
   Tasty.testGroup
     "Act of Treason"
-    [ HU.testCase "steal, untap, haste, attack, then revert" $
-        let base0 = S.landsInPlay (Cards.mountainPrinting cards) 3 -- alice: {R}{R}{R} for {2}{R}
-            (oid, base1) = S.addCreature (Cards.pikerPrinting cards) S.bob base0
+    [ HU.testCase "steal, untap, haste, attack, then revert" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        actOfTreason <- Registry.printing registry "Act of Treason"
+        let base0 = S.landsInPlay mountain 3 -- alice: {R}{R}{R} for {2}{R}
+            (oid, base1) = S.addCreature piker S.bob base0
             base = S.tapObject oid base1 -- start it tapped to prove the untap rider
-            (gs1, spellId) = S.handOne (Cards.actOfTreasonPrinting cards) base
+            (gs1, spellId) = S.handOne actOfTreason base
             cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice spellId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in do
-              HU.assertEqual "alice controls the Piker" (Just S.alice) (Projection.controllerOf oid resolved)
-              HU.assertEqual "the untap rider untapped it" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject oid resolved))
-              HU.assertBool "it has haste" (Projection.hasKeyword Keyword.Haste oid resolved)
-              HU.assertBool "alice may attack with it this turn" (oid `elem` Combat.legalAttackers S.alice resolved)
-              HU.assertBool "bob may not attack with it" (oid `notElem` Combat.legalAttackers S.bob resolved)
-              HU.assertEqual "control reverts at cleanup" (Just S.bob) (Projection.controllerOf oid (Expiry.dropAtCleanup resolved))
+        HU.assertEqual "alice controls the Piker" (Just S.alice) (Projection.controllerOf oid resolved)
+        HU.assertEqual "the untap rider untapped it" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject oid resolved))
+        HU.assertBool "it has haste" (Projection.hasKeyword Keyword.Haste oid resolved)
+        HU.assertBool "alice may attack with it this turn" (oid `elem` Combat.legalAttackers S.alice resolved)
+        HU.assertBool "bob may not attack with it" (oid `notElem` Combat.legalAttackers S.bob resolved)
+        HU.assertEqual "control reverts at cleanup" (Just S.bob) (Projection.controllerOf oid (Expiry.dropAtCleanup resolved))
     ]
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Resolve" [targetTests cards, resolveTests cards, fizzleTests cards, indestructibleTests cards, zoneChangeTests cards, drawCardTests cards, counterTests cards, countersTests cards, untapTests cards, gainControlTests cards, gainPlayerCountersTests cards, createEmblemTests cards, becomeMonarchTests cards, actOfTreasonTests cards]
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, createEmblemTests registry, becomeMonarchTests registry, actOfTreasonTests registry]
