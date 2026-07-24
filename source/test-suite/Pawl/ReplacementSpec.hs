@@ -472,5 +472,19 @@ tests cards =
                    in do
                         HU.assertEqual "(1 * 2) + 1" 3 (countersOn CounterKind.PlusOnePlusOne piker seasonFirst)
                         HU.assertEqual "(1 + 1) * 2" 4 (countersOn CounterKind.PlusOnePlusOne piker scalesFirst)
-                _ -> HU.assertFailure "fixture did not build three permanents"
+                _ -> HU.assertFailure "fixture did not build three permanents",
+        -- #79: resolveDestruction answers with the SETTLED object, not a Bool. The
+        -- identity of what the CR 616.1 loop hands back is what Event.destroy must
+        -- put into the graveyard; collapsing it to a predicate is what made a
+        -- redirecting DestructionRewrite silently unimplementable.
+        HU.testCase "CR 701.8 an unreplaced destruction settles on the object itself" $
+          let base = S.landsInPlay (Cards.swampPrinting cards) 1
+              (piker, g1) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+              (settled, _) = S.runPureWith S.identityAnswer g1 (Replacement.resolveDestruction piker)
+           in HU.assertEqual "the object it was asked about" (Just piker) settled,
+        HU.testCase "CR 701.19a a regenerated destruction settles on nothing" $
+          let base = S.landsInPlay (Cards.swampPrinting cards) 1
+              (piker, g1) = S.addCreature (Cards.pikerPrinting cards) S.alice base
+              (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Replacement.resolveDestruction piker)
+           in HU.assertEqual "consumed by the shield" Nothing settled
       ]

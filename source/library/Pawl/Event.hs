@@ -211,8 +211,12 @@ destroy oid = do
       if Projection.hasKeyword Keyword.Indestructible oid gs
         then pure ()
         else do
-          happens <- Replacement.resolveDestruction oid
-          Monad.when happens (changeZone oid Zone.Graveyard)
+          settled <- Replacement.resolveDestruction oid
+          case settled of
+            Nothing -> pure ()
+            -- The graveyard move follows the SETTLED object, not the one asked
+            -- about, so a rewrite that redirects the destruction is honoured.
+            Just target -> changeZone target Zone.Graveyard
 
 -- The single counter-PLACEMENT funnel (CR 122.6: counters as markers on a
 -- permanent -- not to be confused with `counter` below, CR 701.6's countering

@@ -23,7 +23,6 @@ import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -615,13 +614,23 @@ asDamageEvent event = case event of
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
 
--- CR 701.8 / 614.8: settle a proposed destruction. True means the permanent is
--- actually destroyed; False means a replacement took it (regeneration), and that
--- rewrite has already done its own work.
-resolveDestruction :: ObjectId -> Game Bool
+-- CR 701.8 / 614.8: settle a proposed destruction. `Just` is the object actually
+-- destroyed -- which need not be the one asked about, since a rewrite may
+-- redirect it; `Nothing` means a replacement took the event (regeneration), and
+-- that rewrite has already done its own work.
+resolveDestruction :: ObjectId -> Game (Maybe ObjectId)
 resolveDestruction oid = do
   outcome <- applyReplacements (ProposedEvent.WouldBeDestroyed oid)
-  pure (Maybe.isJust outcome)
+  pure (outcome >>= asDestruction)
+
+asDestruction :: ProposedEvent -> Maybe ObjectId
+asDestruction event = case event of
+  ProposedEvent.WouldBeDestroyed target -> Just target
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing
 
 -- CR 122.6: settle a proposed counter placement. Nothing means none are put on.
 resolveCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind, Natural))
