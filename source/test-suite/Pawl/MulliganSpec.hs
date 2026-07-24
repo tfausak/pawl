@@ -9,10 +9,10 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -24,6 +24,7 @@ import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -41,10 +42,10 @@ poolToLibrary pid gs =
         }
 
 -- n Mountains in each player's library, nothing elsewhere.
-libraryGame :: Cards.Cards -> Int -> GameState.GameState
-libraryGame cards n =
+libraryGame :: Printing.Printing -> Int -> GameState.GameState
+libraryGame mountain n =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany pid g = List.foldl' (\h _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid h)) g (replicate n ())
+      addMany pid g = List.foldl' (\h _ -> snd (S.addCreature mountain pid h)) g (replicate n ())
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany S.bob (addMany S.alice g0)))
 
 libSize :: PlayerId -> GameState.GameState -> Int
@@ -81,35 +82,37 @@ run answer gs = snd (Engine.runGamePure answer gs (Mulligan.openingHands [S.alic
 -- this test tracks instead. Bob's library is uniform Mountains; only alice
 -- mulligans in the accompanying test, so bob's composition never enters the
 -- assertion.
-distinctPrintings :: Cards.Cards -> [Printing.Printing]
-distinctPrintings cards =
-  [ Cards.mountainPrinting cards,
-    Cards.swampPrinting cards,
-    Cards.forestPrinting cards,
-    Cards.pikerPrinting cards,
-    Cards.birdMaidenPrinting cards,
-    Cards.nimbleBirdstickerPrinting cards,
-    Cards.ogreSentryPrinting cards,
-    Cards.windseekerCentaurPrinting cards,
-    Cards.goblinChariotPrinting cards,
-    Cards.sabretoothTigerPrinting cards,
-    Cards.ridgetopRaptorPrinting cards,
-    Cards.typhoidRatsPrinting cards,
-    Cards.warMammothPrinting cards,
-    Cards.lightningBoltPrinting cards,
-    Cards.giantGrowthPrinting cards,
-    Cards.humilityPrinting cards,
-    Cards.serpentsGiftPrinting cards,
-    Cards.bloodMoonPrinting cards,
-    Cards.urborgPrinting cards,
-    Cards.opalescencePrinting cards
-  ]
+distinctPrintings :: Registry.Type.Registry -> IO [Printing.Printing]
+distinctPrintings registry =
+  mapM
+    (Registry.printing registry)
+    [ "Mountain",
+      "Swamp",
+      "Forest",
+      "Goblin Piker",
+      "Bird Maiden",
+      "Nimble Birdsticker",
+      "Ogre Sentry",
+      "Windseeker Centaur",
+      "Goblin Chariot",
+      "Sabretooth Tiger",
+      "Ridgetop Raptor",
+      "Typhoid Rats",
+      "War Mammoth",
+      "Lightning Bolt",
+      "Giant Growth",
+      "Humility",
+      "Serpent's Gift",
+      "Blood Moon",
+      "Urborg, Tomb of Yawgmoth",
+      "Opalescence"
+    ]
 
-orderedLibraryGame :: Cards.Cards -> [Printing.Printing] -> GameState.GameState
-orderedLibraryGame cards printings =
+orderedLibraryGame :: Printing.Printing -> [Printing.Printing] -> GameState.GameState
+orderedLibraryGame mountain printings =
   let g0 = Setup.emptyGame S.bothPlayers
       addOrdered pid g = List.foldl' (\h p -> snd (S.addCreature p pid h)) g printings
-      addUniform pid g = List.foldl' (\h _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid h)) g printings
+      addUniform pid g = List.foldl' (\h _ -> snd (S.addCreature mountain pid h)) g printings
    in poolToLibrary S.bob (poolToLibrary S.alice (addUniform S.bob (addOrdered S.alice g0)))
 
 -- Alice mulligans exactly twice then keeps; bob keeps at once. On each Bottom
@@ -132,35 +135,39 @@ recordAsks p = case p of
     pure (if pid == S.bob && taken < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep)
   _ -> pure (S.identityAnswer p)
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards =
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry =
   Tasty.testGroup
     "Mulligan"
-    [ HU.testCase "CR 103.5: all-Keep draws exactly seven, library shrinks by seven" $
-        let after = run keepAnswer (libraryGame cards 20)
-         in do
-              HU.assertEqual "alice hand" 7 (S.handSize S.alice after)
-              HU.assertEqual "alice library" 13 (libSize S.alice after),
-      HU.testCase "CR 103.5: one mulligan bottoms one card (hand of six)" $
-        let after = run (mulliganUpTo 1) (libraryGame cards 20)
-         in HU.assertEqual "alice hand" 6 (S.handSize S.alice after),
-      HU.testCase "CR 103.5: two mulligans bottom two cards (hand of five)" $
-        let after = run (mulliganUpTo 2) (libraryGame cards 20)
-         in HU.assertEqual "alice hand" 5 (S.handSize S.alice after),
-      HU.testCase "CR 103.5 final sentence: mulligan floors at a zero-card hand" $
+    [ HU.testCase "CR 103.5: all-Keep draws exactly seven, library shrinks by seven" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let after = run keepAnswer (libraryGame mountain 20)
+        HU.assertEqual "alice hand" 7 (S.handSize S.alice after)
+        HU.assertEqual "alice library" 13 (libSize S.alice after),
+      HU.testCase "CR 103.5: one mulligan bottoms one card (hand of six)" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let after = run (mulliganUpTo 1) (libraryGame mountain 20)
+        HU.assertEqual "alice hand" 6 (S.handSize S.alice after),
+      HU.testCase "CR 103.5: two mulligans bottom two cards (hand of five)" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let after = run (mulliganUpTo 2) (libraryGame mountain 20)
+        HU.assertEqual "alice hand" 5 (S.handSize S.alice after),
+      HU.testCase "CR 103.5 final sentence: mulligan floors at a zero-card hand" $ do
         -- A 7-card library: redraw is always 7, but the loop bottoms up to the
         -- growing count; the process deterministically terminates with alice's
         -- opening hand floored at zero cards (never negative).
-        let after = run (mulliganUpTo 100) (libraryGame cards 7)
-         in HU.assertEqual "opening hand floored at zero" 0 (S.handSize S.alice after),
-      HU.testCase "CR 103.5: bottomed cards are the ones NOT in the opening hand" $
+        mountain <- Registry.printing registry "Mountain"
+        let after = run (mulliganUpTo 100) (libraryGame mountain 7)
+        HU.assertEqual "opening hand floored at zero" 0 (S.handSize S.alice after),
+      HU.testCase "CR 103.5: bottomed cards are the ones NOT in the opening hand" $ do
         -- One mulligan: hand is 6, and the 1 bottomed card is at the library
         -- bottom, distinct (by id) from the six in hand.
-        let after = run (mulliganUpTo 1) (libraryGame cards 20)
+        mountain <- Registry.printing registry "Mountain"
+        let after = run (mulliganUpTo 1) (libraryGame mountain 20)
             handIds = Set.fromList (Game.zoneMembers Zone.Hand S.alice after)
             bottom1 = libBottom 1 S.alice after
-         in HU.assertEqual "the bottomed card is not in hand" [] (filter (`Set.member` handIds) bottom1),
-      HU.testCase "CR 103.5: the chosen bottom ORDER is honored, not just the set" $
+        HU.assertEqual "the bottomed card is not in hand" [] (filter (`Set.member` handIds) bottom1),
+      HU.testCase "CR 103.5: the chosen bottom ORDER is honored, not just the set" $ do
         -- alice's deck (top to bottom) is 20 distinct printings, index 0 drawn
         -- first. Opening hand takes indices 0..6; round 1 (taken 0->1) returns
         -- them to the bottom, redraws indices 7..13, and bottoms (reversed)
@@ -169,39 +176,43 @@ tests cards =
         -- indices 14..19,0, and bottoms count=2 reversed: [15,14] -- humility
         -- then giantGrowth, a genuinely non-identity order. Round 3 (taken=2)
         -- keeps, ending the process.
-        let printings = distinctPrintings cards
-            gs0 = orderedLibraryGame cards printings
+        mountain <- Registry.printing registry "Mountain"
+        printings <- distinctPrintings registry
+        humility <- Registry.printing registry "Humility"
+        giantGrowth <- Registry.printing registry "Giant Growth"
+        let gs0 = orderedLibraryGame mountain printings
             after = run bottomReversedAnswer gs0
             bottomCards = fmap (\oid -> Game.cardOf oid after) (libBottom 2 S.alice after)
             -- The round-2 bottoming returns indices [15, 14] of distinctPrintings
             -- (humility, then giantGrowth); named directly to avoid a partial `!!`.
-            expectedCards = fmap (Just . Printing.card) [Cards.humilityPrinting cards, Cards.giantGrowthPrinting cards]
-         in HU.assertEqual "library bottom equals the chosen order exactly (humility, then giantGrowth)" expectedCards bottomCards,
-      HU.testCase "CR 103.5: keeping is terminal -- a kept player is not asked again" $
-        let gs0 = libraryGame cards 20
+            expectedCards = fmap (Just . Printing.card) [humility, giantGrowth]
+        HU.assertEqual "library bottom equals the chosen order exactly (humility, then giantGrowth)" expectedCards bottomCards,
+      HU.testCase "CR 103.5: keeping is terminal -- a kept player is not asked again" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = libraryGame mountain 20
             ((_, _after), asked) = State.runState (Program.foldProgramM recordAsks (State.runStateT (Mulligan.openingHands [S.alice, S.bob]) gs0)) []
-         in do
-              HU.assertEqual "alice kept round 1, so was asked exactly once" 1 (length (filter (== S.alice) asked))
-              HU.assertBool "bob mulliganed twice then kept, so was asked more than once" (length (filter (== S.bob) asked) > 1),
-      HU.testCase "CR 103.5: a game with mulligans replays deterministically" $
-        let gs0 = libraryGame cards 20
+        HU.assertEqual "alice kept round 1, so was asked exactly once" 1 (length (filter (== S.alice) asked))
+        HU.assertBool "bob mulliganed twice then kept, so was asked more than once" (length (filter (== S.bob) asked) > 1),
+      HU.testCase "CR 103.5: a game with mulligans replays deterministically" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = libraryGame mountain 20
             ((_, recorded), responses) = Replay.record (mulliganUpTo 2) gs0 (Mulligan.openingHands [S.alice, S.bob])
             (_, replayed) = Replay.replay responses gs0 (Mulligan.openingHands [S.alice, S.bob])
-         in do
-              HU.assertEqual "alice hand matches" (S.handSize S.alice recorded) (S.handSize S.alice replayed)
-              HU.assertEqual "alice library matches" (libSize S.alice recorded) (libSize S.alice replayed)
-              HU.assertEqual
-                "alice library ORDER matches"
-                (Game.zoneMembers Zone.Library S.alice recorded)
-                (Game.zoneMembers Zone.Library S.alice replayed),
-      HU.testCase "CR 727.3/729.3: a short library still flags drewFromEmpty through the mulligan path" $
+        HU.assertEqual "alice hand matches" (S.handSize S.alice recorded) (S.handSize S.alice replayed)
+        HU.assertEqual "alice library matches" (libSize S.alice recorded) (libSize S.alice replayed)
+        HU.assertEqual
+          "alice library ORDER matches"
+          (Game.zoneMembers Zone.Library S.alice recorded)
+          (Game.zoneMembers Zone.Library S.alice replayed),
+      HU.testCase "CR 727.3/729.3: a short library still flags drewFromEmpty through the mulligan path" $ do
         -- bob has a 5-card library; his 7-card opening draw empties it and flags
         -- the failed draw. Driven by an actual mulligan (mulliganUpTo 1) so the
         -- flag is shown to SURVIVE the shuffle-back-and-redraw path, not merely
         -- the initial draw -- "regardless of any mulligans" (CR 727.3 / 729.3).
+        mountain <- Registry.printing registry "Mountain"
         let g0 = Setup.emptyGame S.bothPlayers
-            addMany pid n g = List.foldl' (\h _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid h)) g (replicate n ())
+            addMany pid n g = List.foldl' (\h _ -> snd (S.addCreature mountain pid h)) g (replicate n ())
             gs0 = poolToLibrary S.bob (poolToLibrary S.alice (addMany S.bob 5 (addMany S.alice 20 g0)))
             after = run (mulliganUpTo 1) gs0
-         in HU.assertBool "bob drew from an empty library" (Set.member S.bob (GameState.drewFromEmpty after))
+        HU.assertBool "bob drew from an empty library" (Set.member S.bob (GameState.drewFromEmpty after))
     ]
