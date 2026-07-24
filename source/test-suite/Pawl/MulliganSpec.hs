@@ -13,6 +13,7 @@ import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
+import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.GameState as GameState
@@ -179,5 +180,24 @@ tests cards =
             ((_, _after), asked) = State.runState (Program.foldProgramM recordAsks (State.runStateT (Mulligan.openingHands [S.alice, S.bob]) gs0)) []
          in do
               HU.assertEqual "alice kept round 1, so was asked exactly once" 1 (length (filter (== S.alice) asked))
-              HU.assertBool "bob mulliganed twice then kept, so was asked more than once" (length (filter (== S.bob) asked) > 1)
+              HU.assertBool "bob mulliganed twice then kept, so was asked more than once" (length (filter (== S.bob) asked) > 1),
+      HU.testCase "CR 103.5: a game with mulligans replays deterministically" $
+        let gs0 = libraryGame cards 20
+            ((_, recorded), responses) = Replay.record (mulliganUpTo 2) gs0 (Mulligan.openingHands [S.alice, S.bob])
+            (_, replayed) = Replay.replay responses gs0 (Mulligan.openingHands [S.alice, S.bob])
+         in do
+              HU.assertEqual "alice hand matches" (S.handSize S.alice recorded) (S.handSize S.alice replayed)
+              HU.assertEqual "alice library matches" (libSize S.alice recorded) (libSize S.alice replayed)
+              HU.assertEqual
+                "alice library ORDER matches"
+                (Game.zoneMembers Zone.Library S.alice recorded)
+                (Game.zoneMembers Zone.Library S.alice replayed),
+      HU.testCase "CR 727.3/729.3: a short library still flags drewFromEmpty through the mulligan path" $
+        -- bob has a 5-card library; his 7-card opening draw empties it and
+        -- flags the failed draw, regardless of any mulligans (CR 103.5 / 729.3).
+        let g0 = Setup.emptyGame S.bothPlayers
+            addMany pid n g = List.foldl' (\h _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid h)) g (replicate n ())
+            gs0 = poolToLibrary S.bob (poolToLibrary S.alice (addMany S.bob 5 (addMany S.alice 20 g0)))
+            after = run keepAnswer gs0
+         in HU.assertBool "bob drew from an empty library" (Set.member S.bob (GameState.drewFromEmpty after))
     ]
