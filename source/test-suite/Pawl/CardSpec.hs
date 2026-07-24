@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
+import qualified Pawl.Codec as Codec
 -- The logic module, alongside Pawl.Type.Modal below: unambiguous under one
 -- alias because the two modules export disjoint names (TriggerSpec's
 -- precedent), and Modal.allEffects is how this lint reaches an activated or
@@ -404,6 +405,18 @@ lintTests registry =
         slugs <- S.corpusSlugs registry
         HU.assertBool "the corpus is not empty" (not (null slugs))
         mapM_ (Registry.card registry) slugs,
+      -- The other direction: Registry.card slugifies the NAME it is asked for,
+      -- then builds a path from that slug -- so a file whose stem is not itself a
+      -- slugify fixed point is never opened by that path; a lookup would quietly
+      -- open some OTHER file (or none) instead of raising the mismatch above.
+      -- Every committed file name must therefore already be its own slug.
+      HU.testCase "every file name in data/cards is already a slug" $ do
+        stems <- S.corpusSlugs registry
+        let offenders =
+              filter
+                (\stem -> Codec.slugify (Text.pack stem) /= Text.pack stem)
+                stems
+        HU.assertEqual "no file name needs slugifying" [] offenders,
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $ do
         blaze <- Registry.printing registry "Blaze"
         let card = Printing.card blaze

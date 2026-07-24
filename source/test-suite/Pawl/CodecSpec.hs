@@ -655,19 +655,22 @@ tests registry =
               (Codec.slugify (Text.pack "Knight in _____ Armor")),
           HU.testCase "a leading underscore run keeps its blank" $
             HU.assertEqual "_-goblin" (Text.pack "_-goblin") (Codec.slugify (Text.pack "_____ Goblin")),
+          HU.testCase "a doubled underscore between alphanumerics keeps its blank" $
+            HU.assertEqual "foo_bar" (Text.pack "foo_bar") (Codec.slugify (Text.pack "Foo__Bar")),
           QC.testProperty "idempotent: a slug slugifies to itself" $
             \s -> let t = Codec.slugify (Text.pack s) in Codec.slugify t QC.=== t,
           QC.testProperty "the output is ASCII [a-z0-9-_] throughout" $
             \s ->
               let ok c = Char.isAsciiLower c || Char.isDigit c || c == '-' || c == '_'
                in QC.property (Text.all ok (Codec.slugify (Text.pack s))),
-          QC.testProperty "no leading, trailing, or doubled hyphen" $
+          QC.testProperty "no leading, trailing, or doubled hyphen, and no doubled underscore" $
             \s ->
               let t = Codec.slugify (Text.pack s)
                in QC.property
                     ( not (Text.isPrefixOf (Text.pack "-") t)
                         && not (Text.isSuffixOf (Text.pack "-") t)
                         && not (Text.isInfixOf (Text.pack "--") t)
+                        && not (Text.isInfixOf (Text.pack "__") t)
                     )
         ]
     ]

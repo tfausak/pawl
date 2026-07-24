@@ -92,7 +92,7 @@ tests =
       HU.testCase "a name with no alphanumerics fails loudly instead of reading .json"
         . withCorpus "empty-slug" []
         $ \registry ->
-          expectIOError "empty slug" (Registry.card registry "_____"),
+          expectIOError "empty slug" (Registry.card registry "!!!"),
       HU.testCase "a failed load is not cached: fixing the file fixes the lookup" $ do
         piker <- pikerJson
         withCorpus "retry" [("goblin-piker.json", Text.pack "{oh no")] $ \registry -> do

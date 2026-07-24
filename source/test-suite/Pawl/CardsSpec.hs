@@ -1,7 +1,6 @@
 -- Covers data/cards/*.json and Pawl.Codec.slugify.
 module Pawl.CardsSpec where
 
-import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 import qualified Pawl.Codec as Codec
@@ -25,13 +24,9 @@ tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Pawl.CardsSpec"
-    [ HU.testCase "slugs are unique" $ do
+    [ HU.testCase "each committed file re-parses to its compiled card (P3)" $ do
         ps <- S.allPrintings registry
-        let slugs = fmap slugOf ps
-        HU.assertEqual "unique" (List.sort slugs) (List.sort (List.nub slugs)),
-      HU.testCase "each committed file re-parses to its compiled card (P3)" $ do
-        ps <- S.allPrintings registry
-        mapM_ checkFile ps,
+        mapM_ (checkFile registry) ps,
       HU.testCase "clone.json loads as a 0/0 Shapeshifter with an EntryR AsCopy" $ do
         c <- Registry.card registry "Clone"
         HU.assertEqual "entry replacement" [ReplacementEffect.EntryR EntryRewrite.AsCopy] (CardT.replacementEffects c)
@@ -39,9 +34,9 @@ tests registry =
         HU.assertEqual "power" (Just (Power.MkPower (Quantity.Literal 0))) (CardT.power c)
     ]
 
-checkFile :: Printing.Printing -> HU.Assertion
-checkFile p = do
-  let path = "data/cards/" <> Text.unpack (slugOf p) <> ".json"
+checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion
+checkFile registry p = do
+  let path = Registry.Type.root registry <> "/" <> Text.unpack (slugOf p) <> ".json"
   contents <- TextIO.readFile path
   case Json.parse contents of
     -- Unreachable: S.allPrintings would have failed in IO first.

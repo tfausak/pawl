@@ -111,7 +111,7 @@ becomes case-folding, ASCII-only and apostrophe-dropping. Because
 - Produces: `Codec.slugify :: Text -> Text` — unchanged signature, new rule.
   Task 2 depends on it being idempotent and ASCII-only.
 
-- [ ] **Step 1: Open the tracking issue for pool-scale slug collisions**
+- [x] **Step 1: Open the tracking issue for pool-scale slug collisions**
 
 The comment written in Step 4 cites it, so it must exist first.
 
@@ -125,7 +125,7 @@ Expiry: card-driven (fires when the full pool is imported)."
 
 Note the issue number it prints; call it `#N` below.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Add to `source/test-suite/Pawl/CodecSpec.hs`, inside the top-level list in
 `tests` (the module already imports `Data.Text as Text`, `Pawl.Codec as Codec`,
@@ -170,13 +170,13 @@ QC` — add any that are missing):
         ],
 ```
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `cabal test --test-options='-p slugify'`
 Expected: FAIL — `serpents-gift` (got `serpent-s-gift`), `khabal-ghoul` (got
 `khabál-ghoul`), `strasse` (got `strae`), and the ASCII property.
 
-- [ ] **Step 4: Rewrite `slugify`**
+- [x] **Step 4: Rewrite `slugify`**
 
 Replace `source/library/Pawl/Codec.hs:1746-1755` (the whole `-- Slug` section)
 with:
@@ -256,7 +256,7 @@ Replace `#N` with the issue number from Step 1. `Data.Char` was imported into
 `Pawl.Codec` only for `Char.isAlphaNum` in the old `slugify`; if nothing else
 uses it, delete the import or the build fails on `-Wunused-imports`.
 
-- [ ] **Step 5: Rename the two card files and their loader lines**
+- [x] **Step 5: Rename the two card files and their loader lines**
 
 ```bash
 git mv "data/cards/khabál-ghoul.json" data/cards/khabal-ghoul.json
@@ -267,14 +267,14 @@ In `source/test-suite/Pawl/Cards.hs`, change the two `loadPrinting` strings:
 `"serpent-s-gift"` → `"serpents-gift"` (line 131) and `"khabál-ghoul"` →
 `"khabal-ghoul"` (line 177).
 
-- [ ] **Step 6: Build and run the whole suite**
+- [x] **Step 6: Build and run the whole suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, including `CardSpec`'s "the data/cards directory and
 Cards.allPrintings agree, by slug" — that test is what proves the renames and
 the new rule agree.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl/Codec.hs source/test-suite/Pawl/CodecSpec.hs source/test-suite/Pawl/Cards.hs data/cards
@@ -308,7 +308,7 @@ no caller uses them yet.
   - `Registry.printing :: Registry.Type.Registry -> String -> IO
     Printing.Printing`
 
-- [ ] **Step 1: Write the failing spec**
+- [x] **Step 1: Write the failing spec**
 
 Create `source/test-suite/Pawl/RegistrySpec.hs`:
 
@@ -419,12 +419,12 @@ Wire it into `source/test-suite/Main.hs`: add
 `import qualified Pawl.RegistrySpec as RegistrySpec` and `RegistrySpec.tests,`
 to the `testTree` list (it takes no argument).
 
-- [ ] **Step 2: Run the spec to verify it fails**
+- [x] **Step 2: Run the spec to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `Could not find module 'Pawl.Registry'`.
 
-- [ ] **Step 3: Write the type**
+- [x] **Step 3: Write the type**
 
 Create `source/library/Pawl/Type/Registry.hs`:
 
@@ -452,7 +452,7 @@ data Registry = MkRegistry
   deriving (Eq)
 ```
 
-- [ ] **Step 4: Write the loader**
+- [x] **Step 4: Write the loader**
 
 Create `source/library/Pawl/Registry.hs`:
 
@@ -531,17 +531,17 @@ load registry slug =
                       )
 ```
 
-- [ ] **Step 5: Run the spec to verify it passes**
+- [x] **Step 5: Run the spec to verify it passes**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test --test-options='-p RegistrySpec'`
 Expected: PASS, 8 cases.
 
-- [ ] **Step 6: Run the whole suite**
+- [x] **Step 6: Run the whole suite**
 
 Run: `cabal test`
 Expected: PASS — nothing else changed yet.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl/Registry.hs source/library/Pawl/Type/Registry.hs source/test-suite/Pawl/RegistrySpec.hs source/test-suite/Main.hs pawl.cabal
@@ -590,7 +590,7 @@ sweep below), so `Pawl.Support` stays pure.
   - `S.corpusSlugs :: Registry.Type.Registry -> IO [String]`
   - `S.allPrintings :: Registry.Type.Registry -> IO [Printing.Printing]`
 
-- [ ] **Step 1: List the call sites**
+- [x] **Step 1: List the call sites**
 
 ```bash
 rg -n 'S\.(addPiker|mountainsInPlay|pikerCard|withHumility|combatBoard|anthemEmblemCard|oneMountainState|boardWithCreatureArtifactLand|pikerInHand|boltInHand|boltAtBobsPiker|m2aPrintings)\b' source/test-suite
@@ -598,7 +598,7 @@ rg -n 'S\.(addPiker|mountainsInPlay|pikerCard|withHumility|combatBoard|anthemEmb
 
 Every hit is edited in Step 3. Keep the list — the build will confirm it.
 
-- [ ] **Step 2: Rewrite the fixtures**
+- [x] **Step 2: Rewrite the fixtures**
 
 In `source/test-suite/Pawl/Support.hs`:
 
@@ -721,7 +721,7 @@ allPrintings registry = do
 Add the imports `Pawl.Registry as Registry`, `Pawl.Type.Registry as
 Registry.Type` and `System.Directory as Directory` to `Pawl.Support`.
 
-- [ ] **Step 3: Update every call site**
+- [x] **Step 3: Update every call site**
 
 At each hit from Step 1, pass the printing(s) the fixture used to fetch itself,
 still from the record. Mechanically:
@@ -757,13 +757,13 @@ inline list at the call site:
 
 and Task 10 replaces that list with `S.m2aKeywords` plus `Registry.printing`.
 
-- [ ] **Step 4: Build and run the whole suite**
+- [x] **Step 4: Build and run the whole suite**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, with the same test count as before. Behavior is unchanged — only
 who fetches the printing moved.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add source/test-suite
@@ -869,30 +869,30 @@ git commit -m "refactor(test): load cards from the registry in <batch> (#145)"
 
 ---
 
-- [ ] **Task 4: The small specs**
+- [x] **Task 4: The small specs**
 
 `TurnSpec`, `ConditionSpec`, `CoreSpec`, `ReplaySpec`, `CopySpec`, `CountSpec`,
 `ActivateSpec`. Includes the `Main.hs` two-argument change described above.
 
-- [ ] **Task 5: The codec and effect specs**
+- [x] **Task 5: The codec and effect specs**
 
 `ManaSpec`, `ExpirySpec`, `ModalSpec`, `EventSpec`, `CodecSpec`, `ColorSpec`,
 `CastSpec`. `CodecSpec` uses `Cards.allPrintings cards` twice — replace with
 `ps <- S.allPrintings registry` inside the test body.
 
-- [ ] **Task 6: Combat and damage**
+- [x] **Task 6: Combat and damage**
 
 `MulliganSpec`, `DamageSpec`, `CombatSpec`.
 
-- [ ] **Task 7: Cost, game and player effects**
+- [x] **Task 7: Cost, game and player effects**
 
 `CostSpec`, `GameSpec`, `PlayerEffectSpec`.
 
-- [ ] **Task 8: Projection, power/toughness and triggers**
+- [x] **Task 8: Projection, power/toughness and triggers**
 
 `PowerToughnessSpec`, `ProjectionSpec`, `TriggerSpec`.
 
-- [ ] **Task 9: Replacement and resolve**
+- [x] **Task 9: Replacement and resolve**
 
 `ReplacementSpec`, `ResolveSpec` (the largest module, 145 card references).
 
@@ -915,7 +915,7 @@ and after this task it cannot be.
 - Consumes: `S.allPrintings`, `S.corpusSlugs`, `S.m2aKeywords` (Task 3),
   `Registry.printing`, `Registry.card` (Task 2).
 
-- [ ] **Step 1: Migrate `Pawl.CardsSpec`**
+- [x] **Step 1: Migrate `Pawl.CardsSpec`**
 
 Replace its body with the registry-driven form. `Codec.slugify` still keys
 everything, so the round-trip test is unchanged in substance:
@@ -944,7 +944,7 @@ tests registry =
 would have failed first" note becomes "unreachable: `S.allPrintings` would have
 failed in IO first".
 
-- [ ] **Step 2: Migrate `Pawl.CardSpec`'s directory test**
+- [x] **Step 2: Migrate `Pawl.CardSpec`'s directory test**
 
 Replace the test at lines 371-387 ("the data/cards directory and
 Cards.allPrintings agree, by slug") with the sweep that the registry makes
@@ -962,7 +962,7 @@ loading every file *is* the assertion:
         mapM_ (Registry.card registry) slugs,
 ```
 
-- [ ] **Step 3: Migrate the rest of `Pawl.CardSpec`**
+- [x] **Step 3: Migrate the rest of `Pawl.CardSpec`**
 
 Apply the Tasks 4-9 recipe to the remaining cases: 16 `Cards.allPrintings cards`
 uses become `ps <- S.allPrintings registry`, and each named field becomes a
@@ -979,13 +979,13 @@ uses become `ps <- S.allPrintings registry`, and each named field becomes a
           S.m2aKeywords,
 ```
 
-- [ ] **Step 4: Build and run**
+- [x] **Step 4: Build and run**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. The test count changes by design here — the directory-agreement
 pair of assertions becomes one sweep.
 
-- [ ] **Step 5: Prove the sweep catches a misfiled card**
+- [x] **Step 5: Prove the sweep catches a misfiled card**
 
 ```bash
 cp data/cards/goblin-piker.json data/cards/nonesuch.json
@@ -998,7 +998,7 @@ Expected: FAIL, naming `nonesuch` and `goblin-piker`. Then:
 rm data/cards/nonesuch.json
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add source/test-suite
@@ -1029,7 +1029,7 @@ and IO, along with the `Pawl.Support` matchup fixtures and their two callers.
   (PlayerId.PlayerId, Deck.Deck))`; `S.matchups :: Registry.Type.Registry -> IO
   [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]`.
 
-- [ ] **Step 1: Rewrite the decks**
+- [x] **Step 1: Rewrite the decks**
 
 In `source/test-suite/Pawl/Cards.hs`, keeping every existing comment (the
 swap-in rationales are load-bearing — they explain the 60-card and 120-object
@@ -1064,7 +1064,7 @@ Growth 4, Serpent's Gift 4, Battlegrowth 4), `blueDeck` (Island 40, Unsummon 8,
 Divination 8, Tome Scour 4) and `blackDeck` (Swamp 36, Typhoid Rats 8, Drudge
 Skeletons 4, Murder 4, Mind Rot 4, Instill Infection 4).
 
-- [ ] **Step 2: Rewrite the matchup fixtures**
+- [x] **Step 2: Rewrite the matchup fixtures**
 
 In `source/test-suite/Pawl/Support.hs`:
 
@@ -1102,7 +1102,7 @@ landsOnly registry = do
   pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) bothPlayers)
 ```
 
-- [ ] **Step 3: Migrate `Pawl.PropertySpec`**
+- [x] **Step 3: Migrate `Pawl.PropertySpec`**
 
 The properties reach IO through `QC.ioProperty`, which `Test.Tasty.QuickCheck`
 re-exports:
@@ -1127,17 +1127,17 @@ propertyTests registry =
 Keep `iterations` and every `QC.counterexample` label exactly as they are — the
 labels are how a failure names the invariant that broke.
 
-- [ ] **Step 4: Migrate `Pawl.SetupSpec`** with the Tasks 4-9 recipe; its
+- [x] **Step 4: Migrate `Pawl.SetupSpec`** with the Tasks 4-9 recipe; its
       `Cards.redDeck cards` uses become `deck <- Cards.redDeck registry`.
 
-- [ ] **Step 5: Build and run**
+- [x] **Step 5: Build and run**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS. `PropertySpec` plays whole games, so it is the slowest — expect
 roughly the same wall time as before; the registry caches, so the decks are
 parsed once, not once per seed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add source/test-suite
@@ -1160,7 +1160,7 @@ benchmark's private copy of the same loading.
 - Modify: `source/test-suite/Main.hs` (one registry, one-argument `testTree`)
 - Modify: `source/benchmark/Main.hs:182-183` (its own `loadPrinting`)
 
-- [ ] **Step 1: Check nothing still names the record**
+- [x] **Step 1: Check nothing still names the record**
 
 ```bash
 rg -n 'Cards\.(Cards|MkCards|loadCards|loadPrinting|allPrintings|\w+Printing)' source
@@ -1169,7 +1169,7 @@ rg -n 'Cards\.(Cards|MkCards|loadCards|loadPrinting|allPrintings|\w+Printing)' s
 Expected: hits only in `source/test-suite/Pawl/Cards.hs` itself. Anything else
 means a module was missed in Tasks 4-11 — migrate it before continuing.
 
-- [ ] **Step 2: Delete the record and the loaders**
+- [x] **Step 2: Delete the record and the loaders**
 
 In `source/test-suite/Pawl/Cards.hs`, delete `data Cards`, `loadPrinting`,
 `loadCards` and `allPrintings`, leaving only the four decks. Replace the module
@@ -1183,7 +1183,7 @@ header comment with:
 -- at 120).
 ```
 
-- [ ] **Step 3: Simplify `Main.hs`**
+- [x] **Step 3: Simplify `Main.hs`**
 
 ```haskell
 main :: IO ()
@@ -1207,7 +1207,7 @@ testTree registry =
 `import qualified Pawl.Cards as Cards`, or the build fails on
 `-Wunused-imports`.
 
-- [ ] **Step 4: Switch the benchmark to the registry**
+- [x] **Step 4: Switch the benchmark to the registry**
 
 In `source/benchmark/Main.hs`, delete its private `loadPrinting` and load
 through the registry instead:
@@ -1220,13 +1220,13 @@ through the registry instead:
 Match the existing benchmark's structure: whatever it loaded by slug, it now
 loads by name from one registry created at the top of `main`.
 
-- [ ] **Step 5: Build, test and benchmark**
+- [x] **Step 5: Build, test and benchmark**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test && cabal bench`
 Expected: all PASS. The benchmark's numbers should be unchanged — it loads the
 same cards, once.
 
-- [ ] **Step 6: Clean build to catch hidden warnings**
+- [x] **Step 6: Clean build to catch hidden warnings**
 
 Incremental builds hide warnings from unchanged modules, and this task deleted
 code in three components.
@@ -1234,7 +1234,7 @@ code in three components.
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks`
 Expected: no warnings (the `pedantic` flag turns any into an error).
 
-- [ ] **Step 7: Commit and close the issue**
+- [x] **Step 7: Commit and close the issue**
 
 ```bash
 git add source/test-suite source/benchmark pawl.cabal

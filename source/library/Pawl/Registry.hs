@@ -5,9 +5,10 @@
 module Pawl.Registry where
 
 import qualified Control.Concurrent.MVar as MVar
+import qualified Data.ByteString as ByteString
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
-import qualified Data.Text.IO as TextIO
+import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
 import qualified Pawl.Type.Card as Card
@@ -44,6 +45,12 @@ printing registry name = fmap Printing.MkPrinting (card registry name)
 -- Read and parse one file. A missing file surfaces as readFile's own IO error,
 -- which already names the path. Everything else is a userError naming it.
 --
+-- Read as bytes and decoded as UTF-8 explicitly, not via Data.Text.IO.readFile:
+-- that decodes using the locale encoding, which is ASCII under LC_ALL=C (a
+-- minimal CI container, env -i, cron), so a card whose text has a non-ASCII
+-- character (khabal-ghoul.json's "á") would throw an unhelpful "invalid byte
+-- sequence" instead of naming the offending file.
+--
 -- The name check is the one thing a per-card load can assert that no sweep has
 -- to: a file's own `name` field must slugify back to the name it is filed
 -- under, or a lookup would quietly serve a different card than it was asked for.
@@ -51,22 +58,25 @@ load :: Registry.Registry -> Text.Text -> IO Card.Card
 load registry slug =
   let path = Registry.root registry <> "/" <> Text.unpack slug <> ".json"
    in do
-        contents <- TextIO.readFile path
-        case Json.parse contents >>= Codec.jsonToCard of
-          Left err -> ioError (userError (path <> ": " <> Text.unpack err))
-          Right c ->
-            let actual = Codec.slugify (Card.name c)
-             in if actual == slug
-                  then pure c
-                  else
-                    ioError
-                      ( userError
-                          ( path
-                              <> ": filed under "
-                              <> Text.unpack slug
-                              <> " but the card is named "
-                              <> Text.unpack (Card.name c)
-                              <> ", which slugifies to "
-                              <> Text.unpack actual
+        bytes <- ByteString.readFile path
+        case Encoding.decodeUtf8' bytes of
+          Left err -> ioError (userError (path <> ": not valid UTF-8: " <> show err))
+          Right contents ->
+            case Json.parse contents >>= Codec.jsonToCard of
+              Left err -> ioError (userError (path <> ": " <> Text.unpack err))
+              Right c ->
+                let actual = Codec.slugify (Card.name c)
+                 in if actual == slug
+                      then pure c
+                      else
+                        ioError
+                          ( userError
+                              ( path
+                                  <> ": filed under "
+                                  <> Text.unpack slug
+                                  <> " but the card is named "
+                                  <> Text.unpack (Card.name c)
+                                  <> ", which slugifies to "
+                                  <> Text.unpack actual
+                              )
                           )
-                      )

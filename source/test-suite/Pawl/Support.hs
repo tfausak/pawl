@@ -385,8 +385,6 @@ runRandomGame :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> Int -> Game
 runRandomGame matchup s =
   snd (State.evalState (Engine.runMatch randomAnswer matchup) (Random.mkStdGen s))
 
--- A Piker put onto the battlefield under pid's control, untapped and Settled.
---
 -- Any printing, on the battlefield under pid's control, untapped and Settled.
 addCreature :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addCreature printing pid gs =
@@ -684,7 +682,8 @@ handOne printing base =
         oid
       )
 
--- alice has n untapped Mountains in play and one Piker in hand, in a chosen phase.
+-- alice has n untapped lands of the given printing in play and one Piker in
+-- hand, in a chosen phase.
 pikerInHand :: Printing.Printing -> Printing.Printing -> Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
 pikerInHand land piker n ph =
   let base = landsInPlay land n
@@ -712,7 +711,8 @@ pikerInHand land piker n ph =
           }
    in (gs3, oid)
 
--- alice has n untapped Mountains in play and one Lightning Bolt in hand.
+-- alice has n untapped lands of the given printing in play and one Lightning
+-- Bolt in hand.
 boltInHand :: Printing.Printing -> Printing.Printing -> Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
 boltInHand land bolt n ph =
   let (gs, oid) = handOne bolt (landsInPlay land n)
