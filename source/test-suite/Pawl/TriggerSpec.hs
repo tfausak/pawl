@@ -21,13 +21,13 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -54,6 +54,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
@@ -64,9 +65,22 @@ import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
+-- Barbarian Outcast on N Swamps, the two loaded printings each test case
+-- supplies.
+outcastBoard :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+outcastBoard barbarianOutcast swamp swamps =
+  S.addCreature barbarianOutcast S.alice (S.landsInPlay swamp swamps)
+
+-- alice casts Tidal Wave off three Islands and lets it resolve.
+castWave :: Printing.Printing -> Printing.Printing -> GameState.GameState
+castWave tidalWave island =
+  let resolveAll g = snd (Engine.runGamePure S.identityAnswer g Engine.priorityLoop)
+      (gs, oid) = S.handOne tidalWave (S.landsInPlay island 3)
+   in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid)))
+
 -- CR 608.2i: the log records; it is never emptied by a reader.
-logTests :: Cards.Cards -> Tasty.TestTree
-logTests cards =
+logTests :: Registry.Type.Registry -> Tasty.TestTree
+logTests registry =
   Tasty.testGroup
     "EventLog"
     [ -- CR 400.7 / 603.2g: a zone change appends a Moved event carrying the
@@ -77,44 +91,48 @@ logTests cards =
       -- CR 608.2h: the snapshot is the object as it last existed in the zone it
       -- LEFT. Re-deriving from the printed card would be wrong for an animated
       -- land and impossible for a token (CR 111.1).
-      HU.testCase "CR 608.2h a Moved event snapshots the object it moved" $
-        let (piker, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+      HU.testCase "CR 608.2h a Moved event snapshots the object it moved" $ do
+        pikerPrinting <- Registry.printing registry "Goblin Piker"
+        let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
             expected = Projection.project piker gs
             after = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
-         in case Foldable.toList (GameState.events after) of
-              GameEvent.Moved _ snapshot : _ -> HU.assertEqual "snapshot from the origin zone" expected snapshot
-              _ -> HU.assertFailure "expected exactly one Moved event",
+        case Foldable.toList (GameState.events after) of
+          GameEvent.Moved _ snapshot : _ -> HU.assertEqual "snapshot from the origin zone" expected snapshot
+          _ -> HU.assertFailure "expected exactly one Moved event",
       -- CR 704.5h's window is "since the last SBA check": the check CONSUMES by
       -- bumping a watermark, and the record survives.
-      HU.testCase "CR 704 the SBA check advances the damage watermark but keeps the record" $
-        let (gs, _, _) = S.combatBoardOf [Cards.typhoidRatsPrinting cards] [Cards.ogreSentryPrinting cards]
+      HU.testCase "CR 704 the SBA check advances the damage watermark but keeps the record" $ do
+        typhoidRats <- Registry.printing registry "Typhoid Rats"
+        ogreSentry <- Registry.printing registry "Ogre Sentry"
+        let (gs, _, _) = S.combatBoardOf [typhoidRats] [ogreSentry]
             fought = S.fightWith S.aggressiveAnswer gs
             after = S.settleSba fought
-         in do
-              HU.assertEqual "nothing left unscanned for damage" [] (Event.unscannedDamage after)
-              HU.assertBool "the damage events are still recorded" (not (null (S.damageEventsOf after))),
-      HU.testCase "CR 117.5 the trigger scan advances its watermark but keeps the record" $
-        let (_, gs) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            (piker, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs
-            moved = S.runPure S.identityAnswer gs1 (Event.changeZone piker Zone.Hand)
+        HU.assertEqual "nothing left unscanned for damage" [] (Event.unscannedDamage after)
+        HU.assertBool "the damage events are still recorded" (not (null (S.damageEventsOf after))),
+      HU.testCase "CR 117.5 the trigger scan advances its watermark but keeps the record" $ do
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (_, gs) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+            (pikerId, gs1) = S.addCreature piker S.bob gs
+            moved = S.runPure S.identityAnswer gs1 (Event.changeZone pikerId Zone.Hand)
             scanned = snd (Engine.runGamePure S.identityAnswer moved Engine.placePendingTriggers)
-         in do
-              HU.assertEqual "nothing left unscanned" [] (Event.unscannedEvents scanned)
-              HU.assertBool "the zone change is still recorded" (not (null (S.zoneChangesOf scanned))),
+        HU.assertEqual "nothing left unscanned" [] (Event.unscannedEvents scanned)
+        HU.assertBool "the zone change is still recorded" (not (null (S.zoneChangesOf scanned))),
       -- The turn is the log's scope (CR 608.2i). Clearing at cleanup would be
       -- wrong: cleanup is still part of THIS turn.
-      HU.testCase "the log and both watermarks are cleared at turn handoff" $
-        let (piker, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+      HU.testCase "the log and both watermarks are cleared at turn handoff" $ do
+        pikerPrinting <- Registry.printing registry "Goblin Piker"
+        let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
             moved = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
             after = snd (Engine.runGamePure S.identityAnswer moved Engine.handoffTurn)
-         in do
-              HU.assertEqual "log empty" Seq.empty (GameState.events after)
-              HU.assertEqual "scan watermark reset" 0 (GameState.scannedThrough after)
-              HU.assertEqual "damage watermark reset" 0 (GameState.damageScannedThrough after),
+        HU.assertEqual "log empty" Seq.empty (GameState.events after)
+        HU.assertEqual "scan watermark reset" 0 (GameState.scannedThrough after)
+        HU.assertEqual "damage watermark reset" 0 (GameState.damageScannedThrough after),
       -- CR 514.3 (partial): an event emitted by the cleanup step must be scanned
       -- BEFORE handoffTurn clears the log, or its trigger is lost outright.
-      HU.testCase "advance settles before handing off, so no unscanned event is discarded" $
-        let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+      HU.testCase "advance settles before handing off, so no unscanned event is discarded" $ do
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
             gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
             ending = gs1 {GameState.remaining = Seq.empty}
@@ -124,14 +142,13 @@ logTests cards =
                 Source.OfTrigger _ _ -> True
                 _ -> False
               Nothing -> False
-         in do
-              HU.assertBool "the pending trigger reached the stack" (any isTrigger (GameState.stack after))
-              HU.assertEqual "the log was cleared afterwards" Seq.empty (GameState.events after)
+        HU.assertBool "the pending trigger reached the stack" (any isTrigger (GameState.stack after))
+        HU.assertEqual "the log was cleared afterwards" Seq.empty (GameState.events after)
     ]
 
 -- CR 603.2b / 603.6a: a step begins, and EVERY permanent is checked.
-scanTests :: Cards.Cards -> Tasty.TestTree
-scanTests cards =
+scanTests :: Registry.Type.Registry -> Tasty.TestTree
+scanTests registry =
   Tasty.testGroup
     "Scan"
     [ HU.testCase "CR 603.2b running a step records that it began, on the active player's turn" $
@@ -166,26 +183,30 @@ scanTests cards =
       -- The widening falsifier: the scan now visits every battlefield permanent,
       -- so SelfEnters must ask whether the event is about THIS permanent. Rest in
       -- Peace is on the battlefield and a DIFFERENT object entered.
-      HU.testCase "CR 603.6a a SelfEnters trigger does not fire on another object's entry" $
-        let (_, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            (piker, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
-            entered = ZoneChange.MkZoneChange piker Zone.Stack Zone.Battlefield
-            gs2 = S.withEvent (GameEvent.Moved entered (Projection.project piker gs1)) gs1
-         in HU.assertEqual "no trigger" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2))),
-      HU.testCase "CR 603.6a a SelfEnters trigger still fires on its own entry" $
-        let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+      HU.testCase "CR 603.6a a SelfEnters trigger does not fire on another object's entry" $ do
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (_, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+            (pikerId, gs1) = S.addCreature piker S.bob gs0
+            entered = ZoneChange.MkZoneChange pikerId Zone.Stack Zone.Battlefield
+            gs2 = S.withEvent (GameEvent.Moved entered (Projection.project pikerId gs1)) gs1
+        HU.assertEqual "no trigger" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2))),
+      HU.testCase "CR 603.6a a SelfEnters trigger still fires on its own entry" $ do
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
             gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
-         in case fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1) of
-              [pt] -> do
-                HU.assertEqual "source is RiP" ripId (PendingTrigger.source pt)
-                HU.assertEqual "controller is alice" S.alice (PendingTrigger.controller pt)
-              other -> HU.assertFailure ("expected exactly one pending trigger, got " <> show (length other)),
-      HU.testCase "a graveyard-bound event yields no enters trigger" $
-        let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+        case fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1) of
+          [pt] -> do
+            HU.assertEqual "source is RiP" ripId (PendingTrigger.source pt)
+            HU.assertEqual "controller is alice" S.alice (PendingTrigger.controller pt)
+          other -> HU.assertFailure ("expected exactly one pending trigger, got " <> show (length other)),
+      HU.testCase "a graveyard-bound event yields no enters trigger" $ do
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             toGrave = ZoneChange.MkZoneChange ripId Zone.Battlefield Zone.Graveyard
             gs1 = S.withEvent (GameEvent.Moved toGrave (Projection.project ripId gs0)) gs0
-         in HU.assertEqual "no triggers" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1))),
+        HU.assertEqual "no triggers" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1))),
       HU.testCase "SelfEnters matches only a battlefield destination" $
         let bearer = ObjectId.MkObjectId 1
             movedTo zone = GameEvent.Moved (ZoneChange.MkZoneChange bearer Zone.Stack zone) S.emptyCharacteristics
@@ -200,18 +221,18 @@ scanTests cards =
       -- enter via two separate events recorded in the same order their ids
       -- were assigned; the resulting PendingTrigger.source list must follow
       -- that same ascending order.
-      HU.testCase "CR 603.6a two SelfEnters triggers emit in ascending ObjectId order" $
-        let (rip1, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            (rip2, gs1) = S.addCreature (Cards.restInPeacePrinting cards) S.alice gs0
+      HU.testCase "CR 603.6a two SelfEnters triggers emit in ascending ObjectId order" $ do
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        let (rip1, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+            (rip2, gs1) = S.addCreature restInPeace S.alice gs0
             entered1 = ZoneChange.MkZoneChange rip1 Zone.Stack Zone.Battlefield
             entered2 = ZoneChange.MkZoneChange rip2 Zone.Stack Zone.Battlefield
             gs2 = S.withEvent (GameEvent.Moved entered1 (Projection.project rip1 gs1)) gs1
             gs3 = Event.recordEvent (GameEvent.Moved entered2 (Projection.project rip2 gs1)) gs2
             triggers = fst (Event.gatherTriggers (Event.unscannedEvents gs3) gs3)
-         in do
-              HU.assertBool "rip1 has the lower id" (rip1 < rip2)
-              HU.assertEqual "both triggers fired" 2 (length triggers)
-              HU.assertEqual "sources in ascending ObjectId order" [rip1, rip2] (fmap PendingTrigger.source triggers),
+        HU.assertBool "rip1 has the lower id" (rip1 < rip2)
+        HU.assertEqual "both triggers fired" 2 (length triggers)
+        HU.assertEqual "sources in ascending ObjectId order" [rip1, rip2] (fmap PendingTrigger.source triggers),
       -- The PERMANENTS-INNER half of that same order guarantee. Every SelfEnters
       -- test above has exactly one bearer matching each event, so inner order
       -- can never affect the output -- SelfEnters alone cannot discriminate
@@ -220,85 +241,85 @@ scanTests cards =
       -- Khabál Ghouls (CR 603.2b, "at the beginning of each end step") on the
       -- battlefield, one end-step event -- the PendingTrigger.source list must
       -- come out in ascending ObjectId order.
-      HU.testCase "CR 603.2b two StepBegins triggers from one event emit in ascending ObjectId order" $
-        let (ghoul1, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-            (ghoul2, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice gs0
+      HU.testCase "CR 603.2b two StepBegins triggers from one event emit in ascending ObjectId order" $ do
+        khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+        let (ghoul1, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+            (ghoul2, gs1) = S.addCreature khabalGhoul S.alice gs0
             event = GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice
             triggers = fst (Event.gatherTriggers [event] gs1)
-         in do
-              HU.assertBool "ghoul1 has the lower id" (ghoul1 < ghoul2)
-              HU.assertEqual "both triggers fired" 2 (length triggers)
-              HU.assertEqual "sources in ascending ObjectId order" [ghoul1, ghoul2] (fmap PendingTrigger.source triggers)
+        HU.assertBool "ghoul1 has the lower id" (ghoul1 < ghoul2)
+        HU.assertEqual "both triggers fired" 2 (length triggers)
+        HU.assertEqual "sources in ascending ObjectId order" [ghoul1, ghoul2] (fmap PendingTrigger.source triggers)
     ]
 
 -- CR 701.21: sacrificing is its own keyword action -- NOT a destruction.
-sacrificeTests :: Cards.Cards -> Tasty.TestTree
-sacrificeTests cards =
+sacrificeTests :: Registry.Type.Registry -> Tasty.TestTree
+sacrificeTests registry =
   Tasty.testGroup
     "Sacrifice"
-    [ HU.testCase "CR 701.21a a sacrificed permanent goes to its owner's graveyard" $
-        let (piker, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+    [ HU.testCase "CR 701.21a a sacrificed permanent goes to its owner's graveyard" $ do
+        pikerPrinting <- Registry.printing registry "Goblin Piker"
+        let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
             after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
-         in do
-              HU.assertEqual "off the battlefield" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+        HU.assertEqual "off the battlefield" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
       -- The test above sacrifices a permanent the same player owns and
       -- controls, so it never exercises owner-relativity: CR 701.21a says
       -- "its CONTROLLER moves it... to its OWNER's graveyard." Here bob owns
       -- and alice controls (S.giveControl installs the layer-2 SetController
       -- effect), so the result must land in bob's graveyard, not alice's.
-      HU.testCase "CR 701.21a a sacrifice lands in the OWNER's graveyard even when a different player controls it" $
-        let (piker, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+      HU.testCase "CR 701.21a a sacrifice lands in the OWNER's graveyard even when a different player controls it" $ do
+        pikerPrinting <- Registry.printing registry "Goblin Piker"
+        let (piker, gs0) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
             gs = S.giveControl piker S.alice gs0
             after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
-         in do
-              HU.assertEqual "off bob's battlefield" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual "in bob's (owner's) graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
-              HU.assertEqual "not in alice's graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+        HU.assertEqual "off bob's battlefield" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual "in bob's (owner's) graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertEqual "not in alice's graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       -- CR 701.21a: "sacrificing a permanent doesn't destroy it", so neither CR
       -- 702.12b's indestructible gate nor CR 701.19a's shield applies.
-      HU.testCase "CR 701.21a an indestructible permanent can still be sacrificed" $
-        let (myr, gs) = S.addCreature (Cards.darksteelMyrPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+      HU.testCase "CR 701.21a an indestructible permanent can still be sacrificed" $ do
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        let (myr, gs) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
             after = S.runPure S.identityAnswer gs (Event.sacrifice myr)
-         in HU.assertEqual "gone from the battlefield" 0 (S.creaturesInPlay S.bob after),
-      HU.testCase "CR 701.21a sacrificing neither consults nor consumes a regeneration shield" $
-        let (piker, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual "gone from the battlefield" 0 (S.creaturesInPlay S.bob after),
+      HU.testCase "CR 701.21a sacrificing neither consults nor consumes a regeneration shield" $ do
+        pikerPrinting <- Registry.printing registry "Goblin Piker"
+        let (piker, gs0) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
             gs = S.addRegenShield piker gs0
             after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
-         in do
-              HU.assertEqual "still sacrificed" 0 (S.creaturesInPlay S.bob after)
-              HU.assertEqual
-                "the shield's source is untouched"
-                [piker]
-                (fmap ActiveReplacement.source (GameState.replacements after)),
-      HU.testCase "only a battlefield permanent can be sacrificed (CR 701.21a)" $
-        let (card, gs) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual "still sacrificed" 0 (S.creaturesInPlay S.bob after)
+        HU.assertEqual
+          "the shield's source is untouched"
+          [piker]
+          (fmap ActiveReplacement.source (GameState.replacements after)),
+      HU.testCase "only a battlefield permanent can be sacrificed (CR 701.21a)" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (card, gs) = S.addLibraryCard piker S.bob (Setup.emptyGame S.bothPlayers)
             after = S.runPure S.identityAnswer gs (Event.sacrifice card)
-         in HU.assertEqual "the library card is untouched" gs after,
+        HU.assertEqual "the library card is untouched" gs after,
       -- CR 113.7: "this creature" is a slot read, filled at placement.
-      HU.testCase "CR 113.7 a placed trigger binds its source into the reserved self slot" $
-        let (ripId, gs0) = S.addCreature (Cards.restInPeacePrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+      HU.testCase "CR 113.7 a placed trigger binds its source into the reserved self slot" $ do
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
             gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
             placed = snd (Engine.runGamePure S.identityAnswer gs1 Engine.placePendingTriggers)
             bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid placed)
             selfOf oid = Map.lookup Binding.triggerSource (Binding.targetsOf (bindingsOn oid))
-         in HU.assertEqual
-              "the trigger names its source"
-              [Just (Recipient.ToObject ripId)]
-              (fmap selfOf (GameState.stack placed))
+        HU.assertEqual
+          "the trigger names its source"
+          [Just (Recipient.ToObject ripId)]
+          (fmap selfOf (GameState.stack placed))
     ]
 
 -- Barbarian Outcast {1}{R} Creature -- Human Barbarian Beast 2/2:
 -- "When you control no Swamps, sacrifice this creature." CR 603.8's own example
 -- shape ("a player controlling no permanents of a particular card type"), chosen
 -- by the rulebook to illustrate the rule.
-stateTriggerTests :: Cards.Cards -> Tasty.TestTree
-stateTriggerTests cards =
-  let outcastBoard swamps =
-        let (oid, gs) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice (S.landsInPlay (Cards.swampPrinting cards) swamps)
-         in (oid, gs)
-      triggerIds gs = filter (isTriggerObject gs) (GameState.stack gs)
+stateTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+stateTriggerTests registry =
+  let triggerIds gs = filter (isTriggerObject gs) (GameState.stack gs)
       isTriggerObject gs oid = case Game.lookupObject oid gs of
         Just obj -> case Object.source obj of
           Source.OfTrigger _ _ -> True
@@ -323,38 +344,48 @@ stateTriggerTests cards =
           -- pinning that suppression is scoped per SOURCE rather than per
           -- ability (a bug that would wrongly suppress a second source, not
           -- flood -- so it fails this same 0/1 shape rather than hanging).
-          HU.testCase "CR 603.8 a true state condition puts EXACTLY ONE instance on the stack" $
-            let (_, gs) = outcastBoard 0
+          HU.testCase "CR 603.8 a true state condition puts EXACTLY ONE instance on the stack" $ do
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+            swamp <- Registry.printing registry "Swamp"
+            let (_, gs) = outcastBoard barbarianOutcast swamp 0
                 settled = settle gs
-             in HU.assertEqual "one trigger, not one per boundary" 1 (length (triggerIds settled)),
-          HU.testCase "CR 603.8 re-settling while the instance is on the stack adds no second copy" $
-            let (_, gs) = outcastBoard 0
+            HU.assertEqual "one trigger, not one per boundary" 1 (length (triggerIds settled)),
+          HU.testCase "CR 603.8 re-settling while the instance is on the stack adds no second copy" $ do
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+            swamp <- Registry.printing registry "Swamp"
+            let (_, gs) = outcastBoard barbarianOutcast swamp 0
                 twice = settle (settle gs)
-             in HU.assertEqual "still exactly one" 1 (length (triggerIds twice)),
-          HU.testCase "CR 603.8 the condition being FALSE means no trigger at all" $
-            let (_, gs) = outcastBoard 1
+            HU.assertEqual "still exactly one" 1 (length (triggerIds twice)),
+          HU.testCase "CR 603.8 the condition being FALSE means no trigger at all" $ do
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+            swamp <- Registry.printing registry "Swamp"
+            let (_, gs) = outcastBoard barbarianOutcast swamp 1
                 settled = settle gs
-             in HU.assertEqual "no trigger while a Swamp is out" 0 (length (triggerIds settled)),
-          HU.testCase "CR 603.8 losing the last Swamp makes the condition true and fires it" $
-            let (_, gs) = outcastBoard 1
+            HU.assertEqual "no trigger while a Swamp is out" 0 (length (triggerIds settled)),
+          HU.testCase "CR 603.8 losing the last Swamp makes the condition true and fires it" $ do
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+            swamp <- Registry.printing registry "Swamp"
+            let (_, gs) = outcastBoard barbarianOutcast swamp 1
                 quiet = settle gs
-                swamp = case Game.zoneMembers Zone.Battlefield S.alice quiet of
+                swampOid = case Game.zoneMembers Zone.Battlefield S.alice quiet of
                   ids -> case filter (\oid -> Set.member Subtype.Swamp (Projection.subtypesOf oid quiet)) ids of
                     s : _ -> s
                     [] -> ObjectId.MkObjectId 999
-                gone = settle (S.runPure S.identityAnswer quiet (Event.destroy swamp))
-             in HU.assertEqual "the Swamp's death arms it" 1 (length (triggerIds gone)),
+                gone = settle (S.runPure S.identityAnswer quiet (Event.destroy swampOid))
+            HU.assertEqual "the Swamp's death arms it" 1 (length (triggerIds gone)),
           -- CR 603.8: "doesn't trigger again until the ability has resolved, has
           -- been countered, or has otherwise left the stack" -- all three are
           -- "no longer on the stack", which is why armedness is derived.
-          HU.testCase "CR 603.8 an instance leaving the stack re-arms the trigger" $
-            let (_, gs) = outcastBoard 0
+          HU.testCase "CR 603.8 an instance leaving the stack re-arms the trigger" $ do
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+            swamp <- Registry.printing registry "Swamp"
+            let (_, gs) = outcastBoard barbarianOutcast swamp 0
                 settled = settle gs
                 removed = case triggerIds settled of
                   abilId : _ -> Resolve.cease abilId settled
                   [] -> settled
                 again = settle removed
-             in HU.assertEqual "a fresh instance" 1 (length (triggerIds again)),
+            HU.assertEqual "a fresh instance" 1 (length (triggerIds again)),
           -- IMPORTANT-2 (review): the suppression check in Event.stateTriggers
           -- compares BOTH the source object's id and the ability (`Object.source
           -- obj == Source.OfTrigger srcId ab`). Every test above uses exactly one
@@ -367,53 +398,58 @@ stateTriggerTests cards =
           -- chance to trigger. Under a source-scoped comparison the second fires;
           -- under an ability-only comparison it is (wrongly) suppressed by the
           -- first's presence on the stack.
-          HU.testCase "CR 603.8 a second identical source still triggers -- suppression is per-source, not per-ability" $
-            let (_, gs0) = outcastBoard 0
+          HU.testCase "CR 603.8 a second identical source still triggers -- suppression is per-source, not per-ability" $ do
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+            swamp <- Registry.printing registry "Swamp"
+            let (_, gs0) = outcastBoard barbarianOutcast swamp 0
                 settledFirst = settle gs0
-                (_, gs1) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice settledFirst
+                (_, gs1) = S.addCreature barbarianOutcast S.alice settledFirst
                 settledBoth = settle gs1
-             in HU.assertEqual "two instances, one per source" 2 (length (triggerIds settledBoth)),
+            HU.assertEqual "two instances, one per source" 2 (length (triggerIds settledBoth)),
           -- M-4 (review): the state trigger's Condition.holds reads the PROJECTION
           -- -- CR 613 layer 4 for a subtype -- not Card.typeLine. Pin it with no real Swamp card
           -- anywhere: alice controls only a Mountain, so the Outcast triggers;
           -- adding an AddLandSubtype Swamp modification (the Urborg shape) to
           -- that same Mountain must turn the trigger off.
-          HU.testCase "CR 613 layer 4: an added Swamp subtype (no real Swamp card) suppresses the trigger" $
-            let gs0 = S.landsInPlay (Cards.mountainPrinting cards) 1
+          HU.testCase "CR 613 layer 4: an added Swamp subtype (no real Swamp card) suppresses the trigger" $ do
+            mountain <- Registry.printing registry "Mountain"
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+            let gs0 = S.landsInPlay mountain 1
                 mountainId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
                   i : _ -> i
                   [] -> ObjectId.MkObjectId 999
-                (_, gs1) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice gs0
+                (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
                 before = settle gs1
                 withUrborg = S.withEffect mountainId (Modification.AddLandSubtype Subtype.Swamp) gs1
                 after = settle withUrborg
-             in do
-                  HU.assertEqual "no real Swamp yet: triggers" 1 (length (triggerIds before))
-                  HU.assertEqual "projected Swamp subtype (still a Mountain card): stops triggering" 0 (length (triggerIds after)),
+            HU.assertEqual "no real Swamp yet: triggers" 1 (length (triggerIds before))
+            HU.assertEqual "projected Swamp subtype (still a Mountain card): stops triggering" 0 (length (triggerIds after)),
           -- M-4 (review): the state trigger's Condition.holds reads projected
           -- CONTROL -- CR 613 layer 2 -- not Object.owner. Pin it: bob owns and controls the only Swamp, so
           -- alice's Outcast triggers; giving alice control of bob's Swamp (a
           -- layer-2 SetController effect, S.giveControl) must turn it off even
           -- though bob still OWNS that Swamp.
-          HU.testCase "CR 110.2/613 layer 2: gaining control of the opponent's Swamp suppresses the trigger" $
+          HU.testCase "CR 110.2/613 layer 2: gaining control of the opponent's Swamp suppresses the trigger" $ do
+            swamp <- Registry.printing registry "Swamp"
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
             let gs0 = Setup.emptyGame S.bothPlayers
-                (swampId, gs1) = S.addCreature (Cards.swampPrinting cards) S.bob gs0
-                (_, gs2) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice gs1
+                (swampId, gs1) = S.addCreature swamp S.bob gs0
+                (_, gs2) = S.addCreature barbarianOutcast S.alice gs1
                 before = settle gs2
                 gs3 = S.giveControl swampId S.alice gs2
                 after = settle gs3
-             in do
-                  HU.assertEqual "alice controls no Swamps yet: triggers" 1 (length (triggerIds before))
-                  HU.assertEqual "alice now controls the Swamp: stops triggering" 0 (length (triggerIds after)),
+            HU.assertEqual "alice controls no Swamps yet: triggers" 1 (length (triggerIds before))
+            HU.assertEqual "alice now controls the Swamp: stops triggering" 0 (length (triggerIds after)),
           -- The whole card, at gameplay level: the trigger resolves and the
           -- Outcast sacrifices itself (CR 701.21a, through Event.sacrifice).
-          HU.testCase "CR 701.21 the resolved trigger sacrifices the Outcast into its owner's graveyard" $
-            let (outcast, gs) = outcastBoard 0
+          HU.testCase "CR 701.21 the resolved trigger sacrifices the Outcast into its owner's graveyard" $ do
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+            swamp <- Registry.printing registry "Swamp"
+            let (outcast, gs) = outcastBoard barbarianOutcast swamp 0
                 settled = settle gs
                 resolved = snd (Engine.runGamePure S.identityAnswer settled Stack.resolveTop)
-             in do
-                  HU.assertBool "the Outcast is off the battlefield" (not (Set.member outcast (GameState.battlefield resolved)))
-                  HU.assertEqual "and in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice resolved))
+            HU.assertBool "the Outcast is off the battlefield" (not (Set.member outcast (GameState.battlefield resolved)))
+            HU.assertEqual "and in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice resolved))
         ]
 
 -- Khabál Ghoul {2}{B} Creature -- Zombie 1/1: "At the beginning of each end step,
@@ -421,8 +457,8 @@ stateTriggerTests cards =
 -- Scryfall's only ruling on the card is the design in one sentence: the count
 -- "includes creature tokens ... as well as creatures put into a graveyard before
 -- Khabál Ghoul entered the battlefield."
-historyTests :: Cards.Cards -> Tasty.TestTree
-historyTests cards =
+historyTests :: Registry.Type.Registry -> Tasty.TestTree
+historyTests registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs =
         Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
@@ -433,31 +469,36 @@ historyTests cards =
         "TurnHistory"
         [ -- The drained-queue falsifier: the deaths are SCANNED past before the end
           -- step's trigger ever exists, and must still be counted.
-          HU.testCase "CR 608.2i deaths the trigger scan already passed are still counted" $
-            let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-                (p1, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
-                (p2, gs2) = S.addCreature (Cards.pikerPrinting cards) S.bob gs1
+          HU.testCase "CR 608.2i deaths the trigger scan already passed are still counted" $ do
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+                (p1, gs1) = S.addCreature piker S.bob gs0
+                (p2, gs2) = S.addCreature piker S.bob gs1
                 dead = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs2 (Event.destroy p1)) (Event.destroy p2)
                 scanned = settle dead
                 atEnd = resolveAll (settle (beginEndStep scanned))
-             in do
-                  HU.assertEqual "two +1/+1 counters" 2 (countersOn ghoul atEnd)
-                  HU.assertEqual "a 3/3" (Just 3) (Projection.powerOf ghoul atEnd),
+            HU.assertEqual "two +1/+1 counters" 2 (countersOn ghoul atEnd)
+            HU.assertEqual "a 3/3" (Just 3) (Projection.powerOf ghoul atEnd),
           -- CR 111.1 / 608.2h: a token has NO printed card, so an implementation
           -- that re-derived card types from print instead of from the event's
           -- snapshot would read zero here.
-          HU.testCase "CR 111.1 a token creature that died counts, though it has no printed card" $
-            let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-                (tok, gs1) = S.addToken (Printing.card (Cards.pikerPrinting cards)) S.bob gs0
+          HU.testCase "CR 111.1 a token creature that died counts, though it has no printed card" $ do
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+                (tok, gs1) = S.addToken (Printing.card piker) S.bob gs0
                 dead = S.settleSba (S.runPure S.identityAnswer gs1 (Event.destroy tok))
                 atEnd = resolveAll (settle (beginEndStep dead))
-             in HU.assertEqual "the token is counted" 1 (countersOn ghoul atEnd),
-          HU.testCase "a creature that left the battlefield for HAND did not die (CR 700.4)" $
-            let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-                (p1, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
+            HU.assertEqual "the token is counted" 1 (countersOn ghoul atEnd),
+          HU.testCase "a creature that left the battlefield for HAND did not die (CR 700.4)" $ do
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+                (p1, gs1) = S.addCreature piker S.bob gs0
                 bounced = S.runPure S.identityAnswer gs1 (Event.changeZone p1 Zone.Hand)
                 atEnd = resolveAll (settle (beginEndStep bounced))
-             in HU.assertEqual "a bounce is not a death" 0 (countersOn ghoul atEnd),
+            HU.assertEqual "a bounce is not a death" 0 (countersOn ghoul atEnd),
           -- CR 608.2i: "look back in time" effects don't require the counted
           -- objects to currently exist, or the counting object to have existed
           -- at the time. Scryfall's ruling says this explicitly: the count
@@ -467,24 +508,29 @@ historyTests cards =
           -- has no way to scope the fold to the Ghoul's own lifetime -- it is
           -- a regression gate on the ruling, pinned ahead of that signature
           -- ever gaining one.
-          HU.testCase "CR 608.2i a creature that died before the Ghoul entered is still counted" $
-            let (p1, gs0) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+          HU.testCase "CR 608.2i a creature that died before the Ghoul entered is still counted" $ do
+            piker <- Registry.printing registry "Goblin Piker"
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            let (p1, gs0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
                 dead = S.runPure S.identityAnswer gs0 (Event.destroy p1)
-                (ghoul, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (settle dead)
+                (ghoul, gs1) = S.addCreature khabalGhoul S.alice (settle dead)
                 atEnd = resolveAll (settle (beginEndStep gs1))
-             in HU.assertEqual "one +1/+1 counter" 1 (countersOn ghoul atEnd),
+            HU.assertEqual "one +1/+1 counter" 1 (countersOn ghoul atEnd),
           -- CR 608.2i: the history's scope is ONE turn.
-          HU.testCase "the count resets at turn handoff, not at the trigger scan" $
-            let (ghoul, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-                (p1, gs1) = S.addCreature (Cards.pikerPrinting cards) S.bob gs0
+          HU.testCase "the count resets at turn handoff, not at the trigger scan" $ do
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+                (p1, gs1) = S.addCreature piker S.bob gs0
                 dead = S.runPure S.identityAnswer gs1 (Event.destroy p1)
                 nextTurn = snd (Engine.runGamePure S.identityAnswer dead Engine.handoffTurn)
                 atEnd = resolveAll (settle (beginEndStep nextTurn))
-             in HU.assertEqual "last turn's death does not count" 0 (countersOn ghoul atEnd),
+            HU.assertEqual "last turn's death does not count" 0 (countersOn ghoul atEnd),
           -- CR 603.2b: the step trigger belongs to a permanent with nothing to do
           -- with the event -- Task 2's widened scan, at gameplay level.
-          HU.testCase "CR 603.2b the end step's beginning is what fires it" $
-            let (_, gs0) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+          HU.testCase "CR 603.2b the end step's beginning is what fires it" $ do
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            let (_, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
                 quiet = settle gs0
                 fired = settle (beginEndStep quiet)
                 isTrigger oid = case Game.lookupObject oid fired of
@@ -492,69 +538,71 @@ historyTests cards =
                     Source.OfTrigger _ _ -> True
                     _ -> False
                   Nothing -> False
-             in do
-                  HU.assertEqual "nothing before the step began" [] (GameState.stack quiet)
-                  HU.assertEqual "one trigger once it did" 1 (length (filter isTrigger (GameState.stack fired)))
+            HU.assertEqual "nothing before the step began" [] (GameState.stack quiet)
+            HU.assertEqual "one trigger once it did" 1 (length (filter isTrigger (GameState.stack fired)))
         ]
 
 -- Tidal Wave {2}{U} Instant: "Create a 5/5 blue Wall creature token with defender.
 -- Sacrifice it at the beginning of the next end step." CR 603.7c's object-bound
 -- delayed ability -- "it" must survive the resolution that armed it.
-delayedTests :: Cards.Cards -> Tasty.TestTree
-delayedTests cards =
+delayedTests :: Registry.Type.Registry -> Tasty.TestTree
+delayedTests registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
-      -- alice casts Tidal Wave off three Islands and lets it resolve.
-      castWave =
-        let (gs, oid) = S.handOne (Cards.tidalWavePrinting cards) (S.landsInPlay (Cards.islandPrinting cards) 3)
-         in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid)))
       walls gs = filter (\oid -> Set.member Subtype.Wall (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
    in Tasty.testGroup
         "DelayedTrigger"
-        [ HU.testCase "CR 111.3 the spell mints a 5/5 Wall with defender and arms one delayed ability" $
-            let after = castWave
-             in case walls after of
-                  [wall] -> do
-                    HU.assertEqual "5 power" (Just 5) (Projection.powerOf wall after)
-                    HU.assertEqual "5 toughness" (Just 5) (Projection.toughnessOf wall after)
-                    HU.assertBool "defender" (Projection.hasKeyword Keyword.Defender wall after)
-                    HU.assertEqual "one delayed ability waiting" 1 (Seq.length (GameState.delayedTriggers after))
-                  other -> HU.assertFailure ("expected exactly one Wall token, got " <> show (length other)),
+        [ HU.testCase "CR 111.3 the spell mints a 5/5 Wall with defender and arms one delayed ability" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let after = castWave tidalWave island
+            case walls after of
+              [wall] -> do
+                HU.assertEqual "5 power" (Just 5) (Projection.powerOf wall after)
+                HU.assertEqual "5 toughness" (Just 5) (Projection.toughnessOf wall after)
+                HU.assertBool "defender" (Projection.hasKeyword Keyword.Defender wall after)
+                HU.assertEqual "one delayed ability waiting" 1 (Seq.length (GameState.delayedTriggers after))
+              other -> HU.assertFailure ("expected exactly one Wall token, got " <> show (length other)),
           -- CR 603.7b: "only once, the next time its trigger event occurs".
-          HU.testCase "CR 603.7 the token is sacrificed at the beginning of the next end step" $
-            let after = resolveAll (settle (beginEndStep castWave))
-             in do
-                  HU.assertEqual "no Wall left" [] (walls after)
-                  HU.assertEqual "the store is empty" 0 (Seq.length (GameState.delayedTriggers after)),
-          HU.testCase "CR 603.7b a second end step does not re-fire it" $
-            let once = resolveAll (settle (beginEndStep castWave))
+          HU.testCase "CR 603.7 the token is sacrificed at the beginning of the next end step" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let after = resolveAll (settle (beginEndStep (castWave tidalWave island)))
+            HU.assertEqual "no Wall left" [] (walls after)
+            HU.assertEqual "the store is empty" 0 (Seq.length (GameState.delayedTriggers after)),
+          HU.testCase "CR 603.7b a second end step does not re-fire it" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let once = resolveAll (settle (beginEndStep (castWave tidalWave island)))
                 again = settle (beginEndStep once)
-             in HU.assertEqual "nothing on the stack" [] (GameState.stack again),
+            HU.assertEqual "nothing on the stack" [] (GameState.stack again),
           -- CR 603.7a: a delayed ability does not trigger on an event that
           -- happened BEFORE it was created. Falls out of the watermark for free.
-          HU.testCase "CR 603.7a armed during an end step, it waits for the NEXT one" $
-            let (gs0, oid) = S.handOne (Cards.tidalWavePrinting cards) (S.landsInPlay (Cards.islandPrinting cards) 3)
+          HU.testCase "CR 603.7a armed during an end step, it waits for the NEXT one" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let (gs0, oid) = S.handOne tidalWave (S.landsInPlay island 3)
                 inEndStep = settle (beginEndStep gs0)
                 cast = resolveAll (snd (Engine.runGamePure S.identityAnswer inEndStep (Cast.castSpell S.alice oid)))
                 sameStep = settle cast
                 nextStep = resolveAll (settle (beginEndStep sameStep))
-             in do
-                  HU.assertEqual "still alive during the step it was armed in" 1 (length (walls sameStep))
-                  HU.assertEqual "sacrificed at the next end step" [] (walls nextStep),
+            HU.assertEqual "still alive during the step it was armed in" 1 (length (walls sameStep))
+            HU.assertEqual "sacrificed at the next end step" [] (walls nextStep),
           -- CR 603.7c: the ability still triggers and is still consumed even when
           -- the object it remembers is gone.
-          HU.testCase "CR 603.7c with the token already gone the ability does nothing and is consumed" $
-            let armed = castWave
+          HU.testCase "CR 603.7c with the token already gone the ability does nothing and is consumed" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let armed = castWave tidalWave island
                 killed = case walls armed of
                   wall : _ -> S.settleSba (S.runPure S.identityAnswer armed (Event.destroy wall))
                   [] -> armed
                 after = resolveAll (settle (beginEndStep killed))
-             in do
-                  HU.assertEqual "no Wall" [] (walls after)
-                  HU.assertEqual "the store is still emptied" 0 (Seq.length (GameState.delayedTriggers after))
-                  HU.assertEqual "nothing stuck on the stack" [] (GameState.stack after),
+            HU.assertEqual "no Wall" [] (walls after)
+            HU.assertEqual "the store is still emptied" 0 (Seq.length (GameState.delayedTriggers after))
+            HU.assertEqual "nothing stuck on the stack" [] (GameState.stack after),
           -- IMPORTANT-1 (fix pass 1): Engine.placeOne merges a delayed ability's
           -- OWN placement-time bindings (its chosen modes/targets, chosen just now)
           -- with the environment CAPTURED when the ability was armed, under
@@ -602,17 +650,17 @@ delayedTests cards =
 
 -- CR 603.3b: "that player puts them on the stack in any order they choose". The
 -- centerpiece: two triggers, one controller, and an order that changes the answer.
-orderingTests :: Cards.Cards -> Tasty.TestTree
-orderingTests cards =
+orderingTests :: Registry.Type.Registry -> Tasty.TestTree
+orderingTests registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       countersOn oid gs = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
       -- alice has Khabál Ghoul out and casts Tidal Wave, so both a delayed
       -- sacrifice and a step trigger are pending at the same end step.
-      board =
-        let (gs0, waveId) = S.handOne (Cards.tidalWavePrinting cards) (S.landsInPlay (Cards.islandPrinting cards) 3)
-            (ghoul, gs1) = S.addCreature (Cards.khabalGhoulPrinting cards) S.alice gs0
+      boardOf tidalWave khabalGhoul island =
+        let (gs0, waveId) = S.handOne tidalWave (S.landsInPlay island 3)
+            (ghoul, gs1) = S.addCreature khabalGhoul S.alice gs0
             cast = resolveAll (snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice waveId)))
          in (ghoul, beginEndStep cast)
       -- The source of the OTHER pending trigger: Tidal Wave's delayed ability,
@@ -640,10 +688,13 @@ orderingTests cards =
         _ -> pure (S.identityAnswer p)
    in Tasty.testGroup
         "TriggerOrdering"
-        [ HU.testCase "CR 603.3b two triggers under one controller ask for an order, exactly once" $
-            let (_, gs) = board
+        [ HU.testCase "CR 603.3b two triggers under one controller ask for an order, exactly once" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            let (_, gs) = boardOf tidalWave khabalGhoul island
                 (_, asked) = State.runState (Engine.runGame countingAnswer gs Engine.settleForPriority) 0
-             in HU.assertEqual "asked once" 1 asked,
+            HU.assertEqual "asked once" 1 asked,
           -- Sacrifice resolves FIRST: the Wall token dies, and CR 608.2h has the
           -- Ghoul count it when its own effect is applied. The token has NO printed
           -- card (CR 111.1) and its death happened at a boundary the scan already
@@ -653,17 +704,23 @@ orderingTests cards =
           -- that RESOLVES FIRST (CR 603.3b, see orderLast's own comment above): for
           -- the sacrifice to resolve first, the OTHER (non-Ghoul) trigger is the one
           -- named -- not the Ghoul itself.
-          HU.testCase "CR 608.2h sacrificing first makes the Ghoul count the token" $
-            let (ghoul, gs) = board
+          HU.testCase "CR 608.2h sacrificing first makes the Ghoul count the token" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            let (ghoul, gs) = boardOf tidalWave khabalGhoul island
                 after = snd (Engine.runGamePure (orderLast (otherThan ghoul gs)) gs Engine.priorityLoop)
-             in HU.assertEqual "the token was counted" 1 (countersOn ghoul after),
+            HU.assertEqual "the token was counted" 1 (countersOn ghoul after),
           -- The Ghoul resolves FIRST: the token is still alive, so it is not
           -- counted. Same board, same cards, opposite answer -- which is what makes
           -- the ordering a genuine choice rather than a formality.
-          HU.testCase "CR 608.2h counting first means the token is still alive and is not counted" $
-            let (ghoul, gs) = board
+          HU.testCase "CR 608.2h counting first means the token is still alive and is not counted" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            let (ghoul, gs) = boardOf tidalWave khabalGhoul island
                 after = snd (Engine.runGamePure (orderLast ghoul) gs Engine.priorityLoop)
-             in HU.assertEqual "nothing counted" 0 (countersOn ghoul after),
+            HU.assertEqual "nothing counted" 0 (countersOn ghoul after),
           -- M-1 (review): permute's reject-not-repair guard, pinned directly. The
           -- centerpiece above only ever answers with a valid permutation (via
           -- orderLast/countingAnswer), and the canonical-answer tests elsewhere use
@@ -686,90 +743,94 @@ orderingTests cards =
           -- Outcast under EACH player, both controlling no Swamps, gives two
           -- controllers with one trigger apiece -- fewer than two each, so no
           -- ordering prompt is asked and the test isolates the cross-controller walk.
-          HU.testCase "CR 101.4/603.3b the active player's trigger is placed first (bottom of stack)" $
+          HU.testCase "CR 101.4/603.3b the active player's trigger is placed first (bottom of stack)" $ do
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
             let gs0 = Setup.emptyGame S.bothPlayers
-                (_, gs1) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.alice gs0
-                (_, gs2) = S.addCreature (Cards.barbarianOutcastPrinting cards) S.bob gs1
+                (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
+                (_, gs2) = S.addCreature barbarianOutcast S.bob gs1
                 placed = snd (Engine.runGamePure S.identityAnswer gs2 Engine.placePendingTriggers)
                 controllerOf oid = fmap Object.owner (Game.lookupObject oid placed)
                 stack = GameState.stack placed
-             in case stack of
-                  [top, bottom] -> do
-                    HU.assertEqual "the OTHER player's trigger is on top -- placed second" (Just S.bob) (controllerOf top)
-                    HU.assertEqual "the active player's (alice's) trigger is at the bottom -- placed first" (Just S.alice) (controllerOf bottom)
-                  other -> HU.assertFailure ("expected exactly two triggers on the stack, got " <> show (length other))
+            case stack of
+              [top, bottom] -> do
+                HU.assertEqual "the OTHER player's trigger is on top -- placed second" (Just S.bob) (controllerOf top)
+                HU.assertEqual "the active player's (alice's) trigger is at the bottom -- placed first" (Just S.alice) (controllerOf bottom)
+              other -> HU.assertFailure ("expected exactly two triggers on the stack, got " <> show (length other))
         ]
 
 -- Sarcomancy {B} Enchantment: "When this enchantment enters, create a 2/2 black
 -- Zombie creature token. At the beginning of your upkeep, if there are no Zombies
 -- on the battlefield, this enchantment deals 1 damage to you."
-interveningTests :: Cards.Cards -> Tasty.TestTree
-interveningTests cards =
+interveningTests :: Registry.Type.Registry -> Tasty.TestTree
+interveningTests registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
       beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       zombies gs = filter (\oid -> Set.member Subtype.Zombie (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
       -- Sarcomancy enters and its ETB resolves, so a Zombie token is out.
-      withZombie =
-        let (sarcId, gs0) = S.addCreature (Cards.sarcomancyPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+      withZombie sarcomancy =
+        let (sarcId, gs0) = S.addCreature sarcomancy S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange sarcId Zone.Stack Zone.Battlefield
             gs1 = S.withEvent (GameEvent.Moved entered (Projection.project sarcId gs0)) gs0
          in (sarcId, resolveAll (settle gs1))
    in Tasty.testGroup
         "InterveningIf"
-        [ HU.testCase "CR 603.6a the enters trigger makes a 2/2 black Zombie token" $
-            let (_, after) = withZombie
-             in case zombies after of
-                  [tok] -> do
-                    HU.assertEqual "2 power" (Just 2) (Projection.powerOf tok after)
-                    HU.assertEqual "black" (Set.singleton Color.Black) (Projection.colorsOf tok after)
-                  other -> HU.assertFailure ("expected exactly one Zombie token, got " <> show (length other)),
+        [ HU.testCase "CR 603.6a the enters trigger makes a 2/2 black Zombie token" $ do
+            sarcomancy <- Registry.printing registry "Sarcomancy"
+            let (_, after) = withZombie sarcomancy
+            case zombies after of
+              [tok] -> do
+                HU.assertEqual "2 power" (Just 2) (Projection.powerOf tok after)
+                HU.assertEqual "black" (Set.singleton Color.Black) (Projection.colorsOf tok after)
+              other -> HU.assertFailure ("expected exactly one Zombie token, got " <> show (length other)),
           -- CR 603.4: with the condition FALSE, the ability does not trigger AT ALL
           -- -- nothing reaches the stack.
-          HU.testCase "CR 603.4 with a Zombie out, the upkeep ability does not trigger" $
-            let (_, board) = withZombie
+          HU.testCase "CR 603.4 with a Zombie out, the upkeep ability does not trigger" $ do
+            sarcomancy <- Registry.printing registry "Sarcomancy"
+            let (_, board) = withZombie sarcomancy
                 atUpkeep = settle (beginUpkeep board)
-             in do
-                  HU.assertEqual "nothing on the stack" [] (GameState.stack atUpkeep)
-                  HU.assertEqual "no life lost" (Just 20) (S.lifeOf S.alice atUpkeep),
-          HU.testCase "CR 603.4 with no Zombie, it triggers and deals 1 to its controller" $
-            let (_, board) = withZombie
+            HU.assertEqual "nothing on the stack" [] (GameState.stack atUpkeep)
+            HU.assertEqual "no life lost" (Just 20) (S.lifeOf S.alice atUpkeep),
+          HU.testCase "CR 603.4 with no Zombie, it triggers and deals 1 to its controller" $ do
+            sarcomancy <- Registry.printing registry "Sarcomancy"
+            let (_, board) = withZombie sarcomancy
                 killed = case zombies board of
                   tok : _ -> S.settleSba (S.runPure S.identityAnswer board (Event.destroy tok))
                   [] -> board
                 after = resolveAll (settle (beginUpkeep killed))
-             in HU.assertEqual "alice took 1" (Just 19) (S.lifeOf S.alice after),
+            HU.assertEqual "alice took 1" (Just 19) (S.lifeOf S.alice after),
           -- CR 608.2a: the case that distinguishes an intervening "if" from a plain
           -- condition. The ability triggered legitimately; a Zombie appearing in
           -- RESPONSE makes it do nothing on resolution.
-          HU.testCase "CR 608.2a a Zombie made in response makes the trigger resolve doing nothing" $
-            let (_, board) = withZombie
+          HU.testCase "CR 608.2a a Zombie made in response makes the trigger resolve doing nothing" $ do
+            sarcomancy <- Registry.printing registry "Sarcomancy"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (_, board) = withZombie sarcomancy
                 killed = case zombies board of
                   tok : _ -> S.settleSba (S.runPure S.identityAnswer board (Event.destroy tok))
                   [] -> board
                 onStack = settle (beginUpkeep killed)
                 -- The Zombie arrives under BOB's control, which is exactly the
-                -- point: CR 603.4's clause is "no Zombies on the battlefield", not
-                -- "no Zombies you control".
-                responded = snd (S.addToken (zombieTokenOf cards) S.bob onStack)
+                -- point: CR 603.4's clause is "no Zombies on the battlefield",
+                -- not "no Zombies you control".
+                responded = snd (S.addToken (zombieTokenOf sarcomancy piker) S.bob onStack)
                 after = resolveAll responded
-             in do
-                  HU.assertBool "the trigger really was on the stack" (not (null (GameState.stack onStack)))
-                  HU.assertEqual "no damage on resolution" (Just 20) (S.lifeOf S.alice after)
+            HU.assertBool "the trigger really was on the stack" (not (null (GameState.stack onStack)))
+            HU.assertEqual "no damage on resolution" (Just 20) (S.lifeOf S.alice after)
         ]
 
 -- The 2/2 black Zombie Sarcomancy's own ETB mints, read back out of the card data
 -- so the "in response" fixture makes the same object the card would.
-zombieTokenOf :: Cards.Cards -> Card.Type.Card
-zombieTokenOf cards =
+zombieTokenOf :: Printing.Printing -> Printing.Printing -> Card.Type.Card
+zombieTokenOf sarcomancy pikerFallback =
   let created effect = case effect of
         Effect.Create _ card _ -> Just card
         _ -> Nothing
-      abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Card.Type.triggeredAbilities (Printing.card (Cards.sarcomancyPrinting cards)))
+      abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Card.Type.triggeredAbilities (Printing.card sarcomancy))
    in case Maybe.mapMaybe created abilityEffects of
         card : _ -> card
-        [] -> Printing.card (Cards.pikerPrinting cards)
+        [] -> Printing.card pikerFallback
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Pawl.TriggerSpec" [logTests cards, scanTests cards, sacrificeTests cards, stateTriggerTests cards, historyTests cards, delayedTests cards, orderingTests cards, interveningTests cards]
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, interveningTests registry]

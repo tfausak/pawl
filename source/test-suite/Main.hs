@@ -72,15 +72,15 @@ testTree registry cards =
       CountSpec.tests registry,
       ConditionSpec.tests registry,
       ResolveSpec.tests cards,
-      ProjectionSpec.tests cards,
-      PowerToughnessSpec.tests cards,
+      ProjectionSpec.tests registry,
+      PowerToughnessSpec.tests registry,
       PlayerEffectSpec.tests registry,
       ActivateSpec.tests registry,
       ModalSpec.tests registry,
       CopySpec.tests registry,
       ReplacementSpec.tests cards,
       ColorSpec.tests registry,
-      TriggerSpec.tests cards,
+      TriggerSpec.tests registry,
       FilterSpec.tests,
       RegistrySpec.tests
     ]
