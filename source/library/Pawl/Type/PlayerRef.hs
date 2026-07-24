@@ -14,7 +14,7 @@ import Pawl.Type.SlotName (SlotName)
 data PlayerRef
   = -- Every player's copy of the zone. For a SHARED zone (CR 400.1: battlefield,
     -- stack, exile, command) this is the only meaningful value; the pairing is
-    -- checked by the card lint, not by this type.
+    -- checked by the card lint, not by this type (#161).
     EachPlayer
   | -- CR 109.5 / 102.2, resolved against the evaluation context's perspective.
     Relative PlayerRelation

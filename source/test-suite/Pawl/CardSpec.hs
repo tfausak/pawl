@@ -4,6 +4,7 @@ module Pawl.CardSpec where
 
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -12,6 +13,11 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Mana as Mana
+-- The logic module, alongside Pawl.Type.Modal below: unambiguous under one
+-- alias because the two modules export disjoint names (TriggerSpec's
+-- precedent), and Modal.allEffects is how this lint reaches an activated or
+-- triggered ability's effects (Card.allEffects only reaches the spell).
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
@@ -21,8 +27,13 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+-- Aliased Condition.Type, matching Pawl.Type.Count below and the project-wide
+-- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Condition may
+-- later be imported and must not collide.
+import qualified Pawl.Type.Condition as Condition.Type
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
+import qualified Pawl.Type.Count as Count.Type
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.Exclusion as Exclusion
@@ -39,6 +50,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
+import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
@@ -46,7 +58,9 @@ import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity.Type
+import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
@@ -188,6 +202,142 @@ cardTests cards =
         HU.assertBool "creature" (not (Card.isInstant (S.pikerCard cards)))
     ]
 
+-- Every Count reachable from a Quantity: a leaf Count directly, or one nested
+-- through Plus's two children (CR 208.2 composition -- a printed 1+*).
+quantityCounts :: Quantity.Type.Quantity -> [Count.Type.Count]
+quantityCounts quantity = case quantity of
+  Quantity.Type.Literal _ -> []
+  Quantity.Type.ManaValue -> []
+  Quantity.Type.X -> []
+  Quantity.Type.Star -> []
+  Quantity.Type.Plus a b -> quantityCounts a <> quantityCounts b
+  Quantity.Type.Count count -> [count]
+
+-- Every Count reachable from a Condition: its own count, plus any inside its
+-- threshold Quantity.
+conditionCounts :: Condition.Type.Condition -> [Count.Type.Count]
+conditionCounts (Condition.Type.MkCondition count _ threshold) =
+  count : quantityCounts threshold
+
+-- Every Count reachable from a Duration: only ForAsLongAs (CR 611.2b) carries
+-- a Condition.
+durationCounts :: Duration.Duration -> [Count.Type.Count]
+durationCounts duration = case duration of
+  Duration.UntilEndOfTurn -> []
+  Duration.Indefinite -> []
+  Duration.UntilYourNextTurn -> []
+  Duration.ForAsLongAs condition -> conditionCounts condition
+
+-- Every Count reachable from a Modification: only its P/T quantities
+-- (layers 7b/7c) carry one.
+modificationCounts :: Modification.Modification -> [Count.Type.Count]
+modificationCounts modification = case modification of
+  Modification.GainKeyword _ -> []
+  Modification.LoseAllAbilities -> []
+  Modification.SetBasePowerToughness p t -> quantityCounts p <> quantityCounts t
+  Modification.ModifyPowerToughness p t -> quantityCounts p <> quantityCounts t
+  Modification.SetLandSubtype _ -> []
+  Modification.AddLandSubtype _ -> []
+  Modification.AddCardType _ -> []
+  Modification.ChangeSubtypeWord _ _ -> []
+  Modification.SetController _ -> []
+  Modification.SetColor _ -> []
+  Modification.SwitchPowerToughness -> []
+
+-- Every Count reachable from a TriggerCondition: only StateIs (CR 603.8, a
+-- trigger's own condition) carries one.
+triggerConditionCounts :: TriggerCondition.TriggerCondition -> [Count.Type.Count]
+triggerConditionCounts triggerCondition = case triggerCondition of
+  TriggerCondition.SelfEnters -> []
+  TriggerCondition.StepBegins _ _ -> []
+  TriggerCondition.StateIs condition -> conditionCounts condition
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+
+-- Every Count reachable from one effect: its own Quantity/Duration fields,
+-- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
+-- card (the same nesting Pawl.Codec's round trip walks).
+effectCounts :: Effect.Effect Card.Type.Card -> [Count.Type.Count]
+effectCounts effect = case effect of
+  Effect.DealDamage _ quantity -> quantityCounts quantity
+  Effect.ModifyTarget duration modification _ -> durationCounts duration <> modificationCounts modification
+  Effect.ChangeText _ -> []
+  Effect.AddMana _ -> []
+  Effect.Search _ -> []
+  Effect.ExileAllGraveyards -> []
+  Effect.RestartGame -> []
+  Effect.ControlPlayerNextTurn _ -> []
+  Effect.Destroy _ -> []
+  Effect.Sacrifice _ -> []
+  Effect.MoveToZone _ _ -> []
+  Effect.Draw quantity -> quantityCounts quantity
+  Effect.Mill _ quantity -> quantityCounts quantity
+  Effect.Discard _ quantity -> quantityCounts quantity
+  Effect.Create quantity card _ -> quantityCounts quantity <> cardCounts card
+  Effect.Replace duration _ _ -> durationCounts duration
+  Effect.Counter _ -> []
+  Effect.PutCounters _ quantity _ -> quantityCounts quantity
+  Effect.GainPlayerCounters _ quantity -> quantityCounts quantity
+  Effect.Untap _ -> []
+  Effect.GainControl duration _ -> durationCounts duration
+  Effect.ArmDelayedTrigger _ -> []
+  Effect.AffectPlayers duration _ _ -> durationCounts duration
+  Effect.CreateEmblem card -> cardCounts card
+  Effect.BecomeMonarch _ -> []
+  Effect.ExileUntilMonarch _ -> []
+  Effect.PlaySubgame _ -> []
+
+-- Every Count reachable from one triggered ability (a card's own, or a
+-- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
+-- intervening "if" clause, and its modes' effects.
+triggeredAbilityCounts :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [Count.Type.Count]
+triggeredAbilityCounts ability =
+  triggerConditionCounts (TriggeredAbility.condition ability)
+    <> foldMap conditionCounts (TriggeredAbility.intervening ability)
+    <> concatMap effectCounts (Modal.allEffects (TriggeredAbility.modal ability))
+
+-- Every Count reachable from a card: every site a Pawl.Type.Count can be
+-- authored -- Quantity (characteristic-defining P/T, printed P/T, and every
+-- effect/modification quantity), Condition (a trigger's own condition, a
+-- triggered ability's intervening clause, and a ForAsLongAs duration), and
+-- every effect (spell, activated, triggered, delayed), recursing into a
+-- minted token or emblem.
+cardCounts :: Card.Type.Card -> [Count.Type.Count]
+cardCounts card =
+  concatMap quantityCounts (Maybe.maybeToList (Card.Type.characteristicPT card))
+    <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Card.Type.power card))
+    <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Card.Type.toughness card))
+    <> concatMap (modificationCounts . StaticAbility.modification) (Card.Type.staticAbilities card)
+    <> concatMap effectCounts (Card.allEffects card)
+    <> concatMap (concatMap effectCounts . Modal.allEffects . ActivatedAbility.modal) (Card.Type.activatedAbilities card)
+    <> concatMap triggeredAbilityCounts (Card.Type.triggeredAbilities card)
+    <> concatMap triggeredAbilityCounts (Map.elems (Card.Type.delayedAbilities card))
+
+-- CR 400.1: "each player has their own library, hand, and graveyard. The
+-- other zones are shared by all players." Battlefield/Stack/Exile/Command are
+-- shared; Library/Hand/Graveyard are per-player.
+isSharedZone :: Zone.Zone -> Bool
+isSharedZone zone = case zone of
+  Zone.Library -> False
+  Zone.Hand -> False
+  Zone.Graveyard -> False
+  Zone.Battlefield -> True
+  Zone.Stack -> True
+  Zone.Exile -> True
+  Zone.Command -> True
+
+-- A Count over a shared zone paired with anything but EachPlayer names a
+-- per-player fold over a zone no player individually owns -- permitted by the
+-- type, not by the rules (#161).
+scopeOffends :: Scope.Scope -> Bool
+scopeOffends scope = case scope of
+  Scope.InZone zone ref -> isSharedZone zone && ref /= PlayerRef.EachPlayer
+  Scope.InHistory _ -> False
+
+cardOffendsSharedZoneScope :: Card.Type.Card -> Bool
+cardOffendsSharedZoneScope card =
+  any (\(Count.Type.MkCount scope _ _) -> scopeOffends scope) (cardCounts card)
+
 -- The D4 dataflow lint: every slot an effect reads is declared, and every
 -- declared slot is read. Equality, not subset: a spec no effect reads is a
 -- card announcing a target it ignores -- representable in Magic, not in this
@@ -318,7 +468,17 @@ lintTests cards =
               filter
                 (Resolve.bindsSeveralTokens . Card.allEffects . Printing.card)
                 (Cards.allPrintings cards)
-         in HU.assertEqual "no multi-token binding" [] (fmap (Card.Type.name . Printing.card) offenders)
+         in HU.assertEqual "no multi-token binding" [] (fmap (Card.Type.name . Printing.card) offenders),
+      -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
+      -- exile, command) must pair with PlayerRef.EachPlayer -- the type
+      -- permits any PlayerRef there, but only EachPlayer is meaningful for a
+      -- zone no player owns individually (#161).
+      HU.testCase "every InZone Count over a shared zone pairs with EachPlayer" $
+        let offenders =
+              filter
+                (cardOffendsSharedZoneScope . Printing.card)
+                (Cards.allPrintings cards)
+         in HU.assertEqual "no shared-zone scope with a non-EachPlayer ref" [] (fmap (Card.Type.name . Printing.card) offenders)
     ]
 
 m2bCardTests :: Cards.Cards -> Tasty.TestTree

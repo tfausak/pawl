@@ -246,7 +246,8 @@ fullView gs oid = Just (viewOfObject oid gs)
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
 -- candidates projected through the layers BEFORE that one. Off-battlefield
 -- candidates have no projection at all (gather walks the battlefield only), so
--- they fall back to the printed card.
+-- they fall back to the printed card -- a library/hand/graveyard candidate is
+-- matched against its PRINTED characteristics, never a projected view (#160).
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
   if Set.member oid (GameState.battlefield gs)
@@ -745,7 +746,7 @@ applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
 -- This is a terminating APPROXIMATION of CR 613.8's dependency system, not an
 -- implementation of it: exact whenever a count reads layers strictly earlier
 -- than its consumer's, and it under-reads a count over its own layer or later
--- (#11 is the missing CR 613.8b reorder).
+-- (#157; #11 is the missing CR 613.8b reorder).
 projectWith :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectWith admits cands oid gs =
   let layers = filter admits (Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))

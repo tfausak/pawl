@@ -16,5 +16,11 @@ import Pawl.Type.Quantity (Quantity)
 --
 -- The threshold is a Quantity rather than an Integer because Quantity already
 -- exists and already composes; only Pawl.Condition may evaluate this.
+--
+-- A Count's Scope may name a slot (PlayerRef.InSlot), and this Condition may be
+-- stored into a Pawl.Type.Expiry.While for a "for as long as" duration. An
+-- InSlot count stored that way outlives its slot binding: Pawl.Count.playersFor
+-- then yields Nothing, and Pawl.Condition.holds collapses that to False
+-- silently (#159).
 data Condition = MkCondition Count Comparison Quantity
   deriving (Eq, Ord, Show)
