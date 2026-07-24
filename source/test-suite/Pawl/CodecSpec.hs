@@ -1,6 +1,7 @@
 -- Covers Pawl.Codec.
 module Pawl.CodecSpec where
 
+import qualified Data.Char as Char
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -91,6 +92,7 @@ import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
+import qualified Test.Tasty.QuickCheck as QC
 
 roundTrip :: (Eq a, Show a) => String -> (a -> Json.Value) -> (Json.Value -> Either Text a) -> a -> HU.Assertion
 roundTrip label enc dec x = HU.assertEqual label (Right x) (dec (enc x))
@@ -615,6 +617,41 @@ tests cards =
                 Condition.Type.MkCondition zeroSwamps Comparison.AtLeast (Quantity.Literal 3),
                 Condition.Type.MkCondition zeroSwamps Comparison.AtMost (Quantity.Literal 1)
               ]
+        ],
+      Tasty.testGroup
+        "slugify"
+        [ HU.testCase "a plain name" $
+            HU.assertEqual "goblin-piker" (Text.pack "goblin-piker") (Codec.slugify (Text.pack "Goblin Piker")),
+          HU.testCase "an apostrophe is dropped, not separated" $
+            HU.assertEqual "serpents-gift" (Text.pack "serpents-gift") (Codec.slugify (Text.pack "Serpent's Gift")),
+          HU.testCase "an accented letter folds to ASCII" $
+            HU.assertEqual "khabal-ghoul" (Text.pack "khabal-ghoul") (Codec.slugify (Text.pack "Khabál Ghoul")),
+          HU.testCase "a comma is one separator, not two" $
+            HU.assertEqual "inner-calm" (Text.pack "inner-calm-outer-strength") (Codec.slugify (Text.pack "Inner Calm, Outer Strength")),
+          HU.testCase "a split card's slashes collapse" $
+            HU.assertEqual "fire-ice" (Text.pack "fire-ice") (Codec.slugify (Text.pack "Fire // Ice")),
+          HU.testCase "trailing punctuation is trimmed" $
+            HU.assertEqual "no trailing hyphen" (Text.pack "sword-of-dungeons-dragons") (Codec.slugify (Text.pack "Sword of Dungeons & Dragons®")),
+          HU.testCase "the eszett folds to ss without a table entry" $
+            HU.assertEqual "strasse" (Text.pack "strasse") (Codec.slugify (Text.pack "Straße")),
+          HU.testCase "digits survive; the comma between them separates" $
+            HU.assertEqual "borrowing-100-000-arrows" (Text.pack "borrowing-100-000-arrows") (Codec.slugify (Text.pack "Borrowing 100,000 Arrows")),
+          HU.testCase "a name with no alphanumerics slugifies to nothing" $
+            HU.assertEqual "empty" Text.empty (Codec.slugify (Text.pack "_____")),
+          QC.testProperty "idempotent: a slug slugifies to itself" $
+            \s -> let t = Codec.slugify (Text.pack s) in Codec.slugify t QC.=== t,
+          QC.testProperty "the output is ASCII [a-z0-9-] throughout" $
+            \s ->
+              let ok c = Char.isAsciiLower c || Char.isDigit c || c == '-'
+               in QC.property (Text.all ok (Codec.slugify (Text.pack s))),
+          QC.testProperty "no leading, trailing, or doubled hyphen" $
+            \s ->
+              let t = Codec.slugify (Text.pack s)
+               in QC.property
+                    ( not (Text.isPrefixOf (Text.pack "-") t)
+                        && not (Text.isSuffixOf (Text.pack "-") t)
+                        && not (Text.isInfixOf (Text.pack "--") t)
+                    )
         ]
     ]
 
