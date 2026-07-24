@@ -4,11 +4,11 @@ module Pawl.ManaSpec where
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -31,6 +31,7 @@ import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
@@ -53,22 +54,24 @@ singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpe
 singleModeAbility effects specs =
   Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs)) (ModeSelection.ChooseExactly 1)
 
-castabilityTests :: Cards.Cards -> Tasty.TestTree
-castabilityTests cards =
+castabilityTests :: Registry.Type.Registry -> Tasty.TestTree
+castabilityTests registry =
   Tasty.testGroup
     "Castability"
-    [ HU.testCase "War Mammoth is cast off four Forests and resolves onto the battlefield" $
-        let gs = resolvedCreature (Cards.forestPrinting cards) (Cards.warMammothPrinting cards) 4
-         in do
-              HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
-              HU.assertEqual "one creature in play" 1 (S.creaturesInPlay S.alice gs)
-              HU.assertEqual "lands tapped" 4 (S.tappedCount S.alice gs),
-      HU.testCase "Typhoid Rats is cast off one Swamp and resolves onto the battlefield" $
-        let gs = resolvedCreature (Cards.swampPrinting cards) (Cards.typhoidRatsPrinting cards) 1
-         in do
-              HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
-              HU.assertEqual "one creature in play" 1 (S.creaturesInPlay S.alice gs)
-              HU.assertEqual "lands tapped" 1 (S.tappedCount S.alice gs)
+    [ HU.testCase "War Mammoth is cast off four Forests and resolves onto the battlefield" $ do
+        forest <- Registry.printing registry "Forest"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        let gs = resolvedCreature forest warMammoth 4
+        HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
+        HU.assertEqual "one creature in play" 1 (S.creaturesInPlay S.alice gs)
+        HU.assertEqual "lands tapped" 4 (S.tappedCount S.alice gs),
+      HU.testCase "Typhoid Rats is cast off one Swamp and resolves onto the battlefield" $ do
+        swamp <- Registry.printing registry "Swamp"
+        typhoidRats <- Registry.printing registry "Typhoid Rats"
+        let gs = resolvedCreature swamp typhoidRats 1
+        HU.assertEqual "stack empty" 0 (length (GameState.stack gs))
+        HU.assertEqual "one creature in play" 1 (S.creaturesInPlay S.alice gs)
+        HU.assertEqual "lands tapped" 1 (S.tappedCount S.alice gs)
     ]
 
 pikerCost :: ManaCost.ManaCost
@@ -78,8 +81,8 @@ poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 poolSize pid gs = case Mana.poolOf pid gs of
   Mana.Type.MkMana units -> length units
 
-manaTests :: Cards.Cards -> Tasty.TestTree
-manaTests cards =
+manaTests :: Registry.Type.Registry -> Tasty.TestTree
+manaTests registry =
   Tasty.testGroup
     "Mana"
     [ HU.testCase "substituteX replaces each Variable with Generic X, keeping order" $
@@ -105,52 +108,61 @@ manaTests cards =
       HU.testCase "CR 305.6 Island taps blue, Plains taps white" $ do
         HU.assertEqual "island" (Just (ManaType.Colored Color.Blue)) (Mana.subtypeMana Subtype.Island)
         HU.assertEqual "plains" (Just (ManaType.Colored Color.White)) (Mana.subtypeMana Subtype.Plains),
-      HU.testCase "an empty pool starts empty" $
-        HU.assertEqual "empty" 0 (poolSize S.alice (S.landsInPlay (Cards.mountainPrinting cards) 2)),
-      HU.testCase "tapping a Mountain taps it and adds one red unit" $
-        let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
-         in case Game.zoneMembers Zone.Battlefield S.alice gs of
-              [] -> HU.assertFailure "fixture should have one Mountain"
-              oid : _ -> do
-                let after = Mana.tapForMana oid gs
-                HU.assertEqual "tapped" 1 (S.tappedCount S.alice after)
-                HU.assertEqual
-                  "pool"
-                  (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red}])
-                  (Mana.poolOf S.alice after),
-      HU.testCase "two Mountains can pay {1}{R}" $
-        HU.assertBool "affordable" (Mana.canPay S.alice pikerCost (S.landsInPlay (Cards.mountainPrinting cards) 2)),
-      HU.testCase "one Mountain cannot pay {1}{R}" $
-        HU.assertBool "unaffordable" (not (Mana.canPay S.alice pikerCost (S.landsInPlay (Cards.mountainPrinting cards) 1))),
-      HU.testCase "no Mountains cannot pay {1}{R}" $
-        HU.assertBool "unaffordable" (not (Mana.canPay S.alice pikerCost (S.landsInPlay (Cards.mountainPrinting cards) 0))),
-      HU.testCase "paying {1}{R} taps exactly two of three Mountains and leaves no float" $
-        case Mana.payCost S.alice pikerCost (S.landsInPlay (Cards.mountainPrinting cards) 3) of
+      HU.testCase "an empty pool starts empty" $ do
+        mountain <- Registry.printing registry "Mountain"
+        HU.assertEqual "empty" 0 (poolSize S.alice (S.landsInPlay mountain 2)),
+      HU.testCase "tapping a Mountain taps it and adds one red unit" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let gs = S.landsInPlay mountain 1
+        case Game.zoneMembers Zone.Battlefield S.alice gs of
+          [] -> HU.assertFailure "fixture should have one Mountain"
+          oid : _ -> do
+            let after = Mana.tapForMana oid gs
+            HU.assertEqual "tapped" 1 (S.tappedCount S.alice after)
+            HU.assertEqual
+              "pool"
+              (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red}])
+              (Mana.poolOf S.alice after),
+      HU.testCase "two Mountains can pay {1}{R}" $ do
+        mountain <- Registry.printing registry "Mountain"
+        HU.assertBool "affordable" (Mana.canPay S.alice pikerCost (S.landsInPlay mountain 2)),
+      HU.testCase "one Mountain cannot pay {1}{R}" $ do
+        mountain <- Registry.printing registry "Mountain"
+        HU.assertBool "unaffordable" (not (Mana.canPay S.alice pikerCost (S.landsInPlay mountain 1))),
+      HU.testCase "no Mountains cannot pay {1}{R}" $ do
+        mountain <- Registry.printing registry "Mountain"
+        HU.assertBool "unaffordable" (not (Mana.canPay S.alice pikerCost (S.landsInPlay mountain 0))),
+      HU.testCase "paying {1}{R} taps exactly two of three Mountains and leaves no float" $ do
+        mountain <- Registry.printing registry "Mountain"
+        case Mana.payCost S.alice pikerCost (S.landsInPlay mountain 3) of
           Nothing -> HU.assertFailure "three Mountains should pay {1}{R}"
           Just after -> do
             HU.assertEqual "tapped" 2 (S.tappedCount S.alice after)
             HU.assertEqual "no float" 0 (poolSize S.alice after),
-      HU.testCase "CR 500.4 mana pools empty" $
-        let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
-         in case Game.zoneMembers Zone.Battlefield S.alice gs of
-              [] -> HU.assertFailure "fixture should have one Mountain"
-              oid : _ ->
-                HU.assertEqual "emptied" 0 (poolSize S.alice (Mana.emptyManaPools (Mana.tapForMana oid gs))),
-      HU.testCase "CR 305.6/305.7 an Urborg'd Mountain taps for black too" $
+      HU.testCase "CR 500.4 mana pools empty" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let gs = S.landsInPlay mountain 1
+        case Game.zoneMembers Zone.Battlefield S.alice gs of
+          [] -> HU.assertFailure "fixture should have one Mountain"
+          oid : _ ->
+            HU.assertEqual "emptied" 0 (poolSize S.alice (Mana.emptyManaPools (Mana.tapForMana oid gs))),
+      HU.testCase "CR 305.6/305.7 an Urborg'd Mountain taps for black too" $ do
+        mountain <- Registry.printing registry "Mountain"
+        urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
         let base = Setup.emptyGame S.bothPlayers
-            (mountainId, g1) = S.addCreature (Cards.mountainPrinting cards) S.alice base
-            (_, gs) = S.addCreature (Cards.urborgPrinting cards) S.alice g1
-         in -- Urborg adds Swamp to all lands, so the Mountain taps for black too.
-            do
-              HU.assertBool "black available" (ManaType.Colored Color.Black `elem` Mana.manaTypesOf mountainId gs)
-              HU.assertBool "red still available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf mountainId gs),
-      HU.testCase "CR 305.6/305.7 a Blood Moon'd Urborg taps for red only" $
+            (mountainId, g1) = S.addCreature mountain S.alice base
+            (_, gs) = S.addCreature urborg S.alice g1
+        -- Urborg adds Swamp to all lands, so the Mountain taps for black too.
+        HU.assertBool "black available" (ManaType.Colored Color.Black `elem` Mana.manaTypesOf mountainId gs)
+        HU.assertBool "red still available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf mountainId gs),
+      HU.testCase "CR 305.6/305.7 a Blood Moon'd Urborg taps for red only" $ do
+        urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+        bloodMoon <- Registry.printing registry "Blood Moon"
         let base = Setup.emptyGame S.bothPlayers
-            (urborgId, g1) = S.addCreature (Cards.urborgPrinting cards) S.alice base
-            (_, gs) = S.addCreature (Cards.bloodMoonPrinting cards) S.alice g1
-         in do
-              HU.assertBool "red available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf urborgId gs)
-              HU.assertBool "black not available (stripped)" (ManaType.Colored Color.Black `notElem` Mana.manaTypesOf urborgId gs),
+            (urborgId, g1) = S.addCreature urborg S.alice base
+            (_, gs) = S.addCreature bloodMoon S.alice g1
+        HU.assertBool "red available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf urborgId gs)
+        HU.assertBool "black not available (stripped)" (ManaType.Colored Color.Black `notElem` Mana.manaTypesOf urborgId gs),
       HU.testCase "CR 605.1a a {T}: Add {G} ability is a mana ability" $
         let ab =
               ActivatedAbility.MkActivatedAbility
@@ -178,25 +190,26 @@ manaTests cards =
                       (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource))
                 }
          in HU.assertBool "no mana produced -> not mana" (not (Mana.isManaAbility ab)),
-      HU.testCase "CR 605 a settled Llanowar Elves is a green mana source" $
-        let (elfId, gs) = S.addCreature (Cards.llanowarElvesPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-         in do
-              HU.assertBool "taps green" (elem (ManaType.Colored Color.Green) (Mana.manaTypesOf elfId gs))
-              HU.assertBool "is a mana source" (elem elfId (Mana.manaSources S.alice gs)),
-      HU.testCase "CR 302.6 a summoning-sick Llanowar Elves is NOT a mana source" $
-        let (elfId, g0) = S.addCreature (Cards.llanowarElvesPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+      HU.testCase "CR 605 a settled Llanowar Elves is a green mana source" $ do
+        llanowarElves <- Registry.printing registry "Llanowar Elves"
+        let (elfId, gs) = S.addCreature llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertBool "taps green" (elem (ManaType.Colored Color.Green) (Mana.manaTypesOf elfId gs))
+        HU.assertBool "is a mana source" (elem elfId (Mana.manaSources S.alice gs)),
+      HU.testCase "CR 302.6 a summoning-sick Llanowar Elves is NOT a mana source" $ do
+        llanowarElves <- Registry.printing registry "Llanowar Elves"
+        let (elfId, g0) = S.addCreature llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
             sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) elfId (GameState.objects g0)}
-         in HU.assertBool "sick elf excluded" (notElem elfId (Mana.manaSources S.alice sick)),
-      HU.testCase "mana from a controlled permanent goes to its controller, not owner" $
-        let (oid, base) = S.addCreature (Cards.llanowarElvesPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
+        HU.assertBool "sick elf excluded" (notElem elfId (Mana.manaSources S.alice sick)),
+      HU.testCase "mana from a controlled permanent goes to its controller, not owner" $ do
+        llanowarElves <- Registry.printing registry "Llanowar Elves"
+        let (oid, base) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
             gs0 = S.giveControl oid S.alice base
             after = Mana.tapForMana oid gs0
             manaUnitsOf pool = case pool of
               Mana.Type.MkMana units -> units
-         in do
-              HU.assertBool "alice received a mana unit" (not (null (manaUnitsOf (Mana.poolOf S.alice after))))
-              HU.assertBool "bob received none" (null (manaUnitsOf (Mana.poolOf S.bob after)))
+        HU.assertBool "alice received a mana unit" (not (null (manaUnitsOf (Mana.poolOf S.alice after))))
+        HU.assertBool "bob received none" (null (manaUnitsOf (Mana.poolOf S.bob after)))
     ]
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Mana" [manaTests cards, castabilityTests cards]
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry = Tasty.testGroup "Mana" [manaTests registry, castabilityTests registry]

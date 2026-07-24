@@ -9,10 +9,10 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as J
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.AbilityName as AbilityName
@@ -75,6 +75,7 @@ import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.Scope as Scope
@@ -97,8 +98,8 @@ import qualified Test.Tasty.QuickCheck as QC
 roundTrip :: (Eq a, Show a) => String -> (a -> Json.Value) -> (Json.Value -> Either Text a) -> a -> HU.Assertion
 roundTrip label enc dec x = HU.assertEqual label (Right x) (dec (enc x))
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards =
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry =
   Tasty.testGroup
     "Pawl.CodecSpec"
     [ Tasty.testGroup
@@ -190,8 +191,9 @@ tests cards =
               (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells),
           HU.testCase "GainPlayerCounters" $
             roundTrip "gpc" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters PlayerCounterKind.Energy (Quantity.Literal 2)),
-          HU.testCase "CreateEmblem" $
-            roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card (Cards.pikerPrinting cards))),
+          HU.testCase "CreateEmblem" $ do
+            piker <- Registry.printing registry "Goblin Piker"
+            roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card piker)),
           HU.testCase "BecomeMonarch" $
             roundTrip "e" Codec.effectToJson Codec.jsonToEffect (Effect.BecomeMonarch MonarchTarget.TheController),
           HU.testCase "ExileUntilMonarch" $
@@ -231,20 +233,21 @@ tests cards =
               Codec.playerStaticAbilityToJson
               Codec.jsonToPlayerStaticAbility
               (PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.CantCastMoreThan 1)),
-          HU.testCase "a Card carrying player abilities round-trips" $
-            let base = Printing.card (Cards.bloodMoonPrinting cards)
+          HU.testCase "a Card carrying player abilities round-trips" $ do
+            bloodMoon <- Registry.printing registry "Blood Moon"
+            let base = Printing.card bloodMoon
                 c = base {CardT.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.NoMaximumHandSize]}
-             in roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
+            roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
           -- Byte-stability: an empty list must not appear in the rendered JSON,
           -- or every committed card file changes. The same posture
           -- colorIndicator and delayedAbilities already take.
-          HU.testCase "an empty playerAbilities list is omitted from the JSON" $
-            let base = Printing.card (Cards.bloodMoonPrinting cards)
-             in do
-                  HU.assertEqual "the fixture really has none" [] (CardT.playerAbilities base)
-                  case J.asObject (Codec.cardToJson base) of
-                    Left err -> HU.assertFailure (Text.unpack err)
-                    Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "playerAbilities") (fmap fst pairs))
+          HU.testCase "an empty playerAbilities list is omitted from the JSON" $ do
+            bloodMoon <- Registry.printing registry "Blood Moon"
+            let base = Printing.card bloodMoon
+            HU.assertEqual "the fixture really has none" [] (CardT.playerAbilities base)
+            case J.asObject (Codec.cardToJson base) of
+              Left err -> HU.assertFailure (Text.unpack err)
+              Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "playerAbilities") (fmap fst pairs))
         ],
       Tasty.testGroup
         "filter (P9)"
@@ -327,36 +330,38 @@ tests cards =
                       "unpayable"
                       (Right Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})
                       (Codec.jsonToCost value),
-              HU.testCase "a Card carrying an additional cost round-trips" $
-                let base = Printing.card (Cards.lightningBoltPrinting cards)
+              HU.testCase "a Card carrying an additional cost round-trips" $ do
+                lightningBolt <- Registry.printing registry "Lightning Bolt"
+                let base = Printing.card lightningBolt
                     c = base {CardT.additionalCosts = [CostComponent.Sacrifice 1 (Filter.Type.HasCardType CardType.Creature)]}
-                 in roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
+                roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
               -- Byte-stability: an empty list must not appear in the rendered JSON,
               -- or every committed card file changes. The posture colorIndicator,
               -- delayedAbilities and playerAbilities already take.
-              HU.testCase "an empty additionalCosts list is omitted from the JSON" $
-                let base = Printing.card (Cards.lightningBoltPrinting cards)
-                 in do
-                      HU.assertEqual "the fixture really has none" [] (CardT.additionalCosts base)
-                      case J.asObject (Codec.cardToJson base) of
-                        Left err -> HU.assertFailure (Text.unpack err)
-                        Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "additionalCosts") (fmap fst pairs)),
-              HU.testCase "a Card carrying an alternative cost round-trips" $
-                let base = Printing.card (Cards.lightningBoltPrinting cards)
+              HU.testCase "an empty additionalCosts list is omitted from the JSON" $ do
+                lightningBolt <- Registry.printing registry "Lightning Bolt"
+                let base = Printing.card lightningBolt
+                HU.assertEqual "the fixture really has none" [] (CardT.additionalCosts base)
+                case J.asObject (Codec.cardToJson base) of
+                  Left err -> HU.assertFailure (Text.unpack err)
+                  Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "additionalCosts") (fmap fst pairs)),
+              HU.testCase "a Card carrying an alternative cost round-trips" $ do
+                lightningBolt <- Registry.printing registry "Lightning Bolt"
+                let base = Printing.card lightningBolt
                     alt =
                       Cost.Type.MkCost
                         { Cost.Type.mana = Just (ManaCost.MkManaCost []),
                           Cost.Type.components = [CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)]
                         }
                     c = base {CardT.alternativeCosts = [alt]}
-                 in roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
-              HU.testCase "an empty alternativeCosts list is omitted from the JSON" $
-                let base = Printing.card (Cards.lightningBoltPrinting cards)
-                 in do
-                      HU.assertEqual "the fixture really has none" [] (CardT.alternativeCosts base)
-                      case J.asObject (Codec.cardToJson base) of
-                        Left err -> HU.assertFailure (Text.unpack err)
-                        Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "alternativeCosts") (fmap fst pairs))
+                roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
+              HU.testCase "an empty alternativeCosts list is omitted from the JSON" $ do
+                lightningBolt <- Registry.printing registry "Lightning Bolt"
+                let base = Printing.card lightningBolt
+                HU.assertEqual "the fixture really has none" [] (CardT.alternativeCosts base)
+                case J.asObject (Codec.cardToJson base) of
+                  Left err -> HU.assertFailure (Text.unpack err)
+                  Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "alternativeCosts") (fmap fst pairs))
             ],
           HU.testCase "a ZoneChangeR replacement round-trips" $
             let re =
@@ -446,23 +451,25 @@ tests cards =
         ],
       Tasty.testGroup
         "honesty round-trip over allPrintings"
-        [ HU.testCase "P1: jsonToPrinting . printingToJson == Right" $
-            mapM_ (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (Codec.jsonToPrinting (Codec.printingToJson p))) (Cards.allPrintings cards),
-          HU.testCase "P2: through text" $
+        [ HU.testCase "P1: jsonToPrinting . printingToJson == Right" $ do
+            ps <- S.allPrintings registry
+            mapM_ (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (Codec.jsonToPrinting (Codec.printingToJson p))) ps,
+          HU.testCase "P2: through text" $ do
+            ps <- S.allPrintings registry
             mapM_
               (\p -> HU.assertEqual (show (CardT.name (Printing.card p))) (Right p) (J.parse (J.render (Codec.printingToJson p)) >>= Codec.jsonToPrinting))
-              (Cards.allPrintings cards),
-          HU.testCase "M4e Cancel loads as a single Counter effect targeting a spell" $
-            let card = Printing.card (Cards.cancelPrinting cards)
-             in do
-                  HU.assertEqual
-                    "effects"
-                    [Effect.Counter (SlotName.MkSlotName (Text.pack "spell"))]
-                    (Card.allEffects card)
-                  HU.assertEqual
-                    "target spec"
-                    (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.MkTargetSpec Pool.Spells Nothing Exclusion.IncludesSource))
-                    (Card.allTargetSpecs card)
+              ps,
+          HU.testCase "M4e Cancel loads as a single Counter effect targeting a spell" $ do
+            cancel <- Registry.printing registry "Cancel"
+            let card = Printing.card cancel
+            HU.assertEqual
+              "effects"
+              [Effect.Counter (SlotName.MkSlotName (Text.pack "spell"))]
+              (Card.allEffects card)
+            HU.assertEqual
+              "target spec"
+              (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.MkTargetSpec Pool.Spells Nothing Exclusion.IncludesSource))
+              (Card.allTargetSpecs card)
         ],
       Tasty.testGroup
         "P4 runtime types"
@@ -480,11 +487,12 @@ tests cards =
           -- cardTypes and subtypes all at once, so a swapped field or a wrong
           -- JSON key would fail this round-trip instead of surviving it on an
           -- all-Nothing/all-empty value.
-          HU.testCase "GameEvent.Moved round-trips with its snapshot" $
-            let (ratId, gs) = S.addCreature (Cards.typhoidRatsPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+          HU.testCase "GameEvent.Moved round-trips with its snapshot" $ do
+            typhoidRats <- Registry.printing registry "Typhoid Rats"
+            let (ratId, gs) = S.addCreature typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
                 zc = ZoneChange.MkZoneChange ratId Zone.Battlefield Zone.Graveyard
                 snapshot = Projection.project ratId gs
-             in roundTrip "moved" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Moved zc snapshot),
+            roundTrip "moved" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Moved zc snapshot),
           HU.testCase "GameEvent.DamageDealt round-trips" $
             roundTrip
               "damage"
