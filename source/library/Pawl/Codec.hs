@@ -19,6 +19,7 @@ import qualified Pawl.Json as Json
 import qualified Pawl.Type.AbilityName as AbilityName
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Binding as Binding
 import qualified Pawl.Type.Card as CardT
@@ -26,9 +27,12 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.Comparison as Comparison
+import qualified Pawl.Type.Condition as Condition.Type
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.Cost as Cost
 import qualified Pawl.Type.CostComponent as CostComponent
+import qualified Pawl.Type.Count as Count.Type
 import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.CounterPattern as CounterPattern
@@ -43,6 +47,7 @@ import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
+import qualified Pawl.Type.EventShape as EventShape
 import qualified Pawl.Type.Exclusion as Exclusion
 import qualified Pawl.Type.Filter as Filter
 import qualified Pawl.Type.GameEvent as GameEvent
@@ -62,6 +67,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
@@ -73,6 +79,7 @@ import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
+import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.StaticAbility as StaticAbility
@@ -518,6 +525,95 @@ jsonToFilter value = do
     ("Or", Just (Array vs)) -> Filter.Or <$> traverse jsonToFilter vs
     ("Not", Just v) -> Filter.Not <$> jsonToFilter v
     _ -> Left (Text.pack "unknown Filter: " <> t)
+
+playerRefToJson :: PlayerRef.PlayerRef -> Value
+playerRefToJson r = case r of
+  PlayerRef.EachPlayer -> nullary (Text.pack "EachPlayer")
+  PlayerRef.Relative rel -> Json.tagged (Text.pack "Relative") (Just (playerRelationToJson rel))
+  PlayerRef.InSlot n -> Json.tagged (Text.pack "InSlot") (Just (slotNameToJson n))
+
+jsonToPlayerRef :: Value -> Either Text PlayerRef.PlayerRef
+jsonToPlayerRef value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("EachPlayer", _) -> Right PlayerRef.EachPlayer
+    ("Relative", Just v) -> PlayerRef.Relative <$> jsonToPlayerRelation v
+    ("InSlot", Just v) -> PlayerRef.InSlot <$> jsonToSlotName v
+    _ -> Left (Text.pack "unknown PlayerRef: " <> t)
+
+eventShapeToJson :: EventShape.EventShape -> Value
+eventShapeToJson s = case s of
+  EventShape.MovedBetween from to -> Json.tagged (Text.pack "MovedBetween") (Just (Array [zoneToJson from, zoneToJson to]))
+
+jsonToEventShape :: Value -> Either Text EventShape.EventShape
+jsonToEventShape value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("MovedBetween", Just (Array [f, u])) -> EventShape.MovedBetween <$> jsonToZone f <*> jsonToZone u
+    _ -> Left (Text.pack "unknown EventShape: " <> t)
+
+scopeToJson :: Scope.Scope -> Value
+scopeToJson s = case s of
+  Scope.InZone z r -> Json.tagged (Text.pack "InZone") (Just (Array [zoneToJson z, playerRefToJson r]))
+  Scope.InHistory e -> Json.tagged (Text.pack "InHistory") (Just (eventShapeToJson e))
+
+jsonToScope :: Value -> Either Text Scope.Scope
+jsonToScope value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("InZone", Just (Array [z, r])) -> Scope.InZone <$> jsonToZone z <*> jsonToPlayerRef r
+    ("InHistory", Just v) -> Scope.InHistory <$> jsonToEventShape v
+    _ -> Left (Text.pack "unknown Scope: " <> t)
+
+aggregationToJson :: Aggregation.Aggregation -> Value
+aggregationToJson a = nullary . Text.pack $ case a of
+  Aggregation.Objects -> "Objects"
+  Aggregation.DistinctCardTypes -> "DistinctCardTypes"
+
+jsonToAggregation :: Value -> Either Text Aggregation.Aggregation
+jsonToAggregation =
+  decodeNullary
+    (Text.pack "Aggregation")
+    [ (Text.pack "Objects", Aggregation.Objects),
+      (Text.pack "DistinctCardTypes", Aggregation.DistinctCardTypes)
+    ]
+
+comparisonToJson :: Comparison.Comparison -> Value
+comparisonToJson c = nullary . Text.pack $ case c of
+  Comparison.Exactly -> "Exactly"
+  Comparison.AtLeast -> "AtLeast"
+  Comparison.AtMost -> "AtMost"
+
+jsonToComparison :: Value -> Either Text Comparison.Comparison
+jsonToComparison =
+  decodeNullary
+    (Text.pack "Comparison")
+    [ (Text.pack "Exactly", Comparison.Exactly),
+      (Text.pack "AtLeast", Comparison.AtLeast),
+      (Text.pack "AtMost", Comparison.AtMost)
+    ]
+
+countToJson :: Count.Type.Count -> Value
+countToJson (Count.Type.MkCount s f a) =
+  Json.tagged (Text.pack "Count") (Just (Array [scopeToJson s, filterToJson f, aggregationToJson a]))
+
+jsonToCount :: Value -> Either Text Count.Type.Count
+jsonToCount value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Count", Just (Array [s, f, a])) -> Count.Type.MkCount <$> jsonToScope s <*> jsonToFilter f <*> jsonToAggregation a
+    _ -> Left (Text.pack "unknown Count: " <> t)
+
+conditionToJson :: Condition.Type.Condition -> Value
+conditionToJson (Condition.Type.MkCondition c cmp q) =
+  Json.tagged (Text.pack "Condition") (Just (Array [countToJson c, comparisonToJson cmp, quantityToJson q]))
+
+jsonToCondition :: Value -> Either Text Condition.Type.Condition
+jsonToCondition value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Condition", Just (Array [c, cmp, q])) -> Condition.Type.MkCondition <$> jsonToCount c <*> jsonToComparison cmp <*> jsonToQuantity q
+    _ -> Left (Text.pack "unknown Condition: " <> t)
 
 playerScopeToJson :: PlayerScope.PlayerScope -> Value
 playerScopeToJson s = nullary . Text.pack $ case s of

@@ -16,15 +16,19 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.AbilityName as AbilityName
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Binding as Binding.Type
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.Comparison as Comparison
+import qualified Pawl.Type.Condition as Condition.Type
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
+import qualified Pawl.Type.Count as Count.Type
 import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.CounterPattern as CounterPattern
@@ -40,6 +44,7 @@ import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
+import qualified Pawl.Type.EventShape as EventShape
 import qualified Pawl.Type.Exclusion as Exclusion
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
 -- evaluator module Pawl.Filter is not imported here today, but the alias
@@ -61,6 +66,7 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
+import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
@@ -68,9 +74,11 @@ import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
+import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.StateCondition as StateCondition
 import qualified Pawl.Type.Subtype as Subtype
@@ -560,5 +568,53 @@ tests cards =
                       TriggeredAbility.intervening = Just (StateCondition.NoPermanentsOfSubtype Subtype.Zombie)
                     }
              in roundTrip "ta" Codec.triggeredAbilityToJson Codec.jsonToTriggeredAbility ability
+        ],
+      Tasty.testGroup
+        "count + condition (M5.5 T2)"
+        [ HU.testCase "Count round-trips" $
+            roundTrip
+              "count"
+              Codec.countToJson
+              Codec.jsonToCount
+              ( Count.Type.MkCount
+                  (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                  (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
+                  Aggregation.Objects
+              ),
+          HU.testCase "Count over the event history round-trips" $
+            roundTrip
+              "history"
+              Codec.countToJson
+              Codec.jsonToCount
+              ( Count.Type.MkCount
+                  (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
+                  (Filter.Type.HasCardType CardType.Creature)
+                  Aggregation.DistinctCardTypes
+              ),
+          HU.testCase "Count scoped to a slot round-trips" $
+            roundTrip
+              "slot"
+              Codec.countToJson
+              Codec.jsonToCount
+              ( Count.Type.MkCount
+                  (Scope.InZone Zone.Hand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+                  (Filter.Type.And [])
+                  Aggregation.Objects
+              ),
+          HU.testCase "Condition round-trips at every comparison" $
+            mapM_
+              (roundTrip "condition" Codec.conditionToJson Codec.jsonToCondition)
+              [ Condition.Type.MkCondition zeroSwamps Comparison.Exactly (Quantity.Type.Literal 0),
+                Condition.Type.MkCondition zeroSwamps Comparison.AtLeast (Quantity.Type.Literal 3),
+                Condition.Type.MkCondition zeroSwamps Comparison.AtMost (Quantity.Type.Literal 1)
+              ]
         ]
     ]
+
+-- A count with every axis non-default, so a codec that drops one is caught.
+zeroSwamps :: Count.Type.Count
+zeroSwamps =
+  Count.Type.MkCount
+    (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
+    (Filter.Type.HasSubtype Subtype.Swamp)
+    Aggregation.Objects
