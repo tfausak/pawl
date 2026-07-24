@@ -222,6 +222,7 @@ executable pawl
 test-suite pawl-test-suite
   import: executable
   build-depends:
+    bytestring ^>=0.12,
     containers ^>=0.8,
     directory ^>=1.3.10,
     random ^>=1.3.1,

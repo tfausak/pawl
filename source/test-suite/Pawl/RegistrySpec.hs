@@ -5,6 +5,8 @@
 module Pawl.RegistrySpec where
 
 import qualified Control.Exception as Exception
+import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
@@ -37,6 +39,30 @@ withCorpus label files action = do
 -- of truth for a card's contents.
 pikerJson :: IO Text.Text
 pikerJson = TextIO.readFile "data/cards/goblin-piker.json"
+
+-- Like withCorpus, but writes a single file's raw bytes rather than Text:
+-- withCorpus cannot express a file containing invalid UTF-8, since Text.Text
+-- cannot hold one. This exercises Registry.load's decodeUtf8' failure branch,
+-- otherwise unreached by any case here.
+withInvalidUtf8Corpus :: String -> (Registry.Type.Registry -> IO a) -> IO a
+withInvalidUtf8Corpus label action = do
+  tmp <- Directory.getTemporaryDirectory
+  let dir = tmp <> "/pawl-registry-spec-" <> label
+      -- Valid JSON except for a lone 0xFF byte inside the name string, which
+      -- is not valid UTF-8 on its own (it is never a legal leading byte).
+      badBytes =
+        ByteString.concat
+          [ ByteString.Char8.pack "{\"name\": \"Goblin Piker",
+            ByteString.singleton 0xFF,
+            ByteString.Char8.pack "\"}"
+          ]
+  Exception.bracket_
+    ( do
+        Directory.createDirectoryIfMissing True dir
+        ByteString.writeFile (dir <> "/goblin-piker.json") badBytes
+    )
+    (Directory.removeDirectoryRecursive dir)
+    (Registry.new dir >>= action)
 
 -- An IO action that must fail. tryIOError fixes the exception type without
 -- ScopedTypeVariables, which this project does not enable.
@@ -93,6 +119,20 @@ tests =
         . withCorpus "empty-slug" []
         $ \registry ->
           expectIOError "empty slug" (Registry.card registry "!!!"),
+      HU.testCase "a file with invalid UTF-8 bytes fails loudly, naming the path and the decode failure"
+        . withInvalidUtf8Corpus "invalid-utf8"
+        $ \registry -> do
+          result <- IOError.tryIOError (Registry.card registry "Goblin Piker")
+          case result of
+            Right _ -> HU.assertFailure "expected an IO error, got a card"
+            Left err -> do
+              -- Specifically the decodeUtf8' failure message, not merely any
+              -- IO error: an incomplete JSON payload (this file's contents)
+              -- would fail for an unrelated reason (missing fields) once
+              -- decoded, so this pins the decode branch rather than any
+              -- downstream one.
+              HU.assertBool ("names the path: " <> show err) (List.isInfixOf "goblin-piker.json" (show err))
+              HU.assertBool ("names the decode failure: " <> show err) (List.isInfixOf "not valid UTF-8" (show err)),
       HU.testCase "a failed load is not cached: fixing the file fixes the lookup" $ do
         piker <- pikerJson
         withCorpus "retry" [("goblin-piker.json", Text.pack "{oh no")] $ \registry -> do
