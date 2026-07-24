@@ -214,16 +214,19 @@ openingHands owners:
      survives every step below — which is exactly what CR 727.3 / 729.3's
      "regardless of any mulligans" means.
   2. counts := empty   (Map PlayerId Natural; absent key = 0)
+     deciding := owners   (players who have NOT yet kept — see the keep-terminal
+     note below; keeping is terminal, CR 103.5, so a kept player leaves this pool)
   3. Round loop (repeats until a round produces zero mulligans — CR 103.5
      "repeated until no player takes a mulligan"):
-       a. Declaration sub-pass, owners in TURN ORDER: for each owner whose current
-          hand size > 0, prompt DeclareMulligan (decider, pid, counts[pid]);
-          collect Mulligan/Keep. A player with a 0-card hand is not asked and is
-          treated as Keep (CR 103.5 final sentence).
+       a. Declaration sub-pass, `deciding` in TURN ORDER (it is filtered from the
+          original `owners`, so turn order is preserved): for each still-deciding
+          player whose current hand size > 0, prompt DeclareMulligan (decider, pid,
+          counts[pid]); collect Mulligan/Keep. A player with a 0-card hand is not
+          asked and is treated as Keep (CR 103.5 final sentence).
        b. If every collected decision is Keep -> STOP; current hands are the
           opening hands.
        c. Simultaneous mulligans (CR 103.5 "all players who decided ... at the same
-          time"), for each owner who chose Mulligan, in turn order:
+          time"), for each still-deciding player who chose Mulligan, in turn order:
             - shuffle the hand back into the library: changeZone every hand card to
               Zone.Library, then shuffleLibrary pid;
             - draw `openingHand` fresh cards;
@@ -234,11 +237,22 @@ openingHands owners:
                   changeZone the answered ids to Zone.Library IN ORDER;
                 * if handSize <= 1: bottom the whole hand (0 or 1 card) with no
                   prompt.
-       d. Repeat the round.
+       d. Repeat the round over the mulliganers only (`deciding := this round's
+          mulliganers`): everyone who kept has dropped out.
 ```
 
 ### 5.1 Fidelity notes
 
+- **Keeping is terminal (CR 103.5: "that player may not take any further
+  mulligans").** The loop must recurse only over the still-deciding players, NOT
+  re-ask everyone each round — a player who keeps drops out of the pool
+  permanently. An earlier draft of this control flow (and the plan derived from
+  it) re-asked every player whose hand was > 0, which would let a player who kept
+  in round 1 illegally mulligan in round 2 once an opponent kept the round alive;
+  the Task 3 review caught it. The fix cannot be pushed onto the interpreter: the
+  DeclareMulligan prompt carries only `counts[pid]`, and `counts[pid] == 0` cannot
+  distinguish "never decided" from "kept immediately," so a stateless decider
+  cannot tell it already kept. The engine threads the pool.
 - **Declare-all-then-take-all** (3a fully before 3c): pawl is sequential, so CR
   103.5's "at the same time" is modeled as *collect every declaration, then apply
   every mulligan*. Because a hand is hidden information, no player's redraw is

@@ -2055,3 +2055,40 @@ its own gate card and spec, landed as it completes. Umbrella:
   flagged surface. Spec (umbrella) and plan kept as reference:
   `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`
   and `docs/superpowers/plans/2026-07-23-m5c-subgames.md`.
+
+- **Mulligans (CR 103.5) are implemented** (issue-driven gap closure #141, not an
+  M5 phase; surfaced by M5c's whole-branch review, which found `Setup.newGame` and
+  `Setup.startGameFromCards` both drew an unconditional seven-card opening hand with
+  no mulligan step). **What it establishes:** a new `Pawl.Mulligan` module owns the
+  whole CR 103.5 process behind one entry point, `openingHands :: [PlayerId] ->
+  Game ()`, which `Setup.newGame` (main game) and `Setup.startGameFromCards`
+  (restart CR 727 + subgames CR 729) both call — so the London mulligan lands once
+  for all three game-start paths. The loop: draw seven each (CR 103.5 sentence 1),
+  then a **declare-all-then-take-all** round (the starting player declares first,
+  then each other in turn order; all who chose to mulligan then do so), where taking
+  a mulligan shuffles the hand back, redraws seven, and bottoms N cards (N =
+  mulligans that player has now taken) in the player's chosen order. **Keeping is
+  terminal** (CR 103.5): the loop threads a still-deciding pool and a kept player
+  drops out permanently — it does NOT re-ask everyone each round, and the fix cannot
+  be delegated to the interpreter (the prompt carries only the count, and count == 0
+  cannot distinguish "never decided" from "kept immediately"). Bottoming reuses the
+  existing `changeZone Hand → Library` bottom-append and `Event.drawCard` top-take —
+  no new zone primitive — so the answered order becomes the library-bottom order.
+  The per-player mulligan count is a **setup-local `Map`**, never a `GameState`
+  field: no in-game effect asks how many mulligans a player took. **Falls out for
+  free:** the CR 727.3 / 729.3 short-deck loss still fires "regardless of any
+  mulligans," because a short library sets `drewFromEmpty` on the initial draw and
+  that flag survives the whole loop. **Added:** `Pawl.Type.MulliganDecision`
+  (`Mulligan | Keep`, a sum type — no boolean blindness); two prompts
+  `Prompt.DeclareMulligan` and `Prompt.Bottom` (each carrying a `Decider`, so CR 723
+  is satisfied for free — at setup `activeControl` is `Nothing`) with their
+  `Response` mirrors and `Replay` encode/decode/defaultAnswer arms; `Pawl.Mulligan`
+  (`openingHand`, `shuffleLibrary` — both moved out of `Setup` to break the import
+  cycle one-way — and the `openingHands`/`mulliganRounds`/`takeMulligan` loop);
+  `Pawl.MulliganSpec` (nine cases, including teeth-verified proofs that a chosen
+  bottom *order* is honored and that a kept player is not re-asked). **Deferred:**
+  CR 103.5c's multiplayer/Brawl free first mulligan (#148, `area:multiplayer`);
+  CR 103.6 opening-hand actions — Leyline, Gemstone Caverns (#149, card-driven);
+  CR 103.2a/b sideboards and companions (#150, card-driven). Spec and plan:
+  `docs/superpowers/specs/2026-07-24-mulligans-cr-103-5-design.md` and
+  `docs/superpowers/plans/2026-07-24-mulligans-cr-103-5.md`.
