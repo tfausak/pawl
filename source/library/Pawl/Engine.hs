@@ -49,6 +49,7 @@ import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import Pawl.Type.Prompt (Prompt)
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.RestartSignal as RestartSignal
 import Pawl.Type.Result (Result)
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
@@ -395,50 +396,58 @@ priorityLoop = do
   -- CR 117.5, observably identical to settling on every priority grant.
   let loop = do
         finished <- State.gets (Maybe.isJust . GameState.result)
-        if finished
-          then State.modify' (\gs -> gs {GameState.priority = Nothing})
-          else do
-            gs <- State.get
-            case GameState.priority gs of
-              Nothing -> pure ()
-              Just p -> do
-                -- CR 723.6: concede is not implemented — there is no Concede
-                -- action or concede channel. When it is added it must read the
-                -- true player `p`, never `decider`: a controller cannot concede
-                -- on the controlled player's behalf (CR 104.3a). (#133)
-                let decider = Decide.deciderFor p gs
-                    actions = Action.legalActions p gs
-                chosen <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
-                case chosen of
-                  Action.Type.Pass -> do
-                    let passes = GameState.passes gs + 1
-                        playing = length (Sba.stillPlaying gs)
-                    if passes >= fromIntegral playing
-                      then case GameState.stack gs of
-                        [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
-                        _ -> do
-                          Stack.resolveTopWith playSubgame
-                          settleForPriority
-                          State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (GameState.activePlayer g)})
-                          loop
-                      else do
-                        State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}
+        restarted <- State.gets GameState.restartSignal
+        case restarted of
+          -- CR 727.4: a restart resolved under this loop, so the game it was
+          -- running has ended (CR 727.1) and been rebuilt. Stop without granting
+          -- priority -- "No player has priority" -- and without touching
+          -- GameState.priority, which the rebuild already set to Nothing.
+          RestartSignal.Restarted -> pure ()
+          RestartSignal.Playing ->
+            if finished
+              then State.modify' (\gs -> gs {GameState.priority = Nothing})
+              else do
+                gs <- State.get
+                case GameState.priority gs of
+                  Nothing -> pure ()
+                  Just p -> do
+                    -- CR 723.6: concede is not implemented — there is no Concede
+                    -- action or concede channel. When it is added it must read the
+                    -- true player `p`, never `decider`: a controller cannot concede
+                    -- on the controlled player's behalf (CR 104.3a). (#133)
+                    let decider = Decide.deciderFor p gs
+                        actions = Action.legalActions p gs
+                    chosen <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
+                    case chosen of
+                      Action.Type.Pass -> do
+                        let passes = GameState.passes gs + 1
+                            playing = length (Sba.stillPlaying gs)
+                        if passes >= fromIntegral playing
+                          then case GameState.stack gs of
+                            [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
+                            _ -> do
+                              Stack.resolveTopWith playSubgame
+                              settleForPriority
+                              State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (GameState.activePlayer g)})
+                              loop
+                          else do
+                            State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}
+                            loop
+                      Action.Type.Play oid -> do
+                        Event.changeZone oid Zone.Battlefield
+                        State.modify' (\g -> g {GameState.landPlayed = Set.insert p (GameState.landPlayed g), GameState.passes = 0, GameState.priority = Just p})
+                        settleForPriority
                         loop
-                  Action.Type.Play oid -> do
-                    Event.changeZone oid Zone.Battlefield
-                    State.modify' (\g -> g {GameState.landPlayed = Set.insert p (GameState.landPlayed g), GameState.passes = 0, GameState.priority = Just p})
-                    settleForPriority
-                    loop
-                  Action.Type.Cast oid -> do
-                    Cast.castSpell p oid
-                    State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
-                    settleForPriority
-                    loop
-                  Action.Type.Activate oid ability -> do
-                    Activate.activateAbility p oid ability
-                    State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
-                    settleForPriority
-                    loop
+                      Action.Type.Cast oid -> do
+                        Cast.castSpell p oid
+                        State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                        settleForPriority
+                        loop
+                      Action.Type.Activate oid ability -> do
+                        Activate.activateAbility p oid ability
+                        State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                        settleForPriority
+                        loop
   settleForPriority
   loop
 
@@ -495,6 +504,11 @@ advance = do
 -- state-based actions, then move on. Bails out as soon as the game has a result.
 runStep :: Game ()
 runStep = do
+  -- CR 727.4: "The effect that restarts the game finishes resolving just before
+  -- the first turn's untap step." If the previous step unwound on a restart, this
+  -- is that untap step, and the rebuilt game is played from here like any other --
+  -- so lower the signal before doing anything else.
+  State.modify' (\gs -> gs {GameState.restartSignal = RestartSignal.Playing})
   phase <- State.gets GameState.phase
   -- CR 603.2b: the step began. Recorded BEFORE the step's turn-based actions, so
   -- the first priority boundary of this step scans it. No player receives
@@ -508,13 +522,23 @@ runStep = do
   finished <- State.gets (Maybe.isJust . GameState.result)
   Monad.unless finished $ do
     Monad.when (Turn.grantsPriority phase) priorityLoop
-    -- CR 500.4: each player's mana pool empties at the end of every step and
-    -- phase. Nothing floats mana in M1a, so this is unobservable today; it is
-    -- the rule, and it is a one-liner.
-    State.modify' Mana.emptyManaPools
-    checkSba
-    stillFinished <- State.gets (Maybe.isJust . GameState.result)
-    Monad.unless stillFinished advance
+    restarted <- State.gets GameState.restartSignal
+    case restarted of
+      -- CR 727.4: a restart replaced the game during this step's priority round.
+      -- Unwind: the rebuilt state is already positioned at turn 1's untap step
+      -- with empty mana pools and nothing to settle, and `advance` in particular
+      -- MUST NOT run -- it would pop the FRESH schedule and skip that untap step
+      -- entirely. playGame's next iteration re-enters runStep, which lowers the
+      -- signal and plays the new game from its first step.
+      RestartSignal.Restarted -> pure ()
+      RestartSignal.Playing -> do
+        -- CR 500.4: each player's mana pool empties at the end of every step and
+        -- phase. Nothing floats mana in M1a, so this is unobservable today; it is
+        -- the rule, and it is a one-liner.
+        State.modify' Mana.emptyManaPools
+        checkSba
+        stillFinished <- State.gets (Maybe.isJust . GameState.result)
+        Monad.unless stillFinished advance
 
 -- Terminates because libraries are finite, each turn draws at most one card, and
 -- drawing from an empty library is a loss (CR 704.5b).

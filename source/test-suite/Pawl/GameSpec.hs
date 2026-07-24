@@ -28,13 +28,21 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Departure as Departure
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.Modal as Modal
+import qualified Pawl.Type.Mode as Mode
+import qualified Pawl.Type.ModeIndex as ModeIndex
+import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -614,7 +622,7 @@ tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
     "Game"
-    [gameTests cards, actionTests cards, objectFactTests cards, engineTests cards, ruleTests cards]
+    [gameTests cards, actionTests cards, objectFactTests cards, engineTests cards, ruleTests cards, restartReentryTests cards]
 
 -- One Lightning Bolt in bob's hand.
 handBobBolt :: Cards.Cards -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
@@ -799,3 +807,106 @@ poolToLibraryG pid gs =
           GameState.battlefield = Set.difference (GameState.battlefield gs) (Set.fromList mine),
           GameState.library = Map.insert pid (Seq.fromList mine) (GameState.library gs)
         }
+
+-- #134 / CR 727.4. A restart that resolves inside a LIVE Engine.runStep replaces
+-- the game underneath the frames that are still running: the resolution, the
+-- priority loop, and the step itself. Setup.restartGame leaves the rebuilt state
+-- positioned just before turn 1's untap step with no player holding priority, so
+-- every one of those frames has to unwind without touching it. The two things
+-- that must NOT happen are a further priority grant ("No player has priority")
+-- and Engine.advance, which would pop the FRESH `remaining` and skip turn 1's
+-- untap step entirely.
+
+-- A player's `n` owned cards, so the rebuilt game can deal a 7-card opening hand
+-- without tripping the CR 727.3 short-deck loss.
+ownedCards :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+ownedCards cards n pid gs =
+  List.foldl' (\g _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid g)) gs [1 .. n]
+
+-- alice is active in her precombat main phase (a step that grants priority) with
+-- bob's RestartGame ability already on the stack. Both players pass, the ability
+-- resolves, and the restart fires mid-step.
+restartOnStack :: Cards.Cards -> GameState.GameState
+restartOnStack cards =
+  let g0 = Setup.emptyGame S.bothPlayers
+      g1 = ownedCards cards 10 S.alice g0
+      g2 = ownedCards cards 10 S.bob g1
+      (abilId, g3) = Game.freshObjectId g2
+      (ts, g4) = Game.freshTimestamp g3
+      ability =
+        ActivatedAbility.MkActivatedAbility
+          { ActivatedAbility.cost =
+              Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
+            ActivatedAbility.modal =
+              Modal.MkModal
+                (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty))
+                (ModeSelection.ChooseExactly 1)
+          }
+      abilObj =
+        Object.MkObject
+          { Object.owner = S.bob,
+            Object.source = Source.OfAbility (ObjectId.MkObjectId 0) ability,
+            Object.zone = Zone.Stack,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled,
+            Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+            Object.counters = Map.empty,
+            Object.timestamp = ts
+          }
+   in g4
+        { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),
+          GameState.stack = abilId : GameState.stack g4,
+          GameState.activePlayer = S.alice,
+          GameState.phase = Phase.PrecombatMain,
+          GameState.remaining = Seq.fromList [Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+        }
+
+-- Run under a prompt-counting interpreter: how many times a player was asked to
+-- act is exactly how CR 727.4's "No player has priority" is observed.
+runCountingActions :: GameState.GameState -> Game.Type.Game a -> (GameState.GameState, Int)
+runCountingActions gs act =
+  let answer :: Prompt.Prompt r -> State.State Int r
+      answer p = do
+        case p of
+          Prompt.ChooseAction {} -> State.modify' (+ 1)
+          _ -> pure ()
+        pure (S.identityAnswer p)
+      ((_, gs1), n) = State.runState (Engine.runGame answer gs act) 0
+   in (gs1, n)
+
+restartReentryTests :: Cards.Cards -> Tasty.TestTree
+restartReentryTests cards =
+  Tasty.testGroup
+    "restart re-entry (CR 727.4)"
+    [ HU.testCase "the step the restart fired in does not advance past turn 1's untap step" $
+        let (after, _) = runCountingActions (restartOnStack cards) Engine.runStep
+         in do
+              HU.assertEqual "still positioned at the untap step" Turn.firstPhase (GameState.phase after)
+              HU.assertEqual "the fresh turn schedule is intact, not popped" Turn.laterPhases (GameState.remaining after)
+              HU.assertEqual "turn 1 of the new game" 1 (GameState.turnNumber after)
+              HU.assertEqual "the new game is still being played" Nothing (GameState.result after),
+      HU.testCase "no player receives priority after the restart resolves" $
+        -- alice passes, bob passes, the ability resolves: two ChooseAction prompts
+        -- and no more. A third means the priority loop kept running on a game that
+        -- no longer exists.
+        let (_, asked) = runCountingActions (restartOnStack cards) Engine.runStep
+         in HU.assertEqual "exactly the two passes that resolved the ability" 2 asked,
+      HU.testCase "the next step runs the rebuilt turn 1's untap step" $
+        let (afterRestart, _) = runCountingActions (restartOnStack cards) Engine.runStep
+            (afterUntap, _) = runCountingActions afterRestart Engine.runStep
+         in do
+              HU.assertEqual "the untap step ran and handed on to upkeep" (Phase.Beginning BeginningStep.Upkeep) (GameState.phase afterUntap)
+              HU.assertEqual "still turn 1" 1 (GameState.turnNumber afterUntap),
+      HU.testCase "a live playGame survives the restart and plays the new game to a result" $
+        -- An end-to-end liveness guard, not a discriminating one: the loop did
+        -- not wedge before the fix either, it just played a turn 1 with no untap
+        -- step. The three tests above are what actually catch that. This one
+        -- pins the surrounding claim -- playGame keeps looping across the
+        -- rebuild and returns the REBUILT game's result (CR 727.1: no player
+        -- wins, loses or draws the game that was restarted). Terminating: the
+        -- restart is a hand-built stack object, not a card in any library, so it
+        -- cannot fire again and the rebuilt game decks out like any other.
+        let (result, _) = Engine.runGamePure S.identityAnswer (restartOnStack cards) Engine.playGame
+         in HU.assertBool "the new game reached a result" (case result of Result.Won _ -> True; Result.Drawn -> True)
+    ]

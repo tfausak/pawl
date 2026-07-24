@@ -26,6 +26,7 @@ import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Printing (Printing)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.RestartSignal as RestartSignal
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
@@ -85,6 +86,7 @@ emptyGame order =
           GameState.passes = 0,
           GameState.turnNumber = 1,
           GameState.result = Nothing,
+          GameState.restartSignal = RestartSignal.Playing,
           GameState.nextObjectId = ObjectId.MkObjectId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
@@ -227,6 +229,10 @@ restartGame starter = do
             GameState.passes = 0,
             GameState.turnNumber = 1,
             GameState.result = Nothing,
+            -- CR 727.4: the game the caller was running has been replaced.
+            -- Engine.priorityLoop and Engine.runStep read this and unwind to the
+            -- rebuilt turn 1 rather than granting priority or advancing past it.
+            GameState.restartSignal = RestartSignal.Restarted,
             GameState.drewFromEmpty = mempty,
             GameState.landPlayed = mempty,
             GameState.pendingControl = Map.empty,
@@ -286,6 +292,7 @@ subgameStateFrom parent =
           GameState.passes = 0,
           GameState.turnNumber = 1,
           GameState.result = Nothing,
+          GameState.restartSignal = RestartSignal.Playing,
           GameState.drewFromEmpty = mempty,
           GameState.landPlayed = mempty,
           GameState.pendingControl = Map.empty,

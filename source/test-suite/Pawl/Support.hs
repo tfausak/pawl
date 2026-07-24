@@ -69,6 +69,7 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.RestartSignal as RestartSignal
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
@@ -968,6 +969,7 @@ oneMountainState cards ph =
           GameState.passes = 0,
           GameState.turnNumber = 1,
           GameState.result = Nothing,
+          GameState.restartSignal = RestartSignal.Playing,
           GameState.nextObjectId = ObjectId.MkObjectId 1,
           GameState.nextTimestamp = Timestamp.MkTimestamp 1,
           GameState.drewFromEmpty = mempty,

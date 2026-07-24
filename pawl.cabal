@@ -173,6 +173,7 @@ library
     Pawl.Type.ReplacementCandidate
     Pawl.Type.ReplacementEffect
     Pawl.Type.Response
+    Pawl.Type.RestartSignal
     Pawl.Type.Result
     Pawl.Type.Scaling
     Pawl.Type.Sickness

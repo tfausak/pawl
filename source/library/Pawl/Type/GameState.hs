@@ -17,6 +17,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Phase (Phase)
 import Pawl.Type.Player (Player)
 import Pawl.Type.PlayerId (PlayerId)
+import Pawl.Type.RestartSignal (RestartSignal)
 import Pawl.Type.Result (Result)
 import Pawl.Type.Timestamp (Timestamp)
 
@@ -82,6 +83,11 @@ data GameState = MkGameState
     passes :: Natural,
     turnNumber :: Natural,
     result :: Maybe Result,
+    -- CR 727.4: raised while a restart has replaced this game underneath the
+    -- frames still running it, so Engine.priorityLoop and Engine.runStep unwind
+    -- to the rebuilt turn 1 instead of acting on it. Transient: Engine.runStep
+    -- lowers it as that turn's untap step begins.
+    restartSignal :: RestartSignal,
     nextObjectId :: ObjectId,
     -- CR 613.7: the monotonic source of timestamps for objects (at creation) and
     -- stored continuous effects (at CR 611 creation). See Timestamp.
