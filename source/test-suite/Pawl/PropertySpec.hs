@@ -1,48 +1,33 @@
 -- Covers cross-cutting universal QuickCheck invariants (true for every seed).
--- The three existence/exit-criterion properties are converted to deterministic
--- (tests cards) in their subsystem specs by the next task.
 module Pawl.PropertySpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import qualified Pawl.Cards as Cards
-import qualified Pawl.Game as Game
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Player as Player
-import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.QuickCheck as QC
+
+-- Playing one game out is this suite's entire cost (~66 ms; the other 948 tests
+-- together take ~1 s), so the iteration count is the only real dial. 16 is the
+-- cheap end of the curve: these are coarse whole-game invariants, so a bug that
+-- breaks one breaks nearly every seed -- a mutation that drops CR 500.4's mana
+-- emptying is caught by the third seed. To crank it for a milestone gate, edit
+-- this number: both a localOption and an in-property withNumTests take
+-- precedence over --quickcheck-tests, so there is no command-line override.
+iterations :: QC.QuickCheckTests
+iterations = 16
 
 nextIdOf :: GameState.GameState -> Integer
 nextIdOf gs = case GameState.nextObjectId gs of
   ObjectId.MkObjectId n -> toInteger n
-
--- Did this seed's green-black game put a card of this name into a graveyard? A
--- cast instant always ends there (resolved or fizzled); nothing else moves a
--- Giant Growth or Serpent's Gift out of a library.
-castsNamed :: Cards.Cards -> Text.Text -> Int -> Bool
-castsNamed cards name s =
-  let gs = S.runRandomGame (S.greenBlack cards) s
-      named oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.Type.name (Printing.card printing) == name
-          Source.OfToken card -> Card.Type.name card == name
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
-          Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
-      inGrave pid = any named (Game.zoneMembers Zone.Graveyard pid gs)
-   in any inGrave [S.alice, S.bob]
 
 -- The card-backed objects (Source.OfCard) are conserved at 120 across a game
 -- (CR 400.7 mints a fresh id per zone change but never a new card). Tokens
@@ -59,45 +44,49 @@ cardBackedCount gs =
         Source.OfInherentTrigger _ _ -> False
    in length (filter fromCard (Map.elems (GameState.objects gs)))
 
-propertyTests :: Cards.Cards -> Tasty.TestTree
-propertyTests cards =
-  Tasty.testGroup
-    "Properties"
-    [ QC.testProperty "conservation: 120 card-backed objects at end" $ \s ->
-        QC.conjoin (fmap (\m -> cardBackedCount (S.runRandomGame m s) QC.=== 120) (S.matchups cards)),
-      -- The property that matters most now. Combat is the first thing that can
+-- Every universal invariant, judged against ONE played-out game. They share the
+-- fixture deliberately: five separate properties each calling runRandomGame
+-- played five times the games to answer the same five questions. Each arm is
+-- labelled so a failure names the invariant that broke.
+universalInvariants :: GameState.GameState -> QC.Property
+universalInvariants gs =
+  QC.conjoin
+    [ QC.counterexample "conservation: 120 card-backed objects at end" $
+        cardBackedCount gs QC.=== 120,
+      -- The invariant that matters most now. Combat is the first thing that can
       -- end a game before the library runs out.
-      QC.testProperty "every game terminates with a result" $ \s ->
-        QC.conjoin (fmap (\m -> QC.property (Maybe.isJust (GameState.result (S.runRandomGame m s)))) (S.matchups cards)),
-      QC.testProperty "at least 120 ids were minted" $ \s ->
-        QC.conjoin (fmap (\m -> QC.property (nextIdOf (S.runRandomGame m s) >= 120)) (S.matchups cards)),
-      QC.testProperty "no mana floats at the end" $ \s ->
-        QC.conjoin (fmap (\m -> GameState.manaPool (S.runRandomGame m s) QC.=== Map.empty) (S.matchups cards)),
+      QC.counterexample "every game terminates with a result" $
+        QC.property (Maybe.isJust (GameState.result gs)),
+      QC.counterexample "at least 120 ids were minted" $
+        QC.property (nextIdOf gs >= 120),
+      QC.counterexample "no mana floats at the end" $
+        GameState.manaPool gs QC.=== Map.empty,
       -- Replaces M0's "no life changes". Nothing here GAINS life, so any
       -- increase is a bug. Dies at lifelink (still unscheduled -- see the
-      -- design doc's punchlist), the same way this property's ancestor
+      -- design doc's punchlist), the same way this invariant's ancestor
       -- announced M1b.
-      QC.testProperty "life never increases" $ \s ->
-        QC.conjoin
-          ( fmap
-              (\m -> QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players (S.runRandomGame m s)))))
-              (S.matchups cards)
-          ),
-      -- Durable structural property: with a deck that can only ever deck out (60
-      -- basic lands, no spells, no attackers), every seed's game ends AND ends by
-      -- a player drawing from an empty library (CR 704.5b) -- never by any other
-      -- loss condition. Stays true no matter what cards later exist.
-      QC.testProperty "a lands-only mirror always ends by deck-out" $ \s ->
-        let final = S.runRandomGame (S.landsOnly cards) s
-         in QC.property
-              ( Maybe.isJust (GameState.result final)
-                  && not (Set.null (GameState.drewFromEmpty final))
-              ),
-      QC.testProperty "continuous effects happen: some green-black seed casts Giant Growth" $
-        QC.once (QC.property (any (castsNamed cards (Text.pack "Giant Growth")) [1 .. 100 :: Int])),
-      QC.testProperty "grants happen: some green-black seed casts Serpent's Gift" $
-        QC.once (QC.property (any (castsNamed cards (Text.pack "Serpent's Gift")) [1 .. 100 :: Int]))
+      QC.counterexample "life never increases" $
+        QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players gs)))
     ]
+
+propertyTests :: Cards.Cards -> Tasty.TestTree
+propertyTests cards =
+  Tasty.localOption iterations
+    . Tasty.testGroup "Properties"
+    $ [ QC.testProperty "every matchup upholds every universal invariant" $
+          \s -> QC.conjoin (fmap (\m -> universalInvariants (S.runRandomGame m s)) (S.matchups cards)),
+        -- Durable structural property: with a deck that can only ever deck out (60
+        -- basic lands, no spells, no attackers), every seed's game ends AND ends by
+        -- a player drawing from an empty library (CR 704.5b) -- never by any other
+        -- loss condition. Stays true no matter what cards later exist.
+        QC.testProperty "a lands-only mirror always ends by deck-out" $
+          \s ->
+            let final = S.runRandomGame (S.landsOnly cards) s
+             in QC.property
+                  ( Maybe.isJust (GameState.result final)
+                      && not (Set.null (GameState.drewFromEmpty final))
+                  )
+      ]
 
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards = Tasty.testGroup "Properties" [propertyTests cards]
