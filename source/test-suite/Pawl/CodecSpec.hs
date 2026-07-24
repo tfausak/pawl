@@ -74,7 +74,6 @@ import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
-import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
@@ -604,9 +603,9 @@ tests cards =
           HU.testCase "Condition round-trips at every comparison" $
             mapM_
               (roundTrip "condition" Codec.conditionToJson Codec.jsonToCondition)
-              [ Condition.Type.MkCondition zeroSwamps Comparison.Exactly (Quantity.Type.Literal 0),
-                Condition.Type.MkCondition zeroSwamps Comparison.AtLeast (Quantity.Type.Literal 3),
-                Condition.Type.MkCondition zeroSwamps Comparison.AtMost (Quantity.Type.Literal 1)
+              [ Condition.Type.MkCondition zeroSwamps Comparison.Exactly (Quantity.Literal 0),
+                Condition.Type.MkCondition zeroSwamps Comparison.AtLeast (Quantity.Literal 3),
+                Condition.Type.MkCondition zeroSwamps Comparison.AtMost (Quantity.Literal 1)
               ]
         ]
     ]
