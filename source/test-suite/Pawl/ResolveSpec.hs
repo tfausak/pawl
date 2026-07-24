@@ -13,12 +13,14 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
+import qualified Pawl.Count as Count
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
@@ -28,11 +30,13 @@ import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
+import qualified Pawl.Type.Count as Count.Type
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -63,6 +67,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
@@ -70,6 +75,7 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Result as Result
+import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
@@ -695,7 +701,52 @@ resolveTests cards =
               HU.assertEqual "Fog installed one replacement" 1 (length (GameState.replacements resolved))
               HU.assertEqual "combat damage prevented (the cancel shape)" (Just 0) (S.damageOf victim combat)
               -- The falsifier: a tag-blind Fog would also blunt this spell damage.
-              HU.assertEqual "spell damage untouched (Noncombat)" (Just 2) (S.damageOf victim spell)
+              HU.assertEqual "spell damage untouched (Noncombat)" (Just 2) (S.damageOf victim spell),
+      -- Sudden Impact: "deals damage to target player equal to the number of
+      -- cards in THAT player's hand." Cast through the real path (Cast.castSpell
+      -- + resolveTop), not S.spellOnStack -- that helper sets Object.bindings =
+      -- Map.empty and so does not fill the target slot the InSlot count reads.
+      HU.testCase "Sudden Impact reads the TARGET's hand, not the caster's" $
+        -- THE FALSIFIER for a perspective baked into the count: Alice holds
+        -- five and Bob holds two, and Bob takes two. A count whose "you" were
+        -- the resolving controller (Alice) would deal five instead.
+        let gs0 = S.mountainsInPlay cards 4
+            fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard (Cards.pikerPrinting cards) pid g)) g0 [1 .. (n :: Int)]
+            gs1 = fill S.alice 5 (fill S.bob 2 gs0)
+            (spellId, gs2) = S.addHandCard (Cards.suddenImpactPrinting cards) S.alice gs1
+            cast = snd (Engine.runGamePure atBobAnswer gs2 (Cast.castSpell S.alice spellId))
+            before = S.lifeOf S.bob cast
+            after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+         in HU.assertEqual "two damage" (fmap (subtract 2) before) (S.lifeOf S.bob after),
+      HU.testCase "CR 608.2h the number is read as the effect is applied, not as the spell is cast" $
+        -- Bob's hand grows AFTER Sudden Impact is on the stack and BEFORE it
+        -- resolves; the damage follows the hand size at resolution.
+        let gs0 = S.mountainsInPlay cards 4
+            fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard (Cards.pikerPrinting cards) pid g)) g0 [1 .. (n :: Int)]
+            gs1 = fill S.bob 2 gs0
+            (spellId, gs2) = S.addHandCard (Cards.suddenImpactPrinting cards) S.alice gs1
+            cast = snd (Engine.runGamePure atBobAnswer gs2 (Cast.castSpell S.alice spellId))
+            (_, cast1) = S.addHandCard (Cards.pikerPrinting cards) S.bob cast
+            before = S.lifeOf S.bob cast1
+            after = snd (Engine.runGamePure atBobAnswer cast1 Stack.resolveTop)
+         in HU.assertEqual "three damage" (fmap (subtract 3) before) (S.lifeOf S.bob after),
+      HU.testCase "the same count with Relative You reads the caster's hand" $
+        -- The direct contrast: the SAME Count shape (InZone Hand, Objects) that
+        -- Sudden Impact scopes with PlayerRef.InSlot also serves Inner Calm,
+        -- Outer Strength's PlayerRef.Relative You -- one shape, two
+        -- perspectives, neither welded into a constructor.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            fill pid n g0 = List.foldl' (\g _ -> snd (S.addHandCard (Cards.pikerPrinting cards) pid g)) g0 [1 .. (n :: Int)]
+            gs = fill S.alice 5 (fill S.bob 2 gs0)
+            yourHand =
+              Count.Type.MkCount
+                (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
+                (Filter.Type.And [])
+                Aggregation.Objects
+         in HU.assertEqual
+              "Alice's five"
+              (Just 5)
+              (Count.evaluate (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.MkContext (Just S.alice) Nothing) gs yourHand)
     ]
 
 -- Add n Mountains to pid's battlefield, discarding the ids (used to bulk up a
