@@ -248,6 +248,7 @@ test-suite pawl-test-suite
     Pawl.JsonSpec
     Pawl.ManaSpec
     Pawl.ModalSpec
+    Pawl.MulliganSpec
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
     Pawl.ProjectionSpec

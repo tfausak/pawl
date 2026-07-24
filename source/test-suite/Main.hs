@@ -20,6 +20,7 @@ import qualified Pawl.GameSpec as GameSpec
 import qualified Pawl.JsonSpec as JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
 import qualified Pawl.ModalSpec as ModalSpec
+import qualified Pawl.MulliganSpec as MulliganSpec
 import qualified Pawl.PlayerEffectSpec as PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
@@ -48,6 +49,7 @@ testTree cards =
       TurnSpec.tests cards,
       GameSpec.tests cards,
       SetupSpec.tests cards,
+      MulliganSpec.tests cards,
       DamageSpec.tests cards,
       DecideSpec.tests,
       DepartureSpec.tests,
