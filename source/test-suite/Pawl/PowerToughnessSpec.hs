@@ -1,15 +1,15 @@
 -- Covers: Pawl.Projection (CR 613 layer 7 -- 7a characteristic-defined P/T, the
 -- CR 608.2h freeze that 7b's stored effects owe, and 7d P/T switching), Pawl.Quantity
--- (the counting quantity) and the P3b gates (Tarmogoyf, Inner Calm Outer Strength,
--- Twisted Image). Gameplay-level: each card is cast or resolved through the stack and
--- the resulting game state is asserted on.
+-- (the counting quantity) and the P3b/M5.5 gates (Tarmogoyf, Inner Calm Outer
+-- Strength, Twisted Image, Nightmare). Gameplay-level: each card is cast or resolved
+-- through the stack and the resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
 
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -309,16 +309,17 @@ tests cards =
       HU.testCase "CR 613.5 a Swamp entering or leaving moves the P/T on the next projection" $
         -- CR 613.5: continuous application is automatic -- nothing touches
         -- Nightmare when a Swamp enters or leaves, only the next projection's
-        -- read of the battlefield.
+        -- read of the battlefield. The Swamp leaves through Event.changeZone --
+        -- the same zone-change machinery a real destroy, sacrifice, or bounce
+        -- runs, which mints the departing permanent a fresh object id in its
+        -- new zone (CR 400.7) -- rather than by deleting it out of
+        -- GameState.objects directly, a state the engine itself never
+        -- produces.
         let gs0 = Setup.emptyGame S.bothPlayers
             (nightId, g1) = S.addCreature (Cards.nightmarePrinting cards) S.alice gs0
             (_, g2) = S.addCreature (Cards.swampPrinting cards) S.alice g1
             (swamp2, g3) = S.addCreature (Cards.swampPrinting cards) S.alice g2
-            g4 =
-              g3
-                { GameState.objects = Map.delete swamp2 (GameState.objects g3),
-                  GameState.battlefield = Set.delete swamp2 (GameState.battlefield g3)
-                }
+            g4 = snd (Engine.runGamePure S.identityAnswer g3 (Event.changeZone swamp2 Zone.Graveyard))
          in do
               HU.assertEqual "one Swamp: power 1" (Just 1) (Projection.powerOf nightId g2)
               HU.assertEqual "a second Swamp enters: power 2" (Just 2) (Projection.powerOf nightId g3)
@@ -332,12 +333,21 @@ tests cards =
         -- from `gather` entirely (reading BASE characteristics, not a timestamp
         -- race), so Urborg ends up a bare Mountain with nothing left for
         -- Nightmare to count.
+        --
+        -- THE POSITIVE CONTROL: a basic Swamp sits on the board alongside
+        -- Urborg. Blood Moon's own filter is land-and-NOT-basic, so the basic
+        -- Swamp is untouched by it and stays a Swamp. A count that never really
+        -- matches HasSubtype, or a land-subtype effect that (wrongly)
+        -- suppresses every permanent's static abilities, would return 0 here
+        -- exactly as a correct implementation returns for Urborg alone -- only
+        -- a count that genuinely sees the basic Swamp reaches 1.
         let gs0 = Setup.emptyGame S.bothPlayers
             (nightId, g1) = S.addCreature (Cards.nightmarePrinting cards) S.alice gs0
-            (_, g2) = S.addCreature (Cards.urborgPrinting cards) S.alice g1
-            (_, gs) = S.addCreature (Cards.bloodMoonPrinting cards) S.alice g2
-         in HU.assertEqual "Urborg is a bare Mountain now, no Swamps to count" (Just 0) (Projection.powerOf nightId gs),
-      HU.testCase "CR 613.7/305.7 the outcome does not flip with entry order (#11)" $
+            (_, g2) = S.addCreature (Cards.swampPrinting cards) S.alice g1
+            (_, g3) = S.addCreature (Cards.urborgPrinting cards) S.alice g2
+            (_, gs) = S.addCreature (Cards.bloodMoonPrinting cards) S.alice g3
+         in HU.assertEqual "Urborg is a bare Mountain now; only the basic Swamp remains" (Just 1) (Projection.powerOf nightId gs),
+      HU.testCase "CR 305.7 the outcome does not depend on entry order (#11)" $
         -- THE FALSIFIER for a naive per-layer TIMESTAMP-ONLY implementation: the
         -- previous test's order reversed -- Blood Moon enters FIRST, Urborg
         -- SECOND. A plain CR 613.7 timestamp fold would apply Urborg's LATER
@@ -346,16 +356,54 @@ tests cards =
         -- ability on CR 305.7 liveness read against BASE characteristics
         -- (Pawl.Projection.staticAbilitiesLive), which does not depend on
         -- timestamps at all, so the result matches the previous test regardless
-        -- of order. General same-layer applies-to dependency reordering (CR
-        -- 613.8b) is otherwise unimplemented (#11); this specific pair does not
+        -- of order.
+        --
+        -- This pair is NOT actually a CR 613.7 timestamp race: it is CR 613.8
+        -- dependency, and the dependency runs only one way, so order was never
+        -- going to matter here regardless of how Pawl is built. By CR 613.8a,
+        -- Urborg's AddLandSubtype effect DEPENDS ON Blood Moon's SetLandSubtype
+        -- effect -- applying Blood Moon changes the EXISTENCE of Urborg's
+        -- effect, because CR 305.7 strips every ability generated by a land's
+        -- own rules text (Urborg's Swamp-granting ability included) the moment
+        -- that land's subtype is SET to a basic type. Blood Moon's effect does
+        -- NOT depend on Urborg's: Blood Moon's filter excludes "basic" lands,
+        -- and "basic" is a supertype (CR 205.4a), which an AddLandSubtype
+        -- effect cannot add or remove (CR 305.7's own text: "doesn't add or
+        -- remove any card types ... or supertypes"), so nothing Urborg does can
+        -- change what Blood Moon's filter matches. Per CR 613.8b, a dependent
+        -- effect waits to apply until just after the effect(s) it depends on
+        -- have applied -- so Blood Moon applies first regardless of timestamps,
+        -- and Urborg's ability is already dead by the time it would otherwise
+        -- run. General same-layer applies-to dependency reordering (CR 613.8b)
+        -- is otherwise unimplemented (#11); this specific pair does not
         -- exercise that gap -- it is carried by the dedicated CR 305.7 liveness
         -- mechanism instead.
+        --
+        -- THE POSITIVE CONTROL, as in the previous test: a basic Swamp sits
+        -- alongside the other two permanents. It is immune to Blood Moon (which
+        -- excludes basic lands), so it stays a Swamp and keeps the count off a
+        -- vacuous 0.
         let gs0 = Setup.emptyGame S.bothPlayers
             (nightId, g1) = S.addCreature (Cards.nightmarePrinting cards) S.alice gs0
-            (_, g2) = S.addCreature (Cards.bloodMoonPrinting cards) S.alice g1
-            (_, gs) = S.addCreature (Cards.urborgPrinting cards) S.alice g2
-         in HU.assertEqual "still 0: order does not matter" (Just 0) (Projection.powerOf nightId gs),
+            (_, g2) = S.addCreature (Cards.swampPrinting cards) S.alice g1
+            (_, g3) = S.addCreature (Cards.bloodMoonPrinting cards) S.alice g2
+            (_, gs) = S.addCreature (Cards.urborgPrinting cards) S.alice g3
+         in HU.assertEqual "still 1: order does not matter" (Just 1) (Projection.powerOf nightId gs),
       HU.testCase "CR 604.3 Humility erases the CDA, and a Humility'd Nightmare is 1/1" $
+        -- NON-DISTINGUISHING BY CONSTRUCTION, same shape as the Tarmogoyf
+        -- Humility test above. Humility is layer 6 (LoseAllAbilities) AND
+        -- layer 7b (SetBasePowerToughness 1/1), and 7b would overwrite
+        -- whatever the CDA leaves behind regardless of whether 6 actually ran
+        -- first -- so the power/toughness assertions below cannot show that
+        -- layer 6 ran BEFORE layer 7a; only the CDA-clearing assertion can.
+        -- And even that one proves the clearing happened, not an ordering:
+        -- `characteristicPT` is populated once from the seed and is untouched
+        -- by SetBasePowerToughness (which writes only PC.power/PC.toughness),
+        -- so `Nothing` here means LoseAllAbilities actually cleared it, not
+        -- that some later step merely hid a CDA that was still there. With
+        -- layer 7b setting a P/T either way, no ordering between "cleared" and
+        -- "never ran" is directly observable from this fixture -- only the
+        -- clearing itself is, and that is all this test claims.
         let gs0 = Setup.emptyGame S.bothPlayers
             (_, g1) = S.addCreature (Cards.swampPrinting cards) S.alice gs0
             (_, g2) = S.addCreature (Cards.swampPrinting cards) S.alice g1
