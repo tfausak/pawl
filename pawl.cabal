@@ -67,6 +67,7 @@ library
     Pawl.Codec
     Pawl.Combat
     Pawl.Cost
+    Pawl.Count
     Pawl.Damage
     Pawl.Decide
     Pawl.Departure
@@ -245,6 +246,7 @@ test-suite pawl-test-suite
     Pawl.CopySpec
     Pawl.CoreSpec
     Pawl.CostSpec
+    Pawl.CountSpec
     Pawl.DamageSpec
     Pawl.DecideSpec
     Pawl.DepartureSpec

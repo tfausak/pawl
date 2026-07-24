@@ -23,9 +23,11 @@ import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Cost as Cost
+import qualified Pawl.Count as Count
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
@@ -49,7 +51,7 @@ import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Exclusion as Exclusion
 import qualified Pawl.Type.Expiry as Expiry
-import qualified Pawl.Type.Filter as Filter
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
@@ -946,7 +948,7 @@ anthemEmblemCard cards =
             { StaticAbility.affected =
                 Affected.Matching
                   Exclusion.IncludesSource
-                  (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]),
+                  (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
               StaticAbility.modification =
                 Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1)
             }
@@ -1060,3 +1062,26 @@ spellOnStack printing pid gs =
             GameState.stack = oid : GameState.stack gs2
           }
       )
+
+-- Shared by Pawl.CountSpec and Pawl.ConditionSpec: a stub ViewOf, so a
+-- Pawl.Count.evaluate fold is exercised apart from any real projection. Every
+-- id gets a view carrying exactly the card types, subtypes and controller it
+-- was registered with; an id absent from the table has no view.
+stubView ::
+  [(ObjectId.ObjectId, Set.Set CardType.CardType, Set.Set Subtype.Subtype, Maybe PlayerId.PlayerId)] ->
+  Count.ViewOf
+stubView table oid =
+  let match (o, _, _, _) = o == oid
+   in case filter match table of
+        (o, ts, ss, ctrl) : _ ->
+          Just
+            Filter.MkView
+              { Filter.cardTypes = ts,
+                Filter.supertypes = Set.empty,
+                Filter.colors = Set.empty,
+                Filter.subtypes = ss,
+                Filter.power = Nothing,
+                Filter.controller = ctrl,
+                Filter.identity = Just o
+              }
+        [] -> Nothing
