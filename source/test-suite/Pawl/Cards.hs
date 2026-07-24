@@ -10,8 +10,10 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text.IO as TextIO
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Registry as Registry.Type
 
 data Cards = MkCards
   { mountainPrinting :: Printing.Printing,
@@ -378,72 +380,95 @@ allPrintings cards =
     suddenImpactPrinting cards
   ]
 
-redDeck :: Cards -> Deck.Deck
-redDeck cards =
-  Deck.MkDeck $
+redDeck :: Registry.Type.Registry -> IO Deck.Deck
+redDeck registry = do
+  mountain <- Registry.printing registry "Mountain"
+  piker <- Registry.printing registry "Goblin Piker"
+  birdMaiden <- Registry.printing registry "Bird Maiden"
+  bolt <- Registry.printing registry "Lightning Bolt"
+  blaze <- Registry.printing registry "Blaze"
+  dragonFodder <- Registry.printing registry "Dragon Fodder"
+  chaosCharm <- Registry.printing registry "Chaos Charm"
+  pure . Deck.MkDeck $
     Map.fromList
-      [ (mountainPrinting cards, 36),
-        (pikerPrinting cards, 4),
-        (birdMaidenPrinting cards, 4),
-        (lightningBoltPrinting cards, 4),
+      [ (mountain, 36),
+        (piker, 4),
+        (birdMaiden, 4),
+        (bolt, 4),
         -- Blaze swaps in for four Pikers to keep the deck at 60 (so the CR 400.7
         -- conservation counts stay 120); the variable red cost gives the random
         -- red matchup its X-payment coverage (M4a spec §6).
-        (blazePrinting cards, 4),
+        (blaze, 4),
         -- Dragon Fodder swaps in for four Pikers to keep the deck at 60 (so the
         -- card-backed conservation count stays 120) and give random red games their
         -- token-churn coverage: creation from nothing and CR 704.5d cease-to-exist.
-        (dragonFodderPrinting cards, 4),
+        (dragonFodder, 4),
         -- Chaos Charm swaps in for four Bird Maidens to keep the deck at 60 (so
         -- the card-backed conservation count stays 120) and give random red games
         -- modal-choice coverage; Pikers and the remaining Bird Maidens stay on
         -- board so the damage/haste modes have legal targets.
-        (chaosCharmPrinting cards, 4)
+        (chaosCharm, 4)
       ]
 
-greenDeck :: Cards -> Deck.Deck
-greenDeck cards =
-  Deck.MkDeck $
+greenDeck :: Registry.Type.Registry -> IO Deck.Deck
+greenDeck registry = do
+  forest <- Registry.printing registry "Forest"
+  warMammoth <- Registry.printing registry "War Mammoth"
+  fog <- Registry.printing registry "Fog"
+  giantGrowth <- Registry.printing registry "Giant Growth"
+  serpentsGift <- Registry.printing registry "Serpent's Gift"
+  battlegrowth <- Registry.printing registry "Battlegrowth"
+  pure . Deck.MkDeck $
     Map.fromList
-      [ (forestPrinting cards, 36),
-        (warMammothPrinting cards, 8),
+      [ (forest, 36),
+        (warMammoth, 8),
         -- Fog swaps in for four War Mammoths to keep the deck at 60 (card-backed
         -- conservation stays 120) and give random green games combat-damage
         -- prevention coverage (CR 615).
-        (fogPrinting cards, 4),
-        (giantGrowthPrinting cards, 4),
-        (serpentsGiftPrinting cards, 4),
+        (fog, 4),
+        (giantGrowth, 4),
+        (serpentsGift, 4),
         -- Battlegrowth swaps in for four War Mammoths (deck stays 60; card-backed
         -- conservation stays 120) so random green games exercise +1/+1 counters.
-        (battlegrowthPrinting cards, 4)
+        (battlegrowth, 4)
       ]
 
 -- Blue, no creatures: Divination accelerates its own deck-out, Unsummon bounces
 -- the opponent's creatures, Tome Scour mills them. Gives bounce/draw/mill random
 -- coverage (M4b fast follow).
-blueDeck :: Cards -> Deck.Deck
-blueDeck cards =
-  Deck.MkDeck $
+blueDeck :: Registry.Type.Registry -> IO Deck.Deck
+blueDeck registry = do
+  island <- Registry.printing registry "Island"
+  unsummon <- Registry.printing registry "Unsummon"
+  divination <- Registry.printing registry "Divination"
+  tomeScour <- Registry.printing registry "Tome Scour"
+  pure . Deck.MkDeck $
     Map.fromList
-      [ (islandPrinting cards, 40),
-        (unsummonPrinting cards, 8),
-        (divinationPrinting cards, 8),
-        (tomeScourPrinting cards, 4)
+      [ (island, 40),
+        (unsummon, 8),
+        (divination, 8),
+        (tomeScour, 4)
       ]
 
-blackDeck :: Cards -> Deck.Deck
-blackDeck cards =
-  Deck.MkDeck $
+blackDeck :: Registry.Type.Registry -> IO Deck.Deck
+blackDeck registry = do
+  swamp <- Registry.printing registry "Swamp"
+  typhoidRats <- Registry.printing registry "Typhoid Rats"
+  drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+  murder <- Registry.printing registry "Murder"
+  mindRot <- Registry.printing registry "Mind Rot"
+  instillInfection <- Registry.printing registry "Instill Infection"
+  pure . Deck.MkDeck $
     Map.fromList
-      [ (swampPrinting cards, 36),
-        (typhoidRatsPrinting cards, 8),
+      [ (swamp, 36),
+        (typhoidRats, 8),
         -- Drudge Skeletons swaps in for four Typhoid Rats (deck stays 60) so random
         -- black games exercise regeneration against Murder's destroy (CR 701.19a).
-        (drudgeSkeletonsPrinting cards, 4),
+        (drudgeSkeletons, 4),
         -- Murder and Mind Rot give Destroy and Discard random-play coverage.
-        (murderPrinting cards, 4),
-        (mindRotPrinting cards, 4),
+        (murder, 4),
+        (mindRot, 4),
         -- Instill Infection swaps in for four Typhoid Rats (deck stays 60) so random
         -- black games exercise -1/-1 counters and the CR 704.5q annihilation SBA.
-        (instillInfectionPrinting cards, 4)
+        (instillInfection, 4)
       ]

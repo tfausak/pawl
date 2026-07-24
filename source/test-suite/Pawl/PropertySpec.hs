@@ -4,13 +4,13 @@ module Pawl.PropertySpec where
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Source as Source
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.QuickCheck as QC
@@ -69,24 +69,28 @@ universalInvariants gs =
         QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players gs)))
     ]
 
-propertyTests :: Cards.Cards -> Tasty.TestTree
-propertyTests cards =
+propertyTests :: Registry.Type.Registry -> Tasty.TestTree
+propertyTests registry =
   Tasty.localOption iterations
     . Tasty.testGroup "Properties"
     $ [ QC.testProperty "every matchup upholds every universal invariant" $
-          \s -> QC.conjoin (fmap (\m -> universalInvariants (S.runRandomGame m s)) (S.matchups cards)),
+          \s -> QC.ioProperty $ do
+            ms <- S.matchups registry
+            pure (QC.conjoin (fmap (\m -> universalInvariants (S.runRandomGame m s)) ms)),
         -- Durable structural property: with a deck that can only ever deck out (60
         -- basic lands, no spells, no attackers), every seed's game ends AND ends by
         -- a player drawing from an empty library (CR 704.5b) -- never by any other
         -- loss condition. Stays true no matter what cards later exist.
         QC.testProperty "a lands-only mirror always ends by deck-out" $
-          \s ->
-            let final = S.runRandomGame (S.landsOnly cards) s
-             in QC.property
-                  ( Maybe.isJust (GameState.result final)
-                      && not (Set.null (GameState.drewFromEmpty final))
-                  )
+          \s -> QC.ioProperty $ do
+            decks <- S.landsOnly registry
+            let final = S.runRandomGame decks s
+            pure $
+              QC.property
+                ( Maybe.isJust (GameState.result final)
+                    && not (Set.null (GameState.drewFromEmpty final))
+                )
       ]
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Properties" [propertyTests cards]
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry = Tasty.testGroup "Properties" [propertyTests registry]

@@ -15,7 +15,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Binding as Binding
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Decide as Decide
@@ -223,13 +222,15 @@ actionTests registry =
         HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice gs)
     ]
 
-goldfishResult :: Cards.Cards -> (Result.Result, GameState.GameState)
-goldfishResult cards =
-  Engine.runMatchPure S.identityAnswer (S.redRed cards)
+goldfishResult :: Registry.Type.Registry -> IO (Result.Result, GameState.GameState)
+goldfishResult registry = do
+  matchup <- S.redRed registry
+  pure (Engine.runMatchPure S.identityAnswer matchup)
 
-landState :: Cards.Cards -> GameState.GameState
-landState cards =
-  snd (Engine.runGamePure S.playLandAnswer (Setup.emptyGame S.bothPlayers) (Engine.playFrom (S.redRed cards)))
+landState :: Registry.Type.Registry -> IO GameState.GameState
+landState registry = do
+  matchup <- S.redRed registry
+  pure (snd (Engine.runGamePure S.playLandAnswer (Setup.emptyGame S.bothPlayers) (Engine.playFrom matchup)))
 
 -- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With one land play per
 -- turn (CR 305.2) a player can never have more lands out than turns taken.
@@ -238,50 +239,57 @@ turnsTaken pid gs =
   let total = fromIntegral (GameState.turnNumber gs)
    in if pid == S.alice then (total + 1) `div` 2 else total `div` 2
 
-engineTests :: Cards.Cards -> Tasty.TestTree
-engineTests cards =
+engineTests :: Registry.Type.Registry -> Tasty.TestTree
+engineTests registry =
   Tasty.testGroup
     "Engine"
-    [ HU.testCase "goldfish game ends with the starting player winning" $
-        HU.assertEqual "winner" (Result.Won S.alice) (fst (goldfishResult cards)),
-      HU.testCase "card conservation holds at end" $
-        HU.assertEqual "objects" 120 (Game.objectCount (snd (goldfishResult cards))),
-      HU.testCase "playing lands fills the battlefield"
-        . HU.assertBool "non-empty"
-        $ not (null (Game.zoneMembers Zone.Battlefield S.alice (landState cards))),
-      HU.testCase "land play conserves cards" $
-        HU.assertEqual "objects" 120 (Game.objectCount (landState cards)),
-      HU.testCase "CR 305.2 at most one land per turn"
-        . HU.assertBool "no double land plays"
-        $ length (Game.zoneMembers Zone.Battlefield S.alice (landState cards)) <= turnsTaken S.alice (landState cards)
-          && length (Game.zoneMembers Zone.Battlefield S.bob (landState cards)) <= turnsTaken S.bob (landState cards)
+    [ HU.testCase "goldfish game ends with the starting player winning" $ do
+        (result, _) <- goldfishResult registry
+        HU.assertEqual "winner" (Result.Won S.alice) result,
+      HU.testCase "card conservation holds at end" $ do
+        (_, gs) <- goldfishResult registry
+        HU.assertEqual "objects" 120 (Game.objectCount gs),
+      HU.testCase "playing lands fills the battlefield" $ do
+        gs <- landState registry
+        HU.assertBool "non-empty" (not (null (Game.zoneMembers Zone.Battlefield S.alice gs))),
+      HU.testCase "land play conserves cards" $ do
+        gs <- landState registry
+        HU.assertEqual "objects" 120 (Game.objectCount gs),
+      HU.testCase "CR 305.2 at most one land per turn" $ do
+        gs <- landState registry
+        HU.assertBool
+          "no double land plays"
+          ( length (Game.zoneMembers Zone.Battlefield S.alice gs) <= turnsTaken S.alice gs
+              && length (Game.zoneMembers Zone.Battlefield S.bob gs) <= turnsTaken S.bob gs
+          )
     ]
 
--- Run setup, then a scripted tweak, then whatever steps the (scenario cards) needs.
-scenario :: Cards.Cards -> Game.Type.Game () -> GameState.GameState
-scenario cards steps =
-  snd . Engine.runGamePure S.identityAnswer (Setup.emptyGame (fmap fst (S.redRed cards))) $ do
-    Setup.newGame (S.redRed cards)
+-- Run setup, then a scripted tweak, then whatever steps the scenario needs.
+scenario :: Registry.Type.Registry -> Game.Type.Game () -> IO GameState.GameState
+scenario registry steps = do
+  matchup <- S.redRed registry
+  pure . snd . Engine.runGamePure S.identityAnswer (Setup.emptyGame (fmap fst matchup)) $ do
+    Setup.newGame matchup
     steps
 
 -- Alice starts, so her turn-1 draw is skipped.
-aliceFirstDraw :: Cards.Cards -> GameState.GameState
-aliceFirstDraw cards = scenario cards S.drawStep
+aliceFirstDraw :: Registry.Type.Registry -> IO GameState.GameState
+aliceFirstDraw registry = scenario registry S.drawStep
 
 -- Bob is not the starting player, so his draw happens normally.
-bobFirstDraw :: Cards.Cards -> GameState.GameState
-bobFirstDraw cards = scenario cards $ do
+bobFirstDraw :: Registry.Type.Registry -> IO GameState.GameState
+bobFirstDraw registry = scenario registry $ do
   State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
   S.drawStep
 
-bobAfterCleanup :: Cards.Cards -> GameState.GameState
-bobAfterCleanup cards = scenario cards $ do
+bobAfterCleanup :: Registry.Type.Registry -> IO GameState.GameState
+bobAfterCleanup registry = scenario registry $ do
   State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
   S.drawStep
   Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)
 
-deckedOut :: Cards.Cards -> GameState.GameState
-deckedOut cards = scenario cards $ do
+deckedOut :: Registry.Type.Registry -> IO GameState.GameState
+deckedOut registry = scenario registry $ do
   State.modify' $ \gs ->
     gs
       { GameState.library = Map.insert S.alice Seq.empty (GameState.library gs),
@@ -340,8 +348,8 @@ askedPlayers mountain piker =
         (Program.foldProgramM recordingAnswer (State.runStateT Engine.priorityLoop gs))
         []
 
-ruleTests :: Registry.Type.Registry -> Cards.Cards -> Tasty.TestTree
-ruleTests registry cards =
+ruleTests :: Registry.Type.Registry -> Tasty.TestTree
+ruleTests registry =
   Tasty.testGroup
     "Rules"
     [ HU.testCase "CR 117.4 a full round of passes resolves the stack, not the step" $ do
@@ -365,20 +373,25 @@ ruleTests registry cards =
         piker <- Registry.printing registry "Goblin Piker"
         HU.assertEqual "alice twice, then bob" [S.alice, S.alice, S.bob] (take 3 (askedPlayers mountain piker)),
       HU.testCase "CR 103.7a starting player skips first draw" $ do
-        HU.assertEqual "hand" 7 (S.handSize S.alice (aliceFirstDraw cards))
-        HU.assertEqual "library" 53 (librarySize S.alice (aliceFirstDraw cards)),
+        gs <- aliceFirstDraw registry
+        HU.assertEqual "hand" 7 (S.handSize S.alice gs)
+        HU.assertEqual "library" 53 (librarySize S.alice gs),
       HU.testCase "CR 103.7a only the starting player skips" $ do
-        HU.assertEqual "hand" 8 (S.handSize S.bob (bobFirstDraw cards))
-        HU.assertEqual "library" 52 (librarySize S.bob (bobFirstDraw cards)),
-      HU.testCase "CR 514.2 discard to hand size" $
-        HU.assertEqual "hand" 7 (S.handSize S.bob (bobAfterCleanup cards)),
-      HU.testCase "CR 704.5b deck-out loses" $
+        gs <- bobFirstDraw registry
+        HU.assertEqual "hand" 8 (S.handSize S.bob gs)
+        HU.assertEqual "library" 52 (librarySize S.bob gs),
+      HU.testCase "CR 514.2 discard to hand size" $ do
+        gs <- bobAfterCleanup registry
+        HU.assertEqual "hand" 7 (S.handSize S.bob gs),
+      HU.testCase "CR 704.5b deck-out loses" $ do
+        gs <- deckedOut registry
         HU.assertEqual
           "alice departed"
           (Just (Status.Departed Departure.Lost))
-          (fmap Player.status (Map.lookup S.alice (GameState.players (deckedOut cards)))),
-      HU.testCase "CR 704.5b the survivor wins" $
-        HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result (deckedOut cards)),
+          (fmap Player.status (Map.lookup S.alice (GameState.players gs))),
+      HU.testCase "CR 704.5b the survivor wins" $ do
+        gs <- deckedOut registry
+        HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result gs),
       HU.testCase "CR 723.3/723.5: alice decides for bob, but bob's resources move" $ do
         -- bob's main phase, controlled by alice, with a Mountain and a Bolt.
         mountain <- Registry.printing registry "Mountain"
@@ -785,11 +798,11 @@ concedeTests registry =
         HU.assertEqual "the spell never left the stack" [spellId] (GameState.stack after)
     ]
 
-tests :: Registry.Type.Registry -> Cards.Cards -> Tasty.TestTree
-tests registry cards =
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry =
   Tasty.testGroup
     "Game"
-    [gameTests registry, actionTests registry, objectFactTests registry, engineTests cards, ruleTests registry cards, restartReentryTests registry, concedeTests registry]
+    [gameTests registry, actionTests registry, objectFactTests registry, engineTests registry, ruleTests registry, restartReentryTests registry, concedeTests registry]
 
 -- One Lightning Bolt in bob's hand.
 handBobBolt :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)

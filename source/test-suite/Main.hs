@@ -1,7 +1,6 @@
 import qualified Pawl.ActivateSpec as ActivateSpec
 import qualified Pawl.BindingSpec as BindingSpec
 import qualified Pawl.CardSpec as CardSpec
-import qualified Pawl.Cards as Cards
 import qualified Pawl.CardsSpec as CardsSpec
 import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.CodecSpec as CodecSpec
@@ -41,11 +40,10 @@ import qualified Test.Tasty as Tasty
 main :: IO ()
 main = do
   registry <- Registry.new "data/cards"
-  cards <- Cards.loadCards
-  Tasty.defaultMain (testTree registry cards)
+  Tasty.defaultMain (testTree registry)
 
-testTree :: Registry.Type.Registry -> Cards.Cards -> Tasty.TestTree
-testTree registry cards =
+testTree :: Registry.Type.Registry -> Tasty.TestTree
+testTree registry =
   Tasty.testGroup
     "pawl"
     [ CoreSpec.tests registry,
@@ -53,8 +51,8 @@ testTree registry cards =
       CardSpec.tests registry,
       CardsSpec.tests registry,
       TurnSpec.tests registry,
-      GameSpec.tests registry cards,
-      SetupSpec.tests cards,
+      GameSpec.tests registry,
+      SetupSpec.tests registry,
       MulliganSpec.tests registry,
       DamageSpec.tests registry,
       DecideSpec.tests,
@@ -62,11 +60,11 @@ testTree registry cards =
       EventSpec.tests registry,
       ExpirySpec.tests registry,
       ReplaySpec.tests registry,
-      PropertySpec.tests cards,
+      PropertySpec.tests registry,
       JsonSpec.tests,
       CodecSpec.tests registry,
       ManaSpec.tests registry,
-      CastSpec.tests registry cards,
+      CastSpec.tests registry,
       CostSpec.tests registry,
       CombatSpec.tests registry,
       CountSpec.tests registry,

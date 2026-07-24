@@ -6,7 +6,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Registry as Registry
@@ -155,15 +154,12 @@ combatReplayTests =
 -- The starting state, the game program, and a transcript recorded with
 -- playLandAnswer (whose choices differ from Replay's exhausted-transcript
 -- fallback, keeping the assertions below honest: the transcript has to
--- actually carry the decisions). Built from Cards.loadCards rather than the
--- Registry: S.redRed still needs the whole Cards.Cards record to build the
--- red mirror deck, and that fixture isn't migrated until Task 11 ("the
--- decks") -- see the batch's task report for the deviation.
-recordedGame :: IO (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
-recordedGame = do
-  cards <- Cards.loadCards
-  let start = Setup.emptyGame (fmap fst (S.redRed cards))
-      game = Engine.playFrom (S.redRed cards)
+-- actually carry the decisions).
+recordedGame :: Registry.Type.Registry -> IO (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
+recordedGame registry = do
+  matchup <- S.redRed registry
+  let start = Setup.emptyGame (fmap fst matchup)
+      game = Engine.playFrom matchup
       ((_, recorded), transcript) = Replay.record S.playLandAnswer start game
   pure (start, game, recorded, transcript)
 
@@ -172,13 +168,13 @@ replayTests registry =
   Tasty.testGroup
     "Replay"
     [ HU.testCase "replaying a recorded game reproduces the final state" $ do
-        (start, game, recorded, transcript) <- recordedGame
+        (start, game, recorded, transcript) <- recordedGame registry
         HU.assertEqual "final states equal" recorded (snd (Replay.replay transcript start game)),
       HU.testCase "the transcript is what carries the decisions" $ do
-        (start, game, recorded, _) <- recordedGame
+        (start, game, recorded, _) <- recordedGame registry
         HU.assertBool "empty log diverges" (recorded /= snd (Replay.replay [] start game)),
       HU.testCase "a recorded goldfish also replays" $ do
-        (start, game, _, _) <- recordedGame
+        (start, game, _, _) <- recordedGame registry
         let ((_, gf), gfLog) = Replay.record S.identityAnswer start game
         HU.assertEqual "goldfish" gf (snd (Replay.replay gfLog start game)),
       HU.testCase "a ChooseTargets answer round-trips through the transcript" $

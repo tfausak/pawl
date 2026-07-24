@@ -17,7 +17,6 @@ import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
@@ -87,15 +86,13 @@ sicknessTests registry =
         HU.assertEqual "still sick" (Just Sickness.Sick) (sicknessOf oid after)
     ]
 
--- S.redRed is a deck fixture that still takes the Cards record (Pawl.Support's
--- deck fixtures migrate in a later batch), so this -- and everything that
--- reads it -- keeps the Cards record alongside the registry.
-castGameState :: Cards.Cards -> GameState.GameState
-castGameState cards =
-  snd (Engine.runMatchPure S.castAnswer (S.redRed cards))
+castGameState :: Registry.Type.Registry -> IO GameState.GameState
+castGameState registry = do
+  matchup <- S.redRed registry
+  pure (snd (Engine.runMatchPure S.castAnswer matchup))
 
-castEngineTests :: Registry.Type.Registry -> Cards.Cards -> Tasty.TestTree
-castEngineTests registry cards =
+castEngineTests :: Registry.Type.Registry -> Tasty.TestTree
+castEngineTests registry =
   Tasty.testGroup
     "CastEngine"
     [ HU.testCase "a castable Piker is offered as a legal action" $ do
@@ -114,16 +111,20 @@ castEngineTests registry cards =
       -- life loss is a resolved Bolt: a player below 20 proves an instant was cast
       -- AND resolved (not merely discarded). Deck-robust where creature-presence
       -- was not.
-      HU.testCase "casting actually happens in a full game" $
+      HU.testCase "casting actually happens in a full game" $ do
+        gs <- castGameState registry
         HU.assertBool
           "a spell resolved and dealt damage"
-          (any (\pl -> Player.life pl < Setup.startingLife) (Map.elems (GameState.players (castGameState cards)))),
-      HU.testCase "a casting game still terminates" $
-        HU.assertBool "has result" (Maybe.isJust (GameState.result (castGameState cards))),
-      HU.testCase "a casting game conserves objects" $
-        HU.assertEqual "objects" 120 (Game.objectCount (castGameState cards)),
-      HU.testCase "CR 500.4 no mana floats at the end of a game" $
-        HU.assertEqual "pools empty" Map.empty (GameState.manaPool (castGameState cards))
+          (any (\pl -> Player.life pl < Setup.startingLife) (Map.elems (GameState.players gs))),
+      HU.testCase "a casting game still terminates" $ do
+        gs <- castGameState registry
+        HU.assertBool "has result" (Maybe.isJust (GameState.result gs)),
+      HU.testCase "a casting game conserves objects" $ do
+        gs <- castGameState registry
+        HU.assertEqual "objects" 120 (Game.objectCount gs),
+      HU.testCase "CR 500.4 no mana floats at the end of a game" $ do
+        gs <- castGameState registry
+        HU.assertEqual "pools empty" Map.empty (GameState.manaPool gs)
     ]
 
 -- A Piker cast and left on the stack, ready to resolve.
@@ -431,33 +432,35 @@ lastN :: Int -> [a] -> [a]
 lastN n xs = drop (length xs - n) xs
 
 -- Bob draws to eight, then discards at cleanup under discardLastAnswer.
-bobDiscardChoice :: Cards.Cards -> (GameState.GameState, [ObjectId.ObjectId])
-bobDiscardChoice cards =
+bobDiscardChoice :: Registry.Type.Registry -> IO (GameState.GameState, [ObjectId.ObjectId])
+bobDiscardChoice registry = do
+  matchup <- S.redRed registry
   let start = Setup.emptyGame S.bothPlayers
       steps = do
-        Setup.newGame (S.redRed cards)
+        Setup.newGame matchup
         State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
         S.drawStep
         beforeCleanup <- State.gets (Game.zoneMembers Zone.Hand S.bob)
         Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)
         pure beforeCleanup
       (held, final) = Engine.runGamePure discardLastAnswer start steps
-   in (final, held)
+  pure (final, held)
 
-discardTests :: Cards.Cards -> Tasty.TestTree
-discardTests cards =
+discardTests :: Registry.Type.Registry -> Tasty.TestTree
+discardTests registry =
   Tasty.testGroup
     "Discard"
-    [ HU.testCase "CR 514.2 discard trims to hand size" $
-        HU.assertEqual "hand" 7 (S.handSize S.bob (fst (bobDiscardChoice cards))),
-      HU.testCase "CR 514.2 the prompted choice is honored" $
-        let (final, held) = bobDiscardChoice cards
-            kept = Game.zoneMembers Zone.Hand S.bob final
+    [ HU.testCase "CR 514.2 discard trims to hand size" $ do
+        (final, _held) <- bobDiscardChoice registry
+        HU.assertEqual "hand" 7 (S.handSize S.bob final),
+      HU.testCase "CR 514.2 the prompted choice is honored" $ do
+        (final, held) <- bobDiscardChoice registry
+        let kept = Game.zoneMembers Zone.Hand S.bob final
             -- discardLastAnswer pitched the last card, so the first seven of the
             -- pre-cleanup hand are exactly what survives. Ids are stable here:
             -- the kept cards never changed zones.
             expected = take 7 held
-         in HU.assertEqual "kept the front seven" expected kept
+        HU.assertEqual "kept the front seven" expected kept
     ]
 
 -- Put one card of a printing into alice's hand over an existing board, in a main
@@ -591,11 +594,11 @@ modalCastTests registry =
         HU.assertBool "no mode is fillable" (not (Cast.castable S.alice oid gs0))
     ]
 
-tests :: Registry.Type.Registry -> Cards.Cards -> Tasty.TestTree
-tests registry cards =
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry =
   Tasty.testGroup
     "Cast"
-    [castTests registry, castEngineTests registry cards, stackTests registry, discardTests cards, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry]
+    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

@@ -103,23 +103,37 @@ bob = PlayerId.MkPlayerId 1
 bothPlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
 bothPlayers = alice NonEmpty.:| [bob]
 
-redRed :: Cards.Cards -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
-redRed cards = Setup.mirror (Cards.redDeck cards) bothPlayers
+redRed :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+redRed registry = do
+  deck <- Cards.redDeck registry
+  pure (Setup.mirror deck bothPlayers)
 
-greenBlack :: Cards.Cards -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
-greenBlack cards = (alice, Cards.greenDeck cards) NonEmpty.:| [(bob, Cards.blackDeck cards)]
+greenBlack :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+greenBlack registry = do
+  green <- Cards.greenDeck registry
+  black <- Cards.blackDeck registry
+  pure ((alice, green) NonEmpty.:| [(bob, black)])
 
-blueBlack :: Cards.Cards -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
-blueBlack cards = (alice, Cards.blueDeck cards) NonEmpty.:| [(bob, Cards.blackDeck cards)]
+blueBlack :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+blueBlack registry = do
+  blue <- Cards.blueDeck registry
+  black <- Cards.blackDeck registry
+  pure ((alice, blue) NonEmpty.:| [(bob, black)])
 
-matchups :: Cards.Cards -> [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
-matchups cards = [redRed cards, greenBlack cards, blueBlack cards]
+matchups :: Registry.Type.Registry -> IO [NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)]
+matchups registry = do
+  rr <- redRed registry
+  gb <- greenBlack registry
+  bb <- blueBlack registry
+  pure [rr, gb, bb]
 
 -- A 60-basic-land mirror: no spell can be cast and no creature can attack, so the
 -- only loss condition reachable is CR 704.5b deck-out. Used by the durable
 -- lands-only-decks property.
-landsOnly :: Cards.Cards -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck)
-landsOnly cards = Setup.mirror (Deck.MkDeck (Map.singleton (Cards.mountainPrinting cards) 60)) bothPlayers
+landsOnly :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+landsOnly registry = do
+  mountain <- Registry.printing registry "Mountain"
+  pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) bothPlayers)
 
 isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
