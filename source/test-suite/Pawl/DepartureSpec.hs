@@ -4,6 +4,7 @@ module Pawl.DepartureSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Departure as Departure
+import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Departure as Departure.Type
@@ -35,6 +36,23 @@ tests =
         let gs = (Setup.emptyGame S.bothPlayers) {GameState.result = Just Result.Drawn}
             after = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.alice)
          in HU.assertEqual "the first result stands" (Just Result.Drawn) (GameState.result after),
+      -- #142: the SAME precedence, through the OTHER door. Pawl.Sba settles its
+      -- own outcome at the end of a state-based-action pass; before this it used
+      -- the opposite order from leaveGame, so a pass could replace a result the
+      -- game had already reached. Set up a decided draw alongside a player who
+      -- would lose to CR 704.5a, so the pass computes a DIFFERENT outcome
+      -- (Won bob) and the two orderings disagree about which survives.
+      HU.testCase "CR 104.1 a state-based-action pass does not overwrite a decided result" $
+        let dying player = player {Player.life = 0}
+            gs =
+              (Setup.emptyGame S.bothPlayers)
+                { GameState.result = Just Result.Drawn,
+                  GameState.players = Map.adjust dying S.alice (GameState.players (Setup.emptyGame S.bothPlayers))
+                }
+            after = S.runPure S.identityAnswer gs Sba.performStateBasedActions
+         in do
+              HU.assertEqual "the decided draw stands" (Just Result.Drawn) (GameState.result after)
+              HU.assertEqual "alice still left the game (CR 704.5a is unaffected)" (Just (Status.Departed Departure.Type.Lost)) (statusOf S.alice after),
       HU.testCase "stillPlaying omits a departed player" $
         let gs = Setup.emptyGame S.bothPlayers
             after = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.alice)

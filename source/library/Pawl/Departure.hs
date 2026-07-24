@@ -52,8 +52,7 @@ outcomeAfterLeaving leaving gs = case stillPlaying gs of
 -- overwritten: CR 104.1 says the game already ended the moment a result was
 -- set, and CR 104.2a's "overrides all effects that would preclude that player
 -- from winning" describes the win itself, not a license to replace a result
--- the game already has. Pawl.Sba's pass currently orders it the other way
--- around; that divergence is tracked as #142.
+-- the game already has. Pawl.Sba's pass settles its own outcome the same way.
 leaveGame :: Departure -> PlayerId -> Game ()
 leaveGame reason pid = State.modify' $ \gs ->
   let departed = depart reason pid gs
