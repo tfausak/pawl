@@ -40,7 +40,8 @@ data Context = MkContext
   deriving (Eq, Show)
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
--- the object's identity, only the View's characteristics.
+-- which effect produced the Filter. Identity checks like IsSource consult the
+-- supplied Context, not information baked into the predicate.
 matches :: Context -> View -> Filter.Filter -> Bool
 matches context view predicate = case predicate of
   Filter.HasCardType t -> Set.member t (cardTypes view)
