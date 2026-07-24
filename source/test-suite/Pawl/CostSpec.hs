@@ -279,7 +279,7 @@ villageRitesTests cards =
       board :: Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
       board n =
         let base = S.landsInPlay (Cards.swampPrinting cards) 1
-            addPiker (ids, gs) _ = let (oid, gs') = S.addPiker cards S.alice gs in (ids ++ [oid], gs')
+            addPiker (ids, gs) _ = let (oid, gs') = S.addPiker cards S.alice gs in (ids <> [oid], gs')
             (pikers, withPikers) = List.foldl' addPiker ([], base) [1 .. n]
             (rites, gs1) = S.addHandCard (Cards.villageRitesPrinting cards) S.alice withPikers
             (_, gs2) = S.addLibraryCard (Cards.pikerPrinting cards) S.alice gs1
@@ -422,7 +422,7 @@ fireblastTests cards =
                   HU.assertEqual
                     "the printed one first"
                     [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, red, red]), Just (ManaCost.MkManaCost [])]
-                    (map Cost.Type.mana candidates),
+                    (fmap Cost.Type.mana candidates),
           -- CR 701.21a again, on the alternative's own component.
           HU.testCase "CR 701.21a three Mountains raise ChooseSacrifices; exactly two elide it" $
             let (three, threeMountains) = board 3 True

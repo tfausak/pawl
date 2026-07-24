@@ -105,11 +105,11 @@ m2aCardTests cards =
             HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness (card (Cards.glistenerElfPrinting cards)))
             HU.assertBool "has infect" (elem Keyword.Infect (Card.Type.keywords (card (Cards.glistenerElfPrinting cards))))
             HU.assertEqual "subtypes" (Set.fromList [Subtype.Phyrexian, Subtype.Elf, Subtype.Warrior]) (TypeLine.subtypes (Card.Type.typeLine (card (Cards.glistenerElfPrinting cards)))),
-          HU.testCase "all five are creatures and none is a land" $
-            HU.assertBool "creatures" $
-              all
-                (\(p, _) -> Card.isCreature (card p) && not (Card.isLand (card p)))
-                (S.m2aPrintings cards)
+          HU.testCase "all five are creatures and none is a land"
+            . HU.assertBool "creatures"
+            $ all
+              (\(p, _) -> Card.isCreature (card p) && not (Card.isLand (card p)))
+              (S.m2aPrintings cards)
         ]
 
 cardTests :: Cards.Cards -> Tasty.TestTree
@@ -120,12 +120,12 @@ cardTests cards =
         HU.assertEqual "name" (Text.pack "Mountain") (Card.Type.name (Printing.card (Cards.mountainPrinting cards))),
       HU.testCase "Mountain is a Land" $
         HU.assertBool "isLand" (Card.isLand (Printing.card (Cards.mountainPrinting cards))),
-      HU.testCase "Mountain has the Mountain subtype" $
-        HU.assertBool "subtype" $
-          Set.member Subtype.Mountain (TypeLine.subtypes (Card.Type.typeLine (Printing.card (Cards.mountainPrinting cards)))),
-      HU.testCase "Mountain type line contains Land" $
-        HU.assertBool "cardtype" $
-          Set.member CardType.Land (TypeLine.types (Card.Type.typeLine (Printing.card (Cards.mountainPrinting cards)))),
+      HU.testCase "Mountain has the Mountain subtype"
+        . HU.assertBool "subtype"
+        $ Set.member Subtype.Mountain (TypeLine.subtypes (Card.Type.typeLine (Printing.card (Cards.mountainPrinting cards)))),
+      HU.testCase "Mountain type line contains Land"
+        . HU.assertBool "cardtype"
+        $ Set.member CardType.Land (TypeLine.types (Card.Type.typeLine (Printing.card (Cards.mountainPrinting cards)))),
       -- CR 202.1: a land has no mana cost. Not a zero cost -- no cost at all.
       HU.testCase "Mountain has no mana cost" $
         HU.assertEqual "no cost" Nothing (Card.Type.manaCost (Printing.card (Cards.mountainPrinting cards))),
@@ -200,7 +200,7 @@ lintTests cards =
     [ HU.testCase "every mode's slot reads equal its declared slots" $
         let modeOffends m =
               let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
-                  reads_ = Set.unions (map Resolve.slotsOf (Foldable.toList (Mode.effects m)))
+                  reads_ = Set.unions (fmap Resolve.slotsOf (Foldable.toList (Mode.effects m)))
                in -- A slot DEFINED in this mode (a Create's minted token, or a
                   -- PlaySubgame's bound subgame outcome) and then read by a later
                   -- effect is legitimate dataflow, not an undeclared target -- the
@@ -212,7 +212,7 @@ lintTests cards =
               filter
                 (cardOffends . Printing.card)
                 (Cards.allPrintings cards)
-         in HU.assertEqual "no dangling or unused slots" [] (map (Card.Type.name . Printing.card) offenders),
+         in HU.assertEqual "no dangling or unused slots" [] (fmap (Card.Type.name . Printing.card) offenders),
       HU.testCase "the data/cards directory and Cards.allPrintings agree, by slug" $ do
         -- A hand-bumped "N printings" count never caught the real hazard: a
         -- data/cards/*.json file that nobody registers in Pawl.Cards is invisible
@@ -224,8 +224,8 @@ lintTests cards =
         -- silent.
         entries <- Directory.listDirectory "data/cards"
         let isJson name = Text.isSuffixOf (Text.pack ".json") (Text.pack name)
-            onDisk = Set.fromList (map (Text.dropEnd 5 . Text.pack) (filter isJson entries))
-            registered = Set.fromList (map (Codec.slugify . Card.Type.name . Printing.card) (Cards.allPrintings cards))
+            onDisk = Set.fromList (fmap (Text.dropEnd 5 . Text.pack) (filter isJson entries))
+            registered = Set.fromList (fmap (Codec.slugify . Card.Type.name . Printing.card) (Cards.allPrintings cards))
             unregistered = Set.difference onDisk registered
             missingFiles = Set.difference registered onDisk
         HU.assertEqual "data/cards files with no registered printing (each name IS the offender)" Set.empty unregistered
@@ -251,31 +251,31 @@ lintTests cards =
               filter
                 (\p -> readsX (Printing.card p) /= hasVariable (Printing.card p))
                 (Cards.allPrintings cards)
-         in HU.assertEqual "X read iff {X} declared" [] (map (Card.Type.name . Printing.card) offenders),
+         in HU.assertEqual "X read iff {X} declared" [] (fmap (Card.Type.name . Printing.card) offenders),
       HU.testCase "the reserved X slot is never a declared target slot" $
         let offenders =
               filter
                 (Map.member Binding.variableX . Card.allTargetSpecs . Printing.card)
                 (Cards.allPrintings cards)
-         in HU.assertEqual "no card names the X slot" [] (map (Card.Type.name . Printing.card) offenders),
+         in HU.assertEqual "no card names the X slot" [] (fmap (Card.Type.name . Printing.card) offenders),
       HU.testCase "the reserved modes slot is never a declared target slot" $
         let offenders =
               filter
                 (Map.member Binding.chosenModes . Card.allTargetSpecs . Printing.card)
                 (Cards.allPrintings cards)
-         in HU.assertEqual "no card names the modes slot" [] (map (Card.Type.name . Printing.card) offenders),
+         in HU.assertEqual "no card names the modes slot" [] (fmap (Card.Type.name . Printing.card) offenders),
       HU.testCase "the reserved trigger-source slot is never a declared target slot" $
         let offenders =
               filter
                 (Map.member Binding.triggerSource . Card.allTargetSpecs . Printing.card)
                 (Cards.allPrintings cards)
-         in HU.assertEqual "no card names the self slot" [] (map (Card.Type.name . Printing.card) offenders),
+         in HU.assertEqual "no card names the self slot" [] (fmap (Card.Type.name . Printing.card) offenders),
       HU.testCase "the reserved you slot is never a declared target slot" $
         let offenders =
               filter
                 (Map.member Binding.you . Card.allTargetSpecs . Printing.card)
                 (Cards.allPrintings cards)
-         in HU.assertEqual "no card names the you slot" [] (map (Card.Type.name . Printing.card) offenders),
+         in HU.assertEqual "no card names the you slot" [] (fmap (Card.Type.name . Printing.card) offenders),
       HU.testCase "Lightning Bolt is in the red pool with one AnyTarget slot" $
         let card = Printing.card (Cards.lightningBoltPrinting cards)
          in do
@@ -302,16 +302,16 @@ lintTests cards =
         let cardOffends card =
               Resolve.armedAbilities (Card.allEffects card) /= Map.keysSet (Card.Type.delayedAbilities card)
             offenders = filter (cardOffends . Printing.card) (Cards.allPrintings cards)
-         in HU.assertEqual "no dangling or unused delayed abilities" [] (map (Card.Type.name . Printing.card) offenders),
+         in HU.assertEqual "no dangling or unused delayed abilities" [] (fmap (Card.Type.name . Printing.card) offenders),
       -- Every slot a delayed ability READS must be one the arming card DEFINES:
       -- the reserved trigger-source slot, or a token bound by a Create.
       HU.testCase "every slot a delayed ability reads is bound by its card" $
         let cardOffends card =
               let available = Set.insert Binding.triggerSource (Resolve.definedSlots (Card.allEffects card))
-                  wanted = Set.unions (map Resolve.slotsOf (Card.delayedEffects card))
+                  wanted = Set.unions (fmap Resolve.slotsOf (Card.delayedEffects card))
                in not (Set.isSubsetOf wanted available)
             offenders = filter (cardOffends . Printing.card) (Cards.allPrintings cards)
-         in HU.assertEqual "no dangling delayed-ability slot" [] (map (Card.Type.name . Printing.card) offenders),
+         in HU.assertEqual "no dangling delayed-ability slot" [] (fmap (Card.Type.name . Printing.card) offenders),
       -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
       -- of them. Rejected rather than guessed (#53).
       HU.testCase "no Create binds a slot while making more than one token" $
@@ -319,7 +319,7 @@ lintTests cards =
               filter
                 (Resolve.bindsSeveralTokens . Card.allEffects . Printing.card)
                 (Cards.allPrintings cards)
-         in HU.assertEqual "no multi-token binding" [] (map (Card.Type.name . Printing.card) offenders)
+         in HU.assertEqual "no multi-token binding" [] (fmap (Card.Type.name . Printing.card) offenders)
     ]
 
 m2bCardTests :: Cards.Cards -> Tasty.TestTree

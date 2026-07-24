@@ -105,7 +105,7 @@ tests cards =
                   HU.assertEqual
                     "one enters-battlefield event emitted"
                     [Zone.Battlefield]
-                    (map ZoneChange.to (S.zoneChangesOf after))
+                    (fmap ZoneChange.to (S.zoneChangesOf after))
                 _ -> HU.assertFailure "expected exactly one token",
       HU.testCase "CR 614 + 704.5d a token dies under Rest in Peace: exiled, then ceases" $
         let base = Setup.emptyGame S.bothPlayers
@@ -156,7 +156,7 @@ tests cards =
             -- Bounce to hand: changeZone mints a new incarnation (CR 400.7).
             bounced = S.runPure S.identityAnswer withCounter (Event.changeZone oid Zone.Hand)
             -- Total (no `head`): map over the hand zone; expect exactly one card, empty.
-            handCounters = map (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h bounced)) (Game.zoneMembers Zone.Hand S.bob bounced)
+            handCounters = fmap (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h bounced)) (Game.zoneMembers Zone.Hand S.bob bounced)
          in do
               HU.assertEqual "counter present before the move" (Map.fromList [(CounterKind.PlusOnePlusOne, 2)]) (maybe Map.empty Object.counters (Game.lookupObject oid withCounter))
               HU.assertEqual "the one new incarnation in hand has no counters" [Map.empty] handCounters,

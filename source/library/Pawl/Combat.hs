@@ -201,7 +201,7 @@ declareAttackers pid = do
               if Projection.hasKeyword Keyword.Vigilance oid g
                 then g
                 else g {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects g)}
-            recorded = Map.fromList (map (\oid -> (oid, AttackTarget.OfPlayer defender)) attacking)
+            recorded = Map.fromList (fmap (\oid -> (oid, AttackTarget.OfPlayer defender)) attacking)
             attach g = g {GameState.combat = (GameState.combat g) {Combat.attackers = recorded}}
         State.modify' (\g -> attach (List.foldl' tapIt g attacking))
 
@@ -211,8 +211,9 @@ declareBlockers :: Game ()
 declareBlockers = do
   start <- State.get
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
-  Monad.unless (null attacking) $
-    Monad.forM_ (defendingPlayers start) $ \pid -> do
+  Monad.unless (null attacking)
+    . Monad.forM_ (defendingPlayers start)
+    $ \pid -> do
       gs <- State.get
       let candidates = legalBlockers pid gs
       Monad.unless (null candidates) $ do

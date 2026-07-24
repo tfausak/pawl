@@ -119,7 +119,7 @@ cleanupTests cards =
             after = Expiry.dropAtCleanup gs1
          in do
               HU.assertEqual "two stored before" 2 (length (GameState.continuousEffects gs1))
-              HU.assertEqual "one survives" [Expiry.Type.Never] (map ContinuousEffect.expiry (GameState.continuousEffects after)),
+              HU.assertEqual "one survives" [Expiry.Type.Never] (fmap ContinuousEffect.expiry (GameState.continuousEffects after)),
       HU.testCase "CR 514.2 the same sweep drops an AtCleanup floating replacement" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (oid, gs1) = S.addPiker cards S.alice gs0
@@ -127,7 +127,7 @@ cleanupTests cards =
             after = Expiry.dropAtCleanup shielded
          in do
               HU.assertEqual "one shield before" 1 (length (GameState.replacements shielded))
-              HU.assertEqual "none after" [] (map ActiveReplacement.expiry (GameState.replacements after))
+              HU.assertEqual "none after" [] (fmap ActiveReplacement.expiry (GameState.replacements after))
     ]
 
 -- A stored continuous effect whose expiry is a live condition over `src`,

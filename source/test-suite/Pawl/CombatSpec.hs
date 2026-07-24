@@ -82,7 +82,7 @@ combatDamageTests cards =
         let (gs, _, theirs) = S.combatBoard cards 1 2
             split :: Prompt.Prompt r -> r
             split p = case p of
-              Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (map (\r -> (r, 1)) (filter S.isCreatureRecipient (Map.keys thresholds)))
+              Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (fmap (\r -> (r, 1)) (filter S.isCreatureRecipient (Map.keys thresholds)))
               _ -> S.aggressiveAnswer p
             after = S.settleSba (S.fightWith split gs)
          in do
@@ -105,7 +105,7 @@ combatDamageTests cards =
         let (gs, _, _) = S.combatBoard cards 1 2
             cheat :: Prompt.Prompt r -> r
             cheat p = case p of
-              Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (map (\r -> (r, 99)) (filter S.isCreatureRecipient (Map.keys thresholds)))
+              Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (fmap (\r -> (r, 99)) (filter S.isCreatureRecipient (Map.keys thresholds)))
               _ -> S.aggressiveAnswer p
             after = S.settleSba (S.fightWith cheat gs)
          in HU.assertEqual "both blockers survive" 2 (S.creaturesInPlay S.bob after),
@@ -183,8 +183,9 @@ declareTests cards =
             arrived = justArrived gs
             sameTurn = snd (Engine.runGamePure S.aggressiveAnswer arrived (Combat.declareAttackers S.alice))
             nextTurn =
-              snd $
-                Engine.runGamePure S.aggressiveAnswer arrived $ do
+              snd
+                . Engine.runGamePure S.aggressiveAnswer arrived
+                $ do
                   Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap)
                   Combat.declareAttackers S.alice
          in do
@@ -230,7 +231,7 @@ tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 justArrived :: GameState.GameState -> GameState.GameState
 justArrived gs =
   let sicken o = if Object.owner o == S.alice then o {Object.sickness = Sickness.Sick} else o
-   in gs {GameState.objects = Map.map sicken (GameState.objects gs)}
+   in gs {GameState.objects = fmap sicken (GameState.objects gs)}
 
 hasteTests :: Cards.Cards -> Tasty.TestTree
 hasteTests cards =
@@ -551,13 +552,13 @@ keywordTests cards =
       carriesOnly (printing, keyword) =
         let (oid, gs) = S.addCreature printing S.alice gs0
             name = Text.unpack (Card.Type.name (Printing.card printing))
-         in HU.testCase (name ++ " carries exactly " ++ show keyword) $ do
+         in HU.testCase (name <> " carries exactly " <> show keyword) $ do
               HU.assertEqual "keywords" (Set.singleton keyword) (Projection.keywordsOf oid gs)
               HU.assertBool "hasKeyword" (Projection.hasKeyword keyword oid gs)
    in Tasty.testGroup
         "Keyword"
-        ( map carriesOnly (S.m2aPrintings cards)
-            ++ [ HU.testCase "a Piker has no keywords" $
+        ( fmap carriesOnly (S.m2aPrintings cards)
+            <> [ HU.testCase "a Piker has no keywords" $
                    let (oid, gs) = S.addPiker cards S.alice gs0
                     in do
                          HU.assertEqual "none" Set.empty (Projection.keywordsOf oid gs)

@@ -82,8 +82,8 @@ costsFor oid gs = case Game.lookupObject oid gs of
           -- applies. The increases and reductions are Pawl.Cost.total's job,
           -- called on whichever candidate is chosen.
           withAdditional alternative =
-            alternative {Cost.components = Cost.components alternative ++ Card.additionalCosts card}
-       in printed : map withAdditional (Card.alternativeCosts card)
+            alternative {Cost.components = Cost.components alternative <> Card.additionalCosts card}
+       in printed : fmap withAdditional (Card.alternativeCosts card)
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
     Source.OfTrigger _ _ -> []
@@ -324,10 +324,10 @@ applyAdjustments adjustments cost =
         -- (retained, not stripped) so that if it ever were reachable, a bare
         -- {X} would still be treated as typed and survive the filter below.
         ManaSymbol.Variable -> True
-      raised = sum (map genericOf symbols) + sum increases
+      raised = sum (fmap genericOf symbols) + sum increases
       taken = sum reductions
       -- Natural subtraction is PARTIAL (it throws on underflow), so the CR
       -- 601.2f floor is also what keeps this total.
       lowered = if raised >= taken then raised - taken else 0
       leading = if lowered == 0 then [] else [ManaSymbol.Generic lowered]
-   in ManaCost.MkManaCost (leading ++ filter isTyped symbols)
+   in ManaCost.MkManaCost (leading <> filter isTyped symbols)

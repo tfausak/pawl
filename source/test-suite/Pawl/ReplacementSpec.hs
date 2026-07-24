@@ -105,7 +105,7 @@ counterBoard :: Cards.Cards -> [Printing.Printing] -> [Printing.Printing] -> (Ga
 counterBoard cards mine theirs =
   let addAll pid ps gs =
         List.foldl'
-          (\(ids, g) p -> let (oid, g1) = S.addCreature p pid g in (ids ++ [oid], g1))
+          (\(ids, g) p -> let (oid, g1) = S.addCreature p pid g in (ids <> [oid], g1))
           ([], gs)
           ps
       (ours, gs1) = addAll S.alice mine (S.landsInPlay (Cards.forestPrinting cards) 1)
@@ -119,7 +119,7 @@ counterBoard cards mine theirs =
 raceAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 raceAnswer preferred victim p = case p of
   Prompt.ChooseReplacement _ _ sources -> maybe 0 fromIntegral (List.elemIndex preferred sources)
-  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
   _ -> S.identityAnswer p
 
 countersOn :: CounterKind.CounterKind -> ObjectId.ObjectId -> GameState.GameState -> Natural.Natural
@@ -142,7 +142,7 @@ copyOf wanted p = case p of
 blueBoard :: Cards.Cards -> Int -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId])
 blueBoard cards n hand =
   let base = S.landsInPlay (Cards.islandPrinting cards) n
-      addOne (ids, g) p = let (oid, g1) = S.addHandCard p S.alice g in (ids ++ [oid], g1)
+      addOne (ids, g) p = let (oid, g1) = S.addHandCard p S.alice g in (ids <> [oid], g1)
       (held, gs) = List.foldl' addOne ([], base) hand
    in ( gs
           { GameState.phase = Phase.PrecombatMain,

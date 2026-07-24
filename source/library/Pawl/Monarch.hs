@@ -130,7 +130,7 @@ placeInherent controller ability provided = do
   let (abilId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       modeCount = Seq.length (Modal.modes (TriggeredAbility.modal ability))
-      allModes = Set.fromList (map (ModeIndex.MkModeIndex . fromIntegral) [0 .. modeCount - 1])
+      allModes = Set.fromList (fmap (ModeIndex.MkModeIndex . fromIntegral) [0 .. modeCount - 1])
       bindings = Binding.setYou controller (Map.union provided (Binding.fromChoices Map.empty Map.empty Nothing allModes))
       obj =
         Object.MkObject

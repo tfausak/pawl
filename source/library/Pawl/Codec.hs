@@ -103,13 +103,13 @@ decodeNullary tyName table value = do
     Nothing -> Left (Text.pack "unknown " <> tyName <> Text.pack ": " <> t)
 
 listTo :: (a -> Value) -> [a] -> Value
-listTo f = Array . map f
+listTo f = Array . fmap f
 
 listFrom :: (Value -> Either Text a) -> Value -> Either Text [a]
 listFrom f value = Json.asArray value >>= mapM f
 
 seqTo :: (a -> Value) -> Seq.Seq a -> Value
-seqTo f = Array . map f . Foldable.toList
+seqTo f = Array . fmap f . Foldable.toList
 
 seqFrom :: (Value -> Either Text a) -> Value -> Either Text (Seq.Seq a)
 seqFrom f value = Seq.fromList <$> listFrom f value
@@ -498,8 +498,8 @@ filterToJson filter_ = case filter_ of
   Filter.HasSubtype s -> Json.tagged (Text.pack "HasSubtype") (Just (subtypeToJson s))
   Filter.PowerAtLeast n -> Json.tagged (Text.pack "PowerAtLeast") (Just (Json.jInt n))
   Filter.ControlledBy r -> Json.tagged (Text.pack "ControlledBy") (Just (playerRelationToJson r))
-  Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (map filterToJson fs)))
-  Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (map filterToJson fs)))
+  Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (fmap filterToJson fs)))
+  Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (fmap filterToJson fs)))
   Filter.Not f -> Json.tagged (Text.pack "Not") (Just (filterToJson f))
 
 jsonToFilter :: Value -> Either Text Filter.Filter
@@ -1369,7 +1369,7 @@ triggeredAbilityToJson ta =
     ( [ (Text.pack "condition", triggerConditionToJson (TriggeredAbility.condition ta)),
         (Text.pack "modal", modalToJson (TriggeredAbility.modal ta))
       ]
-        ++ ( case TriggeredAbility.intervening ta of
+        <> ( case TriggeredAbility.intervening ta of
                Nothing -> []
                Just c -> [(Text.pack "intervening", stateConditionToJson c)]
            )
@@ -1564,27 +1564,27 @@ cardToJson c =
         (Text.pack "triggeredAbilities", listTo triggeredAbilityToJson (CardT.triggeredAbilities c)),
         (Text.pack "castingPermissions", listTo castingPermissionToJson (CardT.castingPermissions c))
       ]
-        ++ ( if Set.null (CardT.colorIndicator c)
+        <> ( if Set.null (CardT.colorIndicator c)
                then []
                else [(Text.pack "colorIndicator", setTo colorToJson (CardT.colorIndicator c))]
            )
-        ++ ( case CardT.characteristicPT c of
+        <> ( case CardT.characteristicPT c of
                Nothing -> []
                Just q -> [(Text.pack "characteristicPT", quantityToJson q)]
            )
-        ++ ( if Map.null (CardT.delayedAbilities c)
+        <> ( if Map.null (CardT.delayedAbilities c)
                then []
                else [(Text.pack "delayedAbilities", delayedAbilitiesToJson (CardT.delayedAbilities c))]
            )
-        ++ ( if null (CardT.playerAbilities c)
+        <> ( if null (CardT.playerAbilities c)
                then []
                else [(Text.pack "playerAbilities", listTo playerStaticAbilityToJson (CardT.playerAbilities c))]
            )
-        ++ ( if null (CardT.additionalCosts c)
+        <> ( if null (CardT.additionalCosts c)
                then []
                else [(Text.pack "additionalCosts", listTo costComponentToJson (CardT.additionalCosts c))]
            )
-        ++ ( if null (CardT.alternativeCosts c)
+        <> ( if null (CardT.alternativeCosts c)
                then []
                else [(Text.pack "alternativeCosts", listTo costToJson (CardT.alternativeCosts c))]
            )

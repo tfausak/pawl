@@ -81,7 +81,7 @@ alwaysPass p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
@@ -111,7 +111,7 @@ castAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
@@ -128,7 +128,7 @@ fightAnswer p = case p of
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
-    a : _ -> Map.fromList (map (\b -> (b, a)) mine)
+    a : _ -> Map.fromList (fmap (\b -> (b, a)) mine)
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
@@ -142,7 +142,7 @@ fightAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates

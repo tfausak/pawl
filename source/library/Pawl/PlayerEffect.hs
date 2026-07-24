@@ -81,7 +81,7 @@ applying pid gs =
               -- loses its rules-text abilities, this one included (Blood Moon on
               -- Reliquary Tower).
               if null setEffs || Projection.liveGiven setEffs Set.empty oid gs
-                then map (\ability -> (controller, PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)) abilities
+                then fmap (\ability -> (controller, PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)) abilities
                 else []
       printed = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       -- CR 611.2c: the stored carrier. Its controller is read off the record and
@@ -92,10 +92,10 @@ applying pid gs =
           ActivePlayerEffect.scope active,
           ActivePlayerEffect.effect active
         )
-      stored = map storedOne (GameState.playerEffects gs)
+      stored = fmap storedOne (GameState.playerEffects gs)
       keep (controller, scope, _) = inScope pid controller scope
       effectOf (_, _, effect) = effect
-   in map effectOf (filter keep (printed ++ stored))
+   in fmap effectOf (filter keep (printed <> stored))
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over P4's
 -- whole log, which is exactly "this turn" because Engine.handoffTurn clears it at

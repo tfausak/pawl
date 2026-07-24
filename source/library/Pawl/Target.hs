@@ -73,24 +73,24 @@ basePool pool gs = case pool of
 creatureRecipients :: GameState -> Set Recipient
 creatureRecipients gs =
   let isCreatureId oid = Projection.isCreatureOf oid gs
-   in Set.fromList $
-        map Recipient.ToCreature $
-          concatMap
-            (filter isCreatureId . (\pid -> Game.zoneMembers Zone.Battlefield pid gs))
-            (Departure.stillPlaying gs)
+   in Set.fromList
+        . fmap Recipient.ToCreature
+        $ concatMap
+          (filter isCreatureId . (\pid -> Game.zoneMembers Zone.Battlefield pid gs))
+          (Departure.stillPlaying gs)
 
 -- CR 115: players still in the game, tagged ToPlayer.
 playerRecipients :: GameState -> Set Recipient
-playerRecipients gs = Set.fromList (map Recipient.ToPlayer (Departure.stillPlaying gs))
+playerRecipients gs = Set.fromList (fmap Recipient.ToPlayer (Departure.stillPlaying gs))
 
 -- CR 110.1: permanents on the battlefield, tagged ToObject.
 permanentRecipients :: GameState -> Set Recipient
-permanentRecipients gs = Set.fromList (map Recipient.ToObject (Set.toList (GameState.battlefield gs)))
+permanentRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameState.battlefield gs)))
 
 -- CR 112.1: only spells (Source.OfCard) on the stack, tagged ToObject; abilities
 -- and permanents are excluded by Game.isSpell.
 spellRecipients :: GameState -> Set Recipient
-spellRecipients gs = Set.fromList (map Recipient.ToObject (filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)))
+spellRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)))
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is
@@ -100,7 +100,7 @@ stillLegal source recipient spec gs = Set.member recipient (legalRecipients sour
 
 -- One legal set per named slot; casting prompts with exactly this map.
 legalSets :: ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
-legalSets source specs gs = Map.map (\spec -> legalRecipients source spec gs) specs
+legalSets source specs gs = fmap (\spec -> legalRecipients source spec gs) specs
 
 -- CR 601.2c "another": a slot excludes the targeting source from its legal set
 -- iff its Exclusion says so ("another nonland permanent", Aether Channeler).
@@ -120,7 +120,7 @@ selfExcludes spec =
 legalSetsExcluding :: ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
 legalSetsExcluding source specs gs =
   let drop1 spec s = if selfExcludes spec then Set.delete (Recipient.ToObject source) s else s
-   in Map.map (\spec -> drop1 spec (legalRecipients source spec gs)) specs
+   in fmap (\spec -> drop1 spec (legalRecipients source spec gs)) specs
 
 -- CR 700.2a: the mode indices all of whose target slots have a legal recipient
 -- (a mode with no slots is trivially fillable). Self-exclusion ("another") is

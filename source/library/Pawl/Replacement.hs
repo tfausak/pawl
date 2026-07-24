@@ -196,8 +196,8 @@ collect gs =
             ReplacementCandidate.effect = ActiveReplacement.effect active,
             ReplacementCandidate.source = ActiveReplacement.source active
           }
-   in map fromPermanent (Projection.replacementsAffecting gs)
-        ++ map fromFloating (GameState.replacements gs)
+   in fmap fromPermanent (Projection.replacementsAffecting gs)
+        <> fmap fromFloating (GameState.replacements gs)
 
 applicable :: GameState -> ProposedEvent -> [ReplacementCandidate]
 applicable gs event = filter (applies gs event) (collect gs)
@@ -282,9 +282,9 @@ scale s n = case s of
 -- from Other (the largest) so it needs no partial `minimum`.
 highestBucket :: [ReplacementCandidate] -> [ReplacementCandidate]
 highestBucket candidates =
-  let bucketed = map (\c -> (bucketOf (ReplacementCandidate.effect c), c)) candidates
-      best = List.foldl' min ReplacementBucket.Other (map fst bucketed)
-   in map snd (filter (\entry -> fst entry == best) bucketed)
+  let bucketed = fmap (\c -> (bucketOf (ReplacementCandidate.effect c), c)) candidates
+      best = List.foldl' min ReplacementBucket.Other (fmap fst bucketed)
+   in fmap snd (filter (\entry -> fst entry == best) bucketed)
 
 -- CR 616.1a-e: which bucket an effect falls in.
 bucketOf :: ReplacementEffect -> ReplacementBucket
@@ -349,7 +349,7 @@ choose gs event candidates = case candidates of
         Nothing -> pure (Just first)
         Just pid -> do
           let decider = Decide.deciderFor pid gs
-          answer <- Trans.lift (Program.prompt (Prompt.ChooseReplacement decider pid (map ReplacementCandidate.source candidates)))
+          answer <- Trans.lift (Program.prompt (Prompt.ChooseReplacement decider pid (fmap ReplacementCandidate.source candidates)))
           -- Reject-not-repair, as payment and Engine.permute already do: an
           -- out-of-range index leaves the canonical first standing rather than
           -- dropping the event or crashing.

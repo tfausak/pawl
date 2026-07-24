@@ -64,7 +64,7 @@ import qualified Test.Tasty.HUnit as HU
 chooseModeAt :: ModeIndex.ModeIndex -> Recipient.Recipient -> Prompt.Prompt r -> r
 chooseModeAt idx recipient p = case p of
   Prompt.ChooseModes {} -> Set.singleton idx
-  Prompt.ChooseTargets _ _ _ sets -> Map.map (const recipient) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const recipient) sets
   _ -> S.identityAnswer p
 
 -- Rejects a ChooseModes prompt outright -- used to prove a non-modal cast

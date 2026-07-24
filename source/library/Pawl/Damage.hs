@@ -43,7 +43,7 @@ import qualified Pawl.Type.Zone as Zone
 removeAllDamage :: GameState -> GameState
 removeAllDamage gs =
   let clear obj = obj {Object.damage = 0}
-   in gs {GameState.objects = Map.map clear (GameState.objects gs)}
+   in gs {GameState.objects = fmap clear (GameState.objects gs)}
 
 -- CR 510.1e / 702.19b, as a pure predicate over the whole assignment. Legal iff it
 -- totals power, uses only legal recipients, and -- the trample implication -- the
@@ -133,11 +133,11 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
               Just pid -> do
                 let decider = Decide.deciderFor pid gs
                     thresholdOf b = if trample then blockerThreshold gs attacker b else 0
-                    blockerEntries = map (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
+                    blockerEntries = fmap (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
                     defenderEntry = case target of
                       AttackTarget.OfPlayer defender ->
                         if trample then [(Recipient.ToPlayer defender, 0 :: Natural)] else []
-                    thresholds = Map.fromList (blockerEntries ++ defenderEntry)
+                    thresholds = Map.fromList (blockerEntries <> defenderEntry)
                 chosen <-
                   Trans.lift
                     (Program.prompt (Prompt.AssignCombatDamage decider pid attacker thresholds power))
@@ -147,7 +147,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                     positive (_, n) = n > 0
                 pure
                   ( if legalAssignment thresholds power chosen
-                      then map toEvent (filter positive (Map.toList chosen))
+                      then fmap toEvent (filter positive (Map.toList chosen))
                       else []
                   )
 
@@ -168,10 +168,10 @@ gatherCombatDamage assigns = do
   gs <- State.get
   let combat = GameState.combat gs
       attackers = filter (assigns . fst) (Map.toList (Combat.Type.attackers combat))
-      blockers = Map.toList (Map.map (Set.filter assigns) (Combat.Type.blockers combat))
+      blockers = Map.toList (fmap (Set.filter assigns) (Combat.Type.blockers combat))
   parts <- Monad.mapM (attackerAssignment gs) attackers
   let fromBlockers = concatMap (blockerAssignment gs) blockers
-  pure (concat parts ++ fromBlockers)
+  pure (concat parts <> fromBlockers)
 
 -- CR 120.3e / 120.3a: mark damage on creatures, drain life from players -- AND
 -- record each event into GameState.events. The change-and-emit funnel for

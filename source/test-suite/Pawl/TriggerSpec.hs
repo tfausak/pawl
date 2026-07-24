@@ -211,7 +211,7 @@ scanTests cards =
          in do
               HU.assertBool "rip1 has the lower id" (rip1 < rip2)
               HU.assertEqual "both triggers fired" 2 (length triggers)
-              HU.assertEqual "sources in ascending ObjectId order" [rip1, rip2] (map PendingTrigger.source triggers),
+              HU.assertEqual "sources in ascending ObjectId order" [rip1, rip2] (fmap PendingTrigger.source triggers),
       -- The PERMANENTS-INNER half of that same order guarantee. Every SelfEnters
       -- test above has exactly one bearer matching each event, so inner order
       -- can never affect the output -- SelfEnters alone cannot discriminate
@@ -228,7 +228,7 @@ scanTests cards =
          in do
               HU.assertBool "ghoul1 has the lower id" (ghoul1 < ghoul2)
               HU.assertEqual "both triggers fired" 2 (length triggers)
-              HU.assertEqual "sources in ascending ObjectId order" [ghoul1, ghoul2] (map PendingTrigger.source triggers)
+              HU.assertEqual "sources in ascending ObjectId order" [ghoul1, ghoul2] (fmap PendingTrigger.source triggers)
     ]
 
 -- CR 701.21: sacrificing is its own keyword action -- NOT a destruction.
@@ -270,7 +270,7 @@ sacrificeTests cards =
               HU.assertEqual
                 "the shield's source is untouched"
                 [piker]
-                (map ActiveReplacement.source (GameState.replacements after)),
+                (fmap ActiveReplacement.source (GameState.replacements after)),
       HU.testCase "only a battlefield permanent can be sacrificed (CR 701.21a)" $
         let (card, gs) = S.addLibraryCard (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
             after = S.runPure S.identityAnswer gs (Event.sacrifice card)
@@ -286,7 +286,7 @@ sacrificeTests cards =
          in HU.assertEqual
               "the trigger names its source"
               [Just (Recipient.ToObject ripId)]
-              (map selfOf (GameState.stack placed))
+              (fmap selfOf (GameState.stack placed))
     ]
 
 -- Barbarian Outcast {1}{R} Creature -- Human Barbarian Beast 2/2:
@@ -618,7 +618,7 @@ orderingTests cards =
       -- The source of the OTHER pending trigger: Tidal Wave's delayed ability,
       -- whose source is the resolved spell's id rather than any permanent.
       otherThan ghoul gs =
-        let sources = map PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs))
+        let sources = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs))
          in case filter (/= ghoul) sources of
               oid : _ -> oid
               [] -> ghoul
@@ -628,15 +628,15 @@ orderingTests cards =
       orderLast wanted p = case p of
         Prompt.OrderTriggers _ _ sources ->
           let indexed = zip [0 :: Int ..] sources
-              pick keep = map (fromIntegral . fst) (filter (\entry -> (snd entry == wanted) == keep) indexed)
-           in pick False ++ pick True
+              pick keep = fmap (fromIntegral . fst) (filter (\entry -> (snd entry == wanted) == keep) indexed)
+           in pick False <> pick True
         _ -> S.identityAnswer p
       -- Counts how many times the ordering prompt was asked, answering canonically.
       countingAnswer :: Prompt.Prompt r -> State.State Int r
       countingAnswer p = case p of
         Prompt.OrderTriggers _ _ sources -> do
           State.modify' (+ 1)
-          pure (map fromIntegral (take (length sources) [0 :: Int ..]))
+          pure (fmap fromIntegral (take (length sources) [0 :: Int ..]))
         _ -> pure (S.identityAnswer p)
    in Tasty.testGroup
         "TriggerOrdering"

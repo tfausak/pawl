@@ -73,7 +73,7 @@ typesInAllGraveyards gs =
       typesOf oid = case Game.cardOf oid gs of
         Nothing -> Set.empty
         Just card -> TypeLine.types (Card.typeLine card)
-   in Set.unions (map typesOf ids)
+   in Set.unions (fmap typesOf ids)
 
 -- CR 700.4 / 608.2h: did this event record a creature dying? Creature-ness comes
 -- from the event's own snapshot -- the object as it last existed on the
@@ -107,7 +107,7 @@ substituteStar star quantity = case quantity of
 manaValueOf :: Card.Card -> Integer
 manaValueOf card = case Card.manaCost card of
   Nothing -> 0
-  Just (ManaCost.MkManaCost symbols) -> sum (map symbolValue symbols)
+  Just (ManaCost.MkManaCost symbols) -> sum (fmap symbolValue symbols)
 
 symbolValue :: ManaSymbol.ManaSymbol -> Integer
 symbolValue symbol = case symbol of

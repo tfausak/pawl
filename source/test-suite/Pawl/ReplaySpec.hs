@@ -149,7 +149,7 @@ combatReplayTests =
 
 replayTests :: Cards.Cards -> Tasty.TestTree
 replayTests cards =
-  let start = Setup.emptyGame (NonEmpty.map fst (S.redRed cards))
+  let start = Setup.emptyGame (fmap fst (S.redRed cards))
       game = Engine.playFrom (S.redRed cards)
       -- Recorded with playLandAnswer, whose choices differ from Replay's
       -- exhausted-transcript fallback. That keeps these assertions honest: the
@@ -159,9 +159,9 @@ replayTests cards =
         "Replay"
         [ HU.testCase "replaying a recorded game reproduces the final state" $
             HU.assertEqual "final states equal" recorded (snd (Replay.replay transcript start game)),
-          HU.testCase "the transcript is what carries the decisions" $
-            HU.assertBool "empty log diverges" $
-              recorded /= snd (Replay.replay [] start game),
+          HU.testCase "the transcript is what carries the decisions"
+            . HU.assertBool "empty log diverges"
+            $ recorded /= snd (Replay.replay [] start game),
           HU.testCase "a recorded goldfish also replays" $
             let ((_, gf), gfLog) = Replay.record S.identityAnswer start game
              in HU.assertEqual "goldfish" gf (snd (Replay.replay gfLog start game)),

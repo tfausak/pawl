@@ -98,7 +98,7 @@ manaTypesOf oid gs =
         concatMap
           (Maybe.mapMaybe Resolve.manaProduced . Modal.allEffects . ActivatedAbility.modal)
           (filter isManaAbility (Projection.abilitiesOf oid gs))
-   in fromSubtypes ++ fromAbilities
+   in fromSubtypes <> fromAbilities
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
 -- doesn't target (the loyalty clause is vacuous -- no planeswalkers). The ABI
@@ -119,7 +119,7 @@ setPool pid pool gs = gs {GameState.manaPool = Map.insert pid pool (GameState.ma
 addMana :: PlayerId -> [ManaUnit] -> GameState -> GameState
 addMana pid units gs =
   let Mana.MkMana existing = poolOf pid gs
-   in setPool pid (Mana.MkMana (existing ++ units)) gs
+   in setPool pid (Mana.MkMana (existing <> units)) gs
 
 -- CR 500.4: each player's mana pool empties at the end of every step and phase.
 emptyManaPools :: GameState -> GameState
@@ -182,7 +182,7 @@ genericOf symbol = case symbol of
 -- spend/canPay.
 substituteX :: Natural -> ManaCost -> ManaCost
 substituteX x (ManaCost.MkManaCost symbols) =
-  ManaCost.MkManaCost (map sub symbols)
+  ManaCost.MkManaCost (fmap sub symbols)
   where
     sub symbol = case symbol of
       ManaSymbol.Variable -> ManaSymbol.Generic x
@@ -190,7 +190,7 @@ substituteX x (ManaCost.MkManaCost symbols) =
 
 takeTyped :: [ManaUnit] -> ManaType -> Maybe [ManaUnit]
 takeTyped units wanted = case List.break (\u -> ManaUnit.manaType u == wanted) units of
-  (before, _ : after) -> Just (before ++ after)
+  (before, _ : after) -> Just (before <> after)
   (_, []) -> Nothing
 
 takeAny :: [ManaUnit] -> a -> Maybe [ManaUnit]
@@ -207,7 +207,7 @@ spend :: ManaCost -> Mana -> Maybe Mana
 spend cost (Mana.MkMana units) =
   let ManaCost.MkManaCost symbols = cost
       typed = Maybe.mapMaybe typedOf symbols
-      generic = sum (map genericOf symbols)
+      generic = sum (fmap genericOf symbols)
    in do
         afterTyped <- Monad.foldM takeTyped units typed
         afterGeneric <- Monad.foldM takeAny afterTyped [1 .. generic]

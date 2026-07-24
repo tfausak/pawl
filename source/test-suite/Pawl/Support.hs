@@ -138,7 +138,7 @@ identityAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
@@ -178,7 +178,7 @@ castAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
@@ -199,7 +199,7 @@ aggressiveAnswer p = case p of
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
-    a : _ -> Map.fromList (map (\b -> (b, a)) mine)
+    a : _ -> Map.fromList (fmap (\b -> (b, a)) mine)
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     case filter isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
@@ -211,7 +211,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
@@ -248,7 +248,7 @@ playLandAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
@@ -270,7 +270,7 @@ randomAnswer p = case p of
       g <- State.get
       let (keep, g') = Random.uniformR (0, length mine) g
       State.put g'
-      pure (Map.fromList (map (\b -> (b, a)) (take keep mine)))
+      pure (Map.fromList (fmap (\b -> (b, a)) (take keep mine)))
   -- The damage division stays canonical rather than random: a random division
   -- would usually be illegal (it must total the attacker's power), and this
   -- property suite is not the place to test the rejection path.
@@ -325,7 +325,7 @@ randomAnswer p = case p of
     pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
-  Prompt.OrderTriggers _ _ sources -> pure (map fromIntegral (take (length sources) [0 :: Int ..]))
+  Prompt.OrderTriggers _ _ sources -> pure (fmap fromIntegral (take (length sources) [0 :: Int ..]))
   Prompt.ChooseReplacement {} -> pure 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
@@ -354,7 +354,7 @@ shuffleWith g xs =
         [] -> [y]
         z : zs -> if fst y <= fst z then y : z : zs else z : insertByKey y zs
       keys = take (length xs) (unfoldInts g)
-   in map snd (foldr insertByKey [] (zip keys xs))
+   in fmap snd (foldr insertByKey [] (zip keys xs))
 
 runRandomGame :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> Int -> GameState.GameState
 runRandomGame matchup s =
@@ -692,7 +692,7 @@ combatBoardOf :: [Printing.Printing] -> [Printing.Printing] -> (GameState.GameSt
 combatBoardOf mine theirs =
   let addAll pid ps gs =
         List.foldl'
-          (\(ids, g) p -> let (oid, g1) = addCreature p pid g in (ids ++ [oid], g1))
+          (\(ids, g) p -> let (oid, g1) = addCreature p pid g in (ids <> [oid], g1))
           ([], gs)
           ps
       (ours, gs1) = addAll alice mine (Setup.emptyGame bothPlayers)
@@ -724,7 +724,7 @@ combatBoard cards a b = combatBoardOf (replicate a (Cards.pikerPrinting cards)) 
 -- Attack with everything, block per the given plan, then deal damage.
 fightWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 fightWith answer gs =
-  snd $ Engine.runGamePure answer gs $ do
+  snd . Engine.runGamePure answer gs $ do
     Combat.declareAttackers alice
     Combat.declareBlockers
     Damage.dealCombatDamage

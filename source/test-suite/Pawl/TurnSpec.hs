@@ -26,10 +26,10 @@ turnTests =
         HU.assertEqual "twelve" 12 (length Turn.allPhases),
       HU.testCase "firstPhase and laterPhases reconstruct the turn template" $
         HU.assertEqual "reconstruct" (Seq.fromList (drop 1 Turn.allPhases)) Turn.laterPhases,
-      HU.testCase "untap and cleanup grant no priority" $
-        HU.assertBool "no priority" $
-          not (Turn.grantsPriority (Phase.Beginning BeginningStep.Untap))
-            && not (Turn.grantsPriority (Phase.Ending EndingStep.Cleanup)),
+      HU.testCase "untap and cleanup grant no priority"
+        . HU.assertBool "no priority"
+        $ not (Turn.grantsPriority (Phase.Beginning BeginningStep.Untap))
+          && not (Turn.grantsPriority (Phase.Ending EndingStep.Cleanup)),
       QC.testProperty "a turn never revisits a phase" $
         QC.property (length Turn.allPhases == length (dedupe Turn.allPhases))
     ]

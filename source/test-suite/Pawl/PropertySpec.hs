@@ -64,22 +64,22 @@ propertyTests cards =
   Tasty.testGroup
     "Properties"
     [ QC.testProperty "conservation: 120 card-backed objects at end" $ \s ->
-        QC.conjoin (map (\m -> cardBackedCount (S.runRandomGame m s) QC.=== 120) (S.matchups cards)),
+        QC.conjoin (fmap (\m -> cardBackedCount (S.runRandomGame m s) QC.=== 120) (S.matchups cards)),
       -- The property that matters most now. Combat is the first thing that can
       -- end a game before the library runs out.
       QC.testProperty "every game terminates with a result" $ \s ->
-        QC.conjoin (map (\m -> QC.property (Maybe.isJust (GameState.result (S.runRandomGame m s)))) (S.matchups cards)),
+        QC.conjoin (fmap (\m -> QC.property (Maybe.isJust (GameState.result (S.runRandomGame m s)))) (S.matchups cards)),
       QC.testProperty "at least 120 ids were minted" $ \s ->
-        QC.conjoin (map (\m -> QC.property (nextIdOf (S.runRandomGame m s) >= 120)) (S.matchups cards)),
+        QC.conjoin (fmap (\m -> QC.property (nextIdOf (S.runRandomGame m s) >= 120)) (S.matchups cards)),
       QC.testProperty "no mana floats at the end" $ \s ->
-        QC.conjoin (map (\m -> GameState.manaPool (S.runRandomGame m s) QC.=== Map.empty) (S.matchups cards)),
+        QC.conjoin (fmap (\m -> GameState.manaPool (S.runRandomGame m s) QC.=== Map.empty) (S.matchups cards)),
       -- Replaces M0's "no life changes". Nothing here GAINS life, so any
       -- increase is a bug. Dies at lifelink (still unscheduled -- see the
       -- design doc's punchlist), the same way this property's ancestor
       -- announced M1b.
       QC.testProperty "life never increases" $ \s ->
         QC.conjoin
-          ( map
+          ( fmap
               (\m -> QC.property (all (\pl -> Player.life pl <= Setup.startingLife) (Map.elems (GameState.players (S.runRandomGame m s)))))
               (S.matchups cards)
           ),

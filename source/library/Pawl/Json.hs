@@ -50,8 +50,8 @@ tagged t mv =
 -- helpers take the first match, so the two agree.
 sortKeys :: Value -> Value
 sortKeys value = case value of
-  Json.Array xs -> Json.Array (map sortKeys xs)
-  Json.Object ps -> Json.Object (List.sortOn fst (map (Bifunctor.second sortKeys) ps))
+  Json.Array xs -> Json.Array (fmap sortKeys xs)
+  Json.Object ps -> Json.Object (List.sortOn fst (fmap (Bifunctor.second sortKeys) ps))
   _ -> value
 
 -- Rendering ------------------------------------------------------------------
@@ -65,8 +65,8 @@ encode value = case value of
   Json.Boolean b -> Builder.stringUtf8 (if b then "true" else "false")
   Json.Number n -> encodeNumber n
   Json.String s -> encodeString s
-  Json.Array xs -> surround '[' ']' (map encode xs)
-  Json.Object ps -> surround '{' '}' (map encodePair ps)
+  Json.Array xs -> surround '[' ']' (fmap encode xs)
+  Json.Object ps -> surround '{' '}' (fmap encodePair ps)
 
 encodePair :: (Text, Value) -> Builder.Builder
 encodePair (k, v) = encodeString k <> Builder.charUtf8 ':' <> encode v

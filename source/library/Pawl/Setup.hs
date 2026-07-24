@@ -39,7 +39,7 @@ deckSize (Deck.MkDeck m) = sum (Map.elems m)
 
 -- Pair every player with one deck, for a symmetric (mirror) matchup.
 mirror :: Deck.Deck -> NonEmpty.NonEmpty PlayerId -> NonEmpty.NonEmpty (PlayerId, Deck.Deck)
-mirror deck = NonEmpty.map (\pid -> (pid, deck))
+mirror deck = fmap (\pid -> (pid, deck))
 
 -- Takes a NonEmpty so the active player is total (no partial head).
 emptyGame :: NonEmpty.NonEmpty PlayerId -> GameState
@@ -62,7 +62,7 @@ emptyGame order =
           GameState.exile = mempty,
           GameState.command = mempty,
           GameState.stack = [],
-          GameState.players = Map.fromList (map newPlayer order_),
+          GameState.players = Map.fromList (fmap newPlayer order_),
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.events = Seq.empty,
@@ -129,7 +129,7 @@ newGame matchup = do
   Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
     createDeck pid deck
     Mulligan.shuffleLibrary pid
-  Mulligan.openingHands (map fst (NonEmpty.toList matchup))
+  Mulligan.openingHands (fmap fst (NonEmpty.toList matchup))
 
 -- CR 727.2 / 729.2: build every player's library from an EXISTING object pool --
 -- each player's owned CARDS, wherever they currently sit -- then shuffle and draw
@@ -154,12 +154,12 @@ startGameFromCards = do
             Object.bindings = Map.empty,
             Object.counters = Map.empty
           }
-      cards = Map.map toLibraryCard (Map.filter isCard (GameState.objects gs))
+      cards = fmap toLibraryCard (Map.filter isCard (GameState.objects gs))
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
   State.put
     gs
       { GameState.objects = cards,
-        GameState.library = Map.fromList (map (\pid -> (pid, libraryOf pid)) owners),
+        GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
         GameState.hand = Map.empty,
         GameState.graveyard = Map.empty,
         GameState.battlefield = mempty,
@@ -175,7 +175,7 @@ startGameFromCards = do
 -- and proceeds clockwise"). Total: a `starter` not in the order leaves it as-is.
 rotateTo :: PlayerId -> [PlayerId] -> [PlayerId]
 rotateTo starter order = case break (== starter) order of
-  (before, after) -> after ++ before
+  (before, after) -> after <> before
 
 -- CR 727: restart the game in place. CR 727.1: the current game immediately ends
 -- and a new game begins per CR 103, with the CR 727.1a exception -- the starting
@@ -197,7 +197,7 @@ restartGame starter = do
               Player.counters = Map.empty
             }
      in gs
-          { GameState.players = Map.map resetPlayer (GameState.players gs),
+          { GameState.players = fmap resetPlayer (GameState.players gs),
             GameState.manaPool = Map.empty,
             GameState.combat = Combat.emptyCombat,
             GameState.events = Seq.empty,
@@ -261,7 +261,7 @@ subgameStateFrom starter parent =
    in parent
         { GameState.objects = libObjects,
           GameState.turnOrder = order,
-          GameState.players = Map.map resetPlayer (GameState.players parent),
+          GameState.players = fmap resetPlayer (GameState.players parent),
           GameState.library = Map.empty,
           GameState.hand = Map.empty,
           GameState.graveyard = Map.empty,
@@ -318,7 +318,7 @@ funnelBack finalSub parent =
             Object.bindings = Map.empty,
             Object.counters = Map.empty
           }
-      returned = Map.map toLibraryCard (Map.filter isCard (GameState.objects finalSub))
+      returned = fmap toLibraryCard (Map.filter isCard (GameState.objects finalSub))
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) returned))
       oldLibIds =
         Set.fromList
@@ -326,7 +326,7 @@ funnelBack finalSub parent =
       keptParentObjects = Map.withoutKeys (GameState.objects parent) oldLibIds
    in parent
         { GameState.objects = Map.union returned keptParentObjects,
-          GameState.library = Map.fromList (map (\pid -> (pid, libraryOf pid)) (GameState.turnOrder parent)),
+          GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) (GameState.turnOrder parent)),
           GameState.nextObjectId = max (GameState.nextObjectId parent) (GameState.nextObjectId finalSub),
           GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub)
         }

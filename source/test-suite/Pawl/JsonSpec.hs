@@ -14,7 +14,7 @@ roundTrips v = HU.assertEqual "round-trip" (Right v) (J.parse (J.render v))
 
 -- Builds an object without Text.pack noise at every key.
 obj :: [(String, Json.Value)] -> Json.Value
-obj ps = Json.Object (map (Bifunctor.first Text.pack) ps)
+obj ps = Json.Object (fmap (Bifunctor.first Text.pack) ps)
 
 tests :: Tasty.TestTree
 tests =

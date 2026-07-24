@@ -74,11 +74,11 @@ runGamePure answer gs game = Program.foldProgram answer (State.runStateT game gs
 -- door, where no deck agreement exists to violate.
 runMatch :: (Monad m) => (forall r. Prompt r -> m r) -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> m (Result, GameState)
 runMatch answer matchup =
-  runGame answer (Setup.emptyGame (NonEmpty.map fst matchup)) (playFrom matchup)
+  runGame answer (Setup.emptyGame (fmap fst matchup)) (playFrom matchup)
 
 runMatchPure :: (forall r. Prompt r -> r) -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> (Result, GameState)
 runMatchPure answer matchup =
-  runGamePure answer (Setup.emptyGame (NonEmpty.map fst matchup)) (playFrom matchup)
+  runGamePure answer (Setup.emptyGame (fmap fst matchup)) (playFrom matchup)
 
 -- The next entry of a cyclic order after 'pid'. Falls back to 'pid' when the
 -- order is empty or does not mention it, keeping the function total.
@@ -315,7 +315,7 @@ apnapPlayers :: GameState -> [PendingTrigger.PendingTrigger] -> [PlayerId]
 apnapPlayers gs pending =
   let order = GameState.turnOrder gs
       active = GameState.activePlayer gs
-      rotated = dropWhile (/= active) order ++ takeWhile (/= active) order
+      rotated = dropWhile (/= active) order <> takeWhile (/= active) order
       controls pid = any (\pt -> PendingTrigger.controller pt == pid) pending
    in filter controls rotated
 
@@ -334,7 +334,7 @@ orderFor gs pending pid = do
     then pure mine
     else do
       let decider = Decide.deciderFor pid gs
-      answer <- Trans.lift (Program.prompt (Prompt.OrderTriggers decider pid (map PendingTrigger.source mine)))
+      answer <- Trans.lift (Program.prompt (Prompt.OrderTriggers decider pid (fmap PendingTrigger.source mine)))
       pure (permute mine answer)
 
 -- Reject-not-repair, as payment already does: only a genuine permutation of the
@@ -344,7 +344,7 @@ orderFor gs pending pid = do
 permute :: [a] -> [Natural] -> [a]
 permute xs order =
   let canonical :: [Natural]
-      canonical = map fromIntegral (take (length xs) [0 :: Int ..])
+      canonical = fmap fromIntegral (take (length xs) [0 :: Int ..])
       at i = case drop (fromIntegral i) xs of
         h : _ -> Just h
         [] -> Nothing

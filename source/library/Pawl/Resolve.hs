@@ -299,7 +299,7 @@ effectsOf oid gs = case Game.lookupObject oid gs of
     Nothing -> []
     Just card ->
       let chosen = Binding.modesOf (Object.bindings obj)
-       in map (rewriteEffect (Projection.textChangesAffecting oid gs)) (Card.modesEffects chosen card)
+       in fmap (rewriteEffect (Projection.textChangesAffecting oid gs)) (Card.modesEffects chosen card)
 
 -- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if
 -- the spell has slots and ALL are now illegal, it does not resolve -- it moves
@@ -534,9 +534,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
               decider = Decide.deciderFor controller gs
           found <- Trans.lift (Program.prompt (Prompt.SearchLibrary decider controller matches))
-          case found of
-            Nothing -> pure ()
-            Just cardId -> putTapped cardId
+          mapM_ putTapped found
           -- CR 701.23: shuffle the (possibly reduced) library afterward.
           lib <- State.gets (Game.zoneMembers Zone.Library controller)
           shuffled <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
@@ -795,9 +793,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       -- CR 701.6a: the slot's target is a spell on the stack; counter it through
       -- the single funnel. A player recipient / illegal slot (CR 608.2b): no-op.
-      (Just recipient, True) -> case recipientObject recipient of
-        Nothing -> pure ()
-        Just target -> Event.counter target
+      (Just recipient, True) -> mapM_ Event.counter $ recipientObject recipient
       _ -> pure ()
   Effect.PutCounters kind quantity slot -> do
     gs <- State.get

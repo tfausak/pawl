@@ -237,7 +237,7 @@ tests cards =
                   HU.assertEqual "the fixture really has none" [] (CardT.playerAbilities base)
                   case J.asObject (Codec.cardToJson base) of
                     Left err -> HU.assertFailure (Text.unpack err)
-                    Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "playerAbilities") (map fst pairs))
+                    Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "playerAbilities") (fmap fst pairs))
         ],
       Tasty.testGroup
         "filter (P9)"
@@ -332,7 +332,7 @@ tests cards =
                       HU.assertEqual "the fixture really has none" [] (CardT.additionalCosts base)
                       case J.asObject (Codec.cardToJson base) of
                         Left err -> HU.assertFailure (Text.unpack err)
-                        Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "additionalCosts") (map fst pairs)),
+                        Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "additionalCosts") (fmap fst pairs)),
               HU.testCase "a Card carrying an alternative cost round-trips" $
                 let base = Printing.card (Cards.lightningBoltPrinting cards)
                     alt =
@@ -348,7 +348,7 @@ tests cards =
                       HU.assertEqual "the fixture really has none" [] (CardT.alternativeCosts base)
                       case J.asObject (Codec.cardToJson base) of
                         Left err -> HU.assertFailure (Text.unpack err)
-                        Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "alternativeCosts") (map fst pairs))
+                        Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "alternativeCosts") (fmap fst pairs))
             ],
           HU.testCase "a ZoneChangeR replacement round-trips" $
             let re =

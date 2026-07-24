@@ -37,10 +37,10 @@ legalActions pid gs =
         Turn.isMainPhase (GameState.phase gs)
           && GameState.activePlayer gs == pid
           && not (Set.member pid (GameState.landPlayed gs))
-      lands = if canPlayLand then map Action.Play (playableLands pid gs) else []
-      spells = map Action.Cast (Cast.castableSpells pid gs)
+      lands = if canPlayLand then fmap Action.Play (playableLands pid gs) else []
+      spells = fmap Action.Cast (Cast.castableSpells pid gs)
       activations =
         let forPermanent oid =
-              map (Action.Activate oid) (filter (\ab -> Activate.activatable pid oid ab gs) (Activate.abilitiesFor oid gs))
+              fmap (Action.Activate oid) (filter (\ab -> Activate.activatable pid oid ab gs) (Activate.abilitiesFor oid gs))
          in concatMap forPermanent (Projection.controls pid gs)
-   in Action.Pass : lands ++ spells ++ activations
+   in Action.Pass : lands <> spells <> activations

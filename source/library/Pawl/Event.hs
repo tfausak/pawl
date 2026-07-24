@@ -234,8 +234,9 @@ putCounters oid kind n = do
   case resolved of
     Nothing -> pure ()
     Just (target, settledKind, settledCount) ->
-      Monad.when (settledCount > 0) $
-        State.modify' $ \gs ->
+      Monad.when (settledCount > 0)
+        . State.modify'
+        $ \gs ->
           let bump obj = obj {Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters obj)}
            in gs {GameState.objects = Map.adjust bump target (GameState.objects gs)}
 
@@ -461,7 +462,7 @@ eventTriggers events gs =
       forOne event (oid, ctrl, abilities) =
         let fires ab = matchesTrigger oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab Map.empty
-         in map pend (filter fires abilities)
+         in fmap pend (filter fires abilities)
    in concatMap (\event -> concatMap (forOne event) onBattlefield) events
 
 -- CR 603.8 / 603.4 / 611.2b: is this state condition currently true, for an
@@ -546,7 +547,7 @@ stateTriggers gs =
                 TriggerCondition.SelfDealsCombatDamageToPlayer -> False
                 TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
               pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab Map.empty
-           in map pend (filter live (Projection.triggeredAbilitiesOf oid gs))
+           in fmap pend (filter live (Projection.triggeredAbilitiesOf oid gs))
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))
 
 -- CR 603.7: delayed abilities whose trigger event is among these events. Each one
@@ -582,7 +583,7 @@ delayedPending events gs =
           (DelayedTrigger.ability entry)
           (DelayedTrigger.bindings entry)
       store = GameState.delayedTriggers gs
-   in (map pend (Foldable.toList (Seq.filter fires store)), Seq.filter (not . fires) store)
+   in (fmap pend (Foldable.toList (Seq.filter fires store)), Seq.filter (not . fires) store)
 
 -- Everything that has triggered and is not yet on the stack, from all three
 -- sources, plus the delayed store as it stands afterwards. One function, so
@@ -590,7 +591,7 @@ delayedPending events gs =
 gatherTriggers :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 gatherTriggers events gs =
   let (fromDelayed, surviving) = delayedPending events gs
-      all_ = eventTriggers events gs ++ stateTriggers gs ++ fromDelayed
+      all_ = eventTriggers events gs <> stateTriggers gs <> fromDelayed
    in (filter (interveningHolds gs) all_, surviving)
 
 -- CR 603.4: "the ability doesn't trigger at all" when its intervening "if" is

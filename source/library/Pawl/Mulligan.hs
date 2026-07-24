@@ -64,7 +64,7 @@ mulliganRounds counts deciding = do
         let taken = Map.findWithDefault 0 pid counts
         decision <- Trans.lift (Program.prompt (Prompt.DeclareMulligan decider pid taken))
         pure (pid, decision)
-  let mulliganers = map fst (filter (\(_, d) -> d == MulliganDecision.Mulligan) decisions)
+  let mulliganers = fmap fst (filter (\(_, d) -> d == MulliganDecision.Mulligan) decisions)
   case mulliganers of
     -- CR 103.5: a round with no mulligans ends the process; the remaining hands
     -- are opening hands.

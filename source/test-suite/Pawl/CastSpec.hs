@@ -217,9 +217,9 @@ castTests cards =
         let (gs, oid) = S.pikerInHand cards 2 Phase.PrecombatMain
             bobsTurn = gs {GameState.activePlayer = S.bob}
          in HU.assertBool "not active" (not (Cast.castable S.alice oid bobsTurn)),
-      HU.testCase "a Mountain in hand is not castable: lands have no mana cost" $
-        HU.assertBool "no cost" $
-          not (Cast.castable S.alice (ObjectId.MkObjectId 0) (S.oneMountainState cards Phase.PrecombatMain)),
+      HU.testCase "a Mountain in hand is not castable: lands have no mana cost"
+        . HU.assertBool "no cost"
+        $ not (Cast.castable S.alice (ObjectId.MkObjectId 0) (S.oneMountainState cards Phase.PrecombatMain)),
       HU.testCase "CR 601 casting puts a NEW object on the stack and taps two lands" $
         let (gs, oid) = S.pikerInHand cards 3 Phase.PrecombatMain
             after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid))
@@ -289,7 +289,7 @@ castTests cards =
             liar :: Prompt.Prompt r -> r
             liar p = case p of
               Prompt.ChooseTargets _ _ _ sets ->
-                Map.map (const (Recipient.ToCreature (ObjectId.MkObjectId 999))) sets
+                fmap (const (Recipient.ToCreature (ObjectId.MkObjectId 999))) sets
               _ -> S.identityAnswer p
             after = snd (Engine.runGamePure liar gs (Cast.castSpell S.alice oid))
          in do
@@ -333,7 +333,7 @@ castTests cards =
 answerX3 :: Prompt.Prompt r -> r
 answerX3 p = case p of
   Prompt.ChooseX {} -> 3
-  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
   _ -> S.identityAnswer p
 
 -- Discards from the BACK of hand. Deliberately unlike every fallback, so the
@@ -359,7 +359,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
@@ -464,7 +464,7 @@ magicalHackTests cards =
 answerX0 :: Prompt.Prompt r -> r
 answerX0 p = case p of
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
   _ -> S.identityAnswer p
 
 -- How many Blazes sit in alice's hand (the reject-not-repair no-op check).
@@ -549,7 +549,7 @@ castFirstOption p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
@@ -590,7 +590,7 @@ castPanglacial p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates

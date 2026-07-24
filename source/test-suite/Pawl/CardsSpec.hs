@@ -24,7 +24,7 @@ tests cards =
   Tasty.testGroup
     "Pawl.CardsSpec"
     [ HU.testCase "slugs are unique" $
-        let slugs = map slugOf (Cards.allPrintings cards)
+        let slugs = fmap slugOf (Cards.allPrintings cards)
          in HU.assertEqual "unique" (List.sort slugs) (List.sort (List.nub slugs)),
       HU.testCase "each committed file re-parses to its compiled card (P3)" $
         mapM_ checkFile (Cards.allPrintings cards),

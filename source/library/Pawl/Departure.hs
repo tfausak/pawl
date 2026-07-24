@@ -24,7 +24,7 @@ import qualified Pawl.Type.Status as Status
 stillPlaying :: GameState -> [PlayerId]
 stillPlaying gs =
   let isPlaying entry = Player.status (snd entry) == Status.Playing
-   in map fst (filter isPlaying (Map.toList (GameState.players gs)))
+   in fmap fst (filter isPlaying (Map.toList (GameState.players gs)))
 
 -- Mark a player as having left, with the reason they left. Pure, because the SBA
 -- pass folds it over several players before recomputing the outcome once.

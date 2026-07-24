@@ -153,7 +153,7 @@ gameTests cards =
                     }
                 moved = S.runPure S.identityAnswer stamped (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
                 landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
-             in HU.assertEqual "reset" [Map.empty] (map Object.bindings landed),
+             in HU.assertEqual "reset" [Map.empty] (fmap Object.bindings landed),
           HU.testCase "CR 400.7 changeZone resets a word-swap binding" $
             let base = S.oneMountainState cards Phase.PrecombatMain
                 slot = SlotName.MkSlotName (Text.pack "target")
@@ -225,21 +225,21 @@ engineTests cards =
         HU.assertEqual "winner" (Result.Won S.alice) (fst (goldfishResult cards)),
       HU.testCase "card conservation holds at end" $
         HU.assertEqual "objects" 120 (Game.objectCount (snd (goldfishResult cards))),
-      HU.testCase "playing lands fills the battlefield" $
-        HU.assertBool "non-empty" $
-          not (null (Game.zoneMembers Zone.Battlefield S.alice (landState cards))),
+      HU.testCase "playing lands fills the battlefield"
+        . HU.assertBool "non-empty"
+        $ not (null (Game.zoneMembers Zone.Battlefield S.alice (landState cards))),
       HU.testCase "land play conserves cards" $
         HU.assertEqual "objects" 120 (Game.objectCount (landState cards)),
-      HU.testCase "CR 305.2 at most one land per turn" $
-        HU.assertBool "no double land plays" $
-          length (Game.zoneMembers Zone.Battlefield S.alice (landState cards)) <= turnsTaken S.alice (landState cards)
-            && length (Game.zoneMembers Zone.Battlefield S.bob (landState cards)) <= turnsTaken S.bob (landState cards)
+      HU.testCase "CR 305.2 at most one land per turn"
+        . HU.assertBool "no double land plays"
+        $ length (Game.zoneMembers Zone.Battlefield S.alice (landState cards)) <= turnsTaken S.alice (landState cards)
+          && length (Game.zoneMembers Zone.Battlefield S.bob (landState cards)) <= turnsTaken S.bob (landState cards)
     ]
 
 -- Run setup, then a scripted tweak, then whatever steps the (scenario cards) needs.
 scenario :: Cards.Cards -> Game.Type.Game () -> GameState.GameState
 scenario cards steps =
-  snd $ Engine.runGamePure S.identityAnswer (Setup.emptyGame (NonEmpty.map fst (S.redRed cards))) $ do
+  snd . Engine.runGamePure S.identityAnswer (Setup.emptyGame (fmap fst (S.redRed cards))) $ do
     Setup.newGame (S.redRed cards)
     steps
 
@@ -289,7 +289,7 @@ recordingAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> pure (Map.mapMaybe Set.lookupMin sets)
   Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
   Prompt.ChooseAction _ pid actions -> do
-    State.modify' (\asked -> asked ++ [pid])
+    State.modify' (\asked -> asked <> [pid])
     let isCast a = case a of
           A.Cast _ -> True
           _ -> False
@@ -303,7 +303,7 @@ recordingAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
-  Prompt.OrderTriggers _ _ sources -> pure (map fromIntegral (take (length sources) [0 :: Int ..]))
+  Prompt.OrderTriggers _ _ sources -> pure (fmap fromIntegral (take (length sources) [0 :: Int ..]))
   Prompt.ChooseReplacement {} -> pure 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
@@ -372,7 +372,7 @@ ruleTests cards =
               length
                 ( filter
                     (namedIs (Text.pack "Lightning Bolt"))
-                    (map (\i -> Game.lookupObject i after) (Game.zoneMembers Zone.Graveyard S.bob after))
+                    (fmap (\i -> Game.lookupObject i after) (Game.zoneMembers Zone.Graveyard S.bob after))
                 )
          in do
               HU.assertEqual "bob took 3 from his own Bolt" (Just 17) (S.lifeOf S.bob after)
@@ -413,7 +413,7 @@ ruleTests cards =
               length
                 ( filter
                     (namedIs (Text.pack "Lightning Bolt"))
-                    (map (\i -> Game.lookupObject i bobPlayed) (Game.zoneMembers Zone.Graveyard S.bob bobPlayed))
+                    (fmap (\i -> Game.lookupObject i bobPlayed) (Game.zoneMembers Zone.Graveyard S.bob bobPlayed))
                 )
          in do
               HU.assertEqual "CR 723.1: control pending for bob after activation" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl afterActivation))
@@ -720,12 +720,12 @@ concedeTests cards =
               Prompt.ChooseAction decider pid _ ->
                 if pid == S.bob
                   then do
-                    State.modify' (\(ds, cs) -> (ds ++ [decider], cs))
+                    State.modify' (\(ds, cs) -> (ds <> [decider], cs))
                     pure (A.Play mountainOid)
                   else pure (S.identityAnswer p)
               Prompt.Concede asked -> do
                 (_, asksSoFar) <- State.get
-                State.modify' (\(ds, cs) -> (ds, cs ++ [asked]))
+                State.modify' (\(ds, cs) -> (ds, cs <> [asked]))
                 pure (if null asksSoFar then Concession.Continues else Concession.Concedes)
               _ -> pure (S.identityAnswer p)
             ((_, after), (deciders, concedeAsks)) = State.runState (Engine.runGame answer gs Engine.runStep) ([], [])
@@ -818,7 +818,7 @@ slaveAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> map fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates

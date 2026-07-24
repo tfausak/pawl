@@ -154,7 +154,7 @@ tests cards =
               HU.assertEqual
                 "the shield's source is the skeleton itself"
                 [skel]
-                (map ActiveReplacement.source (GameState.replacements resolved))
+                (fmap ActiveReplacement.source (GameState.replacements resolved))
               HU.assertEqual "survived the first destruction (regenerated)" True (Set.member skel (GameState.battlefield firstKill))
               HU.assertEqual "died to the second (one-shot shield consumed)" False (Set.member skel (GameState.battlefield secondKill)),
       -- CR 113.8: the controller of an activated ability on the stack is the

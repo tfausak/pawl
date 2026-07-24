@@ -172,10 +172,10 @@ tests cards =
         let printings = distinctPrintings cards
             gs0 = orderedLibraryGame cards printings
             after = run bottomReversedAnswer gs0
-            bottomCards = map (\oid -> Game.cardOf oid after) (libBottom 2 S.alice after)
+            bottomCards = fmap (\oid -> Game.cardOf oid after) (libBottom 2 S.alice after)
             -- The round-2 bottoming returns indices [15, 14] of distinctPrintings
             -- (humility, then giantGrowth); named directly to avoid a partial `!!`.
-            expectedCards = map (Just . Printing.card) [Cards.humilityPrinting cards, Cards.giantGrowthPrinting cards]
+            expectedCards = fmap (Just . Printing.card) [Cards.humilityPrinting cards, Cards.giantGrowthPrinting cards]
          in HU.assertEqual "library bottom equals the chosen order exactly (humility, then giantGrowth)" expectedCards bottomCards,
       HU.testCase "CR 103.5: keeping is terminal -- a kept player is not asked again" $
         let gs0 = libraryGame cards 20

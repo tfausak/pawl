@@ -389,8 +389,9 @@ assignmentLegalityTests =
             answer :: Map.Map Recipient.Recipient Natural.Natural
             answer = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 2), 2)]
          in HU.assertBool "rejected" (not (Damage.legalAssignment thresholds 2 answer)),
-      QC.testProperty "an accepted assignment always totals power and gates the defender" $
-        QC.forAll genLegalityCase $ \(thresholds, power, answer) ->
+      QC.testProperty "an accepted assignment always totals power and gates the defender"
+        . QC.forAll genLegalityCase
+        $ \(thresholds, power, answer) ->
           not (Damage.legalAssignment thresholds power answer)
             || ( sum (Map.elems answer) == power
                    && all (\r -> Map.member r thresholds) (Map.keys answer)
@@ -424,8 +425,8 @@ tramplingAnswer :: Prompt.Prompt r -> r
 tramplingAnswer p = case p of
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     let blockers = Map.toList (Map.filterWithKey (\r _ -> S.isCreatureRecipient r) thresholds)
-        toBlockers = Map.fromList (map (\(r, t) -> (r, t)) blockers)
-        spent = sum (map snd blockers)
+        toBlockers = Map.fromList (fmap (\(r, t) -> (r, t)) blockers)
+        spent = sum (fmap snd blockers)
         leftover = if n >= spent then n - spent else 0
         defenders = filter (not . S.isCreatureRecipient) (Map.keys thresholds)
      in case defenders of

@@ -549,7 +549,7 @@ storedTests cards =
                   HU.assertEqual
                     "the bob-keyed entry ended; the alice-keyed entry survives"
                     [Expiry.Type.AtTurnOf S.alice]
-                    (map ActivePlayerEffect.expiry (GameState.playerEffects bobsTurn)),
+                    (fmap ActivePlayerEffect.expiry (GameState.playerEffects bobsTurn)),
           -- The POSITIVE case: while the condition genuinely holds, the sweep
           -- must leave the effect in place and report that nothing changed.
           -- Without this, "deletes on failure" is indistinguishable from

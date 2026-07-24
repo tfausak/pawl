@@ -25,14 +25,14 @@ allEffects m = concatMap (Foldable.toList . Mode.effects) (Modal.modes m)
 -- The union of every mode's target specs (slot names unique by authoring
 -- discipline; the D4 lint enforces per-mode resolution).
 allTargetSpecs :: Modal.Modal card -> Map SlotName TargetSpec
-allTargetSpecs m = Map.unions (map Mode.targetSpecs (Foldable.toList (Modal.modes m)))
+allTargetSpecs m = Map.unions (fmap Mode.targetSpecs (Foldable.toList (Modal.modes m)))
 
 -- CR 608.2c/700.2: only the CHOSEN modes' effects, in ModeIndex order (the Set is
 -- already sorted). Out-of-range indices contribute nothing (total via Seq.lookup).
 modesEffects :: Set ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
 modesEffects chosen m =
   let modeAt (ModeIndex.MkModeIndex n) =
-        maybe [] (Foldable.toList . Mode.effects) (Seq.lookup (fromIntegral n) (Modal.modes m))
+        foldMap (Foldable.toList . Mode.effects) (Seq.lookup (fromIntegral n) (Modal.modes m))
    in concatMap modeAt (Set.toAscList chosen)
 
 -- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union).
@@ -40,7 +40,7 @@ modesTargetSpecs :: Set ModeIndex.ModeIndex -> Modal.Modal card -> Map SlotName 
 modesTargetSpecs chosen m =
   let specsAt (ModeIndex.MkModeIndex n) =
         maybe Map.empty Mode.targetSpecs (Seq.lookup (fromIntegral n) (Modal.modes m))
-   in Map.unions (map specsAt (Set.toAscList chosen))
+   in Map.unions (fmap specsAt (Set.toAscList chosen))
 
 -- The target specs of one mode by index (CR 700.2c: only the chosen mode's
 -- slots). Nothing if the index is out of range (total).

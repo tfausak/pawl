@@ -36,7 +36,7 @@ freshTimestamp gs =
 
 zoneMembers :: Zone -> PlayerId -> GameState -> [ObjectId]
 zoneMembers zone pid gs =
-  let perPlayer m = maybe [] (foldr (:) []) (Map.lookup pid m)
+  let perPlayer m = foldMap (foldr (:) []) (Map.lookup pid m)
       ownedBy oid = case lookupObject oid gs of
         Just obj -> Object.owner obj == pid
         Nothing -> False
@@ -59,7 +59,7 @@ removeFromCombat oid gs =
       c1 =
         c
           { Combat.attackers = Map.delete oid (Combat.attackers c),
-            Combat.blockers = Map.map (Set.delete oid) (Map.delete oid (Combat.blockers c))
+            Combat.blockers = fmap (Set.delete oid) (Map.delete oid (Combat.blockers c))
           }
    in gs {GameState.combat = c1}
 

@@ -1,3 +1,15 @@
+# Prefer `f . g $ h x` over `f $ g $ h x`.
+- group: {name: dollar, enabled: true}
+
+# Prefer `pure` over `return`.
+- group: {name: future, enabled: true}
+
+# Prefer `fmap` over `map`, `(<>)` over `(++)`, and so on.
+- group: {name: generalise, enabled: true}
+
+# Generally prefer named functions over operators.
+- ignore: {name: "Use <$>"}
+
 # HLint wants prefix `elem x xs` rewritten to infix ``x `elem` xs``. The project
 # style rule is the opposite: prefer functions to operators, and no
 # backtick-infixed functions. See the style section of CONTRIBUTING.md.
@@ -16,15 +28,3 @@
 # project is Haskell 2010 with only GADTs and RankNTypes permitted, so the
 # suggestion can never be applied. See the style section of CONTRIBUTING.md.
 - ignore: {name: "Use tuple-section"}
-
-# HLint rewrites a two-branch Nothing/Just case into the `maybe` combinator.
-# The project style rule is the opposite: prefer case over clever combinators
-# (freezeQuantities in Pawl.Projection is the first to trip this one). See the
-# style section of CONTRIBUTING.md.
-- ignore: {name: "Replace case with maybe", within: Pawl.Projection}
-
-# HLint rewrites a two-branch Nothing/Just case (do nothing / apply an action)
-# into `Data.Foldable.for_`. Same rule as above: prefer explicit case over a
-# clever combinator (P5's Search and Counter arms, Pawl.Resolve, are the
-# first to trip this one). See the style section of CONTRIBUTING.md.
-- ignore: {name: "Use for_", within: Pawl.Resolve}

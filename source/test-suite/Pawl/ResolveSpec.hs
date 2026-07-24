@@ -269,7 +269,7 @@ resolveTests cards =
          in HU.assertEqual
               "the Bolt's damage event is Noncombat"
               [DamageKind.Noncombat]
-              (map DamageEvent.kind (S.damageEventsOf resolved)),
+              (fmap DamageEvent.kind (S.damageEventsOf resolved)),
       HU.testCase "CR 608.3 / 704.5g a resolved Bolt kills a Piker" $
         let (_, cast, _) = S.boltAtBobsPiker cards
             after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
@@ -291,7 +291,7 @@ resolveTests cards =
       HU.testCase "the resolved damage flows through the event funnel" $
         let (_, cast, _) = S.boltAtBobsPiker cards
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-         in HU.assertEqual "one event of amount 3" [3] (map DamageEvent.amount (S.damageEventsOf after)),
+         in HU.assertEqual "one event of amount 3" [3] (fmap DamageEvent.amount (S.damageEventsOf after)),
       HU.testCase "resolving a Bolt conserves objects" $
         let (_, cast, _) = S.boltAtBobsPiker cards
          in HU.assertEqual "conserved" (Game.objectCount cast) (Game.objectCount (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))),
@@ -839,7 +839,7 @@ racingCounters cards =
       (cancelB, gs2) = handAppend (Cards.cancelPrinting cards) S.alice gs1
       atVictim :: Prompt.Prompt r -> r
       atVictim p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToObject victimId)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject victimId)) sets
         _ -> S.identityAnswer p
       castA = snd (Engine.runGamePure atVictim gs2 (Cast.castSpell S.alice cancelA))
       castB = snd (Engine.runGamePure atVictim castA (Cast.castSpell S.alice cancelB))
@@ -929,7 +929,7 @@ fizzleTests cards =
             atBob :: Prompt.Prompt r -> r
             atBob p = case p of
               Prompt.ChooseTargets _ _ _ sets ->
-                Map.map (const (Recipient.ToPlayer S.bob)) sets
+                fmap (const (Recipient.ToPlayer S.bob)) sets
               Prompt.ChooseAction _ _ actions ->
                 case filter (\a -> a == A.Cast oid) actions of
                   h : _ -> h
@@ -995,7 +995,7 @@ castBlackRemovalAt cards printing foe =
 -- behaves like identityAnswer. Used to aim a player-targeting spell at bob.
 atBobAnswer :: Prompt.Prompt r -> r
 atBobAnswer p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
   _ -> S.identityAnswer p
 
 -- Add k cards of a printing to pid's hand (each a fresh Hand-zone object).
@@ -1128,7 +1128,7 @@ zoneChangeTests cards =
             -- aim the spell at bob.
             noDiscard q = case q of
               Prompt.ChooseDiscard {} -> []
-              Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Recipient.ToPlayer S.bob)) sets
+              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
               _ -> S.identityAnswer q
             cast = snd (Engine.runGamePure noDiscard gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure noDiscard cast Stack.resolveTop)
@@ -1215,7 +1215,7 @@ countersTests cards =
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
             -- Total (no `head`): expect exactly one bounced card in hand, empty counters.
-            handCounters = map (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h after)) (Game.zoneMembers Zone.Hand S.bob after)
+            handCounters = fmap (\h -> maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject h after)) (Game.zoneMembers Zone.Hand S.bob after)
          in HU.assertEqual "the bounced incarnation in hand has no counters" [Map.empty] handCounters
     ]
 
@@ -1284,7 +1284,7 @@ createEmblemTests cards =
             emblems = filter (\oid -> fmap Object.zone (Game.lookupObject oid after) == Just Zone.Command) (Set.toList (GameState.command after))
          in do
               HU.assertEqual "one emblem in command" 1 (Set.size (GameState.command after))
-              HU.assertEqual "owned by the resolver" [Just S.alice] (map (\oid -> fmap Object.owner (Game.lookupObject oid after)) emblems)
+              HU.assertEqual "owned by the resolver" [Just S.alice] (fmap (\oid -> fmap Object.owner (Game.lookupObject oid after)) emblems)
     ]
 
 becomeMonarchTests :: Cards.Cards -> Tasty.TestTree

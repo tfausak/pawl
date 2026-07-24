@@ -427,9 +427,7 @@ freezeQuantities gs oid you m =
   -- the stored effect, where applyModification later evaluates it against the
   -- AFFECTED object and that object's controller -- the very mis-evaluation this
   -- freeze exists to prevent (#36).
-  let freeze q = case Quantity.evaluate gs oid you q of
-        Nothing -> q
-        Just n -> Quantity.Type.Literal n
+  let freeze q = maybe q Quantity.Type.Literal $ Quantity.evaluate gs oid you q
    in case m of
         Modification.SetBasePowerToughness p t -> Modification.SetBasePowerToughness (freeze p) (freeze t)
         Modification.ModifyPowerToughness p t -> Modification.ModifyPowerToughness (freeze p) (freeze t)
@@ -464,10 +462,10 @@ setLandSubtypeEffects gs =
       fromPerm permId = case Game.cardOf permId gs of
         Nothing -> []
         Just card ->
-          map (\sa -> (permId, StaticAbility.affected sa)) $
+          fmap (\sa -> (permId, StaticAbility.affected sa)) $
             filter (isSet . StaticAbility.modification) (Card.Type.staticAbilities card)
    in concatMap fromStored (GameState.continuousEffects gs)
-        ++ concatMap fromPerm (Set.toList (GameState.battlefield gs))
+        <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 
 -- CR 305.7: a land whose subtype is SET to a basic type loses its rules-text
 -- abilities. So an object's static abilities are live unless a live SetLandSubtype
@@ -539,7 +537,7 @@ gather gs =
             gTimestamp = ContinuousEffect.timestamp eff,
             gModification = ContinuousEffect.modification eff
           }
-      stored = map fromStored (GameState.continuousEffects gs)
+      stored = fmap fromStored (GameState.continuousEffects gs)
       fromPermanent permId = case Game.lookupObject permId gs of
         Nothing -> []
         Just permObj -> case Game.cardOf permId gs of
@@ -561,7 +559,7 @@ gather gs =
                               gTimestamp = Object.timestamp permObj,
                               gModification = m
                             }
-                 in map gatherOne (Card.Type.staticAbilities card)
+                 in fmap gatherOne (Card.Type.staticAbilities card)
               else []
       static_ = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
@@ -573,7 +571,7 @@ gather gs =
             -- zone. Its static ability's continuous effect shares the emblem's
             -- entry timestamp (CR 613.7a). No liveness/text-change pass: nothing
             -- in scope strips an emblem's abilities or rewrites land types.
-            map
+            fmap
               ( \sa ->
                   MkGathered
                     { gSource = emblemId,
@@ -585,7 +583,7 @@ gather gs =
               )
               (Card.Type.staticAbilities card)
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
-   in stored ++ static_ ++ emblems ++ counterGathered gs
+   in stored <> static_ <> emblems <> counterGathered gs
 
 -- CR 122.1a / 613.4c: a +1/+1 counter adds +1/+1 and a -1/-1 counter adds -1/-1,
 -- in layer 7c. Emit each battlefield object's counters as ONE synthetic 7c
@@ -669,7 +667,7 @@ applyCharacteristicPT gs oid pc = case PC.characteristicPT pc of
 -- identity function over an empty candidate filter.
 projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectFrom cands oid gs =
-  let layers = Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (map gLayer cands)))
+  let layers = Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands)))
       applyLayer partial lyr =
         let seeded =
               if lyr == Layer.CharacteristicPT
@@ -734,7 +732,7 @@ replacementsAffecting gs =
       baseHas oid = case Game.cardOf oid gs of
         Nothing -> False
         Just card -> not (null (Card.Type.replacementEffects card))
-      forOne oid = map (\re -> (oid, re)) (replacementsOf oid gs)
+      forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []
         else concatMap forOne onBattlefield

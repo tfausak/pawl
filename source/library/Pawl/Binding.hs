@@ -152,8 +152,8 @@ fromChoices ::
   Set ModeIndex ->
   Map SlotName Binding
 fromChoices targets subtypes mAmount mModes =
-  let fromTargets = Map.map (\r -> Binding.empty {Binding.target = Just r}) targets
-      fromSubtypes = Map.map (\p -> Binding.empty {Binding.subtypes = Just p}) subtypes
+  let fromTargets = fmap (\r -> Binding.empty {Binding.target = Just r}) targets
+      fromSubtypes = fmap (\p -> Binding.empty {Binding.subtypes = Just p}) subtypes
       merged = Map.unionWith mergeBinding fromTargets fromSubtypes
       withX = case mAmount of
         Nothing -> merged
