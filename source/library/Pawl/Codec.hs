@@ -1746,19 +1746,32 @@ jsonToPrinting value = Printing.MkPrinting <$> jsonToCard value
 -- Slug -----------------------------------------------------------------------
 
 -- The file name for a card: case-folded, transliterated to ASCII, apostrophes
--- dropped, every remaining run of non-alphanumerics (spaces, punctuation, "//")
--- collapsed to a single "-", and the edges trimmed. "Urborg, Tomb of Yawgmoth"
--- -> "urborg-tomb-of-yawgmoth", "Serpent's Gift" -> "serpents-gift",
--- "Khabál Ghoul" -> "khabal-ghoul".
+-- dropped, every remaining run of non-alphanumeric-non-underscore characters
+-- (spaces, punctuation, "//") collapsed to a single "-", every run of
+-- underscores collapsed to a single "_", and the (hyphen) edges trimmed.
+-- "Urborg, Tomb of Yawgmoth" -> "urborg-tomb-of-yawgmoth", "Serpent's Gift" ->
+-- "serpents-gift", "Khabál Ghoul" -> "khabal-ghoul".
+--
+-- "_" is kept rather than treated as punctuation so a name built entirely from
+-- underscores -- Unhinged's literal "_____" and Unknown Event's "______" --
+-- slugifies to a non-empty blank rather than the empty string. Runs collapse
+-- to one underscore so a card's slug never depends on counting how many
+-- underscores its name has ("Knight in _____ Armor" ->
+-- "knight-in-_-armor"). A consequence: "_____" and "______" collapse to the
+-- same "_" and collide -- already true before this change (both slugified to
+-- ""), so this is not a regression, and it is one instance of the pool-scale
+-- collisions #166 already tracks.
 --
 -- Case-folding rather than lower-casing so "ß" folds to "ss" with no table
 -- entry. The keep-or-separate step is what makes the output ASCII
 -- unconditionally: a letter `transliterate` does not carry becomes a separator
 -- rather than leaking a non-ASCII byte into a file name.
 --
--- Idempotent -- the output is already [a-z0-9-] with no runs and no edge
--- hyphens -- which is why Pawl.Registry needs only one lookup function: a card
--- name and its slug are the same lookup.
+-- Idempotent -- the output is already [a-z0-9_-] with no runs of "-" or "_"
+-- and no edge hyphens -- which is why Pawl.Registry needs only one lookup
+-- function: a card name and its slug are the same lookup. Only hyphens are
+-- trimmed from the edges: trimming underscores too would turn "_____" back
+-- into the empty string.
 --
 -- Unique over the committed corpus (Pawl.CardSpec checks it), but not over the
 -- full ~34k-name pool: joke-set, playtest and blank-name cards collide (#166).
@@ -1767,9 +1780,13 @@ slugify t =
   let folded = Text.toCaseFold t
       unquoted = Text.filter (/= '\'') folded
       ascii = Text.concatMap transliterate unquoted
-      isSlugChar c = Char.isAsciiLower c || Char.isDigit c
+      isSlugChar c = Char.isAsciiLower c || Char.isDigit c || c == '_'
       keep c = if isSlugChar c then c else ' '
-   in Text.intercalate (Text.pack "-") (Text.words (Text.map keep ascii))
+      collapseUnderscores = Text.concat . fmap collapseRun . Text.group
+      collapseRun run = case Text.uncons run of
+        Just ('_', _) -> Text.singleton '_'
+        _ -> run
+   in Text.intercalate (Text.pack "-") (Text.words (collapseUnderscores (Text.map keep ascii)))
 
 -- ASCII stand-ins for the accented letters that occur in card names. Applied
 -- after case folding, so only the lower-case forms need entries. Everything

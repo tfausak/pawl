@@ -644,13 +644,22 @@ tests registry =
             HU.assertEqual "strasse" (Text.pack "strasse") (Codec.slugify (Text.pack "Straße")),
           HU.testCase "digits survive; the comma between them separates" $
             HU.assertEqual "borrowing-100-000-arrows" (Text.pack "borrowing-100-000-arrows") (Codec.slugify (Text.pack "Borrowing 100,000 Arrows")),
-          HU.testCase "a name with no alphanumerics slugifies to nothing" $
-            HU.assertEqual "empty" Text.empty (Codec.slugify (Text.pack "_____")),
+          HU.testCase "a run of underscores collapses to one, not nothing" $
+            HU.assertEqual "_" (Text.pack "_") (Codec.slugify (Text.pack "_____")),
+          HU.testCase "a name with nothing to keep slugifies to nothing" $
+            HU.assertEqual "empty" Text.empty (Codec.slugify (Text.pack "!!!")),
+          HU.testCase "an underscore run inside a name keeps its blank" $
+            HU.assertEqual
+              "knight-in-_-armor"
+              (Text.pack "knight-in-_-armor")
+              (Codec.slugify (Text.pack "Knight in _____ Armor")),
+          HU.testCase "a leading underscore run keeps its blank" $
+            HU.assertEqual "_-goblin" (Text.pack "_-goblin") (Codec.slugify (Text.pack "_____ Goblin")),
           QC.testProperty "idempotent: a slug slugifies to itself" $
             \s -> let t = Codec.slugify (Text.pack s) in Codec.slugify t QC.=== t,
-          QC.testProperty "the output is ASCII [a-z0-9-] throughout" $
+          QC.testProperty "the output is ASCII [a-z0-9-_] throughout" $
             \s ->
-              let ok c = Char.isAsciiLower c || Char.isDigit c || c == '-'
+              let ok c = Char.isAsciiLower c || Char.isDigit c || c == '-' || c == '_'
                in QC.property (Text.all ok (Codec.slugify (Text.pack s))),
           QC.testProperty "no leading, trailing, or doubled hyphen" $
             \s ->
