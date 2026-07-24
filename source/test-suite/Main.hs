@@ -27,6 +27,7 @@ import qualified Pawl.PlayerEffectSpec as PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec as PowerToughnessSpec
 import qualified Pawl.ProjectionSpec as ProjectionSpec
 import qualified Pawl.PropertySpec as PropertySpec
+import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec as RegistrySpec
 import qualified Pawl.ReplacementSpec as ReplacementSpec
 import qualified Pawl.ReplaySpec as ReplaySpec
@@ -34,22 +35,24 @@ import qualified Pawl.ResolveSpec as ResolveSpec
 import qualified Pawl.SetupSpec as SetupSpec
 import qualified Pawl.TriggerSpec as TriggerSpec
 import qualified Pawl.TurnSpec as TurnSpec
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Test.Tasty as Tasty
 
 main :: IO ()
 main = do
+  registry <- Registry.new "data/cards"
   cards <- Cards.loadCards
-  Tasty.defaultMain (testTree cards)
+  Tasty.defaultMain (testTree registry cards)
 
-testTree :: Cards.Cards -> Tasty.TestTree
-testTree cards =
+testTree :: Registry.Type.Registry -> Cards.Cards -> Tasty.TestTree
+testTree registry cards =
   Tasty.testGroup
     "pawl"
-    [ CoreSpec.tests cards,
+    [ CoreSpec.tests registry,
       BindingSpec.tests,
       CardSpec.tests cards,
       CardsSpec.tests cards,
-      TurnSpec.tests cards,
+      TurnSpec.tests registry,
       GameSpec.tests cards,
       SetupSpec.tests cards,
       MulliganSpec.tests cards,
@@ -58,7 +61,7 @@ testTree cards =
       DepartureSpec.tests,
       EventSpec.tests cards,
       ExpirySpec.tests cards,
-      ReplaySpec.tests cards,
+      ReplaySpec.tests registry,
       PropertySpec.tests cards,
       JsonSpec.tests,
       CodecSpec.tests cards,
@@ -66,15 +69,15 @@ testTree cards =
       CastSpec.tests cards,
       CostSpec.tests cards,
       CombatSpec.tests cards,
-      CountSpec.tests cards,
-      ConditionSpec.tests cards,
+      CountSpec.tests registry,
+      ConditionSpec.tests registry,
       ResolveSpec.tests cards,
       ProjectionSpec.tests cards,
       PowerToughnessSpec.tests cards,
       PlayerEffectSpec.tests cards,
-      ActivateSpec.tests cards,
+      ActivateSpec.tests registry,
       ModalSpec.tests cards,
-      CopySpec.tests cards,
+      CopySpec.tests registry,
       ReplacementSpec.tests cards,
       ColorSpec.tests cards,
       TriggerSpec.tests cards,

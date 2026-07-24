@@ -2,10 +2,10 @@
 module Pawl.ConditionSpec where
 
 import qualified Data.Set as Set
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Condition as Condition
 import qualified Pawl.Count as Count
 import qualified Pawl.Filter as Filter
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Aggregation as Aggregation
@@ -17,7 +17,9 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
+import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity.Type
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Zone as Zone
@@ -32,65 +34,75 @@ everyPermanent =
     (Filter.Type.And [])
     Aggregation.Objects
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards =
+-- n Swamps on the battlefield, and a ViewOf (via S.stubView, Pawl.Support's
+-- second consumer per Task 3) describing each of them.
+boardOf :: Printing.Printing -> Integer -> (Count.ViewOf, GameState.GameState)
+boardOf swamp n =
   let gs0 = Setup.emptyGame S.bothPlayers
-      -- n Swamps on the battlefield, and a ViewOf (via S.stubView, Pawl.Support's
-      -- second consumer per Task 3) describing each of them.
-      boardOf :: Integer -> (Count.ViewOf, GameState.GameState)
-      boardOf n =
-        let step (ids, g) _ =
-              let (oid, g') = S.addCreature (Cards.swampPrinting cards) S.alice g
-               in (ids <> [oid], g')
-            (oids, gs) = foldl step ([], gs0) [1 .. n]
-            table = fmap (\oid -> (oid, Set.empty, Set.singleton Subtype.Swamp, Just S.alice)) oids
-         in (S.stubView table, gs)
-      context = Filter.MkContext (Just S.alice) (Just (ObjectId.MkObjectId 0))
-      check n comparison threshold =
-        let (viewOf, gs) = boardOf n
-         in Condition.holds
-              viewOf
-              context
-              gs
-              (ObjectId.MkObjectId 0)
-              (Condition.Type.MkCondition everyPermanent comparison (Quantity.Type.Literal threshold))
-   in Tasty.testGroup
-        "Condition"
-        [ HU.testCase "CR 603.8 Exactly holds only on equality" $ do
-            HU.assertBool "0 == 0" (check 0 Comparison.Exactly 0)
-            HU.assertBool "1 /= 0" (not (check 1 Comparison.Exactly 0)),
-          HU.testCase "AtLeast holds at and above the threshold" $ do
-            HU.assertBool "3 >= 3" (check 3 Comparison.AtLeast 3)
-            HU.assertBool "2 < 3" (not (check 2 Comparison.AtLeast 3)),
-          HU.testCase "AtMost holds at and below the threshold" $ do
-            HU.assertBool "0 <= 1" (check 0 Comparison.AtMost 1)
-            HU.assertBool "1 <= 1" (check 1 Comparison.AtMost 1)
-            HU.assertBool "2 > 1" (not (check 2 Comparison.AtMost 1)),
-          HU.testCase "an undeterminable COUNT is false, never true" $
-            -- Relative with no perspective: Count.evaluate is Nothing, and a
-            -- total holds must collapse that to False (CR 611.2b's conservative
-            -- reading), not to a vacuous True.
-            let (viewOf, gs) = boardOf 0
-                count =
-                  Count.Type.MkCount
-                    (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
-                    (Filter.Type.And [])
-                    Aggregation.Objects
-             in HU.assertBool "false" . not $
-                  Condition.holds
-                    viewOf
-                    (Filter.MkContext Nothing Nothing)
-                    gs
-                    (ObjectId.MkObjectId 0)
-                    (Condition.Type.MkCondition count Comparison.Exactly (Quantity.Type.Literal 0)),
-          HU.testCase "an undeterminable THRESHOLD is false, never true" $
-            -- Quantity.X with no binding on the object: same collapse.
-            let (viewOf, gs) = boardOf 0
-             in HU.assertBool "false" . not $
-                  Condition.holds
-                    viewOf
-                    context
-                    gs
-                    (ObjectId.MkObjectId 0)
-                    (Condition.Type.MkCondition everyPermanent Comparison.Exactly Quantity.Type.X)
-        ]
+      step (ids, g) _ =
+        let (oid, g') = S.addCreature swamp S.alice g
+         in (ids <> [oid], g')
+      (oids, gs) = foldl step ([], gs0) [1 .. n]
+      table = fmap (\oid -> (oid, Set.empty, Set.singleton Subtype.Swamp, Just S.alice)) oids
+   in (S.stubView table, gs)
+
+context :: Filter.Context
+context = Filter.MkContext (Just S.alice) (Just (ObjectId.MkObjectId 0))
+
+check :: Printing.Printing -> Integer -> Comparison.Comparison -> Integer -> Bool
+check swamp n comparison threshold =
+  let (viewOf, gs) = boardOf swamp n
+   in Condition.holds
+        viewOf
+        context
+        gs
+        (ObjectId.MkObjectId 0)
+        (Condition.Type.MkCondition everyPermanent comparison (Quantity.Type.Literal threshold))
+
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry =
+  Tasty.testGroup
+    "Condition"
+    [ HU.testCase "CR 603.8 Exactly holds only on equality" $ do
+        swamp <- Registry.printing registry "Swamp"
+        HU.assertBool "0 == 0" (check swamp 0 Comparison.Exactly 0)
+        HU.assertBool "1 /= 0" (not (check swamp 1 Comparison.Exactly 0)),
+      HU.testCase "AtLeast holds at and above the threshold" $ do
+        swamp <- Registry.printing registry "Swamp"
+        HU.assertBool "3 >= 3" (check swamp 3 Comparison.AtLeast 3)
+        HU.assertBool "2 < 3" (not (check swamp 2 Comparison.AtLeast 3)),
+      HU.testCase "AtMost holds at and below the threshold" $ do
+        swamp <- Registry.printing registry "Swamp"
+        HU.assertBool "0 <= 1" (check swamp 0 Comparison.AtMost 1)
+        HU.assertBool "1 <= 1" (check swamp 1 Comparison.AtMost 1)
+        HU.assertBool "2 > 1" (not (check swamp 2 Comparison.AtMost 1)),
+      HU.testCase "an undeterminable COUNT is false, never true" $ do
+        -- Relative with no perspective: Count.evaluate is Nothing, and a
+        -- total holds must collapse that to False (CR 611.2b's conservative
+        -- reading), not to a vacuous True.
+        swamp <- Registry.printing registry "Swamp"
+        let (viewOf, gs) = boardOf swamp 0
+            count =
+              Count.Type.MkCount
+                (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
+                (Filter.Type.And [])
+                Aggregation.Objects
+        HU.assertBool "false" . not $
+          Condition.holds
+            viewOf
+            (Filter.MkContext Nothing Nothing)
+            gs
+            (ObjectId.MkObjectId 0)
+            (Condition.Type.MkCondition count Comparison.Exactly (Quantity.Type.Literal 0)),
+      HU.testCase "an undeterminable THRESHOLD is false, never true" $ do
+        -- Quantity.X with no binding on the object: same collapse.
+        swamp <- Registry.printing registry "Swamp"
+        let (viewOf, gs) = boardOf swamp 0
+        HU.assertBool "false" . not $
+          Condition.holds
+            viewOf
+            context
+            gs
+            (ObjectId.MkObjectId 0)
+            (Condition.Type.MkCondition everyPermanent Comparison.Exactly Quantity.Type.X)
+    ]

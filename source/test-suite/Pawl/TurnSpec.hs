@@ -2,8 +2,8 @@
 module Pawl.TurnSpec where
 
 import qualified Data.Sequence as Seq
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
@@ -12,6 +12,7 @@ import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 import qualified Test.Tasty.QuickCheck as QC
@@ -71,8 +72,8 @@ turnDataTests =
               HU.assertEqual "remaining" Turn.laterPhases (GameState.remaining gs)
     ]
 
-skipTests :: Cards.Cards -> Tasty.TestTree
-skipTests cards =
+skipTests :: Registry.Type.Registry -> Tasty.TestTree
+skipTests registry =
   Tasty.testGroup
     "Skip"
     [ HU.testCase "CR 508.8 dropSkippedCombatSteps removes declare blockers and combat damage" $
@@ -91,12 +92,13 @@ skipTests cards =
         let (gs, _, _) = S.combatBoardOf [] []
             after = snd (Engine.runGamePure S.aggressiveAnswer gs Engine.runStep)
          in HU.assertEqual "jumped past the two dead steps" (Phase.Combat CombatStep.EndOfCombat) (GameState.phase after),
-      HU.testCase "CR 508.8 an attacker keeps the declare blockers step" $
+      HU.testCase "CR 508.8 an attacker keeps the declare blockers step" $ do
         -- The control: with an attacker, the step after declare attackers is
         -- declare blockers, exactly as before. So the skip is not "always skip".
-        let (gs, _, _) = S.combatBoardOf [Cards.pikerPrinting cards] []
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = S.combatBoardOf [piker] []
             after = snd (Engine.runGamePure S.aggressiveAnswer gs Engine.runStep)
-         in HU.assertEqual "declare blockers still next" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase after),
+        HU.assertEqual "declare blockers still next" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase after),
       HU.testCase "CR 508.8 an attacker-less combat changes no life total" $
         -- End to end: run the whole combat region. No attackers means no damage,
         -- and the turn still leaves combat cleanly.
@@ -106,17 +108,18 @@ skipTests cards =
               HU.assertEqual "bob untouched" (Just 20) (S.lifeOf S.bob after)
               HU.assertEqual "alice untouched" (Just 20) (S.lifeOf S.alice after)
               HU.assertBool "left combat" (not (S.inCombatPhase (GameState.phase after))),
-      HU.testCase "CR 508.8 the skip stands even when an instant could have been cast" $
+      HU.testCase "CR 508.8 the skip stands even when an instant could have been cast" $ do
         -- bob holds a castable Bolt; nobody attacks. The blockers and damage
         -- steps are still dropped -- the priority windows an instant would use
         -- in them do not exist (CR 500.11: proceed as though they don't).
-        let (base, _) = S.boltInHand (Cards.mountainPrinting cards) (Cards.lightningBoltPrinting cards) 1 (Phase.Combat CombatStep.DeclareAttackers)
+        mountain <- Registry.printing registry "Mountain"
+        bolt <- Registry.printing registry "Lightning Bolt"
+        let (base, _) = S.boltInHand mountain bolt 1 (Phase.Combat CombatStep.DeclareAttackers)
             armed = base {GameState.activePlayer = S.bob}
             after = snd (Engine.runGamePure S.identityAnswer armed (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers)))
             remaining = foldr (:) [] (GameState.remaining after)
-         in do
-              HU.assertBool "no blockers step" (notElem (Phase.Combat CombatStep.DeclareBlockers) remaining)
-              HU.assertBool "no damage step" (notElem (Phase.Combat CombatStep.CombatDamage) remaining)
+        HU.assertBool "no blockers step" (notElem (Phase.Combat CombatStep.DeclareBlockers) remaining)
+        HU.assertBool "no damage step" (notElem (Phase.Combat CombatStep.CombatDamage) remaining)
     ]
 
 dedupe :: (Eq a) => [a] -> [a]
@@ -124,5 +127,5 @@ dedupe xs = case xs of
   [] -> []
   h : t -> h : dedupe (filter (/= h) t)
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests cards]
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests registry]

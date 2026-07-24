@@ -9,6 +9,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -19,6 +20,8 @@ import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.EntryOption as EntryOption
+import qualified Pawl.Type.Game as Game.Type
+import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ModeIndex as ModeIndex
@@ -27,7 +30,9 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Response as Response
+import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Test.Tasty as Tasty
@@ -147,47 +152,57 @@ combatReplayTests =
             HU.assertEqual "least eventful" Concession.Continues (Replay.defaultAnswer (Prompt.Concede S.alice))
         ]
 
-replayTests :: Cards.Cards -> Tasty.TestTree
-replayTests cards =
+-- The starting state, the game program, and a transcript recorded with
+-- playLandAnswer (whose choices differ from Replay's exhausted-transcript
+-- fallback, keeping the assertions below honest: the transcript has to
+-- actually carry the decisions). Built from Cards.loadCards rather than the
+-- Registry: S.redRed still needs the whole Cards.Cards record to build the
+-- red mirror deck, and that fixture isn't migrated until Task 11 ("the
+-- decks") -- see the batch's task report for the deviation.
+recordedGame :: IO (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
+recordedGame = do
+  cards <- Cards.loadCards
   let start = Setup.emptyGame (fmap fst (S.redRed cards))
       game = Engine.playFrom (S.redRed cards)
-      -- Recorded with playLandAnswer, whose choices differ from Replay's
-      -- exhausted-transcript fallback. That keeps these assertions honest: the
-      -- transcript has to actually carry the decisions.
       ((_, recorded), transcript) = Replay.record S.playLandAnswer start game
-   in Tasty.testGroup
-        "Replay"
-        [ HU.testCase "replaying a recorded game reproduces the final state" $
-            HU.assertEqual "final states equal" recorded (snd (Replay.replay transcript start game)),
-          HU.testCase "the transcript is what carries the decisions"
-            . HU.assertBool "empty log diverges"
-            $ recorded /= snd (Replay.replay [] start game),
-          HU.testCase "a recorded goldfish also replays" $
-            let ((_, gf), gfLog) = Replay.record S.identityAnswer start game
-             in HU.assertEqual "goldfish" gf (snd (Replay.replay gfLog start game)),
-          HU.testCase "a ChooseTargets answer round-trips through the transcript" $
-            let sets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.singleton (Recipient.ToPlayer S.bob))
-                p = Prompt.ChooseTargets (Decider.MkDecider S.alice) S.alice (ObjectId.MkObjectId 0) sets
-                answer = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToPlayer S.bob)
-             in HU.assertEqual "decode . encode = Just" (Just answer) (Replay.decode p (Replay.encode p answer)),
-          -- CR 700.2b/603.3d: the mode chosen as Aether Channeler's ETB trigger is
-          -- placed (Engine.placeOne prompts ChooseModes) records/replays exactly
-          -- like a spell's ChooseModes -- a Response.ChoseModes round-trips through
-          -- the DecisionLog byte-identically.
-          HU.testCase "Aether Channeler's trigger ChooseModes records and replays a Set ModeIndex" $
-            let acPrinting = Cards.aetherChannelerPrinting cards
-                (acId, gs) = S.addCreature acPrinting S.alice (Setup.emptyGame S.bothPlayers)
-                decider = Decide.deciderFor S.alice gs
-             in case Card.Type.triggeredAbilities (Printing.card acPrinting) of
-                  [ability] ->
-                    let legal = Target.fillableModes acId (TriggeredAbility.modal ability) gs
-                        p = Prompt.ChooseModes decider S.alice acId legal 1
-                        answer = Set.singleton (ModeIndex.MkModeIndex 2)
-                     in do
-                          HU.assertEqual "legal modes are 0 and 2 (bounce self-excluded)" (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]) legal
-                          HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer))
-                  _ -> HU.assertFailure "Aether Channeler must have exactly one triggered ability"
-        ]
+  pure (start, game, recorded, transcript)
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards = Tasty.testGroup "Replay" [replayTests cards, combatReplayTests]
+replayTests :: Registry.Type.Registry -> Tasty.TestTree
+replayTests registry =
+  Tasty.testGroup
+    "Replay"
+    [ HU.testCase "replaying a recorded game reproduces the final state" $ do
+        (start, game, recorded, transcript) <- recordedGame
+        HU.assertEqual "final states equal" recorded (snd (Replay.replay transcript start game)),
+      HU.testCase "the transcript is what carries the decisions" $ do
+        (start, game, recorded, _) <- recordedGame
+        HU.assertBool "empty log diverges" (recorded /= snd (Replay.replay [] start game)),
+      HU.testCase "a recorded goldfish also replays" $ do
+        (start, game, _, _) <- recordedGame
+        let ((_, gf), gfLog) = Replay.record S.identityAnswer start game
+        HU.assertEqual "goldfish" gf (snd (Replay.replay gfLog start game)),
+      HU.testCase "a ChooseTargets answer round-trips through the transcript" $
+        let sets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.singleton (Recipient.ToPlayer S.bob))
+            p = Prompt.ChooseTargets (Decider.MkDecider S.alice) S.alice (ObjectId.MkObjectId 0) sets
+            answer = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToPlayer S.bob)
+         in HU.assertEqual "decode . encode = Just" (Just answer) (Replay.decode p (Replay.encode p answer)),
+      -- CR 700.2b/603.3d: the mode chosen as Aether Channeler's ETB trigger is
+      -- placed (Engine.placeOne prompts ChooseModes) records/replays exactly
+      -- like a spell's ChooseModes -- a Response.ChoseModes round-trips through
+      -- the DecisionLog byte-identically.
+      HU.testCase "Aether Channeler's trigger ChooseModes records and replays a Set ModeIndex" $ do
+        acPrinting <- Registry.printing registry "Aether Channeler"
+        let (acId, gs) = S.addCreature acPrinting S.alice (Setup.emptyGame S.bothPlayers)
+            decider = Decide.deciderFor S.alice gs
+        case Card.Type.triggeredAbilities (Printing.card acPrinting) of
+          [ability] -> do
+            let legal = Target.fillableModes acId (TriggeredAbility.modal ability) gs
+                p = Prompt.ChooseModes decider S.alice acId legal 1
+                answer = Set.singleton (ModeIndex.MkModeIndex 2)
+            HU.assertEqual "legal modes are 0 and 2 (bounce self-excluded)" (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]) legal
+            HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer))
+          _ -> HU.assertFailure "Aether Channeler must have exactly one triggered ability"
+    ]
+
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry = Tasty.testGroup "Replay" [replayTests registry, combatReplayTests]
