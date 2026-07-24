@@ -105,6 +105,9 @@ tests cards =
           HU.testCase "PlayerCounterKind" $ do
             roundTrip "energy" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Energy
             roundTrip "poison" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Poison,
+          HU.testCase "CounterKind" $ do
+            HU.assertEqual "plus" (Right CounterKind.PlusOnePlusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.PlusOnePlusOne))
+            HU.assertEqual "minus" (Right CounterKind.MinusOneMinusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.MinusOneMinusOne)),
           HU.testCase "Zone" $
             roundTrip "zone" Codec.zoneToJson Codec.jsonToZone Zone.Graveyard,
           HU.testCase "Zone.Command" $
@@ -163,13 +166,6 @@ tests cards =
             roundTrip "e1" Codec.effectToJson Codec.jsonToEffect (Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 3)),
           HU.testCase "ModifyTarget" $
             roundTrip "e2" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (SlotName.MkSlotName (Text.pack "t"))),
-          HU.testCase "Duration.UntilYourNextTurn round-trips" $
-            HU.assertEqual "preserved" (Right Duration.UntilYourNextTurn) (Codec.jsonToDuration (Codec.durationToJson Duration.UntilYourNextTurn)),
-          HU.testCase "StateCondition.YouControlSource round-trips" $
-            HU.assertEqual "preserved" (Right StateCondition.YouControlSource) (Codec.jsonToStateCondition (Codec.stateConditionToJson StateCondition.YouControlSource)),
-          HU.testCase "Duration.ForAsLongAs round-trips with its condition" $
-            let d = Duration.ForAsLongAs StateCondition.YouControlSource
-             in HU.assertEqual "preserved" (Right d) (Codec.jsonToDuration (Codec.durationToJson d)),
           HU.testCase "AddMana" $
             roundTrip "e3" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana (ManaType.Colored Color.Green)),
           HU.testCase "ExileAllGraveyards" $
@@ -179,9 +175,6 @@ tests cards =
           HU.testCase "PutCounters effect round-trips through the codec" $
             let effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "creature"))
              in HU.assertEqual "round-trip" (Right effect) (Codec.jsonToEffect (Codec.effectToJson effect)),
-          HU.testCase "both CounterKinds round-trip" $ do
-            HU.assertEqual "plus" (Right CounterKind.PlusOnePlusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.PlusOnePlusOne))
-            HU.assertEqual "minus" (Right CounterKind.MinusOneMinusOne) (Codec.jsonToCounterKind (Codec.counterKindToJson CounterKind.MinusOneMinusOne)),
           HU.testCase "AffectPlayers round-trips" $
             roundTrip
               "e6"
@@ -199,6 +192,16 @@ tests cards =
           HU.testCase "PlaySubgame round-trips" $
             let e = Effect.PlaySubgame (SlotName.MkSlotName (Text.pack "loser"))
              in HU.assertEqual "PlaySubgame round-trips" (Right e) (Codec.jsonToEffect (Codec.effectToJson e))
+        ],
+      Tasty.testGroup
+        "duration + state condition"
+        [ HU.testCase "Duration.UntilYourNextTurn round-trips" $
+            HU.assertEqual "preserved" (Right Duration.UntilYourNextTurn) (Codec.jsonToDuration (Codec.durationToJson Duration.UntilYourNextTurn)),
+          HU.testCase "StateCondition.YouControlSource round-trips" $
+            HU.assertEqual "preserved" (Right StateCondition.YouControlSource) (Codec.jsonToStateCondition (Codec.stateConditionToJson StateCondition.YouControlSource)),
+          HU.testCase "Duration.ForAsLongAs round-trips with its condition" $
+            let d = Duration.ForAsLongAs StateCondition.YouControlSource
+             in HU.assertEqual "preserved" (Right d) (Codec.jsonToDuration (Codec.durationToJson d))
         ],
       Tasty.testGroup
         "player effects (P7)"
@@ -253,6 +256,22 @@ tests cards =
             mapM_
               (roundTrip "relation" Codec.playerRelationToJson Codec.jsonToPlayerRelation)
               [PlayerRelation.You, PlayerRelation.Opponent]
+        ],
+      -- Sits beside "filter (P9)": a TargetSpec is Pool + Maybe Filter +
+      -- Exclusion, so these exercise the Filter arm above in its embedded
+      -- position. Covers a bare pool (Nothing filter, omitted key), a filtered
+      -- pool, and the ExcludesSource value that carries "another".
+      Tasty.testGroup
+        "target spec (P9)"
+        [ HU.testCase "TargetSpec bare pool round-trips" $
+            let spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource
+             in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec)),
+          HU.testCase "TargetSpec filtered pool round-trips" $
+            let spec = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource
+             in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec)),
+          HU.testCase "TargetSpec ExcludesSource round-trips" $
+            let spec = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource
+             in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec))
         ],
       Tasty.testGroup
         "records"
@@ -415,19 +434,7 @@ tests cards =
                   (const True)
                   (const False)
                   (Codec.jsonToModal (Json.Object [(Text.pack "modes", Json.Array []), (Text.pack "selection", Codec.modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
-              ),
-          -- P9: TargetSpec is now Pool + Maybe Filter + Exclusion. Cover a bare
-          -- pool (Nothing filter, omitted key), a filtered pool, and the
-          -- ExcludesSource value that carries "another".
-          HU.testCase "TargetSpec bare pool round-trips" $
-            let spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource
-             in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec)),
-          HU.testCase "TargetSpec filtered pool round-trips" $
-            let spec = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource
-             in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec)),
-          HU.testCase "TargetSpec ExcludesSource round-trips" $
-            let spec = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource
-             in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec))
+              )
         ],
       Tasty.testGroup
         "honesty round-trip over allPrintings"

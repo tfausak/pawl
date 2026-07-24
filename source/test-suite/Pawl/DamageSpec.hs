@@ -26,7 +26,7 @@ import qualified Pawl.Type.DamagePattern as DamagePattern
 import qualified Pawl.Type.DamageRewrite as DamageRewrite
 import qualified Pawl.Type.Departure as Departure
 import qualified Pawl.Type.EndingStep as EndingStep
-import qualified Pawl.Type.Expiry as Expiry
+import qualified Pawl.Type.Expiry as Expiry.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
@@ -165,7 +165,7 @@ damageTests cards =
                 { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat)) DamageRewrite.PreventAll,
                   ActiveReplacement.source = victim,
                   ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
-                  ActiveReplacement.expiry = Expiry.AtCleanup,
+                  ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                   ActiveReplacement.uses = Uses.Unlimited
                 }
             withShield = S.addReplacement shield gs0
@@ -182,7 +182,7 @@ damageTests cards =
                 { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat)) DamageRewrite.PreventAll,
                   ActiveReplacement.source = ObjectId.MkObjectId 900,
                   ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
-                  ActiveReplacement.expiry = Expiry.AtCleanup,
+                  ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                   ActiveReplacement.uses = Uses.Unlimited
                 }
             dropped = Expiry.dropAtCleanup (S.addReplacement shield base)
@@ -490,7 +490,7 @@ grantDeathtouch oid gs =
         ContinuousEffect.MkContinuousEffect
           { ContinuousEffect.source = ObjectId.MkObjectId 997,
             ContinuousEffect.timestamp = Timestamp.MkTimestamp 500,
-            ContinuousEffect.expiry = Expiry.AtCleanup,
+            ContinuousEffect.expiry = Expiry.Type.AtCleanup,
             ContinuousEffect.modification = Modification.GainKeyword Keyword.Deathtouch,
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }

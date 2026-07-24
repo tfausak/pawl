@@ -42,40 +42,45 @@ import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
+-- Two distinct stand-in ids, named rather than spelled inline: nothing in this
+-- file looks either object up, so the only thing that matters about them is that
+-- they are not each other and not S.noSource.
+effectSource :: ObjectId.ObjectId
+effectSource = ObjectId.MkObjectId 998
+
+effectTarget :: ObjectId.ObjectId
+effectTarget = ObjectId.MkObjectId 997
+
 -- A stored continuous effect with a chosen expiry, over a stand-in target.
--- Object id 998 is the stand-in source (Support.withEffectAt's posture);
--- nothing here reads the source's characteristics.
 effectWith :: Expiry.Type.Expiry -> GameState.GameState -> GameState.GameState
 effectWith expiry gs =
   let (ts, gs1) = Game.freshTimestamp gs
       eff =
         ContinuousEffect.MkContinuousEffect
-          { ContinuousEffect.source = ObjectId.MkObjectId 998,
+          { ContinuousEffect.source = effectSource,
             ContinuousEffect.timestamp = ts,
             ContinuousEffect.expiry = expiry,
             ContinuousEffect.modification = Modification.GainKeyword Keyword.Flying,
-            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton (ObjectId.MkObjectId 999))
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton effectTarget)
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
--- A stand-in source and state for the three arms that don't consult either --
--- only Duration.ForAsLongAs reads them.
+-- A stand-in state for the three arms that consult neither source nor state --
+-- only Duration.ForAsLongAs reads them. They pass S.noSource for the source
+-- rather than a bare literal, which is what "not consulted" actually means here.
 armGs :: GameState.GameState
 armGs = Setup.emptyGame S.bothPlayers
-
-armSource :: ObjectId.ObjectId
-armSource = ObjectId.MkObjectId 999
 
 armTests :: Tasty.TestTree
 armTests =
   Tasty.testGroup
     "Arm"
     [ HU.testCase "CR 514.2 an until-end-of-turn duration arms to AtCleanup" $
-        HU.assertEqual "armed" (Just Expiry.Type.AtCleanup) (Expiry.arm S.alice armSource Duration.UntilEndOfTurn armGs),
+        HU.assertEqual "armed" (Just Expiry.Type.AtCleanup) (Expiry.arm S.alice S.noSource Duration.UntilEndOfTurn armGs),
       HU.testCase "CR 611.2a an indefinite duration arms to Never" $
-        HU.assertEqual "armed" (Just Expiry.Type.Never) (Expiry.arm S.alice armSource Duration.Indefinite armGs),
+        HU.assertEqual "armed" (Just Expiry.Type.Never) (Expiry.arm S.alice S.noSource Duration.Indefinite armGs),
       HU.testCase "CR 611.2a / 109.5 'until your next turn' bakes the controller" $
-        HU.assertEqual "armed" (Just (Expiry.Type.AtTurnOf S.alice)) (Expiry.arm S.alice armSource Duration.UntilYourNextTurn armGs)
+        HU.assertEqual "armed" (Just (Expiry.Type.AtTurnOf S.alice)) (Expiry.arm S.alice S.noSource Duration.UntilYourNextTurn armGs)
     ]
 
 handoffTests :: Tasty.TestTree
