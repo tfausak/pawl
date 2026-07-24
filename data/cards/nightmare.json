@@ -1,0 +1,76 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "characteristicPT": {
+    "type": "Count",
+    "value": [
+      { "type": "InZone", "value": [ { "type": "Battlefield" }, { "type": "EachPlayer" } ] },
+      {
+        "type": "And",
+        "value": [
+          { "type": "HasSubtype", "value": { "type": "Swamp" } },
+          { "type": "ControlledBy", "value": { "type": "You" } }
+        ]
+      },
+      { "type": "Objects" }
+    ]
+  },
+  "keywords": [
+    {
+      "type": "Flying"
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 5
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Nightmare",
+  "power": {
+    "type": "Star"
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Star"
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Nightmare"
+      },
+      {
+        "type": "Horse"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

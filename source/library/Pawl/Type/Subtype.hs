@@ -35,4 +35,6 @@ data Subtype
   | Soldier -- CR 205.3m (a creature type; Thalia, Guardian of Thraben's)
   | Phyrexian -- CR 205.3m (a creature type; Glistener Elf's)
   | Elf -- CR 205.3m (a creature type; Glistener Elf's)
+  | Nightmare -- CR 205.3m (a creature type; Nightmare's own)
+  | Horse -- CR 205.3m (a creature type; Nightmare's)
   deriving (Eq, Ord, Show)

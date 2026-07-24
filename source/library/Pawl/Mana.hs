@@ -86,6 +86,12 @@ subtypeMana subtype = case subtype of
   -- CR 205.3m: Elf is a creature type, not a basic land type, so CR 305.6's
   -- intrinsic mana ability never applies to it.
   Subtype.Elf -> Nothing
+  -- CR 205.3m: Nightmare is a creature type, not a basic land type, so CR
+  -- 305.6's intrinsic mana ability never applies to it.
+  Subtype.Nightmare -> Nothing
+  -- CR 205.3m: Horse is a creature type, not a basic land type, so CR 305.6's
+  -- intrinsic mana ability never applies to it.
+  Subtype.Horse -> Nothing
 
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
 -- PLUS every projected activated ability that is a mana ability (CR 605.1a),

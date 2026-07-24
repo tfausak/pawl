@@ -97,7 +97,8 @@ data Cards = MkCards
     terrorPrinting :: Printing.Printing,
     reprisalPrinting :: Printing.Printing,
     glistenerElfPrinting :: Printing.Printing,
-    longtuskCubPrinting :: Printing.Printing
+    longtuskCubPrinting :: Printing.Printing,
+    nightmarePrinting :: Printing.Printing
   }
   deriving (Eq, Show)
 
@@ -194,6 +195,7 @@ loadCards = do
   reprisalPrinting_ <- loadPrinting "reprisal"
   glistenerElfPrinting_ <- loadPrinting "glistener-elf"
   longtuskCubPrinting_ <- loadPrinting "longtusk-cub"
+  nightmarePrinting_ <- loadPrinting "nightmare"
   pure
     MkCards
       { mountainPrinting = mountainPrinting_,
@@ -279,7 +281,8 @@ loadCards = do
         terrorPrinting = terrorPrinting_,
         reprisalPrinting = reprisalPrinting_,
         glistenerElfPrinting = glistenerElfPrinting_,
-        longtuskCubPrinting = longtuskCubPrinting_
+        longtuskCubPrinting = longtuskCubPrinting_,
+        nightmarePrinting = nightmarePrinting_
       }
 
 allPrintings :: Cards -> [Printing.Printing]
@@ -367,7 +370,8 @@ allPrintings cards =
     terrorPrinting cards,
     reprisalPrinting cards,
     glistenerElfPrinting cards,
-    longtuskCubPrinting cards
+    longtuskCubPrinting cards,
+    nightmarePrinting cards
   ]
 
 redDeck :: Cards -> Deck.Deck
