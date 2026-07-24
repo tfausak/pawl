@@ -1,3 +1,9 @@
+- extensions:
+  - default: false
+  - name:
+    - GADTs
+    - RankNTypes
+
 # Prefer `f . g $ h x` over `f $ g $ h x`.
 - group: {name: dollar, enabled: true}
 

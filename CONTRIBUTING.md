@@ -57,9 +57,7 @@ easy to read, debug, and modify. The load-bearing rules:
 
 - **Stay in Haskell 2010.** Avoid language extensions; a staggering pile of them
   turns the language into many sub-languages. Reach for one only when there's no
-  reasonable alternative, and be ready to justify it. `NamedFieldPuns` is the one
-  exception, permitted where it makes record-heavy construction/pattern matching
-  clearer — it does not relax the non-punning rule for *constructor* names.
+  reasonable alternative, and be ready to justify it.
 - **Prefer explicit over point-free.** `case` over clever combinators, `do`
   notation over bare `>>=`, one equation with a `case` over multiple
   pattern-matching clauses.
