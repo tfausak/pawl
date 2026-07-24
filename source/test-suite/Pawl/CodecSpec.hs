@@ -29,7 +29,6 @@ import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Count as Count.Type
-import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.CounterPattern as CounterPattern
 import qualified Pawl.Type.DamageEvent as DamageEvent
@@ -520,8 +519,6 @@ tests cards =
               (TriggerCondition.StateIs (StateCondition.YouControlNo Subtype.Swamp)),
           HU.testCase "CreatureDealtCombatDamageToMonarch" $
             roundTrip "cd" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.CreatureDealtCombatDamageToMonarch,
-          HU.testCase "CountSpec.CreaturesDiedThisTurn round-trips" $
-            roundTrip "count" Codec.countSpecToJson Codec.jsonToCountSpec CountSpec.CreaturesDiedThisTurn,
           HU.testCase "AbilityName round-trips" $
             roundTrip "name" Codec.abilityNameToJson Codec.jsonToAbilityName (AbilityName.MkAbilityName (Text.pack "sacrifice it")),
           HU.testCase "ArmDelayedTrigger round-trips" $
@@ -599,6 +596,18 @@ tests cards =
                   (Scope.InZone Zone.Hand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
                   (Filter.Type.And [])
                   Aggregation.Objects
+              ),
+          HU.testCase "Quantity.Count round-trips (Task 5: shares the Count tag, not double-tagged)" $
+            roundTrip
+              "qcount"
+              Codec.quantityToJson
+              Codec.jsonToQuantity
+              ( Quantity.Count
+                  ( Count.Type.MkCount
+                      (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
+                      (Filter.Type.And [])
+                      Aggregation.DistinctCardTypes
+                  )
               ),
           HU.testCase "Condition round-trips at every comparison" $
             mapM_

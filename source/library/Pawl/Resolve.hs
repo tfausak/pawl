@@ -445,8 +445,10 @@ applyEffectWith :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Subt
 applyEffectWith runSubgame source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity -> do
     gs <- State.get
+    let viewOf o = Just (Projection.viewOfObject o gs)
+        context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Quantity.evaluate gs source (Just controller) quantity of
+      (Just recipient, True) -> case Quantity.evaluate viewOf context gs source quantity of
         -- An unevaluable quantity is a no-op, the powerOf posture.
         Nothing -> pure ()
         Just n ->
@@ -610,7 +612,9 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Draw quantity -> do
     gs <- State.get
-    case Quantity.evaluate gs source (Just controller) quantity of
+    let viewOf o = Just (Projection.viewOfObject o gs)
+        context = Filter.MkContext (Just controller) (Just source)
+    case Quantity.evaluate viewOf context gs source quantity of
       Just n
         | n > 0 ->
             -- CR 120: draw n, folding the shared primitive so each draw re-reads the
@@ -619,9 +623,11 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Mill slot quantity -> do
     gs <- State.get
+    let viewOf o = Just (Projection.viewOfObject o gs)
+        context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
-        case Quantity.evaluate gs source (Just controller) quantity of
+        case Quantity.evaluate viewOf context gs source quantity of
           Just n
             | n > 0 ->
                 -- CR 701.17/701.17b: top min(n, library) of the target's library to
@@ -633,9 +639,11 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Discard slot quantity -> do
     gs <- State.get
+    let viewOf o = Just (Projection.viewOfObject o gs)
+        context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
-        case Quantity.evaluate gs source (Just controller) quantity of
+        case Quantity.evaluate viewOf context gs source quantity of
           Just n
             | n > 0 -> do
                 let held = Game.zoneMembers Zone.Hand target gs
@@ -656,7 +664,9 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Create quantity card mSlot -> do
     gs <- State.get
-    case Quantity.evaluate gs source (Just controller) quantity of
+    let viewOf o = Just (Projection.viewOfObject o gs)
+        context = Filter.MkContext (Just controller) (Just source)
+    case Quantity.evaluate viewOf context gs source quantity of
       Just n
         | n > 0 -> do
             -- CR 111: create n tokens with these characteristics under the
@@ -798,10 +808,12 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.PutCounters kind quantity slot -> do
     gs <- State.get
+    let viewOf o = Just (Projection.viewOfObject o gs)
+        context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of
         Nothing -> pure () -- a player recipient takes no counters
-        Just target -> case Quantity.evaluate gs source (Just controller) quantity of
+        Just target -> case Quantity.evaluate viewOf context gs source quantity of
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
           -- CR 122.6: through the single funnel, so CR 614's counter replacements
           -- (Hardened Scales, Doubling Season) get their opportunity.
@@ -809,7 +821,9 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
   Effect.GainPlayerCounters kind quantity -> do
     gs <- State.get
-    case Quantity.evaluate gs source (Just controller) quantity of
+    let viewOf o = Just (Projection.viewOfObject o gs)
+        context = Filter.MkContext (Just controller) (Just source)
+    case Quantity.evaluate viewOf context gs source quantity of
       Just n
         | n > 0 ->
             -- CR 122 / 107.14: the resolving controller gains n counters of

@@ -119,7 +119,6 @@ library
     Pawl.Type.Count
     Pawl.Type.CounterKind
     Pawl.Type.CounterPattern
-    Pawl.Type.CountSpec
     Pawl.Type.DamageEvent
     Pawl.Type.DamageKind
     Pawl.Type.DamagePattern

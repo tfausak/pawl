@@ -3,9 +3,11 @@
   "castingPermissions": [],
   "characteristicPT": {
     "type": "Count",
-    "value": {
-      "type": "CardTypesInAllGraveyards"
-    }
+    "value": [
+      { "type": "InZone", "value": [ { "type": "Graveyard" }, { "type": "EachPlayer" } ] },
+      { "type": "And", "value": [] },
+      { "type": "DistinctCardTypes" }
+    ]
   },
   "keywords": [],
   "manaCost": [

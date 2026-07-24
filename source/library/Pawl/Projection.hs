@@ -72,75 +72,88 @@ layer m = case m of
 -- must not be re-read (CR 608.2h / 611.2d); it is frozen to Literals at store
 -- time by Resolve, via freezeQuantities.
 --
--- The `you` passed to Quantity.evaluate here is the AFFECTED object's controller.
--- That is correct for a characteristic-defining ability (CR 604.3a(3): a CDA does
--- not affect other objects, so its "you" is the object's own controller). It is
--- WRONG for a static ability carrying a player-scoped Count -- "the number of
--- cards in your hand" on a static ability means the SOURCE's controller's hand,
--- and Gathered.gSource is dropped before this function sees it, so the right
--- player is not available here at all (#34). This is the static-ability twin of
--- the stored-effect residual documented in freezeQuantities.
-applyModification :: GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
-applyModification gs oid m pc = case m of
-  Modification.GainKeyword k ->
-    pc {PC.keywords = Set.insert k (PC.keywords pc)}
-  -- CR 604.3: a characteristic-defining ability IS a static ability, so losing
-  -- all abilities loses it too. Layer 6, which is BEFORE 7a -- the reason the CDA
-  -- is folded in place from the partial rather than gathered up front.
-  Modification.LoseAllAbilities ->
-    pc
-      { PC.keywords = Set.empty,
-        PC.characteristicPT = Nothing,
-        PC.activatedAbilities = [],
-        PC.replacementEffects = [],
-        PC.triggeredAbilities = []
-      }
-  Modification.SetBasePowerToughness p t ->
-    pc
-      { PC.power = setPT (PC.power pc) (Quantity.evaluate gs oid (controllerOf oid gs) p),
-        PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate gs oid (controllerOf oid gs) t)
-      }
-  Modification.ModifyPowerToughness p t ->
-    pc
-      { PC.power = addPT (PC.power pc) (Quantity.evaluate gs oid (controllerOf oid gs) p),
-        PC.toughness = addPT (PC.toughness pc) (Quantity.evaluate gs oid (controllerOf oid gs) t)
-      }
-  Modification.AddLandSubtype s ->
-    pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
-  Modification.AddCardType t ->
-    pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
-  -- CR 305.7: setting a land's subtype to a basic type removes its old land
-  -- types AND strips its rules-text abilities (here: keywords and, via
-  -- rulesTextActive, its static abilities -- see gather). It gains the new mana
-  -- ability from the subtype (CR 305.6, read at the mana call site).
-  Modification.SetLandSubtype s ->
-    pc
-      { PC.subtypes = Set.singleton s,
-        PC.keywords = Set.empty,
-        PC.rulesTextActive = False
-      }
-  -- CR 612.1/612.2: a text-changing effect replaces one basic land type word with
-  -- another where the word is used AS a land type -- here, in the projected type
-  -- line. Layer 3, so it folds before layer 4 (Type): a hacked basic Mountain is
-  -- an Island by the time mana (CR 305.6) reads its subtypes. Absent `from` is a
-  -- no-op.
-  Modification.ChangeSubtypeWord from to ->
-    if Set.member from (PC.subtypes pc)
-      then pc {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc))}
-      else pc
-  -- CR 613.1b layer 2: control-changing effects apply here, but
-  -- ProjectedCharacteristics carries no controller field -- controllerOf reads
-  -- GameState.continuousEffects directly (a lean fold, not the full layer pass;
-  -- see its comment). This arm is identity so gather/project's uniform walk over
-  -- every stored effect stays total once a SetController effect exists.
-  Modification.SetController _ -> pc
-  Modification.SetColor cs ->
-    -- CR 105.3: the new colours replace all previous ones.
-    pc {PC.colors = cs}
-  -- CR 613.4d: "take the value of power and apply it to the creature's toughness,
-  -- and take the value of toughness and apply it to the creature's power."
-  Modification.SwitchPowerToughness ->
-    pc {PC.power = PC.toughness pc, PC.toughness = PC.power pc}
+-- CR 109.5: "for a static ability, this is the current controller of the object
+-- it's on" -- the effect's SOURCE's controller, not the affected object's. `src`
+-- (the Gathered candidate's own source, CR 611.2c) supplies both the
+-- perspective and the InSlot binding source for the built Filter.Context. `lyr`
+-- is the layer bound the Pawl.Type.Count fold sees (viewUpTo) -- the layers
+-- already applied when this modification is folded in. This is the #34 fix: a
+-- characteristic-defining ability is the OTHER case (CR 604.3a(3): a CDA does
+-- not directly affect the characteristics of any other object), and it is
+-- applied by applyCharacteristicPT, which builds its context from the
+-- object's OWN controller instead.
+--
+-- No card in the pool is a static ability carrying a Count, so this corrected
+-- branch is not exercised by any test today. A successor issue recording that
+-- gap is filed later in the M5.5 sequence (not yet numbered from here).
+applyModification :: Layer -> ObjectId -> [Gathered] -> GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
+applyModification lyr src cands gs oid m pc =
+  let context = Filter.MkContext (controllerOf src gs) (Just src)
+      viewOf = viewUpTo lyr cands gs
+   in case m of
+        Modification.GainKeyword k ->
+          pc {PC.keywords = Set.insert k (PC.keywords pc)}
+        -- CR 604.3: a characteristic-defining ability IS a static ability, so
+        -- losing all abilities loses it too. Layer 6, which is BEFORE 7a -- the
+        -- reason the CDA is folded in place from the partial rather than
+        -- gathered up front.
+        Modification.LoseAllAbilities ->
+          pc
+            { PC.keywords = Set.empty,
+              PC.characteristicPT = Nothing,
+              PC.activatedAbilities = [],
+              PC.replacementEffects = [],
+              PC.triggeredAbilities = []
+            }
+        Modification.SetBasePowerToughness p t ->
+          pc
+            { PC.power = setPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
+              PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate viewOf context gs oid t)
+            }
+        Modification.ModifyPowerToughness p t ->
+          pc
+            { PC.power = addPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
+              PC.toughness = addPT (PC.toughness pc) (Quantity.evaluate viewOf context gs oid t)
+            }
+        Modification.AddLandSubtype s ->
+          pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
+        Modification.AddCardType t ->
+          pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
+        -- CR 305.7: setting a land's subtype to a basic type removes its old
+        -- land types AND strips its rules-text abilities (here: keywords and,
+        -- via rulesTextActive, its static abilities -- see gather). It gains
+        -- the new mana ability from the subtype (CR 305.6, read at the mana
+        -- call site).
+        Modification.SetLandSubtype s ->
+          pc
+            { PC.subtypes = Set.singleton s,
+              PC.keywords = Set.empty,
+              PC.rulesTextActive = False
+            }
+        -- CR 612.1/612.2: a text-changing effect replaces one basic land type
+        -- word with another where the word is used AS a land type -- here, in
+        -- the projected type line. Layer 3, so it folds before layer 4 (Type):
+        -- a hacked basic Mountain is an Island by the time mana (CR 305.6)
+        -- reads its subtypes. Absent `from` is a no-op.
+        Modification.ChangeSubtypeWord from to ->
+          if Set.member from (PC.subtypes pc)
+            then pc {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc))}
+            else pc
+        -- CR 613.1b layer 2: control-changing effects apply here, but
+        -- ProjectedCharacteristics carries no controller field -- controllerOf
+        -- reads GameState.continuousEffects directly (a lean fold, not the full
+        -- layer pass; see its comment). This arm is identity so gather/project's
+        -- uniform walk over every stored effect stays total once a
+        -- SetController effect exists.
+        Modification.SetController _ -> pc
+        Modification.SetColor cs ->
+          -- CR 105.3: the new colours replace all previous ones.
+          pc {PC.colors = cs}
+        -- CR 613.4d: "take the value of power and apply it to the creature's
+        -- toughness, and take the value of toughness and apply it to the
+        -- creature's power."
+        Modification.SwitchPowerToughness ->
+          pc {PC.power = PC.toughness pc, PC.toughness = PC.power pc}
 
 -- CR 613.4b: layer 7b SETS base P/T to a specific value -- it ESTABLISHES P/T, so
 -- an object with no printed P/T that is set (an Opalescence-animated enchantment)
@@ -305,23 +318,32 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
         PC.triggeredAbilities = []
       }
   Just card ->
-    PC.MkProjectedCharacteristics
-      { PC.keywords = Card.Type.keywords card,
-        PC.colors = baseColorsOf card,
-        PC.power = case Card.Type.power card of
-          Nothing -> Nothing
-          Just (Power.MkPower q) -> Quantity.evaluate gs oid (controllerOf oid gs) q,
-        PC.toughness = case Card.Type.toughness card of
-          Nothing -> Nothing
-          Just (Toughness.MkToughness q) -> Quantity.evaluate gs oid (controllerOf oid gs) q,
-        PC.characteristicPT = seedCharacteristicPT card,
-        PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
-        PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
-        PC.rulesTextActive = True,
-        PC.activatedAbilities = Card.Type.activatedAbilities card,
-        PC.replacementEffects = Card.Type.replacementEffects card,
-        PC.triggeredAbilities = Card.Type.triggeredAbilities card
-      }
+    -- The seed predates every layer, including Copy (1) -- there is no
+    -- established view of ANYTHING yet, so a Count reached from here (a
+    -- printed power/toughness Quantity, never a real card's) gets a viewOf
+    -- that determines nothing rather than one that recurses back into
+    -- copiableCharacteristics/baseCharacteristics through viewUpTo/projectUpTo.
+    -- The context is still the object's own controller, the CDA posture (CR
+    -- 604.3a(3)) this seed already shares with applyCharacteristicPT.
+    let seedViewOf = const Nothing
+        seedContext = Filter.MkContext (controllerOf oid gs) (Just oid)
+     in PC.MkProjectedCharacteristics
+          { PC.keywords = Card.Type.keywords card,
+            PC.colors = baseColorsOf card,
+            PC.power = case Card.Type.power card of
+              Nothing -> Nothing
+              Just (Power.MkPower q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
+            PC.toughness = case Card.Type.toughness card of
+              Nothing -> Nothing
+              Just (Toughness.MkToughness q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
+            PC.characteristicPT = seedCharacteristicPT card,
+            PC.cardTypes = TypeLine.types (Card.Type.typeLine card),
+            PC.subtypes = TypeLine.subtypes (Card.Type.typeLine card),
+            PC.rulesTextActive = True,
+            PC.activatedAbilities = Card.Type.activatedAbilities card,
+            PC.replacementEffects = Card.Type.replacementEffects card,
+            PC.triggeredAbilities = Card.Type.triggeredAbilities card
+          }
 
 -- CR 202.2 / 204.2: an object's PRINTED colours -- the colours of the coloured
 -- mana symbols in its mana cost, together with the colours its colour indicator
@@ -443,7 +465,12 @@ freezeQuantities gs oid you m =
   -- the stored effect, where applyModification later evaluates it against the
   -- AFFECTED object and that object's controller -- the very mis-evaluation this
   -- freeze exists to prevent (#36).
-  let freeze q = maybe q Quantity.Type.Literal $ Quantity.evaluate gs oid you q
+  --
+  -- CR 608.2h / 611.2d: read the CURRENT state through the real projection --
+  -- `oid` is the source, `you` its controller, matching the doc above.
+  let viewOf o = Just (viewOfObject o gs)
+      context = Filter.MkContext you (Just oid)
+      freeze q = maybe q Quantity.Type.Literal $ Quantity.evaluate viewOf context gs oid q
    in case m of
         Modification.SetBasePowerToughness p t -> Modification.SetBasePowerToughness (freeze p) (freeze t)
         Modification.ModifyPowerToughness p t -> Modification.ModifyPowerToughness (freeze p) (freeze t)
@@ -663,14 +690,24 @@ project oid gs = projectFrom (gather gs) oid gs
 -- use a number that can't be determined, including inside a calculation, use 0
 -- instead of that number" -- which neither setPT nor a bare assignment
 -- implements, and neither does its CR 208.5 sibling at the read points (#65).
-applyCharacteristicPT :: GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
-applyCharacteristicPT gs oid pc = case PC.characteristicPT pc of
+--
+-- CR 604.3a(3): a characteristic-defining ability does not directly affect the
+-- characteristics of any OTHER object, so the built Filter.Context is the
+-- object's OWN controller -- contrast applyModification, whose context is the
+-- effect's SOURCE's controller (CR 109.5). `lyr`/`cands` are the same pair
+-- applyModification receives; the caller always passes Layer.CharacteristicPT
+-- for `lyr` here (see projectWith), so a CDA's count sees layers 1-6 -- control
+-- at layer 2 and type at layer 4, which is what Nightmare needs to see Urborg
+-- and Act of Treason.
+applyCharacteristicPT :: Layer -> [Gathered] -> GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
+applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
   Just (p, t) ->
-    let you = controllerOf oid gs
+    let context = Filter.MkContext (controllerOf oid gs) (Just oid)
+        viewOf = viewUpTo lyr cands gs
      in pc
-          { PC.power = setPT (PC.power pc) (Quantity.evaluate gs oid you p),
-            PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate gs oid you t)
+          { PC.power = setPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
+            PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate viewOf context gs oid t)
           }
 
 -- Project one object against a PRECOMBINED candidate list, applying only the
@@ -693,7 +730,7 @@ projectWith admits cands oid gs =
       applyLayer partial lyr =
         let seeded =
               if lyr == Layer.CharacteristicPT
-                then applyCharacteristicPT gs oid partial
+                then applyCharacteristicPT lyr cands gs oid partial
                 else partial
             here = filter (\c -> gLayer c == lyr && affects (gSource c) oid (gAffected c) seeded gs) cands
             -- CR 613.7 timestamp order within a layer; the CR 613.8b dependency
@@ -701,7 +738,7 @@ projectWith admits cands oid gs =
             -- applies to) is not implemented (#11). Existence dependencies are
             -- handled separately by staticAbilitiesLive.
             ordered = List.sortOn gTimestamp here
-            step pc c = applyModification gs oid (gModification c) pc
+            step pc c = applyModification lyr (gSource c) cands gs oid (gModification c) pc
          in List.foldl' step seeded ordered
    in List.foldl' applyLayer (copiableCharacteristics oid gs) layers
 

@@ -1,6 +1,6 @@
 module Pawl.Type.Quantity where
 
-import Pawl.Type.CountSpec (CountSpec)
+import Pawl.Type.Count (Count)
 
 -- A number that may not be a literal number.
 --
@@ -53,7 +53,7 @@ data Quantity
     Star
   | -- CR 208.2: composition, so a printed 1+* needs no constructor of its own.
     Plus Quantity Quantity
-  | -- A quantity that counts game state (CR 208.2a, CR 608.2h). See CountSpec
-    -- for why the payload is its own type.
-    Count CountSpec
+  | -- A quantity that counts game state (CR 208.2a, CR 608.2h). See
+    -- Pawl.Type.Count for why the payload is its own type.
+    Count Count
   deriving (Eq, Ord, Show)

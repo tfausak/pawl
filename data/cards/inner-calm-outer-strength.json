@@ -35,15 +35,19 @@
                 "value": [
                   {
                     "type": "Count",
-                    "value": {
-                      "type": "CardsInYourHand"
-                    }
+                    "value": [
+                      { "type": "InZone", "value": [ { "type": "Hand" }, { "type": "Relative", "value": { "type": "You" } } ] },
+                      { "type": "And", "value": [] },
+                      { "type": "Objects" }
+                    ]
                   },
                   {
                     "type": "Count",
-                    "value": {
-                      "type": "CardsInYourHand"
-                    }
+                    "value": [
+                      { "type": "InZone", "value": [ { "type": "Hand" }, { "type": "Relative", "value": { "type": "You" } } ] },
+                      { "type": "And", "value": [] },
+                      { "type": "Objects" }
+                    ]
                   }
                 ]
               },

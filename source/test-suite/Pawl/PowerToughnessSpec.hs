@@ -13,12 +13,17 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Type.CountSpec as CountSpec
+import qualified Pawl.Type.Aggregation as Aggregation
+import qualified Pawl.Type.Count as Count.Type
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Quantity as Quantity.Type
+import qualified Pawl.Type.Scope as Scope
+import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -32,7 +37,15 @@ tests cards =
         -- \*/1+*, so the pair is <count> and 1+<count>.
         let gs0 = Setup.emptyGame S.bothPlayers
             (goyfId, gs) = S.addCreature (Cards.tarmogoyfPrinting cards) S.alice gs0
-            count = Quantity.Type.Count CountSpec.CardTypesInAllGraveyards
+            -- CR 208.2a: Tarmogoyf's shape -- distinct card types over every
+            -- graveyard.
+            count =
+              Quantity.Type.Count
+                ( Count.Type.MkCount
+                    (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
+                    (Filter.Type.And [])
+                    Aggregation.DistinctCardTypes
+                )
          in HU.assertEqual
               "the CDA pair"
               (Just (count, Quantity.Type.Plus (Quantity.Type.Literal 1) count))

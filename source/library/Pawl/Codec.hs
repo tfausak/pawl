@@ -33,7 +33,6 @@ import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.Cost as Cost
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Count as Count.Type
-import qualified Pawl.Type.CountSpec as CountSpec
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.CounterPattern as CounterPattern
 import qualified Pawl.Type.DamageEvent as DamageEvent
@@ -209,21 +208,6 @@ jsonToPlayerCounterKind =
     (Text.pack "PlayerCounterKind")
     [ (Text.pack "Energy", PlayerCounterKind.Energy),
       (Text.pack "Poison", PlayerCounterKind.Poison)
-    ]
-
-countSpecToJson :: CountSpec.CountSpec -> Value
-countSpecToJson s = nullary . Text.pack $ case s of
-  CountSpec.CardTypesInAllGraveyards -> "CardTypesInAllGraveyards"
-  CountSpec.CardsInYourHand -> "CardsInYourHand"
-  CountSpec.CreaturesDiedThisTurn -> "CreaturesDiedThisTurn"
-
-jsonToCountSpec :: Value -> Either Text CountSpec.CountSpec
-jsonToCountSpec =
-  decodeNullary
-    (Text.pack "CountSpec")
-    [ (Text.pack "CardTypesInAllGraveyards", CountSpec.CardTypesInAllGraveyards),
-      (Text.pack "CardsInYourHand", CountSpec.CardsInYourHand),
-      (Text.pack "CreaturesDiedThisTurn", CountSpec.CreaturesDiedThisTurn)
     ]
 
 subtypeToJson :: Subtype.Subtype -> Value
@@ -973,6 +957,12 @@ manaCostToJson (ManaCost.MkManaCost xs) = listTo manaSymbolToJson xs
 jsonToManaCost :: Value -> Either Text ManaCost.ManaCost
 jsonToManaCost value = ManaCost.MkManaCost <$> listFrom jsonToManaSymbol value
 
+-- Quantity.Count's arm is `countToJson c` directly, NOT re-wrapped in another
+-- "Count" tag: countToJson already tags its own output "Count" (it is shared
+-- with Condition's embedding of a Count), and the two types happen to use the
+-- SAME tag name at two different levels. Re-wrapping would double-tag
+-- ({"type":"Count","value":{"type":"Count","value":[...]}}) -- guarded by the
+-- CodecSpec round-trip test.
 quantityToJson :: Quantity.Quantity -> Value
 quantityToJson q = case q of
   Quantity.Literal n -> Json.tagged (Text.pack "Literal") (Just (Json.jInt n))
@@ -980,7 +970,7 @@ quantityToJson q = case q of
   Quantity.X -> nullary (Text.pack "X")
   Quantity.Star -> nullary (Text.pack "Star")
   Quantity.Plus a b -> Json.tagged (Text.pack "Plus") (Just (Array [quantityToJson a, quantityToJson b]))
-  Quantity.Count s -> Json.tagged (Text.pack "Count") (Just (countSpecToJson s))
+  Quantity.Count c -> countToJson c
 
 jsonToQuantity :: Value -> Either Text Quantity.Quantity
 jsonToQuantity value = do
@@ -991,7 +981,10 @@ jsonToQuantity value = do
     ("X", _) -> Right Quantity.X
     ("Star", _) -> Right Quantity.Star
     ("Plus", Just (Array [x, y])) -> Quantity.Plus <$> jsonToQuantity x <*> jsonToQuantity y
-    ("Count", Just v) -> Quantity.Count <$> jsonToCountSpec v
+    -- jsonToCount re-derives the tag from the WHOLE value (see the comment on
+    -- quantityToJson) rather than from `mv`, which has already had it
+    -- stripped.
+    ("Count", _) -> Quantity.Count <$> jsonToCount value
     _ -> Left (Text.pack "unknown Quantity: " <> t)
 
 powerToJson :: Power.Power -> Value
