@@ -8,6 +8,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Type.Action as Action
+import qualified Pawl.Type.Concession as Concession
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.Program as Program
@@ -24,6 +25,7 @@ encode :: Prompt r -> r -> Response
 encode p answer = case p of
   Prompt.Shuffle _ -> Response.Shuffled answer
   Prompt.ChooseAction {} -> Response.ChoseAction answer
+  Prompt.Concede _ -> Response.Conceded answer
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
   Prompt.DeclareBlockers {} -> Response.DeclaredBlockers answer
@@ -56,6 +58,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseAction {} -> case response of
     Response.ChoseAction action -> Just action
+    _ -> Nothing
+  Prompt.Concede _ -> case response of
+    Response.Conceded concession -> Just concession
     _ -> Nothing
   Prompt.ChooseDiscard {} -> case response of
     Response.ChoseDiscard ids -> Just ids
@@ -115,6 +120,9 @@ defaultAnswer p = case p of
   Prompt.ChooseAction _ _ actions -> case actions of
     h : _ -> h
     [] -> Action.Pass
+  -- CR 104.3a: not conceding is always legal and is the least eventful fallback
+  -- when a transcript runs short.
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   -- Declining to attack or block is always legal, and is the least eventful
   -- thing a fallback can do.

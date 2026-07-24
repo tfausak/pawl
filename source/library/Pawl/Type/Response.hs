@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
+import Pawl.Type.Concession (Concession)
 import Pawl.Type.Cost (Cost)
 import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.ObjectId (ObjectId)
@@ -13,6 +14,9 @@ import Pawl.Type.Subtype (Subtype)
 
 data Response
   = ChoseAction Action
+  | -- CR 104.3a: whether a player conceded when asked, serialized so a
+    -- DecisionLog replays the concession deterministically.
+    Conceded Concession
   | Shuffled [ObjectId]
   | ChoseDiscard [ObjectId]
   | DeclaredAttackers [ObjectId]

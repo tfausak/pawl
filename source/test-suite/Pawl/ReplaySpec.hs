@@ -14,6 +14,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Decider as Decider
@@ -113,7 +114,16 @@ combatReplayTests =
              in HU.assertEqual
                   "the printed one"
                   printed
-                  (Replay.defaultAnswer (Prompt.ChooseCost decider S.alice oid [printed, alternative]))
+                  (Replay.defaultAnswer (Prompt.ChooseCost decider S.alice oid [printed, alternative])),
+          -- #133: the concede channel round-trips like every other prompt. Note
+          -- the prompt takes a PlayerId and NO Decider (CR 723.6).
+          HU.testCase "Concede round-trips both ways" $
+            let p = Prompt.Concede S.alice
+             in do
+                  HU.assertEqual "concedes" (Just Concession.Concedes) (Replay.decode p (Replay.encode p Concession.Concedes))
+                  HU.assertEqual "continues" (Just Concession.Continues) (Replay.decode p (Replay.encode p Concession.Continues)),
+          HU.testCase "a short transcript defaults a Concede to Continues" $
+            HU.assertEqual "least eventful" Concession.Continues (Replay.defaultAnswer (Prompt.Concede S.alice))
         ]
 
 replayTests :: Cards.Cards -> Tasty.TestTree

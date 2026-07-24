@@ -6,6 +6,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
+import Pawl.Type.Concession (Concession)
 import Pawl.Type.Cost (Cost)
 import Pawl.Type.Decider (Decider)
 import Pawl.Type.EntryOption (EntryOption)
@@ -18,6 +19,20 @@ import Pawl.Type.Subtype (Subtype)
 
 data Prompt r where
   ChooseAction :: Decider -> PlayerId -> [Action] -> Prompt Action
+  -- CR 104.3a: "A player can concede the game at any time. A player who concedes
+  -- leaves the game immediately." Asked before ChooseAction wherever a player
+  -- would receive priority.
+  --
+  -- This constructor deliberately carries NO Decider, and is the only one that
+  -- does not. That asymmetry IS the CR 723.6 mechanism: a controller may not make
+  -- a controlled player concede, but the controlled player may still concede
+  -- themselves -- so the ask must reach the true player, and there must be
+  -- nowhere to put a controller. Routing concede through ChooseAction (as an
+  -- Action constructor) would hand the controller exactly the power CR 723.6
+  -- forbids, and leave the controlled player with no channel at all.
+  --
+  -- "At any time" is narrowed to "at each priority grant" (#TBD-ELISION).
+  Concede :: PlayerId -> Prompt Concession
   Shuffle :: [ObjectId] -> Prompt [ObjectId]
   -- CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
   ChooseDiscard :: Decider -> PlayerId -> [ObjectId] -> Natural -> Prompt [ObjectId]

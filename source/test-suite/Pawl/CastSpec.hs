@@ -31,6 +31,7 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaType as ManaType
@@ -345,6 +346,7 @@ discardLastAnswer p = case p of
       [] -> Map.empty
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> A.Pass
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> lastN (fromIntegral n) ids
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
@@ -527,6 +529,7 @@ castFirstOption p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction {} -> A.Pass
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
@@ -565,6 +568,7 @@ castPanglacial p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction {} -> A.Pass
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty

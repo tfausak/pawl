@@ -106,6 +106,7 @@ library
     Pawl.Type.Color
     Pawl.Type.Combat
     Pawl.Type.CombatStep
+    Pawl.Type.Concession
     Pawl.Type.ContinuousEffect
     Pawl.Type.ControllerRelation
     Pawl.Type.Cost

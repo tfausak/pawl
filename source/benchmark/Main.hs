@@ -11,6 +11,7 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Json as Json
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Type.Action as Action
+import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.Deck as Deck
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.PlayerId as PlayerId
@@ -62,6 +63,7 @@ alwaysPass :: Prompt.Prompt r -> r
 alwaysPass p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> Action.Pass
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
@@ -87,6 +89,7 @@ alwaysPass p = case p of
 castAnswer :: Prompt.Prompt r -> r
 castAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
@@ -112,6 +115,7 @@ castAnswer p = case p of
 fightAnswer :: Prompt.Prompt r -> r
 fightAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of

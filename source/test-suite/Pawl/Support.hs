@@ -40,6 +40,7 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
@@ -125,6 +126,7 @@ identityAnswer p = case p of
       [] -> Map.empty
   Prompt.Shuffle ids -> ids
   Prompt.ChooseAction {} -> A.Pass
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
@@ -143,6 +145,7 @@ identityAnswer p = case p of
 castAnswer :: Prompt.Prompt r -> r
 castAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
@@ -183,6 +186,7 @@ aggressiveAnswer p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction {} -> A.Pass
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
@@ -208,6 +212,7 @@ aggressiveAnswer p = case p of
 playLandAnswer :: Prompt.Prompt r -> r
 playLandAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
@@ -240,6 +245,7 @@ playLandAnswer p = case p of
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
 randomAnswer p = case p of
+  Prompt.Concede _ -> pure Concession.Continues
   Prompt.DeclareAttackers _ _ ids -> do
     g <- State.get
     let (keep, g') = Random.uniformR (0, length ids) g

@@ -31,6 +31,7 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Departure as Departure
@@ -275,6 +276,7 @@ librarySize pid gs = length (Game.zoneMembers Zone.Library pid gs)
 -- who gets asked next.
 recordingAnswer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
 recordingAnswer p = case p of
+  Prompt.Concede _ -> pure Concession.Continues
   Prompt.DeclareAttackers {} -> pure []
   Prompt.DeclareBlockers {} -> pure Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -671,6 +673,7 @@ slaveAnswer p = case p of
       (\s -> if Set.member (Recipient.ToPlayer S.bob) s then Just (Recipient.ToPlayer S.bob) else Set.lookupMin s)
       sets
   Prompt.Shuffle ids -> ids
+  Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
