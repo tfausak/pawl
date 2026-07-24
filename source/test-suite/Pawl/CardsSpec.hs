@@ -4,14 +4,16 @@ module Pawl.CardsSpec where
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
-import qualified Pawl.Cards as Cards
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
+import qualified Pawl.Registry as Registry
+import qualified Pawl.Support as S
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -19,21 +21,22 @@ import qualified Test.Tasty.HUnit as HU
 slugOf :: Printing.Printing -> Text.Text
 slugOf = Codec.slugify . CardT.name . Printing.card
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards =
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry =
   Tasty.testGroup
     "Pawl.CardsSpec"
-    [ HU.testCase "slugs are unique" $
-        let slugs = fmap slugOf (Cards.allPrintings cards)
-         in HU.assertEqual "unique" (List.sort slugs) (List.sort (List.nub slugs)),
-      HU.testCase "each committed file re-parses to its compiled card (P3)" $
-        mapM_ checkFile (Cards.allPrintings cards),
-      HU.testCase "clone.json loads as a 0/0 Shapeshifter with an EntryR AsCopy" $
-        let c = Printing.card (Cards.clonePrinting cards)
-         in do
-              HU.assertEqual "entry replacement" [ReplacementEffect.EntryR EntryRewrite.AsCopy] (CardT.replacementEffects c)
-              HU.assertEqual "name" (Text.pack "Clone") (CardT.name c)
-              HU.assertEqual "power" (Just (Power.MkPower (Quantity.Literal 0))) (CardT.power c)
+    [ HU.testCase "slugs are unique" $ do
+        ps <- S.allPrintings registry
+        let slugs = fmap slugOf ps
+        HU.assertEqual "unique" (List.sort slugs) (List.sort (List.nub slugs)),
+      HU.testCase "each committed file re-parses to its compiled card (P3)" $ do
+        ps <- S.allPrintings registry
+        mapM_ checkFile ps,
+      HU.testCase "clone.json loads as a 0/0 Shapeshifter with an EntryR AsCopy" $ do
+        c <- Registry.card registry "Clone"
+        HU.assertEqual "entry replacement" [ReplacementEffect.EntryR EntryRewrite.AsCopy] (CardT.replacementEffects c)
+        HU.assertEqual "name" (Text.pack "Clone") (CardT.name c)
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Literal 0))) (CardT.power c)
     ]
 
 checkFile :: Printing.Printing -> HU.Assertion
@@ -41,7 +44,7 @@ checkFile p = do
   let path = "data/cards/" <> Text.unpack (slugOf p) <> ".json"
   contents <- TextIO.readFile path
   case Json.parse contents of
-    -- Unreachable: Cards.loadPrinting would have failed in IO first.
+    -- Unreachable: S.allPrintings would have failed in IO first.
     Left err -> HU.assertFailure (path <> ": " <> Text.unpack err)
     Right value ->
       -- The loader reads everything the file says and invents nothing:

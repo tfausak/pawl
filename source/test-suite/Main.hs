@@ -50,8 +50,8 @@ testTree registry cards =
     "pawl"
     [ CoreSpec.tests registry,
       BindingSpec.tests,
-      CardSpec.tests cards,
-      CardsSpec.tests cards,
+      CardSpec.tests registry,
+      CardsSpec.tests registry,
       TurnSpec.tests registry,
       GameSpec.tests registry cards,
       SetupSpec.tests cards,
