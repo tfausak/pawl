@@ -119,7 +119,7 @@ tests cards =
               Just bId -> do
                 HU.assertEqual "the copy-of-a-copy is a 2/1" (Just 2) (Projection.powerOf bId afterB)
                 HU.assertBool "the copy-of-a-copy is a creature" (Projection.isCreatureOf bId afterB),
-      HU.testCase "a copy survives its source leaving the battlefield (CR 707.9a lock)" $
+      HU.testCase "a copy survives its source leaving the battlefield (CR 707.5 lock)" $
         let gs0 = Setup.emptyGame S.bothPlayers
             (pikerId, board) = S.addPiker cards S.alice gs0
             (_, staged) = S.spellOnStack (Cards.clonePrinting cards) S.alice board

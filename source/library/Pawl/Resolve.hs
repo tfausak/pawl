@@ -371,7 +371,7 @@ resolveSpell = resolveSpellWith noSubgame
 -- CR 608.2: the executor shared by an activated ability (M3e) and a triggered
 -- ability (M3f) on the stack. Re-validate filled slots (CR 608.2b), fold
 -- applyEffect over the effects with `srcId` (the source permanent) as the effect
--- source (CR 608.2g), then the ability ceases (CR 608.2n). `stackId` is the
+-- source (CR 113.7), then the ability ceases (CR 608.2n). `stackId` is the
 -- ability object's own id.
 resolveEffects :: ObjectId -> ObjectId -> [Effect Card.Type.Card] -> Map.Map SlotName TargetSpec -> Game ()
 resolveEffects stackId srcId effects specs = do
@@ -410,7 +410,7 @@ resolveEffects stackId srcId effects specs = do
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
 -- (srcId), not the ability object -- so DealDamage comes from Prodigal Sorcerer
--- (CR 608.2g). CR 700.2c/M4g: reads only the ability's CHOSEN modes (stamped at
+-- (CR 113.7a). CR 700.2c/M4g: reads only the ability's CHOSEN modes (stamped at
 -- activation, Activate.activateAbility) via Modal.modesEffects/modesTargetSpecs,
 -- the same mode-scoping resolveSpell already applies to a modal spell. Reuses
 -- applyEffect with the same per-slot legality and CR 608.2b fizzle as a spell.

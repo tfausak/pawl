@@ -32,7 +32,7 @@ variableX = SlotName.MkSlotName (Text.pack "X")
 chosenModes :: SlotName
 chosenModes = SlotName.MkSlotName (Text.pack "modes")
 
--- CR 707.9a: the reserved slot under which an object's copy snapshot is stored
+-- CR 707.5: the reserved slot under which an object's copy snapshot is stored
 -- (P2). No card's targetSpecs may name it: a copy source is not a target.
 copySource :: SlotName
 copySource = SlotName.MkSlotName (Text.pack "copySource")

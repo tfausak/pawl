@@ -149,7 +149,7 @@ defaultAnswer p = case p of
   -- The first `count` legal modes, deterministically -- the least eventful
   -- fallback when a transcript runs short on a modal cast.
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
-  -- CR 707.9a: declining to copy is always legal, and is the least eventful
+  -- CR 707.5: declining to copy is always legal, and is the least eventful
   -- fallback -- Clone is a deterministic fixture, never in a random deck, so
   -- this is never exercised in play.
   Prompt.ChooseCopyTarget {} -> Nothing

@@ -34,7 +34,7 @@ data Response
   | -- CR 601.2b: the mode(s) a caster chose for a modal spell, serialized so a
     -- DecisionLog replays a modal cast deterministically.
     ChoseModes (Set ModeIndex)
-  | -- CR 707.9a: the permanent a copy chose to copy (Nothing = declined),
+  | -- CR 707.5: the permanent a copy chose to copy (Nothing = declined),
     -- serialized so a DecisionLog replays an as-enters copy deterministically.
     ChoseCopyTarget (Maybe ObjectId)
   | -- CR 208.2b: the index of the entry shape a player chose as an object entered,

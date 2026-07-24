@@ -25,7 +25,7 @@ data Binding = MkBinding
     -- ordering IS printed order (CR 608.2c), so resolution reads them pre-sorted.
     -- Stored only under the reserved Binding.chosenModes slot. Nothing elsewhere.
     modes :: Maybe (Set ModeIndex),
-    -- CR 707.2 / 707.9a: the copiable-value snapshot a permanent copies AS IT
+    -- CR 707.2 / 707.5: the copiable-value snapshot a permanent copies AS IT
     -- ENTERS (P2). Stored only under Pawl.Binding.copySource; the layer fold reads
     -- it as the layer-1 seed. Nothing for a non-copy object.
     copy :: Maybe ProjectedCharacteristics

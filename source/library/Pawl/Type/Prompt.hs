@@ -49,11 +49,14 @@ data Prompt r where
   -- criterion (the engine pre-filters to legal choices); Nothing is "fail to
   -- find," always permitted for a search of one's own library for a quality.
   SearchLibrary :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
-  -- The re-entrant cast opportunity during a library search (Panglacial Wurm).
-  -- The [ObjectId] is the searcher's library cards castable-while-searching (the
-  -- engine pre-filters to permitted, affordable, fillable). Nothing = decline /
-  -- done. Offered in a loop before the search finds (per the ruling), so multiple
-  -- copies may be cast. CR 605.3a permits mana activation to pay.
+  -- CR 608.2g: the re-entrant cast opportunity during a library search (Panglacial
+  -- Wurm) -- an effect that "specifically instructs or allows a player to cast a
+  -- spell during resolution", following CR 601.2a-i except that no player receives
+  -- priority after it is cast. The [ObjectId] is the searcher's library cards
+  -- castable-while-searching (the engine pre-filters to permitted, affordable,
+  -- fillable). Nothing = decline / done. Offered in a loop before the search finds
+  -- (per the ruling), so multiple copies may be cast. CR 605.3a permits mana
+  -- activation to pay.
   CastWhileSearching :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
   -- CR 601.2b: choose the value of X while casting (the ObjectId is the spell).
   -- Any Natural; payment (reject-not-repair) rejects an unaffordable choice, so
@@ -67,11 +70,11 @@ data Prompt r where
   -- The answer is the chosen subset. Prompted before X and targets, and ONLY when
   -- #legal > count; a forced selection is not asked.
   ChooseModes :: Decider -> PlayerId -> ObjectId -> Set ModeIndex -> Natural -> Prompt (Set ModeIndex)
-  -- CR 707.9a / 614.1c / 614.12a: as an object enters AS A COPY (Clone), its
+  -- CR 707.5 / 614.1c / 614.12a: as an object enters AS A COPY (Clone), its
   -- controller chooses which permanent to copy. The ObjectId is the entering
   -- object; the [ObjectId] is the legal copy targets (battlefield creatures other
-  -- than itself; the engine pre-filters). Nothing is the "may" decline (CR 707.9a
-  -- lets Clone enter as itself, a 0/0). Answered inside the zone change that puts
+  -- than itself; the engine pre-filters). Nothing is the "may" decline (Clone's
+  -- own wording, not a rule; it then enters as itself, a 0/0). Answered inside the zone change that puts
   -- the object onto the battlefield (CR 614.12a), before the enters event is
   -- recorded -- the choice really is made as the object enters. The legal set
   -- excludes anything entering in the same batch (CR 614.12a: a sibling
