@@ -42,15 +42,20 @@ openingHands owners = do
   -- sets drewFromEmpty here; the flag survives the loop, which is what CR 727.3 /
   -- 729.3's "regardless of any mulligans" means.
   Monad.forM_ owners (Monad.replicateM_ openingHand . Event.drawCard)
-  mulliganRounds owners Map.empty
+  mulliganRounds Map.empty owners
 
--- CR 103.5: repeat the declare-all-then-take-all round until no one mulligans.
-mulliganRounds :: [PlayerId] -> Map.Map PlayerId Numeric.Natural.Natural -> Game ()
-mulliganRounds owners counts = do
-  -- CR 103.5: the starting player declares first, then each other in turn order.
+-- CR 103.5: repeat the declare-all-then-take-all round until no still-deciding
+-- player mulligans. `deciding` is the players who have NOT yet kept -- keeping is
+-- terminal (CR 103.5: "that player may not take any further mulligans"), so a
+-- player who keeps drops out of the pool and is never asked again; only the
+-- mulliganers of a round remain to decide in the next one.
+mulliganRounds :: Map.Map PlayerId Numeric.Natural.Natural -> [PlayerId] -> Game ()
+mulliganRounds counts deciding = do
+  -- CR 103.5: the starting player declares first, then each other in turn order
+  -- (turn order is preserved: `deciding` is filtered from the original `owners`).
   -- A player whose hand is already zero cannot mulligan (final sentence) and is
-  -- treated as Keep without being asked.
-  decisions <- Monad.forM owners $ \pid -> do
+  -- treated as Keep without being asked -- which also drops them from the pool.
+  decisions <- Monad.forM deciding $ \pid -> do
     handSize <- State.gets (length . Game.zoneMembers Zone.Hand pid)
     if handSize <= 0
       then pure (pid, MulliganDecision.Keep)
@@ -61,14 +66,16 @@ mulliganRounds owners counts = do
         pure (pid, decision)
   let mulliganers = map fst (filter (\(_, d) -> d == MulliganDecision.Mulligan) decisions)
   case mulliganers of
-    -- CR 103.5: a round with no mulligans ends the process; hands are opening hands.
+    -- CR 103.5: a round with no mulligans ends the process; the remaining hands
+    -- are opening hands.
     [] -> pure ()
     _ -> do
       -- CR 103.5: "all players who decided to take mulligans do so at the same
       -- time." pawl is sequential; because a hand is hidden information, applying
       -- them in turn order is observably equivalent to simultaneity.
       counts' <- Monad.foldM takeMulligan counts mulliganers
-      mulliganRounds owners counts'
+      -- Kept players have dropped out; only this round's mulliganers decide again.
+      mulliganRounds counts' mulliganers
 
 -- CR 103.5: one player takes a mulligan -- shuffle hand back, redraw a full hand,
 -- then bottom `count` cards (count = mulligans now taken) in the player's order.
