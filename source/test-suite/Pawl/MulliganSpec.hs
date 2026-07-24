@@ -173,7 +173,9 @@ tests cards =
             gs0 = orderedLibraryGame cards printings
             after = run bottomReversedAnswer gs0
             bottomCards = map (\oid -> Game.cardOf oid after) (libBottom 2 S.alice after)
-            expectedCards = map (Just . Printing.card) [printings !! 15, printings !! 14]
+            -- The round-2 bottoming returns indices [15, 14] of distinctPrintings
+            -- (humility, then giantGrowth); named directly to avoid a partial `!!`.
+            expectedCards = map (Just . Printing.card) [Cards.humilityPrinting cards, Cards.giantGrowthPrinting cards]
          in HU.assertEqual "library bottom equals the chosen order exactly (humility, then giantGrowth)" expectedCards bottomCards,
       HU.testCase "CR 103.5: keeping is terminal -- a kept player is not asked again" $
         let gs0 = libraryGame cards 20
@@ -193,11 +195,13 @@ tests cards =
                 (Game.zoneMembers Zone.Library S.alice recorded)
                 (Game.zoneMembers Zone.Library S.alice replayed),
       HU.testCase "CR 727.3/729.3: a short library still flags drewFromEmpty through the mulligan path" $
-        -- bob has a 5-card library; his 7-card opening draw empties it and
-        -- flags the failed draw, regardless of any mulligans (CR 103.5 / 729.3).
+        -- bob has a 5-card library; his 7-card opening draw empties it and flags
+        -- the failed draw. Driven by an actual mulligan (mulliganUpTo 1) so the
+        -- flag is shown to SURVIVE the shuffle-back-and-redraw path, not merely
+        -- the initial draw -- "regardless of any mulligans" (CR 727.3 / 729.3).
         let g0 = Setup.emptyGame S.bothPlayers
             addMany pid n g = List.foldl' (\h _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid h)) g (replicate n ())
             gs0 = poolToLibrary S.bob (poolToLibrary S.alice (addMany S.bob 5 (addMany S.alice 20 g0)))
-            after = run keepAnswer gs0
+            after = run (mulliganUpTo 1) gs0
          in HU.assertBool "bob drew from an empty library" (Set.member S.bob (GameState.drewFromEmpty after))
     ]
