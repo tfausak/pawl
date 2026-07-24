@@ -620,11 +620,67 @@ ruleTests cards =
          in HU.assertEqual "a subgame replays deterministically (the reason PlaySubgame is not a Prompt, CR 729 / M0 determinism)" after replayed
     ]
 
+-- #133 / CR 104.3a. Concede is a special action, not a card, so the gate is
+-- gameplay-level. The central case is CR 723.6: a Mindslaver controller may not
+-- concede for the player they control, but that player may still concede
+-- themselves -- which is why Prompt.Concede carries no Decider.
+
+-- Concedes for exactly one player, continues for everyone else, and otherwise
+-- passes. The PlayerId the prompt carries is the TRUE player: if the engine ever
+-- routed this through Decide.deciderFor, this answerer would concede for the
+-- wrong person and the CR 723.6 test below would fail.
+concedeAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+concedeAnswer who p = case p of
+  Prompt.Concede asked -> if asked == who then Concession.Concedes else Concession.Continues
+  _ -> S.identityAnswer p
+
+concedeTests :: Cards.Cards -> Tasty.TestTree
+concedeTests cards =
+  Tasty.testGroup
+    "concede (CR 104.3a)"
+    [ HU.testCase "CR 104.3a/104.2a a concede ends the game immediately, opponent wins" $
+        let gs = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
+            after = S.runPure (concedeAnswer S.alice) gs Engine.runStep
+         in HU.assertEqual "bob wins" (Just (Result.Won S.bob)) (GameState.result after),
+      HU.testCase "the conceding player departs as Conceded, not Lost" $
+        let gs = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
+            after = S.runPure (concedeAnswer S.alice) gs Engine.runStep
+         in HU.assertEqual "reason recorded" (Just (Status.Departed Departure.Conceded)) (fmap Player.status (Map.lookup S.alice (GameState.players after))),
+      HU.testCase "CR 723.6 a controlled player concedes themselves; their controller cannot do it for them" $
+        -- alice controls bob (Mindslaver). Every ChooseAction for bob is answered
+        -- by alice. The concede ask is NOT: it reaches bob, and bob takes it.
+        -- If Prompt.Concede carried a Decider, this would be alice's call.
+        let gs =
+              (Setup.emptyGame S.bothPlayers)
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.bob,
+                  GameState.activeControl = Just (Decider.MkDecider S.alice)
+                }
+            after = S.runPure (concedeAnswer S.bob) gs Engine.runStep
+         in do
+              HU.assertEqual "bob left by his own concession" (Just (Status.Departed Departure.Conceded)) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
+              HU.assertEqual "alice wins" (Just (Result.Won S.alice)) (GameState.result after),
+      HU.testCase "CR 104.3a concede does not use the stack: a spell on it never resolves" $
+        -- A Lightning Bolt is on the stack targeting nothing in particular. alice
+        -- concedes at her priority; the game ends without the stack resolving.
+        let (spellId, base) = S.spellOnStack (Cards.lightningBoltPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+            gs =
+              base
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.stack = [spellId]
+                }
+            after = S.runPure (concedeAnswer S.alice) gs Engine.runStep
+         in do
+              HU.assertEqual "bob wins" (Just (Result.Won S.bob)) (GameState.result after)
+              HU.assertEqual "the spell never left the stack" [spellId] (GameState.stack after)
+    ]
+
 tests :: Cards.Cards -> Tasty.TestTree
 tests cards =
   Tasty.testGroup
     "Game"
-    [gameTests cards, actionTests cards, objectFactTests cards, engineTests cards, ruleTests cards, restartReentryTests cards]
+    [gameTests cards, actionTests cards, objectFactTests cards, engineTests cards, ruleTests cards, restartReentryTests cards, concedeTests cards]
 
 -- One Lightning Bolt in bob's hand.
 handBobBolt :: Cards.Cards -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)

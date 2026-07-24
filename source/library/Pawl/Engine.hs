@@ -37,7 +37,9 @@ import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.Deck as Deck
+import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.EndingStep as EndingStep
 import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameEvent as GameEvent
@@ -412,43 +414,56 @@ priorityLoop = do
                 case GameState.priority gs of
                   Nothing -> pure ()
                   Just p -> do
-                    -- CR 723.6: concede is not implemented — there is no Concede
-                    -- action or concede channel. When it is added it must read the
-                    -- true player `p`, never `decider`: a controller cannot concede
-                    -- on the controlled player's behalf (CR 104.3a). (#133)
-                    let decider = Decide.deciderFor p gs
-                        actions = Action.legalActions p gs
-                    chosen <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
-                    case chosen of
-                      Action.Type.Pass -> do
-                        let passes = GameState.passes gs + 1
-                            playing = length (Departure.stillPlaying gs)
-                        if passes >= fromIntegral playing
-                          then case GameState.stack gs of
-                            [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
-                            _ -> do
-                              Stack.resolveTopWith playSubgame
-                              settleForPriority
-                              State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (GameState.activePlayer g)})
-                              loop
-                          else do
-                            State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}
+                    -- CR 104.3a: asked before anything else, and keyed to `p` -- the
+                    -- TRUE player, never `Decide.deciderFor p`. Prompt.Concede carries
+                    -- no Decider precisely so this cannot be got wrong (CR 723.6): a
+                    -- controller may not concede for the player they control, though
+                    -- that player may still concede themselves.
+                    concession <- Trans.lift (Program.prompt (Prompt.Concede p))
+                    case concession of
+                      Concession.Concedes -> do
+                        -- CR 104.3a: leaves the game IMMEDIATELY. Not a state-based
+                        -- action (that is CR 104.3b), so it does not wait for a settle,
+                        -- and nothing goes on the stack -- there is nothing to respond
+                        -- to. leaveGame settles CR 104.2a on the spot; the loop's own
+                        -- `finished` check then unwinds on the next iteration.
+                        Departure.leaveGame Departure.Type.Conceded p
+                        State.modify' (\g -> g {GameState.priority = Just (nextStillPlaying g p)})
+                        loop
+                      Concession.Continues -> do
+                        let decider = Decide.deciderFor p gs
+                            actions = Action.legalActions p gs
+                        chosen <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
+                        case chosen of
+                          Action.Type.Pass -> do
+                            let passes = GameState.passes gs + 1
+                                playing = length (Departure.stillPlaying gs)
+                            if passes >= fromIntegral playing
+                              then case GameState.stack gs of
+                                [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
+                                _ -> do
+                                  Stack.resolveTopWith playSubgame
+                                  settleForPriority
+                                  State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (GameState.activePlayer g)})
+                                  loop
+                              else do
+                                State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}
+                                loop
+                          Action.Type.Play oid -> do
+                            Event.changeZone oid Zone.Battlefield
+                            State.modify' (\g -> g {GameState.landPlayed = Set.insert p (GameState.landPlayed g), GameState.passes = 0, GameState.priority = Just p})
+                            settleForPriority
                             loop
-                      Action.Type.Play oid -> do
-                        Event.changeZone oid Zone.Battlefield
-                        State.modify' (\g -> g {GameState.landPlayed = Set.insert p (GameState.landPlayed g), GameState.passes = 0, GameState.priority = Just p})
-                        settleForPriority
-                        loop
-                      Action.Type.Cast oid -> do
-                        Cast.castSpell p oid
-                        State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
-                        settleForPriority
-                        loop
-                      Action.Type.Activate oid ability -> do
-                        Activate.activateAbility p oid ability
-                        State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
-                        settleForPriority
-                        loop
+                          Action.Type.Cast oid -> do
+                            Cast.castSpell p oid
+                            State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                            settleForPriority
+                            loop
+                          Action.Type.Activate oid ability -> do
+                            Activate.activateAbility p oid ability
+                            State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                            settleForPriority
+                            loop
   settleForPriority
   loop
 
