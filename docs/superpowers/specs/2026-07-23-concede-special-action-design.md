@@ -139,13 +139,22 @@ sites of `stillPlaying` across `Target`, `Engine`, and `Combat` re-point.
 
 ## 6. Cost, stated plainly
 
-Every prompt has a `Response` arm, two `Replay` arms (record and fold), and a
-`Codec` arm. This change therefore touches: `Pawl.Type.Concession` (new),
-`Pawl.Type.Prompt`, `Pawl.Type.Response`, `Pawl.Replay` ×3 (record, fold, and the
-deterministic short-transcript fallback, which answers `Continues` as the least
-eventful choice), `Pawl.Codec` ×2, `Pawl.Departure` (new), `Pawl.Sba`,
-`Pawl.Engine`, plus `Pawl.Support` and every spec-local and benchmark answer
-function.
+Every prompt has a `Response` arm and three `Replay` arms. This change therefore
+touches: `Pawl.Type.Concession` (new), `Pawl.Type.Prompt`, `Pawl.Type.Response`,
+`Pawl.Replay` ×3 (`encode`, `decode`, and `defaultAnswer` — the deterministic
+short-transcript fallback, which answers `Continues` as the least eventful
+choice), `Pawl.Departure` (new), `Pawl.Sba`, `Pawl.Engine`, plus the
+prompt-answering functions that case on the GADT *exhaustively*.
+
+`Pawl.Codec` needs **no** arm: `Response` has no JSON codec at all (it is
+referenced only by `Pawl.Replay` and `Pawl.Type.DecisionLog`), which is the same
+absence #126 tracks. An earlier draft of this section claimed two `Codec` arms;
+that was wrong.
+
+Most answer functions in the suite end in `_ -> S.identityAnswer p` and need
+nothing. The exhaustive ones — which `-Werror=incomplete-patterns` will name
+precisely — live in `Pawl.Support`, `Pawl.CastSpec`, `Pawl.GameSpec`,
+`Pawl.ReplaySpec`, and the benchmark's `Main.hs`.
 
 Prompt volume roughly doubles — the benchmark games issue 650–1800 `ChooseAction`
 prompts — and replay logs grow accordingly. This is the honest price. Conceding
