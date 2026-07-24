@@ -56,8 +56,8 @@ section a task cites before starting it.
 - Commit messages end with:
   `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`
 
-**TDD applies to Tasks 1, 2 and 11** — new behavior, so write the failing test,
-run it, watch it fail, then implement. **Tasks 3–10 and 12 are refactors**: the
+**TDD applies to Tasks 1 and 2** — new behavior, so write the failing test,
+run it, watch it fail, then implement. **Tasks 3–12 are refactors**: the
 existing suite is the oracle, so the cycle is "change, build, run the affected
 tests, commit". Never weaken an assertion or delete a test to make a check pass.
 If the plan looks wrong, stop and say so.
