@@ -75,7 +75,7 @@ Pure refactor plus one genuinely new function (`leaveGame`). No existing behavio
 - Consumes: nothing from earlier tasks.
 - Produces: `Departure.stillPlaying :: GameState -> [PlayerId]`, `Departure.depart :: Departure -> PlayerId -> GameState -> GameState`, `Departure.outcomeAfterLeaving :: [PlayerId] -> GameState -> Maybe Result`, `Departure.leaveGame :: Departure -> PlayerId -> Game ()`. Task 3 calls `leaveGame`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `source/test-suite/Pawl/DepartureSpec.hs`:
 
@@ -126,7 +126,7 @@ tests =
 
 Wire it into `source/test-suite/Main.hs`: add `import qualified Pawl.DepartureSpec` alongside the other spec imports, and add `Pawl.DepartureSpec.tests` to the `testTree` list. Match the exact style of the neighbouring entries — read the file first.
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 cabal build pawl-test-suite --enable-tests
@@ -134,7 +134,7 @@ cabal build pawl-test-suite --enable-tests
 
 Expected: FAIL — `Could not find module 'Pawl.Departure'`. That is the correct failure; the module does not exist yet.
 
-- [ ] **Step 3: Create `Pawl.Departure`**
+- [x] **Step 3: Create `Pawl.Departure`**
 
 Create `source/library/Pawl/Departure.hs`:
 
@@ -197,7 +197,7 @@ leaveGame reason pid = State.modify' $ \gs ->
    in departed {GameState.result = outcomeAfterLeaving [pid] departed <|> GameState.result departed}
 ```
 
-- [ ] **Step 4: Run the new tests**
+- [x] **Step 4: Run the new tests**
 
 ```bash
 cabal test 2>&1 | grep -E "Departure|^All [0-9]+|FAIL"
@@ -205,7 +205,7 @@ cabal test 2>&1 | grep -E "Departure|^All [0-9]+|FAIL"
 
 Expected: the four `Departure` cases PASS. The rest of the suite may not build yet — that is Step 5.
 
-- [ ] **Step 5: Delete the old definitions from `Pawl.Sba` and delegate**
+- [x] **Step 5: Delete the old definitions from `Pawl.Sba` and delegate**
 
 In `source/library/Pawl/Sba.hs`:
 
@@ -251,7 +251,7 @@ with:
 
 5. Remove any import that is now unused. `-Werror=unused-imports` will name them; expect `Pawl.Type.Result` and possibly `Pawl.Type.Status` to survive (`losesNow` still uses `Status.Playing`) — let the compiler decide, do not guess.
 
-- [ ] **Step 6: Re-point the five `Sba.stillPlaying` call sites**
+- [x] **Step 6: Re-point the five `Sba.stillPlaying` call sites**
 
 Each file gains `import qualified Pawl.Departure as Departure` (none of the three currently imports anything named `Departure`, so there is no collision) and changes `Sba.stillPlaying` to `Departure.stillPlaying`:
 
@@ -261,7 +261,7 @@ Each file gains `import qualified Pawl.Departure as Departure` (none of the thre
 
 If removing the last `Sba.` use from a file makes its `Pawl.Sba` import unused, delete that import — the compiler will say so.
 
-- [ ] **Step 7: Build clean and run the whole suite**
+- [x] **Step 7: Build clean and run the whole suite**
 
 ```bash
 cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -iE "error|warning"
@@ -270,7 +270,7 @@ cabal test 2>&1 | grep -E "^All [0-9]+|FAIL"
 
 Expected: no warnings, and **935 tests pass** (931 before, plus the 4 new `Departure` cases). If any pre-existing test fails, the extraction changed behaviour — stop and diagnose rather than editing the test.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add <the exact files this task touched> pawl.cabal
@@ -310,7 +310,7 @@ Types and interpreters only. Nothing polls the new prompt yet, so there is still
 - Consumes: nothing from Task 1.
 - Produces: `Concession.Concession = Concedes | Continues`; `Prompt.Concede :: PlayerId -> Prompt Concession`; `Response.Conceded Concession`. Task 3 prompts with `Prompt.Concede`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/ReplaySpec.hs`, add to the existing round-trip group (match the file's surrounding style — read it first):
 
@@ -328,7 +328,7 @@ In `source/test-suite/Pawl/ReplaySpec.hs`, add to the existing round-trip group 
 
 Add `import qualified Pawl.Type.Concession as Concession` to `ReplaySpec.hs`.
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 cabal build pawl-test-suite --enable-tests
@@ -336,7 +336,7 @@ cabal build pawl-test-suite --enable-tests
 
 Expected: FAIL — `Could not find module 'Pawl.Type.Concession'` and `Not in scope: data constructor 'Prompt.Concede'`.
 
-- [ ] **Step 3: Create the `Concession` type**
+- [x] **Step 3: Create the `Concession` type**
 
 Create `source/library/Pawl/Type/Concession.hs`:
 
@@ -354,7 +354,7 @@ data Concession
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Add the `Concede` prompt**
+- [x] **Step 4: Add the `Concede` prompt**
 
 In `source/library/Pawl/Type/Prompt.hs`, add the import `import Pawl.Type.Concession (Concession)` and add this constructor immediately after `ChooseAction` (they are asked back to back, so they should read together):
 
@@ -377,7 +377,7 @@ In `source/library/Pawl/Type/Prompt.hs`, add the import `import Pawl.Type.Conces
 
 Leave the literal text `#TBD-ELISION` in place; Task 4 replaces it with the real issue number.
 
-- [ ] **Step 5: Add the `Response` arm**
+- [x] **Step 5: Add the `Response` arm**
 
 In `source/library/Pawl/Type/Response.hs`, add `import Pawl.Type.Concession (Concession)` and this arm (placement: immediately after `ChoseAction`, matching the prompt order):
 
@@ -387,7 +387,7 @@ In `source/library/Pawl/Type/Response.hs`, add `import Pawl.Type.Concession (Con
     Conceded Concession
 ```
 
-- [ ] **Step 6: Add the three `Replay` arms**
+- [x] **Step 6: Add the three `Replay` arms**
 
 In `source/library/Pawl/Replay.hs`, add `import qualified Pawl.Type.Concession as Concession`, then:
 
@@ -413,7 +413,7 @@ In `defaultAnswer`, alongside the other fallbacks:
   Prompt.Concede _ -> Concession.Continues
 ```
 
-- [ ] **Step 7: Add the arm to every exhaustive answer function**
+- [x] **Step 7: Add the arm to every exhaustive answer function**
 
 ```bash
 cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -E "incomplete-patterns" -A 4
@@ -431,7 +431,7 @@ and the `Pawl.Type.Concession` import. For `randomAnswer`, whose result is in `S
 
 **Every one of these answers `Continues`.** A test answer function that conceded would end the game before the behaviour it is testing. Task 3 introduces the one function that ever answers `Concedes`.
 
-- [ ] **Step 8: Build clean and run the suite**
+- [x] **Step 8: Build clean and run the suite**
 
 ```bash
 cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -iE "error|warning"
@@ -440,7 +440,7 @@ cabal test 2>&1 | grep -E "Concede|^All [0-9]+|FAIL"
 
 Expected: no warnings; **937 tests pass** (935 plus the 2 new `ReplaySpec` cases). No existing test changes behaviour, because nothing prompts `Concede` yet.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add <the exact files this task touched> pawl.cabal
@@ -474,7 +474,7 @@ Where the behaviour arrives.
 - Consumes: `Departure.leaveGame` (Task 1); `Prompt.Concede`, `Concession.Concedes`, `Concession.Continues` (Task 2).
 - Produces: nothing further.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/GameSpec.hs`, append a new group and wire it into the file's `tests` list alongside `restartReentryTests cards`:
 
@@ -540,7 +540,7 @@ Imports to add to `GameSpec.hs` if absent: `Pawl.Type.Concession as Concession`,
 
 `S.handOne` puts one card in a player's hand and returns its id; check its exact signature in `Pawl.Support` and adjust the binding if it differs from `(GameState, ObjectId)`.
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 ```bash
 cabal test 2>&1 | grep -E "concede \(CR|expected|but got|FAIL"
@@ -548,7 +548,7 @@ cabal test 2>&1 | grep -E "concede \(CR|expected|but got|FAIL"
 
 Expected: all four FAIL. `GameState.result` will be `Nothing` because nothing ever asks `Prompt.Concede`, so `concedeAnswer` is never consulted.
 
-- [ ] **Step 3: Poll the prompt**
+- [x] **Step 3: Poll the prompt**
 
 In `source/library/Pawl/Engine.hs`, add the imports:
 
@@ -603,7 +603,7 @@ The whole remaining body of the `Just p` branch (the `case chosen of …` block)
 
 Note `nextStillPlaying` already exists in `Pawl.Engine`; it takes the state and the current player. Confirm its exact signature at its definition before using it.
 
-- [ ] **Step 4: Run the new tests, then the whole suite**
+- [x] **Step 4: Run the new tests, then the whole suite**
 
 ```bash
 cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -iE "error|warning"
@@ -614,7 +614,7 @@ Expected: no warnings; the four concede cases PASS; **941 tests pass**.
 
 If a pre-existing test now fails, the likely cause is an answer function from Task 2 that answers `Concedes`. Fix the answerer, never the assertion.
 
-- [ ] **Step 5: Check the benchmark still measures a game**
+- [x] **Step 5: Check the benchmark still measures a game**
 
 ```bash
 cabal bench 2>&1 | tail -12
@@ -622,7 +622,7 @@ cabal bench 2>&1 | tail -12
 
 Expected: three benchmarks that still differ from each other. Prompt volume roughly doubles, so absolute times may rise; what must not happen is the three collapsing to the same number, which would mean a benchmark answerer is conceding immediately.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add <the exact files this task touched>
@@ -655,7 +655,7 @@ enforces what it asked readers to remember."
 - Modify: `source/library/Pawl/Type/Prompt.hs` (replace the `#TBD-ELISION` placeholder)
 - Modify: `docs/superpowers/specs/2026-07-23-concede-special-action-design.md` (status line)
 
-- [ ] **Step 1: File the elision issue**
+- [x] **Step 1: File the elision issue**
 
 ```bash
 gh issue create --label elision --label rules-correctness --label expires:card-driven \
@@ -673,7 +673,7 @@ Expiry trigger: a card or subsystem requiring concession outside one'"'"'s own p
 Design: docs/superpowers/specs/2026-07-23-concede-special-action-design.md section 7.'
 ```
 
-- [ ] **Step 2: Replace the placeholder with the real number**
+- [x] **Step 2: Replace the placeholder with the real number**
 
 In `source/library/Pawl/Type/Prompt.hs`, change `(#TBD-ELISION)` to `(#N)` using the number the previous step printed. Confirm none remain:
 
@@ -681,11 +681,11 @@ In `source/library/Pawl/Type/Prompt.hs`, change `(#TBD-ELISION)` to `(#N)` using
 grep -rn "TBD-ELISION" source/ && echo "STILL PRESENT — fix before committing"
 ```
 
-- [ ] **Step 3: Update the spec's status line**
+- [x] **Step 3: Update the spec's status line**
 
 Change line 3 of `docs/superpowers/specs/2026-07-23-concede-special-action-design.md` from `**Status:** design approved 2026-07-23, not yet implemented.` to `**Status:** implemented 2026-07-23.`
 
-- [ ] **Step 4: Final verification**
+- [x] **Step 4: Final verification**
 
 ```bash
 cabal build all --enable-tests --enable-benchmarks 2>&1 | grep -iE "error|warning"
@@ -695,7 +695,7 @@ grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-23-concede-special-
 
 Expected: no warnings, 941 tests pass, and the step count reaches `0`.
 
-- [ ] **Step 5: Commit and close**
+- [x] **Step 5: Commit and close**
 
 ```bash
 git add <the exact files this task touched>
