@@ -39,6 +39,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Source as Source
@@ -496,5 +497,23 @@ tests cards =
             withEmblem = S.runPure S.identityAnswer gs0 (Resolve.applyEffect creature S.alice Map.empty Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard cards)))
             wiped = withEmblem {GameState.battlefield = mempty, GameState.objects = Map.filterWithKey (\oid _ -> Set.member oid (GameState.command withEmblem)) (GameState.objects withEmblem)}
             (token, afterToken) = S.addCreature (Cards.pikerPrinting cards) S.alice wiped
-         in HU.assertEqual "emblem still buffs the new creature" (Just 3) (Projection.powerOf token afterToken)
+         in HU.assertEqual "emblem still buffs the new creature" (Just 3) (Projection.powerOf token afterToken),
+      HU.testCase "CR 613.1 projectUpTo stops before the bound layer" $
+        -- A layer-7c modification is invisible to a projection bounded at
+        -- ModifyPT, and visible to an unbounded one. The bound is the whole
+        -- termination argument for a projected count, so it gets its own test
+        -- independent of any count.
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (pikerId, gs1) = S.addPiker cards S.alice gs0
+            gs = S.withEffect pikerId (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs1
+            cands = Projection.gather gs
+         in do
+              HU.assertEqual
+                "unbounded sees the pump"
+                (Just 5)
+                (PC.power (Projection.projectFrom cands pikerId gs))
+              HU.assertEqual
+                "bounded at 7c does not"
+                (Just 2)
+                (PC.power (Projection.projectUpTo Layer.ModifyPT cands pikerId gs))
     ]

@@ -8,6 +8,7 @@ import qualified Data.Ord as Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
+import qualified Pawl.Count as Count
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Quantity as Quantity
@@ -212,6 +213,16 @@ printedSupertypes oid gs = case Game.cardOf oid gs of
 -- the id is unknown -- e.g. a source that has left the battlefield).
 viewOfObject :: ObjectId -> GameState -> Filter.View
 viewOfObject oid gs = viewOfCharacteristics oid (project oid gs) (controllerOf oid gs) gs
+
+-- The ViewOf a count gets when it is evaluated while `bound` is being applied:
+-- candidates projected through the layers BEFORE that one. Off-battlefield
+-- candidates have no projection at all (gather walks the battlefield only), so
+-- they fall back to the printed card.
+viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
+viewUpTo bound cands gs oid =
+  if Set.member oid (GameState.battlefield gs)
+    then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) gs)
+    else fmap viewOfCard (Game.cardOf oid gs)
 
 -- The characteristics view of a PRINTED card off the battlefield (a card in a
 -- library/graveyard/hand being matched by a search). No projection exists off the
@@ -662,17 +673,23 @@ applyCharacteristicPT gs oid pc = case PC.characteristicPT pc of
             PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate gs oid you t)
           }
 
--- Project one object against a PRECOMPUTED candidate list. gather is
--- oid-independent, so a whole-board sweep gathers once and folds each object
--- (projectAll) instead of re-gathering per object.
+-- Project one object against a PRECOMBINED candidate list, applying only the
+-- layers the predicate admits. CR 613.1 applies layers in order and Layer's
+-- derived Ord IS that order, so `(< bound)` is exactly "the layers before this
+-- one".
 --
--- Layer 7a is ALWAYS in the layer list, even when no gathered effect lives there:
--- an object's own characteristic-defining ability is not a gathered candidate
--- (see applyCharacteristicPT). For an object with no CDA the extra pass is an
--- identity function over an empty candidate filter.
-projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
-projectFrom cands oid gs =
-  let layers = Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands)))
+-- The bound exists for counting: a Pawl.Type.Count evaluated while layer L is
+-- being applied sees its candidates through `< L`, so a count encountered inside
+-- THAT fold is applied at some K < L and sees `< K`. The bound strictly
+-- decreases and Layer is finite, so the nesting terminates.
+--
+-- This is a terminating APPROXIMATION of CR 613.8's dependency system, not an
+-- implementation of it: exact whenever a count reads layers strictly earlier
+-- than its consumer's, and it under-reads a count over its own layer or later
+-- (#11 is the missing CR 613.8b reorder).
+projectWith :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
+projectWith admits cands oid gs =
+  let layers = filter admits (Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))
       applyLayer partial lyr =
         let seeded =
               if lyr == Layer.CharacteristicPT
@@ -687,6 +704,23 @@ projectFrom cands oid gs =
             step pc c = applyModification gs oid (gModification c) pc
          in List.foldl' step seeded ordered
    in List.foldl' applyLayer (copiableCharacteristics oid gs) layers
+
+-- Project one object against a PRECOMPUTED candidate list. gather is
+-- oid-independent, so a whole-board sweep gathers once and folds each object
+-- (projectAll) instead of re-gathering per object.
+--
+-- Layer 7a is ALWAYS in the layer list, even when no gathered effect lives there:
+-- an object's own characteristic-defining ability is not a gathered candidate
+-- (see applyCharacteristicPT). For an object with no CDA the extra pass is an
+-- identity function over an empty candidate filter.
+projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
+projectFrom = projectWith (const True)
+
+-- CR 613.1: a projection bounded to the layers BEFORE `bound` -- the fold a
+-- Pawl.Type.Count sees while layer `bound` is being applied. See projectWith's
+-- comment for the termination argument this exists to serve.
+projectUpTo :: Layer -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
+projectUpTo bound = projectWith (< bound)
 
 -- Project every battlefield object against ONE gather: O(gather + P*fold) instead
 -- of the O(P*(gather+fold)) of calling project per object. The hot path for SBA
