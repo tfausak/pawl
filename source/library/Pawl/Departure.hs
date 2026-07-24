@@ -48,8 +48,12 @@ outcomeAfterLeaving leaving gs = case stillPlaying gs of
 
 -- CR 104.3a: leave the game IMMEDIATELY, and settle CR 104.2a right now rather
 -- than at the next state-based action check -- which is the whole distinction
--- between 104.3a and 104.3b. An already-decided result wins, matching the
--- `outcome <|> existing` precedence Pawl.Sba's pass uses.
+-- between 104.3a and 104.3b. An already-decided result is kept rather than
+-- overwritten: CR 104.1 says the game already ended the moment a result was
+-- set, and CR 104.2a's "overrides all effects that would preclude that player
+-- from winning" describes the win itself, not a license to replace a result
+-- the game already has. Pawl.Sba's pass currently orders it the other way
+-- around; that divergence is tracked as #142.
 leaveGame :: Departure -> PlayerId -> Game ()
 leaveGame reason pid = State.modify' $ \gs ->
   let departed = depart reason pid gs

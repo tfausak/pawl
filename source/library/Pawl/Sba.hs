@@ -184,5 +184,7 @@ performStateBasedActions = do
       -- re-checks and -- because the regen healed the damage -- terminates), a
       -- player left, or a token ceased to exist.
       acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations)
+  -- This ordering lets a newly computed outcome overwrite an already-decided
+  -- result, the opposite of Departure.leaveGame's ordering (#142).
   State.put balanced {GameState.result = outcome <|> GameState.result balanced}
   pure acted
