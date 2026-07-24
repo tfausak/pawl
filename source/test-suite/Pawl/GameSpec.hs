@@ -23,6 +23,7 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -55,6 +56,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Sickness as Sickness
@@ -68,42 +70,44 @@ import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-objectFactTests :: Cards.Cards -> Tasty.TestTree
-objectFactTests cards =
+objectFactTests :: Registry.Type.Registry -> Tasty.TestTree
+objectFactTests registry =
   Tasty.testGroup
     "ObjectFacts"
-    [ HU.testCase "a Piker's power and toughness are 2 and 1" $
-        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
-         in do
-              HU.assertEqual "power" (Just 2) (Projection.powerOf oid gs)
-              HU.assertEqual "toughness" (Just 1) (Projection.toughnessOf oid gs),
-      HU.testCase "CR 111.3 a token's characteristics are read through cardOf" $
+    [ HU.testCase "a Piker's power and toughness are 2 and 1" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual "power" (Just 2) (Projection.powerOf oid gs)
+        HU.assertEqual "toughness" (Just 1) (Projection.toughnessOf oid gs),
+      HU.testCase "CR 111.3 a token's characteristics are read through cardOf" $ do
+        piker <- Registry.printing registry "Goblin Piker"
         let base = Setup.emptyGame S.bothPlayers
-            goblinCard = Printing.card (Cards.pikerPrinting cards)
+            goblinCard = Printing.card piker
             (tokId, gs) = S.addToken goblinCard S.alice base
-         in do
-              HU.assertEqual "cardOf returns the token's embedded card" (Just goblinCard) (Game.cardOf tokId gs)
-              HU.assertEqual "the token is on the battlefield" True (Set.member tokId (GameState.battlefield gs)),
-      HU.testCase "CR 112.1 isSpell is True for a spell on the stack, False off it" $
+        HU.assertEqual "cardOf returns the token's embedded card" (Just goblinCard) (Game.cardOf tokId gs)
+        HU.assertEqual "the token is on the battlefield" True (Set.member tokId (GameState.battlefield gs)),
+      HU.testCase "CR 112.1 isSpell is True for a spell on the stack, False off it" $ do
+        piker <- Registry.printing registry "Goblin Piker"
         let base = Setup.emptyGame S.bothPlayers
-            (spellId, gs1) = S.spellOnStack (Cards.pikerPrinting cards) S.alice base
-            (permId, gs2) = S.addCreature (Cards.pikerPrinting cards) S.bob gs1
-            tokenCard = Printing.card (Cards.pikerPrinting cards)
+            (spellId, gs1) = S.spellOnStack piker S.alice base
+            (permId, gs2) = S.addCreature piker S.bob gs1
+            tokenCard = Printing.card piker
             (tokId, gs3) = S.addToken tokenCard S.bob gs2
-         in do
-              HU.assertBool "a card on the stack is a spell" (Game.isSpell spellId gs3)
-              HU.assertBool "a battlefield permanent is not a spell" (not (Game.isSpell permId gs3))
-              HU.assertBool "a token is not a spell" (not (Game.isSpell tokId gs3)),
-      HU.testCase "a Mountain has no power or toughness" $
-        let gs = S.landsInPlay (Cards.mountainPrinting cards) 1
-         in case Game.zoneMembers Zone.Battlefield S.alice gs of
-              [] -> HU.assertFailure "fixture should have one Mountain"
-              oid : _ -> do
-                HU.assertEqual "power" Nothing (Projection.powerOf oid gs)
-                HU.assertEqual "toughness" Nothing (Projection.toughnessOf oid gs),
-      HU.testCase "controllerOf is the owner while nothing can change control" $
-        let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (Setup.emptyGame S.bothPlayers)
-         in HU.assertEqual "controller" (Just S.bob) (Projection.controllerOf oid gs),
+        HU.assertBool "a card on the stack is a spell" (Game.isSpell spellId gs3)
+        HU.assertBool "a battlefield permanent is not a spell" (not (Game.isSpell permId gs3))
+        HU.assertBool "a token is not a spell" (not (Game.isSpell tokId gs3)),
+      HU.testCase "a Mountain has no power or toughness" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let gs = S.landsInPlay mountain 1
+        case Game.zoneMembers Zone.Battlefield S.alice gs of
+          [] -> HU.assertFailure "fixture should have one Mountain"
+          oid : _ -> do
+            HU.assertEqual "power" Nothing (Projection.powerOf oid gs)
+            HU.assertEqual "toughness" Nothing (Projection.toughnessOf oid gs),
+      HU.testCase "controllerOf is the owner while nothing can change control" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual "controller" (Just S.bob) (Projection.controllerOf oid gs),
       HU.testCase "an unknown id has no facts" $
         let gs = Setup.emptyGame S.bothPlayers
             missing = ObjectId.MkObjectId 999
@@ -112,94 +116,111 @@ objectFactTests cards =
               HU.assertEqual "controller" Nothing (Projection.controllerOf missing gs)
     ]
 
-gameTests :: Cards.Cards -> Tasty.TestTree
-gameTests cards =
-  let after = S.runPure S.identityAnswer (S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain) (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
-   in Tasty.testGroup
-        "Game"
-        [ HU.testCase "changeZone preserves object count" $
-            HU.assertEqual "count" 1 (Game.objectCount after),
-          HU.testCase "changeZone drops the old id" $
-            HU.assertEqual "old gone" Nothing (Game.lookupObject (ObjectId.MkObjectId 0) after),
-          HU.testCase "the moved object is on the battlefield, owner preserved" $
-            HU.assertEqual
-              "moved"
-              ( Just
-                  Object.MkObject
-                    { Object.owner = S.alice,
-                      Object.source = Source.OfCard (Cards.mountainPrinting cards),
-                      Object.zone = Zone.Battlefield,
-                      Object.tapped = TapState.Untapped,
-                      Object.damage = 0,
-                      Object.sickness = Sickness.Sick,
-                      Object.bindings = Map.empty,
-                      Object.counters = Map.empty,
-                      -- changeZone draws a fresh timestamp; oneMountainState's
-                      -- nextTimestamp starts at 1 (object 0 already holds 0).
-                      Object.timestamp = Timestamp.MkTimestamp 1
-                    }
-              )
-              (Game.lookupObject (ObjectId.MkObjectId 1) after),
-          HU.testCase "CR 400.7 changeZone forgets a spell's bindings" $
-            let base = S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain
-                slot = SlotName.MkSlotName (Text.pack "target")
-                stamped =
-                  base
-                    { GameState.objects =
-                        Map.adjust
-                          (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.alice)) Map.empty Nothing Set.empty})
-                          (ObjectId.MkObjectId 0)
-                          (GameState.objects base)
-                    }
-                moved = S.runPure S.identityAnswer stamped (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
-                landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
-             in HU.assertEqual "reset" [Map.empty] (fmap Object.bindings landed),
-          HU.testCase "CR 400.7 changeZone resets a word-swap binding" $
-            let base = S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain
-                slot = SlotName.MkSlotName (Text.pack "target")
-                stamped =
-                  base
-                    { GameState.objects =
-                        Map.adjust
-                          (\o -> o {Object.bindings = Binding.fromChoices Map.empty (Map.singleton slot (Subtype.Mountain, Subtype.Island)) Nothing Set.empty})
-                          (ObjectId.MkObjectId 0)
-                          (GameState.objects base)
-                    }
-                moved = S.runPure S.identityAnswer stamped (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
-                newObj = Game.lookupObject (ObjectId.MkObjectId 1) moved
-             in HU.assertEqual "reset to empty" (Just Map.empty) (fmap Object.bindings newObj),
-          HU.testCase "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $
-            let (oid, gs) = S.addCreature (Cards.pikerPrinting cards) S.bob (S.landsInPlay (Cards.mountainPrinting cards) 1)
-                before = GameState.nextTimestamp gs
-                movedState = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
-                movedId = case Game.zoneMembers Zone.Graveyard S.bob movedState of
-                  i : _ -> i
-                  [] -> ObjectId.MkObjectId 999
-                stamp = fmap Object.timestamp (Game.lookupObject movedId movedState)
-             in do
-                  HU.assertEqual "the incarnation carries the pre-move next timestamp" (Just before) stamp
-                  HU.assertBool "the counter advanced" (GameState.nextTimestamp movedState > before),
-          HU.testCase "emptyGame starts the timestamp counter at zero" $
-            HU.assertEqual "zero" (Timestamp.MkTimestamp 0) (GameState.nextTimestamp (Setup.emptyGame S.bothPlayers)),
-          HU.testCase "a fresh game has no continuous effects" $
-            HU.assertEqual "empty" [] (GameState.continuousEffects (Setup.emptyGame S.bothPlayers)),
-          HU.testCase "a vanilla printing declares no static abilities" $
-            HU.assertEqual "empty" [] (Card.Type.staticAbilities (Printing.card (Cards.pikerPrinting cards)))
-        ]
+-- The battlefield after changeZone moves the sole Mountain onto it. Loaded
+-- fresh inside each case that needs it -- equivalent because loading is
+-- deterministic and cached (batch-recipe.md).
+afterMountainMoved :: Printing.Printing -> GameState.GameState
+afterMountainMoved mountain =
+  S.runPure S.identityAnswer (S.oneMountainState mountain Phase.PrecombatMain) (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
 
-actionTests :: Cards.Cards -> Tasty.TestTree
-actionTests cards =
+gameTests :: Registry.Type.Registry -> Tasty.TestTree
+gameTests registry =
+  Tasty.testGroup
+    "Game"
+    [ HU.testCase "changeZone preserves object count" $ do
+        mountain <- Registry.printing registry "Mountain"
+        HU.assertEqual "count" 1 (Game.objectCount (afterMountainMoved mountain)),
+      HU.testCase "changeZone drops the old id" $ do
+        mountain <- Registry.printing registry "Mountain"
+        HU.assertEqual "old gone" Nothing (Game.lookupObject (ObjectId.MkObjectId 0) (afterMountainMoved mountain)),
+      HU.testCase "the moved object is on the battlefield, owner preserved" $ do
+        mountain <- Registry.printing registry "Mountain"
+        HU.assertEqual
+          "moved"
+          ( Just
+              Object.MkObject
+                { Object.owner = S.alice,
+                  Object.source = Source.OfCard mountain,
+                  Object.zone = Zone.Battlefield,
+                  Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
+                  Object.sickness = Sickness.Sick,
+                  Object.bindings = Map.empty,
+                  Object.counters = Map.empty,
+                  -- changeZone draws a fresh timestamp; oneMountainState's
+                  -- nextTimestamp starts at 1 (object 0 already holds 0).
+                  Object.timestamp = Timestamp.MkTimestamp 1
+                }
+          )
+          (Game.lookupObject (ObjectId.MkObjectId 1) (afterMountainMoved mountain)),
+      HU.testCase "CR 400.7 changeZone forgets a spell's bindings" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let base = S.oneMountainState mountain Phase.PrecombatMain
+            slot = SlotName.MkSlotName (Text.pack "target")
+            stamped =
+              base
+                { GameState.objects =
+                    Map.adjust
+                      (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.alice)) Map.empty Nothing Set.empty})
+                      (ObjectId.MkObjectId 0)
+                      (GameState.objects base)
+                }
+            moved = S.runPure S.identityAnswer stamped (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
+            landed = Map.elems (Map.filter (\o -> Object.zone o == Zone.Battlefield) (GameState.objects moved))
+        HU.assertEqual "reset" [Map.empty] (fmap Object.bindings landed),
+      HU.testCase "CR 400.7 changeZone resets a word-swap binding" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let base = S.oneMountainState mountain Phase.PrecombatMain
+            slot = SlotName.MkSlotName (Text.pack "target")
+            stamped =
+              base
+                { GameState.objects =
+                    Map.adjust
+                      (\o -> o {Object.bindings = Binding.fromChoices Map.empty (Map.singleton slot (Subtype.Mountain, Subtype.Island)) Nothing Set.empty})
+                      (ObjectId.MkObjectId 0)
+                      (GameState.objects base)
+                }
+            moved = S.runPure S.identityAnswer stamped (Event.changeZone (ObjectId.MkObjectId 0) Zone.Battlefield)
+            newObj = Game.lookupObject (ObjectId.MkObjectId 1) moved
+        HU.assertEqual "reset to empty" (Just Map.empty) (fmap Object.bindings newObj),
+      HU.testCase "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        let (oid, gs) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+            before = GameState.nextTimestamp gs
+            movedState = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
+            movedId = case Game.zoneMembers Zone.Graveyard S.bob movedState of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+            stamp = fmap Object.timestamp (Game.lookupObject movedId movedState)
+        HU.assertEqual "the incarnation carries the pre-move next timestamp" (Just before) stamp
+        HU.assertBool "the counter advanced" (GameState.nextTimestamp movedState > before),
+      HU.testCase "emptyGame starts the timestamp counter at zero" $
+        HU.assertEqual "zero" (Timestamp.MkTimestamp 0) (GameState.nextTimestamp (Setup.emptyGame S.bothPlayers)),
+      HU.testCase "a fresh game has no continuous effects" $
+        HU.assertEqual "empty" [] (GameState.continuousEffects (Setup.emptyGame S.bothPlayers)),
+      HU.testCase "a vanilla printing declares no static abilities" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        HU.assertEqual "empty" [] (Card.Type.staticAbilities (Printing.card piker))
+    ]
+
+actionTests :: Registry.Type.Registry -> Tasty.TestTree
+actionTests registry =
   Tasty.testGroup
     "Action"
-    [ HU.testCase "a land in hand is playable in a main phase" $
-        HU.assertBool "play" (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice (S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain)),
-      HU.testCase "passing is always legal" $
-        HU.assertBool "pass" (A.Pass `elem` Action.legalActions S.alice (S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain)),
-      HU.testCase "no land play outside a main phase" $
-        HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice (S.oneMountainState (Cards.mountainPrinting cards) (Phase.Beginning BeginningStep.Upkeep))),
-      HU.testCase "no second land after one is played" $
-        let gs = (S.oneMountainState (Cards.mountainPrinting cards) Phase.PrecombatMain) {GameState.landPlayed = Set.singleton S.alice}
-         in HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice gs)
+    [ HU.testCase "a land in hand is playable in a main phase" $ do
+        mountain <- Registry.printing registry "Mountain"
+        HU.assertBool "play" (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice (S.oneMountainState mountain Phase.PrecombatMain)),
+      HU.testCase "passing is always legal" $ do
+        mountain <- Registry.printing registry "Mountain"
+        HU.assertBool "pass" (A.Pass `elem` Action.legalActions S.alice (S.oneMountainState mountain Phase.PrecombatMain)),
+      HU.testCase "no land play outside a main phase" $ do
+        mountain <- Registry.printing registry "Mountain"
+        HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice (S.oneMountainState mountain (Phase.Beginning BeginningStep.Upkeep))),
+      HU.testCase "no second land after one is played" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let gs = (S.oneMountainState mountain Phase.PrecombatMain) {GameState.landPlayed = Set.singleton S.alice}
+        HU.assertEqual "only pass" [A.Pass] (Action.legalActions S.alice gs)
     ]
 
 goldfishResult :: Cards.Cards -> (Result.Result, GameState.GameState)
@@ -312,34 +333,37 @@ recordingAnswer p = case p of
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
-askedPlayers :: Cards.Cards -> [PlayerId.PlayerId]
-askedPlayers cards =
-  let (gs, _) = S.pikerInHand (Cards.mountainPrinting cards) (Cards.pikerPrinting cards) 3 Phase.PrecombatMain
+askedPlayers :: Printing.Printing -> Printing.Printing -> [PlayerId.PlayerId]
+askedPlayers mountain piker =
+  let (gs, _) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
    in State.execState
         (Program.foldProgramM recordingAnswer (State.runStateT Engine.priorityLoop gs))
         []
 
-ruleTests :: Cards.Cards -> Tasty.TestTree
-ruleTests cards =
+ruleTests :: Registry.Type.Registry -> Cards.Cards -> Tasty.TestTree
+ruleTests registry cards =
   Tasty.testGroup
     "Rules"
-    [ HU.testCase "CR 117.4 a full round of passes resolves the stack, not the step" $
+    [ HU.testCase "CR 117.4 a full round of passes resolves the stack, not the step" $ do
         -- With a spell on the stack, everyone passing must RESOLVE it and keep
         -- the step alive. Under M0's rule the step would simply end with the
         -- spell still sitting on the stack.
-        let (gs, oid) = S.pikerInHand (Cards.mountainPrinting cards) (Cards.pikerPrinting cards) 3 Phase.PrecombatMain
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, oid) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
             steps = do
               Cast.castSpell S.alice oid
               Engine.priorityLoop
             after = snd (Engine.runGamePure S.identityAnswer gs steps)
-         in do
-              HU.assertEqual "stack emptied" 0 (length (GameState.stack after))
-              HU.assertEqual "piker resolved onto the battlefield" 1 (S.creaturesInPlay S.alice after),
-      HU.testCase "CR 117.3c the caster is asked again, rather than passing priority on" $
+        HU.assertEqual "stack emptied" 0 (length (GameState.stack after))
+        HU.assertEqual "piker resolved onto the battlefield" 1 (S.creaturesInPlay S.alice after),
+      HU.testCase "CR 117.3c the caster is asked again, rather than passing priority on" $ do
         -- alice is asked, casts, and must be asked AGAIN before bob gets a turn.
         -- If priority wrongly advanced to the next player, this would be
         -- [alice, bob, ...] instead.
-        HU.assertEqual "alice twice, then bob" [S.alice, S.alice, S.bob] (take 3 (askedPlayers cards)),
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        HU.assertEqual "alice twice, then bob" [S.alice, S.alice, S.bob] (take 3 (askedPlayers mountain piker)),
       HU.testCase "CR 103.7a starting player skips first draw" $ do
         HU.assertEqual "hand" 7 (S.handSize S.alice (aliceFirstDraw cards))
         HU.assertEqual "library" 53 (librarySize S.alice (aliceFirstDraw cards)),
@@ -355,11 +379,13 @@ ruleTests cards =
           (fmap Player.status (Map.lookup S.alice (GameState.players (deckedOut cards)))),
       HU.testCase "CR 704.5b the survivor wins" $
         HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result (deckedOut cards)),
-      HU.testCase "CR 723.3/723.5: alice decides for bob, but bob's resources move" $
+      HU.testCase "CR 723.3/723.5: alice decides for bob, but bob's resources move" $ do
         -- bob's main phase, controlled by alice, with a Mountain and a Bolt.
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
         let g0 = Setup.emptyGame S.bothPlayers
-            (_mtnId, g1) = S.addCreature (Cards.mountainPrinting cards) S.bob g0
-            (_boltId, g2) = handBobBolt cards g1
+            (_mtnId, g1) = S.addCreature mountain S.bob g0
+            (_boltId, g2) = handBobBolt lightningBolt g1
             g3 =
               g2
                 { GameState.activePlayer = S.bob,
@@ -374,24 +400,26 @@ ruleTests cards =
                     (namedIs (Text.pack "Lightning Bolt"))
                     (fmap (\i -> Game.lookupObject i after) (Game.zoneMembers Zone.Graveyard S.bob after))
                 )
-         in do
-              HU.assertEqual "bob took 3 from his own Bolt" (Just 17) (S.lifeOf S.bob after)
-              HU.assertEqual "bob's Bolt is in bob's graveyard" 1 boltInBobGrave
-              HU.assertEqual "the Mountain (bob's) is tapped" 1 (S.tappedCount S.bob after),
-      HU.testCase "CR 723.1/723.3 gameplay: Mindslaver hands alice bob's whole turn, then control lapses" $
+        HU.assertEqual "bob took 3 from his own Bolt" (Just 17) (S.lifeOf S.bob after)
+        HU.assertEqual "bob's Bolt is in bob's graveyard" 1 boltInBobGrave
+        HU.assertEqual "the Mountain (bob's) is tapped" 1 (S.tappedCount S.bob after),
+      HU.testCase "CR 723.1/723.3 gameplay: Mindslaver hands alice bob's whole turn, then control lapses" $ do
         -- Alice activates a REAL Mindslaver through the driver loop at bob, the
         -- engine promotes control on bob's turn, alice casts bob's Bolt at bob
         -- (bob's own resource), and control ends at the following turn boundary.
+        mindslaver <- Registry.printing registry "Mindslaver"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
         let g0 = Setup.emptyGame S.bothPlayers
-            (_msId, g1) = S.addCreature (Cards.mindslaverPrinting cards) S.alice g0
+            (_msId, g1) = S.addCreature mindslaver S.alice g0
             -- {4} for Mindslaver's activation: four untapped Mountains for alice.
-            (_a1, g2) = S.addCreature (Cards.mountainPrinting cards) S.alice g1
-            (_a2, g3) = S.addCreature (Cards.mountainPrinting cards) S.alice g2
-            (_a3, g4) = S.addCreature (Cards.mountainPrinting cards) S.alice g3
-            (_a4, g5) = S.addCreature (Cards.mountainPrinting cards) S.alice g4
+            (_a1, g2) = S.addCreature mountain S.alice g1
+            (_a2, g3) = S.addCreature mountain S.alice g2
+            (_a3, g4) = S.addCreature mountain S.alice g3
+            (_a4, g5) = S.addCreature mountain S.alice g4
             -- bob's own resources for his controlled turn: a Mountain and a Bolt.
-            (_bMtn, g6) = S.addCreature (Cards.mountainPrinting cards) S.bob g5
-            (_bBolt, g7) = handBobBolt cards g6
+            (_bMtn, g6) = S.addCreature mountain S.bob g5
+            (_bBolt, g7) = handBobBolt lightningBolt g6
             gStart =
               g7
                 { GameState.activePlayer = S.alice,
@@ -415,36 +443,38 @@ ruleTests cards =
                     (namedIs (Text.pack "Lightning Bolt"))
                     (fmap (\i -> Game.lookupObject i bobPlayed) (Game.zoneMembers Zone.Graveyard S.bob bobPlayed))
                 )
-         in do
-              HU.assertEqual "CR 723.1: control pending for bob after activation" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl afterActivation))
-              HU.assertEqual "CR 723.1: promoted to active control on bob's turn" (Just (Decider.MkDecider S.alice)) (GameState.activeControl bobsTurn)
-              HU.assertEqual "CR 723.3: bob is still the active player while controlled" S.bob (GameState.activePlayer bobsTurn)
-              HU.assertEqual "CR 723.5: bob's decisions route to alice" (Decider.MkDecider S.alice) (Decide.deciderFor S.bob bobsTurn)
-              HU.assertEqual "alice's whole-turn choice moved bob's life" (Just 17) (S.lifeOf S.bob bobPlayed)
-              HU.assertEqual "bob's Bolt went to bob's graveyard" 1 boltInBobGrave
-              HU.assertEqual "bob's Mountain (his resource) is tapped" 1 (S.tappedCount S.bob bobPlayed)
-              HU.assertEqual "CR 723.1: control lapses at the next turn" (Decider.MkDecider S.bob) (Decide.deciderFor S.bob afterBob)
-              HU.assertEqual "active control cleared after bob's turn" Nothing (GameState.activeControl afterBob),
-      HU.testCase "CR 723.5 combat: alice declares bob's attackers, so alice takes the hit" $
+        HU.assertEqual "CR 723.1: control pending for bob after activation" (Just (Decider.MkDecider S.alice)) (Map.lookup S.bob (GameState.pendingControl afterActivation))
+        HU.assertEqual "CR 723.1: promoted to active control on bob's turn" (Just (Decider.MkDecider S.alice)) (GameState.activeControl bobsTurn)
+        HU.assertEqual "CR 723.3: bob is still the active player while controlled" S.bob (GameState.activePlayer bobsTurn)
+        HU.assertEqual "CR 723.5: bob's decisions route to alice" (Decider.MkDecider S.alice) (Decide.deciderFor S.bob bobsTurn)
+        HU.assertEqual "alice's whole-turn choice moved bob's life" (Just 17) (S.lifeOf S.bob bobPlayed)
+        HU.assertEqual "bob's Bolt went to bob's graveyard" 1 boltInBobGrave
+        HU.assertEqual "bob's Mountain (his resource) is tapped" 1 (S.tappedCount S.bob bobPlayed)
+        HU.assertEqual "CR 723.1: control lapses at the next turn" (Decider.MkDecider S.bob) (Decide.deciderFor S.bob afterBob)
+        HU.assertEqual "active control cleared after bob's turn" Nothing (GameState.activeControl afterBob),
+      HU.testCase "CR 723.5 combat: alice declares bob's attackers, so alice takes the hit" $ do
         -- bob's turn, controlled by alice, with one 2/1 Piker. combatBoardOf sets
         -- alice active with `mine` and bob with `theirs`; here alice attacks with
         -- nothing and bob has the Piker, and we flip the active player to bob.
-        let (board, _mine, _bobsPikers) = S.combatBoardOf [] [Cards.pikerPrinting cards]
+        piker <- Registry.printing registry "Goblin Piker"
+        let (board, _mine, _bobsPikers) = S.combatBoardOf [] [piker]
             g0 =
               board
                 { GameState.activePlayer = S.bob,
                   GameState.activeControl = Just (Decider.MkDecider S.alice)
                 }
             after = S.runCombat controlCombatAnswer g0
-         in HU.assertEqual "alice took 2 from bob's Piker, declared by alice-as-bob" (Just 18) (S.lifeOf S.alice after),
-      HU.testCase "CR 723.5a: the controller spends only the controlled player's resources" $
+        HU.assertEqual "alice took 2 from bob's Piker, declared by alice-as-bob" (Just 18) (S.lifeOf S.alice after),
+      HU.testCase "CR 723.5a: the controller spends only the controlled player's resources" $ do
         -- bob (controlled by alice) and alice each have an untapped Mountain; bob
         -- has a Bolt. Alice-as-bob casts bob's Bolt, paid from BOB's Mountain.
         -- alice's Mountain and hand must be untouched.
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
         let g0 = Setup.emptyGame S.bothPlayers
-            (_bMtn, g1) = S.addCreature (Cards.mountainPrinting cards) S.bob g0
-            (_aMtn, g2) = S.addCreature (Cards.mountainPrinting cards) S.alice g1
-            (_bBolt, g3) = handBobBolt cards g2
+            (_bMtn, g1) = S.addCreature mountain S.bob g0
+            (_aMtn, g2) = S.addCreature mountain S.alice g1
+            (_bBolt, g3) = handBobBolt lightningBolt g2
             g4 =
               g3
                 { GameState.activePlayer = S.bob,
@@ -453,22 +483,24 @@ ruleTests cards =
                   GameState.activeControl = Just (Decider.MkDecider S.alice)
                 }
             after = snd (Engine.runGamePure slaveAnswer g4 Engine.priorityLoop)
-         in do
-              HU.assertEqual "bob took 3 from his own Bolt" (Just 17) (S.lifeOf S.bob after)
-              HU.assertEqual "bob's Mountain (his resource) is tapped" 1 (S.tappedCount S.bob after)
-              HU.assertEqual "CR 723.5a: alice's Mountain is untouched" 0 (S.tappedCount S.alice after)
-              HU.assertEqual "CR 723.5a: alice's hand is untouched" 0 (S.handSize S.alice after),
-      HU.testCase "CR 727.1/727.2/727.4 gameplay: bob activates a restart and the game rebuilds from its own cards" $
+        HU.assertEqual "bob took 3 from his own Bolt" (Just 17) (S.lifeOf S.bob after)
+        HU.assertEqual "bob's Mountain (his resource) is tapped" 1 (S.tappedCount S.bob after)
+        HU.assertEqual "CR 723.5a: alice's Mountain is untouched" 0 (S.tappedCount S.alice after)
+        HU.assertEqual "CR 723.5a: alice's hand is untouched" 0 (S.handSize S.alice after),
+      HU.testCase "CR 727.1/727.2/727.4 gameplay: bob activates a restart and the game rebuilds from its own cards" $ do
         -- bob controls the synthetic restart artifact and owns 8 cards total;
         -- alice owns 8. Both start with reduced life on a populated board. bob
         -- activates the artifact through the priority loop; it resolves, restarts
         -- the game, and the result is a valid new game with bob as starter.
+        syntheticRestart <- Registry.printing registry "Synthetic Restart"
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
         let g0 = Setup.emptyGame S.bothPlayers
-            (_restartId, g1) = S.addCreature (Cards.syntheticRestartPrinting cards) S.bob g0
-            (_aPiker, g2) = S.addCreature (Cards.pikerPrinting cards) S.alice g1
+            (_restartId, g1) = S.addCreature syntheticRestart S.bob g0
+            (_aPiker, g2) = S.addCreature piker S.alice g1
             -- fill each owner's pool to >= 7 cards so opening hands draw without a
             -- CR 727.3 loss (the restart artifact + 7 mountains = 8 for bob).
-            g3 = addManyG cards 7 S.bob (addManyG cards 7 S.alice g2)
+            g3 = addManyG mountain 7 S.bob (addManyG mountain 7 S.alice g2)
             gStart =
               g3
                 { GameState.activePlayer = S.bob,
@@ -481,27 +513,26 @@ ruleTests cards =
                   GameState.players = Map.adjust (\p -> p {Player.life = 8}) S.alice (Map.adjust (\p -> p {Player.life = 8}) S.bob (GameState.players g3))
                 }
             after = snd (Engine.runGamePure restartAnswer gStart Engine.priorityLoop)
-         in do
-              HU.assertEqual "CR 727.1a: bob is the new active player" S.bob (GameState.activePlayer after)
-              HU.assertEqual "CR 727.1a: the turn order begins with bob" (Just S.bob) (Maybe.listToMaybe (GameState.turnOrder after))
-              HU.assertEqual "both players reset to 20 life (alice)" (Just 20) (S.lifeOf S.alice after)
-              HU.assertEqual "both players reset to 20 life (bob)" (Just 20) (S.lifeOf S.bob after)
-              HU.assertEqual "CR 103.5: alice drew a 7-card opening hand" 7 (S.handSize S.alice after)
-              HU.assertEqual "CR 103.5: bob drew a 7-card opening hand" 7 (S.handSize S.bob after)
-              HU.assertEqual "CR 727.4: settled at the first untap step" Turn.firstPhase (GameState.phase after)
-              HU.assertEqual "CR 727.2: the battlefield is empty (every card returned to a library)" True (Set.null (GameState.battlefield after))
-              HU.assertEqual "the game did not end -- the new game is live" Nothing (GameState.result after),
-      HU.testCase "CR 729.2/729.3/729.5: playSubgame runs a nested game, bob decks, cards funnel back" $
+        HU.assertEqual "CR 727.1a: bob is the new active player" S.bob (GameState.activePlayer after)
+        HU.assertEqual "CR 727.1a: the turn order begins with bob" (Just S.bob) (Maybe.listToMaybe (GameState.turnOrder after))
+        HU.assertEqual "both players reset to 20 life (alice)" (Just 20) (S.lifeOf S.alice after)
+        HU.assertEqual "both players reset to 20 life (bob)" (Just 20) (S.lifeOf S.bob after)
+        HU.assertEqual "CR 103.5: alice drew a 7-card opening hand" 7 (S.handSize S.alice after)
+        HU.assertEqual "CR 103.5: bob drew a 7-card opening hand" 7 (S.handSize S.bob after)
+        HU.assertEqual "CR 727.4: settled at the first untap step" Turn.firstPhase (GameState.phase after)
+        HU.assertEqual "CR 727.2: the battlefield is empty (every card returned to a library)" True (Set.null (GameState.battlefield after))
+        HU.assertEqual "the game did not end -- the new game is live" Nothing (GameState.result after),
+      HU.testCase "CR 729.2/729.3/729.5: playSubgame runs a nested game, bob decks, cards funnel back" $ do
+        mountain <- Registry.printing registry "Mountain"
         let g0 = Setup.emptyGame S.bothPlayers
             -- alice: 8 library cards; bob: 3 (fewer than seven -> loses, CR 729.3)
-            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG cards 3 S.bob (addManyG cards 8 S.alice g0)))
+            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 3 S.bob (addManyG mountain 8 S.alice g0)))
             (result, after) = Engine.runGamePure S.identityAnswer g1 Engine.playSubgame
             libCount pid = length (Game.zoneMembers Zone.Library pid after)
-         in do
-              HU.assertEqual "CR 729.3: bob has fewer than 7 cards, so alice wins the subgame" (Result.Won S.alice) result
-              HU.assertEqual "CR 729.5: alice's cards funnel back into her main-game library" 8 (libCount S.alice)
-              HU.assertEqual "CR 729.5: bob's cards funnel back into his main-game library" 3 (libCount S.bob)
-              HU.assertEqual "the main game resumes with no result recorded" Nothing (GameState.result after),
+        HU.assertEqual "CR 729.3: bob has fewer than 7 cards, so alice wins the subgame" (Result.Won S.alice) result
+        HU.assertEqual "CR 729.5: alice's cards funnel back into her main-game library" 8 (libCount S.alice)
+        HU.assertEqual "CR 729.5: bob's cards funnel back into his main-game library" 3 (libCount S.bob)
+        HU.assertEqual "the main game resumes with no result recorded" Nothing (GameState.result after),
       -- #136 / CR 729.2: "Randomly determine which player goes first." The
       -- interpreter supplies the randomness (Prompt.RandomFirstPlayer); the
       -- engine only asks. Both players get libraries of EXACTLY seven, so each
@@ -511,13 +542,13 @@ ruleTests cards =
       -- library on turn 2 and decks (CR 704.5b) -- the subgame's winner is
       -- exactly whoever the roll started. Flipping the answer flips the winner,
       -- which is what makes the determination observable rather than cosmetic.
-      HU.testCase "CR 729.2: the subgame's first player comes from the roll; the answer decides who wins" $
+      HU.testCase "CR 729.2: the subgame's first player comes from the roll; the answer decides who wins" $ do
+        mountain <- Registry.printing registry "Mountain"
         let g0 = Setup.emptyGame S.bothPlayers
-            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG cards 7 S.bob (addManyG cards 7 S.alice g0)))
+            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 7 S.bob (addManyG mountain 7 S.alice g0)))
             winnerWhenStarting starter = fst (Engine.runGamePure (firstPlayerAnswer starter) g1 Engine.playSubgame)
-         in do
-              HU.assertEqual "alice starts, skips her first draw, and bob decks on turn 2" (Result.Won S.alice) (winnerWhenStarting S.alice)
-              HU.assertEqual "bob starts, skips his first draw, and alice decks on turn 2" (Result.Won S.bob) (winnerWhenStarting S.bob),
+        HU.assertEqual "alice starts, skips her first draw, and bob decks on turn 2" (Result.Won S.alice) (winnerWhenStarting S.alice)
+        HU.assertEqual "bob starts, skips his first draw, and alice decks on turn 2" (Result.Won S.bob) (winnerWhenStarting S.bob),
       HU.testCase "CR 729.2: a lone player is not asked -- the determination is forced" $
         -- Where the rules leave nothing to determine, don't prompt: with one
         -- player in the turn order, every roll yields the same starter. alice's
@@ -538,14 +569,16 @@ ruleTests cards =
          in do
               HU.assertEqual "bob is the subgame's active player" S.bob (GameState.activePlayer sub)
               HU.assertEqual "the subgame turn order begins with bob" [S.bob, S.alice] (GameState.turnOrder sub),
-      HU.testCase "CR 729.1b/729.3 gameplay: alice casts a subgame spell, bob decks, bob takes 3" $
+      HU.testCase "CR 729.1b/729.3 gameplay: alice casts a subgame spell, bob decks, bob takes 3" $ do
         -- alice has the {0} subgame sorcery in hand and an 8-card library; bob has
         -- a 3-card library (decks in the subgame, CR 729.3). alice casts through
         -- the priority loop; the subgame resolves alice the winner; the follow-on
         -- DealDamage hits bob (the loser) for 3.
+        mountain <- Registry.printing registry "Mountain"
+        syntheticSubgame <- Registry.printing registry "Synthetic Subgame"
         let g0 = Setup.emptyGame S.bothPlayers
-            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG cards 3 S.bob (addManyG cards 8 S.alice g0)))
-            (spellId, g2) = S.addHandCard (Cards.syntheticSubgamePrinting cards) S.alice g1
+            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 3 S.bob (addManyG mountain 8 S.alice g0)))
+            (spellId, g2) = S.addHandCard syntheticSubgame S.alice g1
             gStart =
               g2
                 { GameState.activePlayer = S.alice,
@@ -553,26 +586,27 @@ ruleTests cards =
                   GameState.priority = Just S.alice
                 }
             after = snd (Engine.runGamePure subgameAnswer gStart Engine.priorityLoop)
-         in do
-              HU.assertEqual "CR 729.1b: bob (the subgame loser) took 3 from the follow-on DealDamage" (Just 17) (S.lifeOf S.bob after)
-              HU.assertEqual "alice, the winner, is untouched" (Just 20) (S.lifeOf S.alice after)
-              HU.assertEqual "the subgame spell resolved and left the stack" [] (GameState.stack after)
-              HU.assertEqual "the main game did not end" Nothing (GameState.result after)
-              -- Casting routes through changeZone (CR 400.7), which mints a fresh
-              -- id and drops spellId entirely -- Game.lookupObject spellId after
-              -- is unconditionally Nothing, so that alone proves nothing about
-              -- alice's hand. The load-bearing check is that spellId's old
-              -- incarnation is not lingering in her hand's member list.
-              HU.assertEqual "the subgame spell's original id no longer sits in alice's hand (cast)" True (notElem spellId (Game.zoneMembers Zone.Hand S.alice after)),
-      HU.testCase "CR 729.5/729.4b gameplay: cards funnel back, main-game board survives, main-game counters untouched" $
+        HU.assertEqual "CR 729.1b: bob (the subgame loser) took 3 from the follow-on DealDamage" (Just 17) (S.lifeOf S.bob after)
+        HU.assertEqual "alice, the winner, is untouched" (Just 20) (S.lifeOf S.alice after)
+        HU.assertEqual "the subgame spell resolved and left the stack" [] (GameState.stack after)
+        HU.assertEqual "the main game did not end" Nothing (GameState.result after)
+        -- Casting routes through changeZone (CR 400.7), which mints a fresh
+        -- id and drops spellId entirely -- Game.lookupObject spellId after
+        -- is unconditionally Nothing, so that alone proves nothing about
+        -- alice's hand. The load-bearing check is that spellId's old
+        -- incarnation is not lingering in her hand's member list.
+        HU.assertEqual "the subgame spell's original id no longer sits in alice's hand (cast)" True (notElem spellId (Game.zoneMembers Zone.Hand S.alice after)),
+      HU.testCase "CR 729.5/729.4b gameplay: cards funnel back, main-game board survives, main-game counters untouched" $ do
         -- library pool built first, THEN the survivor is added to the battlefield --
         -- poolToLibraryG sweeps every object a player owns onto their library, so a
         -- survivor added before it would be swept in too and vanish from the board.
+        mountain <- Registry.printing registry "Mountain"
+        syntheticSubgame <- Registry.printing registry "Synthetic Subgame"
         let g0 = Setup.emptyGame S.bothPlayers
-            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG cards 3 S.bob (addManyG cards 8 S.alice g0)))
+            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 3 S.bob (addManyG mountain 8 S.alice g0)))
             -- a survivor on the main battlefield that must remain after the subgame
-            (survivorId, g2) = S.addCreature (Cards.mountainPrinting cards) S.alice g1
-            (_spellId, g3) = S.addHandCard (Cards.syntheticSubgamePrinting cards) S.alice g2
+            (survivorId, g2) = S.addCreature mountain S.alice g1
+            (_spellId, g3) = S.addHandCard syntheticSubgame S.alice g2
             -- give bob a main-game poison counter (CR 729.4b: outside the subgame)
             g4 =
               g3
@@ -594,12 +628,11 @@ ruleTests cards =
                 0
                 (Map.findWithDefault 0 PlayerCounterKind.Poison . Player.counters)
                 (Map.lookup S.bob (GameState.players after))
-         in do
-              HU.assertEqual "CR 729.4b: bob's main-game poison counter is untouched by the subgame" 1 bobPoison
-              HU.assertEqual "CR 729.5: alice's library holds her 8 subgame cards again" 8 (length (Game.zoneMembers Zone.Library S.alice after))
-              HU.assertEqual "CR 729.5: bob's library holds his 3 subgame cards again" 3 (length (Game.zoneMembers Zone.Library S.bob after))
-              HU.assertEqual "the main-game survivor is still on the battlefield" True (Set.member survivorId (GameState.battlefield after)),
-      HU.testCase "CR 729.6 gameplay: a subgame nests a subgame; nesting terminates and the main game resumes" $
+        HU.assertEqual "CR 729.4b: bob's main-game poison counter is untouched by the subgame" 1 bobPoison
+        HU.assertEqual "CR 729.5: alice's library holds her 8 subgame cards again" 8 (length (Game.zoneMembers Zone.Library S.alice after))
+        HU.assertEqual "CR 729.5: bob's library holds his 3 subgame cards again" 3 (length (Game.zoneMembers Zone.Library S.bob after))
+        HU.assertEqual "the main-game survivor is still on the battlefield" True (Set.member survivorId (GameState.battlefield after)),
+      HU.testCase "CR 729.6 gameplay: a subgame nests a subgame; nesting terminates and the main game resumes" $ do
         -- alice's MAIN-GAME library feeds level 1's library: one nested
         -- synthetic-subgame sorcery + 13 Mountains (14 total). The level-1 opening
         -- hand draws 7 (the sorcery + 6 Mountains), leaving exactly 7 Mountains in
@@ -627,37 +660,40 @@ ruleTests cards =
         -- (2 setup + 2 funnel-back); this two-level gate contributes 8 (2 levels
         -- x (2 setup + 2 funnel-back)), so asserting the count is a genuine
         -- nesting regression test, not just a termination guard.
+        syntheticSubgame <- Registry.printing registry "Synthetic Subgame"
+        mountain <- Registry.printing registry "Mountain"
         let g0 = Setup.emptyGame S.bothPlayers
-            (_nestedId, g1) = libraryCard (Cards.syntheticSubgamePrinting cards) S.alice g0
-            g2 = poolToLibraryG S.bob (addToLibraryG cards 13 S.alice (addManyG cards 7 S.bob g1))
-            (_spellId, g3) = S.addHandCard (Cards.syntheticSubgamePrinting cards) S.alice g2
+            (_nestedId, g1) = libraryCard syntheticSubgame S.alice g0
+            g2 = poolToLibraryG S.bob (addToLibraryG mountain 13 S.alice (addManyG mountain 7 S.bob g1))
+            (_spellId, g3) = S.addHandCard syntheticSubgame S.alice g2
             gStart = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
             ((_, after), log_) = Replay.record subgameAnswer gStart Engine.priorityLoop
             isShuffled r = case r of
               Response.Shuffled _ -> True
               _ -> False
             shuffles = length (filter isShuffled log_)
-         in do
-              -- If nesting had not terminated, runGamePure/Replay.record would not return.
-              HU.assertEqual "CR 729.6: the top-level main game resumed with no result" Nothing (GameState.result after)
-              HU.assertEqual "CR 729.1b: bob took 3 from the level-1 subgame's follow-on" (Just 17) (S.lifeOf S.bob after)
-              HU.assertEqual "the top-level subgame spell left the stack" [] (GameState.stack after)
-              HU.assertEqual "CR 729.6: two nested subgame levels each shuffle on setup and funnel-back (measured; a flat gate yields 4)" 8 shuffles,
-      HU.testCase "a subgame replays deterministically (the reason Prompt.PlaySubgame was rejected, CR 729 / M0's determinism criterion)" $
+        -- If nesting had not terminated, runGamePure/Replay.record would not return.
+        HU.assertEqual "CR 729.6: the top-level main game resumed with no result" Nothing (GameState.result after)
+        HU.assertEqual "CR 729.1b: bob took 3 from the level-1 subgame's follow-on" (Just 17) (S.lifeOf S.bob after)
+        HU.assertEqual "the top-level subgame spell left the stack" [] (GameState.stack after)
+        HU.assertEqual "CR 729.6: two nested subgame levels each shuffle on setup and funnel-back (measured; a flat gate yields 4)" 8 shuffles,
+      HU.testCase "a subgame replays deterministically (the reason Prompt.PlaySubgame was rejected, CR 729 / M0's determinism criterion)" $ do
         -- A Prompt would run the subgame INSIDE the answer function, below
         -- Replay.record's interposition point, so its inner choices could never
         -- be recovered from the recorded transcript. Round-tripping this nested
         -- gate's fixture through record -> replay and comparing the final
         -- GameState (derives Eq) is the test that would fail if that design had
         -- been taken instead.
+        syntheticSubgame <- Registry.printing registry "Synthetic Subgame"
+        mountain <- Registry.printing registry "Mountain"
         let g0 = Setup.emptyGame S.bothPlayers
-            (_nestedId, g1) = libraryCard (Cards.syntheticSubgamePrinting cards) S.alice g0
-            g2 = poolToLibraryG S.bob (addToLibraryG cards 13 S.alice (addManyG cards 7 S.bob g1))
-            (_spellId, g3) = S.addHandCard (Cards.syntheticSubgamePrinting cards) S.alice g2
+            (_nestedId, g1) = libraryCard syntheticSubgame S.alice g0
+            g2 = poolToLibraryG S.bob (addToLibraryG mountain 13 S.alice (addManyG mountain 7 S.bob g1))
+            (_spellId, g3) = S.addHandCard syntheticSubgame S.alice g2
             gStart = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
             ((_, after), log_) = Replay.record subgameAnswer gStart Engine.priorityLoop
             (_, replayed) = Replay.replay log_ gStart Engine.priorityLoop
-         in HU.assertEqual "a subgame replays deterministically (the reason PlaySubgame is not a Prompt, CR 729 / M0 determinism)" after replayed
+        HU.assertEqual "a subgame replays deterministically (the reason PlaySubgame is not a Prompt, CR 729 / M0 determinism)" after replayed
     ]
 
 -- #133 / CR 104.3a. Concede is a special action, not a card, so the gate is
@@ -674,8 +710,8 @@ concedeAnswer who p = case p of
   Prompt.Concede asked -> if asked == who then Concession.Concedes else Concession.Continues
   _ -> S.identityAnswer p
 
-concedeTests :: Cards.Cards -> Tasty.TestTree
-concedeTests cards =
+concedeTests :: Registry.Type.Registry -> Tasty.TestTree
+concedeTests registry =
   Tasty.testGroup
     "concede (CR 104.3a)"
     [ HU.testCase "CR 104.3a/104.2a a concede ends the game immediately, opponent wins" $
@@ -686,7 +722,7 @@ concedeTests cards =
         let gs = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
             after = S.runPure (concedeAnswer S.alice) gs Engine.runStep
          in HU.assertEqual "reason recorded" (Just (Status.Departed Departure.Conceded)) (fmap Player.status (Map.lookup S.alice (GameState.players after))),
-      HU.testCase "CR 723.6 a controlled player concedes themselves; their controller cannot do it for them" $
+      HU.testCase "CR 723.6 a controlled player concedes themselves; their controller cannot do it for them" $ do
         -- alice controls bob (Mindslaver). Every ChooseAction for bob is answered
         -- by alice. The concede ask is NOT: it reaches bob, and bob takes it.
         -- If Prompt.Concede carried a Decider, this would be alice's call.
@@ -698,9 +734,10 @@ concedeTests cards =
         -- Decide.deciderFor (activeControl stops being honoured) would make this
         -- record MkDecider bob instead, and the test would catch it even though
         -- the headline outcome (bob departs Conceded, alice wins) would still hold.
+        mountain <- Registry.printing registry "Mountain"
         let (mountainOid, gs) =
               S.addHandCard
-                (Cards.mountainPrinting cards)
+                mountain
                 S.bob
                 ( (Setup.emptyGame S.bothPlayers)
                     { GameState.phase = Phase.PrecombatMain,
@@ -729,41 +766,40 @@ concedeTests cards =
                 pure (if null asksSoFar then Concession.Continues else Concession.Concedes)
               _ -> pure (S.identityAnswer p)
             ((_, after), (deciders, concedeAsks)) = State.runState (Engine.runGame answer gs Engine.runStep) ([], [])
-         in do
-              HU.assertEqual "bob's ChooseAction carried alice as decider (bob genuinely is controlled)" [Decider.MkDecider S.alice] deciders
-              HU.assertEqual "every Concede ask reached bob himself, not his controller" [S.bob, S.bob] concedeAsks
-              HU.assertEqual "bob left by his own concession" (Just (Status.Departed Departure.Conceded)) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
-              HU.assertEqual "alice wins" (Just (Result.Won S.alice)) (GameState.result after),
-      HU.testCase "CR 104.3a concede does not use the stack: a spell on it never resolves" $
+        HU.assertEqual "bob's ChooseAction carried alice as decider (bob genuinely is controlled)" [Decider.MkDecider S.alice] deciders
+        HU.assertEqual "every Concede ask reached bob himself, not his controller" [S.bob, S.bob] concedeAsks
+        HU.assertEqual "bob left by his own concession" (Just (Status.Departed Departure.Conceded)) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
+        HU.assertEqual "alice wins" (Just (Result.Won S.alice)) (GameState.result after),
+      HU.testCase "CR 104.3a concede does not use the stack: a spell on it never resolves" $ do
         -- A Lightning Bolt is on the stack targeting nothing in particular. alice
         -- concedes at her priority; the game ends without the stack resolving.
-        let (spellId, base) = S.spellOnStack (Cards.lightningBoltPrinting cards) S.alice (Setup.emptyGame S.bothPlayers)
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (spellId, base) = S.spellOnStack lightningBolt S.alice (Setup.emptyGame S.bothPlayers)
             gs =
               base
                 { GameState.phase = Phase.PrecombatMain,
                   GameState.activePlayer = S.alice
                 }
             after = S.runPure (concedeAnswer S.alice) gs Engine.runStep
-         in do
-              HU.assertEqual "bob wins" (Just (Result.Won S.bob)) (GameState.result after)
-              HU.assertEqual "the spell never left the stack" [spellId] (GameState.stack after)
+        HU.assertEqual "bob wins" (Just (Result.Won S.bob)) (GameState.result after)
+        HU.assertEqual "the spell never left the stack" [spellId] (GameState.stack after)
     ]
 
-tests :: Cards.Cards -> Tasty.TestTree
-tests cards =
+tests :: Registry.Type.Registry -> Cards.Cards -> Tasty.TestTree
+tests registry cards =
   Tasty.testGroup
     "Game"
-    [gameTests cards, actionTests cards, objectFactTests cards, engineTests cards, ruleTests cards, restartReentryTests cards, concedeTests cards]
+    [gameTests registry, actionTests registry, objectFactTests registry, engineTests cards, ruleTests registry cards, restartReentryTests registry, concedeTests registry]
 
 -- One Lightning Bolt in bob's hand.
-handBobBolt :: Cards.Cards -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
-handBobBolt cards gs =
+handBobBolt :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+handBobBolt lightningBolt gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = S.bob,
-            Object.source = Source.OfCard (Cards.lightningBoltPrinting cards),
+            Object.source = Source.OfCard lightningBolt,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
@@ -916,9 +952,9 @@ firstPlayerAnswer starter p = case p of
   Prompt.RandomFirstPlayer _ -> starter
   _ -> S.identityAnswer p
 
-addManyG :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-addManyG cards n pid gs =
-  List.foldl' (\g _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid g)) gs (replicate n ())
+addManyG :: Printing.Printing -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+addManyG mountain n pid gs =
+  List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs (replicate n ())
 
 -- Put one printing into a player's library as a fresh object; return its id.
 -- Mirrors S.addHandCard, then relocates hand -> library.
@@ -935,9 +971,9 @@ libraryCard printing pid gs =
       )
 
 -- Append n Mountains to a player's library.
-addToLibraryG :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-addToLibraryG cards n pid gs =
-  List.foldl' (\g _ -> snd (libraryCard (Cards.mountainPrinting cards) pid g)) gs (replicate n ())
+addToLibraryG :: Printing.Printing -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+addToLibraryG mountain n pid gs =
+  List.foldl' (\g _ -> snd (libraryCard mountain pid g)) gs (replicate n ())
 
 -- Move every object this player owns onto their library (mirror of
 -- SetupSpec.poolToLibrary, adapted to GameSpec's imports): used to craft a
@@ -963,18 +999,18 @@ poolToLibraryG pid gs =
 
 -- A player's `n` owned cards, so the rebuilt game can deal a 7-card opening hand
 -- without tripping the CR 727.3 short-deck loss.
-ownedCards :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-ownedCards cards n pid gs =
-  List.foldl' (\g _ -> snd (S.addCreature (Cards.mountainPrinting cards) pid g)) gs [1 .. n]
+ownedCards :: Printing.Printing -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+ownedCards mountain n pid gs =
+  List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs [1 .. n]
 
 -- alice is active in her precombat main phase (a step that grants priority) with
 -- bob's RestartGame ability already on the stack. Both players pass, the ability
 -- resolves, and the restart fires mid-step.
-restartOnStack :: Cards.Cards -> GameState.GameState
-restartOnStack cards =
+restartOnStack :: Printing.Printing -> GameState.GameState
+restartOnStack mountain =
   let g0 = Setup.emptyGame S.bothPlayers
-      g1 = ownedCards cards 10 S.alice g0
-      g2 = ownedCards cards 10 S.bob g1
+      g1 = ownedCards mountain 10 S.alice g0
+      g2 = ownedCards mountain 10 S.bob g1
       (abilId, g3) = Game.freshObjectId g2
       (ts, g4) = Game.freshTimestamp g3
       ability =
@@ -1019,30 +1055,31 @@ runCountingActions gs act =
       ((_, gs1), n) = State.runState (Engine.runGame answer gs act) 0
    in (gs1, n)
 
-restartReentryTests :: Cards.Cards -> Tasty.TestTree
-restartReentryTests cards =
+restartReentryTests :: Registry.Type.Registry -> Tasty.TestTree
+restartReentryTests registry =
   Tasty.testGroup
     "restart re-entry (CR 727.4)"
-    [ HU.testCase "the step the restart fired in does not advance past turn 1's untap step" $
-        let (after, _) = runCountingActions (restartOnStack cards) Engine.runStep
-         in do
-              HU.assertEqual "still positioned at the untap step" Turn.firstPhase (GameState.phase after)
-              HU.assertEqual "the fresh turn schedule is intact, not popped" Turn.laterPhases (GameState.remaining after)
-              HU.assertEqual "turn 1 of the new game" 1 (GameState.turnNumber after)
-              HU.assertEqual "the new game is still being played" Nothing (GameState.result after),
-      HU.testCase "no player receives priority after the restart resolves" $
+    [ HU.testCase "the step the restart fired in does not advance past turn 1's untap step" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let (after, _) = runCountingActions (restartOnStack mountain) Engine.runStep
+        HU.assertEqual "still positioned at the untap step" Turn.firstPhase (GameState.phase after)
+        HU.assertEqual "the fresh turn schedule is intact, not popped" Turn.laterPhases (GameState.remaining after)
+        HU.assertEqual "turn 1 of the new game" 1 (GameState.turnNumber after)
+        HU.assertEqual "the new game is still being played" Nothing (GameState.result after),
+      HU.testCase "no player receives priority after the restart resolves" $ do
         -- alice passes, bob passes, the ability resolves: two ChooseAction prompts
         -- and no more. A third means the priority loop kept running on a game that
         -- no longer exists.
-        let (_, asked) = runCountingActions (restartOnStack cards) Engine.runStep
-         in HU.assertEqual "exactly the two passes that resolved the ability" 2 asked,
-      HU.testCase "the next step runs the rebuilt turn 1's untap step" $
-        let (afterRestart, _) = runCountingActions (restartOnStack cards) Engine.runStep
+        mountain <- Registry.printing registry "Mountain"
+        let (_, asked) = runCountingActions (restartOnStack mountain) Engine.runStep
+        HU.assertEqual "exactly the two passes that resolved the ability" 2 asked,
+      HU.testCase "the next step runs the rebuilt turn 1's untap step" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let (afterRestart, _) = runCountingActions (restartOnStack mountain) Engine.runStep
             (afterUntap, _) = runCountingActions afterRestart Engine.runStep
-         in do
-              HU.assertEqual "the untap step ran and handed on to upkeep" (Phase.Beginning BeginningStep.Upkeep) (GameState.phase afterUntap)
-              HU.assertEqual "still turn 1" 1 (GameState.turnNumber afterUntap),
-      HU.testCase "a live playGame survives the restart and plays the new game to a result" $
+        HU.assertEqual "the untap step ran and handed on to upkeep" (Phase.Beginning BeginningStep.Upkeep) (GameState.phase afterUntap)
+        HU.assertEqual "still turn 1" 1 (GameState.turnNumber afterUntap),
+      HU.testCase "a live playGame survives the restart and plays the new game to a result" $ do
         -- An end-to-end liveness guard, not a discriminating one: the loop did
         -- not wedge before the fix either, it just played a turn 1 with no untap
         -- step. The three tests above are what actually catch that. This one
@@ -1051,6 +1088,7 @@ restartReentryTests cards =
         -- wins, loses or draws the game that was restarted). Terminating: the
         -- restart is a hand-built stack object, not a card in any library, so it
         -- cannot fire again and the rebuilt game decks out like any other.
-        let (result, _) = Engine.runGamePure S.identityAnswer (restartOnStack cards) Engine.playGame
-         in HU.assertBool "the new game reached a result" (case result of Result.Won _ -> True; Result.Drawn -> True)
+        mountain <- Registry.printing registry "Mountain"
+        let (result, _) = Engine.runGamePure S.identityAnswer (restartOnStack mountain) Engine.playGame
+        HU.assertBool "the new game reached a result" (case result of Result.Won _ -> True; Result.Drawn -> True)
     ]
