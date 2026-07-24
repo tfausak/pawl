@@ -1,6 +1,6 @@
 # Concede — the special action (CR 104.3a / 405.6g)
 
-**Issue:** #133. **Status:** design approved 2026-07-23, not yet implemented.
+**Issue:** #133. **Status:** implemented 2026-07-23.
 
 Every CR number below was checked against `docs/rules.txt` while writing this
 document, not recalled.

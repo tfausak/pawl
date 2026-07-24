@@ -31,7 +31,7 @@ data Prompt r where
   -- Action constructor) would hand the controller exactly the power CR 723.6
   -- forbids, and leave the controlled player with no channel at all.
   --
-  -- "At any time" is narrowed to "at each priority grant" (#TBD-ELISION).
+  -- "At any time" is narrowed to "at each priority grant" (#144).
   Concede :: PlayerId -> Prompt Concession
   Shuffle :: [ObjectId] -> Prompt [ObjectId]
   -- CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.

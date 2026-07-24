@@ -667,8 +667,7 @@ concedeTests cards =
             gs =
               base
                 { GameState.phase = Phase.PrecombatMain,
-                  GameState.activePlayer = S.alice,
-                  GameState.stack = [spellId]
+                  GameState.activePlayer = S.alice
                 }
             after = S.runPure (concedeAnswer S.alice) gs Engine.runStep
          in do

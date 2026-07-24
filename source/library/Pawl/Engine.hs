@@ -428,6 +428,15 @@ priorityLoop = do
                         -- to. leaveGame settles CR 104.2a on the spot; the loop's own
                         -- `finished` check then unwinds on the next iteration.
                         Departure.leaveGame Departure.Type.Conceded p
+                        -- nextStillPlaying is evaluated after leaveGame, so `p` has
+                        -- already been filtered out of the turn order and the result
+                        -- falls through to the first still-playing player rather than
+                        -- the one after `p`. Correct at two players; wrong in
+                        -- multiplayer (#143).
+                        --
+                        -- GameState.passes is not reset here, unlike the neighbouring
+                        -- Play/Cast/Activate arms below; in multiplayer a concede
+                        -- mid-pass-cycle could resolve the stack a pass early (#143).
                         State.modify' (\g -> g {GameState.priority = Just (nextStillPlaying g p)})
                         loop
                       Concession.Continues -> do
