@@ -55,6 +55,7 @@ import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -141,6 +142,8 @@ identityAnswer p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -179,6 +182,8 @@ castAnswer p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -210,6 +215,8 @@ aggressiveAnswer p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
@@ -245,6 +252,8 @@ playLandAnswer p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -320,6 +329,8 @@ randomAnswer p = case p of
   Prompt.ChooseReplacement {} -> pure 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
+  Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> pure (take (fromIntegral count) hand)
 
 -- Total index into a turn order: an out-of-range draw falls back to the head,
 -- which the NonEmpty guarantees exists (no partial functions).

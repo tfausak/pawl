@@ -13,6 +13,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Type.Action as Action
 import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.Deck as Deck
+import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
@@ -84,6 +85,8 @@ alwaysPass p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
 -- Plays lands and casts when legal, otherwise passes: the benchmark that actually
 -- exercises the stack, mana payment, and resolution.
@@ -112,6 +115,8 @@ castAnswer p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
 -- Plays lands, casts, attacks, and blocks: the benchmark that exercises combat.
 fightAnswer :: Prompt.Prompt r -> r
@@ -141,6 +146,8 @@ fightAnswer p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
 -- Two players, seeded from the benchmark's argument.
 playersFrom :: Natural -> NonEmpty.NonEmpty PlayerId

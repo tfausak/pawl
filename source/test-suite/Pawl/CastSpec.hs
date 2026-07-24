@@ -36,6 +36,7 @@ import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -362,6 +363,8 @@ discardLastAnswer p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
 lastN :: Int -> [a] -> [a]
 lastN n xs = drop (length xs - n) xs
@@ -550,6 +553,8 @@ castFirstOption p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
 nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
@@ -589,3 +594,5 @@ castPanglacial p = case p of
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand

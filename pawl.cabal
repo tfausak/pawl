@@ -150,6 +150,7 @@ library
     Pawl.Type.ModeSelection
     Pawl.Type.Modification
     Pawl.Type.MonarchTarget
+    Pawl.Type.MulliganDecision
     Pawl.Type.Object
     Pawl.Type.ObjectId
     Pawl.Type.Payment

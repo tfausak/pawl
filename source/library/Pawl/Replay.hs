@@ -12,6 +12,7 @@ import qualified Pawl.Type.Action as Action
 import qualified Pawl.Type.Concession as Concession
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
+import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.Program as Program
 import Pawl.Type.Prompt (Prompt)
 import qualified Pawl.Type.Prompt as Prompt
@@ -44,6 +45,8 @@ encode p answer = case p of
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
   Prompt.ChooseCost {} -> Response.ChoseCost answer
+  Prompt.DeclareMulligan {} -> Response.DeclaredMulligan answer
+  Prompt.Bottom {} -> Response.PutOnBottom answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -114,6 +117,12 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCost {} -> case response of
     Response.ChoseCost cost -> Just cost
+    _ -> Nothing
+  Prompt.DeclareMulligan {} -> case response of
+    Response.DeclaredMulligan decision -> Just decision
+    _ -> Nothing
+  Prompt.Bottom {} -> case response of
+    Response.PutOnBottom ids -> Just ids
     _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
@@ -188,6 +197,12 @@ defaultAnswer p = case p of
   -- sacrifices nothing. Cost.firstOffered keeps this total for the empty list the
   -- engine never produces.
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  -- CR 103.5: keeping is always legal and the least-eventful fallback when a
+  -- transcript runs short (mirrors Concede -> Continues).
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  -- A legal ordered subset of the redrawn hand, deterministically the first
+  -- `count` -- the least-eventful fallback when a transcript runs short.
+  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

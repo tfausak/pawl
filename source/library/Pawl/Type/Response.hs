@@ -7,6 +7,7 @@ import Pawl.Type.Action (Action)
 import Pawl.Type.Concession (Concession)
 import Pawl.Type.Cost (Cost)
 import Pawl.Type.ModeIndex (ModeIndex)
+import Pawl.Type.MulliganDecision (MulliganDecision)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
@@ -60,4 +61,10 @@ data Response
   | -- CR 601.2b: the cost a caster announced they would pay, serialized so a
     -- DecisionLog replays an alternative-cost cast deterministically.
     ChoseCost Cost
+  | -- CR 103.5: a player's mulligan declaration, serialized so a DecisionLog
+    -- replays the mulligan round deterministically.
+    DeclaredMulligan MulliganDecision
+  | -- CR 103.5: the cards a player put on the bottom of their library after a
+    -- mulligan, in chosen order, serialized so a DecisionLog replays it.
+    PutOnBottom [ObjectId]
   deriving (Eq, Show)
