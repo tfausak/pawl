@@ -1,7 +1,6 @@
 module Pawl.Setup where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List.NonEmpty as NonEmpty
@@ -11,8 +10,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
-import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Deck as Deck
 import Pawl.Type.Game (Game)
@@ -24,8 +23,6 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Printing (Printing)
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.RestartSignal as RestartSignal
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
@@ -43,9 +40,6 @@ deckSize (Deck.MkDeck m) = sum (Map.elems m)
 -- Pair every player with one deck, for a symmetric (mirror) matchup.
 mirror :: Deck.Deck -> NonEmpty.NonEmpty PlayerId -> NonEmpty.NonEmpty (PlayerId, Deck.Deck)
 mirror deck = NonEmpty.map (\pid -> (pid, deck))
-
-openingHand :: Int
-openingHand = 7
 
 -- Takes a NonEmpty so the active player is total (no partial head).
 emptyGame :: NonEmpty.NonEmpty PlayerId -> GameState
@@ -122,13 +116,6 @@ createCard pid printing = do
   State.put gs3
   pure oid
 
-shuffleLibrary :: PlayerId -> Game ()
-shuffleLibrary pid = do
-  gs <- State.get
-  let ids = Game.zoneMembers Zone.Library pid gs
-  shuffled <- Trans.lift (Program.prompt (Prompt.Shuffle ids))
-  State.put gs {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library gs)}
-
 -- Build each player's library from their deck's multiset, shuffle, draw.
 createDeck :: PlayerId -> Deck.Deck -> Game ()
 createDeck pid (Deck.MkDeck m) =
@@ -136,12 +123,13 @@ createDeck pid (Deck.MkDeck m) =
     Monad.replicateM_ (fromIntegral n) (createCard pid printing)
 
 newGame :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
-newGame matchup = Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
-  createDeck pid deck
-  shuffleLibrary pid
-  -- CR 103.4 mulligans are not implemented; the opening hand is always exactly
-  -- `openingHand` cards, unconditionally (#141).
-  Monad.replicateM_ openingHand (Event.drawCard pid)
+newGame matchup = do
+  -- CR 103.3: build and shuffle every library BEFORE any opening hand is drawn,
+  -- so CR 103.5's declaration round (Mulligan.openingHands) sees settled libraries.
+  Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
+    createDeck pid deck
+    Mulligan.shuffleLibrary pid
+  Mulligan.openingHands (map fst (NonEmpty.toList matchup))
 
 -- CR 727.2 / 729.2: build every player's library from an EXISTING object pool --
 -- each player's owned CARDS, wherever they currently sit -- then shuffle and draw
@@ -179,10 +167,8 @@ startGameFromCards = do
         GameState.command = mempty,
         GameState.stack = []
       }
-  Monad.forM_ owners $ \pid -> do
-    shuffleLibrary pid
-    -- CR 103.4 mulligans are not implemented here either (#141).
-    Monad.replicateM_ openingHand (Event.drawCard pid)
+  Monad.forM_ owners Mulligan.shuffleLibrary
+  Mulligan.openingHands owners
 
 -- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the
 -- cyclic order ("the game's default turn order begins with the starting player

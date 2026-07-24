@@ -177,7 +177,7 @@ costAdjustments pid oid gs =
 
 -- CR 402.2: "each player has a maximum hand size, which is normally seven
 -- cards." This is NOT CR 103.5's starting hand size, which is a different seven
--- (Setup.openingHand) that this constant deliberately does not share -- the
+-- (Mulligan.openingHand) that this constant deliberately does not share -- the
 -- rules keep them apart, and Reliquary Tower changes only one of them.
 defaultMaximumHandSize :: Natural
 defaultMaximumHandSize = 7

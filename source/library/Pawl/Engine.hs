@@ -26,6 +26,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Monarch as Monarch
+import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
@@ -610,7 +611,7 @@ playSubgame = do
   (result, finalSub) <- Trans.lift (State.runStateT (Setup.startGameFromCards >> playGame) sub0)
   State.modify' (Setup.funnelBack finalSub)
   order <- State.gets GameState.turnOrder
-  Monad.forM_ order Setup.shuffleLibrary
+  Monad.forM_ order Mulligan.shuffleLibrary
   pure result
 
 playFrom :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game Result

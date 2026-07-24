@@ -7,16 +7,17 @@ module Pawl
     Engine.playGame,
     Engine.runGame,
     Engine.runGamePure,
+    Mulligan.openingHand,
     Replay.record,
     Replay.replay,
     Setup.deckSize,
     Setup.emptyGame,
     Setup.newGame,
-    Setup.openingHand,
     Setup.startingLife,
   )
 where
 
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup

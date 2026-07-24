@@ -79,6 +79,7 @@ library
     Pawl.Mana
     Pawl.Modal
     Pawl.Monarch
+    Pawl.Mulligan
     Pawl.PlayerEffect
     Pawl.Projection
     Pawl.Quantity
