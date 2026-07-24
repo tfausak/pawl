@@ -8,6 +8,7 @@ import Pawl.Type.Concession (Concession)
 import Pawl.Type.Cost (Cost)
 import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Subtype (Subtype)
@@ -18,6 +19,9 @@ data Response
     -- DecisionLog replays the concession deterministically.
     Conceded Concession
   | Shuffled [ObjectId]
+  | -- CR 729.2: the player randomness picked to go first in a subgame,
+    -- serialized so a DecisionLog replays that roll deterministically.
+    DeterminedFirstPlayer PlayerId
   | ChoseDiscard [ObjectId]
   | DeclaredAttackers [ObjectId]
   | DeclaredBlockers (Map ObjectId ObjectId)

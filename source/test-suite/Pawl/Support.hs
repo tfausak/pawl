@@ -125,6 +125,7 @@ identityAnswer p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
@@ -145,6 +146,7 @@ identityAnswer p = case p of
 castAnswer :: Prompt.Prompt r -> r
 castAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.DeclareAttackers {} -> []
@@ -184,6 +186,7 @@ castAnswer p = case p of
 aggressiveAnswer :: Prompt.Prompt r -> r
 aggressiveAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
@@ -212,6 +215,7 @@ aggressiveAnswer p = case p of
 playLandAnswer :: Prompt.Prompt r -> r
 playLandAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.DeclareAttackers {} -> []
@@ -270,6 +274,15 @@ randomAnswer p = case p of
     let (g1, g2) = Random.splitGen g
     State.put g2
     pure (shuffleWith g1 ids)
+  -- CR 729.2: the one interpreter that carries actual randomness, so this is the
+  -- one that answers the first-player roll with a real draw rather than the head
+  -- of the order.
+  Prompt.RandomFirstPlayer order -> do
+    g <- State.get
+    let players = NonEmpty.toList order
+        (i, g') = Random.uniformR (0, length players - 1) g
+    State.put g'
+    pure (pickPlayer order i)
   Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
   Prompt.ChooseAction _ _ actions -> do
     g <- State.get
@@ -307,6 +320,13 @@ randomAnswer p = case p of
   Prompt.ChooseReplacement {} -> pure 0
   Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
+
+-- Total index into a turn order: an out-of-range draw falls back to the head,
+-- which the NonEmpty guarantees exists (no partial functions).
+pickPlayer :: NonEmpty.NonEmpty PlayerId.PlayerId -> Int -> PlayerId.PlayerId
+pickPlayer order i = case drop i (NonEmpty.toList order) of
+  h : _ -> h
+  [] -> NonEmpty.head order
 
 -- Total index into a list; the engine always offers at least Pass, so the
 -- fallback is unreachable in practice but keeps this free of partial functions.

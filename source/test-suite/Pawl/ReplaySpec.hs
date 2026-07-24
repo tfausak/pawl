@@ -115,6 +115,19 @@ combatReplayTests =
                   "the printed one"
                   printed
                   (Replay.defaultAnswer (Prompt.ChooseCost decider S.alice oid [printed, alternative])),
+          -- #136 / CR 729.2: "Randomly determine which player goes first." The
+          -- determination is randomness, not a choice, so the prompt carries NO
+          -- Decider -- Shuffle is the only other such constructor. Recording it
+          -- is what keeps a subgame replayable: the randomness lives in the
+          -- interpreter, and the transcript carries what it rolled.
+          HU.testCase "RandomFirstPlayer round-trips through the transcript" $
+            let p = Prompt.RandomFirstPlayer (S.alice NonEmpty.:| [S.bob])
+             in HU.assertEqual "round trip" (Just S.bob) (Replay.decode p (Replay.encode p S.bob)),
+          HU.testCase "a short transcript starts the head of the turn order" $
+            HU.assertEqual
+              "the head"
+              S.alice
+              (Replay.defaultAnswer (Prompt.RandomFirstPlayer (S.alice NonEmpty.:| [S.bob]))),
           -- #133: the concede channel round-trips like every other prompt. Note
           -- the prompt takes a PlayerId and NO Decider (CR 723.6).
           HU.testCase "Concede round-trips both ways" $

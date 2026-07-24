@@ -284,6 +284,7 @@ recordingAnswer p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.Shuffle ids -> pure ids
+  Prompt.RandomFirstPlayer order -> pure (NonEmpty.head order)
   Prompt.ChooseTargets _ _ _ sets -> pure (Map.mapMaybe Set.lookupMin sets)
   Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
   Prompt.ChooseAction _ pid actions -> do
@@ -762,6 +763,7 @@ slaveAnswer p = case p of
       (\s -> if Set.member (Recipient.ToPlayer S.bob) s then Just (Recipient.ToPlayer S.bob) else Set.lookupMin s)
       sets
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.DeclareAttackers {} -> []

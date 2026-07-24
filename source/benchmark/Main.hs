@@ -62,6 +62,7 @@ discardNewest ids n = take (fromIntegral n) (reverse ids)
 alwaysPass :: Prompt.Prompt r -> r
 alwaysPass p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.ChooseAction {} -> Action.Pass
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
@@ -89,6 +90,7 @@ alwaysPass p = case p of
 castAnswer :: Prompt.Prompt r -> r
 castAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.DeclareAttackers {} -> []
@@ -115,6 +117,7 @@ castAnswer p = case p of
 fightAnswer :: Prompt.Prompt r -> r
 fightAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.DeclareAttackers _ _ ids -> ids

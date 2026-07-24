@@ -2,6 +2,7 @@
 
 module Pawl.Type.Prompt where
 
+import Data.List.NonEmpty (NonEmpty)
 import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
@@ -34,6 +35,21 @@ data Prompt r where
   -- "At any time" is narrowed to "at each priority grant" (#144).
   Concede :: PlayerId -> Prompt Concession
   Shuffle :: [ObjectId] -> Prompt [ObjectId]
+  -- CR 729.2: "Randomly determine which player goes first." The NonEmpty is the
+  -- turn order; the answer is the starting player, and the order is then rotated
+  -- to begin with them (CR 103.1: "the game's default turn order begins with the
+  -- starting player and proceeds clockwise").
+  --
+  -- Carries no Decider, and Shuffle is the only other constructor that does not:
+  -- this is randomness, not a choice, so there is no player whose decision could
+  -- be usurped and nowhere for a controller (CR 723) to sit. Asked only where the
+  -- rules call for randomness -- a subgame's start. A MAIN game's starting player
+  -- is settled before the game begins, by any mutually agreeable method (CR
+  -- 103.1), which is the caller-supplied turn order Setup.emptyGame takes.
+  --
+  -- NonEmpty, not [], for the same reason Setup.emptyGame takes one: the answer
+  -- has to come from somewhere, and a fallback must be total.
+  RandomFirstPlayer :: NonEmpty PlayerId -> Prompt PlayerId
   -- CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
   ChooseDiscard :: Decider -> PlayerId -> [ObjectId] -> Natural -> Prompt [ObjectId]
   -- CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them

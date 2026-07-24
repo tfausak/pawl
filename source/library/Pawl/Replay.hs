@@ -4,6 +4,7 @@
 module Pawl.Replay where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Cost as Cost
@@ -24,6 +25,7 @@ import qualified Pawl.Type.Subtype as Subtype
 encode :: Prompt r -> r -> Response
 encode p answer = case p of
   Prompt.Shuffle _ -> Response.Shuffled answer
+  Prompt.RandomFirstPlayer _ -> Response.DeterminedFirstPlayer answer
   Prompt.ChooseAction {} -> Response.ChoseAction answer
   Prompt.Concede _ -> Response.Conceded answer
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
@@ -55,6 +57,9 @@ decode :: Prompt r -> Response -> Maybe r
 decode p response = case p of
   Prompt.Shuffle _ -> case response of
     Response.Shuffled ids -> Just ids
+    _ -> Nothing
+  Prompt.RandomFirstPlayer _ -> case response of
+    Response.DeterminedFirstPlayer pid -> Just pid
     _ -> Nothing
   Prompt.ChooseAction {} -> case response of
     Response.ChoseAction action -> Just action
@@ -117,6 +122,10 @@ decode p response = case p of
 defaultAnswer :: Prompt r -> r
 defaultAnswer p = case p of
   Prompt.Shuffle ids -> ids
+  -- CR 729.2: the head of the turn order is always a legal starting player, and
+  -- is the least eventful fallback when a transcript runs short -- it is what a
+  -- subgame did before randomness had a channel at all.
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.ChooseAction _ _ actions -> case actions of
     h : _ -> h
     [] -> Action.Pass

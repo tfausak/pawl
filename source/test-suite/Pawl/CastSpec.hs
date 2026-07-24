@@ -7,6 +7,7 @@ module Pawl.CastSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -345,6 +346,7 @@ discardLastAnswer p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
@@ -527,6 +529,7 @@ castFirstOption p = case p of
     oid : _ -> Just oid
     [] -> Nothing
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
@@ -566,6 +569,7 @@ castPanglacial p = case p of
     [] -> Nothing
   Prompt.SearchLibrary {} -> Nothing
   Prompt.Shuffle ids -> ids
+  Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
