@@ -261,7 +261,9 @@ subgameTests cards =
                   GameState.battlefield = Set.difference (GameState.battlefield g1) (Set.fromList toLib),
                   GameState.library = Map.insert S.alice (Seq.fromList toLib) (GameState.library g1)
                 }
-            sub = Setup.subgameStateFrom g2
+            -- alice starts (the head of the order); this test is about which CARDS
+            -- enter the subgame, not who goes first.
+            sub = Setup.subgameStateFrom S.alice g2
          in do
               HU.assertEqual "the subgame pool holds exactly the 2 library cards" 2 (Map.size (GameState.objects sub))
               HU.assertEqual "every subgame object is one of the 2 library cards" True (all (`elem` toLib) (Map.keys (GameState.objects sub)))
@@ -295,7 +297,7 @@ subgameTests cards =
             -- all 2 and record drewFromEmpty for the other 5 draw attempts --
             -- irrelevant here, this test only checks funnelBack's bookkeeping,
             -- not the CR 727.3/729.3 short-deck loss.
-            sub0 = Setup.subgameStateFrom parent
+            sub0 = Setup.subgameStateFrom S.alice parent
             (_, finalSub) = Engine.runGamePure S.identityAnswer sub0 Setup.startGameFromCards
             after = Setup.funnelBack finalSub parent
             libCount pid = length (Game.zoneMembers Zone.Library pid after)

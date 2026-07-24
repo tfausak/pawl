@@ -597,7 +597,16 @@ playGame =
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get
-  let sub0 = Setup.subgameStateFrom parent
+  -- CR 729.2: "Randomly determine which player goes first." The engine asks; the
+  -- interpreter rolls. Not asked when the answer is forced -- a lone player in
+  -- the turn order goes first no matter what randomness says, and where the
+  -- rules leave nothing to determine, don't prompt.
+  starter <- case NonEmpty.nonEmpty (GameState.turnOrder parent) of
+    Nothing -> pure (GameState.activePlayer parent)
+    Just order -> case order of
+      only NonEmpty.:| [] -> pure only
+      _ -> Trans.lift (Program.prompt (Prompt.RandomFirstPlayer order))
+  let sub0 = Setup.subgameStateFrom starter parent
   (result, finalSub) <- Trans.lift (State.runStateT (Setup.startGameFromCards >> playGame) sub0)
   State.modify' (Setup.funnelBack finalSub)
   order <- State.gets GameState.turnOrder

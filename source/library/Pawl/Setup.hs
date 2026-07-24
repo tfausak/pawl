@@ -251,10 +251,15 @@ restartGame starter = do
 -- cleared, exactly as restartGame does, EXCEPT the object/timestamp id supplies,
 -- which are INHERITED from the parent so every object the subgame mints (CR 400.7)
 -- gets an id above every parent id -- funnelBack relies on that for non-collision.
--- CR 729.2's "randomly determine which player goes first" is elided to the
--- head of the turn order (pawl has no first-player randomness prompt) (#136).
-subgameStateFrom :: GameState -> GameState
-subgameStateFrom parent =
+-- CR 729.2's "randomly determine which player goes first" happens in the caller
+-- (Engine.playSubgame asks Prompt.RandomFirstPlayer); `starter` is what it rolled.
+-- CR 103.1: the turn order is rotated to begin with them, exactly as CR 727.1a's
+-- restart does -- rotating rather than only setting activePlayer is load-bearing,
+-- because Engine.skipsDraw (CR 103.7a) tests the HEAD of the turn order. Total: a
+-- `starter` outside the order leaves it alone (rotateTo), and activePlayer is read
+-- back off the rotated order, so the two can never disagree.
+subgameStateFrom :: PlayerId -> GameState -> GameState
+subgameStateFrom starter parent =
   let libIds =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
@@ -265,9 +270,11 @@ subgameStateFrom parent =
             Player.status = Status.Playing,
             Player.counters = Map.empty
           }
-      firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe (GameState.turnOrder parent))
+      order = rotateTo starter (GameState.turnOrder parent)
+      firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe order)
    in parent
         { GameState.objects = libObjects,
+          GameState.turnOrder = order,
           GameState.players = Map.map resetPlayer (GameState.players parent),
           GameState.library = Map.empty,
           GameState.hand = Map.empty,

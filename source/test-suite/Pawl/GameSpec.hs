@@ -499,6 +499,42 @@ ruleTests cards =
               HU.assertEqual "CR 729.5: alice's cards funnel back into her main-game library" 8 (libCount S.alice)
               HU.assertEqual "CR 729.5: bob's cards funnel back into his main-game library" 3 (libCount S.bob)
               HU.assertEqual "the main game resumes with no result recorded" Nothing (GameState.result after),
+      -- #136 / CR 729.2: "Randomly determine which player goes first." The
+      -- interpreter supplies the randomness (Prompt.RandomFirstPlayer); the
+      -- engine only asks. Both players get libraries of EXACTLY seven, so each
+      -- opening hand (CR 103.5) empties its library without drawing from empty:
+      -- nobody loses during setup. The starting player then skips their first
+      -- draw (CR 103.7a), so the OTHER player is the one who draws from an empty
+      -- library on turn 2 and decks (CR 704.5b) -- the subgame's winner is
+      -- exactly whoever the roll started. Flipping the answer flips the winner,
+      -- which is what makes the determination observable rather than cosmetic.
+      HU.testCase "CR 729.2: the subgame's first player comes from the roll; the answer decides who wins" $
+        let g0 = Setup.emptyGame S.bothPlayers
+            g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG cards 7 S.bob (addManyG cards 7 S.alice g0)))
+            winnerWhenStarting starter = fst (Engine.runGamePure (firstPlayerAnswer starter) g1 Engine.playSubgame)
+         in do
+              HU.assertEqual "alice starts, skips her first draw, and bob decks on turn 2" (Result.Won S.alice) (winnerWhenStarting S.alice)
+              HU.assertEqual "bob starts, skips his first draw, and alice decks on turn 2" (Result.Won S.bob) (winnerWhenStarting S.bob),
+      HU.testCase "CR 729.2: a lone player is not asked -- the determination is forced" $
+        -- Where the rules leave nothing to determine, don't prompt: with one
+        -- player in the turn order, every roll yields the same starter. alice's
+        -- library is empty, so her opening draw decks her (CR 704.5b) and the
+        -- subgame ends during setup -- long enough to record an ask if one were
+        -- made, which is what the transcript is inspected for.
+        let g0 = Setup.emptyGame (S.alice NonEmpty.:| [])
+            (_, log_) = Replay.record S.identityAnswer g0 Engine.playSubgame
+            isRoll r = case r of
+              Response.DeterminedFirstPlayer _ -> True
+              _ -> False
+         in HU.assertEqual "no first-player roll was recorded" 0 (length (filter isRoll log_)),
+      HU.testCase "CR 103.1/729.2: the subgame's turn order is rotated to begin with the starting player" $
+        -- Not just activePlayer: Engine.skipsDraw (CR 103.7a) reads the HEAD of
+        -- the turn order, so a subgame that set one without the other would hand
+        -- the skip to the wrong player.
+        let sub = Setup.subgameStateFrom S.bob (Setup.emptyGame S.bothPlayers)
+         in do
+              HU.assertEqual "bob is the subgame's active player" S.bob (GameState.activePlayer sub)
+              HU.assertEqual "the subgame turn order begins with bob" [S.bob, S.alice] (GameState.turnOrder sub),
       HU.testCase "CR 729.1b/729.3 gameplay: alice casts a subgame spell, bob decks, bob takes 3" $
         -- alice has the {0} subgame sorcery in hand and an 8-card library; bob has
         -- a 3-card library (decks in the subgame, CR 729.3). alice casts through
@@ -864,6 +900,15 @@ subgameAnswer p = case p of
     case filter isCastAction actions of
       cast : _ -> cast
       [] -> A.Pass
+  _ -> S.identityAnswer p
+
+-- #136 / CR 729.2: hands the subgame's first-player roll a fixed answer, so a
+-- test can play the same fixture with each player starting. Every other prompt
+-- delegates to identityAnswer (which would answer this one with the head of the
+-- order -- the pre-#136 behaviour).
+firstPlayerAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+firstPlayerAnswer starter p = case p of
+  Prompt.RandomFirstPlayer _ -> starter
   _ -> S.identityAnswer p
 
 addManyG :: Cards.Cards -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState

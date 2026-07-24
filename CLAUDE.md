@@ -85,9 +85,10 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   (CR 729.1b, read via a per-effect binding re-read in `resolveSpellWith`);
   `Setup.subgameStateFrom`/`funnelBack` build from the library only (CR 729.2)
   and return owned cards (CR 729.5) with an inherited id supply; nesting (CR
-  729.6) is free recursion. Deferred: subgame first-player RNG, ability-path
-  subgames, Result-widening, full Shahrazad, and the subsystem-blocked
-  movement slices. With control, restart, and subgames closed, **the closed
+  729.6) is free recursion; CR 729.2's random first player is a real roll
+  (`Prompt.RandomFirstPlayer`, answered by the interpreter). Deferred:
+  ability-path subgames, Result-widening, full Shahrazad, and the
+  subsystem-blocked movement slices. With control, restart, and subgames closed, **the closed
   half is functionally complete for its flagged surface; M6 (the transpiler)
   is next.** The umbrella spec is
   `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`.
