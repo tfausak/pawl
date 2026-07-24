@@ -74,7 +74,7 @@ layer m = case m of
 --
 -- CR 109.5: "for a static ability, this is the current controller of the object
 -- it's on" -- the effect's SOURCE's controller, not the affected object's. `src`
--- (the Gathered candidate's own source, CR 611.2c) supplies both the
+-- (the Gathered candidate's own source) supplies both the
 -- perspective and the InSlot binding source for the built Filter.Context. `lyr`
 -- is the layer bound the Pawl.Type.Count fold sees (viewUpTo) -- the layers
 -- already applied when this modification is folded in. This is the #34 fix: a
@@ -84,8 +84,7 @@ layer m = case m of
 -- object's OWN controller instead.
 --
 -- No card in the pool is a static ability carrying a Count, so this corrected
--- branch is not exercised by any test today. A successor issue recording that
--- gap is filed later in the M5.5 sequence (not yet numbered from here).
+-- branch has no producer and no test exercises it (#155).
 applyModification :: Layer -> ObjectId -> [Gathered] -> GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification lyr src cands gs oid m pc =
   let context = Filter.MkContext (controllerOf src gs) (Just src)
@@ -323,6 +322,10 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
     -- printed power/toughness Quantity, never a real card's) gets a viewOf
     -- that determines nothing rather than one that recurses back into
     -- copiableCharacteristics/baseCharacteristics through viewUpTo/projectUpTo.
+    -- The tradeoff: a Count reached from here folds an empty candidate set and
+    -- aggregates to Just 0 -- a plausible wrong answer -- rather than the
+    -- honest Nothing a printed-P/T Count deserves; no card in the pool has one
+    -- (#156).
     -- The context is still the object's own controller, the CDA posture (CR
     -- 604.3a(3)) this seed already shares with applyCharacteristicPT.
     let seedViewOf = const Nothing
@@ -462,9 +465,11 @@ freezeQuantities gs oid you m =
   -- The Nothing fallback leaves the quantity in the store rather than dropping
   -- the effect. That is deliberate, but it leaves a RESIDUAL: an unevaluable
   -- quantity (an X with no binding on the source, or a bare Star) survives into
-  -- the stored effect, where applyModification later evaluates it against the
-  -- AFFECTED object and that object's controller -- the very mis-evaluation this
-  -- freeze exists to prevent (#36).
+  -- the stored effect, where applyModification later evaluates it live against
+  -- the CURRENT game state on every projection, using the effect's SOURCE's
+  -- controller as perspective (CR 109.5) -- correct on WHO, but still wrong on
+  -- WHEN: CR 608.2h/611.2d call for a single read at store time, which is the
+  -- very mis-evaluation this freeze exists to prevent (#36).
   --
   -- CR 608.2h / 611.2d: read the CURRENT state through the real projection --
   -- `oid` is the source, `you` its controller, matching the doc above.
