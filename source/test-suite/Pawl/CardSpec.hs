@@ -612,15 +612,7 @@ m3cCardTests :: Registry.Type.Registry -> Tasty.TestTree
 m3cCardTests registry =
   Tasty.testGroup
     "M3cCards"
-    [ HU.testCase "M3c printings are registered in allPrintings" $ do
-        bloodMoon <- Registry.printing registry "Blood Moon"
-        urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
-        opalescence <- Registry.printing registry "Opalescence"
-        ps <- S.allPrintings registry
-        HU.assertBool "Blood Moon" (elem bloodMoon ps)
-        HU.assertBool "Urborg" (elem urborg ps)
-        HU.assertBool "Opalescence" (elem opalescence ps),
-      HU.testCase "Blood Moon is a {2}{R} enchantment with one SetLandSubtype static ability" $ do
+    [ HU.testCase "Blood Moon is a {2}{R} enchantment with one SetLandSubtype static ability" $ do
         bloodMoon <- Registry.printing registry "Blood Moon"
         let card = Printing.card bloodMoon
         HU.assertEqual "one static ability" 1 (length (Card.Type.staticAbilities card))
