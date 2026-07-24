@@ -593,8 +593,9 @@ playGame =
 -- >= 7 cards its own opening hand consumed, so nesting depth is bounded by
 -- roughly |library| / 7 -- it cannot recurse forever (the CR 729.6 gate rests
 -- on this bound).
--- Nontraditional/Vanguard/Commander subgame movement and cards brought into
--- a subgame are subsystem-blocked (#140).
+-- Cards brought into a subgame from the main game, and the main-game triggers
+-- their removal queues, are not implemented (#152). Nontraditional/Vanguard/
+-- Commander subgame movement is not implemented (#131).
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get

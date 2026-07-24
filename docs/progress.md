@@ -2048,8 +2048,10 @@ its own gate card and spec, landed as it completes. Umbrella:
   runner-carrying variants; the `synthetic-subgame` card. **Deferred:** subgame
   first-player RNG (#136, elision), ability-path subgames (#137), Result-widening for
   multi-player non-winners (#138), full Shahrazad's half-life rider (#139,
-  card-driven), and the subsystem-blocked slices — nontraditional/Vanguard/Commander
-  movement, cards brought into a subgame, and subgame prompt tagging (#140).
+  card-driven), cards brought into a subgame from the main game plus the main-game
+  triggers their removal queues (#152), nontraditional/Vanguard/Commander subgame
+  movement (#131), subgame prompt tagging (#153), and the phased-out half of CR
+  729.5's second sentence, which phasing being unmodeled blocks (#154).
   **M5 exits here:** control (M5a), restart (M5b), and subgames (M5c) close
   design.md §3's "nightmares"; the closed half is functionally complete for its
   flagged surface. Spec (umbrella) and plan kept as reference:
