@@ -12,6 +12,7 @@ import qualified Pawl.CoreSpec as CoreSpec
 import qualified Pawl.CostSpec as CostSpec
 import qualified Pawl.DamageSpec as DamageSpec
 import qualified Pawl.DecideSpec as DecideSpec
+import qualified Pawl.DepartureSpec as DepartureSpec
 import qualified Pawl.EventSpec as EventSpec
 import qualified Pawl.ExpirySpec as ExpirySpec
 import qualified Pawl.FilterSpec as FilterSpec
@@ -49,6 +50,7 @@ testTree cards =
       SetupSpec.tests cards,
       DamageSpec.tests cards,
       DecideSpec.tests,
+      DepartureSpec.tests,
       EventSpec.tests cards,
       ExpirySpec.tests cards,
       ReplaySpec.tests cards,

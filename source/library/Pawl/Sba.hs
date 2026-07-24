@@ -9,13 +9,14 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
-import qualified Pawl.Type.Departure as Departure
+import qualified Pawl.Type.Departure as Departure.Type
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
@@ -27,15 +28,9 @@ import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Zone as Zone
-
-stillPlaying :: GameState -> [PlayerId]
-stillPlaying gs =
-  let isPlaying entry = Player.status (snd entry) == Status.Playing
-   in map fst (filter isPlaying (Map.toList (GameState.players gs)))
 
 -- CR 704.5a (life <= 0), CR 704.5b (drawing from an empty library), and CR
 -- 704.5c (ten or more poison counters). Two-Headed Giant's shared-poison variant
@@ -49,11 +44,6 @@ losesNow gs pid = case Map.lookup pid (GameState.players gs) of
              || Set.member pid (GameState.drewFromEmpty gs)
              || Map.findWithDefault 0 PlayerCounterKind.Poison (Player.counters player) >= 10
          )
-
-depart :: PlayerId -> GameState -> GameState
-depart pid gs =
-  let lose p = p {Player.status = Status.Departed Departure.Lost}
-   in gs {GameState.players = Map.adjust lose pid (GameState.players gs)}
 
 -- CR 704.5h: a creature with toughness > 0 dealt damage by a deathtouch source
 -- since the last SBA check is destroyed. "Deathtouch source" is read from the
@@ -162,9 +152,8 @@ performStateBasedActions = do
   -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
   Monad.mapM_ Event.destroy toDestroy
   destroyed <- State.get
-  let leaving = filter (losesNow destroyed) (stillPlaying destroyed)
-      departed = foldr depart destroyed leaving
-      remaining = stillPlaying departed
+  let leaving = filter (losesNow destroyed) (Departure.stillPlaying destroyed)
+      departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving
       -- CR 704.5d: a token in any zone other than the battlefield ceases to exist.
       -- Computed from the post-bury state so a token that just died (now in the
       -- graveyard) or was redirected (Rest in Peace -> exile) is removed here; its
@@ -187,10 +176,7 @@ performStateBasedActions = do
       balance g (oid, n) =
         let strip obj = obj {Object.counters = Map.update (removeN n) CounterKind.MinusOneMinusOne (Map.update (removeN n) CounterKind.PlusOnePlusOne (Object.counters obj))}
          in g {GameState.objects = Map.adjust strip oid (GameState.objects g)}
-      outcome = case remaining of
-        [winner] -> Just (Result.Won winner)
-        [] -> if null leaving then Nothing else Just Result.Drawn
-        _ -> Nothing
+      outcome = Departure.outcomeAfterLeaving leaving departed
       drained = vanished {GameState.damageScannedThrough = watermark}
       balanced = List.foldl' balance drained annihilations
       -- A state-based action was performed iff a creature was buried or destroyed

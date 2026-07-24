@@ -6,10 +6,10 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Sba as Sba
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.Exclusion as Exclusion
 import Pawl.Type.GameState (GameState)
@@ -77,11 +77,11 @@ creatureRecipients gs =
         map Recipient.ToCreature $
           concatMap
             (filter isCreatureId . (\pid -> Game.zoneMembers Zone.Battlefield pid gs))
-            (Sba.stillPlaying gs)
+            (Departure.stillPlaying gs)
 
 -- CR 115: players still in the game, tagged ToPlayer.
 playerRecipients :: GameState -> Set Recipient
-playerRecipients gs = Set.fromList (map Recipient.ToPlayer (Sba.stillPlaying gs))
+playerRecipients gs = Set.fromList (map Recipient.ToPlayer (Departure.stillPlaying gs))
 
 -- CR 110.1: permanents on the battlefield, tagged ToObject.
 permanentRecipients :: GameState -> Set Recipient

@@ -19,6 +19,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
@@ -88,7 +89,7 @@ nextInOrder order pid = case dropWhile (/= pid) order of
 -- The next player after 'pid' in APNAP order who has not left the game.
 nextStillPlaying :: GameState -> PlayerId -> PlayerId
 nextStillPlaying gs pid =
-  let playing = Sba.stillPlaying gs
+  let playing = Departure.stillPlaying gs
       order = filter (`List.elem` playing) (GameState.turnOrder gs)
    in nextInOrder order pid
 
@@ -421,7 +422,7 @@ priorityLoop = do
                     case chosen of
                       Action.Type.Pass -> do
                         let passes = GameState.passes gs + 1
-                            playing = length (Sba.stillPlaying gs)
+                            playing = length (Departure.stillPlaying gs)
                         if passes >= fromIntegral playing
                           then case GameState.stack gs of
                             [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}

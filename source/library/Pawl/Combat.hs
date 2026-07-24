@@ -9,9 +9,9 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Sba as Sba
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.CardType as CardType
@@ -59,7 +59,7 @@ skipEmptyCombat gs =
 -- Grows: multiplayer, where the attacking player chooses among opponents, and
 -- planeswalkers/battles, at which point AttackTarget becomes a real decision.
 defendingPlayers :: GameState -> [PlayerId]
-defendingPlayers gs = filter (/= GameState.activePlayer gs) (Sba.stillPlaying gs)
+defendingPlayers gs = filter (/= GameState.activePlayer gs) (Departure.stillPlaying gs)
 
 isCreatureObject :: ObjectId -> GameState -> Bool
 isCreatureObject = Projection.isCreatureOf

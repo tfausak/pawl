@@ -69,6 +69,7 @@ library
     Pawl.Cost
     Pawl.Damage
     Pawl.Decide
+    Pawl.Departure
     Pawl.Engine
     Pawl.Event
     Pawl.Expiry
@@ -236,6 +237,7 @@ test-suite pawl-test-suite
     Pawl.CostSpec
     Pawl.DamageSpec
     Pawl.DecideSpec
+    Pawl.DepartureSpec
     Pawl.EventSpec
     Pawl.ExpirySpec
     Pawl.FilterSpec
