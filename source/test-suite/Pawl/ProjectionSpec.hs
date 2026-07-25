@@ -123,6 +123,11 @@ tests registry =
         HU.assertEqual "lose-all is layer 6" Layer.Ability (Projection.layer Modification.LoseAllAbilities)
         HU.assertEqual "set base is 7b" Layer.SetPT (Projection.layer (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))
         HU.assertEqual "modify is 7c" Layer.ModifyPT (Projection.layer (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))),
+      -- CR 613.1b: layer 2 is where control-changing effects apply, whether the new
+      -- controller was baked at resolution (SetController) or is derived from the
+      -- effect's source (SetControllerToSource).
+      HU.testCase "CR 613.1b: SetControllerToSource is a layer-2 modification" $
+        HU.assertEqual "layer 2" Layer.Control (Projection.layer Modification.SetControllerToSource),
       HU.testCase "no effects: the projection is the base printing (Piker is 2/1)" $ do
         piker <- Registry.printing registry "Goblin Piker"
         mountain <- Registry.printing registry "Mountain"

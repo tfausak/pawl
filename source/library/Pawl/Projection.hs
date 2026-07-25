@@ -60,6 +60,7 @@ layer m = case m of
   Modification.AddCardType _ -> Layer.Type
   Modification.ChangeSubtypeWord _ _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
+  Modification.SetControllerToSource -> Layer.Control
   Modification.SetColor _ -> Layer.Color
   Modification.SwitchPowerToughness -> Layer.SwitchPT
 
@@ -144,6 +145,11 @@ applyModification lyr src cands gs oid m pc =
         -- uniform walk over every stored effect stays total once a
         -- SetController effect exists.
         Modification.SetController _ -> pc
+        -- Same identity treatment as SetController just above, and for the same
+        -- reason: ProjectedCharacteristics carries no controller field.
+        -- controllerOf reads GameState.continuousEffects (and, once a static
+        -- ability can produce this, the battlefield's static abilities) directly.
+        Modification.SetControllerToSource -> pc
         Modification.SetColor cs ->
           -- CR 105.3: the new colours replace all previous ones.
           pc {PC.colors = cs}
@@ -508,6 +514,7 @@ freezeQuantities gs oid you m =
         Modification.AddCardType _ -> m
         Modification.ChangeSubtypeWord _ _ -> m
         Modification.SetController _ -> m
+        Modification.SetControllerToSource -> m
         Modification.SetColor _ -> m
         Modification.SwitchPowerToughness -> m
 
@@ -522,6 +529,7 @@ setLandSubtypeEffects gs =
         -- op, not a type change); the existing wildcard already covers it, but
         -- named explicitly per Modification's exhaustiveness discipline.
         Modification.SetController _ -> False
+        Modification.SetControllerToSource -> False
         _ -> False
       fromStored eff =
         if isSet (ContinuousEffect.modification eff)
@@ -894,4 +902,10 @@ controls pid gs = filter (\oid -> controllerOf oid gs == Just pid) (Set.toList (
 givesControlTo :: PlayerId.PlayerId -> ContinuousEffect.ContinuousEffect -> Bool
 givesControlTo pid eff = case ContinuousEffect.modification eff of
   Modification.SetController who -> who == pid
+  -- A STORED ContinuousEffect never carries this: it is producible only by a
+  -- static ability, which the projection re-derives and never stores. CR 800.4a's
+  -- second clause ends stored effects, so there is nothing here to end -- the
+  -- static-ability path is handled by clause 1 removing the source object (see
+  -- Pawl.Departure).
+  Modification.SetControllerToSource -> False
   _ -> False

@@ -985,6 +985,7 @@ modificationToJson m = case m of
   Modification.AddCardType c -> Json.tagged (Text.pack "AddCardType") (Just (cardTypeToJson c))
   Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array [subtypeToJson a, subtypeToJson b]))
   Modification.SetController p -> Json.tagged (Text.pack "SetController") (Just (playerIdToJson p))
+  Modification.SetControllerToSource -> nullary (Text.pack "SetControllerToSource")
   Modification.SetColor cs -> Json.tagged (Text.pack "SetColor") (Just (setTo colorToJson cs))
   Modification.SwitchPowerToughness -> nullary (Text.pack "SwitchPowerToughness")
 
@@ -1004,6 +1005,7 @@ jsonToModification value = do
     "AddCardType" -> withValue mv (fmap Modification.AddCardType . jsonToCardType)
     "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> jsonToSubtype x <*> jsonToSubtype y
     "SetController" -> withValue mv (fmap Modification.SetController . jsonToPlayerId)
+    "SetControllerToSource" -> Right Modification.SetControllerToSource
     "SetColor" -> withValue mv (fmap Modification.SetColor . setFrom jsonToColor)
     "SwitchPowerToughness" -> Right Modification.SwitchPowerToughness
     _ -> Left (Text.pack "unknown Modification: " <> t)

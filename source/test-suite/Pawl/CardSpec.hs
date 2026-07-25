@@ -271,6 +271,7 @@ modificationCounts modification = case modification of
   Modification.AddCardType _ -> []
   Modification.ChangeSubtypeWord _ _ -> []
   Modification.SetController _ -> []
+  Modification.SetControllerToSource -> []
   Modification.SetColor _ -> []
   Modification.SwitchPowerToughness -> []
 

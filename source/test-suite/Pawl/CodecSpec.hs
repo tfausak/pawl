@@ -157,6 +157,8 @@ tests registry =
             roundTrip "m2" Codec.modificationToJson Codec.jsonToModification (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)),
           HU.testCase "ChangeSubtypeWord" $
             roundTrip "m3" Codec.modificationToJson Codec.jsonToModification (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island),
+          HU.testCase "SetControllerToSource" $
+            roundTrip "m4" Codec.modificationToJson Codec.jsonToModification Modification.SetControllerToSource,
           HU.testCase "Affected round-trips (TheseObjects, Matching, and Matching's \"each other\" shape)" $
             mapM_
               (roundTrip "affected" Codec.affectedToJson Codec.jsonToAffected)

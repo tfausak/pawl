@@ -29,6 +29,21 @@ data Modification
     -- the effect's source's controller, never chosen. Applied only by
     -- Projection.controllerOf. Never appears in card JSON (runtime-only).
     SetController PlayerId
+  | -- layer 2, CR 613.1b: this object's controller becomes the controller of THIS
+    -- effect's SOURCE. Payload-free because the player is DERIVED at projection
+    -- time, not baked -- the contrast with SetController above, whose PlayerId is
+    -- fixed at resolution by CR 611.2c because a resolution effect's answer is
+    -- determined once.
+    --
+    -- A static ability's modification is CARD DATA and cannot name a PlayerId, so
+    -- this is the only shape in which a printed card can grant control. Control
+    -- Magic's "You control enchanted creature."
+    --
+    -- CR 303.4e: an Aura's controller and the enchanted object's controller are
+    -- separate. Deriving from the SOURCE's controller is what keeps them so --
+    -- gaining control of the creature does not gain control of the Aura, and
+    -- gaining control of the Aura DOES move the creature.
+    SetControllerToSource
   | -- layer 5, CR 613.1e / 105.3: this object becomes exactly these colours. A
     -- SET, not an add: CR 105.3 says a new colour REPLACES all previous colours
     -- unless the effect says "in addition" -- and no card in the pool does, so
