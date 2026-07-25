@@ -69,9 +69,29 @@
                   {
                     "type": "Count",
                     "value": [
-                      { "type": "InHistory", "value": { "type": "MovedBetween", "value": [ { "type": "Battlefield" }, { "type": "Graveyard" } ] } },
-                      { "type": "HasCardType", "value": { "type": "Creature" } },
-                      { "type": "Objects" }
+                      {
+                        "type": "InHistory",
+                        "value": {
+                          "type": "MovedBetween",
+                          "value": [
+                            {
+                              "type": "Battlefield"
+                            },
+                            {
+                              "type": "Graveyard"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "Objects"
+                      }
                     ]
                   },
                   "self"

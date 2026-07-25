@@ -1,54 +1,126 @@
 {
   "activatedAbilities": [
     {
-      "cost": { "components": [{ "type": "PayEnergy", "value": 2 }], "mana": [] },
+      "cost": {
+        "components": [
+          {
+            "type": "PayEnergy",
+            "value": 2
+          }
+        ],
+        "mana": []
+      },
       "modal": {
         "modes": [
           {
             "effects": [
-              { "type": "PutCounters", "value": [{ "type": "PlusOnePlusOne" }, { "type": "Literal", "value": 1 }, "self"] }
+              {
+                "type": "PutCounters",
+                "value": [
+                  {
+                    "type": "PlusOnePlusOne"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  },
+                  "self"
+                ]
+              }
             ],
             "targetSpecs": []
           }
         ],
-        "selection": { "type": "ChooseExactly", "value": 1 }
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
       }
     }
   ],
   "castingPermissions": [],
   "keywords": [],
   "manaCost": [
-    { "type": "Generic", "value": 1 },
-    { "type": "OfType", "value": { "type": "Colored", "value": { "type": "Green" } } }
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    }
   ],
   "name": "Longtusk Cub",
-  "power": { "type": "Literal", "value": 2 },
+  "power": {
+    "type": "Literal",
+    "value": 2
+  },
   "replacementEffects": [],
   "spell": {
-    "modes": [{ "effects": [], "targetSpecs": [] }],
-    "selection": { "type": "ChooseExactly", "value": 1 }
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
   },
   "staticAbilities": [],
-  "toughness": { "type": "Literal", "value": 2 },
+  "toughness": {
+    "type": "Literal",
+    "value": 2
+  },
   "triggeredAbilities": [
     {
-      "condition": { "type": "SelfDealsCombatDamageToPlayer" },
+      "condition": {
+        "type": "SelfDealsCombatDamageToPlayer"
+      },
       "modal": {
         "modes": [
           {
             "effects": [
-              { "type": "GainPlayerCounters", "value": [{ "type": "Energy" }, { "type": "Literal", "value": 2 }] }
+              {
+                "type": "GainPlayerCounters",
+                "value": [
+                  {
+                    "type": "Energy"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
+              }
             ],
             "targetSpecs": []
           }
         ],
-        "selection": { "type": "ChooseExactly", "value": 1 }
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
       }
     }
   ],
   "typeLine": {
-    "subtypes": [{ "type": "Cat" }],
+    "subtypes": [
+      {
+        "type": "Cat"
+      }
+    ],
     "supertypes": [],
-    "types": [{ "type": "Creature" }]
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
   }
 }

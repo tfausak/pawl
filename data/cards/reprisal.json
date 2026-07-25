@@ -33,12 +33,12 @@
           {
             "slot": "target",
             "spec": {
-              "pool": {
-                "type": "Creatures"
-              },
               "filter": {
                 "type": "PowerAtLeast",
                 "value": 4
+              },
+              "pool": {
+                "type": "Creatures"
               }
             }
           }

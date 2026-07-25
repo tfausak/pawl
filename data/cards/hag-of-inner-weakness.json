@@ -87,14 +87,14 @@
               {
                 "slot": "target",
                 "spec": {
-                  "pool": {
-                    "type": "Creatures"
-                  },
                   "filter": {
                     "type": "ControlledBy",
                     "value": {
                       "type": "Opponent"
                     }
+                  },
+                  "pool": {
+                    "type": "Creatures"
                   }
                 }
               }

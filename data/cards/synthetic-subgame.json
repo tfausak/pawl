@@ -10,13 +10,28 @@
     "modes": [
       {
         "effects": [
-          { "type": "PlaySubgame", "value": "loser" },
-          { "type": "DealDamage", "value": [ "loser", { "type": "Literal", "value": 3 } ] }
+          {
+            "type": "PlaySubgame",
+            "value": "loser"
+          },
+          {
+            "type": "DealDamage",
+            "value": [
+              "loser",
+              {
+                "type": "Literal",
+                "value": 3
+              }
+            ]
+          }
         ],
         "targetSpecs": []
       }
     ],
-    "selection": { "type": "ChooseExactly", "value": 1 }
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
   },
   "staticAbilities": [],
   "toughness": null,
@@ -24,6 +39,10 @@
   "typeLine": {
     "subtypes": [],
     "supertypes": [],
-    "types": [ { "type": "Sorcery" } ]
+    "types": [
+      {
+        "type": "Sorcery"
+      }
+    ]
   }
 }

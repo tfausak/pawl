@@ -26,6 +26,14 @@ hook hooky {
     files *
 }
 
+hook json {
+    command "script/format-json.sh" {
+        check_args check
+        fix_args fix
+    }
+    files *.json
+}
+
 hook ormolu {
     command ormolu {
         check_args --mode check

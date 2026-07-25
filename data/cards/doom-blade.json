@@ -33,9 +33,6 @@
           {
             "slot": "target",
             "spec": {
-              "pool": {
-                "type": "Creatures"
-              },
               "filter": {
                 "type": "Not",
                 "value": {
@@ -44,6 +41,9 @@
                     "type": "Black"
                   }
                 }
+              },
+              "pool": {
+                "type": "Creatures"
               }
             }
           }

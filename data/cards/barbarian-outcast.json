@@ -50,19 +50,46 @@
             {
               "type": "Count",
               "value": [
-                { "type": "InZone", "value": [ { "type": "Battlefield" }, { "type": "EachPlayer" } ] },
+                {
+                  "type": "InZone",
+                  "value": [
+                    {
+                      "type": "Battlefield"
+                    },
+                    {
+                      "type": "EachPlayer"
+                    }
+                  ]
+                },
                 {
                   "type": "And",
                   "value": [
-                    { "type": "HasSubtype", "value": { "type": "Swamp" } },
-                    { "type": "ControlledBy", "value": { "type": "You" } }
+                    {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Swamp"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    }
                   ]
                 },
-                { "type": "Objects" }
+                {
+                  "type": "Objects"
+                }
               ]
             },
-            { "type": "Exactly" },
-            { "type": "Literal", "value": 0 }
+            {
+              "type": "Exactly"
+            },
+            {
+              "type": "Literal",
+              "value": 0
+            }
           ]
         }
       },

@@ -29,14 +29,14 @@
           {
             "slot": "wall",
             "spec": {
-              "pool": {
-                "type": "Creatures"
-              },
               "filter": {
                 "type": "HasSubtype",
                 "value": {
                   "type": "Wall"
                 }
+              },
+              "pool": {
+                "type": "Creatures"
               }
             }
           }

@@ -33,9 +33,6 @@
           {
             "slot": "target",
             "spec": {
-              "pool": {
-                "type": "Creatures"
-              },
               "filter": {
                 "type": "And",
                 "value": [
@@ -58,6 +55,9 @@
                     }
                   }
                 ]
+              },
+              "pool": {
+                "type": "Creatures"
               }
             }
           }

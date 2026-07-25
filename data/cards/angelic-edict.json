@@ -38,9 +38,6 @@
           {
             "slot": "target",
             "spec": {
-              "pool": {
-                "type": "Permanents"
-              },
               "filter": {
                 "type": "Or",
                 "value": [
@@ -57,6 +54,9 @@
                     }
                   }
                 ]
+              },
+              "pool": {
+                "type": "Permanents"
               }
             }
           }

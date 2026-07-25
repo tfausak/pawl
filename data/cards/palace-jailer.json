@@ -3,53 +3,129 @@
   "castingPermissions": [],
   "keywords": [],
   "manaCost": [
-    { "type": "Generic", "value": 2 },
-    { "type": "OfType", "value": { "type": "Colored", "value": { "type": "White" } } },
-    { "type": "OfType", "value": { "type": "Colored", "value": { "type": "White" } } }
-  ],
-  "name": "Palace Jailer",
-  "power": { "type": "Literal", "value": 2 },
-  "replacementEffects": [],
-  "spell": {
-    "modes": [{ "effects": [], "targetSpecs": [] }],
-    "selection": { "type": "ChooseExactly", "value": 1 }
-  },
-  "staticAbilities": [],
-  "toughness": { "type": "Literal", "value": 2 },
-  "triggeredAbilities": [
     {
-      "condition": { "type": "SelfEnters" },
-      "modal": {
-        "modes": [
-          { "effects": [{ "type": "BecomeMonarch", "value": { "type": "TheController" } }], "targetSpecs": [] }
-        ],
-        "selection": { "type": "ChooseExactly", "value": 1 }
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "White"
+        }
       }
     },
     {
-      "condition": { "type": "SelfEnters" },
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "White"
+        }
+      }
+    }
+  ],
+  "name": "Palace Jailer",
+  "power": {
+    "type": "Literal",
+    "value": 2
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 2
+  },
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfEnters"
+      },
       "modal": {
         "modes": [
           {
-            "effects": [{ "type": "ExileUntilMonarch", "value": "target" }],
+            "effects": [
+              {
+                "type": "BecomeMonarch",
+                "value": {
+                  "type": "TheController"
+                }
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    },
+    {
+      "condition": {
+        "type": "SelfEnters"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ExileUntilMonarch",
+                "value": "target"
+              }
+            ],
             "targetSpecs": [
               {
                 "slot": "target",
                 "spec": {
-                  "pool": { "type": "Creatures" },
-                  "filter": { "type": "ControlledBy", "value": { "type": "Opponent" } }
+                  "filter": {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "Opponent"
+                    }
+                  },
+                  "pool": {
+                    "type": "Creatures"
+                  }
                 }
               }
             ]
           }
         ],
-        "selection": { "type": "ChooseExactly", "value": 1 }
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
       }
     }
   ],
   "typeLine": {
-    "subtypes": [{ "type": "Human" }, { "type": "Soldier" }],
+    "subtypes": [
+      {
+        "type": "Human"
+      },
+      {
+        "type": "Soldier"
+      }
+    ],
     "supertypes": [],
-    "types": [{ "type": "Creature" }]
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
   }
 }

@@ -31,9 +31,25 @@
               {
                 "type": "Count",
                 "value": [
-                  { "type": "InZone", "value": [ { "type": "Hand" }, { "type": "InSlot", "value": "target" } ] },
-                  { "type": "And", "value": [] },
-                  { "type": "Objects" }
+                  {
+                    "type": "InZone",
+                    "value": [
+                      {
+                        "type": "Hand"
+                      },
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "And",
+                    "value": []
+                  },
+                  {
+                    "type": "Objects"
+                  }
                 ]
               }
             ]

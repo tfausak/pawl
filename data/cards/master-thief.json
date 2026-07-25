@@ -69,19 +69,43 @@
                         {
                           "type": "Count",
                           "value": [
-                            { "type": "InZone", "value": [ { "type": "Battlefield" }, { "type": "EachPlayer" } ] },
+                            {
+                              "type": "InZone",
+                              "value": [
+                                {
+                                  "type": "Battlefield"
+                                },
+                                {
+                                  "type": "EachPlayer"
+                                }
+                              ]
+                            },
                             {
                               "type": "And",
                               "value": [
-                                { "type": "IsSource" },
-                                { "type": "ControlledBy", "value": { "type": "You" } }
+                                {
+                                  "type": "IsSource"
+                                },
+                                {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                }
                               ]
                             },
-                            { "type": "Objects" }
+                            {
+                              "type": "Objects"
+                            }
                           ]
                         },
-                        { "type": "Exactly" },
-                        { "type": "Literal", "value": 1 }
+                        {
+                          "type": "Exactly"
+                        },
+                        {
+                          "type": "Literal",
+                          "value": 1
+                        }
                       ]
                     }
                   },
@@ -93,14 +117,14 @@
               {
                 "slot": "target",
                 "spec": {
-                  "pool": {
-                    "type": "Permanents"
-                  },
                   "filter": {
                     "type": "HasCardType",
                     "value": {
                       "type": "Artifact"
                     }
+                  },
+                  "pool": {
+                    "type": "Permanents"
                   }
                 }
               }

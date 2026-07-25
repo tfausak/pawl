@@ -29,8 +29,9 @@ There is no test suite yet. When there is, `cabal test` will run it.
 ## Checks: formatting and linting
 
 `hooky` runs every check configured in `.hooky.kdl` — `cabal check`, `cabal-gild`
-(cabal-file formatting), `hlint`, `ormolu` (Haskell formatting), and a few
-file-hygiene rules (trailing whitespace, final newline, merge markers).
+(cabal-file formatting), `hlint`, `ormolu` (Haskell formatting),
+`script/format-json.sh` (the card corpus), and a few file-hygiene rules
+(trailing whitespace, final newline, merge markers).
 
 ```sh
 hooky install   # install hooky as your git pre-commit hook (do this once)
@@ -39,8 +40,13 @@ hooky run       # run all checks without fixing — what the commit hook enforce
 ```
 
 Run the underlying tools directly if you prefer (`ormolu --mode inplace`,
-`hlint`, `cabal-gild --mode format`). Apply HLint's suggestions rather than
-suppressing them, unless you can defend the exception in review.
+`hlint`, `cabal-gild --mode format`, `script/format-json.sh fix data/cards/*.json`).
+Apply HLint's suggestions rather than suppressing them, unless you can defend the
+exception in review.
+
+Card JSON is canonically `jq --sort-keys` output: two-space indent, object keys
+sorted, one trailing newline. Don't hand-tune the layout — the check will undo
+it.
 
 ## Adding a module
 
