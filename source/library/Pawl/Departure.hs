@@ -255,8 +255,7 @@ nonCardStackObjectsCease pid gs =
 -- control could not silently skip a clause of this rule -- nothing would
 -- warn. The exile is a direct move rather than an
 -- Event.changeZone: this function is pure, so it cannot funnel, and a
--- leaves-the-battlefield trigger on this move is therefore not emitted (#N --
--- replace with the issue filed in Task 11).
+-- leaves-the-battlefield trigger on this move is therefore not emitted (#179).
 remainingControlledExiled :: PlayerId -> GameState -> GameState
 remainingControlledExiled pid gs =
   let theirs = filter (\oid -> Projection.controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs))

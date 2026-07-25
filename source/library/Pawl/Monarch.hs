@@ -220,7 +220,7 @@ returnExiledForMonarch = do
 --
 -- "who can become the monarch" is read as "is still in the game": no card in the
 -- pool prevents a player from becoming the monarch, and the phrase exists for
--- cards that do (#N -- replace with the issue filed in Task 11).
+-- cards that do (#178).
 reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
 reassignOnDeparture leaving playing gs =
   if GameState.monarch gs /= Just leaving
