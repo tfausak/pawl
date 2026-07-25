@@ -58,7 +58,7 @@ The wire only, no behavior. One commit, because a new GADT constructor breaks ev
 **Interfaces:**
 - Produces: `Prompt.MulliganAction :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)`; `Response.TookMulliganAction (Maybe ObjectId)`.
 
-- [ ] **Step 1: Write the failing test.** In `source/test-suite/Pawl/ReplaySpec.hs`, add this case immediately after the existing `"Bottom records and replays an ordered [ObjectId]"` case (around line 91), inside the same list:
+- [x] **Step 1: Write the failing test.** In `source/test-suite/Pawl/ReplaySpec.hs`, add this case immediately after the existing `"Bottom records and replays an ordered [ObjectId]"` case (around line 91), inside the same list:
 
 ```haskell
           HU.testCase "MulliganAction records and replays a Maybe ObjectId" $
@@ -67,12 +67,12 @@ The wire only, no behavior. One commit, because a new GADT constructor breaks ev
              in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
 ```
 
-- [ ] **Step 2: Run the test to verify it fails to COMPILE** (the constructor does not exist yet).
+- [x] **Step 2: Run the test to verify it fails to COMPILE** (the constructor does not exist yet).
 
 Run: `cabal build pawl-test-suite --enable-tests 2>&1 | tail -20`
 Expected: compile error — `Data constructor not in scope: Prompt.MulliganAction`.
 
-- [ ] **Step 3: Add the `Prompt` constructor.** In `source/library/Pawl/Type/Prompt.hs`, append after `Bottom` (the last constructor):
+- [x] **Step 3: Add the `Prompt` constructor.** In `source/library/Pawl/Type/Prompt.hs`, append after `Bottom` (the last constructor):
 
 ```haskell
   -- CR 103.5b: "If an effect allows a player to perform an action 'any time
@@ -98,7 +98,7 @@ Expected: compile error — `Data constructor not in scope: Prompt.MulliganActio
   MulliganAction :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
 ```
 
-- [ ] **Step 4: Add the `Response` constructor.** In `source/library/Pawl/Type/Response.hs`, append inside the `data Response` sum, after `PutOnBottom [ObjectId]`:
+- [x] **Step 4: Add the `Response` constructor.** In `source/library/Pawl/Type/Response.hs`, append inside the `data Response` sum, after `PutOnBottom [ObjectId]`:
 
 ```haskell
   | -- CR 103.5b: the hand card whose mulligan-window action a player took
@@ -110,7 +110,7 @@ Expected: compile error — `Data constructor not in scope: Prompt.MulliganActio
     TookMulliganAction (Maybe ObjectId)
 ```
 
-- [ ] **Step 5: Wire `Pawl.Replay`.** Three edits in `source/library/Pawl/Replay.hs`:
+- [x] **Step 5: Wire `Pawl.Replay`.** Three edits in `source/library/Pawl/Replay.hs`:
 
 In `encode`, after the `Prompt.Bottom {}` arm:
 
@@ -134,19 +134,19 @@ In `defaultAnswer`, after the `Prompt.Bottom` arm:
   Prompt.MulliganAction {} -> Nothing
 ```
 
-- [ ] **Step 6: Update the 13 exhaustive answerers.** Each already has a `Prompt.Bottom _ _ hand count -> …` arm; add the new arm directly after it. **Pure** answerers (the arm is `Prompt.MulliganAction {} -> Nothing`): `Support.hs:220,261,295,348`; `benchmark/Main.hs:88,119,151`; `CastSpec.hs:430,634,676`; `GameSpec.hs:1369`. **Monadic** answerers (the arm is `Prompt.MulliganAction {} -> pure Nothing`): `Support.hs:434`; `GameSpec.hs:350`.
+- [x] **Step 6: Update the 13 exhaustive answerers.** Each already has a `Prompt.Bottom _ _ hand count -> …` arm; add the new arm directly after it. **Pure** answerers (the arm is `Prompt.MulliganAction {} -> Nothing`): `Support.hs:220,261,295,348`; `benchmark/Main.hs:88,119,151`; `CastSpec.hs:430,634,676`; `GameSpec.hs:1369`. **Monadic** answerers (the arm is `Prompt.MulliganAction {} -> pure Nothing`): `Support.hs:434`; `GameSpec.hs:350`.
 
 Line numbers shift as you edit — find them by searching for `Prompt.Bottom`:
 
 Run: `grep -n "Prompt.Bottom" source/test-suite/Pawl/Support.hs source/benchmark/Main.hs source/test-suite/Pawl/CastSpec.hs source/test-suite/Pawl/GameSpec.hs`
 Expected: 13 hits. Every one gets a sibling arm.
 
-- [ ] **Step 7: Run the build and the test to verify they pass.**
+- [x] **Step 7: Run the build and the test to verify they pass.**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -20`
 Expected: warning-free build; the suite passes, including `MulliganAction records and replays a Maybe ObjectId`.
 
-- [ ] **Step 8: Format, lint, and commit.**
+- [x] **Step 8: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

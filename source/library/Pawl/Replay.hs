@@ -48,6 +48,7 @@ encode p answer = case p of
   Prompt.ChooseCost {} -> Response.ChoseCost answer
   Prompt.DeclareMulligan {} -> Response.DeclaredMulligan answer
   Prompt.Bottom {} -> Response.PutOnBottom answer
+  Prompt.MulliganAction {} -> Response.TookMulliganAction answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -127,6 +128,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.Bottom {} -> case response of
     Response.PutOnBottom ids -> Just ids
+    _ -> Nothing
+  Prompt.MulliganAction {} -> case response of
+    Response.TookMulliganAction moid -> Just moid
     _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
@@ -211,6 +215,9 @@ defaultAnswer p = case p of
   -- A legal ordered subset of the redrawn hand, deterministically the first
   -- `count` -- the least-eventful fallback when a transcript runs short.
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  -- CR 103.5b: declining is always legal and the least-eventful fallback when a
+  -- transcript runs short (mirrors DeclareMulligan -> Keep).
+  Prompt.MulliganAction {} -> Nothing
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])

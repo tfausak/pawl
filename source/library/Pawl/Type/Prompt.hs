@@ -239,3 +239,24 @@ data Prompt r where
   -- when the hand has >= 2 cards; with 0 or 1 there is one possible outcome, and
   -- where the rules leave nothing to ask, don't prompt.
   Bottom :: Decider -> PlayerId -> [ObjectId] -> Natural -> Prompt [ObjectId]
+  -- CR 103.5b: "If an effect allows a player to perform an action 'any time
+  -- [that player] could mulligan,' the player may perform that action at a time
+  -- they would declare whether they will take a mulligan." The [ObjectId] is the
+  -- cards in this player's hand that grant such an action; the answer is which
+  -- one to use, or Nothing to decline.
+  --
+  -- Offered immediately BEFORE each DeclareMulligan, and again after each action
+  -- taken -- CR 103.5b's last sentence ("If the player performs the action, they
+  -- then declare whether they will take a mulligan") makes the declaration
+  -- follow, and nothing in the rule limits a player to one action. Offered in
+  -- EVERY round, not just the first ("This need not be in the first round of
+  -- mulligans"), and only to a player who has not yet kept -- a player who kept
+  -- never declares again, so there is no time at which they could act.
+  --
+  -- Performing the action is NOT taking a mulligan: nothing is shuffled or
+  -- bottomed and the CR 103.5 mulligan count is untouched, so it feeds neither
+  -- the bottom count nor CR 103.5c's free allowance.
+  --
+  -- Not asked when the list is empty; where the rules leave nothing to ask,
+  -- don't prompt. Carries a Decider like every other player-facing prompt.
+  MulliganAction :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)

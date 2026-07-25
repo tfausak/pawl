@@ -348,6 +348,7 @@ recordingAnswer p = case p of
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
   Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> pure (take (fromIntegral count) hand)
+  Prompt.MulliganAction {} -> pure Nothing
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
@@ -1367,6 +1368,7 @@ slaveAnswer p = case p of
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.MulliganAction {} -> Nothing
 
 -- CR 723.5 combat: alice, controlling bob, declares bob's attackers. Attackers
 -- are declared only when the prompt's Decider is alice for player bob; a naive

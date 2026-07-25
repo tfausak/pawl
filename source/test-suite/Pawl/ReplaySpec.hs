@@ -89,6 +89,10 @@ combatReplayTests =
             let p = Prompt.Bottom decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8] 1
                 answer = [ObjectId.MkObjectId 8]
              in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
+          HU.testCase "MulliganAction records and replays a Maybe ObjectId" $
+            let p = Prompt.MulliganAction decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
+                answer = Just (ObjectId.MkObjectId 8)
+             in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
           HU.testCase "defaultAnswer attacks with nothing" $
             HU.assertEqual "no attacks" [] (Replay.defaultAnswer attackPrompt),
           HU.testCase "defaultAnswer blocks with nothing" $

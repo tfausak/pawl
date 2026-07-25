@@ -86,6 +86,7 @@ alwaysPass p = case p of
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.MulliganAction {} -> Nothing
 
 -- Plays lands and casts when legal, otherwise passes: the benchmark that actually
 -- exercises the stack, mana payment, and resolution.
@@ -117,6 +118,7 @@ castAnswer p = case p of
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.MulliganAction {} -> Nothing
 
 -- Plays lands, casts, attacks, and blocks: the benchmark that exercises combat.
 fightAnswer :: Prompt.Prompt r -> r
@@ -149,6 +151,7 @@ fightAnswer p = case p of
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.MulliganAction {} -> Nothing
 
 -- Two players, seeded from the benchmark's argument.
 playersFrom :: Natural -> NonEmpty.NonEmpty PlayerId

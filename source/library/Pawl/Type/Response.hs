@@ -73,4 +73,11 @@ data Response
   | -- CR 103.5: the cards a player put on the bottom of their library after a
     -- mulligan, in chosen order, serialized so a DecisionLog replays it.
     PutOnBottom [ObjectId]
+  | -- CR 103.5b: the hand card whose mulligan-window action a player took
+    -- (Nothing = declined), serialized so a DecisionLog replays it. Its own
+    -- constructor rather than a reuse of Searched / CastWhileSearched, for the
+    -- reason ChoseDefender records: decode's job is to return Nothing for a
+    -- response that does not match the prompt being asked, and two prompts
+    -- sharing a constructor cannot do that.
+    TookMulliganAction (Maybe ObjectId)
   deriving (Eq, Show)

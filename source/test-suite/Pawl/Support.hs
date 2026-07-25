@@ -218,6 +218,7 @@ identityAnswer p = case p of
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.MulliganAction {} -> Nothing
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -259,6 +260,7 @@ castAnswer p = case p of
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.MulliganAction {} -> Nothing
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -293,6 +295,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.MulliganAction {} -> Nothing
 
 -- Answers Prompt.ChooseDefender with `who` and everything else with
 -- aggressiveAnswer -- the shared shape of CombatSpec's and GameSpec's M5.6d
@@ -346,6 +349,7 @@ playLandAnswer p = case p of
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.MulliganAction {} -> Nothing
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -432,6 +436,7 @@ randomAnswer p = case p of
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
   Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> pure (take (fromIntegral count) hand)
+  Prompt.MulliganAction {} -> pure Nothing
 
 -- Total index into a turn order: an out-of-range draw falls back to the head,
 -- which the NonEmpty guarantees exists (no partial functions).
