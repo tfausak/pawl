@@ -493,12 +493,17 @@ ruleTests registry =
         -- bob's turn, controlled by alice, with one 2/1 Piker. combatBoardOf sets
         -- alice active with `mine` and bob with `theirs`; here alice attacks with
         -- nothing and bob has the Piker, and we flip the active player to bob.
+        -- Flipping who attacks flips who defends: combatBoardOf states bob as the
+        -- defending player because alice is active there (CR 506.2), so a board
+        -- that makes bob active must name alice instead -- otherwise bob would be
+        -- declared the defending player on his own turn.
         piker <- Registry.printing registry "Goblin Piker"
         let (board, _mine, _bobsPikers) = S.combatBoardOf [] [piker]
             g0 =
               board
                 { GameState.activePlayer = S.bob,
-                  GameState.activeControl = Just (Decider.MkDecider S.alice)
+                  GameState.activeControl = Just (Decider.MkDecider S.alice),
+                  GameState.combat = (GameState.combat board) {Combat.Type.defender = Just S.alice}
                 }
             after = S.runCombat controlCombatAnswer g0
         HU.assertEqual "alice took 2 from bob's Piker, declared by alice-as-bob" (Just 18) (S.lifeOf S.alice after),
@@ -1074,7 +1079,17 @@ turnOrderTests registry =
               HU.assertEqual "a playing active player's land play IS cleared" Set.empty (GameState.landPlayed control),
       HU.testCase "CR 800.4j/703.4i a departed active player is not asked to declare attackers" $ do
         piker <- Registry.printing registry "Goblin Piker"
-        let (pikerId, board) = S.addCreature piker S.alice (S.threePlayerGame {GameState.phase = Phase.Combat CombatStep.DeclareAttackers})
+        -- The board sits at the declare attackers step, so CR 703.4h has already
+        -- settled the defending player and it has to say who: alice is active, so
+        -- bob is her first candidate (CR 506.2a). Without it Combat.defender is
+        -- Nothing, no attack is possible for either run, and askedControl below
+        -- would be [] for a reason that has nothing to do with the CR 800.4j guard.
+        let seated =
+              S.threePlayerGame
+                { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+                  GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defender = Just S.bob}
+                }
+            (pikerId, board) = S.addCreature piker S.alice seated
             gone = Departure.depart Departure.Type.Conceded S.alice board
             ((_, after), askedAfter) = State.runState (Engine.runGame declareAttackersAskAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
             ((_, control), askedControl) = State.runState (Engine.runGame declareAttackersAskAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
@@ -1104,8 +1119,19 @@ turnOrderTests registry =
         -- the promotion guard for a state CR 800.4a makes unreachable in play.
         -- Deleting the hasActive guard here does not just change what is
         -- asked -- her Piker actually attacks.
+        --
+        -- The stated defending player is what keeps that load-bearing: a board at
+        -- the declare attackers step with Combat.defender still Nothing cannot
+        -- attack at all (no attack is possible), so deleting the guard would leave
+        -- this case green for the wrong reason. alice is active, so bob defends
+        -- (CR 506.2's second sentence).
         piker <- Registry.printing registry "Goblin Piker"
-        let (pikerId, board) = S.addCreature piker S.alice ((Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.Combat CombatStep.DeclareAttackers})
+        let seated =
+              (Setup.emptyGame S.bothPlayers)
+                { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+                  GameState.combat = (GameState.combat (Setup.emptyGame S.bothPlayers)) {Combat.Type.defender = Just S.bob}
+                }
+            (pikerId, board) = S.addCreature piker S.alice seated
             gone = Departure.depart Departure.Type.Conceded S.alice board
             ((_, after), askedAfter) = State.runState (Engine.runGame declareAttackersAskAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
         HU.assertEqual "she still controls her Piker -- CR 800.4a never ran at two seats" [pikerId] (Projection.controls S.alice gone)

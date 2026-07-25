@@ -276,10 +276,33 @@ choosesDefenderRecordingDecider who p = case p of
     pure who
   _ -> pure (S.identityAnswer p)
 
+-- Records the PlayerId of every Prompt.DeclareBlockers ask AND the blocker
+-- candidates that ask was offered, then blocks the first attacker with
+-- everything. Two accumulators threaded as one State pair: the ASK is what
+-- CR 509.1 is about (who declares), and the OFFER is what CR 509.1a is about
+-- (whose creatures are even eligible). Everything else delegates, so the
+-- wildcard keeps this out of the -Werror exhaustiveness net.
+recordingBlockers :: Prompt.Prompt r -> State.State ([PlayerId.PlayerId], [ObjectId.ObjectId]) r
+recordingBlockers p = case p of
+  Prompt.DeclareBlockers _ pid candidates attackers -> do
+    State.modify' (\(asks, offers) -> (asks <> [pid], offers <> candidates))
+    pure $ case attackers of
+      [] -> Map.empty
+      a : _ -> Map.fromList (fmap (\b -> (b, a)) candidates)
+  _ -> pure (S.identityAnswer p)
+
+-- Run Combat.declareBlockers under recordingBlockers. State.runState (State s a)
+-- s0 :: (a, s), so the tuple comes back (final state, accumulators) and this
+-- flips it to put the accumulators first.
+runRecordingBlockers :: GameState.GameState -> (([PlayerId.PlayerId], [ObjectId.ObjectId]), GameState.GameState)
+runRecordingBlockers gs =
+  let (after, seen) = State.runState (Program.foldProgramM recordingBlockers (State.execStateT Combat.declareBlockers gs)) ([], [])
+   in (seen, after)
+
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderTests, which is the Defender KEYWORD (CR 702.3b).
-defendingPlayerTests :: Tasty.TestTree
-defendingPlayerTests =
+defendingPlayerTests :: Registry.Type.Registry -> Tasty.TestTree
+defendingPlayerTests registry =
   Tasty.testGroup
     "DefendingPlayer"
     [ HU.testCase "CR 703.4h/507.1 the active player chooses which opponent is the defending player" $
@@ -427,7 +450,63 @@ defendingPlayerTests =
         let busy = S.threePlayerGame {GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defender = Just S.carol}}
          in do
               HU.assertEqual "set" (Just S.carol) (Combat.Type.defender (GameState.combat busy))
-              HU.assertEqual "and cleared at end of combat" Nothing (Combat.Type.defender (GameState.combat (Combat.clearCombat busy)))
+              HU.assertEqual "and cleared at end of combat" Nothing (Combat.Type.defender (GameState.combat (Combat.clearCombat busy))),
+      HU.testCase "CR 508.1 every attacker attacks the CHOSEN defending player" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (board, mine, _, _) = S.threePlayerCombat [piker, piker] [piker] [piker]
+            -- carol, deliberately not the first candidate.
+            ready =
+              board
+                { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+                  GameState.combat = (GameState.combat board) {Combat.Type.defender = Just S.carol}
+                }
+            after = S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.alice)
+        HU.assertEqual "both of alice's creatures attack" 2 (length mine)
+        -- Discriminating: under the head-of-list behaviour this phase replaces,
+        -- every value here is OfPlayer bob, because bob is the first candidate.
+        HU.assertEqual
+          "and both attack carol"
+          (Map.fromList (fmap (\oid -> (oid, AttackTarget.OfPlayer S.carol)) mine))
+          (Combat.Type.attackers (GameState.combat after)),
+      HU.testCase "CR 508.1 with no defending player chosen, nothing attacks" $ do
+        -- Discriminating against a declareAttackers that fell back to computing a
+        -- defender when the field is Nothing -- which is the head-of-list
+        -- behaviour wearing a different hat. The answerer is maximal (it attacks
+        -- with everything offered), so an empty attacker map can only come from
+        -- the prompt never being issued.
+        piker <- Registry.printing registry "Goblin Piker"
+        let (board, mine, _, _) = S.threePlayerCombat [piker] [piker] [piker]
+            ready = board {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}
+            after = S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.alice)
+        HU.assertEqual "alice really had a legal attacker" [True] (fmap (\oid -> Combat.canAttack S.alice oid ready) mine)
+        HU.assertEqual "nobody attacked" Map.empty (Combat.Type.attackers (GameState.combat after))
+        HU.assertEqual "and nothing was tapped" 0 (S.tappedCount S.alice after),
+      HU.testCase "CR 509.1 only the defending player is asked to declare blockers" $ do
+        -- CR 509.1's first sentence names THE defending player, singular. CR 802.4
+        -- is the rule that has several of them declare in APNAP order, and it needs
+        -- an option pawl cannot express (#175).
+        piker <- Registry.printing registry "Goblin Piker"
+        let (board, mine, bobs, carols) = S.threePlayerCombat [piker] [piker] [piker]
+            attackMap = case mine of
+              oid : _ -> Map.singleton oid (AttackTarget.OfPlayer S.carol)
+              [] -> Map.empty
+            ready =
+              board
+                { GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+                  GameState.combat =
+                    (GameState.combat board)
+                      { Combat.Type.defender = Just S.carol,
+                        Combat.Type.attackers = attackMap
+                      }
+                }
+            ((asked, offeredBlockers), after) = runRecordingBlockers ready
+        HU.assertEqual "the fixture gave bob and carol a blocker each" (1, 1) (length bobs, length carols)
+        -- Discriminating: the behaviour this phase replaces loops over every
+        -- opponent, so `asked` would be [bob, carol].
+        HU.assertEqual "only carol was asked" [S.carol] asked
+        -- And bob's untapped creature is never offered, per CR 509.1a.
+        HU.assertEqual "bob's creature is in no candidate list" [] (filter (\oid -> elem oid bobs) offeredBlockers)
+        HU.assertEqual "carol's block was recorded" 1 (Map.size (Combat.Type.blockers (GameState.combat after)))
     ]
 
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
@@ -775,10 +854,6 @@ combatLegalityTests registry =
             gs0 = S.giveControl oid S.alice base
         HU.assertBool "alice may attack with it" (elem oid (Combat.legalAttackers S.alice gs0))
         HU.assertBool "bob may not (not the controller, not active)" (notElem oid (Combat.legalAttackers S.bob gs0)),
-      HU.testCase "the defending player is the non-active player" $ do
-        piker <- Registry.printing registry "Goblin Piker"
-        let (gs, _, _) = S.combatBoard piker 1 1
-        HU.assertEqual "bob defends" [S.bob] (Combat.defendingPlayers gs),
       HU.testCase "combat starts empty and clears" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (gs, mine, _) = S.combatBoard piker 1 0
@@ -955,7 +1030,7 @@ tests registry =
       firstStrikeTests registry,
       m2bExitTests registry,
       defenderTests registry,
-      defendingPlayerTests,
+      defendingPlayerTests registry,
       vigilanceTests registry,
       hasteTests registry,
       evasionTests registry,

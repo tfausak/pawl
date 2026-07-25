@@ -69,8 +69,11 @@ data Prompt r where
   -- player from CR 506.2's second sentence with nothing to ask.
   ChooseDefender :: Decider -> PlayerId -> NonEmpty PlayerId -> Prompt PlayerId
   -- CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
-  -- attack. Whom they attack is not asked: M1b has exactly one opponent and no
-  -- planeswalkers, so there is nothing to choose (#59).
+  -- attack. WHOM they attack is not asked here: the defending player was already
+  -- chosen at the beginning of combat step (Prompt.ChooseDefender), and CR 508.1b
+  -- calls for a per-creature announcement only if that player controls a
+  -- planeswalker, protects a battle, or the game lets the active player attack
+  -- multiple other players -- none of which this pool can produce (#59).
   DeclareAttackers :: Decider -> PlayerId -> [ObjectId] -> Prompt [ObjectId]
   -- CR 509.1. The legal blockers, then the attackers they may block. The answer
   -- maps each blocking creature to the attacker it blocks.

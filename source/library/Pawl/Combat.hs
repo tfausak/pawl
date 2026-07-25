@@ -7,6 +7,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Decide as Decide
@@ -58,14 +59,6 @@ skipEmptyCombat gs =
   if Map.null (Combat.attackers (GameState.combat gs))
     then gs {GameState.remaining = Turn.dropSkippedCombatSteps (GameState.remaining gs)}
     else gs
-
--- CR 506.2. M1b is two-player, so this is "the other one" and choosing whom to
--- attack is not a choice at all.
---
--- Grows: multiplayer, where the attacking player chooses among opponents, and
--- planeswalkers/battles, at which point AttackTarget becomes a real decision.
-defendingPlayers :: GameState -> [PlayerId]
-defendingPlayers gs = filter (/= GameState.activePlayer gs) (Departure.stillPlaying gs)
 
 -- CR 506.2a: the candidates the attacking player chooses from. Read only by
 -- chooseDefender; the CHOSEN one lives in Combat.defender.
@@ -255,11 +248,19 @@ declareAttackers :: PlayerId -> Game ()
 declareAttackers pid = do
   gs <- State.get
   let candidates = legalAttackers pid gs
-  case defendingPlayers gs of
-    -- Nobody to attack. Cannot happen while the game is running -- the last
-    -- opponent leaving ends it -- but the branch keeps this total.
-    [] -> pure ()
-    defender : _ ->
+  case Combat.defender (GameState.combat gs) of
+    -- Nothing means no attack is possible, and that is the right answer rather
+    -- than a fallback: either the beginning of combat step's turn-based action
+    -- has not run, or it ran on a turn with no active player (CR 800.4j), or it
+    -- found no opponents. Never a place to recompute a defender -- doing so is
+    -- the head-of-list behaviour this replaced.
+    Nothing -> pure ()
+    Just defender ->
+      -- CR 508.1b asks for a per-creature announcement only if the defending
+      -- player controls a planeswalker, protects a battle, or the game lets the
+      -- active player attack multiple other players. None of the three exists
+      -- here, so every chosen creature attacks the one defending player and no
+      -- second prompt is issued (#59).
       Monad.unless (null candidates) $ do
         let decider = Decide.deciderFor pid gs
         chosen <- Trans.lift (Program.prompt (Prompt.DeclareAttackers decider pid candidates))
@@ -278,14 +279,24 @@ declareAttackers pid = do
             attach g = g {GameState.combat = (GameState.combat g) {Combat.attackers = recorded}}
         State.modify' (\g -> attach (List.foldl' tapIt g attacking))
 
--- CR 509.1: each defending player chooses which of their creatures block, and
--- which attacker each blocks.
+-- CR 509.1: the defending player declares blockers -- singular. The loop is over
+-- at most one player, and Maybe.maybeToList is what makes "nobody is being
+-- attacked" and "one player is" the same code path.
+--
+-- CR 802.4 is the rule that has each of several defending players declare blocks
+-- in APNAP order, and CR 802.4a restricts each to blocking creatures attacking
+-- them. Both need the attack-multiple-players option, which pawl has no options
+-- concept to read (#175).
+--
+-- No still-playing guard: a defending player who left the game has had every
+-- object they owned removed by CR 800.4a, so legalBlockers finds nothing for them
+-- and the inner Monad.unless short-circuits.
 declareBlockers :: Game ()
 declareBlockers = do
   start <- State.get
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
   Monad.unless (null attacking)
-    . Monad.forM_ (defendingPlayers start)
+    . Monad.forM_ (Maybe.maybeToList (Combat.defender (GameState.combat start)))
     $ \pid -> do
       gs <- State.get
       let candidates = legalBlockers pid gs

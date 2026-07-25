@@ -43,6 +43,7 @@ import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.Comparison as Comparison
 import qualified Pawl.Type.Concession as Concession
@@ -796,6 +797,12 @@ combatBoardOf mine theirs =
    in ( gs2
           { GameState.activePlayer = alice,
             GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            -- The board sits AFTER the beginning of combat step, so CR 703.4h has
+            -- already happened and the defending player is settled. alice is
+            -- active, so by CR 506.2's second sentence bob is the defending
+            -- player. Stated rather than derived, because a direct-call test
+            -- never runs the turn-based action that would fill this in.
+            GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just bob},
             -- The steps after declare attackers, so a runStep-driven test (Tasks
             -- 2 and 4) can advance through combat. Direct-call tests ignore it.
             GameState.remaining =
@@ -816,6 +823,43 @@ combatBoardOf mine theirs =
 -- Returns the attackers' ids and the blockers' ids alongside the state.
 combatBoard :: Printing.Printing -> Int -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
 combatBoard piker a b = combatBoardOf (replicate a piker) (replicate b piker)
+
+-- CR 800.1: the three-seat twin of combatBoardOf. alice is active with one
+-- Settled creature per printing in `mine`; bob gets one per printing in `theirs`
+-- and carol one per printing in `others`, so BOTH opponents are legal
+-- defending-player choices and both can block.
+--
+-- Positioned at the BEGINNING of combat, unlike combatBoardOf: Combat.defender is
+-- Nothing, and running the step is what fills it (CR 703.4h). A test that wants a
+-- particular defender without running the step sets the field itself.
+threePlayerCombat :: [Printing.Printing] -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId], [ObjectId.ObjectId])
+threePlayerCombat mine theirs others =
+  let addAll pid ps gs =
+        List.foldl'
+          (\(ids, g) p -> let (oid, g1) = addCreature p pid g in (ids <> [oid], g1))
+          ([], gs)
+          ps
+      (ours, gs1) = addAll alice mine threePlayerGame
+      (yours, gs2) = addAll bob theirs gs1
+      (hers, gs3) = addAll carol others gs2
+   in ( gs3
+          { GameState.activePlayer = alice,
+            GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+            GameState.remaining =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareAttackers,
+                  Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain,
+                  Phase.Ending EndingStep.EndStep,
+                  Phase.Ending EndingStep.Cleanup
+                ]
+          },
+        ours,
+        yours,
+        hers
+      )
 
 -- Attack with everything, block per the given plan, then deal damage.
 fightWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
