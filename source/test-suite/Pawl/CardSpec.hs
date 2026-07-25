@@ -845,8 +845,33 @@ m45p11CardTests registry =
         HU.assertEqual "two triggered abilities" 2 (length (Card.Type.triggeredAbilities c))
     ]
 
+-- M5.5 pinned the migrated per-card conditions at the CODEC level: the decoded
+-- card must equal the Condition the fixture spells out, so a decoding regression
+-- fails here rather than surfacing as a behavioural oddity somewhere downstream.
+-- Master Thief's ForAsLongAs is pinned this way in m45p6CardTests; this is
+-- Barbarian Outcast's StateIs, which had only behavioural coverage (#165).
+m55CardTests :: Registry.Type.Registry -> Tasty.TestTree
+m55CardTests registry =
+  Tasty.testGroup
+    "M5.5"
+    [ HU.testCase "Barbarian Outcast's state trigger is a Count of exactly 0 Swamps you control (CR 603.8)" $ do
+        barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+        let c = Printing.card barbarianOutcast
+        HU.assertEqual "name" (Text.pack "Barbarian Outcast") (Card.Type.name c)
+        case Card.Type.triggeredAbilities c of
+          [ab] -> do
+            HU.assertEqual
+              "the decoded condition is S.youControlNoSwamps"
+              (TriggerCondition.StateIs S.youControlNoSwamps)
+              (TriggeredAbility.condition ab)
+            case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
+              [m] -> HU.assertEqual "one Sacrifice self effect" [Effect.Sacrifice (SlotName.MkSlotName (Text.pack "self"))] (Foldable.toList (Mode.effects m))
+              _ -> HU.assertFailure "expected exactly one mode"
+          _ -> HU.assertFailure "expected exactly one triggered ability"
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry]

@@ -443,6 +443,22 @@ youControlSource =
     Comparison.Exactly
     (Quantity.Literal 1)
 
+-- Barbarian Outcast's migrated StateIs (retired StateCondition.YouControlNo
+-- Swamp -- CR 603.8): "you control no Swamps" as a Count of exactly 0. Shared by
+-- Pawl.CodecSpec (round-trip) and Pawl.CardSpec (the decoded card equals this
+-- value), so one fixture is what both the wire format and the corpus are pinned
+-- against -- the shape youControlSource already has.
+youControlNoSwamps :: Condition.Type.Condition
+youControlNoSwamps =
+  Condition.Type.MkCondition
+    ( Count.Type.MkCount
+        (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+        (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
+        Aggregation.Objects
+    )
+    Comparison.Exactly
+    (Quantity.Literal 0)
+
 -- Does a stored continuous effect target `target` specifically? Used to tell
 -- "nothing was stored FOR THIS OBJECT" apart from an unrelated entry already
 -- in play (S.giveControl's own AtCleanup SetController on the object whose

@@ -517,13 +517,13 @@ tests registry =
           HU.testCase "Barbarian Outcast / Sarcomancy shaped Conditions round-trip" $
             mapM_
               (roundTrip "condition" Codec.conditionToJson Codec.jsonToCondition)
-              [youControlNoSwamps, noZombiesOnBattlefield],
+              [S.youControlNoSwamps, noZombiesOnBattlefield],
           HU.testCase "TriggerCondition.StateIs round-trips" $
             roundTrip
               "cond"
               Codec.triggerConditionToJson
               Codec.jsonToTriggerCondition
-              (TriggerCondition.StateIs youControlNoSwamps),
+              (TriggerCondition.StateIs S.youControlNoSwamps),
           HU.testCase "CreatureDealtCombatDamageToMonarch" $
             roundTrip "cd" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.CreatureDealtCombatDamageToMonarch,
           HU.testCase "AbilityName round-trips" $
@@ -634,22 +634,9 @@ zeroSwamps =
     (Filter.Type.HasSubtype Subtype.Swamp)
     Aggregation.Objects
 
--- Barbarian Outcast's migrated StateIs (retired StateCondition.YouControlNo
--- Swamp -- CR 603.8): "you control no Swamps" as a Count of exactly 0.
-youControlNoSwamps :: Condition.Type.Condition
-youControlNoSwamps =
-  Condition.Type.MkCondition
-    ( Count.Type.MkCount
-        (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-        (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
-        Aggregation.Objects
-    )
-    Comparison.Exactly
-    (Quantity.Literal 0)
-
 -- Sarcomancy's migrated intervening "if" (retired
 -- StateCondition.NoPermanentsOfSubtype Zombie -- CR 603.4): ANY player's
--- Zombies, unlike youControlNoSwamps's ControlledBy conjunct.
+-- Zombies, unlike S.youControlNoSwamps's ControlledBy conjunct.
 noZombiesOnBattlefield :: Condition.Type.Condition
 noZombiesOnBattlefield =
   Condition.Type.MkCondition
