@@ -20,7 +20,9 @@ import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Result (Result)
 import qualified Pawl.Type.Result as Result
+import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
+import qualified Pawl.Type.Zone as Zone
 
 -- CR 104.2a / 104.3: who is still in the game, and what happens when someone
 -- leaves it.
@@ -66,7 +68,7 @@ depart reason pid gs =
       -- "objects still controlled by that player".
       settled =
         if continuesAfterDeparture gs
-          then controlEffectsEnd pid (objectsLeaveWith pid gs)
+          then remainingControlledExiled pid (nonCardStackObjectsCease pid (controlEffectsEnd pid (objectsLeaveWith pid gs)))
           else gs
       flipped = settled {GameState.players = Map.adjust lose pid (GameState.players settled)}
    in Monarch.reassignOnDeparture pid (stillPlayingInOrder flipped) flipped
@@ -192,6 +194,60 @@ controlEffectsEnd pid gs =
             Nothing -> Nothing,
           GameState.pendingControl = Map.filter (\decider -> not (heldBy decider)) (GameState.pendingControl gs)
         }
+
+-- CR 800.4a, third clause: "Then, if that player controlled any objects on the
+-- stack not represented by cards, those objects cease to exist." An activated or
+-- triggered ability on the stack, or a token somehow there -- a SPELL is a card
+-- and left with the first clause.
+--
+-- Empty by construction once the first two clauses have run, and the proof is
+-- worth writing down rather than trusting: Projection.controllerOf is an object's
+-- OWNER overridden by a layer-2 SetController and nothing else, the first clause
+-- deleted every object the departing player owned, and the second deleted every
+-- SetController naming them. Written anyway, so a second source of control could
+-- not silently skip a clause of this rule -- nothing would warn.
+nonCardStackObjectsCease :: PlayerId -> GameState -> GameState
+nonCardStackObjectsCease pid gs =
+  let notACard oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> case Object.source obj of
+          Source.OfCard _ -> False
+          Source.OfToken _ -> True
+          Source.OfAbility _ _ -> True
+          Source.OfTrigger _ _ -> True
+          Source.OfEmblem _ -> True
+          Source.OfInherentTrigger _ _ -> True
+      theirs oid = Projection.controllerOf oid gs == Just pid && notACard oid
+      cease g oid = case Game.lookupObject oid g of
+        Nothing -> g
+        Just obj ->
+          let g1 = Game.removeFromZones (Object.owner obj) oid g
+           in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
+   in List.foldl' cease gs (filter theirs (GameState.stack gs))
+
+-- CR 800.4a, fourth clause: "Then, if there are any objects still controlled by
+-- that player, those objects are exiled." CR 800.4a's third example is the case
+-- it exists for -- Bribery's Serra Angel, owned by the player who stayed and
+-- controlled by the one who left. Bribery is not in the pool.
+--
+-- CR 109.4: "Only objects on the stack or on the battlefield have a controller",
+-- and the stack was just swept, so the battlefield is the whole search.
+--
+-- Empty by construction, for the reason nonCardStackObjectsCease gives. Written
+-- anyway, for the same reason. The exile is a direct move rather than an
+-- Event.changeZone: this function is pure, so it cannot funnel, and a
+-- leaves-the-battlefield trigger on this move is therefore not emitted (#N --
+-- replace with the issue filed in Task 11).
+remainingControlledExiled :: PlayerId -> GameState -> GameState
+remainingControlledExiled pid gs =
+  let theirs = filter (\oid -> Projection.controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs))
+      exileOne g oid = case Game.lookupObject oid g of
+        Nothing -> g
+        Just obj ->
+          let g1 = Game.removeFromZones (Object.owner obj) oid g
+              g2 = Game.insertIntoZone Zone.Exile (Object.owner obj) oid g1
+           in g2 {GameState.objects = Map.insert oid obj {Object.zone = Zone.Exile} (GameState.objects g2)}
+   in List.foldl' exileOne gs theirs
 
 -- CR 104.2a: "A player still in the game wins the game if that player's opponents
 -- have all left the game."

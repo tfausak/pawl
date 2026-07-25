@@ -7,6 +7,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
@@ -230,5 +231,29 @@ tests registry =
          in do
               HU.assertEqual "the scheduled control is gone" Map.empty (GameState.pendingControl pendingGone)
               HU.assertEqual "the live control is gone" Nothing (GameState.activeControl activeGone)
-              HU.assertEqual "and a control held by someone still playing is untouched" (Just (Decider.MkDecider S.alice)) (GameState.activeControl (Departure.depart Departure.Type.Conceded S.bob (duringTurn {GameState.activeControl = Just (Decider.MkDecider S.alice)})))
+              HU.assertEqual "and a control held by someone still playing is untouched" (Just (Decider.MkDecider S.alice)) (GameState.activeControl (Departure.depart Departure.Type.Conceded S.bob (duringTurn {GameState.activeControl = Just (Decider.MkDecider S.alice)}))),
+      HU.testCase "CR 800.4a nothing in the game is owned or controlled by a player who has left it" $ do
+        -- The postcondition CR 800.4a's four clauses exist to guarantee, on a
+        -- board that reaches all of them: bob owns a permanent, an activated
+        -- ability object on the stack, and a spell; he has stolen alice's
+        -- Darksteel Myr with a stored SetController; and alice owns a permanent
+        -- he never touched.
+        piker <- Registry.printing registry "Goblin Piker"
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        mindslaver <- Registry.printing registry "Mindslaver"
+        let (bobsPiker, g1) = S.addCreature piker S.bob S.threePlayerGame
+            (aliceMyr, g2) = S.addCreature darksteelMyr S.alice g1
+            (bobsSpell, g3) = S.spellOnStack piker S.bob g2
+            (bobsSlaver, g4) = S.addCreature mindslaver S.bob g3
+            g5 = S.giveControl aliceMyr S.bob g4
+            gone = Departure.depart Departure.Type.Conceded S.bob g5
+            ownedBy who = Map.keys (Map.filter (\obj -> Object.owner obj == who) (GameState.objects gone))
+            controlledBy who = filter (\oid -> Projection.controllerOf oid gone == Just who) (Map.keys (GameState.objects gone))
+        HU.assertBool "the fixture really did put four of bob's objects in play" (length [bobsPiker, bobsSpell, bobsSlaver] == 3)
+        HU.assertEqual "bob really controlled alice's Myr before he left" (Just S.bob) (Projection.controllerOf aliceMyr g5)
+        HU.assertEqual "bob owns nothing" [] (ownedBy S.bob)
+        HU.assertEqual "bob controls nothing" [] (controlledBy S.bob)
+        HU.assertEqual "no non-card object of his is left on the stack" [] (GameState.stack gone)
+        HU.assertEqual "alice's Myr survived and reverted to her" (Just S.alice) (Projection.controllerOf aliceMyr gone)
+        HU.assertEqual "CR 104.2a: two survivors, so the game continues" Nothing (GameState.result gone)
     ]
