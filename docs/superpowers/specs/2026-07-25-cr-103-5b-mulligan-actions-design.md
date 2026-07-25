@@ -293,10 +293,12 @@ matching branch), and `defaultAnswer` (`Nothing` — declining is always legal a
 the least-eventful fallback when a transcript runs short, mirroring
 `DeclareMulligan -> Keep`).
 
-The exhaustive `Prompt` answerers that gain the new arm (five interpreters in
-`Support.hs`, three in `benchmark/Main.hs`, and the `CastSpec` / `GameSpec` /
-`MulliganSpec` locals) all answer `Nothing`; `-Werror` turns each omission into a
-compile error, so none can be silently missed.
+The exhaustive `Prompt` answerers that gain the new arm all answer `Nothing`:
+five interpreters in `Support.hs`, three in `benchmark/Main.hs`, three in
+`CastSpec.hs` and two in `GameSpec.hs` — thirteen in all. (`MulliganSpec`'s own
+answerers end in a wildcard delegating to `S.identityAnswer` and need none.)
+`-Werror` turns each omission into a compile error, so none can be silently
+missed.
 
 ## 5. Card data
 
