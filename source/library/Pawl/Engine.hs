@@ -354,9 +354,11 @@ placeOne pending = do
 -- CR 101.4 / 603.3b: the players who control a pending trigger, active player
 -- first and then the rest in turn order. Replaces M3f's apnapOrder, which sorted
 -- the triggers directly -- with a within-controller ORDER now being a choice, the
--- pass has to group by controller first. Departed seats are filtered out (CR
--- 800.4j / 800.4d): they are not in the APNAP order and their triggers are not
--- placed.
+-- pass has to group by controller first. A departed seat is not in the APNAP
+-- order at all -- CR 101.4 orders the active player and the nonactive players,
+-- and CR 102.1 makes a player "one of the people in the game" -- and CR 800.4d
+-- keeps its triggers off the stack. Since turnOrder is the permanent seating
+-- roster, this filter is what enforces both.
 apnapPlayers :: GameState -> [PendingTrigger.PendingTrigger] -> [PlayerId]
 apnapPlayers gs pending =
   let order = GameState.turnOrder gs
