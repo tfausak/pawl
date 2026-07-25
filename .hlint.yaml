@@ -25,6 +25,11 @@
 # backticked section rather than a bare application.
 - ignore: {name: "Avoid lambda using `infix`"}
 
+# HLint wants `\gs -> f x (g gs)` eta-reduced to `f x . g`. The project style
+# rule is the opposite: prefer explicit over point-free. See the style section
+# of CONTRIBUTING.md.
+- ignore: {name: "Avoid lambda"}
+
 # HLint rewrites `if c then [] else [x]` into `[x | not c]`. The project style
 # rule bans list comprehensions outright, so this can never be applied. See the
 # style section of CONTRIBUTING.md.

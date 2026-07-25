@@ -202,7 +202,7 @@ runTurnBasedActions phase = do
   -- perform them. Declare blockers (CR 703.4j) belongs to the defending player,
   -- and CR 703.4p's damage/until-end-of-turn sweep is the GAME's action, not the
   -- active player's; neither is guarded.
-  hasActive <- State.gets (List.elem active . Departure.stillPlaying)
+  hasActive <- State.gets (\gs -> List.elem active (Departure.stillPlaying gs))
   case phase of
     Phase.Beginning BeginningStep.Untap -> Monad.when hasActive $ do
       untapAll active
