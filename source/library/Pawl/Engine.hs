@@ -159,11 +159,12 @@ untapAll pid = do
 -- Control-change re-sickening is handled (M4.5 P1): `GainControl` re-Sicks its
 -- target at resolution, and this settle now iterates `Projection.controls`, so
 -- it clears sickness for whoever currently controls the permanent, not its
--- owner. A P1 control effect is until-end-of-turn, so it always wears off
--- (CR 514.2) before the thief's own next untap step -- the creature is back
--- under the owner's control by then, and settles normally there. Settling a
--- permanent held under INDEFINITE control, across the thief's own untap step,
--- is the Auras / Control Magic phase.
+-- owner. That reading is control-duration-agnostic: an until-end-of-turn
+-- effect (Act of Treason) always wears off (CR 514.2) before the thief's own
+-- next untap step, so the creature settles back under its owner there, but an
+-- Aura's static ability (Control Magic) grants control INDEFINITELY, so the
+-- creature can still be the thief's at their own untap step and settles for
+-- them instead -- covered by CR 302.6 (#62) in `Pawl.AuraSpec`.
 settleAll :: PlayerId -> Game ()
 settleAll pid = do
   gs <- State.get

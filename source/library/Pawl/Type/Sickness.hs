@@ -11,10 +11,9 @@ module Pawl.Type.Sickness where
 -- (M4.5 P1): Resolve.applyEffect's GainControl arm re-sets Sick on the target
 -- when control moves (CR 302.6 is about control held CONTINUOUSLY), and the
 -- untap-step settle (Engine.settleAll, iterating Projection.controls) clears it
--- for whichever player controls the permanent at that step. P1's control effects
--- are all until-end-of-turn, so the thief never reaches their own untap step with
--- the creature still theirs; settling a permanent held under INDEFINITE control
--- across turns is not exercised (#62).
+-- for whichever player controls the permanent at that step -- whether that
+-- control is until-end-of-turn (Act of Treason) or indefinite (an Aura's static
+-- ability, Control Magic), settling reads the current controller either way.
 data Sickness
   = Sick
   | Settled

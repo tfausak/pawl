@@ -7,6 +7,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -124,5 +125,21 @@ tests registry =
             (gs, spellId) = S.handOne controlMagic withCreature
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        HU.assertEqual "alice controls bob's creature" (Just S.alice) (Projection.controllerOf creature after)
+        HU.assertEqual "alice controls bob's creature" (Just S.alice) (Projection.controllerOf creature after),
+      -- CR 302.6 across turns (#62): control from an Aura is INDEFINITE, so alice
+      -- still holds the creature when her own untap step arrives. Engine.settleAll
+      -- iterates Projection.controls, so it settles for the controller, and the
+      -- creature can attack. Act of Treason could never test this -- its control ends
+      -- at cleanup (CR 514.2), long before the thief's untap step.
+      HU.testCase "CR 302.6 (#62): a creature held under indefinite control settles at the thief's untap step" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, withCreature) = S.addCreature piker S.bob base
+            (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+            attached = S.attach aura creature withAura
+            sick = S.resick creature attached
+            settled = S.runPure S.identityAnswer sick (Engine.settleAll S.alice)
+        HU.assertEqual "alice controls it" (Just S.alice) (Projection.controllerOf creature settled)
+        HU.assertBool "and it has settled under her control, so it can attack" (Combat.canAttack S.alice creature settled)
     ]

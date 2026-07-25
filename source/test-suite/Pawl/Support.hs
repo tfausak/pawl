@@ -1120,6 +1120,15 @@ attach rider host gs =
   let set obj = obj {Object.attachedTo = Just host}
    in gs {GameState.objects = Map.adjust set rider (GameState.objects gs)}
 
+-- CR 302.6: set an object's sickness to Sick directly, without a zone change. A
+-- STATE fixture (the shape attach already is), not the synthetic
+-- Resolve.applyEffect/GainControl path -- this only needs the summoning-sick flag
+-- set, not a control change, so it reaches straight for the field.
+resick :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+resick oid gs =
+  let set obj = obj {Object.sickness = Sickness.Sick}
+   in gs {GameState.objects = Map.adjust set oid (GameState.objects gs)}
+
 -- Put `n` counters of a player-counter kind directly onto a player, bypassing
 -- the diversion/effect that would add them -- so an SBA or cost test can set up
 -- poison or energy without resolving anything.
