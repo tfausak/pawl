@@ -234,10 +234,10 @@ tests registry =
               HU.assertEqual "and a control held by someone still playing is untouched" (Just (Decider.MkDecider S.alice)) (GameState.activeControl (Departure.depart Departure.Type.Conceded S.bob (duringTurn {GameState.activeControl = Just (Decider.MkDecider S.alice)}))),
       HU.testCase "CR 800.4a nothing in the game is owned or controlled by a player who has left it" $ do
         -- The postcondition CR 800.4a's four clauses exist to guarantee, on a
-        -- board that reaches all of them: bob owns a permanent, an activated
-        -- ability object on the stack, and a spell; he has stolen alice's
-        -- Darksteel Myr with a stored SetController; and alice owns a permanent
-        -- he never touched.
+        -- board that reaches all of them: bob owns two permanents (a Goblin
+        -- Piker and a Mindslaver, both added via S.addCreature) and a spell on
+        -- the stack; he has also stolen control of alice's Darksteel Myr, a
+        -- permanent she still owns, with a stored SetController.
         piker <- Registry.printing registry "Goblin Piker"
         darksteelMyr <- Registry.printing registry "Darksteel Myr"
         mindslaver <- Registry.printing registry "Mindslaver"
@@ -249,7 +249,7 @@ tests registry =
             gone = Departure.depart Departure.Type.Conceded S.bob g5
             ownedBy who = Map.keys (Map.filter (\obj -> Object.owner obj == who) (GameState.objects gone))
             controlledBy who = filter (\oid -> Projection.controllerOf oid gone == Just who) (Map.keys (GameState.objects gone))
-        HU.assertBool "the fixture really did put four of bob's objects in play" (length [bobsPiker, bobsSpell, bobsSlaver] == 3)
+        HU.assertBool "the fixture put bob's permanent, spell, and Mindslaver into play before he left" (all (\oid -> Map.member oid (GameState.objects g5)) [bobsPiker, bobsSpell, bobsSlaver])
         HU.assertEqual "bob really controlled alice's Myr before he left" (Just S.bob) (Projection.controllerOf aliceMyr g5)
         HU.assertEqual "bob owns nothing" [] (ownedBy S.bob)
         HU.assertEqual "bob controls nothing" [] (controlledBy S.bob)

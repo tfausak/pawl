@@ -231,10 +231,29 @@ nonCardStackObjectsCease pid gs =
 -- controlled by the one who left. Bribery is not in the pool.
 --
 -- CR 109.4: "Only objects on the stack or on the battlefield have a controller",
--- and the stack was just swept, so the battlefield is the whole search.
+-- so the search need only cover the stack and the battlefield. It is NOT
+-- "the stack was just swept, so the battlefield is the whole search" --
+-- nonCardStackObjectsCease's sweep explicitly skips cards, so a controlled
+-- SPELL would still be sitting on the stack if that were the only reason. The
+-- real reason is unconditional: Object.owner is baked in at creation for
+-- every kind of stack object and never mutated afterward -- Activate.hs:80
+-- stamps the activating player (CR 113.8, activated ability), Engine.hs:321
+-- stamps the triggering ability's controller (CR 113.8/603.3a, triggered
+-- ability), Monarch.hs:138 stamps the inherent monarch trigger's controller
+-- the same way, and a spell's owner is fixed when it is cast. Modification is
+-- a flat sum with exactly one construction site for SetController
+-- (Resolve.hs:880, Effect.GainControl, whose payload is always the granting
+-- effect's source's controller at resolution). So once clause 1 has deleted
+-- every object `pid` OWNS and clause 2 has ended every SetController naming
+-- `pid` (regardless of which object it targets), Projection.controllerOf's
+-- two cases -- owner, or the latest SetController naming this object -- can
+-- both no longer read as `pid`, for any object of any kind, on the stack or
+-- off it. The stack contributes nothing to this clause's search either way.
 --
--- Empty by construction, for the reason nonCardStackObjectsCease gives. Written
--- anyway, for the same reason. The exile is a direct move rather than an
+-- Empty by construction, for the reason just given -- which is also why
+-- nonCardStackObjectsCease is empty. Written anyway, so a second source of
+-- control could not silently skip a clause of this rule -- nothing would
+-- warn. The exile is a direct move rather than an
 -- Event.changeZone: this function is pure, so it cannot funnel, and a
 -- leaves-the-battlefield trigger on this move is therefore not emitted (#N --
 -- replace with the issue filed in Task 11).
