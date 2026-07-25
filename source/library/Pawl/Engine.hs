@@ -614,6 +614,13 @@ beginTurnOf pid gs =
   let -- CR 800.4b: "If a player would be controlled by a player who has left the
       -- game, they aren't." A pending Decider naming a departed player is not
       -- promoted; the stale entry is dropped either way, below.
+      --
+      -- CR 800.4a's second clause -- effects giving a departing player control of
+      -- objects or players end -- clears the entry at the departure itself
+      -- (Departure.controlEffectsEnd), so in play the two rules reach the same
+      -- outcome. This guard is the one that answers for CR 800.4b, and it is the
+      -- only thing that answers when the entry arrives without a departure having
+      -- run over it.
       promoted = case Map.lookup pid (GameState.pendingControl gs) of
         Nothing -> Nothing
         Just decider -> case decider of

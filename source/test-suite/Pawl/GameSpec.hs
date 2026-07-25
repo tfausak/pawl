@@ -971,6 +971,21 @@ turnOrderTests registry =
               HU.assertEqual "carol's turn began" S.carol (GameState.activePlayer after)
               HU.assertEqual "she is uncontrolled" Nothing (GameState.activeControl after)
               HU.assertEqual "and the stale entry is gone" Map.empty (GameState.pendingControl after),
+      HU.testCase "CR 800.4b the promotion guard stands on its own: an entry armed AFTER the departure is still not promoted" $
+        -- CR 800.4a's second clause now clears pendingControl at the moment its
+        -- decider leaves, so the sibling case above is satisfied by two rules at
+        -- once. This one isolates CR 800.4b's last sentence -- "If a player would
+        -- be controlled by a player who has left the game, they aren't" -- by
+        -- arming the entry after bob has already gone, a state CR 800.4a makes
+        -- unreachable in play and which therefore only the promotion guard can
+        -- answer for.
+        let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+            armed = gone {GameState.pendingControl = Map.singleton S.carol (Decider.MkDecider S.bob)}
+            after = S.runPure S.identityAnswer armed Engine.handoffTurn
+         in do
+              HU.assertEqual "carol's turn began" S.carol (GameState.activePlayer after)
+              HU.assertEqual "she is uncontrolled" Nothing (GameState.activeControl after)
+              HU.assertEqual "and the stale entry is gone" Map.empty (GameState.pendingControl after),
       HU.testCase "CR 723.1b a pending control whose decider is still playing IS promoted" $
         -- The control assertion: the same board with bob still in the game. If
         -- this passed either way, the case above would prove nothing.

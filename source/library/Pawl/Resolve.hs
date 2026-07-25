@@ -862,29 +862,36 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
         (Just recipient, True) -> case recipientObject recipient of
           Nothing -> gs -- a player recipient cannot be controlled
-          Just target -> case Expiry.arm controller source duration gs of
-            -- CR 611.2b: the duration never started -- no control effect is
-            -- stored, and nothing is re-Sicked, because control never changed.
-            Nothing -> gs
-            Just expiry ->
-              -- CR 613.1b / 611.2c: the new controller is `controller` (this
-              -- effect's source's controller), baked in now -- derived, never
-              -- chosen. CR 302.6: the new controller has not controlled the
-              -- permanent continuously, so it is re-Sicked.
-              let (ts, gs1) = Game.freshTimestamp gs
-                  eff =
-                    ContinuousEffect.MkContinuousEffect
-                      { ContinuousEffect.source = source,
-                        ContinuousEffect.timestamp = ts,
-                        ContinuousEffect.expiry = expiry,
-                        ContinuousEffect.modification = Modification.SetController controller,
-                        ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
-                      }
-                  sicken o = o {Object.sickness = Sickness.Sick}
-               in gs1
-                    { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
-                      GameState.objects = Map.adjust sicken target (GameState.objects gs1)
-                    }
+          Just target
+            -- CR 800.4b: "If an object would change to the control of a player
+            -- who has left the game, it doesn't." `controller` is baked at
+            -- trigger time (CR 113.8), so a resolution can name a player who has
+            -- since left -- and CR 800.4a would then have to exile the object all
+            -- over again (CR 800.4c) if control were allowed to change first.
+            | List.notElem controller (Departure.stillPlaying gs) -> gs
+            | otherwise -> case Expiry.arm controller source duration gs of
+                -- CR 611.2b: the duration never started -- no control effect is
+                -- stored, and nothing is re-Sicked, because control never changed.
+                Nothing -> gs
+                Just expiry ->
+                  -- CR 613.1b / 611.2c: the new controller is `controller` (this
+                  -- effect's source's controller), baked in now -- derived, never
+                  -- chosen. CR 302.6: the new controller has not controlled the
+                  -- permanent continuously, so it is re-Sicked.
+                  let (ts, gs1) = Game.freshTimestamp gs
+                      eff =
+                        ContinuousEffect.MkContinuousEffect
+                          { ContinuousEffect.source = source,
+                            ContinuousEffect.timestamp = ts,
+                            ContinuousEffect.expiry = expiry,
+                            ContinuousEffect.modification = Modification.SetController controller,
+                            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
+                          }
+                      sicken o = o {Object.sickness = Sickness.Sick}
+                   in gs1
+                        { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
+                          GameState.objects = Map.adjust sicken target (GameState.objects gs1)
+                        }
         _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
 
 -- The no-subgame executor (the ability path and every direct caller): a

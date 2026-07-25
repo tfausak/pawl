@@ -106,6 +106,37 @@ targetTests registry =
          in HU.assertBool
               "bob gone"
               (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs))),
+      HU.testCase "CR 800.4b an object does not change to the control of a player who has left the game" $ do
+        -- CR 800.4b: "If an object would change to the control of a player who has
+        -- left the game, it doesn't." Resolve.applyEffect takes the controller
+        -- explicitly, which is what makes this testable: the effect is asked to
+        -- resolve on behalf of a player who is no longer in the game.
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        let (myr, board) = S.addCreature darksteelMyr S.carol S.threePlayerGame
+            gone = Departure.depart Departure.Type.Conceded S.bob board
+            slot = SlotName.MkSlotName (Text.pack "target")
+            after =
+              S.runPure S.identityAnswer gone $
+                Resolve.applyEffect
+                  S.noSource
+                  S.bob
+                  Map.empty
+                  (Map.singleton slot True)
+                  (Map.singleton slot (Recipient.ToObject myr))
+                  (Effect.GainControl Duration.Indefinite slot)
+            control =
+              S.runPure S.identityAnswer board $
+                Resolve.applyEffect
+                  S.noSource
+                  S.bob
+                  Map.empty
+                  (Map.singleton slot True)
+                  (Map.singleton slot (Recipient.ToObject myr))
+                  (Effect.GainControl Duration.Indefinite slot)
+        HU.assertEqual "no control effect is stored for a departed controller" [] (GameState.continuousEffects after)
+        HU.assertEqual "and the Myr's controller is unchanged" (Just S.carol) (Projection.controllerOf myr after)
+        HU.assertEqual "the same call for a player still in the game DOES store one -- the guard is what did it" 1 (length (GameState.continuousEffects control))
+        HU.assertEqual "and takes control" (Just S.bob) (Projection.controllerOf myr control),
       HU.testCase "CR 608.2b a creature that left its zone is no longer legal" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
