@@ -77,7 +77,9 @@ tests registry =
         HU.assertBool "the Aura is still on the battlefield after pass one" (Set.member aura (GameState.battlefield pass1))
         HU.assertBool "the Aura is gone from the battlefield after pass two" (not (Set.member aura (GameState.battlefield pass2)))
         HU.assertEqual "and is in its OWNER's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice pass2)),
-      -- CR 704.5m's other two clauses.
+      -- CR 704.5m's remaining clause: unattached. The third clause -- attached to
+      -- an object the enchant spec no longer admits -- is dormant: nothing in
+      -- the pool strips creature-ness from a permanent, so it has no test here.
       HU.testCase "CR 704.5m: an unattached Aura on the battlefield goes to the graveyard" $ do
         unholyStrength <- Registry.printing registry "Unholy Strength"
         let base = Setup.emptyGame S.bothPlayers

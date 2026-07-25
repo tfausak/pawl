@@ -134,6 +134,13 @@ changeZoneReturning oid requestedDest = changeZoneAttaching oid requestedDest No
 -- Moved event both run before this function returns, so an Aura attached
 -- afterward would be unattached during both. No card in this pool can observe
 -- the difference today; the seed buys the ordering rather than a passing test.
+--
+-- Pawl.Stack's Aura branch is the only caller that supplies a seed; every other
+-- door to the battlefield (this function's own changeZoneReturning included)
+-- passes Nothing, so an Aura entering the battlefield by any other route enters
+-- unattached and is buried on the next SBA pass by CR 704.5m -- where CR 303.4g
+-- says such an Aura should instead just stay in its current zone. That
+-- divergence is #188.
 changeZoneAttaching :: ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)
 changeZoneAttaching oid requestedDest seed = do
   gs <- State.get
