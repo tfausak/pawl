@@ -302,11 +302,19 @@ runTurnBasedActions phase = do
 --
 -- NOT implemented: CR 800.4d's FIRST sentence ("If an object that would be
 -- owned by a player who has left the game would be created in any zone, it
--- isn't created") and CR 800.4b's token-creation and
--- put-onto-the-battlefield sentences. `Event.createTokens` is the unguarded
--- producer -- it takes one player and uses it for both control and
--- ownership, so for tokens CR 800.4d's first sentence and CR 800.4b's second
--- sentence coincide exactly and one guard would satisfy both (#177).
+-- isn't created") and CR 800.4b's SECOND sentence ("If a token would be
+-- created under the control of a player who has left the game, no token is
+-- created"). `Event.createTokens` is the unguarded producer -- it takes one
+-- player and uses it for both control and ownership, so for tokens those two
+-- sentences coincide exactly and one guard would satisfy both (#177); a token
+-- is also the only object in this pool that either sentence has a producer
+-- for at all.
+--
+-- CR 800.4b's THIRD sentence (an object put onto the battlefield or the stack
+-- under a departed player's control) is producerless, so nothing tracks it:
+-- Event.changeZoneReturning is the sole zone-change primitive and takes the
+-- destination controller from `Object.owner`, never from a named player, so
+-- no opcode can express the situation.
 placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get

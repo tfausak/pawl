@@ -253,7 +253,7 @@ tests registry =
         HU.assertEqual "bob really controlled alice's Myr before he left" (Just S.bob) (Projection.controllerOf aliceMyr g5)
         HU.assertEqual "bob owns nothing" [] (ownedBy S.bob)
         HU.assertEqual "bob controls nothing" [] (controlledBy S.bob)
-        HU.assertEqual "no non-card object of his is left on the stack" [] (GameState.stack gone)
+        HU.assertEqual "nothing of his is left on the stack -- his spell IS a card, so clause 1 is what removed it" [] (GameState.stack gone)
         HU.assertEqual "alice's Myr survived and reverted to her" (Just S.alice) (Projection.controllerOf aliceMyr gone)
         HU.assertEqual "CR 104.2a: two survivors, so the game continues" Nothing (GameState.result gone)
     ]

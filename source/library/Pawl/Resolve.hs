@@ -872,8 +872,13 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- CR 800.4b: "If an object would change to the control of a player
             -- who has left the game, it doesn't." `controller` is baked at
             -- trigger time (CR 113.8), so a resolution can name a player who has
-            -- since left -- and CR 800.4a would then have to exile the object all
-            -- over again (CR 800.4c) if control were allowed to change first.
+            -- since left. Nothing would clean up after the change: CR 800.4a's
+            -- fourth clause ("Then, if there are any objects still controlled by
+            -- that player, those objects are exiled") is not a state-based action
+            -- and "happens as soon as the player leaves the game", so it has
+            -- already run and does not run again. Without this guard the
+            -- permanent would simply sit on the battlefield controlled by a
+            -- player who is not in the game.
             | List.notElem controller (Departure.stillPlaying gs) -> gs
             | otherwise -> case Expiry.arm controller source duration gs of
                 -- CR 611.2b: the duration never started -- no control effect is

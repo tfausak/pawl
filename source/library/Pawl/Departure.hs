@@ -64,8 +64,13 @@ depart reason pid gs =
   let lose p = p {Player.status = Status.Departed reason}
       -- CR 800.4a's own ordering ("Then ... Then ...") is load-bearing, so the
       -- clauses are composed in the rule's order and nothing here reorders them.
-      -- They run BEFORE the status flip, as the rule's later clauses read
-      -- "objects still controlled by that player".
+      -- They run before the status flip, and THAT much is arbitrary: no clause
+      -- reads Player.status (Projection.controllerOf is an object's owner
+      -- overridden by a layer-2 SetController and nothing else), and
+      -- continuesAfterDeparture reads GameState.turnOrder, which the flip does
+      -- not touch. The flip's position is load-bearing only for the monarch
+      -- call below, which Monarch.reassignOnDeparture requires to have already
+      -- happened -- see its own haddock.
       settled =
         if continuesAfterDeparture gs
           then remainingControlledExiled pid (nonCardStackObjectsCease pid (controlEffectsEnd pid (objectsLeaveWith pid gs)))
@@ -105,20 +110,25 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 -- Pawl.Event: no Moved event, no CR 616 replacement, no trigger. Pawl.Sba's
 -- CR 704.5d token `ceaseToExist` is the same shape for the same reason.
 --
--- Combat.blockers is DELIBERATELY left untouched, even for a departing
--- BLOCKER. CR 509.1h's last sentence: "A creature remains blocked even if all
--- the creatures blocking it are removed from combat" -- and
+-- Combat.blockers is DELIBERATELY left untouched -- neither a departing
+-- BLOCKER's id inside an attacker's blocker set, nor a departing ATTACKER's own
+-- key. CR 509.1h's last sentence: "A creature remains blocked even if all the
+-- creatures blocking it are removed from combat" -- and
 -- Damage.attackerAssignment's own comment says why the engine must honor that:
 -- the recorded blockers set IS the record of blocked-ness, and the liveness
--- filter (an onBattlefield check on Game.lookupObject) belongs at damage
--- ASSIGNMENT, not here. Deleting a departing blocker's id out of that set
--- would make a blocked attacker with no living blockers read as UNBLOCKED and
--- send its full damage at the defending player, which CR 510.1c forbids.
+-- filter (Damage.onBattlefield) belongs at damage ASSIGNMENT, not here.
+-- Deleting a departing blocker's id out of that set would make a blocked
+-- attacker with no living blockers read as UNBLOCKED and send its full damage
+-- at the defending player, which CR 510.1c forbids. A departing attacker's KEY
+-- stays for the same reason and is filtered at the same place, by
+-- Damage.blockerAssignment's CR 510.1d check on the attacker -- and that really
+-- is the only correct site, because an attacker DESTROYED mid-combat (CR 510.4's
+-- two-step window) leaves an identical stale key this function never sees.
+--
 -- Combat.attackers loses only the departing player's OWN entry, because a
--- deleted object cannot itself still be attacking; nothing downstream even
--- needs that much tidying (Damage.attackerAssignment's onBattlefield filter
--- and Damage.blockerAssignment's Projection.powerOf both already fall through
--- to nothing for a missing id), so this is cleanliness, not correctness.
+-- deleted object cannot itself still be attacking. That much is cleanliness
+-- rather than correctness: Damage.attackerAssignment's Projection.powerOf
+-- already falls through to nothing for a missing id.
 --
 -- Three more things it deliberately does NOT touch, each because CR 800.4a
 -- does not reach them:
@@ -129,8 +139,9 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     emblem" -- and a stored continuous effect is none of them, so the first
 --     clause does not end one just because its source left. The effects this rule
 --     DOES end are the control-granting ones, which is CR 800.4a's SECOND clause
---     and is not implemented here. A departing player's Giant Growth on someone
---     else's creature keeps its +3/+3 until cleanup.
+--     and therefore controlEffectsEnd's job -- the next function in this file. A
+--     departing player's Giant Growth on someone else's creature keeps its
+--     +3/+3 until cleanup.
 --
 --   * GameState.delayedTriggers. A delayed triggered ability that has not
 --     triggered is not on the stack, so by CR 109.1 it is not an object either.
@@ -143,8 +154,14 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     which give that player control, and an exile grants none. Only an entry
 --     whose KEY -- the exiled object itself -- is owned by the departing player is
 --     dropped, because that object is leaving; whether the entry's value later
---     reads as "an opponent" of the new monarch is CR 102.2's question, decided
---     when Pawl.Monarch.returnExiledForMonarch next runs, not this function's.
+--     reads as "an opponent" of the new monarch is decided when
+--     Pawl.Monarch.returnExiledForMonarch next runs, not here, under the
+--     free-for-all reading recorded there: the players compete as individuals
+--     (CR 806.1), so every other player is an opponent, and CR 102.3's teammates
+--     are the one exception pawl has no way to reach (#175). NOT CR 102.2 --
+--     this function only runs behind continuesAfterDeparture, so the game began
+--     with more than two players (CR 800.1) and the two-player shortcut cannot
+--     govern it.
 objectsLeaveWith :: PlayerId -> GameState -> GameState
 objectsLeaveWith pid gs =
   let owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid) (GameState.objects gs))
