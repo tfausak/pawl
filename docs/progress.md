@@ -2147,3 +2147,83 @@ its own gate card and spec, landed as it completes. Umbrella:
   `Count` would evaluate to 0 rather than Nothing through the seed view (#156).
   Spec and plan: `docs/superpowers/specs/2026-07-24-m5.5-count-compare-design.md`
   and `docs/superpowers/plans/2026-07-24-m5.5-count-compare.md`.
+- **M5.6 (Multiplayer: CR 800 general + CR 806 free-for-all) is complete** (the
+  interstitial after M5.5, seating a third player and finding out what breaks —
+  tracked end to end by #172, filed the way #151 tracked M5.5 and #8 tracked M5).
+  Five phases, each with its own gate:
+  - **a — turn order and priority.** Gate: a scripted three-player game where bob
+    concedes mid-cycle, carol receives priority, the game continues, and bob's
+    until-your-next-turn effect ends at the seat where his turn would have begun.
+    Decision proved: `turnOrder` is the permanent seating roster (CR 800.5, CR
+    806.3) and is never shortened — CR 800.4m, CR 800.4a's priority clause, and CR
+    729.1b's non-winner set all depend on a departed player keeping their seat.
+    Added: `Expiry.dropAtTurnOf` replacing `dropAtHandoff`, the CR 800.4k/800.4m
+    `handoffTurn` seat walk, `nextStillPlaying`'s full-order lookup and the
+    concede `passes` reset, `Engine.priorityHolder` (CR 800.4j), the CR
+    703.4c/703.4d/703.4n active-player guards, the `apnapPlayers` still-playing
+    filter, and `S.carol`/`threePlayers`/`threePlayerGame`. Closes #87 (citation
+    corrected from CR 800.4g to CR 800.4m) and #143.
+  - **b — setup.** Gate: a three-player `newGame` where every player bottoms one
+    fewer card on their first mulligan and the starting player draws on turn one;
+    a restart after a departure has two seats, not three. Decision proved: each
+    multiplayer capability is one named function stating the capability rather
+    than the cause (`Mulligan.freeMulligans`, `Engine.skipsDraw`), with the
+    player-count test inside it — no options record was built. Added:
+    `Mulligan.freeMulligans :: GameState -> Natural` (CR 103.5c/800.6), the
+    seat-count conjunct in `skipsDraw` (CR 103.8c/800.7), `Departure
+    .stillPlayingInOrder`, `Setup.resetPlayers`, and the still-playing filters in
+    `startGameFromCards`, `restartGame`, `subgameStateFrom` and `playSubgame`.
+    Closes #147 and #148's multiplayer half (Brawl split off as #174).
+  - **c — leaving the game.** Gate: Master Thief in both directions; the crown
+    passing to the active player when its holder leaves; Mindslaver's victim
+    released. Decision proved: CR 800.4a is an *immediate* ordered sequence, not a
+    sweep — its second clause ends control-granting effects explicitly rather
+    than waiting for a condition sweep to notice — and the whole sequence is
+    gated on CR 800.1, because a two-player subgame is read after it ends and
+    removing the loser's cards would destroy them. Added:
+    `Departure.continuesAfterDeparture` and CR 800.4a's four clause helpers,
+    `Projection.givesControlTo`, CR 800.4b sentence 1 in `Resolve`, CR 800.4d in
+    `placePendingTriggers`, CR 800.4e in `Damage.attackerAssignment`, `Monarch
+    .reassignOnDeparture` (CR 725.4), and the narrow CR 800.4i frozen
+    opponent-set. Closes #128; files #177, #178, #179.
+  - **d — combat.** Gate: Palace Jailer at three seats — attacking the monarch
+    takes the crown and frees the prisoner, attacking the other opponent does
+    neither, one board and one interpreter shape giving two different answers.
+    Decision proved: "who is being attacked" is state chosen by a turn-based
+    action, not a function of the board — `Combat.defendingPlayers` served two
+    incompatible jobs (the head of a list for attackers, the whole list for
+    blockers) that come apart the moment the list can hold two entries. Added:
+    `Combat.defender`, `Combat.attackableOpponents`, `Combat.chooseDefender` (CR
+    507.1/703.4h), `Prompt.ChooseDefender` + `Response.ChoseDefender` with their
+    `Replay` arms and every answerer arm, `S.threePlayerCombat`; deleted `Combat
+    .defendingPlayers`. Narrows #59; files #169, #170, #171, #180.
+  - **e — close-out.** The `Opponent` axis proved at three seats rather than
+    asserted (Silence stops both opponents; a `ControlledBy Opponent` pool spans
+    both boards; a `Relative Opponent` count folds both zones), with the
+    doc-comment sites that had claimed an unstated two-player assumption
+    corrected to say the axis was already free-for-all correct;
+    `threeWayMirror` added to the universal-invariant matchups with card-backed
+    conservation restated per CR 800.4a as sixty cards per player still in the
+    game; and the three-seat lands-only property now needs **two** deck-outs to
+    find a winner — the headline falsifier, covering the seat walk, the priority
+    handoff, CR 800.4a, the pass count, and `outcomeAfterLeaving` at once. Also
+    swept four stale or unverified rule citations, closing #173.
+
+  **The headline finding:** `docs/design.md` §2.4's bet is **half vindicated**.
+  The data model — `turnOrder`, `players`, `Departure.outcomeAfterLeaving`,
+  `Count.playersFor`, `emptyGame` — was N-player-shaped throughout, and
+  `PlayerRelation.Opponent`, the piece the bet's own wording predicted would be
+  largest, was not a piece at all: all three sites that resolve an opponent
+  relation were already set-shaped and already correct. The *control flow*
+  around a departure was two-player-shaped in four concentrated places, which is
+  what this phase closes. `Pawl.Type.Result` is deliberately **not** widened —
+  CR 104.1/104.2a/104.4a give a free-for-all exactly one outcome, and the
+  per-player outcome already lives in `Player.status`. CR 801's limited range of
+  influence is never used and no field exists for it — every rule under it is
+  inert by the CR 800.1/806.2a default. Suite 1024 → 1109 across the five
+  phases. Spec: `docs/superpowers/specs/2026-07-24-m5.6-multiplayer-design.md`.
+  Plans: `docs/superpowers/plans/2026-07-24-m5.6a-turn-order-priority.md`,
+  `docs/superpowers/plans/2026-07-25-m5.6b-setup-mulligans-restart-subgames.md`,
+  `docs/superpowers/plans/2026-07-25-m5.6c-leaving-the-game-objects-monarch.md`,
+  `docs/superpowers/plans/2026-07-25-m5.6d-combat-defending-player.md`, and
+  `docs/superpowers/plans/2026-07-25-m5.6e-close-out.md`.

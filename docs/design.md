@@ -83,6 +83,8 @@ Note the `Decider` field, separate from `PlayerId`. Rule **723 (Controlling Anot
 
 APNAP ordering, **801 (Limited Range of Influence)**, the monarch. A hardcoded two-player assumption is a rewrite, and it costs almost nothing to avoid up front.
 
+**Called in M5.6, and half vindicated.** The data model needed nothing: `turnOrder`, `players`, `Departure.outcomeAfterLeaving`, `Count.playersFor`, and `emptyGame` were all N-player-shaped throughout, and `PlayerRelation.Opponent` — the piece this bet's own wording would have predicted was largest — turned out not to be a piece at all; every site that resolves an opponent relation was already set-shaped. What the bet missed: the *control flow* around a player's departure was two-player-shaped in four concentrated places (turn handoff, priority, CR 800.4a's object removal, and combat's defending-player choice), because a departure had always ended a two-player game before any of the four ran. That cost one interstitial, not a rewrite — see `docs/progress.md`'s M5.6 entry.
+
 ### 2.5 Immutable state, base vs. projected
 
 Store the **base state**. Compute the **projected state** by applying continuous effects in layer order. When Giant Growth wears off you remove the effect and recalculate — you never undo anything, because the base state never changed.
@@ -474,6 +476,24 @@ translates it, rather than discovering it needs building. Its gate cards —
 Nightmare (a count that reads the CR 613 projection, falsified by Urborg and
 Blood Moon) and Sudden Impact (a count whose perspective is the *target*, not
 "you") — retire the last per-card constructors in the closed half.
+
+### M5.6 — Multiplayer (CR 800 general + CR 806 free-for-all)
+
+An interstitial, lettered like M3.5/M4.5/M5.5: not new vocabulary, but a settling
+of §2.4's bet before the transpiler exists to make settling it expensive. §2.4
+never named a milestone, so nothing forced this until now — and a hardcoded
+two-player assumption discovered *after* M6 ships would be a rewrite of card data
+as well as engine, since every printed test and fixture assumes exactly two
+seats. This phase seats a third player and finds out what breaks, precisely so
+M6 inherits an engine already proven at N players rather than one that merely
+looks that way.
+
+Its three gate cards — Palace Jailer, Master Thief, Silence — are all already in
+the pool, which is itself the finding: this is closed-half work the card corpus
+had been waiting on, not new territory the corpus forced open. §2.4's
+"almost nothing" held for the data model and did not hold for departure's
+control flow; see §2.4's annotation above and `docs/progress.md`'s M5.6 entry
+for the per-phase decisions, gates, and deferrals.
 
 ### M6 — The transpiler
 
