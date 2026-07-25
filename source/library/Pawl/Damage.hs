@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
@@ -93,6 +94,18 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
         let power :: Natural
             power = fromInteger p
             trample = Projection.hasKeyword Keyword.Trample attacker gs
+            -- CR 800.4e: "If combat damage would be assigned to a player who has
+            -- left the game, that damage isn't assigned." Reachable in a
+            -- multiplayer game: a defending player can concede between the
+            -- declare-attackers step and the combat damage step. Read HERE, at
+            -- assignment, and at both places the defender can receive damage --
+            -- the unblocked/trample-through list and the CR 702.19b threshold map
+            -- the prompt offers. Filtering the finished batch instead would let
+            -- the attacker's controller legally assign trample excess to a player
+            -- who cannot take it and then lose that damage, rather than never
+            -- offering the choice.
+            defenderIsPlaying = case target of
+              AttackTarget.OfPlayer defender -> List.elem defender (Departure.stillPlaying gs)
         let recorded = Combat.blockersOf attacker gs
             -- CR 510.1c: damage goes only to the creatures CURRENTLY blocking.
             -- The recorded set is deliberately NOT pruned when a blocker leaves --
@@ -104,9 +117,12 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
               Just obj -> Object.zone obj == Zone.Battlefield
               Nothing -> False
             toDefender :: [DamageEvent.DamageEvent]
-            toDefender = case target of
-              AttackTarget.OfPlayer defender ->
-                [DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer defender) power (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat]
+            toDefender =
+              if defenderIsPlaying
+                then case target of
+                  AttackTarget.OfPlayer defender ->
+                    [DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer defender) power (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat]
+                else []
         if Set.null recorded
           then -- CR 510.1b: never blocked, so it hits what it is attacking.
             pure toDefender
@@ -136,7 +152,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                     blockerEntries = fmap (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
                     defenderEntry = case target of
                       AttackTarget.OfPlayer defender ->
-                        if trample then [(Recipient.ToPlayer defender, 0 :: Natural)] else []
+                        if trample && defenderIsPlaying then [(Recipient.ToPlayer defender, 0 :: Natural)] else []
                     thresholds = Map.fromList (blockerEntries <> defenderEntry)
                 chosen <-
                   Trans.lift

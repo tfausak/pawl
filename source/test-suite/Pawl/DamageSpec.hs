@@ -7,11 +7,14 @@
 module Pawl.DamageSpec where
 
 import qualified Control.Monad as Monad
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
@@ -21,13 +24,15 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.AttackTarget as AttackTarget
+import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.DamagePattern as DamagePattern
 import qualified Pawl.Type.DamageRewrite as DamageRewrite
-import qualified Pawl.Type.Departure as Departure
+import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Expiry as Expiry.Type
 import qualified Pawl.Type.GameEvent as GameEvent
@@ -252,7 +257,7 @@ sbaTests =
     "Sba"
     [ HU.testCase "drew-from-empty loses" $
         let after = S.settleSba sbaBase {GameState.drewFromEmpty = Set.singleton S.alice}
-         in HU.assertEqual "alice lost" (Just (Status.Departed Departure.Lost)) (fmap Player.status (Map.lookup S.alice (GameState.players after))),
+         in HU.assertEqual "alice lost" (Just (Status.Departed Departure.Type.Lost)) (fmap Player.status (Map.lookup S.alice (GameState.players after))),
       HU.testCase "one remaining player wins" $
         let after = S.settleSba sbaBase {GameState.drewFromEmpty = Set.singleton S.alice}
          in HU.assertEqual "bob won" (Just (Result.Won S.bob)) (GameState.result after),
@@ -265,7 +270,7 @@ sbaTests =
       HU.testCase "CR 704.5c ten poison counters lose the game" $
         let gs = S.addPlayerCounter PlayerCounterKind.Poison 10 S.bob (Setup.emptyGame S.bothPlayers)
             after = S.settleSba gs
-         in HU.assertEqual "bob lost" (Just (Status.Departed Departure.Lost)) (fmap Player.status (Map.lookup S.bob (GameState.players after))),
+         in HU.assertEqual "bob lost" (Just (Status.Departed Departure.Type.Lost)) (fmap Player.status (Map.lookup S.bob (GameState.players after))),
       HU.testCase "CR 704.5c nine poison counters do not" $
         let gs = S.addPlayerCounter PlayerCounterKind.Poison 9 S.bob (Setup.emptyGame S.bothPlayers)
             after = S.settleSba gs
@@ -601,6 +606,105 @@ departedBlockerTests registry =
           _ -> HU.assertFailure "fixture did not build two blockers"
     ]
 
+-- CR 800.4e: "If combat damage would be assigned to a player who has left the
+-- game, that damage isn't assigned." attackerAssignment reads the defender's
+-- status at two independent sites -- the unblocked/trample-through toDefender
+-- list, and the CR 702.19b threshold map the assignment prompt offers -- and
+-- both need coverage.
+--
+-- S.identityAnswer's AssignCombatDamage arm dumps the WHOLE amount onto the
+-- first CREATURE recipient it finds (Support.hs), never a player one, so it
+-- cannot tell whether a ToPlayer entry is present in the threshold map at all:
+-- guarded or not, a blocked trampler's excess lands on the blocker either way
+-- under that answerer. It is fine for the unblocked path (no prompt is ever
+-- issued there), but the trample threshold map needs an answerer that actually
+-- spends the excess on a player recipient when one is offered.
+-- defenderOrBlockerAnswer assigns each blocker exactly its threshold and routes
+-- the leftover to a player recipient if the threshold map offers one, falling
+-- back onto the blocker (over-lethal, still legal -- Damage.legalAssignment has
+-- no upper bound) when it does not. That is what actually surfaces whether the
+-- departed defender was offered.
+defenderOrBlockerAnswer :: Prompt.Prompt r -> r
+defenderOrBlockerAnswer p = case p of
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    let blockerEntries = Map.toList (Map.filterWithKey (\r _ -> S.isCreatureRecipient r) thresholds)
+        toBlockers = Map.fromList blockerEntries
+        spent = sum (fmap snd blockerEntries)
+        leftover = if n >= spent then n - spent else 0
+        defenders = filter (not . S.isCreatureRecipient) (Map.keys thresholds)
+     in case defenders of
+          d : _ -> Map.insert d leftover toBlockers
+          [] -> case blockerEntries of
+            (r, _) : _ -> Map.insertWith (+) r leftover toBlockers
+            [] -> toBlockers
+  _ -> S.aggressiveAnswer p
+
+departedDefenderTests :: Registry.Type.Registry -> Tasty.TestTree
+departedDefenderTests registry =
+  Tasty.testGroup
+    "Departed defender (CR 800.4e)"
+    [ HU.testCase "CR 800.4e no combat damage is assigned to a player who has left the game" $ do
+        -- CR 800.4e: "If combat damage would be assigned to a player who has left
+        -- the game, that damage isn't assigned." Reachable: a defending player can
+        -- concede between the declare-attackers step and the combat damage step.
+        -- Three seats, because at two the concession ends the game (CR 104.2a).
+        piker <- Registry.printing registry "Goblin Piker"
+        let (attacker, board) = S.addCreature piker S.alice S.threePlayerGame
+            attacking =
+              board
+                { GameState.combat =
+                    Combat.Type.MkCombat
+                      { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.bob),
+                        Combat.Type.blockers = Map.empty,
+                        Combat.Type.struckFirst = Nothing
+                      }
+                }
+            gone = Departure.depart Departure.Type.Conceded S.bob attacking
+            (assignedAfter, _) = S.runPureWith S.identityAnswer gone (Damage.gatherCombatDamage (const True))
+            (assignedBefore, _) = S.runPureWith S.identityAnswer attacking (Damage.gatherCombatDamage (const True))
+        HU.assertEqual "nothing is assigned to the departed defender" [] assignedAfter
+        HU.assertEqual "and with bob still in the game the same board assigns one hit -- the guard is what did it" 1 (length assignedBefore)
+        HU.assertEqual "to bob" [Recipient.ToPlayer S.bob] (fmap DamageEvent.target assignedBefore),
+      HU.testCase "CR 800.4e a departed defender is not offered as a trample recipient either" $ do
+        -- CR 702.19b assigns trample's excess "as its controller chooses", and the
+        -- defending player is one of the choices Prompt.AssignCombatDamage offers.
+        -- CR 800.4e removes the damage, so the choice must not be offered: an
+        -- assignment the engine then discards would silently take damage away from
+        -- the blockers it could otherwise have gone to.
+        --
+        -- CAROL is the defender and the one who leaves, and BOB's Piker blocks, so
+        -- the blocker survives the departure and the board stays in the prompt arm.
+        -- (Making the defender the blocker's controller would work too, right up
+        -- to the point where CR 800.4a's first clause removes their blocker and
+        -- the board falls out of that arm entirely.) War Mammoth is a 3/3 with
+        -- trample; the Piker is a 2/1, so there is excess and a real choice.
+        --
+        -- S.identityAnswer is not the discriminating answerer here (see the
+        -- group comment above): it never picks a player recipient, so a blocked
+        -- trampler's excess lands on the blocker whether the defender is offered
+        -- or not. defenderOrBlockerAnswer is used for both legs instead.
+        warMammoth <- Registry.printing registry "War Mammoth"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (attacker, b1) = S.addCreature warMammoth S.alice S.threePlayerGame
+            (blocker, b2) = S.addCreature piker S.bob b1
+            attacking =
+              b2
+                { GameState.combat =
+                    Combat.Type.MkCombat
+                      { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.carol),
+                        Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker),
+                        Combat.Type.struckFirst = Nothing
+                      }
+                }
+            gone = Departure.depart Departure.Type.Conceded S.carol attacking
+            (assignedAfter, _) = S.runPureWith defenderOrBlockerAnswer gone (Damage.gatherCombatDamage (const True))
+            (assignedBefore, _) = S.runPureWith defenderOrBlockerAnswer attacking (Damage.gatherCombatDamage (const True))
+        HU.assertBool "the blocker survived carol's departure, so the board is still in the prompt arm" (Maybe.isJust (Game.lookupObject blocker gone))
+        HU.assertBool "no assignment names the departed defender" (notElem (Recipient.ToPlayer S.carol) (fmap DamageEvent.target assignedAfter))
+        HU.assertEqual "all three points land on the blocker instead" [3] (fmap DamageEvent.amount (filter (\ev -> DamageEvent.target ev == Recipient.ToCreature blocker) assignedAfter))
+        HU.assertBool "with carol still in the game the threshold map DOES offer her -- the guard is what did it" (Maybe.isJust (List.find (\ev -> DamageEvent.target ev == Recipient.ToPlayer S.carol) assignedBefore))
+    ]
+
 -- Grant deathtouch to `oid` the way Serpent's Gift does: a stored continuous
 -- effect over just that object. Timestamp is arbitrary (no competing layer-6
 -- effect in these fixtures).
@@ -683,6 +787,7 @@ tests registry =
       assignmentLegalityTests,
       trampleTests registry,
       departedBlockerTests registry,
+      departedDefenderTests registry,
       trampleDeathtouchTests registry,
       sbaTests,
       creatureSbaTests registry,
