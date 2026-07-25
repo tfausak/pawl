@@ -21,6 +21,10 @@ import qualified Pawl.Type.TypeLine as TypeLine
 -- order. CR 608.2c/700.2: the card's whole text spans its modes; the D4 lint
 -- and the text-change scan (M3d) range over all of them regardless of what is
 -- chosen.
+--
+-- Card.mulliganAction is deliberately NOT included: it is not part of the
+-- spell, and CR 103.5b's action is performed from the hand rather than cast
+-- (#184).
 allEffects :: Card.Card -> [Effect Card.Card]
 allEffects card = Modal.allEffects (Card.spell card)
 

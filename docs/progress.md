@@ -2261,3 +2261,44 @@ its own gate card and spec, landed as it completes. Umbrella:
   `docs/superpowers/plans/2026-07-25-m5.6c-leaving-the-game-objects-monarch.md`,
   `docs/superpowers/plans/2026-07-25-m5.6d-combat-defending-player.md`, and
   `docs/superpowers/plans/2026-07-25-m5.6e-close-out.md`.
+
+- **CR 103.5b (mulligan-window actions) is implemented** (issue-driven gap
+  closure #182, not a milestone phase; surfaced by the CR 103.5 spec's own §3.2,
+  which named Serum Powder as the card that would want a mulligan window).
+  **Gate: Serum Powder.** **What it establishes:** the CR 103.5 declaration pass
+  now opens a window before each still-deciding player's declaration, looping
+  until they decline — CR 103.5b's action may be taken in any round ("This need
+  not be in the first round"), more than once, and only by a player who has not
+  yet kept. Performing one is **not** taking a mulligan: nothing is shuffled or
+  bottomed and the count is untouched, so it feeds neither CR 103.5's bottom
+  count nor CR 103.5c's free allowance, and the declaration still follows it.
+  The window runs BEFORE the hand-size read, which is load-bearing: an action
+  that empties the hand makes the declaration a forced keep under CR 103.5's
+  final sentence. **The structural finding:** `Pawl.Resolve` sits ABOVE
+  `Pawl.Mulligan` (`Effect.RestartGame` → `Setup.restartGame` →
+  `startGameFromCards` → `openingHands`), and that cycle is a fact about the
+  rules rather than the layout — an opcode restarts a game, a game start draws
+  opening hands, and drawing opening hands performs opcodes. The effect
+  performer is therefore a **parameter**, `Pawl.Type.MulliganPerformer`, threaded
+  through the four setup entry points; the `resolveSpellWith runSubgame`
+  precedent, with no default, because "no mulligan performer" is not a real
+  state of the world (whereas `Resolve.noSubgame` is). `Pawl.Mulligan` mentions
+  `Effect` but never cases on one: the candidate list is a classification (does
+  this hand card declare an action?), and the payload is handed to the performer
+  opaquely. **Added:** `Effect.ExileHandThenDraw` (one fused opcode — "that
+  many" is the hand size BEFORE the exile, so a following `Draw` would read an
+  empty hand); `Card.mulliganAction :: [Effect Card]`, read straight off the
+  card and never through the projection (the ability functions in the HAND, CR
+  113.6 — the `castingPermissions` precedent), with the omit-when-empty codec
+  treatment so all 86 committed card files stayed byte-identical;
+  `Prompt.MulliganAction` + `Response.TookMulliganAction` + their `Replay` arms;
+  `Mulligan.actionsFor` and `Mulligan.mulliganWindow`;
+  `data/cards/serum-powder.json`; nine `Pawl.MulliganSpec` cases. **Falls out
+  for free:** the CR 727.3 / 729.3 short-deck loss fires through the action too,
+  because the redraw is the ordinary `Event.drawCard` funnel. Suite 1109 → 1124.
+  **Deferred:** a printing declaring two CR 103.5b actions (#183, card-driven);
+  the `CardSpec` lint family's coverage of the new field (#184, card-driven). CR
+  103.6's opening-hand actions (#149) are a different mechanism at a different
+  time — after the whole mulligan process — and are untouched. Spec and plan:
+  `docs/superpowers/specs/2026-07-25-cr-103-5b-mulligan-actions-design.md` and
+  `docs/superpowers/plans/2026-07-25-cr-103-5b-mulligan-actions.md`.

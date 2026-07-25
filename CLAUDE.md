@@ -35,8 +35,9 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 
 ## Current work and tracking
 
-- **Status: M0–M5, the M5.5 count/compare interstitial, and the M5.6
-  multiplayer interstitial are complete.** The closed-half milestones M0–M3g,
+- **Status: M0–M5, the M5.5 count/compare interstitial, the M5.6 multiplayer
+  interstitial, and the CR 103.5b mulligan-window gap closure are complete.**
+  The closed-half milestones M0–M3g,
   the M3.5 cards-as-data interstitial, all of M4 (M4a–M4h), all eleven phases
   of M4.5 (the closed-half gap census), all of M5 (Controlling Another Player
   CR 723, Restarting the Game CR 727, Subgames CR 729), the mulligan
@@ -60,8 +61,16 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   already in the pool — no card data changed. Deliberately out of scope: CR
   801's limited range of influence (always unlimited here), CR 802–805's
   options, CR 806–811's other variants, and teams, all of which need a
-  format/variant concept pawl does not have (#175). **M6 (the transpiler) is
-  next** (#9). The umbrella spec is
+  format/variant concept pawl does not have (#175). **After M5.6, the CR 103.5b
+  gap closure (#182) landed:** a mulligan-declaration window that lets a card in
+  hand act "any time you could mulligan", gated on **Serum Powder**, adding
+  `Effect.ExileHandThenDraw`, `Card.mulliganAction`, `Prompt.MulliganAction`,
+  and `Pawl.Type.MulliganPerformer` — the parameter that breaks the
+  `Resolve → Setup → Mulligan` cycle, since a game start now performs opcodes.
+  Its spec and plan are
+  `docs/superpowers/specs/2026-07-25-cr-103-5b-mulligan-actions-design.md` and
+  `docs/superpowers/plans/2026-07-25-cr-103-5b-mulligan-actions.md`.
+  **M6 (the transpiler) is next** (#9). M5.6's umbrella spec is
   `docs/superpowers/specs/2026-07-24-m5.6-multiplayer-design.md`; its five
   phase plans are `docs/superpowers/plans/2026-07-24-m5.6a-turn-order-priority.md`,
   `docs/superpowers/plans/2026-07-25-m5.6b-setup-mulligans-restart-subgames.md`,

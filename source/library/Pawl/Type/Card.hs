@@ -139,7 +139,7 @@ data Card = MkCard
     -- An empty list means NO action, not an action that does nothing: the two
     -- are indistinguishable in play, so the ambiguity costs nothing.
     --
-    -- One action per card. A printing declaring two is unrepresentable (#N).
+    -- One action per card. A printing declaring two is unrepresentable (#183).
     mulliganAction :: [Effect Card]
   }
   deriving (Eq, Ord, Show)

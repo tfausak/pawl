@@ -965,7 +965,7 @@ gh issue create --title "The CardSpec lint family does not range over Card.mulli
   --body "\`Pawl.Card.allEffects\` is the spell's effects only -- it serves the D4 slot lint and the CR 612 text-change scan, both of which range over a spell's text. A slot named inside a \`Card.mulliganAction\` would therefore go unlinted. Nothing can name one today: \`Effect.ExileHandThenDraw\` is targetless and slotless. The lint should grow this with the first slotted mulligan action, not before. Spec: docs/superpowers/specs/2026-07-25-cr-103-5b-mulligan-actions-design.md section 3.1."
 ```
 
-- [ ] **Step 2: Replace the `(#N)` placeholder** in `source/library/Pawl/Type/Card.hs` with the first issue's real number, and add a citation to `Pawl.Card.allEffects` for the second:
+- [x] **Step 2: Replace the `(#N)` placeholder** in `source/library/Pawl/Type/Card.hs` with the first issue's real number, and add a citation to `Pawl.Card.allEffects` for the second:
 
 ```haskell
 -- Every effect across all of a card's modes, in printed (mode, then written)
@@ -978,12 +978,12 @@ gh issue create --title "The CardSpec lint family does not range over Card.mulli
 -- (#N).
 ```
 
-- [ ] **Step 3: Verify the whole build and suite once more, from clean.**
+- [x] **Step 3: Verify the whole build and suite once more, from clean.**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -20`
 Expected: warning-free (a clean build is the only one that shows warnings from unchanged modules); the whole suite passes.
 
-- [ ] **Step 4: Add the `docs/progress.md` entry.** Append after the M5.6 entry, matching the surrounding style (a bolded lead, what it establishes, what it added, what it deferred, and the spec/plan paths):
+- [x] **Step 4: Add the `docs/progress.md` entry.** Append after the M5.6 entry, matching the surrounding style (a bolded lead, what it establishes, what it added, what it deferred, and the spec/plan paths):
 
 ```markdown
 - **CR 103.5b (mulligan-window actions) is implemented** (issue-driven gap
@@ -1023,9 +1023,9 @@ Expected: warning-free (a clean build is the only one that shows warnings from u
 
 Replace both `#N` placeholders with the real issue numbers from Step 1.
 
-- [ ] **Step 5: Update the `CLAUDE.md` status bullet** — **replace**, never append (the milestone history lives in `progress.md`). Amend the first sentence of the status bullet to record that CR 103.5b landed after M5.6 and that M6 (#9) is still next; leave the rest of the bullet's M5.6 summary intact.
+- [x] **Step 5: Update the `CLAUDE.md` status bullet** — **replace**, never append (the milestone history lives in `progress.md`). Amend the first sentence of the status bullet to record that CR 103.5b landed after M5.6 and that M6 (#9) is still next; leave the rest of the bullet's M5.6 summary intact.
 
-- [ ] **Step 6: Verify the plan is complete and close the issue.**
+- [x] **Step 6: Verify the plan is complete and close the issue.**
 
 ```bash
 grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-25-cr-103-5b-mulligan-actions.md
@@ -1036,7 +1036,7 @@ Expected: `0`.
 gh issue close 182 --comment "CR 103.5b is implemented: the mulligan-declaration window offers every action a hand card grants, looping until declined, in every round and only to players who have not yet kept. Serum Powder is in data/cards. Deferrals filed as #N and #N."
 ```
 
-- [ ] **Step 7: Format, lint, and commit.**
+- [x] **Step 7: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
