@@ -18,6 +18,7 @@ import qualified Pawl.Type.Deck as Deck
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import Pawl.Type.MulliganPerformer (MulliganPerformer)
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -123,14 +124,14 @@ createDeck pid (Deck.MkDeck m) =
   Monad.forM_ (Map.toList m) $ \(printing, n) ->
     Monad.replicateM_ (fromIntegral n) (createCard pid printing)
 
-newGame :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
-newGame matchup = do
+newGame :: MulliganPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
+newGame perform matchup = do
   -- CR 103.3: build and shuffle every library BEFORE any opening hand is drawn,
   -- so CR 103.5's declaration round (Mulligan.openingHands) sees settled libraries.
   Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
     createDeck pid deck
     Mulligan.shuffleLibrary pid
-  Mulligan.openingHands (fmap fst (NonEmpty.toList matchup))
+  Mulligan.openingHands perform (fmap fst (NonEmpty.toList matchup))
 
 -- CR 727.2 / 729.2: build every player's library from an EXISTING object pool --
 -- each player's owned CARDS, wherever they currently sit -- then shuffle and draw
@@ -147,8 +148,8 @@ newGame matchup = do
 -- takes every object a departing player owns out of the game with them
 -- (Departure.objectsLeaveWith), so a rebuild has nothing of theirs left in the
 -- object pool to orphan.
-startGameFromCards :: Game ()
-startGameFromCards = do
+startGameFromCards :: MulliganPerformer -> Game ()
+startGameFromCards perform = do
   gs <- State.get
   let owners = Departure.stillPlayingInOrder gs
       isCard obj = case Object.source obj of
@@ -177,7 +178,7 @@ startGameFromCards = do
         GameState.stack = []
       }
   Monad.forM_ owners Mulligan.shuffleLibrary
-  Mulligan.openingHands owners
+  Mulligan.openingHands perform owners
 
 -- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the
 -- cyclic order ("the game's default turn order begins with the starting player
@@ -224,8 +225,8 @@ resetPlayers players =
 -- turn's untap step, with no player holding priority -- phase = firstPhase,
 -- priority = Nothing, turn 1. The object and timestamp id supplies are preserved
 -- so reused cards keep unique ids; startGameFromCards rebuilds objects and zones.
-restartGame :: PlayerId -> Game ()
-restartGame starter = do
+restartGame :: MulliganPerformer -> PlayerId -> Game ()
+restartGame perform starter = do
   State.modify' $ \gs ->
     -- CR 727.1: "All players in that game when it ended then start a new game
     -- ..." -- so the rebuilt seating order is the players who were still in the
@@ -267,7 +268,7 @@ restartGame starter = do
             GameState.monarch = Nothing,
             GameState.exiledUntilMonarch = Map.empty
           }
-  startGameFromCards
+  startGameFromCards perform
 
 -- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards ONLY --
 -- each player takes all the cards in their main-game library into the subgame

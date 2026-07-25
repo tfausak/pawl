@@ -7,6 +7,7 @@ module Pawl.MulliganSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Departure as Departure
@@ -71,7 +72,7 @@ mulliganUpTo k p = case p of
   _ -> S.identityAnswer p
 
 run :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-run answer gs = snd (Engine.runGamePure answer gs (Mulligan.openingHands [S.alice, S.bob]))
+run answer gs = snd (Engine.runGamePure answer gs (Mulligan.openingHands S.performer [S.alice, S.bob]))
 
 -- CR 800.1: the three-seat twin of libraryGame -- n Mountains in each of the
 -- three players' libraries, nothing elsewhere. The SEAT COUNT is what CR 103.5c
@@ -87,7 +88,7 @@ libraryGame3 mountain n =
 -- run, for three seats. CR 103.5: the declaration order is the turn order, so
 -- the list is [alice, bob, carol] and not a set.
 run3 :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-run3 answer gs = snd (Engine.runGamePure answer gs (Mulligan.openingHands [S.alice, S.bob, S.carol]))
+run3 answer gs = snd (Engine.runGamePure answer gs (Mulligan.openingHands S.performer [S.alice, S.bob, S.carol]))
 
 -- Always mulligan, recording every player asked. How many times a player is
 -- ASKED is how pawl expresses CR 103.5's limit ("A player can take mulligans
@@ -158,6 +159,37 @@ bottomReversedAnswer p = case p of
   Prompt.Bottom _ _ hand count -> reverse (take (fromIntegral count) hand)
   _ -> S.identityAnswer p
 
+-- alice's library: a Serum Powder on top, then `n` Mountains; bob's is uniform
+-- Mountains. poolToLibrary orders a library by ascending ObjectId, which is
+-- insertion order, so the Powder added first is the top card and is drawn into
+-- her opening hand -- CR 103.5b's window reads the HAND, so it has to be drawn
+-- and not merely owned.
+powderGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+powderGame powder mountain n =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice n (addMany powder S.alice 1 g0)
+   in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
+
+-- Records every CR 103.5b offer's candidate list, declines it, and keeps.
+recordWindow :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+recordWindow p = case p of
+  Prompt.MulliganAction _ _ candidates -> do
+    State.modify' (candidates :)
+    pure Nothing
+  Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
+  _ -> pure (S.identityAnswer p)
+
+-- Takes the first offered CR 103.5b action whenever one is offered, and always
+-- keeps. With a single Powder in the deck the window loop ends by itself: the
+-- action exiles the Powder along with the rest of the hand, so the redrawn hand
+-- offers nothing.
+usePowder :: Prompt.Prompt r -> r
+usePowder p = case p of
+  Prompt.MulliganAction _ _ candidates -> Maybe.listToMaybe candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  _ -> S.identityAnswer p
+
 -- Records each DeclareMulligan's pid, so the test can assert a kept player is
 -- not asked again. Alice keeps immediately; bob mulligans twice then keeps.
 recordAsks :: Prompt.Prompt r -> State.State [PlayerId] r
@@ -171,7 +203,23 @@ tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Mulligan"
-    [ HU.testCase "CR 103.5: all-Keep draws exactly seven, library shrinks by seven" $ do
+    [ HU.testCase "CR 103.5b: a hand card granting an action is offered at the declaration" $ do
+        powder <- Registry.printing registry "Serum Powder"
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = powderGame powder mountain 20
+            ((_, _after), offered) = State.runState (Program.foldProgramM recordWindow (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+        HU.assertEqual "exactly one offer -- alice's, in the one round she declares" 1 (length offered)
+        HU.assertEqual "and it offered exactly her Powder" [1] (fmap length offered),
+      HU.testCase "CR 103.5b: taking the action exiles the whole hand and redraws that many" $ do
+        powder <- Registry.printing registry "Serum Powder"
+        mountain <- Registry.printing registry "Mountain"
+        let after = run usePowder (powderGame powder mountain 20)
+        HU.assertEqual "alice's hand is a full seven again" 7 (S.handSize S.alice after)
+        HU.assertEqual "her first seven are exiled" 7 (length (Game.zoneMembers Zone.Exile S.alice after))
+        HU.assertEqual "and her library is seven shorter than after the opening draw" 7 (libSize S.alice after)
+        HU.assertEqual "bob, with no Powder, is untouched" 7 (S.handSize S.bob after)
+        HU.assertEqual "and exiles nothing" 0 (length (Game.zoneMembers Zone.Exile S.bob after)),
+      HU.testCase "CR 103.5: all-Keep draws exactly seven, library shrinks by seven" $ do
         mountain <- Registry.printing registry "Mountain"
         let after = run keepAnswer (libraryGame mountain 20)
         HU.assertEqual "alice hand" 7 (S.handSize S.alice after)
@@ -222,14 +270,14 @@ tests registry =
       HU.testCase "CR 103.5: keeping is terminal -- a kept player is not asked again" $ do
         mountain <- Registry.printing registry "Mountain"
         let gs0 = libraryGame mountain 20
-            ((_, _after), asked) = State.runState (Program.foldProgramM recordAsks (State.runStateT (Mulligan.openingHands [S.alice, S.bob]) gs0)) []
+            ((_, _after), asked) = State.runState (Program.foldProgramM recordAsks (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
         HU.assertEqual "alice kept round 1, so was asked exactly once" 1 (length (filter (== S.alice) asked))
         HU.assertBool "bob mulliganed twice then kept, so was asked more than once" (length (filter (== S.bob) asked) > 1),
       HU.testCase "CR 103.5: a game with mulligans replays deterministically" $ do
         mountain <- Registry.printing registry "Mountain"
         let gs0 = libraryGame mountain 20
-            ((_, recorded), responses) = Replay.record (mulliganUpTo 2) gs0 (Mulligan.openingHands [S.alice, S.bob])
-            (_, replayed) = Replay.replay responses gs0 (Mulligan.openingHands [S.alice, S.bob])
+            ((_, recorded), responses) = Replay.record (mulliganUpTo 2) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
+            (_, replayed) = Replay.replay responses gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
         HU.assertEqual "alice hand matches" (S.handSize S.alice recorded) (S.handSize S.alice replayed)
         HU.assertEqual "alice library matches" (libSize S.alice recorded) (libSize S.alice replayed)
         HU.assertEqual
@@ -279,7 +327,7 @@ tests registry =
         -- first is free, so 7,6,5,4,3,2,1,0 -- eight asks. Today both give
         -- seven, because the free allowance does not exist.
         mountain <- Registry.printing registry "Mountain"
-        let asksIn owners gs0 = snd (State.runState (Program.foldProgramM recordAlwaysMulligan (State.runStateT (Mulligan.openingHands owners) gs0)) [])
+        let asksIn owners gs0 = snd (State.runState (Program.foldProgramM recordAlwaysMulligan (State.runStateT (Mulligan.openingHands S.performer owners) gs0)) [])
             three = asksIn [S.alice, S.bob, S.carol] (libraryGame3 mountain 20)
             two = asksIn [S.alice, S.bob] (libraryGame mountain 20)
         HU.assertEqual "three seats: alice may take eight mulligans" 8 (length (filter (== S.alice) three))
@@ -291,7 +339,7 @@ tests registry =
         -- three Response.PutOnBottom entries are recorded.
         mountain <- Registry.printing registry "Mountain"
         let bottomsIn owners gs0 =
-              let (_, log_) = Replay.record (mulliganUpTo 1) gs0 (Mulligan.openingHands owners)
+              let (_, log_) = Replay.record (mulliganUpTo 1) gs0 (Mulligan.openingHands S.performer owners)
                   isBottom r = case r of
                     Response.PutOnBottom _ -> True
                     _ -> False

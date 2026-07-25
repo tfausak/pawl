@@ -4,14 +4,19 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Numeric.Natural
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Type.Card as Card
+import Pawl.Type.Effect (Effect)
 import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
+import Pawl.Type.MulliganPerformer (MulliganPerformer)
+import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
@@ -37,26 +42,79 @@ shuffleLibrary pid = do
 -- reader is this loop, which needs it for the number of cards bottomed (CR 103.5)
 -- less the free allowance (CR 103.5c), so it never enters GameState. `owners` is
 -- in turn order (starting player first).
-openingHands :: [PlayerId] -> Game ()
-openingHands owners = do
+openingHands :: MulliganPerformer -> [PlayerId] -> Game ()
+openingHands perform owners = do
   -- CR 103.5 sentence 1: every player draws a full opening hand. A short library
   -- sets drewFromEmpty here; the flag survives the loop, which is what CR 727.3 /
   -- 729.3's "regardless of any mulligans" means.
   Monad.forM_ owners (Monad.replicateM_ openingHand . Event.drawCard)
-  mulliganRounds Map.empty owners
+  mulliganRounds perform Map.empty owners
+
+-- CR 103.5b: the cards in this player's hand that grant an action they may take
+-- at their mulligan declaration, each paired with the effects that action
+-- performs. A CLASSIFICATION, not an identity test: this asks whether the card
+-- declares an action, never which card it is.
+--
+-- Read straight off the card (Game.cardOf) and never through the projection --
+-- the Card.castingPermissions precedent: the ability functions in the HAND (CR
+-- 113.6), where the CR 613 layer system does not reach.
+actionsFor :: PlayerId -> GameState.GameState -> [(ObjectId, [Effect Card.Card])]
+actionsFor pid gs =
+  let withAction oid = case Game.cardOf oid gs of
+        Nothing -> Nothing
+        Just card -> case Card.mulliganAction card of
+          [] -> Nothing
+          effects -> Just (oid, effects)
+   in Maybe.mapMaybe withAction (Game.zoneMembers Zone.Hand pid gs)
+
+-- CR 103.5b: offer this player every action their hand grants "any time [they]
+-- could mulligan", repeatedly, until they decline or none is left. Performing
+-- one is NOT taking a mulligan -- nothing is shuffled or bottomed and `counts`
+-- is untouched -- so the caller's declaration still follows (CR 103.5b's last
+-- sentence). Nothing in CR 103.5b or on the card limits a player to one action,
+-- and a hand that redraws into a second granting card may use it here too.
+--
+-- Terminates even against an interpreter that never declines: each action moves
+-- at least one card out of the hand for the rest of the game, so the deck
+-- strictly shrinks, and an empty library redraws nothing -- leaving a hand with
+-- no candidate, which ends the loop.
+mulliganWindow :: MulliganPerformer -> PlayerId -> Game ()
+mulliganWindow perform pid = do
+  candidates <- State.gets (actionsFor pid)
+  case candidates of
+    -- Where the rules leave nothing to ask, don't prompt.
+    [] -> pure ()
+    _ -> do
+      decider <- State.gets (Decide.deciderFor pid)
+      answer <- Trans.lift (Program.prompt (Prompt.MulliganAction decider pid (fmap fst candidates)))
+      case answer of
+        Nothing -> pure ()
+        Just oid -> case lookup oid candidates of
+          -- An id that was not offered: validated by MEMBERSHIP, the
+          -- Action.Activate posture, which keeps this total with no partial
+          -- lookup and no way for an interpreter to conjure an action.
+          Nothing -> pure ()
+          Just effects -> do
+            perform oid pid effects
+            mulliganWindow perform pid
 
 -- CR 103.5: repeat the declare-all-then-take-all round until no still-deciding
 -- player mulligans. `deciding` is the players who have NOT yet kept -- keeping is
 -- terminal (CR 103.5: "that player may not take any further mulligans"), so a
 -- player who keeps drops out of the pool and is never asked again; only the
 -- mulliganers of a round remain to decide in the next one.
-mulliganRounds :: Map.Map PlayerId Numeric.Natural.Natural -> [PlayerId] -> Game ()
-mulliganRounds counts deciding = do
+mulliganRounds :: MulliganPerformer -> Map.Map PlayerId Numeric.Natural.Natural -> [PlayerId] -> Game ()
+mulliganRounds perform counts deciding = do
   -- CR 103.5: the starting player declares first, then each other in turn order
   -- (turn order is preserved: `deciding` is filtered from the original `owners`).
   -- A player whose hand is already zero cannot mulligan (final sentence) and is
   -- treated as Keep without being asked -- which also drops them from the pool.
   decisions <- Monad.forM deciding $ \pid -> do
+    -- CR 103.5b: the window comes FIRST -- the action is taken "at a time they
+    -- would declare", and the declaration follows it. Reading the hand size
+    -- after it is load-bearing: an action that empties the hand makes this a
+    -- forced keep under CR 103.5's final sentence.
+    mulliganWindow perform pid
     handSize <- State.gets (length . Game.zoneMembers Zone.Hand pid)
     if handSize <= 0
       then pure (pid, MulliganDecision.Keep)
@@ -76,7 +134,7 @@ mulliganRounds counts deciding = do
       -- them in turn order is observably equivalent to simultaneity.
       counts' <- Monad.foldM takeMulligan counts mulliganers
       -- Kept players have dropped out; only this round's mulliganers decide again.
-      mulliganRounds counts' mulliganers
+      mulliganRounds perform counts' mulliganers
 
 -- CR 103.5c / CR 800.6: how many of a player's mulligans are free -- do not count
 -- toward the number of cards that player puts on the bottom of their library, or

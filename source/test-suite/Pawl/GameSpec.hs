@@ -278,7 +278,7 @@ scenario :: Registry.Type.Registry -> Game.Type.Game () -> IO GameState.GameStat
 scenario registry steps = do
   matchup <- S.redRed registry
   pure . snd . Engine.runGamePure S.identityAnswer (Setup.emptyGame (fmap fst matchup)) $ do
-    Setup.newGame matchup
+    Setup.newGame S.performer matchup
     steps
 
 -- Alice starts, so her turn-1 draw is skipped.
@@ -769,7 +769,7 @@ ruleTests registry =
         -- starting player does not skip the first draw -- today alice skips.
         matchup <- S.threeWayMirror registry
         let g0 = Setup.emptyGame (fmap fst matchup)
-            afterSetup = snd (Engine.runGamePure mulliganOnceAnswer g0 (Setup.newGame matchup))
+            afterSetup = snd (Engine.runGamePure mulliganOnceAnswer g0 (Setup.newGame S.performer matchup))
             afterDraw = snd (Engine.runGamePure mulliganOnceAnswer afterSetup S.drawStep)
         HU.assertEqual "alice's free mulligan bottomed nothing" 7 (S.handSize S.alice afterSetup)
         HU.assertEqual "bob's did not either" 7 (S.handSize S.bob afterSetup)

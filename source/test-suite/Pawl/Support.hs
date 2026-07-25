@@ -32,6 +32,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Turn as Turn
@@ -63,6 +64,7 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
+import qualified Pawl.Type.MulliganPerformer as MulliganPerformer
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -577,6 +579,11 @@ withEffect :: ObjectId.ObjectId -> Modification.Modification -> GameState.GameSt
 withEffect oid m gs =
   let (ts, gs1) = Game.freshTimestamp gs
    in withEffectAt oid ts m gs1
+
+-- The one CR 103.5b performer (Pawl.Resolve.performMulliganAction), so a test
+-- that only wants a game set up does not have to reach into Pawl.Resolve for it.
+performer :: MulliganPerformer.MulliganPerformer
+performer = Resolve.performMulliganAction
 
 -- The source stand-in for a targeting call whose spec is source-blind (every
 -- spec but OpponentCreatureTarget). Object id 999 names nothing, the same

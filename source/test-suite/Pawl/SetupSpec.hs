@@ -121,7 +121,7 @@ deckTests registry =
 setupState :: Registry.Type.Registry -> IO GameState.GameState
 setupState registry = do
   matchup <- S.redRed registry
-  pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame matchup) (Setup.emptyGame S.bothPlayers)))
+  pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame S.performer matchup) (Setup.emptyGame S.bothPlayers)))
 
 setupTests :: Registry.Type.Registry -> Tasty.TestTree
 setupTests registry =
@@ -166,7 +166,7 @@ setupTests registry =
 greenBlackSetup :: Registry.Type.Registry -> IO GameState.GameState
 greenBlackSetup registry = do
   matchup <- S.greenBlack registry
-  pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame matchup) (Setup.emptyGame S.bothPlayers)))
+  pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame S.performer matchup) (Setup.emptyGame S.bothPlayers)))
 
 greenBlackSetupTests :: Registry.Type.Registry -> Tasty.TestTree
 greenBlackSetupTests registry =
@@ -201,7 +201,7 @@ restartTests registry =
         let g0 = Setup.emptyGame S.bothPlayers
             g1 = addMany mountain 8 S.alice g0
             g2 = addMany mountain 8 S.bob g1
-            after = snd (Engine.runGamePure S.identityAnswer g2 Setup.startGameFromCards)
+            after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.startGameFromCards S.performer))
             libSize pid = length (Game.zoneMembers Zone.Library pid after)
         HU.assertEqual "alice drew a 7-card opening hand" 7 (S.handSize S.alice after)
         HU.assertEqual "bob drew a 7-card opening hand" 7 (S.handSize S.bob after)
@@ -214,8 +214,8 @@ restartTests registry =
         -- active player and the head of the turn order follow the controller.
         mountain <- Registry.printing registry "Mountain"
         let g0 = addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.bothPlayers))
-            byBob = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.bob))
-            byAlice = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.alice))
+            byBob = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer S.bob))
+            byAlice = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer S.alice))
         HU.assertEqual "bob restarted: bob is the new active player" S.bob (GameState.activePlayer byBob)
         HU.assertEqual "bob restarted: bob heads the turn order" (Just S.bob) (Maybe.listToMaybe (GameState.turnOrder byBob))
         HU.assertEqual "alice restarted: alice is the new active player" S.alice (GameState.activePlayer byAlice)
@@ -235,7 +235,7 @@ restartTests registry =
             g3 = addMany mountain 7 S.alice (addMany mountain 7 S.bob g2)
             -- move bob's card to his graveyard, to prove zone-independence.
             g4 = snd (Engine.runGamePure S.identityAnswer g3 (Event.changeZone bId Zone.Graveyard))
-            after = snd (Engine.runGamePure S.identityAnswer g4 (Setup.restartGame S.alice))
+            after = snd (Engine.runGamePure S.identityAnswer g4 (Setup.restartGame S.performer S.alice))
             ownedCount pid = length (filter (\o -> Object.owner o == pid) (Map.elems (GameState.objects after)))
             libHandCount pid = length (Game.zoneMembers Zone.Library pid after) + length (Game.zoneMembers Zone.Hand pid after)
         HU.assertEqual "alice still owns all 8 of her cards" 8 (ownedCount S.alice)
@@ -254,7 +254,7 @@ restartTests registry =
         let g0 = addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.bothPlayers))
             g1 = S.addPlayerCounter PlayerCounterKind.Poison 3 S.bob g0
             g2 = g1 {GameState.players = Map.adjust (\p -> p {Player.life = 5}) S.bob (GameState.players g1)}
-            after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.restartGame S.bob))
+            after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.restartGame S.performer S.bob))
         HU.assertEqual "phase is the first turn's untap step" Turn.firstPhase (GameState.phase after)
         HU.assertEqual "no player holds priority" Nothing (GameState.priority after)
         HU.assertEqual "it is turn 1" 1 (GameState.turnNumber after)
@@ -270,7 +270,7 @@ restartTests registry =
         -- here it is asserted at the next explicit SBA check.)
         mountain <- Registry.printing registry "Mountain"
         let g0 = addMany mountain 3 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.bothPlayers))
-            afterRestart = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.alice))
+            afterRestart = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer S.alice))
             afterSba = snd (Engine.runGamePure S.identityAnswer afterRestart Engine.checkSba)
         HU.assertEqual "bob drew from an empty library during the opening draw" True (Set.member S.bob (GameState.drewFromEmpty afterRestart))
         HU.assertEqual "CR 727.3: bob loses, alice wins at the SBA check" (Just (Result.Won S.alice)) (GameState.result afterSba),
@@ -290,7 +290,7 @@ restartTests registry =
                 { GameState.players =
                     Map.adjust (\p -> p {Player.life = 3}) S.bob (Map.adjust (\p -> p {Player.life = 5}) S.alice (GameState.players g0))
                 }
-            afterRestart = S.runPure S.identityAnswer g1 (Setup.restartGame S.alice)
+            afterRestart = S.runPure S.identityAnswer g1 (Setup.restartGame S.performer S.alice)
             sub = Setup.subgameStateFrom S.alice g1
             statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
          in do
@@ -309,7 +309,7 @@ restartTests registry =
         mountain <- Registry.printing registry "Mountain"
         let g0 = addMany mountain 8 S.carol (addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.threePlayers)))
             g1 = Departure.depart Departure.Type.Conceded S.bob g0
-            after = snd (Engine.runGamePure S.identityAnswer g1 (Setup.restartGame S.alice))
+            after = snd (Engine.runGamePure S.identityAnswer g1 (Setup.restartGame S.performer S.alice))
             libSizeOf pid = length (Game.zoneMembers Zone.Library pid after)
         HU.assertEqual "two seats in the rebuilt order, in their seating order" [S.alice, S.carol] (GameState.turnOrder after)
         HU.assertEqual "alice starts it (CR 727.1a)" S.alice (GameState.activePlayer after)
@@ -398,7 +398,7 @@ subgameTests registry =
             -- irrelevant here, this test only checks funnelBack's bookkeeping,
             -- not the CR 727.3/729.3 short-deck loss.
             sub0 = Setup.subgameStateFrom S.alice parent
-            (_, finalSub) = Engine.runGamePure S.identityAnswer sub0 Setup.startGameFromCards
+            (_, finalSub) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer)
             after = Setup.funnelBack finalSub parent
             libCount pid = length (Game.zoneMembers Zone.Library pid after)
             battlefieldSurvivors = Set.size (GameState.battlefield after)
@@ -423,7 +423,7 @@ subgameTests registry =
         let g0 = Setup.emptyGame S.threePlayers
             g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
             sub0 = Setup.subgameStateFrom S.alice g1
-            (_, seated) = Engine.runGamePure S.identityAnswer sub0 Setup.startGameFromCards
+            (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer)
             departedSub = Departure.depart Departure.Type.Lost S.bob seated
             after = Setup.funnelBack departedSub g1
         HU.assertEqual "the subgame really was multiplayer, so CR 800.4a's removal fired" True (Departure.continuesAfterDeparture departedSub)
@@ -446,9 +446,9 @@ subgameTests registry =
         let g0 = Setup.emptyGame S.threePlayers
             g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
             sub0 = Setup.subgameStateFrom S.alice g1
-            (_, seated) = Engine.runGamePure S.identityAnswer sub0 Setup.startGameFromCards
+            (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer)
             departedSub = Departure.depart Departure.Type.Lost S.bob seated
-            (_, restarted) = Engine.runGamePure S.identityAnswer departedSub (Setup.restartGame S.alice)
+            (_, restarted) = Engine.runGamePure S.identityAnswer departedSub (Setup.restartGame S.performer S.alice)
             after = Setup.funnelBack restarted g1
         HU.assertEqual "the in-subgame restart really did shrink finalSub's own turnOrder to two" 2 (length (GameState.turnOrder restarted))
         HU.assertEqual "so the naive seam-at-the-end reading would (wrongly) say it is not multiplayer any more" False (Departure.continuesAfterDeparture restarted)

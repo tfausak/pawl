@@ -509,7 +509,7 @@ The behavior: the performer parameter, the classification, and the window loop. 
 - Consumes: `Prompt.MulliganAction` (Task 1), `Effect.ExileHandThenDraw` (Task 2), `CardT.mulliganAction` (Task 3), the `"Serum Powder"` printing (Task 4).
 - Produces: `MulliganPerformer.MulliganPerformer = ObjectId -> PlayerId -> [Effect Card] -> Game ()`; `Resolve.performMulliganAction :: MulliganPerformer`; `Mulligan.actionsFor :: PlayerId -> GameState -> [(ObjectId, [Effect Card])]`; `Mulligan.openingHands :: MulliganPerformer -> [PlayerId] -> Game ()`; `Setup.newGame :: MulliganPerformer -> NonEmpty (PlayerId, Deck) -> Game ()`; `Setup.startGameFromCards :: MulliganPerformer -> Game ()`; `Setup.restartGame :: MulliganPerformer -> PlayerId -> Game ()`; `S.performer :: MulliganPerformer`.
 
-- [ ] **Step 1: Write the failing tests.** In `source/test-suite/Pawl/MulliganSpec.hs`, add these helpers after `bottomReversedAnswer`, and the two cases to the `tests` list. Exactly one new import is needed — `import qualified Data.Maybe as Maybe`; everything else these use (`State`, `Program`, `Prompt`, `ObjectId`, `Printing`, `Registry`, `Replay`, `Set`, `GameState`, `Game`, `Zone`, `PlayerId`) is already imported there.
+- [x] **Step 1: Write the failing tests.** In `source/test-suite/Pawl/MulliganSpec.hs`, add these helpers after `bottomReversedAnswer`, and the two cases to the `tests` list. Exactly one new import is needed — `import qualified Data.Maybe as Maybe`; everything else these use (`State`, `Program`, `Prompt`, `ObjectId`, `Printing`, `Registry`, `Replay`, `Set`, `GameState`, `Game`, `Zone`, `PlayerId`) is already imported there.
 
 ```haskell
 -- alice's library: a Serum Powder on top, then `n` Mountains; bob's is uniform
@@ -565,12 +565,12 @@ usePowder p = case p of
 
 The `libSize` arithmetic: alice's library is 21 (one Powder + 20 Mountains). The opening draw takes 7, leaving 14; the action exiles those 7 and draws 7 more, leaving 7.
 
-- [ ] **Step 2: Run the tests to verify they fail to COMPILE** (`Mulligan.openingHands` takes one argument today, and `S.performer` does not exist).
+- [x] **Step 2: Run the tests to verify they fail to COMPILE** (`Mulligan.openingHands` takes one argument today, and `S.performer` does not exist).
 
 Run: `cabal build pawl-test-suite --enable-tests 2>&1 | tail -20`
 Expected: compile error — `Couldn't match expected type` on `Mulligan.openingHands`, and `S.performer` not in scope.
 
-- [ ] **Step 3: Create the performer type.** Write `source/library/Pawl/Type/MulliganPerformer.hs`:
+- [x] **Step 3: Create the performer type.** Write `source/library/Pawl/Type/MulliganPerformer.hs`:
 
 ```haskell
 module Pawl.Type.MulliganPerformer where
@@ -599,7 +599,7 @@ import Pawl.Type.PlayerId (PlayerId)
 type MulliganPerformer = ObjectId -> PlayerId -> [Effect Card] -> Game ()
 ```
 
-- [ ] **Step 4: Implement the performer in `Pawl.Resolve`.** Add `import qualified Pawl.Type.MulliganPerformer as MulliganPerformer` to `source/library/Pawl/Resolve.hs`, then add this definition next to `applyEffect` (around line 910):
+- [x] **Step 4: Implement the performer in `Pawl.Resolve`.** Add `import qualified Pawl.Type.MulliganPerformer as MulliganPerformer` to `source/library/Pawl/Resolve.hs`, then add this definition next to `applyEffect` (around line 910):
 
 ```haskell
 -- CR 103.5b: perform the effects of a mulligan-window action. Pawl.Mulligan's
@@ -619,7 +619,7 @@ performMulliganAction source player =
   Monad.mapM_ (applyEffect source player Map.empty Map.empty Map.empty)
 ```
 
-- [ ] **Step 5: Add the window to `Pawl.Mulligan`.** In `source/library/Pawl/Mulligan.hs`, add the imports `import qualified Data.Maybe as Maybe`, `import qualified Pawl.Type.Card as Card`, `import Pawl.Type.Effect (Effect)`, `import Pawl.Type.MulliganPerformer (MulliganPerformer)`, `import Pawl.Type.ObjectId (ObjectId)`, then add these two definitions (put them just before `mulliganRounds`):
+- [x] **Step 5: Add the window to `Pawl.Mulligan`.** In `source/library/Pawl/Mulligan.hs`, add the imports `import qualified Data.Maybe as Maybe`, `import qualified Pawl.Type.Card as Card`, `import Pawl.Type.Effect (Effect)`, `import Pawl.Type.MulliganPerformer (MulliganPerformer)`, `import Pawl.Type.ObjectId (ObjectId)`, then add these two definitions (put them just before `mulliganRounds`):
 
 ```haskell
 -- CR 103.5b: the cards in this player's hand that grant an action they may take
@@ -671,7 +671,7 @@ mulliganWindow perform pid = do
             mulliganWindow perform pid
 ```
 
-- [ ] **Step 6: Thread the parameter through `Pawl.Mulligan`.** Change the two signatures and call the window. `openingHands`:
+- [x] **Step 6: Thread the parameter through `Pawl.Mulligan`.** Change the two signatures and call the window. `openingHands`:
 
 ```haskell
 openingHands :: MulliganPerformer -> [PlayerId] -> Game ()
@@ -709,7 +709,7 @@ mulliganRounds perform counts deciding = do
 
 Keep the existing comments on `mulliganRounds` and its `case`; only the marked lines change.
 
-- [ ] **Step 7: Thread the parameter through `Pawl.Setup` and `Pawl.Engine`.** In `source/library/Pawl/Setup.hs`, add `import Pawl.Type.MulliganPerformer (MulliganPerformer)` and change three definitions (bodies otherwise unchanged):
+- [x] **Step 7: Thread the parameter through `Pawl.Setup` and `Pawl.Engine`.** In `source/library/Pawl/Setup.hs`, add `import Pawl.Type.MulliganPerformer (MulliganPerformer)` and change three definitions (bodies otherwise unchanged):
 
 ```haskell
 newGame :: MulliganPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
@@ -744,7 +744,7 @@ In `source/library/Pawl/Engine.hs`, two call sites (around lines 858 and 870):
   Setup.newGame Resolve.performMulliganAction matchup
 ```
 
-- [ ] **Step 8: Add `S.performer` and fix every test call site.** In `source/test-suite/Pawl/Support.hs`, add `import qualified Pawl.Resolve as Resolve` and `import qualified Pawl.Type.MulliganPerformer as MulliganPerformer`, then:
+- [x] **Step 8: Add `S.performer` and fix every test call site.** In `source/test-suite/Pawl/Support.hs`, add `import qualified Pawl.Resolve as Resolve` and `import qualified Pawl.Type.MulliganPerformer as MulliganPerformer`, then:
 
 ```haskell
 -- The one CR 103.5b performer (Pawl.Resolve.performMulliganAction), so a test
@@ -758,12 +758,12 @@ Then pass `S.performer` at every call site of the four re-signatured functions:
 Run: `grep -rn "Setup.newGame\|Setup.startGameFromCards\|Setup.restartGame\|Mulligan.openingHands" source/test-suite`
 Expected: ~22 hits across `SetupSpec`, `GameSpec`, `CastSpec`, `MulliganSpec`. Each becomes `Setup.newGame S.performer matchup`, `Setup.startGameFromCards S.performer`, `Setup.restartGame S.performer S.alice`, `Mulligan.openingHands S.performer [S.alice, S.bob]` and so on. Comment-only mentions do not change.
 
-- [ ] **Step 9: Run the tests to verify they pass.**
+- [x] **Step 9: Run the tests to verify they pass.**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -20`
 Expected: warning-free build; both new cases pass and the whole existing suite still passes — the window is a no-op for every deck without a granting card.
 
-- [ ] **Step 10: Format, lint, and commit.**
+- [x] **Step 10: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

@@ -439,7 +439,7 @@ bobDiscardChoice registry = do
   matchup <- S.redRed registry
   let start = Setup.emptyGame S.bothPlayers
       steps = do
-        Setup.newGame matchup
+        Setup.newGame S.performer matchup
         State.modify' $ \gs -> gs {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
         S.drawStep
         beforeCleanup <- State.gets (Game.zoneMembers Zone.Hand S.bob)

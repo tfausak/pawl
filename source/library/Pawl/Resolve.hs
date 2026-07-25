@@ -45,6 +45,7 @@ import qualified Pawl.Type.Keyword as Keyword
 import Pawl.Type.ManaType (ManaType)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
+import qualified Pawl.Type.MulliganPerformer as MulliganPerformer
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
@@ -584,7 +585,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- Pawl.Type.RestartSignal.
   -- Not implemented: the CR 727.5/727.5a exemption + put-onto-battlefield rider
   -- of full Karn Liberated (#135), which retires the synthetic-restart gate.
-  Effect.RestartGame -> Setup.restartGame controller
+  Effect.RestartGame -> Setup.restartGame performMulliganAction controller
   -- CR 729.1/729.5: run the nested game to completion (the runner does the
   -- construction, play, funnel-back, and reshuffle); then bind its outcome.
   -- CR 729.1b: the loser is the 2-player derivation from the Result; a Drawn
@@ -927,6 +928,22 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
 -- PlaySubgame resolves as a draw here (see noSubgame).
 applyEffect :: ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffect = applyEffectWith noSubgame
+
+-- CR 103.5b: perform the effects of a mulligan-window action. Pawl.Mulligan's
+-- window loop reaches this through the MulliganPerformer parameter it is handed
+-- (see Pawl.Type.MulliganPerformer for why it is a parameter).
+--
+-- The action does not use the stack -- CR 103.5b says the player PERFORMS it,
+-- not that they cast or activate anything -- so there is nothing to put on the
+-- stack, no targets to choose and no modes to bind: the empty binding, legality
+-- and chosen maps are the whole context. The CHOICE of whether to act was
+-- already routed through Decide.deciderFor at the prompt (CR 723).
+--
+-- Stands on the noSubgame floor (applyEffect), exactly as the RestartGame arm
+-- does: no mulligan-window action starts a subgame.
+performMulliganAction :: MulliganPerformer.MulliganPerformer
+performMulliganAction source player =
+  Monad.mapM_ (applyEffect source player Map.empty Map.empty Map.empty)
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.
