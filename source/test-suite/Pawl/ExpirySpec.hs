@@ -7,6 +7,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Condition as Condition
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
@@ -22,6 +23,7 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.EndingStep as EndingStep
@@ -125,7 +127,26 @@ handoffTests =
         let gs0 = S.threePlayerGame
             armed = effectWith Expiry.Type.Never (effectWith Expiry.Type.AtCleanup (effectWith (Expiry.Type.AtTurnOf S.bob) gs0))
             after = Expiry.dropAtTurnOf S.bob armed
-         in HU.assertEqual "Never and AtCleanup both survive" 2 (length (GameState.continuousEffects after))
+         in HU.assertEqual "Never and AtCleanup both survive" 2 (length (GameState.continuousEffects after)),
+      HU.testCase "CR 800.4k/800.4m a departed seat is skipped, and its durations end there anyway" $
+        -- alice, bob, carol. Bob departs, then alice's turn ends. CR 800.4k: bob's
+        -- turn doesn't begin, so carol becomes active. CR 800.4m: bob's "until
+        -- your next turn" effect ends AT BOB'S SEAT -- not immediately when he
+        -- left, and not never.
+        let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+            armed = effectWith (Expiry.Type.AtTurnOf S.bob) gone
+            after = S.runPure S.identityAnswer armed Engine.handoffTurn
+         in do
+              HU.assertEqual "it survived bob's departure itself" 1 (length (GameState.continuousEffects armed))
+              HU.assertEqual "carol takes the turn, not bob" S.carol (GameState.activePlayer after)
+              HU.assertEqual "bob's effect ended at bob's seat" [] (GameState.continuousEffects after),
+      HU.testCase "CR 800.4m the walk sweeps only the seats it passes" $
+        -- Same board. The walk goes bob's seat -> carol's seat and STOPS. Alice's
+        -- own AtTurnOf effect must survive: her seat was not passed.
+        let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+            armed = effectWith (Expiry.Type.AtTurnOf S.alice) (effectWith (Expiry.Type.AtTurnOf S.bob) gone)
+            after = S.runPure S.identityAnswer armed Engine.handoffTurn
+         in HU.assertEqual "alice's survives, bob's does not" [Expiry.Type.AtTurnOf S.alice] (fmap ContinuousEffect.expiry (GameState.continuousEffects after))
     ]
 
 cleanupTests :: Registry.Type.Registry -> Tasty.TestTree

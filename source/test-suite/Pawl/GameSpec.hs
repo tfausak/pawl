@@ -18,6 +18,7 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -34,7 +35,7 @@ import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Decider as Decider
-import qualified Pawl.Type.Departure as Departure
+import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Game as Game.Type
@@ -387,7 +388,7 @@ ruleTests registry =
         gs <- deckedOut registry
         HU.assertEqual
           "alice departed"
-          (Just (Status.Departed Departure.Lost))
+          (Just (Status.Departed Departure.Type.Lost))
           (fmap Player.status (Map.lookup S.alice (GameState.players gs))),
       HU.testCase "CR 704.5b the survivor wins" $ do
         gs <- deckedOut registry
@@ -734,7 +735,7 @@ concedeTests registry =
       HU.testCase "the conceding player departs as Conceded, not Lost" $
         let gs = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
             after = S.runPure (concedeAnswer S.alice) gs Engine.runStep
-         in HU.assertEqual "reason recorded" (Just (Status.Departed Departure.Conceded)) (fmap Player.status (Map.lookup S.alice (GameState.players after))),
+         in HU.assertEqual "reason recorded" (Just (Status.Departed Departure.Type.Conceded)) (fmap Player.status (Map.lookup S.alice (GameState.players after))),
       HU.testCase "CR 723.6 a controlled player concedes themselves; their controller cannot do it for them" $ do
         -- alice controls bob (Mindslaver). Every ChooseAction for bob is answered
         -- by alice. The concede ask is NOT: it reaches bob, and bob takes it.
@@ -781,7 +782,7 @@ concedeTests registry =
             ((_, after), (deciders, concedeAsks)) = State.runState (Engine.runGame answer gs Engine.runStep) ([], [])
         HU.assertEqual "bob's ChooseAction carried alice as decider (bob genuinely is controlled)" [Decider.MkDecider S.alice] deciders
         HU.assertEqual "every Concede ask reached bob himself, not his controller" [S.bob, S.bob] concedeAsks
-        HU.assertEqual "bob left by his own concession" (Just (Status.Departed Departure.Conceded)) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
+        HU.assertEqual "bob left by his own concession" (Just (Status.Departed Departure.Type.Conceded)) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
         HU.assertEqual "alice wins" (Just (Result.Won S.alice)) (GameState.result after),
       HU.testCase "CR 104.3a concede does not use the stack: a spell on it never resolves" $ do
         -- A Lightning Bolt is on the stack targeting nothing in particular. alice
@@ -798,11 +799,58 @@ concedeTests registry =
         HU.assertEqual "the spell never left the stack" [spellId] (GameState.stack after)
     ]
 
+-- M5.6a / CR 800.4: the turn order and priority control flow around a departure
+-- that does NOT end the game. Every case here needs three seats: at two players
+-- a departure ends the game before the next thing happens, which is exactly why
+-- these defects survived five milestones.
+turnOrderTests :: Tasty.TestTree
+turnOrderTests =
+  Tasty.testGroup
+    "TurnOrder (CR 800.4)"
+    [ HU.testCase "CR 800.4k a departed player's turn does not begin" $
+        let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+            after = S.runPure S.identityAnswer gone Engine.handoffTurn
+         in do
+              HU.assertEqual "carol is active, bob is skipped" S.carol (GameState.activePlayer after)
+              HU.assertEqual "exactly one turn began" 2 (GameState.turnNumber after)
+              HU.assertEqual "the seating roster is untouched" [S.alice, S.bob, S.carol] (GameState.turnOrder after),
+      HU.testCase "CR 800.4k the walk is a loop: two consecutive departed seats are both skipped" $
+        -- Proves the walk keeps walking rather than skipping exactly one seat.
+        -- With bob and carol both gone, alice takes consecutive turns.
+        let gone =
+              Departure.depart
+                Departure.Type.Conceded
+                S.carol
+                (Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame)
+            after = S.runPure S.identityAnswer gone Engine.handoffTurn
+         in do
+              HU.assertEqual "alice takes the next turn too" S.alice (GameState.activePlayer after)
+              HU.assertEqual "and it is a new turn" 2 (GameState.turnNumber after),
+      HU.testCase "the seat walk terminates when every seat has departed" $
+        -- Totality, pinned. A game with no survivors already has a Result, so
+        -- this is unreachable while the game is running -- but the walk is
+        -- bounded by the seat count and falls back rather than looping or
+        -- reaching for a partial head.
+        let gone =
+              Departure.depart
+                Departure.Type.Conceded
+                S.carol
+                ( Departure.depart
+                    Departure.Type.Conceded
+                    S.bob
+                    (Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame)
+                )
+            after = S.runPure S.identityAnswer gone Engine.handoffTurn
+         in do
+              HU.assertEqual "the active player is unchanged" S.alice (GameState.activePlayer after)
+              HU.assertEqual "no turn began" 1 (GameState.turnNumber after)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Game"
-    [gameTests registry, actionTests registry, objectFactTests registry, engineTests registry, ruleTests registry, restartReentryTests registry, concedeTests registry]
+    [gameTests registry, actionTests registry, objectFactTests registry, engineTests registry, ruleTests registry, restartReentryTests registry, concedeTests registry, turnOrderTests]
 
 -- One Lightning Bolt in bob's hand.
 handBobBolt :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)

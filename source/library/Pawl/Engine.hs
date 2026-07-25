@@ -477,36 +477,65 @@ priorityLoop = do
   settleForPriority
   loop
 
+-- CR 800.4k / CR 800.4m: hand the turn to the next SEAT in the seating order
+-- (GameState.turnOrder, which is never shortened -- see Pawl.Type.GameState)
+-- whose player is still in the game.
+--
+-- CR 800.4k: "If a player who has left the game would begin a turn, that turn
+-- doesn't begin." So a departed seat is walked past, not made active.
+--
+-- CR 800.4m: "any continuous effects with durations that last until that
+-- player's next turn ... will last until that turn WOULD have begun." So
+-- Expiry.dropAtTurnOf fires at EVERY seat the walk passes, including the ones
+-- whose turn never begins. For the seat that does begin a turn, the same call is
+-- CR 611.2a.
 handoffTurn :: Game ()
 handoffTurn = State.modify' $ \gs ->
-  let newActive = nextInOrder (GameState.turnOrder gs) (GameState.activePlayer gs)
-   in -- CR 611.2a: drop every "until your next turn" effect belonging to the
-      -- player whose turn just began. The transition IS the event, known
-      -- exactly here; see Pawl.Expiry.
-      Expiry.dropAtTurnOf newActive $
-        gs
-          { GameState.activePlayer = newActive,
-            GameState.turnNumber = GameState.turnNumber gs + 1,
-            -- CR 608.2i is why a log exists at all -- "some effects look back in
-            -- time and require information about previous game states and
-            -- actions." It does not itself say how far back; the ONE-turn scope is
-            -- this engine's choice, made because every history-reading card in the
-            -- pool asks "this turn" (Khabál Ghoul: "creatures that died this
-            -- turn"). Cleared here, with both watermarks, and never at cleanup --
-            -- cleanup is still part of this turn and CR 514.1's discard is itself
-            -- an event of it. Engine.advance settles immediately before calling
-            -- this, so nothing unscanned is discarded.
-            GameState.events = Seq.empty,
-            GameState.scannedThrough = 0,
-            GameState.damageScannedThrough = 0,
-            GameState.phase = Turn.firstPhase,
-            GameState.remaining = Turn.laterPhases,
-            -- CR 723.1/723.1b: the new active player's pending control (if any)
-            -- becomes this turn's active control; overwriting activeControl every
-            -- turn is what ends a prior control at the next turn's start (CR 723.1).
-            GameState.activeControl = Map.lookup newActive (GameState.pendingControl gs),
-            GameState.pendingControl = Map.delete newActive (GameState.pendingControl gs)
-          }
+  walkToNextTurn (length (GameState.turnOrder gs)) (GameState.activePlayer gs) gs
+
+-- One seat at a time, bounded by the number of seats, so it terminates even when
+-- every seat has departed. The fallback returns the state as-is, keeping this
+-- total with no partial head -- written as an explicit bounded recursion rather
+-- than `cycle`/`head` for exactly that reason. Unreachable while the game is
+-- running: a game with no survivors already has a Result (CR 104.2a / 104.4a).
+walkToNextTurn :: Int -> PlayerId -> GameState -> GameState
+walkToNextTurn seatsLeft seat gs =
+  if seatsLeft <= 0
+    then gs
+    else
+      let next = nextInOrder (GameState.turnOrder gs) seat
+          swept = Expiry.dropAtTurnOf next gs
+       in if List.elem next (Departure.stillPlaying swept)
+            then beginTurnOf next swept
+            else walkToNextTurn (seatsLeft - 1) next swept
+
+-- The turn actually begins for `pid`. Split out of handoffTurn so the CR 800.4k
+-- seat walk has exactly one place to land.
+beginTurnOf :: PlayerId -> GameState -> GameState
+beginTurnOf pid gs =
+  gs
+    { GameState.activePlayer = pid,
+      GameState.turnNumber = GameState.turnNumber gs + 1,
+      -- CR 608.2i is why a log exists at all -- "some effects look back in
+      -- time and require information about previous game states and
+      -- actions." It does not itself say how far back; the ONE-turn scope is
+      -- this engine's choice, made because every history-reading card in the
+      -- pool asks "this turn" (Khabál Ghoul: "creatures that died this
+      -- turn"). Cleared here, with both watermarks, and never at cleanup --
+      -- cleanup is still part of this turn and CR 514.1's discard is itself
+      -- an event of it. Engine.advance settles immediately before calling
+      -- this, so nothing unscanned is discarded.
+      GameState.events = Seq.empty,
+      GameState.scannedThrough = 0,
+      GameState.damageScannedThrough = 0,
+      GameState.phase = Turn.firstPhase,
+      GameState.remaining = Turn.laterPhases,
+      -- CR 723.1/723.1b: the new active player's pending control (if any)
+      -- becomes this turn's active control; overwriting activeControl every
+      -- turn is what ends a prior control at the next turn's start (CR 723.1).
+      GameState.activeControl = Map.lookup pid (GameState.pendingControl gs),
+      GameState.pendingControl = Map.delete pid (GameState.pendingControl gs)
+    }
 
 -- Consume the schedule: the next step becomes current. An empty schedule means
 -- the turn is over, so hand off. Replaces the old `Turn.next` walk -- the turn is
