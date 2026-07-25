@@ -36,10 +36,15 @@ emptyCombat =
   Combat.MkCombat
     { Combat.attackers = Map.empty,
       Combat.blockers = Map.empty,
-      Combat.struckFirst = Nothing
+      Combat.struckFirst = Nothing,
+      Combat.defender = Nothing
     }
 
--- CR 511.3: creatures stop being attacking and blocking at end of combat.
+-- CR 511.3: as soon as the end of combat step ends, all creatures, battles and
+-- planeswalkers are removed from combat -- which by CR 506.4 is what stops them
+-- being attacking and blocking creatures. Resetting `defender` alongside them is
+-- CR 506.2, not CR 511.3: the designation is scoped to the combat phase, so it
+-- cannot survive the phase ending.
 clearCombat :: GameState -> GameState
 clearCombat gs = gs {GameState.combat = emptyCombat}
 
@@ -60,6 +65,26 @@ skipEmptyCombat gs =
 -- planeswalkers/battles, at which point AttackTarget becomes a real decision.
 defendingPlayers :: GameState -> [PlayerId]
 defendingPlayers gs = filter (/= GameState.activePlayer gs) (Departure.stillPlaying gs)
+
+-- CR 506.2a: the candidates the attacking player chooses from. Read only by
+-- chooseDefender; the CHOSEN one lives in Combat.defender.
+--
+-- CR 506.2a says the attacking player chooses one of their opponents, and three
+-- rules get from "opponents" to this list. CR 102.1: a player is one of the
+-- people IN THE GAME, so someone who has left is not a player and cannot be an
+-- opponent. CR 806.1: in a free-for-all the players compete as individuals, so
+-- every other player is an opponent. CR 102.3 is the one reading this is wrong
+-- for -- a teammate is not an opponent -- and pawl has no teams to express
+-- (#175). Same argument Count.playersFor and Filter.matches carry for the
+-- Opponent axis, phrased the same way on purpose.
+--
+-- SEATING order (Departure.stillPlayingInOrder), not player-id order: the seating
+-- roster is the game's own ordering for anything player-shaped (CR 800.5), and
+-- Departure.stillPlaying's order is an artifact of reading the players map. It
+-- makes the first candidate the next seat rather than the lowest id, which is
+-- what an interpreter that takes the head should get.
+attackableOpponents :: GameState -> [PlayerId]
+attackableOpponents gs = filter (/= GameState.activePlayer gs) (Departure.stillPlayingInOrder gs)
 
 isCreatureObject :: ObjectId -> GameState -> Bool
 isCreatureObject = Projection.isCreatureOf

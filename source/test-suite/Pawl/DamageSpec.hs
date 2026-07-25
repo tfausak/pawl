@@ -661,7 +661,8 @@ departedAttackerTests registry =
                     Combat.Type.MkCombat
                       { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.bob),
                         Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker),
-                        Combat.Type.struckFirst = Nothing
+                        Combat.Type.struckFirst = Nothing,
+                        Combat.Type.defender = Just S.bob
                       }
                 }
             gone = Departure.depart Departure.Type.Conceded S.alice fighting
@@ -722,7 +723,8 @@ departedDefenderTests registry =
                     Combat.Type.MkCombat
                       { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.bob),
                         Combat.Type.blockers = Map.empty,
-                        Combat.Type.struckFirst = Nothing
+                        Combat.Type.struckFirst = Nothing,
+                        Combat.Type.defender = Just S.bob
                       }
                 }
             gone = Departure.depart Departure.Type.Conceded S.bob attacking
@@ -759,7 +761,8 @@ departedDefenderTests registry =
                     Combat.Type.MkCombat
                       { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.carol),
                         Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker),
-                        Combat.Type.struckFirst = Nothing
+                        Combat.Type.struckFirst = Nothing,
+                        Combat.Type.defender = Just S.carol
                       }
                 }
             gone = Departure.depart Departure.Type.Conceded S.carol attacking

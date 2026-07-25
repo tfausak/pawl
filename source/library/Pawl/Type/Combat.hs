@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Pawl.Type.AttackTarget (AttackTarget)
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.PlayerId (PlayerId)
 
 -- The current combat (CR 508/509). Cleared at end of combat (CR 511).
 --
@@ -36,6 +37,24 @@ data Combat = MkCombat
     -- Damage.dealCombatDamage reads this snapshot for CR 510.4's "had neither ...
     -- as the first step began" and reads DOUBLE strike live, which is what CR
     -- 510.4 says verbatim.
-    struckFirst :: Maybe (Set ObjectId)
+    struckFirst :: Maybe (Set ObjectId),
+    -- CR 506.2/506.2a: the one player being attacked this combat phase. Chosen as
+    -- a turn-based action immediately after the beginning of combat step begins
+    -- (CR 703.4h, CR 507.1) by Pawl.Combat.chooseDefender.
+    --
+    -- Nothing before that action has run, and again after Pawl.Combat.clearCombat.
+    -- The designation is scoped to the combat phase -- CR 506.2's sentences all
+    -- begin "During the combat phase" -- and CR 703.4h makes the choice per
+    -- beginning-of-combat step, so a turn with a second combat phase (CR 506.7c)
+    -- chooses again rather than inheriting. Nothing also means NO ATTACK IS
+    -- POSSIBLE, which is the right answer and not a fallback: a turn whose active
+    -- player has left the game (CR 800.4j) never performs the action.
+    --
+    -- Maybe PlayerId, not a set. CR 802 (attack multiple players) is the option
+    -- that makes several players defenders at once, and CR 802.4 then has each of
+    -- them declare blockers in APNAP order; neither is available here, because
+    -- pawl has no options concept to read one from (#175). This field becomes a
+    -- set when that arrives.
+    defender :: Maybe PlayerId
   }
   deriving (Eq, Ord, Show)

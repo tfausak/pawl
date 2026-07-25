@@ -5,11 +5,13 @@
 -- keywords (flying, reach, defender, vigilance, haste, first/double strike).
 module Pawl.CombatSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Combat as Combat
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
@@ -22,6 +24,7 @@ import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.Expiry as Expiry
@@ -242,6 +245,50 @@ defenderTests registry =
         case mine of
           [_, p] -> HU.assertEqual "only the piker" [p] (Combat.legalAttackers S.alice gs)
           _ -> HU.assertFailure "fixture should have two creatures"
+    ]
+
+-- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
+-- defenderTests, which is the Defender KEYWORD (CR 702.3b).
+defendingPlayerTests :: Tasty.TestTree
+defendingPlayerTests =
+  Tasty.testGroup
+    "DefendingPlayer"
+    [ HU.testCase "CR 506.2a the candidates are every other player still in the game" $
+        -- Three seats, because two cannot tell "the chosen opponent" from "the
+        -- only opponent". Discriminating: an implementation that forgot to drop
+        -- the active player would answer [alice, bob, carol].
+        HU.assertEqual "bob and carol" [S.bob, S.carol] (Combat.attackableOpponents S.threePlayerGame),
+      HU.testCase "CR 102.1 a player who has left the game is not a candidate" $
+        -- CR 102.1: "A player is one of the people in the game." Four seats so
+        -- that TWO candidates survive one departure -- with three seats the
+        -- surviving list is a singleton and cannot distinguish "filtered" from
+        -- "truncated to one".
+        let gone = Departure.depart Departure.Type.Conceded S.bob S.fourPlayerGame
+         in do
+              HU.assertEqual "bob is dropped, carol and dave remain" [S.carol, S.dave] (Combat.attackableOpponents gone)
+              HU.assertEqual "and before he left there were three" [S.bob, S.carol, S.dave] (Combat.attackableOpponents S.fourPlayerGame),
+      HU.testCase "CR 506.2a the candidates come back in SEATING order, not player-id order" $
+        -- The discriminator between Departure.stillPlayingInOrder and
+        -- Departure.stillPlaying: seated carol-alice-bob with alice attacking,
+        -- seating order gives [carol, bob] and the players map gives [bob, carol].
+        -- Every other fixture in the suite is seated ascending, so this is the
+        -- only place the two readings disagree.
+        let rotated = (Setup.emptyGame (S.carol NonEmpty.:| [S.alice, S.bob])) {GameState.activePlayer = S.alice}
+         in HU.assertEqual "carol's seat comes first" [S.carol, S.bob] (Combat.attackableOpponents rotated),
+      HU.testCase "CR 703.4h no defending player has been chosen before the beginning of combat step" $
+        -- Discriminating: a field defaulted to Just <somebody> would let a board
+        -- that has never run the turn-based action declare attackers.
+        HU.assertEqual "empty combat names nobody" Nothing (Combat.Type.defender (GameState.combat S.threePlayerGame)),
+      HU.testCase "CR 506.2 the designation does not outlive the combat phase" $
+        -- CR 506.2's sentences are all scoped "During the combat phase", and
+        -- CR 703.4h makes the choice per beginning-of-combat step, so a second
+        -- combat phase in one turn chooses again. Discriminating: a clearCombat
+        -- that reset only attackers and blockers would leave Just carol here, and
+        -- the next combat phase would inherit a stale defender.
+        let busy = S.threePlayerGame {GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defender = Just S.carol}}
+         in do
+              HU.assertEqual "set" (Just S.carol) (Combat.Type.defender (GameState.combat busy))
+              HU.assertEqual "and cleared at end of combat" Nothing (Combat.Type.defender (GameState.combat (Combat.clearCombat busy)))
     ]
 
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
@@ -604,7 +651,8 @@ combatLegalityTests registry =
                       Combat.Type.MkCombat
                         { Combat.Type.attackers = Map.singleton oid (AttackTarget.OfPlayer S.bob),
                           Combat.Type.blockers = Map.empty,
-                          Combat.Type.struckFirst = Nothing
+                          Combat.Type.struckFirst = Nothing,
+                          Combat.Type.defender = Just S.bob
                         }
                   }
         HU.assertEqual "starts empty" Map.empty (Combat.Type.attackers (GameState.combat gs))
@@ -768,6 +816,7 @@ tests registry =
       firstStrikeTests registry,
       m2bExitTests registry,
       defenderTests registry,
+      defendingPlayerTests,
       vigilanceTests registry,
       hasteTests registry,
       evasionTests registry,
