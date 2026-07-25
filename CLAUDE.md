@@ -61,16 +61,22 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   already in the pool — no card data changed. Deliberately out of scope: CR
   801's limited range of influence (always unlimited here), CR 802–805's
   options, CR 806–811's other variants, and teams, all of which need a
-  format/variant concept pawl does not have (#175). **After M5.6, the CR 103.5b
-  gap closure (#182) landed:** a mulligan-declaration window that lets a card in
-  hand act "any time you could mulligan", gated on **Serum Powder**, adding
-  `Effect.ExileHandThenDraw`, `Card.mulliganAction`, `Prompt.MulliganAction`,
-  and `Pawl.Type.MulliganPerformer` — the parameter that breaks the
-  `Resolve → Setup → Mulligan` cycle, since a game start now performs opcodes.
-  Its spec and plan are
-  `docs/superpowers/specs/2026-07-25-cr-103-5b-mulligan-actions-design.md` and
-  `docs/superpowers/plans/2026-07-25-cr-103-5b-mulligan-actions.md`.
-  **M6 (the transpiler) is next** (#9). M5.6's umbrella spec is
+  format/variant concept pawl does not have (#175). **After M5.6, three
+  mulligan-adjacent gap closures landed** — all of `docs/superpowers/specs/` and
+  `plans/` dated 2026-07-25. **CR 103.5b (#182)**, a mulligan-declaration window
+  letting a card in hand act "any time you could mulligan", gated on **Serum
+  Powder**: adds `Effect.ExileHandThenDraw`, `Card.mulliganAction`,
+  `Prompt.MulliganAction`, and `Pawl.Type.HandActionPerformer` — the parameter
+  that breaks the `Resolve → Setup → Mulligan` cycle, since a game start now
+  performs opcodes. **#176**, which made `Prompt.DeclareMulligan` carry a
+  `MulliganOffer` (mulligans taken *and* what the next one costs, which CR
+  103.5c's free mulligan makes different numbers). **CR 103.6a (#149)**, the
+  opening-hand window that opens once the whole mulligan process completes,
+  gated on **Leyline of the Void**: adds `Card.openingHandAction`,
+  `Prompt.OpeningHandAction`, and `ControllerRelation.Opponents`, needs **no new
+  opcode** (`MoveToZone` on the reserved `self` slot is how this codebase says
+  "this permanent"), and splits the zone-change subject test owner-based per CR
+  400.3. **M6 (the transpiler) is next** (#9). M5.6's umbrella spec is
   `docs/superpowers/specs/2026-07-24-m5.6-multiplayer-design.md`; its five
   phase plans are `docs/superpowers/plans/2026-07-24-m5.6a-turn-order-priority.md`,
   `docs/superpowers/plans/2026-07-25-m5.6b-setup-mulligans-restart-subgames.md`,

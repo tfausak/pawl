@@ -128,7 +128,7 @@ Expected: 13 hits. Pure answerers get `Prompt.OpeningHandAction {} -> Nothing`; 
 
 `MulliganSpec`'s local answerers end in `_ -> S.identityAnswer p` and need no arm.
 
-- [ ] **Step 7: Build and test.**
+- [x] **Step 7: Build and test.**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -5`
 Expected: warning-free; the suite passes including the new round-trip.
@@ -840,7 +840,7 @@ The CR 103.5b call site in `mulliganRounds` becomes:
 
 `Pawl.Mulligan` needs `import qualified Pawl.Type.Decider as Decider`. Keep `mulliganWindow`'s existing doc comment on the CR 103.5b call site as a short note; the general argument now lives on `handWindow`.
 
-- [ ] **Step 4: Add the CR 103.6 phase.**
+- [x] **Step 4: Add the CR 103.6 phase.**
 
 ```haskell
 -- CR 103.6: "Once the mulligan process (see rule 103.5) is complete, the
@@ -864,7 +864,7 @@ and the third phase in `openingHands`:
   openingHandActions perform owners
 ```
 
-- [ ] **Step 5: Add the loop-distinguishing case.** Now that the loop exists, prove it is a loop. Add this fixture and case:
+- [x] **Step 5: Add the loop-distinguishing case.** Now that the loop exists, prove it is a loop. Add this fixture and case:
 
 ```haskell
 -- alice opens with TWO Leylines on top of her library, so CR 103.6's "any such
@@ -886,14 +886,14 @@ twoLeylineGame leyline mountain n =
         HU.assertEqual "and the hand is two smaller" 5 (S.handSize S.alice after),
 ```
 
-- [ ] **Step 6: Build and test.**
+- [x] **Step 6: Build and test.**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -5`
 Expected: warning-free; all seven new cases pass and the whole existing suite still does.
 
-- [ ] **Step 7: Verify the tests have teeth.** They passed only after the implementation, but confirm the ordering case is real: temporarily move `openingHandActions` ABOVE `mulliganRounds` in `openingHands` and check the "window opens only once the mulligan process is complete" case fails. Restore afterwards.
+- [x] **Step 7: Verify the tests have teeth.** They passed only after the implementation, but confirm the ordering case is real: temporarily move `openingHandActions` ABOVE `mulliganRounds` in `openingHands` and check the "window opens only once the mulligan process is complete" case fails. Restore afterwards.
 
-- [ ] **Step 8: Format, lint, and commit.**
+- [x] **Step 8: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -907,7 +907,7 @@ git commit -m "feat(mulligan): open the CR 103.6 opening-hand window after the m
 **Files:**
 - Modify: `source/library/Pawl/Type/Card.hs` (the `(#N)` placeholder), `docs/progress.md`, `CLAUDE.md`
 
-- [ ] **Step 1: File the two deferral issues.**
+- [x] **Step 1: File the two deferral issues.**
 
 ```bash
 gh issue create --title "CR 103.6b: revealing a card from the opening hand (the Chancellor cycle)" \
@@ -919,22 +919,22 @@ gh issue create --title "Gemstone Caverns (CR 103.6a with a rider)" \
   --body "A second CR 103.6a card, deferred with the rule's window built (#149). \"If Gemstone Caverns is in your opening hand and you're not the starting player, you may begin the game with Gemstone Caverns on the battlefield with a luck counter on it. If you do, exile a card from your hand.\" Needs a luck CounterKind (CR 122.1b-i are all future), an exile-from-hand choice, and a CONDITION on the action itself (\"you're not the starting player\") -- Card.openingHandAction is an unconditional effect list today. Spec: docs/superpowers/specs/2026-07-25-cr-103-6-opening-hand-actions-design.md section 2."
 ```
 
-- [ ] **Step 2: Replace the `(#N)` placeholder** in `Card.openingHandAction`'s comment with #183's number (the same one-action-per-card caveat `mulliganAction` cites), and comment on #184 so it covers the new field and the reserved-slot trap:
+- [x] **Step 2: Replace the `(#N)` placeholder** in `Card.openingHandAction`'s comment with #183's number (the same one-action-per-card caveat `mulliganAction` cites), and comment on #184 so it covers the new field and the reserved-slot trap:
 
 ```bash
 gh issue comment 184 --body "This now applies to \`Card.openingHandAction\` too (#149), and that field makes the trap concrete: Leyline of the Void's action is \`MoveToZone Binding.triggerSource Zone.Battlefield\`, and \`Resolve.slotsOf\` DOES return the reserved \`self\` slot for it. So an equality-style D4 lint widened to these fields must subtract the reserved slot names (self, variableX, chosenModes, copySource, you) from the read-slots side before comparing, exactly as Pawl.Binding's comment warns -- otherwise it demands a targetSpecs entry the reserved-slot rule forbids, and becomes unsatisfiable."
 ```
 
-- [ ] **Step 3: Verify the whole build and suite from clean.**
+- [x] **Step 3: Verify the whole build and suite from clean.**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -5`
 Expected: warning-free; the whole suite passes.
 
-- [ ] **Step 4: Add the `docs/progress.md` entry**, after the #176 entry, matching the surrounding style: what it establishes (the CR 103.6 window and its position after the whole 103.5 process), the two design findings (no new opcode — `MoveToZone` plus the reserved self slot, per `Effect.Sacrifice`'s own comment; and the owner-based zone-change subject test per CR 400.3, which also corrects `Yours` for that event class), the gate card, what was added, the rename of `MulliganPerformer` → `HandActionPerformer` and why, the deferrals with their issue numbers, and the spec/plan paths.
+- [x] **Step 4: Add the `docs/progress.md` entry**, after the #176 entry, matching the surrounding style: what it establishes (the CR 103.6 window and its position after the whole 103.5 process), the two design findings (no new opcode — `MoveToZone` plus the reserved self slot, per `Effect.Sacrifice`'s own comment; and the owner-based zone-change subject test per CR 400.3, which also corrects `Yours` for that event class), the gate card, what was added, the rename of `MulliganPerformer` → `HandActionPerformer` and why, the deferrals with their issue numbers, and the spec/plan paths.
 
-- [ ] **Step 5: Update the `CLAUDE.md` status bullet** — **replace**, never append. Fold CR 103.6a in beside the CR 103.5b sentence; leave the M5.6 summary and the "M6 is next" pointer intact.
+- [x] **Step 5: Update the `CLAUDE.md` status bullet** — **replace**, never append. Fold CR 103.6a in beside the CR 103.5b sentence; leave the M5.6 summary and the "M6 is next" pointer intact.
 
-- [ ] **Step 6: Verify the plan is complete and close the issue.**
+- [x] **Step 6: Verify the plan is complete and close the issue.**
 
 ```bash
 grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-25-cr-103-6-opening-hand-actions.md
@@ -945,7 +945,7 @@ Expected: `0`.
 gh issue close 149 --comment "CR 103.6a is implemented: the opening-hand window opens once the mulligan process completes, in turn order from the starting player, re-offering until each player declines. Leyline of the Void is in data/cards. CR 103.6b (reveal) and Gemstone Caverns are filed as #N and #N; CR 103.6c belongs to #175."
 ```
 
-- [ ] **Step 7: Format, lint, and commit.**
+- [x] **Step 7: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

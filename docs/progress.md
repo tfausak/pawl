@@ -2328,3 +2328,44 @@ its own gate card and spec, landed as it completes. Umbrella:
   `source/benchmark/Main.hs` did not change at all; only eight binding sites
   did. Suite 1124 → 1125, the new case pinning that three seats and two seats
   agree on `taken` at every step and disagree on the cost at every step.
+
+- **CR 103.6a (opening-hand actions) is implemented** (issue-driven gap closure
+  #149, the third and last of the mulligan-adjacent issues, done directly after
+  CR 103.5b). **Gate: Leyline of the Void.** **What it establishes:** a second
+  hand-action window, opening once the *whole* CR 103.5 process is complete and
+  running in turn order from the starting player, re-offering to each player
+  until they decline — CR 103.6's "any such actions in any order". Its position
+  is the rule's own wording and is pinned by a test that watches both
+  declarations precede the first opening-hand prompt. **Two findings did most of
+  the design work.** First, **no new opcode**: `Effect.Sacrifice`'s own comment
+  already argues against self-variant opcodes because "this permanent" is
+  expressible by binding the source into the reserved `Binding.triggerSource`
+  slot, so Leyline's action is pure card data — `MoveToZone self Battlefield` —
+  and the ISA did not change. The performer now binds that slot, which gives CR
+  103.5b the same expressiveness for free. Second, **`ControllerRelation` was
+  answering the wrong question for zone changes**: Leyline's "an opponent's
+  graveyard" is about which graveyard the card lands in, and CR 400.3 / 404.1
+  make that its **owner's**, not its controller's — a creature you own that an
+  opponent stole with Act of Treason still dies to your graveyard. The
+  zone-change subject test therefore split out of `matchesController` into an
+  owner-based `matchesZoneOwner`, which also makes `Yours` correct for that event
+  class. No behavior changed in the pool (Rest in Peace uses `Anyones`, true
+  either way), and the case a controller test gets wrong is pinned. **Added:**
+  `ControllerRelation.Opponents`; `Card.openingHandAction :: [Effect Card]`, the
+  sibling of `mulliganAction` with the same omit-when-empty codec treatment;
+  `Prompt.OpeningHandAction` + `Response.TookOpeningHandAction` + their `Replay`
+  arms; `Mulligan.handWindow` (the CR 103.5b loop generalized over the card field
+  it reads and the prompt channel it offers) and `Mulligan.openingHandActions`;
+  `data/cards/leyline-of-the-void.json`. **Renamed:**
+  `Pawl.Type.MulliganPerformer` → `HandActionPerformer` and
+  `Resolve.performMulliganAction` → `performHandAction`, since CR 103.6's window
+  is explicitly not a mulligan and the type was one day old with every site
+  compiler-enforced. Suite 1125 → 1140. **Deferred:** CR 103.6b's reveal, which
+  needs a per-object revealed flag and once-only tracking (#185, card-driven);
+  Gemstone Caverns, which needs a luck `CounterKind`, an exile-from-hand choice,
+  and a *condition* on the action (#186, card-driven); CR 103.6c's shared team
+  turns, which belongs to #175. #184 gained a note: the lint gap now covers this
+  field too, and `MoveToZone self` makes its reserved-slot trap concrete. Spec
+  and plan:
+  `docs/superpowers/specs/2026-07-25-cr-103-6-opening-hand-actions-design.md` and
+  `docs/superpowers/plans/2026-07-25-cr-103-6-opening-hand-actions.md`.
