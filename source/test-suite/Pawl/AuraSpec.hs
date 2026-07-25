@@ -5,11 +5,13 @@ module Pawl.AuraSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.GameState as GameState
@@ -51,5 +53,35 @@ tests registry =
             bounced = S.runPure S.identityAnswer cast (Event.changeZone creature Zone.Hand)
             after = snd (Engine.runGamePure S.identityAnswer bounced Stack.resolveTop)
         HU.assertEqual "nothing attached on the battlefield" [] (filter (\o -> Object.zone o == Zone.Battlefield && Maybe.isJust (Object.attachedTo o)) (Map.elems (GameState.objects after)))
-        HU.assertEqual "the Aura is in its owner's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+        HU.assertEqual "the Aura is in its owner's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      -- CR 704.5m, and CR 704.3's repeat. SBAs are simultaneous, so the pass that
+      -- buries the creature judged the Aura against a state in which that creature was
+      -- still there; the Aura falls off on the NEXT pass. Asserting both passes is the
+      -- point -- an implementation that dropped the Aura in pass one would be reading
+      -- post-pass state, which is what CR 704.3's "simultaneously" forbids.
+      HU.testCase "CR 704.5m: an Aura whose creature died falls off on the next SBA pass" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        let base = S.landsInPlay swamp 1
+            (creature, withCreature) = S.addCreature piker S.bob base
+            (aura, withAura) = S.addCreature unholyStrength S.alice withCreature
+            attached = S.attach aura creature withAura
+            -- Goblin Piker is 2/1; Unholy Strength makes it 4/2, so 2 damage is not
+            -- lethal and 3 is (CR 704.5g reads TOTAL marked damage against projected
+            -- toughness).
+            damaged = S.markDamage creature 3 attached
+            pass1 = S.settleSba damaged
+            pass2 = S.settleSba pass1
+        HU.assertEqual "the creature is gone after pass one" Nothing (Game.lookupObject creature pass1)
+        HU.assertBool "the Aura is still on the battlefield after pass one" (Set.member aura (GameState.battlefield pass1))
+        HU.assertBool "the Aura is gone from the battlefield after pass two" (not (Set.member aura (GameState.battlefield pass2)))
+        HU.assertEqual "and is in its OWNER's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice pass2)),
+      -- CR 704.5m's other two clauses.
+      HU.testCase "CR 704.5m: an unattached Aura on the battlefield goes to the graveyard" $ do
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        let base = Setup.emptyGame S.bothPlayers
+            (aura, gs) = S.addCreature unholyStrength S.alice base
+            after = S.settleSba gs
+        HU.assertBool "never attached, so it falls off immediately" (not (Set.member aura (GameState.battlefield after)))
     ]

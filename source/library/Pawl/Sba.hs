@@ -13,6 +13,8 @@ import qualified Pawl.Departure as Departure
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Target as Target
+import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
@@ -95,9 +97,52 @@ destroyedBySba gs pc oid =
                    || woundedByDeathtouch gs oid
                )
 
--- CR 704.3 says to repeat until no state-based action is performed. One pass is
--- enough in M1b: a creature dying cannot cause another SBA, because nothing
--- gains or loses life when a creature dies. Revisit when it can.
+-- CR 704.5m: "If an Aura is attached to an illegal object or player, or is not
+-- attached to an object or player, that Aura is put into its owner's graveyard."
+-- Three clauses: unattached, attached to an id that is no longer a permanent, and
+-- attached to one its own enchant ability no longer admits (CR 303.4c's "as
+-- defined by its enchant ability and other applicable effects").
+--
+-- The third reuses Target.stillLegal so cast-time legality, CR 608.2b's
+-- re-validation and this check are one implementation.
+--
+-- CR 303.4d's first clause -- an Aura can't enchant itself -- is the `oid == self`
+-- arm. Unreachable in this pool (a Creatures enchant spec cannot name the Aura
+-- spell on the stack), written anyway because it costs one comparison.
+--
+-- A put-into-graveyard, NOT a destruction: CR 704.5m says "put into its owner's
+-- graveyard", so this goes through Event.changeZone and consults neither
+-- indestructible (CR 702.12b) nor a regeneration shield (CR 701.19a).
+fallsOff :: GameState -> ObjectId -> Bool
+fallsOff gs oid = case Game.cardOf oid gs of
+  Nothing -> False
+  Just card -> case Card.Type.enchant card of
+    Nothing -> False
+    Just spec -> case Game.lookupObject oid gs of
+      Nothing -> False
+      Just obj -> case Object.attachedTo obj of
+        Nothing -> True
+        Just target ->
+          target == oid
+            -- Pool.Creatures is the only pool an enchant spec carries in this
+            -- pool (Unholy Strength's "enchant creature"), and
+            -- Target.creatureRecipients (Target.hs) tags every candidate it
+            -- produces ToCreature -- so re-checking with that tag reuses the
+            -- SAME legality Cast/Resolve already judge. A second enchant pool
+            -- (CR 702.5d's enchant-player Auras, #190) would need this tag
+            -- derived from the spec instead of hard-coded.
+            || not (Target.stillLegal oid (Recipient.ToCreature target) spec gs)
+
+-- CR 704.3: repeat until no state-based action is performed. ONE pass here, with
+-- the repeat living in Engine's CR 117.5 settle loop, which re-runs while
+-- performStateBasedActions reports True.
+--
+-- A creature dying CAN now cause another state-based action: CR 704.5m puts an
+-- Aura attached to it into its owner's graveyard, and because this pass judged
+-- that Aura against the state in which its creature was still alive (SBAs are
+-- simultaneous), the Aura falls off on the following pass. Any caller that
+-- checks state-based actions without looping is therefore wrong; use the settle
+-- loop.
 checkStateBasedActions :: Game ()
 checkStateBasedActions = Monad.void performStateBasedActions
 
@@ -141,6 +186,11 @@ performStateBasedActions = do
               n = min plus minus
            in if n > 0 then Just (oid, n) else Nothing
       annihilations = Maybe.mapMaybe annihilateOne onBattlefield
+      -- CR 704.5m: an Aura attached to nothing, or to something its enchant
+      -- ability no longer admits. Judged against the SAME pre-pass gs as every
+      -- other classification above -- see fallsOff's Haddock for why an Aura
+      -- whose creature dies THIS pass survives it and falls off the next.
+      unattachedAuras = filter (fallsOff gs) onBattlefield
       -- CR 704.5h's window is "since the last SBA check", so the watermark is the
       -- log length AS THIS PASS BEGAN: every 704.5h victim was computed from that
       -- same pre-pass state, and the Moved events this pass itself appends carry
@@ -149,6 +199,8 @@ performStateBasedActions = do
       watermark = fromIntegral (Seq.length (GameState.events gs))
   -- CR 704.5f: a plain put-into-graveyard (regeneration cannot save it).
   Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toGraveyard
+  -- CR 704.5m: the Aura follows its creature. A plain put-into-graveyard.
+  Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) unattachedAuras
   -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
   Monad.mapM_ Event.destroy toDestroy
   destroyed <- State.get
@@ -182,8 +234,8 @@ performStateBasedActions = do
       -- A state-based action was performed iff a creature was buried or destroyed
       -- (a regenerated creature still counts, which the CR 704.4 settle loop
       -- re-checks and -- because the regen healed the damage -- terminates), a
-      -- player left, or a token ceased to exist.
-      acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations)
+      -- player left, a token ceased to exist, or an Aura fell off (CR 704.5m).
+      acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as
