@@ -147,7 +147,8 @@ newGame matchup = do
 -- 800.4a's object removal, which would take a departed player's objects out of the
 -- game with them, is not implemented (#172) -- but the library map is rebuilt from
 -- scratch for the owners only, so those cards sit in no library and nobody can
--- draw them.
+-- draw them. The one visible artifact of this: those orphaned objects stay in
+-- GameState.objects, so they inflate Game.objectCount until #172 removes them.
 startGameFromCards :: Game ()
 startGameFromCards = do
   gs <- State.get

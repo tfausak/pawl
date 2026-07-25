@@ -747,6 +747,60 @@ resolveTests registry =
             g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
             after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
         HU.assertEqual "bob (the derived loser) lost 3 life to the follow-on DealDamage" (Just 17) (S.lifeOf S.bob after),
+      HU.testCase "CR 729.1b: PlaySubgame's derived loser is drawn from the subgame roster, not the full main-game seating (a departed seat is never the loser)" $ do
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        -- bob departed the MAIN game before this effect resolves, so bob was never
+        -- seated for the subgame (Setup.subgameStateFrom seats only
+        -- Departure.stillPlayingInOrder) -- only alice and carol played it. The
+        -- stub reports alice won, so the derived loser must be carol; bob still
+        -- appears in the raw seating roster (GameState.turnOrder) and is the
+        -- non-participant a roster bug would wrongly name.
+        let g0 = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+            slot = SlotName.MkSlotName (Text.pack "loser")
+            stubRunner :: Game Result.Result
+            stubRunner = pure (Result.Won S.alice)
+            (spellId, g1) = Game.freshObjectId g0
+            (ts, g2) = Game.freshTimestamp g1
+            card =
+              Card.Type.MkCard
+                { Card.Type.name = Text.pack "Subgame Test Spell (Three Seats, One Departed)",
+                  Card.Type.manaCost = Nothing,
+                  Card.Type.typeLine = Card.Type.typeLine (Printing.card lightningBolt),
+                  Card.Type.power = Nothing,
+                  Card.Type.toughness = Nothing,
+                  Card.Type.keywords = Set.empty,
+                  Card.Type.colorIndicator = Set.empty,
+                  Card.Type.staticAbilities = [],
+                  Card.Type.spell =
+                    Modal.MkModal
+                      (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage slot (Quantity.Literal 3)]) Map.empty))
+                      (ModeSelection.ChooseExactly 1),
+                  Card.Type.activatedAbilities = [],
+                  Card.Type.replacementEffects = [],
+                  Card.Type.triggeredAbilities = [],
+                  Card.Type.delayedAbilities = Map.empty,
+                  Card.Type.castingPermissions = [],
+                  Card.Type.characteristicPT = Nothing,
+                  Card.Type.playerAbilities = [],
+                  Card.Type.additionalCosts = [],
+                  Card.Type.alternativeCosts = []
+                }
+            spellObj =
+              Object.MkObject
+                { Object.owner = S.alice,
+                  Object.source = Source.OfToken card,
+                  Object.zone = Zone.Stack,
+                  Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
+                  Object.sickness = Sickness.Settled,
+                  Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+                  Object.counters = Map.empty,
+                  Object.timestamp = ts
+                }
+            g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
+            after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
+        HU.assertEqual "carol (a genuine subgame participant) lost 3 life to the follow-on DealDamage" (Just 17) (S.lifeOf S.carol after)
+        HU.assertEqual "bob (departed before the subgame; never played it) was not named the loser and took no damage" (Just 20) (S.lifeOf S.bob after),
       HU.testCase "CR 111 Dragon Fodder creates two 1/1 Goblin tokens" $ do
         mountain <- Registry.printing registry "Mountain"
         dragonFodder <- Registry.printing registry "Dragon Fodder"
