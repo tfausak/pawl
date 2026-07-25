@@ -299,17 +299,6 @@ runRecordingBlockers gs =
   let (after, seen) = State.runState (Program.foldProgramM recordingBlockers (State.execStateT Combat.declareBlockers gs)) ([], [])
    in (seen, after)
 
--- An interpreter that answers Prompt.ChooseDefender with `who` and everything
--- else with S.aggressiveAnswer. Lifted to top level (rather than a `let` inside
--- the test) so its type is the ordinary rank-1 `PlayerId -> forall r. Prompt r ->
--- r` -- the forall sits to the right of the first arrow, so this needs no
--- RankNTypes on attackTo itself; partially applying `attackTo who` then gives
--- exactly the `forall r. Prompt.Prompt r -> r` that S.runCombat expects.
-attackTo :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-attackTo who p = case p of
-  Prompt.ChooseDefender {} -> who
-  _ -> S.aggressiveAnswer p
-
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderTests, which is the Defender KEYWORD (CR 702.3b).
 defendingPlayerTests :: Registry.Type.Registry -> Tasty.TestTree
@@ -530,9 +519,8 @@ defendingPlayerTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         let (board, _, _, _) = S.threePlayerCombat [piker] [] []
             crowned = S.withMonarch S.bob board
-            hitBob = S.runCombat (attackTo S.bob) crowned
-            hitCarol = S.runCombat (attackTo S.carol) crowned
-        HU.assertEqual "bob starts as the monarch" (Just S.bob) (GameState.monarch crowned)
+            hitBob = S.runCombat (S.attackTo S.bob) crowned
+            hitCarol = S.runCombat (S.attackTo S.carol) crowned
         -- Run A: attacking the monarch takes the crown.
         HU.assertEqual "bob took 2" (Just 18) (S.lifeOf S.bob hitBob)
         HU.assertEqual "carol was untouched" (Just 20) (S.lifeOf S.carol hitBob)

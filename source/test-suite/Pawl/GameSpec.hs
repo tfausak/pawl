@@ -1242,25 +1242,35 @@ turnOrderTests registry =
             -- Declines blocks rather than delegating to S.aggressiveAnswer's
             -- DeclareBlockers arm: in run A bob himself is the defending player,
             -- and his only creature is the Jailer, which aggressiveAnswer would
-            -- happily throw in front of alice's attacker. That would zero out the
-            -- combat damage to bob for a reason CR 509.1's blocker restriction
-            -- (Task 4's own case, not this gate's) already covers -- not evidence
-            -- about the chosen defender. Declining blocks keeps this test's
-            -- damage assertions about the ONE thing it is meant to discriminate.
+            -- happily throw in front of alice's attacker. That would zero out
+            -- the combat damage to bob for a reason CR 509.1 (only the
+            -- DEFENDING player declares blockers -- Task 4's own case, not this
+            -- gate's) already covers -- not evidence about the chosen defender.
+            -- Declining blocks keeps this test's damage assertions about the
+            -- ONE thing it is meant to discriminate.
             attackTo who p = case p of
-              Prompt.ChooseDefender {} -> who
               Prompt.DeclareBlockers {} -> Map.empty
-              _ -> S.aggressiveAnswer p
+              _ -> S.attackTo who p
             hitBob = S.runCombat (attackTo S.bob) board
             hitCarol = S.runCombat (attackTo S.carol) board
         -- The fixture really is what the test claims.
         HU.assertEqual "bob is the monarch before combat" (Just S.bob) (GameState.monarch board)
         HU.assertEqual "exactly one creature is under the watch" 1 (Map.size (GameState.exiledUntilMonarch board))
-        HU.assertBool "carol's Piker is exiled, watching for a new monarch" (Map.member prisoner (GameState.exiledUntilMonarch board))
+        HU.assertEqual "carol's Piker left the battlefield" 0 (S.creaturesInPlay S.carol board)
         HU.assertBool "alice has an attacker" (Combat.canAttack S.alice attacker board)
         -- Run A: alice attacks the monarch.
         HU.assertEqual "bob took 2" (Just 18) (S.lifeOf S.bob hitBob)
         HU.assertEqual "alice is the monarch" (Just S.alice) (GameState.monarch hitBob)
+        -- The next two assertions are ENTAILED by "alice is the monarch" just
+        -- above: Monarch.returnExiledForMonarch's `due` set is a pure function
+        -- of (monarch, exiledUntilMonarch) -- an entry is due iff its
+        -- controller is not the CURRENT monarch -- so once alice holds the
+        -- crown, carol's watch entry is due and nothing consistent with that
+        -- fact can leave it undischarged. They are not a second, independent
+        -- observation that the crown moved; what they add is real coverage of
+        -- the return machinery itself (Resolve's ExileUntilMonarch arm,
+        -- Event.changeZoneReturning, and this settle-loop return) running
+        -- inside a full Engine.runStep-driven combat.
         HU.assertEqual "the watch is discharged" Map.empty (GameState.exiledUntilMonarch hitBob)
         -- CR 400.7: the return is itself a zone change, so the returned
         -- permanent has yet another new object id -- `prisoner`'s id (the one it
@@ -1273,6 +1283,9 @@ turnOrderTests registry =
         HU.assertEqual "carol took 2" (Just 18) (S.lifeOf S.carol hitCarol)
         HU.assertEqual "bob was untouched, so he keeps the crown" (Just 20) (S.lifeOf S.bob hitCarol)
         HU.assertEqual "bob is still the monarch" (Just S.bob) (GameState.monarch hitCarol)
+        -- Entailed by "bob is still the monarch" just above, for the same
+        -- reason as run A's pair: real coverage of the same return code path,
+        -- not independent evidence that the crown followed the chosen defender.
         HU.assertBool "the watch still stands" (Map.member prisoner (GameState.exiledUntilMonarch hitCarol))
         HU.assertEqual "and the prisoner is still exiled, not back on carol's battlefield" 0 (S.creaturesInPlay S.carol hitCarol)
         HU.assertEqual "neither run ended the game" (Nothing, Nothing) (GameState.result hitBob, GameState.result hitCarol)

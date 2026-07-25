@@ -281,6 +281,21 @@ aggressiveAnswer p = case p of
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
 
+-- Answers Prompt.ChooseDefender with `who` and everything else with
+-- aggressiveAnswer -- the shared shape of CombatSpec's and GameSpec's M5.6d
+-- defending-player fixtures. Its own type is the ordinary rank-1 `forall r.
+-- PlayerId -> Prompt r -> r` (the implicit forall is outermost, quantifying
+-- the whole arrow chain), so it needs no RankNTypes of its own; partially
+-- applying `attackTo who` gives exactly the `forall r. Prompt.Prompt r -> r`
+-- that runCombat expects, with GHC instantiating attackTo's `r` at the skolem
+-- constant runCombat's argument type introduces. GameSpec's gate also needs to
+-- decline blocks (CR 509.1 routing, not this module's concern), which stays a
+-- group-local refinement rather than a second parameter here.
+attackTo :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+attackTo who p = case p of
+  Prompt.ChooseDefender {} -> who
+  _ -> aggressiveAnswer p
+
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
 playLandAnswer p = case p of
