@@ -172,7 +172,7 @@ addPT base delta = case (base, delta) of
   (Nothing, _) -> Nothing
 
 -- A continuous effect ready to fold: its source (for the Matching ExcludesSource
--- self-exclusion, CR 305.2), the set it affects, its layer, its timestamp, and the
+-- self-exclusion), the set it affects, its layer, its timestamp, and the
 -- modification. Projection-internal; not a domain type.
 data Gathered = MkGathered
   { gSource :: ObjectId,
@@ -186,12 +186,13 @@ data Gathered = MkGathered
 -- PARTIAL projection built by the layers below this one? A fixed set is a
 -- membership test; a dynamic set is a Filter evaluated against the PARTIAL
 -- characteristics, so a layer-4 type change is visible to a later layer.
--- A Not IsSource conjunct in that Filter is CR 305.2's "each other"
--- (Opalescence does not animate itself), matched against this View's own
--- identity. CR 109.5: an affected-set filter's "you" is the effect's SOURCE's
--- controller (the perspective), which ControlledBy compares against the affected
--- object's own controller (the View's controller) -- the emblem anthem's
--- "creatures you control" is the first affected set to reference a player.
+-- A Not IsSource conjunct in that Filter is Opalescence's own "each other"
+-- (card text, not a rule -- Opalescence does not animate itself), matched
+-- against this View's own identity. CR 109.5: an affected-set filter's "you"
+-- is the effect's SOURCE's controller (the perspective), which ControlledBy
+-- compares against the affected object's own controller (the View's
+-- controller) -- the emblem anthem's "creatures you control" is the first
+-- affected set to reference a player.
 -- Supertypes read from the printed type line (CR 205.4a; not projected at M3c)
 -- via viewOfCharacteristics.
 affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
@@ -848,7 +849,7 @@ subtypesOf oid gs = PC.subtypes (project oid gs)
 cardTypesOf :: ObjectId -> GameState -> Set CardType.CardType
 cardTypesOf oid gs = PC.cardTypes (project oid gs)
 
--- CR 305.2 / 613.1d: creature-ness is the projected card-type question, the same
+-- CR 613.1d: creature-ness is the projected card-type question, the same
 -- projection posture as keywordsOf. An Opalescence'd enchantment is a creature.
 isCreatureOf :: ObjectId -> GameState -> Bool
 isCreatureOf oid gs = Set.member CardType.Creature (cardTypesOf oid gs)

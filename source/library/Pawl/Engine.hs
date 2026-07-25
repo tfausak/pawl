@@ -768,6 +768,11 @@ advance = do
     -- lost trigger. CR 514.3a's extra cleanup step and its priority round are not
     -- built (#51), so a trigger placed here resolves at the next turn's first
     -- priority rather than during this cleanup.
+    --
+    -- This is also where CR 704.3 catches a state-based action raised by the
+    -- terminal phase's own turn-based actions (e.g. an Aura's CR 704.5m
+    -- fall-off): settleForPriority loops rather than checking once, and that
+    -- only works here because Cleanup is the schedule-terminal phase.
     Seq.EmptyL -> do
       settleForPriority
       handoffTurn

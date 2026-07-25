@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Binding as Binding
+import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -137,7 +138,7 @@ falsifierTests registry =
         HU.assertEqual
           "the Wall mode (0) is absent from the fillable set"
           (Set.fromList [ModeIndex.MkModeIndex 1, ModeIndex.MkModeIndex 2])
-          (Target.fillableModes oid Map.empty (Card.Type.spell (Printing.card chaosCharm)) gs1)
+          (Target.fillableModes oid (Card.enchantSpecs (Printing.card chaosCharm)) (Card.Type.spell (Printing.card chaosCharm)) gs1)
     ]
 
 -- CR 601.2c/700.2c: only the CHOSEN mode's slots are ever prompted or stamped

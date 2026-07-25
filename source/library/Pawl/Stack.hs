@@ -116,9 +116,11 @@ resolveTop = resolveTopWith Resolve.noSubgame
 -- The ObjectId an Aura spell's enchant slot names (CR 303.4a). Nothing when the
 -- slot is unbound, which CR 303.4a makes unreachable for a cast Aura -- the slot
 -- is a required target. A ToPlayer recipient is likewise unreachable while
--- Card.enchant is restricted to object pools; it is REJECTED rather than guessed
--- at, because CR 702.5d's enchant-player Auras need Object.attachedTo widened
--- before they can be attached at all (#190).
+-- Card.enchant is restricted to object pools; it falls through to Nothing here
+-- rather than being guessed at, so the Aura enters the battlefield unattached
+-- (and CR 704.5m then buries it) instead of being attached to a player, because
+-- CR 702.5d's enchant-player Auras need Object.attachedTo widened before they
+-- can be attached at all (#190).
 enchantedBy :: ObjectId -> GameState.GameState -> Maybe ObjectId
 enchantedBy oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing

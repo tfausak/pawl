@@ -162,7 +162,8 @@ tests registry =
               (roundTrip "affected" Codec.affectedToJson Codec.jsonToAffected)
               [ Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1, ObjectId.MkObjectId 2]),
                 Affected.Matching (Filter.Type.HasCardType CardType.Creature),
-                -- Opalescence's shape: CR 305.2's "each other" as Not IsSource.
+                -- Opalescence's shape: its own "each other" card text (not a
+                -- rule) as Not IsSource.
                 Affected.Matching (Filter.Type.And [Filter.Type.HasCardType CardType.Enchantment, Filter.Type.Not (Filter.Type.HasSubtype Subtype.Mountain), Filter.Type.Not Filter.Type.IsSource])
               ]
         ],

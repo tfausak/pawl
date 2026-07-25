@@ -400,7 +400,7 @@ tests registry =
             -- outcome must not change.
             gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g2
         HU.assertEqual "nonbasic land is Island, order-independent" (Set.singleton Subtype.Island) (Projection.subtypesOf nonbasicId gs),
-      HU.testCase "CR 305.2 Opalescence makes Humility a creature: legal creature target and SBA-killable" $ do
+      HU.testCase "Opalescence makes Humility a creature: legal creature target and SBA-killable" $ do
         humility <- Registry.printing registry "Humility"
         opalescence <- Registry.printing registry "Opalescence"
         let base = Setup.emptyGame S.bothPlayers
@@ -419,7 +419,7 @@ tests registry =
       -- the card's own affected-set Filter, evaluated against the candidate
       -- View's identity -- so it is the data file, not an engine field, that has
       -- to carry it.
-      HU.testCase "CR 305.2 Opalescence does not animate itself" $ do
+      HU.testCase "Opalescence does not animate itself" $ do
         humility <- Registry.printing registry "Humility"
         opalescence <- Registry.printing registry "Opalescence"
         let base = Setup.emptyGame S.bothPlayers

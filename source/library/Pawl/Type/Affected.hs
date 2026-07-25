@@ -16,10 +16,10 @@ data Affected
   | -- Dynamic: any object matching the Filter, re-derived each projection against
     -- the PARTIAL projection accumulated so far, so it reads each axis as of
     -- whichever layers have already applied (CR 613: layers apply in order) -- a
-    -- layer-4 type change is visible to a later layer. CR 305.2's "each other"
-    -- (Opalescence does not animate itself) is Filter.Not Filter.IsSource inside
-    -- the Filter, not a separate field -- the predicate language already names
-    -- the source that way.
+    -- layer-4 type change is visible to a later layer. Opalescence's own "each
+    -- other" card text (not a rule -- Opalescence does not animate itself) is
+    -- Filter.Not Filter.IsSource inside the Filter, not a separate field -- the
+    -- predicate language already names the source that way.
     Matching Filter
   | -- CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
     -- creature". A THIRD kind of affected set: TheseObjects is fixed at
