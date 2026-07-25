@@ -12,7 +12,7 @@
 
 - **Haskell 2010, no language extensions.** Only `GADTs`, `RankNTypes` and `NamedFieldPuns` are permitted, and this phase needs none of them.
 - **Warning-clean under `+pedantic` (`-Werror`).** A new `Subtype`, `Affected` or `Card` field breaks every exhaustive match at once — that is the safety net, not a nuisance. Run `cabal build all --enable-tests --enable-benchmarks`; `cabal clean` first for a definitive check, because incremental builds hide warnings from unchanged modules. **Never run two builds concurrently** — `jobs: $ncpus` already saturates the machine.
-- **No library module is added or deleted in this phase**, so `hooky fix` handles `pawl.cabal`; no direct `cabal-gild` run is needed. One *test-suite* module is added (Task 8), which **does** require adding it by hand to the test-suite `other-modules` list.
+- **No library module is added or deleted in this phase**, so `hooky fix` handles `pawl.cabal`; no direct `cabal-gild` run is needed. One *test-suite* module is added (Task 7), which **does** require adding it by hand to the test-suite `other-modules` list.
 - **No partial functions**, no boolean blindness, `Mk` constructor prefix, derive at least `Eq` and `Show`, `Text` not `String`, no list comprehensions, `let` over `where`, `case` over point-free, `do` + record syntax to build records.
 - **One type per module** under `Pawl.Type.<Name>`; qualified imports aliased to the last component; no explicit export lists; a module never imports its parents.
 - **The two invariants outrank this plan:** the engine never cases on a card's *identity* (only classifications), and never makes a player's choice. `Card.isAura` is a **subtype** read off the type line — the same closed-half classification as the `Card.isPermanent` beside it (CR 205.3h), and not a violation. See spec §3.4.
@@ -74,12 +74,12 @@ The subtype alone. One commit, because the constructor breaks three exhaustive m
 
 - [ ] **Step 0: File the phase's deferral issues, so later tasks cite real numbers**
 
-Do this **first**, not at the end: Tasks 2, 4 and 8 each leave a code comment citing one of these, and a comment carrying a placeholder is exactly the drift the tracker exists to prevent. One `gh issue create` per spec §9 entry, each carrying status, rationale and expiry trigger, labelled `gap` or `elision` plus `expires:card-driven`:
+Do this **first**, not at the end: Tasks 2, 3 and 7 each leave a code comment citing one of these, and a comment carrying a placeholder is exactly the drift the tracker exists to prevent. One `gh issue create` per spec §9 entry, each carrying status, rationale and expiry trigger, labelled `gap` or `elision` plus `expires:card-driven`:
 
 1. CR 701.3 `Attach` / CR 303.4j — no opcode moves an Aura already on the battlefield.
 2. CR 303.4f/303.4g/303.4i — an Aura entering by any means other than resolving as an Aura spell, including the controller's choice of what to enchant and the stays-in-its-zone rule when no legal object exists.
 3. CR 702.5c — multiple `enchant` instances; `Card.enchant` is a `Maybe`, so a second one is unrepresentable. **Cited by Task 2.**
-4. CR 702.5d "enchant player" — **a modelling limit, not a missing producer.** The body must say so plainly: `Object.attachedTo :: Maybe ObjectId` cannot name a player, and CR 303.4c's "the player it was attached to has left the game" clause has nowhere to be checked. **Cited by Tasks 4 and 8.**
+4. CR 702.5d "enchant player" — **a modelling limit, not a missing producer.** The body must say so plainly: `Object.attachedTo :: Maybe ObjectId` cannot name a player, and CR 303.4c's "the player it was attached to has left the game" clause has nowhere to be checked. **Cited by Tasks 3 and 7.**
 5. CR 303.4d's chooser — "if a spell or ability would cause an Aura to become attached to more than one object or player, the Aura's controller chooses". No effect attaches, so there is nothing to choose between.
 6. CR 303.4k — face-down permanents do not exist.
 7. CR 704.5n/704.5p — Equipment, Fortification, attached creatures and battles becoming unattached.
@@ -161,7 +161,7 @@ The carrier and its readers. No behaviour yet — a card can *declare* an enchan
 - Test: `source/test-suite/Pawl/CardSpec.hs`
 
 **Interfaces:**
-- Produces: `Card.Type.enchant :: Card -> Maybe TargetSpec`; `Pawl.Card.isAura :: Card -> Bool`; `Pawl.Card.enchantSlot :: SlotName`; `Pawl.Card.enchantSpecs :: Card -> Map SlotName TargetSpec`. Consumed by Tasks 3, 6, 7.
+- Produces: `Card.Type.enchant :: Card -> Maybe TargetSpec`; `Pawl.Card.isAura :: Card -> Bool`; `Pawl.Card.enchantSlot :: SlotName`; `Pawl.Card.enchantSpecs :: Card -> Map SlotName TargetSpec`. Consumed by Tasks 4 and 6.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -269,23 +269,148 @@ git commit -m "feat(card): carry CR 702.5a's enchant ability on Card"
 
 ---
 
-## Task 3: Unholy Strength, and the two lints that keep the pool honest
+## Task 3: `Object.attachedTo`, seeded at entry
 
-The gate card as data, plus the lint coverage the enchant slot would otherwise never get (spec §3.3, item 2 — the #184 shape).
+Base state plus the entry seam. CR 303.4 says an Aura *enters* attached, so the seed rides `changeZone` rather than being written after it returns (spec §3.4, step 3).
+
+**This task has no Aura in it.** The field, its reset, and the seed are properties of *objects*, not of Auras — CR 400.7 resets attachment for the same reason it resets damage and counters. The gate card arrives in Task 4, which is what makes this task's fixture two ordinary permanents rather than a real Aura.
+
+**Files:**
+- Modify: `source/library/Pawl/Type/Object.hs`, `source/library/Pawl/Event.hs`, `source/library/Pawl/Setup.hs`, `source/library/Pawl/Monarch.hs`, `source/library/Pawl/Activate.hs`, `source/library/Pawl/Engine.hs`, `source/library/Pawl/Resolve.hs`
+- Modify: `source/test-suite/Pawl/Support.hs`
+- Test: `source/test-suite/Pawl/EventSpec.hs`
+
+**Interfaces:**
+- Produces: `Object.attachedTo :: Maybe ObjectId`; `Event.changeZoneAttaching :: ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)`; `S.attach :: ObjectId -> ObjectId -> GameState -> GameState`. Consumed by Tasks 4, 7 and 8.
+
+- [ ] **Step 1: Write the failing test**
+
+In `source/test-suite/Pawl/EventSpec.hs`. Two Goblin Pikers, deliberately — this asserts that CR 400.7 clears the FIELD, which is true of every object regardless of type, and it must not wait on the Aura printing Task 4 adds:
+
+```haskell
+HU.testCase "CR 400.7: a zone change forgets attachment" $ do
+  plains <- Registry.printing registry "Plains"
+  piker <- Registry.printing registry "Goblin Piker"
+  let base = S.landsInPlay plains 1
+      (host, withHost) = S.addCreature piker S.bob base
+      (rider, withRider) = S.addCreature piker S.alice withHost
+      attached = S.attach rider host withRider
+      bounced = S.runPure S.identityAnswer attached (Event.changeZone rider Zone.Hand)
+      moved = filter (\o -> Object.zone o == Zone.Hand) (Map.elems (GameState.objects bounced))
+  HU.assertEqual "attached before the move" (Just (Just host)) (fmap Object.attachedTo (Game.lookupObject rider attached))
+  HU.assertEqual "one card in hand" 1 (length moved)
+  HU.assertEqual "the new incarnation is unattached" [Nothing] (fmap Object.attachedTo moved),
+```
+
+Note the `Just (Just host)` — `Game.lookupObject` returns `Maybe Object` and `attachedTo` is itself a `Maybe`, so `fmap` produces a nested `Maybe`. Match whatever `Game.lookupObject`'s actual signature gives you.
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cabal build all --enable-tests --enable-benchmarks`
+Expected: FAIL to compile — `Object.attachedTo` and `S.attach` are not in scope.
+
+- [ ] **Step 3: Add the field**
+
+In `source/library/Pawl/Type/Object.hs`, add `import Pawl.Type.ObjectId (ObjectId)` and the field after `counters`:
+
+```haskell
+    -- CR 303.4b: the object this permanent is attached to -- what CR 303.4b calls
+    -- "enchanted". Nothing for every permanent that is not an attached Aura.
+    --
+    -- BASE state, not projected: attachment is a fact about the object, and no CR
+    -- 613 layer reads or writes it. Per-incarnation, like damage and counters:
+    -- changeZone resets it, because CR 400.7 makes the moved object a new one with
+    -- no memory of what it enchanted.
+    --
+    -- One direction only. "What is attached to me" is derived by scanning the
+    -- battlefield, the posture Projection.controls already takes toward control,
+    -- so there is no reverse index to keep consistent across zone changes.
+    --
+    -- Maybe ObjectId, not a Recipient: CR 702.5d's enchant-player Auras cannot be
+    -- expressed and need this widened (#N).
+    attachedTo :: Maybe ObjectId,
+```
+
+`#N` is **issue 4** from Task 1 Step 0 (CR 702.5d). Write the real number; never commit a literal `#N`, and never write the expiry into the comment.
+
+Add `Object.attachedTo = Nothing` to the six `Object.MkObject` literals the compiler names (`Setup.hs:102`, `Monarch.hs:137`, `Activate.hs:79`, `Engine.hs:419`, `Resolve.hs:792`, `Event.hs:320`).
+
+- [ ] **Step 4: Seed it through the zone change**
+
+In `source/library/Pawl/Event.hs`, rename the body and add the seeded entry point:
+
+```haskell
+changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
+changeZoneReturning oid requestedDest = changeZoneAttaching oid requestedDest Nothing
+
+-- changeZoneReturning with an attachment seed. CR 303.4: "An Aura ENTERS the
+-- battlefield attached to an object or player" -- attachment is a property of
+-- entering, not a step after it. The entry replacement loop (CR 614.1c) and the
+-- Moved event both run before this function returns, so an Aura attached
+-- afterward would be unattached during both. No card in this pool can observe
+-- the difference today; the seed buys the ordering rather than a passing test.
+changeZoneAttaching :: ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)
+changeZoneAttaching oid requestedDest seed = do
+```
+
+— the existing body follows unchanged except for `mkObj`, which gains the field:
+
+```haskell
+              mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.timestamp = ts}
+```
+
+`changeZone` is unchanged (`Monad.void (changeZoneReturning oid requestedDest)`), so **every existing call site is untouched**.
+
+- [ ] **Step 5: Add the test fixture**
+
+In `source/test-suite/Pawl/Support.hs`:
+
+```haskell
+-- CR 303.4b: attach `rider` to `host` directly, without casting. A STATE fixture
+-- (the shape addCreature and withEffect already have), not a synthetic card --
+-- every printing a caller passes is real. Type-agnostic on purpose: CR 400.7's
+-- reset is a property of the field, so the CR 400.7 test does not need an Aura.
+attach :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+attach rider host gs =
+  let set obj = obj {Object.attachedTo = Just host}
+   in gs {GameState.objects = Map.adjust set rider (GameState.objects gs)}
+```
+
+- [ ] **Step 6: Run tests to verify they pass**
+
+Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
+Expected: PASS, warning-free.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add source/library/Pawl/ source/test-suite/Pawl/
+hooky fix
+git add source/library/Pawl/ source/test-suite/Pawl/
+hooky run
+git commit -m "feat(object): attachment is base state, seeded as the object enters (CR 303.4)"
+```
+
+---
+
+## Task 4: Unholy Strength and `Affected.Attached`
+
+The gate card, the affected-set constructor its static ability needs, and the two lints that keep the pool honest. **One task, because the card and the constructor are mutually dependent** — the card's JSON references `Attached`, and `Attached`'s only honest test is a real Aura modifying a real creature. Splitting them means one commit with a knowingly-red test; merging them keeps the tree green and the commit is still one idea: *an Aura's static ability names the permanent it is attached to.*
 
 **Files:**
 - Create: `data/cards/unholy-strength.json`
-- Modify: `source/test-suite/Pawl/CardSpec.hs`
+- Modify: `source/library/Pawl/Type/Affected.hs`, `source/library/Pawl/Projection.hs`, `source/library/Pawl/Codec.hs`
+- Test: `source/test-suite/Pawl/CardSpec.hs`, `source/test-suite/Pawl/PowerToughnessSpec.hs`
 
 **Interfaces:**
-- Consumes: `Card.Type.enchant`, `Card.isAura`, `Card.enchantSlot` (Task 2); `Subtype.Aura` (Task 1).
-- Produces: the printing `"Unholy Strength"`, loadable via `Registry.printing registry "Unholy Strength"`.
+- Consumes: `Subtype.Aura` (Task 1); `Card.Type.enchant`, `Card.isAura`, `Card.enchantSlot` (Task 2); `Object.attachedTo`, `S.attach` (Task 3).
+- Produces: `Affected.Attached`; the printing `"Unholy Strength"`, loadable via `Registry.printing registry "Unholy Strength"`. Consumed by Tasks 5, 6, 7, 8.
 
 Scryfall-verified 2026-07-25: `Unholy Strength` — `{B}` — `Enchantment — Aura` — "Enchant creature / Enchanted creature gets +2/+1."
 
-`Affected.Attached` does not exist until Task 6, so this task authors the card with the affected set it will have and **the card is not yet projectable**. That is fine: the JSON is inert data until Task 6 teaches the projection to read it, and the codec round-trip test in this task is the whole assertion. If you prefer a strictly always-green tree, swap Tasks 3 and 6 — nothing else depends on the order.
+Adding the card costs exactly one file. The registry loads cards on demand by name, and `S.allPrintings` sweeps `data/cards/`, so the new file gets whole-pool codec round-trip coverage automatically — there is no list to append to.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/CardSpec.hs`:
 
@@ -314,16 +439,16 @@ Plus the two lints, in the lint group:
 
 ```haskell
 -- CR 303.4 / 702.5a: the biconditional. An Aura without enchant has no legal
--- target and could never be cast; a non-Aura with enchant declares a
--- restriction nothing reads. The D4 lint cannot see either, because it walks
+-- target and could never be cast; a non-Aura with enchant declares a restriction
+-- nothing reads. The D4 lint cannot see either, because it walks
 -- Mode.targetSpecs and the enchant slot is not there (#184's shape).
 HU.testCase "a card is an Aura iff it declares an enchant ability" $ do
   ps <- S.allPrintings registry
   let offends c = Card.isAura c /= Maybe.isJust (Card.Type.enchant c)
       offenders = filter (offends . Printing.card) ps
   HU.assertEqual "Aura iff enchant" [] (fmap (Card.Type.name . Printing.card) offenders),
--- The merge in Pawl.Card.allTargetSpecs binds the enchant spec under this name,
--- so a mode declaring it would be silently shadowed.
+-- Pawl.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
+-- mode declaring it would be silently shadowed.
 HU.testCase "no mode declares a slot named enchant" $ do
   ps <- S.allPrintings registry
   let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Card.Type.spell c))
@@ -331,12 +456,81 @@ HU.testCase "no mode declares a slot named enchant" $ do
   HU.assertEqual "the enchant slot is never hand-declared" [] (fmap (Card.Type.name . Printing.card) offenders),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+And in `source/test-suite/Pawl/PowerToughnessSpec.hs`, the behavioural test — this is the one that proves `Attached` works:
 
-Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
-Expected: FAIL — `Affected.Attached` is not in scope (Task 6 adds it). Comment out only the `staticAbilities` assertion, re-run, and confirm it now fails with the registry's `MissingRoot`/file-not-found for `"Unholy Strength"`. Restore the assertion before Step 3 and leave the test red until Task 6.
+```haskell
+HU.testCase "CR 303.4m: an attached Unholy Strength gives the enchanted creature +2/+1" $ do
+  piker <- Registry.printing registry "Goblin Piker"
+  unholyStrength <- Registry.printing registry "Unholy Strength"
+  let base = Setup.emptyGame S.bothPlayers
+      -- Goblin Piker is a 2/1.
+      (creature, withCreature) = S.addCreature piker S.bob base
+      (aura, withAura) = S.addCreature unholyStrength S.alice withCreature
+      attached = S.attach aura creature withAura
+  HU.assertEqual "unattached, the ability names nothing" (Just (2, 1)) (S.powerToughnessOf creature withAura)
+  HU.assertEqual "attached, +2/+1" (Just (4, 2)) (S.powerToughnessOf creature attached),
+```
 
-- [ ] **Step 3: Write the card**
+If `S.powerToughnessOf` does not exist, use whatever accessor the neighbouring cases in `PowerToughnessSpec.hs` already use to read projected P/T, and match its exact return type.
+
+While you are in `PowerToughnessSpec.hs`, note the comment at line 120 recording that the Aura family "is blocked on Attach". Half of that is now false — the Darksteel Mutation family needs layer-4 card-type *replacement*, not `Attach`. Correct the comment to say what is actually still missing; do not delete the whole note.
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cabal build all --enable-tests --enable-benchmarks`
+Expected: FAIL to compile — `Affected.Attached` is not in scope.
+
+- [ ] **Step 3: Add the constructor**
+
+In `source/library/Pawl/Type/Affected.hs`:
+
+```haskell
+  | -- CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
+    -- creature". A THIRD kind of affected set: TheseObjects is fixed at
+    -- resolution (CR 611.2c) and Matching is a predicate re-derived per
+    -- candidate, while this is re-derived from the SOURCE's own state.
+    --
+    -- The set is {o} when the source is attached to o, and EMPTY when it is
+    -- unattached -- an Aura in the graveyard, or one the CR 704.5m sweep has not
+    -- reached yet. Payload-free: CR 303.4m defines it for any permanent, "even
+    -- if the permanent with the ability isn't an Aura", so there is nothing to
+    -- parameterize.
+    Attached
+```
+
+Extend the module's own header comment to describe three kinds rather than two.
+
+- [ ] **Step 4: Add the projection arm**
+
+In `source/library/Pawl/Projection.hs`, in `affects`:
+
+```haskell
+  -- CR 303.4m: read the SOURCE's attachment, not the candidate's. An unattached
+  -- source names nothing, so the set is empty and the effect applies to no one.
+  Affected.Attached -> case Game.lookupObject source gs of
+    Nothing -> False
+    Just src -> Object.attachedTo src == Just oid
+```
+
+Then fix every other exhaustive `Affected` match the compiler names. The one at `Projection.hs:865` (inside `controllerOf`) keeps its existing `_ -> False` default — phase (b) is what teaches control to read static abilities, and adding `Attached` there now would be dead code.
+
+- [ ] **Step 5: Add the codec arms**
+
+In `source/library/Pawl/Codec.hs`:
+
+```haskell
+  Affected.Attached -> Json.tagged (Text.pack "Attached") Nothing
+```
+
+and in `jsonToAffected`:
+
+```haskell
+    "Attached" -> pure Affected.Attached
+```
+
+Match the exact shape the neighbouring nullary tags use — check how another payload-free tagged constructor decodes in this module before writing the arm.
+
+- [ ] **Step 6: Write the card**
 
 `data/cards/unholy-strength.json`. Field order is alphabetical, matching every other file in the directory:
 
@@ -415,141 +609,21 @@ Expected: FAIL — `Affected.Attached` is not in scope (Task 6 adds it). Comment
 }
 ```
 
-Check `targetSpecToJson` in `Pawl.Codec` for the exact `pool`/`restriction` key names and correct the `enchant` object above to match what the encoder actually emits — the whole-pool canonical-emission test will tell you immediately if it does not.
+Check `targetSpecToJson` and the `Affected` encoder in `Pawl.Codec` for the exact key names, and correct the `enchant` and `affected` objects above to match what the encoders actually emit — the whole-pool canonical-emission test will tell you immediately if they do not.
 
-- [ ] **Step 4: Run the lints to verify they pass**
-
-Run: `cabal test`
-Expected: the two lints PASS; the Unholy Strength case still FAILS on `Affected.Attached` until Task 6. That is the intended state.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add data/cards/unholy-strength.json source/test-suite/Pawl/CardSpec.hs
-hooky fix
-git add data/cards/unholy-strength.json source/test-suite/Pawl/CardSpec.hs
-hooky run
-git commit -m "feat(cards): add Unholy Strength, and lint the Aura/enchant biconditional"
-```
-
----
-
-## Task 4: `Object.attachedTo`, seeded at entry
-
-Base state plus the entry seam. CR 303.4 says an Aura *enters* attached, so the seed rides `changeZone` rather than being written after it returns (spec §3.4, step 3).
-
-**Files:**
-- Modify: `source/library/Pawl/Type/Object.hs`, `source/library/Pawl/Event.hs`, `source/library/Pawl/Setup.hs`, `source/library/Pawl/Monarch.hs`, `source/library/Pawl/Activate.hs`, `source/library/Pawl/Engine.hs`, `source/library/Pawl/Resolve.hs`
-- Modify: `source/test-suite/Pawl/Support.hs`
-- Test: `source/test-suite/Pawl/EventSpec.hs`
-
-**Interfaces:**
-- Produces: `Object.attachedTo :: Maybe ObjectId`; `Event.changeZoneAttaching :: ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)`; `S.attach :: ObjectId -> ObjectId -> GameState -> GameState`. Consumed by Tasks 6, 8, 9.
-
-- [ ] **Step 1: Write the failing test**
-
-In `source/test-suite/Pawl/EventSpec.hs`:
-
-```haskell
-HU.testCase "CR 400.7: a zone change forgets attachment" $ do
-  plains <- Registry.printing registry "Plains"
-  piker <- Registry.printing registry "Goblin Piker"
-  unholyStrength <- Registry.printing registry "Unholy Strength"
-  let base = S.landsInPlay plains 1
-      (creature, withCreature) = S.addCreature piker S.bob base
-      (aura, withAura) = S.addCreature unholyStrength S.alice withCreature
-      attached = S.attach aura creature withAura
-      bounced = S.runPure S.identityAnswer attached (Event.changeZone aura Zone.Hand)
-      moved = filter (\o -> Object.zone o == Zone.Hand) (Map.elems (GameState.objects bounced))
-  HU.assertEqual "attached before the move" (Just creature) (fmap Object.attachedTo (Game.lookupObject aura attached))
-  HU.assertEqual "one card in hand" 1 (length moved)
-  HU.assertEqual "the new incarnation is unattached" [Nothing] (fmap Object.attachedTo moved),
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cabal build all --enable-tests --enable-benchmarks`
-Expected: FAIL to compile — `Object.attachedTo` and `S.attach` are not in scope.
-
-- [ ] **Step 3: Add the field**
-
-In `source/library/Pawl/Type/Object.hs`, add `import Pawl.Type.ObjectId (ObjectId)` and the field after `counters`:
-
-```haskell
-    -- CR 303.4b: the object this permanent is attached to -- what CR 303.4b calls
-    -- "enchanted". Nothing for every permanent that is not an attached Aura.
-    --
-    -- BASE state, not projected: attachment is a fact about the object, and no CR
-    -- 613 layer reads or writes it. Per-incarnation, like damage and counters:
-    -- changeZone resets it, because CR 400.7 makes the moved object a new one with
-    -- no memory of what it enchanted.
-    --
-    -- One direction only. "What is attached to me" is derived by scanning the
-    -- battlefield, the posture Projection.controls already takes toward control,
-    -- so there is no reverse index to keep consistent across zone changes.
-    --
-    -- Maybe ObjectId, not a Recipient: CR 702.5d's enchant-player Auras cannot be
-    -- expressed and need this widened (#N).
-    attachedTo :: Maybe ObjectId,
-```
-
-`#N` is **issue 4** from Task 1 Step 0 (CR 702.5d).
-
-Add `Object.attachedTo = Nothing` to the five `Object.MkObject` literals the compiler names (`Setup.hs:102`, `Monarch.hs:137`, `Activate.hs:79`, `Engine.hs:419`, `Resolve.hs:792`, `Event.hs:320`).
-
-- [ ] **Step 4: Seed it through the zone change**
-
-In `source/library/Pawl/Event.hs`, rename the body and add the seeded entry point:
-
-```haskell
-changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching oid requestedDest Nothing
-
--- changeZoneReturning with an attachment seed. CR 303.4: "An Aura ENTERS the
--- battlefield attached to an object or player" -- attachment is a property of
--- entering, not a step after it. The entry replacement loop (CR 614.1c) and the
--- Moved event both run before this function returns, so an Aura attached
--- afterward would be unattached during both. No card in this pool can observe
--- the difference today; the seed buys the ordering rather than a passing test.
-changeZoneAttaching :: ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)
-changeZoneAttaching oid requestedDest seed = do
-```
-
-— the existing body follows unchanged except for `mkObj`, which gains the field:
-
-```haskell
-              mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.timestamp = ts}
-```
-
-`changeZone` is unchanged (`Monad.void (changeZoneReturning oid requestedDest)`), so **every existing call site is untouched**.
-
-- [ ] **Step 5: Add the test fixture**
-
-In `source/test-suite/Pawl/Support.hs`:
-
-```haskell
--- CR 303.4b: attach `aura` to `target` directly, without casting. A STATE
--- fixture (the shape addCreature and withEffect already have), not a synthetic
--- card -- both cards involved are real printings.
-attach :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-attach aura target gs =
-  let set obj = obj {Object.attachedTo = Just target}
-   in gs {GameState.objects = Map.adjust set aura (GameState.objects gs)}
-```
-
-- [ ] **Step 6: Run tests to verify they pass**
+- [ ] **Step 7: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add source/library/Pawl/ source/test-suite/Pawl/
+git add data/cards/unholy-strength.json source/library/Pawl/ source/test-suite/Pawl/
 hooky fix
-git add source/library/Pawl/ source/test-suite/Pawl/
+git add data/cards/unholy-strength.json source/library/Pawl/ source/test-suite/Pawl/
 hooky run
-git commit -m "feat(object): attachment is base state, seeded as the object enters (CR 303.4)"
+git commit -m "feat(cards): add Unholy Strength, and Affected.Attached for the enchanted permanent (CR 303.4m)"
 ```
 
 ---
@@ -563,7 +637,7 @@ An Aura printing now exists, so the qualifier is testable for the first time.
 - Modify: `source/test-suite/Pawl/ProjectionSpec.hs`
 
 **Interfaces:**
-- Consumes: `Subtype.Aura` (Task 1), the Unholy Strength printing (Task 3).
+- Consumes: `Subtype.Aura` (Task 1), the Unholy Strength printing (Task 4).
 
 Opalescence reads "Each other non-Aura enchantment is a creature in addition to its other types and has base power and toughness each equal to its mana value." Both of its static abilities carry the same affected set; **both** get the new conjunct.
 
@@ -631,110 +705,7 @@ gh issue close 114 --comment "Subtype.Aura now exists, so the qualifier is a Not
 
 ---
 
-## Task 6: `Affected.Attached`
-
-The projection reads "the enchanted permanent". This is what makes Unholy Strength's static ability live and turns Task 3's red test green.
-
-**Files:**
-- Modify: `source/library/Pawl/Type/Affected.hs`, `source/library/Pawl/Projection.hs`, `source/library/Pawl/Codec.hs`
-- Test: `source/test-suite/Pawl/PowerToughnessSpec.hs`
-
-**Interfaces:**
-- Consumes: `Object.attachedTo` (Task 4), `S.attach` (Task 4), the Unholy Strength printing (Task 3).
-- Produces: `Affected.Attached`.
-
-- [ ] **Step 1: Write the failing test**
-
-In `source/test-suite/Pawl/PowerToughnessSpec.hs`:
-
-```haskell
-HU.testCase "CR 303.4m: an attached Unholy Strength gives the enchanted creature +2/+1" $ do
-  piker <- Registry.printing registry "Goblin Piker"
-  unholyStrength <- Registry.printing registry "Unholy Strength"
-  let base = Setup.emptyGame S.bothPlayers
-      -- Goblin Piker is a 2/1.
-      (creature, withCreature) = S.addCreature piker S.bob base
-      (aura, withAura) = S.addCreature unholyStrength S.alice withCreature
-      attached = S.attach aura creature withAura
-  HU.assertEqual "unattached, the ability names nothing" (Just (2, 1)) (S.powerToughnessOf creature withAura)
-  HU.assertEqual "attached, +2/+1" (Just (4, 2)) (S.powerToughnessOf creature attached),
-```
-
-If `S.powerToughnessOf` does not exist, use whatever accessor the neighbouring cases in this file already use to read projected P/T, and match its exact return type.
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cabal build all --enable-tests --enable-benchmarks`
-Expected: FAIL to compile — `Affected.Attached` is not in scope. (Task 3's Unholy Strength case fails the same way; both go green together.)
-
-- [ ] **Step 3: Add the constructor**
-
-In `source/library/Pawl/Type/Affected.hs`:
-
-```haskell
-  | -- CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
-    -- creature". A THIRD kind of affected set: TheseObjects is fixed at
-    -- resolution (CR 611.2c) and Matching is a predicate re-derived per
-    -- candidate, while this is re-derived from the SOURCE's own state.
-    --
-    -- The set is {o} when the source is attached to o, and EMPTY when it is
-    -- unattached -- an Aura in the graveyard, or one the CR 704.5m sweep has not
-    -- reached yet. Payload-free: CR 303.4m defines it for any permanent, "even
-    -- if the permanent with the ability isn't an Aura", so there is nothing to
-    -- parameterize.
-    Attached
-```
-
-Extend the module's own header comment to describe three kinds rather than two.
-
-- [ ] **Step 4: Add the projection arm**
-
-In `source/library/Pawl/Projection.hs`, in `affects`:
-
-```haskell
-  -- CR 303.4m: read the SOURCE's attachment, not the candidate's. An unattached
-  -- source names nothing, so the set is empty and the effect applies to no one.
-  Affected.Attached -> case Game.lookupObject source gs of
-    Nothing -> False
-    Just src -> Object.attachedTo src == Just oid
-```
-
-Then fix every other exhaustive `Affected` match the compiler names. The one at `Projection.hs:865` (inside `controllerOf`) keeps its existing `_ -> False` default — phase (b) is what teaches control to read static abilities, and adding `Attached` there now would be dead code.
-
-- [ ] **Step 5: Add the codec arms**
-
-In `source/library/Pawl/Codec.hs`:
-
-```haskell
-  Affected.Attached -> Json.tagged (Text.pack "Attached") Nothing
-```
-
-and in `jsonToAffected`:
-
-```haskell
-    "Attached" -> pure Affected.Attached
-```
-
-Match the exact shape the neighbouring nullary tags use — check how another payload-free tagged constructor decodes in this module before writing the arm.
-
-- [ ] **Step 6: Run tests to verify they pass**
-
-Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
-Expected: PASS — including Task 3's previously-red Unholy Strength case.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add source/library/Pawl/ source/test-suite/Pawl/PowerToughnessSpec.hs
-hooky fix
-git add source/library/Pawl/ source/test-suite/Pawl/PowerToughnessSpec.hs
-hooky run
-git commit -m "feat(projection): Affected.Attached names the enchanted permanent (CR 303.4m)"
-```
-
----
-
-## Task 7: The enchant slot reaches targeting and castability
+## Task 6: The enchant slot reaches targeting and castability
 
 The merge, plus `Target.fillableModes`'s extra-slots parameter. Without the second half, an Aura with no legal creature is castable and then countered on resolution — which CR 601.2c says can never happen (spec §3.3, item 1).
 
@@ -743,7 +714,7 @@ The merge, plus `Target.fillableModes`'s extra-slots parameter. Without the seco
 - Test: `source/test-suite/Pawl/CastSpec.hs`
 
 **Interfaces:**
-- Consumes: `Card.enchantSpecs`, `Card.enchantSlot` (Task 2).
+- Consumes: `Card.enchantSpecs`, `Card.enchantSlot` (Task 2); the Unholy Strength printing (Task 4).
 - Produces: `Target.fillableModes :: ObjectId -> Map SlotName TargetSpec -> Modal.Modal Card -> GameState -> Set ModeIndex` (note the **new second parameter**).
 
 - [ ] **Step 1: Write the failing test**
@@ -860,7 +831,7 @@ git commit -m "feat(target): an Aura spell's enchant slot reaches targeting and 
 
 ---
 
-## Task 8: `Stack`'s Aura branch — fizzle, then enter attached
+## Task 7: `Stack`'s Aura branch — fizzle, then enter attached
 
 The end-to-end path, and the phase's headline test.
 
@@ -870,7 +841,7 @@ The end-to-end path, and the phase's headline test.
 - Modify: `source/test-suite/Pawl/Main.hs`, `pawl.cabal`
 
 **Interfaces:**
-- Consumes: `Card.isAura`, `Card.enchantSlot` (Task 2); `Event.changeZoneAttaching` (Task 4); the merged specs (Task 7).
+- Consumes: `Card.isAura`, `Card.enchantSlot` (Task 2); `Event.changeZoneAttaching` (Task 3); the merged specs (Task 6).
 - Produces: `Resolve.targetsAllIllegal :: ObjectId -> GameState -> Bool`.
 
 `AuraSpec` heads with a comment listing the modules it covers, exposes `tests :: TestTree`, and is added to `Main.hs`'s `testTree` **and** to the test-suite `other-modules` list in `pawl.cabal` by hand.
@@ -1015,7 +986,7 @@ git commit -m "feat(stack): an Aura spell fizzles or enters attached (CR 303.4, 
 
 ---
 
-## Task 9: CR 704.5m — the Aura falls off
+## Task 8: CR 704.5m — the Aura falls off
 
 The state-based action, and the stale comment it falsifies.
 
@@ -1024,7 +995,7 @@ The state-based action, and the stale comment it falsifies.
 - Test: `source/test-suite/Pawl/AuraSpec.hs`
 
 **Interfaces:**
-- Consumes: `Object.attachedTo` (Task 4), `Target.stillLegal`, `Card.Type.enchant` (Task 2).
+- Consumes: `Object.attachedTo` (Task 3), `Target.stillLegal`, `Card.Type.enchant` (Task 2).
 
 **The two-pass behaviour is the assertion, not an accident.** SBAs are simultaneous: `performStateBasedActions` judges every object against the *pre-pass* projection (`Sba.hs:117-120`). When the enchanted creature dies in pass N, the Aura's illegality was judged against the state in which that creature was still on the battlefield — so the Aura survives pass N and falls off in pass N+1. CR 704.3 repeats the check until no state-based action is performed, which is what makes that correct rather than a bug.
 
@@ -1164,7 +1135,7 @@ git commit -m "feat(sba): an Aura attached to nothing or to an illegal object fa
 
 ---
 
-## Task 10: Record the phase
+## Task 9: Record the phase
 
 The bookkeeping that closes it out. The deferral issues were filed in Task 1 Step 0 and cited as the code went in.
 
