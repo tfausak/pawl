@@ -855,7 +855,7 @@ playSubgame = do
       only NonEmpty.:| [] -> pure only
       _ -> Trans.lift (Program.prompt (Prompt.RandomFirstPlayer order))
   let sub0 = Setup.subgameStateFrom starter parent
-  (result, finalSub) <- Trans.lift (State.runStateT (Setup.startGameFromCards Resolve.performMulliganAction >> playGame) sub0)
+  (result, finalSub) <- Trans.lift (State.runStateT (Setup.startGameFromCards Resolve.performHandAction >> playGame) sub0)
   State.modify' (Setup.funnelBack finalSub)
   -- CR 729.5: "each player takes all traditional cards they own that are in the
   -- subgame ... puts them into their main-game library, then shuffles them." Each
@@ -867,5 +867,5 @@ playSubgame = do
 
 playFrom :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game Result
 playFrom matchup = do
-  Setup.newGame Resolve.performMulliganAction matchup
+  Setup.newGame Resolve.performHandAction matchup
   playGame

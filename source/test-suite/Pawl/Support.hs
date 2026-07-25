@@ -61,10 +61,10 @@ import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
-import qualified Pawl.Type.MulliganPerformer as MulliganPerformer
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -585,10 +585,10 @@ withEffect oid m gs =
   let (ts, gs1) = Game.freshTimestamp gs
    in withEffectAt oid ts m gs1
 
--- The one CR 103.5b performer (Pawl.Resolve.performMulliganAction), so a test
+-- The one CR 103.5b performer (Pawl.Resolve.performHandAction), so a test
 -- that only wants a game set up does not have to reach into Pawl.Resolve for it.
-performer :: MulliganPerformer.MulliganPerformer
-performer = Resolve.performMulliganAction
+performer :: HandActionPerformer.HandActionPerformer
+performer = Resolve.performHandAction
 
 -- The source stand-in for a targeting call whose spec is source-blind (every
 -- spec but OpponentCreatureTarget). Object id 999 names nothing, the same

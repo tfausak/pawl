@@ -18,7 +18,7 @@ import qualified Pawl.Type.Deck as Deck
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.MulliganPerformer (MulliganPerformer)
+import Pawl.Type.HandActionPerformer (HandActionPerformer)
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -124,7 +124,7 @@ createDeck pid (Deck.MkDeck m) =
   Monad.forM_ (Map.toList m) $ \(printing, n) ->
     Monad.replicateM_ (fromIntegral n) (createCard pid printing)
 
-newGame :: MulliganPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
+newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do
   -- CR 103.3: build and shuffle every library BEFORE any opening hand is drawn,
   -- so CR 103.5's declaration round (Mulligan.openingHands) sees settled libraries.
@@ -148,7 +148,7 @@ newGame perform matchup = do
 -- takes every object a departing player owns out of the game with them
 -- (Departure.objectsLeaveWith), so a rebuild has nothing of theirs left in the
 -- object pool to orphan.
-startGameFromCards :: MulliganPerformer -> Game ()
+startGameFromCards :: HandActionPerformer -> Game ()
 startGameFromCards perform = do
   gs <- State.get
   let owners = Departure.stillPlayingInOrder gs
@@ -225,7 +225,7 @@ resetPlayers players =
 -- turn's untap step, with no player holding priority -- phase = firstPhase,
 -- priority = Nothing, turn 1. The object and timestamp id supplies are preserved
 -- so reused cards keep unique ids; startGameFromCards rebuilds objects and zones.
-restartGame :: MulliganPerformer -> PlayerId -> Game ()
+restartGame :: HandActionPerformer -> PlayerId -> Game ()
 restartGame perform starter = do
   State.modify' $ \gs ->
     -- CR 727.1: "All players in that game when it ended then start a new game

@@ -416,12 +416,12 @@ actionsFor field pid gs =
 
 Its one existing caller, `mulliganWindow`, becomes `State.gets (actionsFor Card.mulliganAction pid)`.
 
-- [ ] **Step 7: Build and test.**
+- [x] **Step 7: Build and test.**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -5`
 Expected: warning-free; the two new codec cases pass and every committed card file still round-trips byte-identically.
 
-- [ ] **Step 8: Format, lint, and commit.**
+- [x] **Step 8: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -443,7 +443,7 @@ Rename the type and its implementation, and bind the granting card into the rese
 **Interfaces:**
 - Produces: `HandActionPerformer.HandActionPerformer`; `Resolve.performHandAction :: HandActionPerformer`.
 
-- [ ] **Step 1: Write the failing test.** The observable change is that an effect naming the reserved `self` slot now resolves. Put this in `MulliganSpec` beside the CR 103.5b cases — it drives the *mulligan* window, so it proves the binding independently of Task 6:
+- [x] **Step 1: Write the failing test.** The observable change is that an effect naming the reserved `self` slot now resolves. Put this in `MulliganSpec` beside the CR 103.5b cases — it drives the *mulligan* window, so it proves the binding independently of Task 6:
 
 ```haskell
       HU.testCase "a hand action's effects can name their own card through the reserved self slot" $ do
@@ -463,12 +463,12 @@ Rename the type and its implementation, and bind the granting card into the rese
 
 Note `gs0` here has **not** had opening hands drawn, so `handIds` is empty and the case fails on `assertFailure` until you draw. Replace `S.runPure S.identityAnswer gs0 (pure ())` with a state that has hands: run `Mulligan.openingHands S.performer [S.alice, S.bob]` under `keepAnswer` first and take its hand. Write it that way; the placeholder above is what NOT to ship.
 
-- [ ] **Step 2: Run the test to verify it fails.**
+- [x] **Step 2: Run the test to verify it fails.**
 
 Run: `cabal test 2>&1 | tail -30`
 Expected: FAIL — `Resolve.performHandAction` is not in scope (the rename has not happened), or, once renamed but before the binding is added, the exile does not happen because the slot is unbound.
 
-- [ ] **Step 3: Rename the type module.**
+- [x] **Step 3: Rename the type module.**
 
 ```bash
 git mv source/library/Pawl/Type/MulliganPerformer.hs source/library/Pawl/Type/HandActionPerformer.hs
@@ -492,14 +492,14 @@ type HandActionPerformer = ObjectId -> PlayerId -> [Effect Card] -> Game ()
 
 Keep the rest of the comment (the cycle argument and the no-default argument) unchanged.
 
-- [ ] **Step 4: Regenerate the cabal module list.** `hooky fix` will NOT do this — the rename leaves `pawl.cabal` with no staged change of its own.
+- [x] **Step 4: Regenerate the cabal module list.** `hooky fix` will NOT do this — the rename leaves `pawl.cabal` with no staged change of its own.
 
 ```bash
 cabal-gild --io pawl.cabal && grep -n "HandActionPerformer\|MulliganPerformer" pawl.cabal
 ```
 Expected: `Pawl.Type.HandActionPerformer` present, `Pawl.Type.MulliganPerformer` gone.
 
-- [ ] **Step 5: Rename the implementation and add the bindings.** In `source/library/Pawl/Resolve.hs`, rename `performMulliganAction` to `performHandAction`, update its import and signature, and replace its three empty maps:
+- [x] **Step 5: Rename the implementation and add the bindings.** In `source/library/Pawl/Resolve.hs`, rename `performMulliganAction` to `performHandAction`, update its import and signature, and replace its three empty maps:
 
 ```haskell
 performHandAction :: HandActionPerformer.HandActionPerformer

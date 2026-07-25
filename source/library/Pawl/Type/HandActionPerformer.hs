@@ -1,4 +1,4 @@
-module Pawl.Type.MulliganPerformer where
+module Pawl.Type.HandActionPerformer where
 
 import Pawl.Type.Card (Card)
 import Pawl.Type.Effect (Effect)
@@ -6,9 +6,13 @@ import Pawl.Type.Game (Game)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 
--- CR 103.5b: how the closed half performs a mulligan-window action's effects --
--- the hand card that granted the action, the player taking it, and the effects
--- themselves.
+-- CR 103.5b / CR 103.6: how the closed half performs the effects of an action a
+-- card grants from a player's HAND before the game begins -- the card that
+-- granted it, the player taking it, and the effects themselves.
+--
+-- Both windows use it: the mulligan-declaration window (CR 103.5b) and the
+-- opening-hand window (CR 103.6), the second of which is explicitly not a
+-- mulligan, which is why the name is no longer MulliganPerformer.
 --
 -- A PARAMETER rather than an import because Pawl.Resolve sits ABOVE
 -- Pawl.Mulligan in the module graph (Effect.RestartGame -> Setup.restartGame ->
@@ -21,4 +25,4 @@ import Pawl.Type.PlayerId (PlayerId)
 -- Deliberately has NO default: "no subgame runner" is a real state of the world
 -- (Resolve.noSubgame), but "no mulligan performer" is not -- it would silently
 -- disable every CR 103.5b card at whichever call site forgot one.
-type MulliganPerformer = ObjectId -> PlayerId -> [Effect Card] -> Game ()
+type HandActionPerformer = ObjectId -> PlayerId -> [Effect Card] -> Game ()

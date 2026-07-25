@@ -41,11 +41,11 @@ import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Type.Keyword as Keyword
 import Pawl.Type.ManaType (ManaType)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
-import qualified Pawl.Type.MulliganPerformer as MulliganPerformer
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
@@ -585,7 +585,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- Pawl.Type.RestartSignal.
   -- Not implemented: the CR 727.5/727.5a exemption + put-onto-battlefield rider
   -- of full Karn Liberated (#135), which retires the synthetic-restart gate.
-  Effect.RestartGame -> Setup.restartGame performMulliganAction controller
+  Effect.RestartGame -> Setup.restartGame performHandAction controller
   -- CR 729.1/729.5: run the nested game to completion (the runner does the
   -- construction, play, funnel-back, and reshuffle); then bind its outcome.
   -- CR 729.1b: the loser is the 2-player derivation from the Result; a Drawn
@@ -929,21 +929,35 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
 applyEffect :: ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffect = applyEffectWith noSubgame
 
--- CR 103.5b: perform the effects of a mulligan-window action. Pawl.Mulligan's
--- window loop reaches this through the MulliganPerformer parameter it is handed
--- (see Pawl.Type.MulliganPerformer for why it is a parameter).
+-- CR 103.5b / CR 103.6: perform the effects of an action a card grants from a
+-- player's hand. Pawl.Mulligan's two window loops reach this through the
+-- HandActionPerformer parameter they are handed (see
+-- Pawl.Type.HandActionPerformer for why it is a parameter).
 --
--- The action does not use the stack -- CR 103.5b says the player PERFORMS it,
+-- The action does not use the stack -- both rules say the player PERFORMS it,
 -- not that they cast or activate anything -- so there is nothing to put on the
--- stack, no targets to choose and no modes to bind: the empty binding, legality
--- and chosen maps are the whole context. The CHOICE of whether to act was
--- already routed through Decide.deciderFor at the prompt (CR 723).
+-- stack and no modes to bind. The CHOICE of whether to act was already routed
+-- through Decide.deciderFor at the prompt (CR 723).
 --
 -- Stands on the noSubgame floor (applyEffect), exactly as the RestartGame arm
--- does: no mulligan-window action starts a subgame.
-performMulliganAction :: MulliganPerformer.MulliganPerformer
-performMulliganAction source player =
-  Monad.mapM_ (applyEffect source player Map.empty Map.empty Map.empty)
+-- does: no hand action starts a subgame.
+performHandAction :: HandActionPerformer.HandActionPerformer
+performHandAction source player =
+  Monad.mapM_
+    ( applyEffect
+        source
+        player
+        Map.empty
+        -- CR 115.1: the reserved self slot is NOT a target, so there is no CR
+        -- 608.2b legality question to answer -- the card is in the acting
+        -- player's hand by construction. Binding it is how "this card" is
+        -- expressible with no self-variant opcode (see Effect.Sacrifice's
+        -- comment, and Engine.placeOne, which binds a trigger's source the same
+        -- way). CR 103.6a's "puts that card onto the battlefield" is then just
+        -- MoveToZone on this slot.
+        (Map.singleton Binding.triggerSource True)
+        (Map.singleton Binding.triggerSource (Recipient.ToObject source))
+    )
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.

@@ -149,6 +149,7 @@ library
     Pawl.Type.Game
     Pawl.Type.GameEvent
     Pawl.Type.GameState
+    Pawl.Type.HandActionPerformer
     Pawl.Type.Json
     Pawl.Type.Keyword
     Pawl.Type.Layer
@@ -167,7 +168,6 @@ library
     Pawl.Type.MonarchTarget
     Pawl.Type.MulliganDecision
     Pawl.Type.MulliganOffer
-    Pawl.Type.MulliganPerformer
     Pawl.Type.Object
     Pawl.Type.ObjectId
     Pawl.Type.Payment

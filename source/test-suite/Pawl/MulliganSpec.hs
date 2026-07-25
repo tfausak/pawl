@@ -11,15 +11,18 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Replay as Replay
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Departure as Departure.Type
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.MulliganOffer as MulliganOffer
@@ -307,6 +310,20 @@ tests registry =
         HU.assertEqual "and her library is seven shorter than after the opening draw" 7 (libSize S.alice after)
         HU.assertEqual "bob, with no Powder, is untouched" 7 (S.handSize S.bob after)
         HU.assertEqual "and exiles nothing" 0 (length (Game.zoneMembers Zone.Exile S.bob after)),
+      HU.testCase "a hand action's effects can name their own card through the reserved self slot" $ do
+        -- Resolve.performHandAction binds the granting card into
+        -- Binding.triggerSource, which is how "this card" is expressible with no
+        -- self-variant opcode (Effect.Sacrifice's own comment). Proved here on a
+        -- settled opening hand so it does not depend on CR 103.6 existing yet.
+        powder <- Registry.printing registry "Serum Powder"
+        mountain <- Registry.printing registry "Mountain"
+        let drawn = run keepAnswer (powderGame powder mountain 20)
+        case Game.zoneMembers Zone.Hand S.alice drawn of
+          [] -> HU.assertFailure "expected a drawn opening hand to act from"
+          oid : _ -> do
+            let after = S.runPure S.identityAnswer drawn (Resolve.performHandAction oid S.alice [Effect.MoveToZone Binding.triggerSource Zone.Exile])
+            HU.assertEqual "the named card left the hand" 6 (S.handSize S.alice after)
+            HU.assertEqual "and is in exile" 1 (length (Game.zoneMembers Zone.Exile S.alice after)),
       HU.testCase "CR 103.5b: the action is not a mulligan -- it does not add to the bottom count" $ do
         -- alice takes the action and then mulligans ONCE. CR 103.5 bottoms a
         -- number equal to the mulligans she has taken, which is one -- so her

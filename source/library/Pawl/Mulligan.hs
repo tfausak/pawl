@@ -14,9 +14,9 @@ import qualified Pawl.Type.Card as Card
 import Pawl.Type.Effect (Effect)
 import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameState as GameState
+import Pawl.Type.HandActionPerformer (HandActionPerformer)
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.MulliganOffer as MulliganOffer
-import Pawl.Type.MulliganPerformer (MulliganPerformer)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
@@ -43,7 +43,7 @@ shuffleLibrary pid = do
 -- reader is this loop, which needs it for the number of cards bottomed (CR 103.5)
 -- less the free allowance (CR 103.5c), so it never enters GameState. `owners` is
 -- in turn order (starting player first).
-openingHands :: MulliganPerformer -> [PlayerId] -> Game ()
+openingHands :: HandActionPerformer -> [PlayerId] -> Game ()
 openingHands perform owners = do
   -- CR 103.5 sentence 1: every player draws a full opening hand. A short library
   -- sets drewFromEmpty here; the flag survives the loop, which is what CR 727.3 /
@@ -79,7 +79,7 @@ actionsFor field pid gs =
 -- at least one card out of the hand for the rest of the game, so the deck
 -- strictly shrinks, and an empty library redraws nothing -- leaving a hand with
 -- no candidate, which ends the loop.
-mulliganWindow :: MulliganPerformer -> PlayerId -> Game ()
+mulliganWindow :: HandActionPerformer -> PlayerId -> Game ()
 mulliganWindow perform pid = do
   candidates <- State.gets (actionsFor Card.mulliganAction pid)
   case candidates of
@@ -104,7 +104,7 @@ mulliganWindow perform pid = do
 -- terminal (CR 103.5: "that player may not take any further mulligans"), so a
 -- player who keeps drops out of the pool and is never asked again; only the
 -- mulliganers of a round remain to decide in the next one.
-mulliganRounds :: MulliganPerformer -> Map.Map PlayerId Numeric.Natural.Natural -> [PlayerId] -> Game ()
+mulliganRounds :: HandActionPerformer -> Map.Map PlayerId Numeric.Natural.Natural -> [PlayerId] -> Game ()
 mulliganRounds perform counts deciding = do
   -- CR 103.5: the starting player declares first, then each other in turn order
   -- (turn order is preserved: `deciding` is filtered from the original `owners`).
