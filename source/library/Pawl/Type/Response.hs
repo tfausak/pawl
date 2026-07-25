@@ -80,4 +80,10 @@ data Response
     -- response that does not match the prompt being asked, and two prompts
     -- sharing a constructor cannot do that.
     TookMulliganAction (Maybe ObjectId)
+  | -- CR 103.6: the hand card whose opening-hand action a player took (Nothing =
+    -- declined), serialized so a DecisionLog replays it. Its own constructor
+    -- rather than a reuse of TookMulliganAction, for the reason ChoseDefender
+    -- records: decode must return Nothing for a response that does not match the
+    -- prompt being asked, and two prompts sharing a constructor cannot do that.
+    TookOpeningHandAction (Maybe ObjectId)
   deriving (Eq, Show)

@@ -58,7 +58,7 @@ The wire only. One commit, because a new GADT constructor breaks every exhaustiv
 **Interfaces:**
 - Produces: `Prompt.OpeningHandAction :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)`; `Response.TookOpeningHandAction (Maybe ObjectId)`.
 
-- [ ] **Step 1: Write the failing test.** In `source/test-suite/Pawl/ReplaySpec.hs`, add this case immediately after the existing `"MulliganAction records and replays a Maybe ObjectId"` case:
+- [x] **Step 1: Write the failing test.** In `source/test-suite/Pawl/ReplaySpec.hs`, add this case immediately after the existing `"MulliganAction records and replays a Maybe ObjectId"` case:
 
 ```haskell
           HU.testCase "OpeningHandAction records and replays a Maybe ObjectId" $
@@ -67,12 +67,12 @@ The wire only. One commit, because a new GADT constructor breaks every exhaustiv
              in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
 ```
 
-- [ ] **Step 2: Run the test to verify it fails to COMPILE.**
+- [x] **Step 2: Run the test to verify it fails to COMPILE.**
 
 Run: `cabal build pawl-test-suite --enable-tests 2>&1 | tail -20`
 Expected: compile error — `Data constructor not in scope: Prompt.OpeningHandAction`.
 
-- [ ] **Step 3: Add the `Prompt` constructor.** In `source/library/Pawl/Type/Prompt.hs`, append after `MulliganAction`:
+- [x] **Step 3: Add the `Prompt` constructor.** In `source/library/Pawl/Type/Prompt.hs`, append after `MulliganAction`:
 
 ```haskell
   -- CR 103.6: an action a card in this player's opening hand lets them take once
@@ -92,7 +92,7 @@ Expected: compile error — `Data constructor not in scope: Prompt.OpeningHandAc
   OpeningHandAction :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
 ```
 
-- [ ] **Step 4: Add the `Response` constructor.** In `source/library/Pawl/Type/Response.hs`, append after `TookMulliganAction`:
+- [x] **Step 4: Add the `Response` constructor.** In `source/library/Pawl/Type/Response.hs`, append after `TookMulliganAction`:
 
 ```haskell
   | -- CR 103.6: the hand card whose opening-hand action a player took (Nothing =
@@ -103,7 +103,7 @@ Expected: compile error — `Data constructor not in scope: Prompt.OpeningHandAc
     TookOpeningHandAction (Maybe ObjectId)
 ```
 
-- [ ] **Step 5: Wire `Pawl.Replay`.** Three edits, each directly after the matching `MulliganAction` arm:
+- [x] **Step 5: Wire `Pawl.Replay`.** Three edits, each directly after the matching `MulliganAction` arm:
 
 ```haskell
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
@@ -121,7 +121,7 @@ Expected: compile error — `Data constructor not in scope: Prompt.OpeningHandAc
   Prompt.OpeningHandAction {} -> Nothing
 ```
 
-- [ ] **Step 6: Update every exhaustive answerer.** Each already has a `Prompt.MulliganAction {} -> …` arm; add a sibling directly after it.
+- [x] **Step 6: Update every exhaustive answerer.** Each already has a `Prompt.MulliganAction {} -> …` arm; add a sibling directly after it.
 
 Run: `grep -rn "Prompt.MulliganAction {}" source/test-suite source/benchmark`
 Expected: 13 hits. Pure answerers get `Prompt.OpeningHandAction {} -> Nothing`; the two monadic ones (`Support.hs`'s last interpreter and `GameSpec.hs`'s) get `Prompt.OpeningHandAction {} -> pure Nothing`.

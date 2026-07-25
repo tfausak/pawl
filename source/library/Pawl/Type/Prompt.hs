@@ -265,3 +265,18 @@ data Prompt r where
   -- Not asked when the list is empty; where the rules leave nothing to ask,
   -- don't prompt. Carries a Decider like every other player-facing prompt.
   MulliganAction :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
+  -- CR 103.6: an action a card in this player's opening hand lets them take once
+  -- the mulligan process is complete -- "begin the game with it on the
+  -- battlefield" (CR 103.6a). The [ObjectId] is the cards in hand offering one;
+  -- the answer is which to take, or Nothing to decline.
+  --
+  -- Offered in turn order, starting player first (CR 103.6), and repeatedly to
+  -- the same player until they decline: CR 103.6 lets a player take "any such
+  -- actions in any order", so both which and how many are theirs to choose.
+  --
+  -- A SEPARATE channel from MulliganAction, not a reuse of it: that window sits
+  -- AT a mulligan declaration and this one opens once the whole process is
+  -- complete, so an interpreter that could not tell them apart could not answer
+  -- either well. Not asked when the list is empty; where the rules leave nothing
+  -- to ask, don't prompt.
+  OpeningHandAction :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)

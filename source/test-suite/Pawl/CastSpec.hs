@@ -429,6 +429,7 @@ discardLastAnswer p = case p of
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
   Prompt.MulliganAction {} -> Nothing
+  Prompt.OpeningHandAction {} -> Nothing
 
 lastN :: Int -> [a] -> [a]
 lastN n xs = drop (length xs - n) xs
@@ -634,6 +635,7 @@ castFirstOption p = case p of
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
   Prompt.MulliganAction {} -> Nothing
+  Prompt.OpeningHandAction {} -> Nothing
 
 nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
@@ -677,3 +679,4 @@ castPanglacial p = case p of
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
   Prompt.MulliganAction {} -> Nothing
+  Prompt.OpeningHandAction {} -> Nothing
