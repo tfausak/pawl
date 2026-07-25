@@ -105,10 +105,10 @@ Expected: FAIL to compile — `Data constructor not in scope: Subtype.Aura`.
 At the end of `data Subtype` in `source/library/Pawl/Type/Subtype.hs`, after `Horse`:
 
 ```haskell
-  | -- CR 205.3h (an ENCHANTMENT type, not a creature type -- the first non-land,
-    -- non-creature subtype in this pool). Appended rather than grouped with the
-    -- other enchantment types, of which there are none, so every existing card's
-    -- Ord-canonical subtype list is unchanged.
+  | -- CR 205.3h: an ENCHANTMENT type. Appended rather than grouped with the other
+    -- enchantment types, of which this pool has none, so every existing card's
+    -- Ord-canonical subtype list is unchanged (card JSON stores subtypes in
+    -- declaration order, and a whole-pool test compares against it).
     Aura
 ```
 
