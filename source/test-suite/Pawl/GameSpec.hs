@@ -16,6 +16,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Departure as Departure
@@ -42,6 +43,7 @@ import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Expiry as Expiry.Type
 import qualified Pawl.Type.Game as Game.Type
+import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.Modal as Modal
@@ -72,6 +74,7 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -1193,7 +1196,86 @@ turnOrderTests registry =
         HU.assertEqual
           "alice departed by paying her last 2 life"
           (Just (Status.Departed Departure.Type.Lost))
-          (fmap Player.status (Map.lookup S.alice (GameState.players after)))
+          (fmap Player.status (Map.lookup S.alice (GameState.players after))),
+      HU.testCase "M5.6d gate: attacking the monarch takes the crown and frees Palace Jailer's prisoner; attacking the other opponent does neither" $ do
+        -- bob's Palace Jailer has entered: its first ETB made bob the monarch, and
+        -- its second exiled carol's Piker until an opponent becomes the monarch.
+        -- Carol's is the ONLY creature on the board when that ETB resolves, so the
+        -- target is forced and the test does not depend on id ordering. alice's
+        -- attacker is added afterwards.
+        --
+        -- CR 725.2: "Whenever a creature deals combat damage to the monarch, its
+        -- controller becomes the monarch."
+        --
+        -- Palace Jailer's Gatherer ruling (2021-03-19) is why the prisoner is
+        -- watching for a new monarch rather than for the Jailer: "Palace Jailer
+        -- leaving the battlefield won't cause the exiled creature to return. The
+        -- game will continue to watch for the next time an opponent becomes the
+        -- monarch."
+        piker <- Registry.printing registry "Goblin Piker"
+        palaceJailer <- Registry.printing registry "Palace Jailer"
+        let (victim, g1) = S.addCreature piker S.carol S.threePlayerGame
+            (jailer, g2) = S.addCreature palaceJailer S.bob g1
+            entered = ZoneChange.MkZoneChange jailer Zone.Stack Zone.Battlefield
+            g3 = S.withEvents [GameEvent.Moved entered (Projection.project jailer g2)] g2
+            resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 Engine.settleForPriority) Engine.priorityLoop
+            -- CR 400.7: exiling the target gives it a new object identity, so the
+            -- watch Palace Jailer's second ETB registers is keyed to a NEW id, not
+            -- `victim`'s battlefield id. `victim` is kept only as a deterministic,
+            -- total fallback -- unreachable once the size assertion below holds --
+            -- so no partial function is needed to find it.
+            prisoner = Maybe.fromMaybe victim (Maybe.listToMaybe (Map.keys (GameState.exiledUntilMonarch resolved)))
+            (attacker, g4) = S.addCreature piker S.alice resolved
+            board =
+              g4
+                { GameState.activePlayer = S.alice,
+                  GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+                  GameState.remaining =
+                    Seq.fromList
+                      [ Phase.Combat CombatStep.DeclareAttackers,
+                        Phase.Combat CombatStep.DeclareBlockers,
+                        Phase.Combat CombatStep.CombatDamage,
+                        Phase.Combat CombatStep.EndOfCombat,
+                        Phase.PostcombatMain
+                      ]
+                }
+            -- Declines blocks rather than delegating to S.aggressiveAnswer's
+            -- DeclareBlockers arm: in run A bob himself is the defending player,
+            -- and his only creature is the Jailer, which aggressiveAnswer would
+            -- happily throw in front of alice's attacker. That would zero out the
+            -- combat damage to bob for a reason CR 509.1's blocker restriction
+            -- (Task 4's own case, not this gate's) already covers -- not evidence
+            -- about the chosen defender. Declining blocks keeps this test's
+            -- damage assertions about the ONE thing it is meant to discriminate.
+            attackTo who p = case p of
+              Prompt.ChooseDefender {} -> who
+              Prompt.DeclareBlockers {} -> Map.empty
+              _ -> S.aggressiveAnswer p
+            hitBob = S.runCombat (attackTo S.bob) board
+            hitCarol = S.runCombat (attackTo S.carol) board
+        -- The fixture really is what the test claims.
+        HU.assertEqual "bob is the monarch before combat" (Just S.bob) (GameState.monarch board)
+        HU.assertEqual "exactly one creature is under the watch" 1 (Map.size (GameState.exiledUntilMonarch board))
+        HU.assertBool "carol's Piker is exiled, watching for a new monarch" (Map.member prisoner (GameState.exiledUntilMonarch board))
+        HU.assertBool "alice has an attacker" (Combat.canAttack S.alice attacker board)
+        -- Run A: alice attacks the monarch.
+        HU.assertEqual "bob took 2" (Just 18) (S.lifeOf S.bob hitBob)
+        HU.assertEqual "alice is the monarch" (Just S.alice) (GameState.monarch hitBob)
+        HU.assertEqual "the watch is discharged" Map.empty (GameState.exiledUntilMonarch hitBob)
+        -- CR 400.7: the return is itself a zone change, so the returned
+        -- permanent has yet another new object id -- `prisoner`'s id (the one it
+        -- held while exiled) never appears on any battlefield. Carol's creature
+        -- COUNT is what survives across that identity reset.
+        HU.assertEqual "and the prisoner is back on the battlefield" 1 (S.creaturesInPlay S.carol hitBob)
+        -- Run B: alice attacks the other opponent. Same board, same interpreter
+        -- shape, one different answer. Unreachable under the head-of-list
+        -- behaviour, which is what makes the pair evidence.
+        HU.assertEqual "carol took 2" (Just 18) (S.lifeOf S.carol hitCarol)
+        HU.assertEqual "bob was untouched, so he keeps the crown" (Just 20) (S.lifeOf S.bob hitCarol)
+        HU.assertEqual "bob is still the monarch" (Just S.bob) (GameState.monarch hitCarol)
+        HU.assertBool "the watch still stands" (Map.member prisoner (GameState.exiledUntilMonarch hitCarol))
+        HU.assertEqual "and the prisoner is still exiled, not back on carol's battlefield" 0 (S.creaturesInPlay S.carol hitCarol)
+        HU.assertEqual "neither run ended the game" (Nothing, Nothing) (GameState.result hitBob, GameState.result hitCarol)
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
