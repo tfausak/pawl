@@ -165,6 +165,15 @@ landsOnly registry = do
   mountain <- Registry.printing registry "Mountain"
   pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) bothPlayers)
 
+-- CR 800.1: the three-seat twin of landsOnly. 60 basic lands each, so the only
+-- reachable loss condition is CR 704.5b deck-out and the only reachable end is
+-- CR 104.2a's last player standing. The seat count is what makes it a falsifier:
+-- at two players the first deck-out ends the game, at three it must not.
+threePlayerLandsOnly :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+threePlayerLandsOnly registry = do
+  mountain <- Registry.printing registry "Mountain"
+  pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) threePlayers)
+
 -- CR 800.1: the three-seat twin of redRed -- one red deck each for alice, bob and
 -- carol. Setup.mirror is already NonEmpty-shaped, so the seat count is the only
 -- difference. The three-seat setup rules (CR 103.5c's free first mulligan, CR

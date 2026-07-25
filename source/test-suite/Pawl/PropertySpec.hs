@@ -15,6 +15,7 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Registry as Registry.Type
+import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Source as Source
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.QuickCheck as QC
@@ -134,7 +135,37 @@ propertyTests registry =
               QC.property
                 ( Maybe.isJust (GameState.result final)
                     && not (Set.null (GameState.drewFromEmpty final))
-                )
+                ),
+        -- The milestone's headline falsifier (spec sections 0 and 4). Three
+        -- lands-only seats can only ever deck out, so the game's shape is
+        -- forced: CR 704.5b takes the first player, the game CONTINUES with two
+        -- (CR 104.2a does not fire yet), CR 704.5b takes a second, and only then
+        -- is there a winner. So exactly two players drew from an empty library
+        -- and the winner is the third.
+        --
+        -- DISCRIMINATING against the two-player-shaped implementation this
+        -- milestone replaced -- one where a departure decides the game -- which
+        -- gives exactly one. It is a count, not an isJust: the old property's
+        -- shape (a result exists AND someone decked out) passes under that
+        -- implementation on the first deck-out.
+        QC.testProperty "a three-seat lands-only mirror needs TWO deck-outs to find a winner" $
+          \s -> QC.ioProperty $ do
+            decks <- S.threePlayerLandsOnly registry
+            let final = S.runRandomGame decks s
+                decked = GameState.drewFromEmpty final
+            pure $
+              QC.conjoin
+                [ QC.counterexample "exactly two players decked out" $
+                    Set.size decked QC.=== 2,
+                  QC.counterexample "and the game was won, not drawn" $
+                    QC.property (case GameState.result final of Just (Result.Won _) -> True; _ -> False),
+                  QC.counterexample "by the one player who did not deck out" $
+                    QC.property
+                      ( case GameState.result final of
+                          Just (Result.Won w) -> not (Set.member w decked)
+                          _ -> False
+                      )
+                ]
       ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
