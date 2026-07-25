@@ -724,6 +724,17 @@ concedeAnswer who p = case p of
   Prompt.Concede asked -> if asked == who then Concession.Concedes else Concession.Continues
   _ -> S.identityAnswer p
 
+-- Records the PlayerId of every Concede ask, in order, and concedes for `who`.
+-- Prompt.Concede is asked of the priority holder before anything else, so the
+-- recorded order IS the order priority moved in. Delegating through a wildcard
+-- keeps this answerer out of the -Werror exhaustiveness net.
+concedeOrderAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+concedeOrderAnswer who p = case p of
+  Prompt.Concede asked -> do
+    State.modify' (\seen -> seen <> [asked])
+    pure (if asked == who then Concession.Concedes else Concession.Continues)
+  _ -> pure (S.identityAnswer p)
+
 concedeTests :: Registry.Type.Registry -> Tasty.TestTree
 concedeTests registry =
   Tasty.testGroup
@@ -862,7 +873,37 @@ turnOrderTests =
             after = S.runPure S.identityAnswer armed Engine.handoffTurn
          in do
               HU.assertEqual "bob's turn began" S.bob (GameState.activePlayer after)
-              HU.assertEqual "alice controls him" (Just (Decider.MkDecider S.alice)) (GameState.activeControl after)
+              HU.assertEqual "alice controls him" (Just (Decider.MkDecider S.alice)) (GameState.activeControl after),
+      HU.testCase "CR 800.4a nextStillPlaying finds the successor of a player who has ALREADY departed" $
+        -- The unit-level statement of #143's first half. Bob's seat is looked up
+        -- in the FULL seating order, so his successor is carol -- not alice, the
+        -- head of the filtered list.
+        let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+         in do
+              HU.assertEqual "bob's successor is carol" S.carol (Engine.nextStillPlaying gone S.bob)
+              HU.assertEqual "carol's successor is alice (wraps)" S.alice (Engine.nextStillPlaying gone S.carol)
+              HU.assertEqual "alice's successor skips departed bob" S.carol (Engine.nextStillPlaying gone S.alice),
+      HU.testCase "CR 800.4a/117.4 priority after a concede goes to the next seat, and the pass cycle restarts" $
+        -- Both halves of #143 in one exact list, which is why it is asserted in
+        -- full rather than with `take`:
+        --
+        --   * The THIRD ask proves the seat lookup. Alice passes, bob concedes at
+        --     his own priority, and CR 800.4a's last sentence hands priority to
+        --     CAROL -- the seat after bob's. Before the fix, nextStillPlaying
+        --     could not find already-departed bob in the filtered order and fell
+        --     through to alice, the head of the list.
+        --   * The FOURTH ask proves the `passes` reset. CR 117.4 needs "all
+        --     players pass without taking any actions in between"; bob's
+        --     concession is an action, so alice's earlier pass no longer counts
+        --     and BOTH survivors must pass again. Without the reset the list is
+        --     three asks long -- carol's single pass would reach
+        --     `passes >= length (stillPlaying gs)` and end the step.
+        let gs = S.threePlayerGame {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
+            ((_, after), asks) = State.runState (Engine.runGame (concedeOrderAnswer S.bob) gs Engine.priorityLoop) []
+         in do
+              HU.assertEqual "alice, then bob, then CAROL, then alice again" [S.alice, S.bob, S.carol, S.alice] asks
+              HU.assertEqual "bob departed by conceding" (Just (Status.Departed Departure.Type.Conceded)) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
+              HU.assertEqual "the game continues" Nothing (GameState.result after)
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree

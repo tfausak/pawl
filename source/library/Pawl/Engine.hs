@@ -90,12 +90,28 @@ nextInOrder order pid = case dropWhile (/= pid) order of
     h : _ -> h
     [] -> pid
 
--- The next player after 'pid' in APNAP order who has not left the game.
+-- CR 800.4a (last sentence): "If the player who left the game had priority at
+-- the time they left, priority passes to the next player in turn order who's
+-- still in the game."
+--
+-- The seat is looked up in the FULL seating order (GameState.turnOrder is never
+-- shortened -- see Pawl.Type.GameState), so a player who has ALREADY departed
+-- still has a position from which to find their successor. That is exactly the
+-- case priorityLoop's concede arm calls this in, and it is simultaneously the
+-- correct implementation for the ordinary pass case, where `pid` is still
+-- playing and the answer is unchanged.
+--
+-- Total: falls back to `pid` when nobody is still playing.
 nextStillPlaying :: GameState -> PlayerId -> PlayerId
 nextStillPlaying gs pid =
-  let playing = Departure.stillPlaying gs
-      order = filter (`List.elem` playing) (GameState.turnOrder gs)
-   in nextInOrder order pid
+  let order = GameState.turnOrder gs
+      playing = Departure.stillPlaying gs
+      -- The cyclic scan: everyone after `pid`, then the whole order again so the
+      -- wrap is covered. A `pid` absent from the order simply starts at the head.
+      scan = drop 1 (dropWhile (/= pid) order) <> order
+   in case filter (\p -> List.elem p playing) scan of
+        h : _ -> h
+        [] -> pid
 
 checkSba :: Game ()
 checkSba = Sba.checkStateBasedActions
@@ -430,16 +446,22 @@ priorityLoop = do
                         -- to. leaveGame settles CR 104.2a on the spot; the loop's own
                         -- `finished` check then unwinds on the next iteration.
                         Departure.leaveGame Departure.Type.Conceded p
-                        -- nextStillPlaying is evaluated after leaveGame, so `p` has
-                        -- already been filtered out of the turn order and the result
-                        -- falls through to the first still-playing player rather than
-                        -- the one after `p`. Correct at two players; wrong in
-                        -- multiplayer (#143).
+                        -- CR 800.4a: priority passes to the next player in turn
+                        -- order who's still in the game. nextStillPlaying looks
+                        -- `p` up in the full seating order, so it finds p's
+                        -- SUCCESSOR even though leaveGame has already run.
                         --
-                        -- GameState.passes is not reset here, unlike the neighbouring
-                        -- Play/Cast/Activate arms below; in multiplayer a concede
-                        -- mid-pass-cycle could resolve the stack a pass early (#143).
-                        State.modify' (\g -> g {GameState.priority = Just (nextStillPlaying g p)})
+                        -- CR 117.4 requires "all players pass without taking any
+                        -- actions in between." A concession is an action that
+                        -- changes the board (CR 800.4a removes the departing
+                        -- player's objects from the game), so the passes already
+                        -- counted this cycle no longer form a succession and the
+                        -- count restarts -- as it does in the Play/Cast/Activate
+                        -- arms below. The CR does not settle this directly; not
+                        -- resetting risks resolving a spell that a player who has
+                        -- just watched a board disappear would have responded to,
+                        -- and resetting costs at most one redundant pass prompt.
+                        State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (nextStillPlaying g p)})
                         loop
                       Concession.Continues -> do
                         let decider = Decide.deciderFor p gs
