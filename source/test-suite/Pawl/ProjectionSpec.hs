@@ -413,10 +413,12 @@ tests registry =
         let damaged = S.markDamage humilityId 4 g2
             afterSba = S.settleSba damaged
         HU.assertBool "lethal damage destroys the animated enchantment" (not (Set.member humilityId (GameState.battlefield afterSba))),
-      -- CR 305.2's "each OTHER enchantment": Opalescence does not animate
-      -- itself. Since #163 that is the Not IsSource conjunct in the card's own
-      -- affected-set Filter, evaluated against the candidate View's identity --
-      -- so it is the data file, not an engine field, that has to carry it.
+      -- Opalescence's card text says "each OTHER enchantment" (no rule number
+      -- -- CR 305.2 is the one-land-per-turn rule and is unrelated): Opalescence
+      -- does not animate itself. Since #163 that is the Not IsSource conjunct in
+      -- the card's own affected-set Filter, evaluated against the candidate
+      -- View's identity -- so it is the data file, not an engine field, that has
+      -- to carry it.
       HU.testCase "CR 305.2 Opalescence does not animate itself" $ do
         humility <- Registry.printing registry "Humility"
         opalescence <- Registry.printing registry "Opalescence"
@@ -452,14 +454,18 @@ tests registry =
             (_, g1) = S.addCreature opalescence S.alice base
             (humilityId, gs) = S.addCreature humility S.alice g1
         HU.assertEqual "Humility's 1/1 7b wins" (Just 1) (Projection.powerOf humilityId gs),
-      -- Opalescence's non-Aura qualifier is unenforced; Aura subtype unmodeled (#114)
-      HU.testCase "CR 305.2 Opalescence is not itself a creature (\"each other\")" $ do
+      -- Opalescence's own text says "each other NON-AURA enchantment". Card text, not
+      -- a rule -- CR 305.2 is the one-land-per-turn rule and does not bear on this.
+      HU.testCase "Opalescence does not animate an Aura" $ do
         opalescence <- Registry.printing registry "Opalescence"
-        humility <- Registry.printing registry "Humility"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        restInPeace <- Registry.printing registry "Rest in Peace"
         let base = Setup.emptyGame S.bothPlayers
-            (opalId, g1) = S.addCreature opalescence S.alice base
-            (_, gs) = S.addCreature humility S.alice g1
-        HU.assertBool "Opalescence stays a non-creature enchantment" (not (Projection.isCreatureOf opalId gs)),
+            (_, withOpal) = S.addCreature opalescence S.alice base
+            (auraId, withAura) = S.addCreature unholyStrength S.alice withOpal
+            (ripId, gs) = S.addCreature restInPeace S.alice withAura
+        HU.assertBool "the Aura stays a non-creature" (not (Projection.isCreatureOf auraId gs))
+        HU.assertBool "a non-Aura enchantment IS animated" (Projection.isCreatureOf ripId gs),
       HU.testCase "CR 613.7 within layer 4, timestamp order (EXPIRES at CR 613.8b, #11)" $ do
         -- A Piker made a Land by B (layer 4, TheseObjects), and A = AddLandSubtype
         -- Swamp over Matching (HasCardType Land) (layer 4). With A OLDER than B, timestamp order applies

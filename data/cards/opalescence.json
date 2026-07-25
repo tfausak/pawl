@@ -59,6 +59,15 @@
               "value": {
                 "type": "IsSource"
               }
+            },
+            {
+              "type": "Not",
+              "value": {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Aura"
+                }
+              }
             }
           ]
         }
@@ -86,6 +95,15 @@
               "type": "Not",
               "value": {
                 "type": "IsSource"
+              }
+            },
+            {
+              "type": "Not",
+              "value": {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Aura"
+                }
               }
             }
           ]
