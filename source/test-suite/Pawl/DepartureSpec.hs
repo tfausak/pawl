@@ -13,6 +13,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.Combat as Combat.Type
+import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
@@ -210,5 +211,24 @@ tests registry =
             threeGone = Departure.depart Departure.Type.Conceded S.bob threeSeats
         HU.assertEqual "two seats: bob's Piker stays in the game" (Just S.bob) (fmap Object.owner (Game.lookupObject onField twoGone))
         HU.assertEqual "three seats: it does not" Nothing (Game.lookupObject alsoOnField threeGone)
-        HU.assertEqual "and the seam agrees" [False, True] (fmap Departure.continuesAfterDeparture [twoSeats, threeSeats])
+        HU.assertEqual "and the seam agrees" [False, True] (fmap Departure.continuesAfterDeparture [twoSeats, threeSeats]),
+      -- CR 800.4a: "any effects which give that player control of any objects or
+      -- players end." Mindslaver's opcode is Effect.ControlPlayerNextTurn, whose
+      -- effect lives in GameState.pendingControl until the controlled player's
+      -- turn begins (CR 723.1b) and in GameState.activeControl during it
+      -- (CR 723.1/723.3). Both are effects giving the departing player control of
+      -- a PLAYER, so both end.
+      HU.testCase "CR 800.4a a Mindslaver controller departing releases their victim, pending and active alike" $
+        let pending = S.threePlayerGame {GameState.pendingControl = Map.singleton S.carol (Decider.MkDecider S.bob)}
+            duringTurn =
+              S.threePlayerGame
+                { GameState.activePlayer = S.carol,
+                  GameState.activeControl = Just (Decider.MkDecider S.bob)
+                }
+            pendingGone = Departure.depart Departure.Type.Conceded S.bob pending
+            activeGone = Departure.depart Departure.Type.Conceded S.bob duringTurn
+         in do
+              HU.assertEqual "the scheduled control is gone" Map.empty (GameState.pendingControl pendingGone)
+              HU.assertEqual "the live control is gone" Nothing (GameState.activeControl activeGone)
+              HU.assertEqual "and a control held by someone still playing is untouched" (Just (Decider.MkDecider S.alice)) (GameState.activeControl (Departure.depart Departure.Type.Conceded S.bob (duringTurn {GameState.activeControl = Just (Decider.MkDecider S.alice)})))
     ]

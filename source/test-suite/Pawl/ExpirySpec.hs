@@ -477,6 +477,27 @@ masterThiefTests registry =
         -- CR 800.4a ends only the effects that GIVE the departing player control
         -- and this one gives control to alice, who is still here.
         HU.assertEqual "the effect that named it is still stored, and inert" 1 (length (GameState.continuousEffects gone))
+        HU.assertEqual "CR 104.2a: two survivors, so the game continues" Nothing (GameState.result gone),
+      -- CR 800.4a, first example: "If Alex leaves the game, so does Mind Control,
+      -- and Assault Griffin reverts to Bianca's control." CR 800.4a's second
+      -- example says the same for Act of Treason's change-of-control effect.
+      -- Master Thief is a creature rather than an Aura, so the thief simply
+      -- leaves; what matters is that the effect ends AT THE DEPARTURE and not at
+      -- some later sweep.
+      HU.testCase "CR 800.4a the THIEF departs: the control effect ends immediately and the artifact reverts" $ do
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        masterThief <- Registry.printing registry "Master Thief"
+        let (thief, myr, stolen) = masterThiefThreeWay darksteelMyr masterThief
+            gone = Departure.depart Departure.Type.Conceded S.alice stolen
+        HU.assertEqual "alice really had it before she left" (Just S.alice) (Projection.controllerOf myr stolen)
+        HU.assertEqual "Master Thief left the game with its owner" Nothing (Game.lookupObject thief gone)
+        HU.assertEqual "the Myr is still in the game" (Just S.bob) (fmap Object.owner (Game.lookupObject myr gone))
+        HU.assertBool "and still on the battlefield" (Set.member myr (GameState.battlefield gone))
+        HU.assertEqual "under bob again" (Just S.bob) (Projection.controllerOf myr gone)
+        -- The discriminator against "a sweep would have got there eventually":
+        -- CR 800.4a says "It happens as soon as the player leaves the game", and
+        -- Expiry.sweepConditional runs at the next settle, not now.
+        HU.assertEqual "no stored effect survives the departure itself" [] (GameState.continuousEffects gone)
         HU.assertEqual "CR 104.2a: two survivors, so the game continues" Nothing (GameState.result gone)
     ]
 

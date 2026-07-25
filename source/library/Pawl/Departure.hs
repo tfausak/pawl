@@ -7,7 +7,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Game as Game
 import qualified Pawl.Monarch as Monarch
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.Combat as Combat
+import qualified Pawl.Type.Decider as Decider
 import Pawl.Type.Departure (Departure)
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
@@ -62,7 +64,10 @@ depart reason pid gs =
       -- clauses are composed in the rule's order and nothing here reorders them.
       -- They run BEFORE the status flip, as the rule's later clauses read
       -- "objects still controlled by that player".
-      settled = if continuesAfterDeparture gs then objectsLeaveWith pid gs else gs
+      settled =
+        if continuesAfterDeparture gs
+          then controlEffectsEnd pid (objectsLeaveWith pid gs)
+          else gs
       flipped = settled {GameState.players = Map.adjust lose pid (GameState.players settled)}
    in Monarch.reassignOnDeparture pid (stillPlayingInOrder flipped) flipped
 
@@ -155,6 +160,38 @@ objectsLeaveWith pid gs =
                 GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1)
               }
    in List.foldl' leave gs owned
+
+-- CR 800.4a, second clause: "any effects which give that player control of any
+-- objects or players end."
+--
+-- Three carriers, because pawl has three ways to give control:
+--
+--   * a stored layer-2 SetController continuous effect (Master Thief, Act of
+--     Treason -- both in the pool). Projection.givesControlTo makes the match, so
+--     the case on Modification stays where it belongs.
+--   * GameState.activeControl -- this turn's Decider (CR 723.1/723.3).
+--   * GameState.pendingControl -- a Decider scheduled for a later turn
+--     (CR 723.1b). CR 800.4b's last sentence, "If a player would be controlled by
+--     a player who has left the game, they aren't", says the same thing one step
+--     later at Engine.beginTurnOf's promotion. Two rules, one outcome; neither is
+--     the other's spare.
+--
+-- CR 800.4a is immediate: "It happens as soon as the player leaves the game."
+-- Master Thief's ForAsLongAs condition would eventually drop its effect through
+-- Expiry.sweepConditional, but a sweep runs at the next settle, and the gap
+-- between the two is exactly the difference between the rule and an
+-- approximation of it.
+controlEffectsEnd :: PlayerId -> GameState -> GameState
+controlEffectsEnd pid gs =
+  let heldBy decider = case decider of
+        Decider.MkDecider d -> d == pid
+   in gs
+        { GameState.continuousEffects = filter (\eff -> not (Projection.givesControlTo pid eff)) (GameState.continuousEffects gs),
+          GameState.activeControl = case GameState.activeControl gs of
+            Just decider -> if heldBy decider then Nothing else Just decider
+            Nothing -> Nothing,
+          GameState.pendingControl = Map.filter (\decider -> not (heldBy decider)) (GameState.pendingControl gs)
+        }
 
 -- CR 104.2a: "A player still in the game wins the game if that player's opponents
 -- have all left the game."

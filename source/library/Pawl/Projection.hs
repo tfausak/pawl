@@ -878,3 +878,14 @@ controllerOf oid gs = case Game.lookupObject oid gs of
 -- control", replacing the owner-based Game.zoneMembers Battlefield.
 controls :: PlayerId.PlayerId -> GameState -> [ObjectId]
 controls pid gs = filter (\oid -> controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs))
+
+-- CR 800.4a: does this stored effect give `pid` control of an object? The
+-- control-granting classification Pawl.Departure asks, so that the case on
+-- Modification stays in the one module allowed to make it (see
+-- Pawl.Type.Modification). Modification.SetController's payload IS the player who
+-- gains control -- it is baked at effect creation and is the effect's source's
+-- controller -- so the payload is what "that player" names.
+givesControlTo :: PlayerId.PlayerId -> ContinuousEffect.ContinuousEffect -> Bool
+givesControlTo pid eff = case ContinuousEffect.modification eff of
+  Modification.SetController who -> who == pid
+  _ -> False
