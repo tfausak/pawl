@@ -40,6 +40,7 @@ import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Expiry as Expiry.Type
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -53,7 +54,9 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Type.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
@@ -969,7 +972,36 @@ turnOrderTests registry =
             after = S.runPure attackWithEverythingAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))
             control = S.runPure attackWithEverythingAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))
         HU.assertBool "the departed active player is never asked to attack" (Map.null (Combat.Type.attackers (GameState.combat after)))
-        HU.assertBool "a playing active player IS asked -- the all-in answerer proves the prompt fires" (not (Map.null (Combat.Type.attackers (GameState.combat control))))
+        HU.assertBool "a playing active player IS asked -- the all-in answerer proves the prompt fires" (not (Map.null (Combat.Type.attackers (GameState.combat control)))),
+      HU.testCase "M5.6a gate: a three-player game survives a concede, and the departed seat still ends its durations" $
+        -- Alice, bob, carol. Bob arms an "until your next turn" player effect
+        -- (Silence's shape: an ActivePlayerEffect with Expiry.AtTurnOf bob), then
+        -- concedes mid-cycle at his own priority.
+        --
+        --   * CR 800.4a: priority passes to CAROL, the next seat still in the
+        --     game -- not alice, the head of the order.
+        --   * CR 104.2a: two survivors, so there is no result and the step runs
+        --     to its end.
+        --   * CR 800.4k: bob's turn does not begin at the handoff.
+        --   * CR 800.4m: bob's effect ends at the seat where his turn WOULD have
+        --     begun -- not when he left, and not never.
+        let armed =
+              S.addPlayerEffect
+                (Expiry.Type.AtTurnOf S.bob)
+                PlayerScope.Opponents
+                PlayerEffect.Type.CantCastSpells
+                S.bob
+                (S.threePlayerGame {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
+            ((_, afterStep), asks) = State.runState (Engine.runGame (concedeOrderAnswer S.bob) armed Engine.runStep) []
+            afterHandoff = S.runPure S.identityAnswer afterStep Engine.handoffTurn
+         in do
+              HU.assertEqual "carol received priority after bob's concession" [S.alice, S.bob, S.carol, S.alice] asks
+              HU.assertEqual "bob departed by conceding" (Just (Status.Departed Departure.Type.Conceded)) (fmap Player.status (Map.lookup S.bob (GameState.players afterStep)))
+              HU.assertEqual "the game continues" Nothing (GameState.result afterStep)
+              HU.assertBool "the step ran to its end and advanced" (GameState.phase afterStep /= Phase.PrecombatMain)
+              HU.assertEqual "bob's effect did NOT end when he left" 1 (length (GameState.playerEffects afterStep))
+              HU.assertEqual "carol takes the next turn, bob's seat is skipped" S.carol (GameState.activePlayer afterHandoff)
+              HU.assertEqual "and bob's effect ended at bob's seat -- not never" [] (GameState.playerEffects afterHandoff)
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
