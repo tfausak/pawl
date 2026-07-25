@@ -701,6 +701,31 @@ silenceBoard plains silence mountain prodigalSorcerer piker =
           }
       )
 
+-- CR 800.1: the three-seat Silence board. alice has two Plains and a Silence in
+-- hand; bob and carol each have TWO Mountains (Goblin Piker is {1}{R}, two mana,
+-- so one Mountain each -- as the brief originally specified -- cannot afford it;
+-- the two-seat silenceBoard above gives bob two Mountains for the same reason)
+-- and a creature in hand to cast. The SEAT COUNT is the whole point -- at two
+-- players "the other player" and "every other player" are the same set, so
+-- silenceBoard cannot tell the readings apart.
+threeSeatSilenceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+threeSeatSilenceBoard plains silence mountain piker =
+  let gs0 = Setup.emptyGame S.threePlayers
+      (_, gs1) = S.addCreature plains S.alice gs0
+      (_, gs2) = S.addCreature plains S.alice gs1
+      (silenceId, gs3) = S.addHandCard silence S.alice gs2
+      (_, gs4) = S.addCreature mountain S.bob gs3
+      (_, gs5) = S.addCreature mountain S.bob gs4
+      (bobsPiker, gs6) = S.addHandCard piker S.bob gs5
+      (_, gs7) = S.addCreature mountain S.carol gs6
+      (_, gs8) = S.addCreature mountain S.carol gs7
+      (carolsPiker, gs9) = S.addHandCard piker S.carol gs8
+   in ( silenceId,
+        bobsPiker,
+        carolsPiker,
+        gs9 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+      )
+
 -- alice casts Silence and it resolves.
 silenceAfter :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
 silenceAfter plains silence mountain prodigalSorcerer piker =
@@ -777,7 +802,46 @@ silenceTests registry =
         let (_, _, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
             ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
         HU.assertEqual "nothing stored" [] (GameState.playerEffects ended)
-        HU.assertBool "bob may cast again" (not (PlayerEffect.prohibitsCasting S.bob ended))
+        HU.assertBool "bob may cast again" (not (PlayerEffect.prohibitsCasting S.bob ended)),
+      -- CR 806.1: in a free-for-all the players compete as individuals, so the
+      -- card's your-opponents is EVERY other player, not the next seat. This is
+      -- the first Silence fixture that can tell those apart.
+      HU.testCase "CR 806.1 at three seats Silence stops BOTH opponents, and still spares the caster" $ do
+        plains <- Registry.printing registry "Plains"
+        silence <- Registry.printing registry "Silence"
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (silenceId, bobsPiker, carolsPiker, before) = threeSeatSilenceBoard plains silence mountain piker
+            -- Goblin Piker is a creature, so CR 601.3a's sorcery speed applies: it is
+            -- offered only to the ACTIVE player (Cast.sorcerySpeed). `before` is
+            -- alice's own main phase (she needs no such window: Silence is an
+            -- instant), so bob and carol's positive controls are checked against a
+            -- copy with the activePlayer field flipped to each of them in turn --
+            -- nothing else about the board changes. Directly poking activePlayer via
+            -- record update to stage a hypothetical turn already appears above
+            -- (thaliaBoard, ruleOfLawBoard's nextOwnTurn).
+            bobsTurn = before {GameState.activePlayer = S.bob}
+            carolsTurn = before {GameState.activePlayer = S.carol}
+            resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer before (Cast.castSpell S.alice silenceId)) Engine.priorityLoop
+            resolvedBobsTurn = resolved {GameState.activePlayer = S.bob}
+            resolvedCarolsTurn = resolved {GameState.activePlayer = S.carol}
+        -- The fixture really is three-seat and both opponents really could cast,
+        -- given their own main phase.
+        HU.assertEqual "three seats" 3 (length (GameState.turnOrder before))
+        HU.assertBool "bob could cast before it resolved" (elem (Action.Type.Cast bobsPiker) (Action.legalActions S.bob bobsTurn))
+        HU.assertBool "carol could cast before it resolved" (elem (Action.Type.Cast carolsPiker) (Action.legalActions S.carol carolsTurn))
+        HU.assertEqual "one stored effect" 1 (length (GameState.playerEffects resolved))
+        -- THE DISCRIMINATOR. carol is the far seat: an Opponents scope resolved as
+        -- "the next player in turn order" prohibits bob and leaves carol free, and
+        -- that is the reading the doc comments claimed was in here.
+        HU.assertBool "bob is prohibited" (PlayerEffect.prohibitsCasting S.bob resolved)
+        HU.assertBool "carol is prohibited too" (PlayerEffect.prohibitsCasting S.carol resolved)
+        HU.assertEqual
+          "and nothing is offered to either, even on their own main phase"
+          []
+          (filter isCast (Action.legalActions S.bob resolvedBobsTurn) <> filter isCast (Action.legalActions S.carol resolvedCarolsTurn))
+        -- CR 109.5: the scope is resolved off the effect's controller.
+        HU.assertBool "alice is not prohibited" (not (PlayerEffect.prohibitsCasting S.alice resolved))
     ]
 
 -- Loaded fresh inside each case that needs it -- equivalent because loading
