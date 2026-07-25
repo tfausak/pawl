@@ -177,6 +177,34 @@ rotateTo :: PlayerId -> [PlayerId] -> [PlayerId]
 rotateTo starter order = case break (== starter) order of
   (before, after) -> after <> before
 
+-- CR 103.4 / CR 727.1 / CR 729.2: put every player back to a new game's starting
+-- state -- the starting life total, no counters -- for the two paths that rebuild
+-- a game in place (restart and subgames). One helper, because the two rules want
+-- the same filter for different reasons.
+--
+-- A player who has already LEFT is not reset. CR 727.1: "All players in that game
+-- when it ended then start a new game following the procedures set forth in rule
+-- 103" -- a player who left before it ended is not one of them. CR 729.4: "All
+-- players not currently in the subgame are considered outside the subgame." So
+-- their Status.Departed survives the rebuild, and nothing else about them is
+-- touched either: they are not starting a game (#147).
+--
+-- They keep their entry in the map rather than being deleted, so every Map.lookup
+-- on a PlayerId that still names them stays total. Which players are IN the
+-- rebuilt game is the rebuilt GameState.turnOrder.
+resetPlayers :: Map.Map PlayerId Player.Player -> Map.Map PlayerId Player.Player
+resetPlayers players =
+  let reset player = case Player.status player of
+        -- Already Playing, so the status is not rewritten -- only the fields a
+        -- new game resets.
+        Status.Playing ->
+          player
+            { Player.life = startingLife,
+              Player.counters = Map.empty
+            }
+        Status.Departed _ -> player
+   in fmap reset players
+
 -- CR 727: restart the game in place. CR 727.1: the current game immediately ends
 -- and a new game begins per CR 103, with the CR 727.1a exception -- the starting
 -- player is `starter` (the controller of the restarting ability), so the turn
@@ -190,42 +218,36 @@ rotateTo starter order = case break (== starter) order of
 restartGame :: PlayerId -> Game ()
 restartGame starter = do
   State.modify' $ \gs ->
-    let resetPlayer player =
-          player
-            { Player.life = startingLife,
-              Player.status = Status.Playing,
-              Player.counters = Map.empty
-            }
-     in gs
-          { GameState.players = fmap resetPlayer (GameState.players gs),
-            GameState.manaPool = Map.empty,
-            GameState.combat = Combat.emptyCombat,
-            GameState.events = Seq.empty,
-            GameState.scannedThrough = 0,
-            GameState.damageScannedThrough = 0,
-            GameState.delayedTriggers = Seq.empty,
-            GameState.continuousEffects = [],
-            GameState.replacements = [],
-            GameState.playerEffects = [],
-            GameState.turnOrder = rotateTo starter (GameState.turnOrder gs),
-            GameState.activePlayer = starter,
-            GameState.phase = Turn.firstPhase,
-            GameState.remaining = Turn.laterPhases,
-            GameState.priority = Nothing,
-            GameState.passes = 0,
-            GameState.turnNumber = 1,
-            GameState.result = Nothing,
-            -- CR 727.4: the game the caller was running has been replaced.
-            -- Engine.priorityLoop and Engine.runStep read this and unwind to the
-            -- rebuilt turn 1 rather than granting priority or advancing past it.
-            GameState.restartSignal = RestartSignal.Restarted,
-            GameState.drewFromEmpty = mempty,
-            GameState.landPlayed = mempty,
-            GameState.pendingControl = Map.empty,
-            GameState.activeControl = Nothing,
-            GameState.monarch = Nothing,
-            GameState.exiledUntilMonarch = Map.empty
-          }
+    gs
+      { GameState.players = resetPlayers (GameState.players gs),
+        GameState.manaPool = Map.empty,
+        GameState.combat = Combat.emptyCombat,
+        GameState.events = Seq.empty,
+        GameState.scannedThrough = 0,
+        GameState.damageScannedThrough = 0,
+        GameState.delayedTriggers = Seq.empty,
+        GameState.continuousEffects = [],
+        GameState.replacements = [],
+        GameState.playerEffects = [],
+        GameState.turnOrder = rotateTo starter (GameState.turnOrder gs),
+        GameState.activePlayer = starter,
+        GameState.phase = Turn.firstPhase,
+        GameState.remaining = Turn.laterPhases,
+        GameState.priority = Nothing,
+        GameState.passes = 0,
+        GameState.turnNumber = 1,
+        GameState.result = Nothing,
+        -- CR 727.4: the game the caller was running has been replaced.
+        -- Engine.priorityLoop and Engine.runStep read this and unwind to the
+        -- rebuilt turn 1 rather than granting priority or advancing past it.
+        GameState.restartSignal = RestartSignal.Restarted,
+        GameState.drewFromEmpty = mempty,
+        GameState.landPlayed = mempty,
+        GameState.pendingControl = Map.empty,
+        GameState.activeControl = Nothing,
+        GameState.monarch = Nothing,
+        GameState.exiledUntilMonarch = Map.empty
+      }
   startGameFromCards
 
 -- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards ONLY --
@@ -250,18 +272,12 @@ subgameStateFrom starter parent =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
       libObjects = Map.restrictKeys (GameState.objects parent) libIds
-      resetPlayer player =
-        player
-          { Player.life = startingLife,
-            Player.status = Status.Playing,
-            Player.counters = Map.empty
-          }
       order = rotateTo starter (GameState.turnOrder parent)
       firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe order)
    in parent
         { GameState.objects = libObjects,
           GameState.turnOrder = order,
-          GameState.players = fmap resetPlayer (GameState.players parent),
+          GameState.players = resetPlayers (GameState.players parent),
           GameState.library = Map.empty,
           GameState.hand = Map.empty,
           GameState.graveyard = Map.empty,

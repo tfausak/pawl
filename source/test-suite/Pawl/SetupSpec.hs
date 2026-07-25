@@ -19,6 +19,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Deck as Deck
+import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Player as Player
@@ -28,6 +29,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Result as Result
+import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -270,7 +272,34 @@ restartTests registry =
             afterRestart = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.alice))
             afterSba = snd (Engine.runGamePure S.identityAnswer afterRestart Engine.checkSba)
         HU.assertEqual "bob drew from an empty library during the opening draw" True (Set.member S.bob (GameState.drewFromEmpty afterRestart))
-        HU.assertEqual "CR 727.3: bob loses, alice wins at the SBA check" (Just (Result.Won S.alice)) (GameState.result afterSba)
+        HU.assertEqual "CR 727.3: bob loses, alice wins at the SBA check" (Just (Result.Won S.alice)) (GameState.result afterSba),
+      HU.testCase "CR 727.1/729.4 #147: a rebuild does not revive a player who had already left" $
+        -- CR 727.1: "All players in that game when it ended then start a new game
+        -- following the procedures set forth in rule 103" -- bob left BEFORE it
+        -- ended, so he is not one of them. CR 729.4 says the same for a subgame:
+        -- "All players not currently in the subgame are considered outside the
+        -- subgame." Today both rebuild paths set every player's status to Playing
+        -- unconditionally, so bob comes back at 20 life.
+        --
+        -- Alice's life is knocked down too, so "alice is back to 20" is a real
+        -- assertion and not something Setup.emptyGame already produced.
+        let g0 = Departure.depart Departure.Type.Conceded S.bob (Setup.emptyGame S.threePlayers)
+            g1 =
+              g0
+                { GameState.players =
+                    Map.adjust (\p -> p {Player.life = 3}) S.bob (Map.adjust (\p -> p {Player.life = 5}) S.alice (GameState.players g0))
+                }
+            afterRestart = S.runPure S.identityAnswer g1 (Setup.restartGame S.alice)
+            sub = Setup.subgameStateFrom S.alice g1
+            statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
+         in do
+              HU.assertEqual "restart: bob is still departed" (Just (Status.Departed Departure.Type.Conceded)) (statusOf S.bob afterRestart)
+              HU.assertEqual "restart: and nothing of his is reset" (Just 3) (S.lifeOf S.bob afterRestart)
+              HU.assertEqual "restart: alice starts a new game, still playing" (Just Status.Playing) (statusOf S.alice afterRestart)
+              HU.assertEqual "restart: at 20 life" (Just 20) (S.lifeOf S.alice afterRestart)
+              HU.assertEqual "subgame: bob is still departed" (Just (Status.Departed Departure.Type.Conceded)) (statusOf S.bob sub)
+              HU.assertEqual "subgame: and nothing of his is reset" (Just 3) (S.lifeOf S.bob sub)
+              HU.assertEqual "subgame: alice is playing at 20 life" (Just 20) (S.lifeOf S.alice sub)
     ]
 
 -- Move a player's pool onto their LIBRARY (subgameStateFrom reads the library
