@@ -783,7 +783,7 @@ The seven remaining behaviors from the spec's §6. Each is a separate assertion 
 - Consumes: everything from Tasks 1–5 (`S.performer`, `powderGame`, `recordWindow`, `usePowder`).
 - Produces: nothing.
 
-- [ ] **Step 1: Write the failing tests.** Add these helpers after `usePowder`:
+- [x] **Step 1: Write the failing tests.** Add these helpers after `usePowder`:
 
 ```haskell
 -- alice's library: `above` Mountains, then a Serum Powder, then 20 more; bob's
@@ -928,17 +928,17 @@ Then add these seven cases to the `tests` list:
         HU.assertBool "and she drew from an empty library" (Set.member S.alice (GameState.drewFromEmpty after)),
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail.**
+- [x] **Step 2: Run the tests to verify they fail.**
 
 Run: `cabal test 2>&1 | tail -40`
 Expected: compile errors first (the new helpers reference nothing new, so this should compile) and then FAILs only if the Task 5 implementation is wrong. **If every case passes on the first run, that is the expected outcome for tests 1, 4, 5, 6 and 7** — they pin behavior Task 5 already implements. Tests 2 (later round) and 3 (repeats) are the ones most likely to expose a bug; if any case fails, fix `Pawl.Mulligan`, never the assertion.
 
-- [ ] **Step 3: Run the whole suite.**
+- [x] **Step 3: Run the whole suite.**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -20`
 Expected: warning-free build; all cases pass.
 
-- [ ] **Step 4: Format, lint, and commit.**
+- [x] **Step 4: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -953,7 +953,7 @@ git commit -m "test(mulligan): pin the seven CR 103.5b fidelity behaviors (#182)
 - Modify: `source/library/Pawl/Type/Card.hs` (the `(#N)` placeholder), `source/library/Pawl/Card.hs` (the lint citation)
 - Modify: `docs/progress.md`, `CLAUDE.md`
 
-- [ ] **Step 1: File the two deferral issues.**
+- [x] **Step 1: File the two deferral issues.**
 
 ```bash
 gh issue create --title "A card declaring two CR 103.5b mulligan actions is unrepresentable" \

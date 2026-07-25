@@ -190,6 +190,78 @@ usePowder p = case p of
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   _ -> S.identityAnswer p
 
+-- alice's library: `above` Mountains, then a Serum Powder, then 20 more; bob's
+-- is uniform. With `above` = 7 the Powder is NOT in the opening hand and is
+-- drawn only after a mulligan, which is how CR 103.5b's "This need not be in
+-- the first round of mulligans" becomes observable.
+powderUnder :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+powderUnder powder mountain above =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice 20 (addMany powder S.alice 1 (addMany mountain S.alice above g0))
+   in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob 20 withAlice))
+
+-- alice's library: a Serum Powder, six Mountains, a SECOND Serum Powder, then
+-- 20 Mountains. Her opening hand is the first Powder plus six Mountains; using
+-- it exiles that hand and draws the second Powder, which is what makes CR
+-- 103.5b's repeated action observable.
+chainGame :: Printing.Printing -> Printing.Printing -> GameState.GameState
+chainGame powder mountain =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice =
+        addMany mountain S.alice 20 (addMany powder S.alice 1 (addMany mountain S.alice 6 (addMany powder S.alice 1 g0)))
+   in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob 20 withAlice))
+
+-- alice's whole library is a Serum Powder and six Mountains -- exactly one
+-- opening hand, nothing left to redraw.
+shortPowderGame :: Printing.Printing -> Printing.Printing -> GameState.GameState
+shortPowderGame powder mountain =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice 6 (addMany powder S.alice 1 g0)
+   in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob 20 withAlice))
+
+-- Takes the first offered action, and mulligans exactly once (alice only), so a
+-- test can prove the action did NOT count toward CR 103.5's bottom count.
+powderThenMulliganOnce :: Prompt.Prompt r -> r
+powderThenMulliganOnce p = case p of
+  Prompt.MulliganAction _ _ candidates -> Maybe.listToMaybe candidates
+  Prompt.DeclareMulligan _ pid taken ->
+    if pid == S.alice && taken < 1 then MulliganDecision.Mulligan else MulliganDecision.Keep
+  _ -> S.identityAnswer p
+
+-- Declines every window and mulligans once (alice only), recording how many
+-- DECLARATIONS had already happened at each offer. An offer recorded after two
+-- declarations is a second-round offer: round 1 is alice's declaration then
+-- bob's.
+recordWindowRound :: Prompt.Prompt r -> State.State (Int, [Int]) r
+recordWindowRound p = case p of
+  Prompt.MulliganAction {} -> do
+    State.modify' (\(n, seen) -> (n, n : seen))
+    pure Nothing
+  Prompt.DeclareMulligan _ pid taken -> do
+    State.modify' (\(n, seen) -> (n + 1, seen))
+    pure (if pid == S.alice && taken < 1 then MulliganDecision.Mulligan else MulliganDecision.Keep)
+  -- Bottoms the LAST card, not the first. S.identityAnswer bottoms the first,
+  -- which here is the Powder the mulligan just drew -- it would land at the
+  -- library bottom and round 2 would have nothing to offer, so the test would
+  -- pass or fail on the fixture's draw order rather than on CR 103.5b.
+  Prompt.Bottom _ _ hand count -> pure (reverse (take (fromIntegral count) (reverse hand)))
+  _ -> pure (S.identityAnswer p)
+
+-- alice keeps at once; bob mulligans twice then keeps. Every window is
+-- declined, and each offer's player is recorded, so a test can prove a player
+-- who has kept is never offered again.
+recordWindowPlayers :: Prompt.Prompt r -> State.State [PlayerId] r
+recordWindowPlayers p = case p of
+  Prompt.MulliganAction _ pid _ -> do
+    State.modify' (pid :)
+    pure Nothing
+  Prompt.DeclareMulligan _ pid taken ->
+    pure (if pid == S.bob && taken < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep)
+  _ -> pure (S.identityAnswer p)
+
 -- Records each DeclareMulligan's pid, so the test can assert a kept player is
 -- not asked again. Alice keeps immediately; bob mulligans twice then keeps.
 recordAsks :: Prompt.Prompt r -> State.State [PlayerId] r
@@ -219,6 +291,70 @@ tests registry =
         HU.assertEqual "and her library is seven shorter than after the opening draw" 7 (libSize S.alice after)
         HU.assertEqual "bob, with no Powder, is untouched" 7 (S.handSize S.bob after)
         HU.assertEqual "and exiles nothing" 0 (length (Game.zoneMembers Zone.Exile S.bob after)),
+      HU.testCase "CR 103.5b: the action is not a mulligan -- it does not add to the bottom count" $ do
+        -- alice takes the action and then mulligans ONCE. CR 103.5 bottoms a
+        -- number equal to the mulligans she has taken, which is one -- so her
+        -- opening hand is six. A five would mean the action had been counted.
+        powder <- Registry.printing registry "Serum Powder"
+        mountain <- Registry.printing registry "Mountain"
+        let after = run powderThenMulliganOnce (powderGame powder mountain 20)
+        HU.assertEqual "one mulligan bottoms exactly one card" 6 (S.handSize S.alice after),
+      HU.testCase "CR 103.5b: the window is offered in a later round, not just the first" $ do
+        -- The Powder sits under alice's opening seven, so round 1 offers her
+        -- nothing; she mulligans, redraws into it, and round 2 offers it. The
+        -- recorded value is how many declarations preceded the offer: 2 (hers
+        -- and bob's, both in round 1).
+        powder <- Registry.printing registry "Serum Powder"
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = powderUnder powder mountain 7
+            ((_, _after), (_, offers)) = State.runState (Program.foldProgramM recordWindowRound (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) (0, [])
+        HU.assertEqual "exactly one offer, and it came after both first-round declarations" [2] offers,
+      HU.testCase "CR 103.5b: the action may be taken more than once in one window" $ do
+        -- Using the first Powder draws the second; the loop offers again and
+        -- ends only when the redrawn hand holds none. Fourteen cards exiled is
+        -- two uses.
+        powder <- Registry.printing registry "Serum Powder"
+        mountain <- Registry.printing registry "Mountain"
+        let after = run usePowder (chainGame powder mountain)
+        HU.assertEqual "two hands exiled" 14 (length (Game.zoneMembers Zone.Exile S.alice after))
+        HU.assertEqual "and the third hand is a full seven" 7 (S.handSize S.alice after),
+      HU.testCase "CR 103.5b: a hand with no granting card is not asked" $ do
+        -- Where the rules leave nothing to ask, don't prompt.
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = libraryGame mountain 20
+            ((_, _after), offered) = State.runState (Program.foldProgramM recordWindow (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+        HU.assertEqual "no window prompt at all" [] offered,
+      HU.testCase "CR 103.5b: a player who has kept is never offered the window again" $ do
+        -- alice keeps in round 1 and leaves the pool; bob keeps the loop alive
+        -- for two more rounds. She declares once, so she is offered once --
+        -- CR 103.5b's window exists only "at a time they would declare".
+        powder <- Registry.printing registry "Serum Powder"
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = powderGame powder mountain 20
+            ((_, _after), offers) = State.runState (Program.foldProgramM recordWindowPlayers (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+        HU.assertEqual "offered in her one declaration round and never again" 1 (length (filter (== S.alice) offers)),
+      HU.testCase "CR 103.5b: a game with a mulligan action replays deterministically" $ do
+        powder <- Registry.printing registry "Serum Powder"
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = powderGame powder mountain 20
+            ((_, recorded), responses) = Replay.record usePowder gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
+            (_, replayed) = Replay.replay responses gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
+        HU.assertEqual "alice hand matches" (S.handSize S.alice recorded) (S.handSize S.alice replayed)
+        HU.assertEqual "alice exile matches" (Game.zoneMembers Zone.Exile S.alice recorded) (Game.zoneMembers Zone.Exile S.alice replayed)
+        HU.assertEqual
+          "alice library ORDER matches"
+          (Game.zoneMembers Zone.Library S.alice recorded)
+          (Game.zoneMembers Zone.Library S.alice replayed),
+      HU.testCase "CR 727.3/729.3: a short deck still flags drewFromEmpty through the CR 103.5b action" $ do
+        -- alice's whole library is one opening hand. Taking the action exiles
+        -- all seven and redraws from an empty library, which flags the failed
+        -- draw and leaves her with nothing -- a forced keep under CR 103.5's
+        -- final sentence, so she is not asked to declare.
+        powder <- Registry.printing registry "Serum Powder"
+        mountain <- Registry.printing registry "Mountain"
+        let after = run usePowder (shortPowderGame powder mountain)
+        HU.assertEqual "her hand is empty" 0 (S.handSize S.alice after)
+        HU.assertBool "and she drew from an empty library" (Set.member S.alice (GameState.drewFromEmpty after)),
       HU.testCase "CR 103.5: all-Keep draws exactly seven, library shrinks by seven" $ do
         mountain <- Registry.printing registry "Mountain"
         let after = run keepAnswer (libraryGame mountain 20)
