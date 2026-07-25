@@ -1,0 +1,84 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Leyline of the Void",
+  "openingHandAction": [
+    {
+      "type": "MoveToZone",
+      "value": [
+        "self",
+        {
+          "type": "Battlefield"
+        }
+      ]
+    }
+  ],
+  "power": null,
+  "replacementEffects": [
+    {
+      "type": "ZoneChangeR",
+      "value": [
+        {
+          "whenDestination": {
+            "type": "Graveyard"
+          },
+          "whoseObject": {
+            "type": "Opponents"
+          }
+        },
+        {
+          "type": "Exile"
+        }
+      ]
+    }
+  ],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

@@ -4,12 +4,14 @@ module Pawl.CardsSpec where
 import qualified Data.ByteString as ByteString
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Card as CardT
+import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.Power as Power
@@ -18,6 +20,8 @@ import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Slug as Slug.Type
+import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -40,7 +44,21 @@ tests registry =
         c <- Registry.card registry "Serum Powder"
         HU.assertEqual "name" (Text.pack "Serum Powder") (CardT.name c)
         HU.assertEqual "the CR 103.5b action" [Effect.ExileHandThenDraw] (CardT.mulliganAction c)
-        HU.assertEqual "one activated ability, the {T}: Add {C} mana ability" 1 (length (CardT.activatedAbilities c))
+        HU.assertEqual "one activated ability, the {T}: Add {C} mana ability" 1 (length (CardT.activatedAbilities c)),
+      HU.testCase "leyline-of-the-void.json loads with a CR 103.6a action and an Opponents redirect" $ do
+        c <- Registry.card registry "Leyline of the Void"
+        HU.assertEqual "name" (Text.pack "Leyline of the Void") (CardT.name c)
+        HU.assertEqual
+          "the CR 103.6a action puts itself onto the battlefield"
+          [Effect.MoveToZone Binding.triggerSource Zone.Battlefield]
+          (CardT.openingHandAction c)
+        HU.assertEqual
+          "and the redirect is scoped to an opponent's graveyard"
+          [ ReplacementEffect.ZoneChangeR
+              (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents)
+              Zone.Exile
+          ]
+          (CardT.replacementEffects c)
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion

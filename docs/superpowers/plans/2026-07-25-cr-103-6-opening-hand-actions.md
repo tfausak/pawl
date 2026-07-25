@@ -522,17 +522,17 @@ performHandAction source player =
 
 Update the `RestartGame` arm to `Setup.restartGame performHandAction controller`.
 
-- [ ] **Step 6: Follow the rename through.** `-Werror` names every site.
+- [x] **Step 6: Follow the rename through.** `-Werror` names every site.
 
 Run: `grep -rn "MulliganPerformer\|performMulliganAction" source/`
 Expected: after editing, 0 hits. The sites are `Mulligan.hs` (import + three signatures), `Setup.hs` (import + three signatures), `Support.hs` (import + `performer`'s type). `S.performer` keeps its name.
 
-- [ ] **Step 7: Build and test.**
+- [x] **Step 7: Build and test.**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -5`
 Expected: warning-free; the new self-slot case passes and every CR 103.5b case still does.
 
-- [ ] **Step 8: Format, lint, and commit.**
+- [x] **Step 8: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -551,7 +551,7 @@ git commit -m "refactor(resolve): the hand-action performer serves both windows 
 - Consumes: `ControllerRelation.Opponents` (Task 2), `CardT.openingHandAction` (Task 3).
 - Produces: the printing `"Leyline of the Void"`.
 
-- [ ] **Step 1: Write the failing test.** In `source/test-suite/Pawl/CardsSpec.hs`, beside the Serum Powder case:
+- [x] **Step 1: Write the failing test.** In `source/test-suite/Pawl/CardsSpec.hs`, beside the Serum Powder case:
 
 ```haskell
       HU.testCase "leyline-of-the-void.json loads with a CR 103.6a action and an Opponents redirect" $ do
@@ -572,12 +572,12 @@ git commit -m "refactor(resolve): the hand-action performer serves both windows 
 
 Add the imports the file lacks (`Binding`, `Zone`, `ZoneChangePattern`, `ControllerRelation`).
 
-- [ ] **Step 2: Run the test to verify it fails.**
+- [x] **Step 2: Run the test to verify it fails.**
 
 Run: `cabal test 2>&1 | tail -30`
 Expected: FAIL — `MkUnknownCard {slug = UnsafeSlug "leyline-of-the-void", …}`.
 
-- [ ] **Step 3: Write the card.** Oracle text (Scryfall, verified 2026-07-25): `{2}{B}{B}` Enchantment. "If this card is in your opening hand, you may begin the game with it on the battlefield. / If a card would be put into an opponent's graveyard from anywhere, exile it instead."
+- [x] **Step 3: Write the card.** Oracle text (Scryfall, verified 2026-07-25): `{2}{B}{B}` Enchantment. "If this card is in your opening hand, you may begin the game with it on the battlefield. / If a card would be put into an opponent's graveyard from anywhere, exile it instead."
 
 ```json
 {
