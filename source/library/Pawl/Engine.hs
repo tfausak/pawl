@@ -494,10 +494,13 @@ handoffTurn = State.modify' $ \gs ->
   walkToNextTurn (length (GameState.turnOrder gs)) (GameState.activePlayer gs) gs
 
 -- One seat at a time, bounded by the number of seats, so it terminates even when
--- every seat has departed. The fallback returns the state as-is, keeping this
--- total with no partial head -- written as an explicit bounded recursion rather
--- than `cycle`/`head` for exactly that reason. Unreachable while the game is
--- running: a game with no survivors already has a Result (CR 104.2a / 104.4a).
+-- every seat has departed. The fallback returns the state without beginning a
+-- turn, keeping the sweeps already applied -- it does NOT roll back to the
+-- pre-walk state, since `swept` (each seat's dropAtTurnOf) threads forward with
+-- every recursive call. Total with no partial head -- written as an explicit
+-- bounded recursion rather than `cycle`/`head` for exactly that reason.
+-- Unreachable while the game is running: a game with no survivors already has a
+-- Result (CR 104.2a / 104.4a).
 walkToNextTurn :: Int -> PlayerId -> GameState -> GameState
 walkToNextTurn seatsLeft seat gs =
   if seatsLeft <= 0

@@ -142,11 +142,38 @@ handoffTests =
               HU.assertEqual "bob's effect ended at bob's seat" [] (GameState.continuousEffects after),
       HU.testCase "CR 800.4m the walk sweeps only the seats it passes" $
         -- Same board. The walk goes bob's seat -> carol's seat and STOPS. Alice's
-        -- own AtTurnOf effect must survive: her seat was not passed.
+        -- own AtTurnOf effect must survive: her seat was not passed. The
+        -- activePlayer assertion is load-bearing (fix round 1, #87 review): without
+        -- it this case cannot fail against the OLD single-step
+        -- `dropAtTurnOf newActive` code, because with bob departed immediately
+        -- after alice, newActive is ALSO bob, so the old code happened to sweep
+        -- the same seat as the walk and left continuousEffects byte-identical.
         let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
             armed = effectWith (Expiry.Type.AtTurnOf S.alice) (effectWith (Expiry.Type.AtTurnOf S.bob) gone)
             after = S.runPure S.identityAnswer armed Engine.handoffTurn
-         in HU.assertEqual "alice's survives, bob's does not" [Expiry.Type.AtTurnOf S.alice] (fmap ContinuousEffect.expiry (GameState.continuousEffects after))
+         in do
+              HU.assertEqual "carol takes the turn, not bob" S.carol (GameState.activePlayer after)
+              HU.assertEqual "alice's survives, bob's does not" [Expiry.Type.AtTurnOf S.alice] (fmap ContinuousEffect.expiry (GameState.continuousEffects after)),
+      HU.testCase "CR 800.4m the sweep reaches a seat the walk only passes through, not just the seat it lands next to" $
+        -- alice, bob, carol; bob AND carol both departed, alice active. The walk
+        -- passes bob's seat, then carol's seat, then begins alice's turn (wrapping
+        -- around). CR 800.4m requires the sweep to fire at EVERY seat walked past,
+        -- not just the one immediately after the active player -- carol's AtTurnOf
+        -- effect must be gone even though carol's seat is two hops away, not one.
+        -- This is the discriminating case fix round 1 added: the OLD single-step
+        -- `dropAtTurnOf newActive` only ever swept the FIRST seat past the active
+        -- player (bob here), so carol's effect survived under the old code. See
+        -- the fix report for the RED proof.
+        let gone =
+              Departure.depart
+                Departure.Type.Conceded
+                S.carol
+                (Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame)
+            armed = effectWith (Expiry.Type.AtTurnOf S.carol) gone
+            after = S.runPure S.identityAnswer armed Engine.handoffTurn
+         in do
+              HU.assertEqual "alice takes the turn (wrapping past both departed seats)" S.alice (GameState.activePlayer after)
+              HU.assertEqual "carol's effect ended at carol's seat, two hops past alice" [] (GameState.continuousEffects after)
     ]
 
 cleanupTests :: Registry.Type.Registry -> Tasty.TestTree
