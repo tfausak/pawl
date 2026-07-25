@@ -1,3 +1,4 @@
 /.direnv/
+/.superpowers/
 /cabal.project.*
 /dist-newstyle/
