@@ -147,10 +147,39 @@ placeInherent controller ability provided = do
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
 
--- CR 725 (Palace Jailer): return every "exiled until an opponent becomes the
--- monarch" object once an opponent of its controller is the monarch. Two-player
--- (CR 102.2): an opponent is any player other than the controller, so an entry
--- is due iff its controller is not the current monarch. Runs in the settle loop.
+-- CR 725 (Palace Jailer): return every object exiled "until an opponent becomes
+-- the monarch" once an opponent of the entry's controller is the monarch. Runs in
+-- the settle loop; CR 704.3 fixes "whenever a player would get priority" as the
+-- coarsest moment anything can observe a condition, and Engine.settleForPriority
+-- runs at exactly the points where the board can change.
+--
+-- "An opponent" is every player other than the controller. That is not a
+-- two-player shortcut: in a free-for-all the players compete as individuals and
+-- every other player is an opponent by construction (CR 806.1), so an entry is
+-- due iff its controller is not the current monarch. CR 102.3 makes a TEAMMATE
+-- not an opponent, and teams are the only reading this arm would be wrong for;
+-- pawl has none (#175).
+--
+-- When the controller has LEFT the game, the set is resolved by CR 800.4i: "If an
+-- effect requires information about a specific player, the effect uses the current
+-- information about that player if they are still in the game; otherwise, the
+-- effect uses the last known information about that player before they left the
+-- game." Who a departed player's opponents were is information about a specific
+-- player, so the set freezes at departure -- in a free-for-all, every other player
+-- who was in the game. The same `/= m` filter computes it, because CR 725.4
+-- guarantees the monarch is always a player still in the game and a departed
+-- controller is therefore never the monarch. Nothing needs to be stored.
+--
+-- Departure.objectsLeaveWith drops an entry whose KEY -- the exiled object -- is
+-- owned by a departing player, and never one whose VALUE is: the effect survives
+-- its controller's departure. Palace Jailer's own ruling agrees the watch is not
+-- tied to the source object.
+--
+-- The due test is a STATE check where the card's ruling asks for an EVENT -- a new
+-- monarch being crowned who is an opponent, not merely an opponent currently
+-- holding the crown. Reachable at two players by ordering Palace Jailer's two
+-- entry triggers (#171). The CR 725.4 departure path above is unaffected: a
+-- reassignment IS a new monarch being crowned, so both readings agree there.
 returnExiledForMonarch :: Game Bool
 returnExiledForMonarch = do
   gs <- State.get

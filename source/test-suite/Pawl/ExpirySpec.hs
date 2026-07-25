@@ -559,7 +559,49 @@ monarchTests registry =
         HU.assertBool "victim registered for return" (not (Map.null (GameState.exiledUntilMonarch afterEtb)))
         HU.assertBool "still exiled while alice stays monarch" (not (Map.null (GameState.exiledUntilMonarch heldExiled)))
         HU.assertEqual "a creature is back on the battlefield once bob is monarch" 1 (length (Game.zoneMembers Zone.Battlefield S.bob afterSteal))
-        HU.assertEqual "return cleared the exile register" True (Map.null (GameState.exiledUntilMonarch afterSteal))
+        HU.assertEqual "return cleared the exile register" True (Map.null (GameState.exiledUntilMonarch afterSteal)),
+      HU.testCase "M5.6c gate: the monarch holding a Palace Jailer exile leaves, CR 725.4 crowns the active player, and the prisoner comes home" $ do
+        -- Alice, bob, carol. Alice's Palace Jailer has entered: alice is the
+        -- monarch and bob's Piker is exiled under the CR 725 watch. Carol is the
+        -- active player, so CR 725.4's FIRST sentence applies when alice leaves.
+        --
+        -- Three rules meet here:
+        --   * CR 800.4a removes alice's Palace Jailer (she owns it) but NOT bob's
+        --     exiled card (he does), and it ends no effect here, because an exile
+        --     grants nobody control. The card's own ruling agrees the watch is not
+        --     tied to the source object: "Palace Jailer leaving the battlefield
+        --     won't cause the exiled creature to return. The game will continue to
+        --     watch for the next time an opponent becomes the monarch."
+        --     (2021-03-19)
+        --   * CR 725.4 crowns carol "at the same time as that player leaves the
+        --     game."
+        --   * CR 800.4i freezes what "an opponent" of departed alice means to the
+        --     last known information -- in a free-for-all with no teams, every
+        --     other player who was in the game. Carol is necessarily in that set,
+        --     so the prisoner returns as part of the same departure.
+        piker <- Registry.printing registry "Goblin Piker"
+        palaceJailer <- Registry.printing registry "Palace Jailer"
+        let (victim, gs1) = S.addCreature piker S.bob S.threePlayerGame
+            (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
+            entered = ZoneChange.MkZoneChange jailer Zone.Stack Zone.Battlefield
+            gs3 = S.withEvents [GameEvent.Moved entered (Projection.project jailer gs2)] gs2
+            afterEtb = monarchResolveAll (monarchSettle (gs3 {GameState.activePlayer = S.carol}))
+            gone = Departure.depart Departure.Type.Conceded S.alice afterEtb
+            settled = monarchSettle gone
+        HU.assertEqual "alice is the monarch on ETB" (Just S.alice) (GameState.monarch afterEtb)
+        HU.assertEqual "bob's creature is exiled under the watch, keyed to alice" [S.alice] (Map.elems (GameState.exiledUntilMonarch afterEtb))
+        HU.assertEqual "the original is off the battlefield" 0 (length (filter (== victim) (Set.toList (GameState.battlefield afterEtb))))
+        -- CR 800.4a: alice's own object leaves; bob's exiled card does not.
+        HU.assertEqual "Palace Jailer left the game with alice" Nothing (Game.lookupObject jailer gone)
+        HU.assertEqual "but the watch survived her departure, still keyed to her" [S.alice] (Map.elems (GameState.exiledUntilMonarch gone))
+        -- CR 725.4, first sentence.
+        HU.assertEqual "carol, the active player, is the monarch" (Just S.carol) (GameState.monarch gone)
+        -- CR 800.4i: carol is in departed alice's frozen opponent set, so the
+        -- watch fires at the next settle (CR 704.3 fixes that as the coarsest
+        -- moment anything can observe it).
+        HU.assertEqual "the prisoner is back on bob's side of the table" 1 (length (Game.zoneMembers Zone.Battlefield S.bob settled))
+        HU.assertEqual "and the watch is cleared" True (Map.null (GameState.exiledUntilMonarch settled))
+        HU.assertEqual "CR 104.2a: two survivors, so the game continues" Nothing (GameState.result settled)
     ]
 
 hagUpkeep :: Phase.Phase
