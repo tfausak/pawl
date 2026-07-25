@@ -90,24 +90,40 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 
 -- CR 800.4a, first clause: "all objects (see rule 109) owned by that player
 -- leave the game". Every id the player owns is deleted from GameState.objects
--- and from every collection that can name one -- the zones, the combat record,
--- and the CR 725 exile watch.
+-- and from every collection that can name one -- the zones, the CR 725 exile
+-- watch, and the parts of the combat record that stop meaning anything once
+-- the id itself is gone.
 --
 -- Leaving the game is not a zone change, so this does not funnel through
 -- Pawl.Event: no Moved event, no CR 616 replacement, no trigger. Pawl.Sba's
 -- CR 704.5d token `ceaseToExist` is the same shape for the same reason.
 --
--- Three things it deliberately does NOT touch, each because CR 800.4a does not
--- reach them:
+-- Combat.blockers is DELIBERATELY left untouched, even for a departing
+-- BLOCKER. CR 509.1h's last sentence: "A creature remains blocked even if all
+-- the creatures blocking it are removed from combat" -- and
+-- Damage.attackerAssignment's own comment says why the engine must honor that:
+-- the recorded blockers set IS the record of blocked-ness, and the liveness
+-- filter (an onBattlefield check on Game.lookupObject) belongs at damage
+-- ASSIGNMENT, not here. Deleting a departing blocker's id out of that set
+-- would make a blocked attacker with no living blockers read as UNBLOCKED and
+-- send its full damage at the defending player, which CR 510.1c forbids.
+-- Combat.attackers loses only the departing player's OWN entry, because a
+-- deleted object cannot itself still be attacking; nothing downstream even
+-- needs that much tidying (Damage.attackerAssignment's onBattlefield filter
+-- and Damage.blockerAssignment's Projection.powerOf both already fall through
+-- to nothing for a missing id), so this is cleanliness, not correctness.
+--
+-- Three more things it deliberately does NOT touch, each because CR 800.4a
+-- does not reach them:
 --
 --   * GameState.continuousEffects, GameState.replacements and
 --     GameState.playerEffects. CR 109.1 lists what an object is -- "an ability on
 --     the stack, a card, a copy of a card, a token, a spell, a permanent, or an
 --     emblem" -- and a stored continuous effect is none of them, so the first
 --     clause does not end one just because its source left. The effects this rule
---     DOES end are the control-granting ones, which is the next clause
---     (controlEffectsEnd). A departing player's Giant Growth on someone else's
---     creature keeps its +3/+3 until cleanup.
+--     DOES end are the control-granting ones, which is CR 800.4a's SECOND clause
+--     and is not implemented here. A departing player's Giant Growth on someone
+--     else's creature keeps its +3/+3 until cleanup.
 --
 --   * GameState.delayedTriggers. A delayed triggered ability that has not
 --     triggered is not on the stack, so by CR 109.1 it is not an object either.
@@ -119,21 +135,23 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     effect survives its controller's departure: CR 800.4a ends only effects
 --     which give that player control, and an exile grants none. Only an entry
 --     whose KEY -- the exiled object itself -- is owned by the departing player is
---     dropped, because that object is leaving. What "an opponent" then means is
---     CR 800.4i, read at Pawl.Monarch.returnExiledForMonarch.
+--     dropped, because that object is leaving; whether the entry's value later
+--     reads as "an opponent" of the new monarch is CR 102.2's question, decided
+--     when Pawl.Monarch.returnExiledForMonarch next runs, not this function's.
 objectsLeaveWith :: PlayerId -> GameState -> GameState
 objectsLeaveWith pid gs =
   let owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid) (GameState.objects gs))
       leave :: GameState -> ObjectId -> GameState
       leave g oid =
-        let g1 = Game.removeFromCombat oid (Game.removeFromZones pid oid g)
+        let g1 = Game.removeFromZones pid oid g
             combat = GameState.combat g1
          in g1
               { GameState.objects = Map.delete oid (GameState.objects g1),
-                -- Game.removeFromCombat clears attackers and blockers; CR 510.4's
-                -- first-strike snapshot is the third combat collection that can
-                -- name an id and has no helper of its own.
-                GameState.combat = combat {Combat.struckFirst = fmap (Set.delete oid) (Combat.struckFirst combat)},
+                GameState.combat =
+                  combat
+                    { Combat.attackers = Map.delete oid (Combat.attackers combat),
+                      Combat.struckFirst = fmap (Set.delete oid) (Combat.struckFirst combat)
+                    },
                 GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1)
               }
    in List.foldl' leave gs owned

@@ -405,6 +405,28 @@ subgameTests registry =
         HU.assertEqual "no object id collides (object count = survivors + returned cards)" (Map.size (GameState.objects after)) (battlefieldSurvivors + libCount S.alice + libCount S.bob)
         HU.assertEqual "the subgame genuinely minted fresh ids (drawCard's changeZone, CR 400.7)" True (GameState.nextObjectId finalSub > GameState.nextObjectId sub0)
         HU.assertEqual "the id supply advanced to exactly the subgame high-water mark" (GameState.nextObjectId finalSub) (GameState.nextObjectId after),
+      -- The gate's whole reason to exist (Pawl.Departure's continuesAfterDeparture
+      -- doc comment): a two-player subgame's departure is caught by CR 104.2a
+      -- before it can be observed, but a subgame seated with three or more still-
+      -- playing parent players is itself CR 800.1 multiplayer, so a departure
+      -- INSIDE it is real and CR 800.4a's object removal reaches the departing
+      -- player's subgame objects outright. CR 729.5 still requires every card they
+      -- owned coming back to their MAIN-game library regardless -- CR 729.4's
+      -- second sentence keeps the two games separate populations, and nothing in
+      -- the CR removes a card from a player's deck for losing a subgame.
+      HU.testCase "CR 729.5/800.4a a player who departs inside a MULTIPLAYER subgame still gets their library back" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let g0 = Setup.emptyGame S.threePlayers
+            g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
+            sub0 = Setup.subgameStateFrom S.alice g1
+            (_, seated) = Engine.runGamePure S.identityAnswer sub0 Setup.startGameFromCards
+            departedSub = Departure.depart Departure.Type.Lost S.bob seated
+            after = Setup.funnelBack departedSub g1
+        HU.assertEqual "the subgame really was multiplayer, so CR 800.4a's removal fired" True (Departure.continuesAfterDeparture departedSub)
+        HU.assertEqual "bob's own subgame objects are gone" [] (Game.zoneMembers Zone.Library S.bob departedSub <> Game.zoneMembers Zone.Hand S.bob departedSub)
+        HU.assertEqual "bob's 3-card library comes back whole" 3 (length (Game.zoneMembers Zone.Library S.bob after))
+        HU.assertEqual "alice's library is unaffected" 3 (length (Game.zoneMembers Zone.Library S.alice after))
+        HU.assertEqual "carol's library is unaffected" 3 (length (Game.zoneMembers Zone.Library S.carol after)),
       HU.testCase "CR 729.2/729.4 #147: a subgame seats only the players still in the main game" $
         -- CR 729.2: "Each player takes all the cards in their main-game library,
         -- moves them to their subgame library, and shuffles them." Each player IN

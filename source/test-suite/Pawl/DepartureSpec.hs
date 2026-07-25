@@ -4,12 +4,15 @@ module Pawl.DepartureSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Game as Game
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.AttackTarget as AttackTarget
+import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
@@ -154,8 +157,43 @@ tests registry =
         HU.assertEqual "bob's spell on the stack is gone" Nothing (Game.lookupObject onStack gone)
         HU.assertEqual "the shared battlefield set no longer names it" False (Set.member onField (GameState.battlefield gone))
         HU.assertEqual "the stack list no longer names it" [] (filter (== onStack) (GameState.stack gone))
-        HU.assertEqual "nothing of bob's is left in any of his zones" [] (concatMap (\z -> Game.zoneMembers z S.bob gone) [Zone.Library, Zone.Hand, Zone.Graveyard, Zone.Battlefield, Zone.Exile, Zone.Command, Zone.Stack])
+        -- Only the zones this fixture actually PUT something in: Exile and
+        -- Command hold nothing here, so including them would pass vacuously --
+        -- Game.zoneMembers filters through ownedBy, which is False for a
+        -- deleted id regardless of whether it was ever a member.
+        HU.assertEqual "nothing of bob's is left in any zone that received an object" [] (concatMap (\z -> Game.zoneMembers z S.bob gone) [Zone.Library, Zone.Hand, Zone.Graveyard, Zone.Battlefield, Zone.Stack])
         HU.assertEqual "and alice's permanent is untouched -- the sweep is keyed to the OWNER" (Just S.alice) (fmap Object.owner (Game.lookupObject aliceKeeps gone)),
+      HU.testCase "CR 510.4 a departing player's id is dropped from the struckFirst snapshot" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
+            snapshotted = g1 {GameState.combat = (GameState.combat g1) {Combat.Type.struckFirst = Just (Set.singleton onField)}}
+            gone = Departure.depart Departure.Type.Conceded S.bob snapshotted
+        HU.assertEqual "bob's id is pruned from the CR 510.4 first-strike snapshot" (Just Set.empty) (Combat.Type.struckFirst (GameState.combat gone)),
+      HU.testCase "CR 725 an exiledUntilMonarch entry KEYED on the departing player's own object is dropped" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
+            exiled = g1 {GameState.exiledUntilMonarch = Map.singleton onField S.alice}
+            gone = Departure.depart Departure.Type.Conceded S.bob exiled
+        HU.assertEqual "the entry keyed on bob's own (now-gone) object is dropped" Map.empty (GameState.exiledUntilMonarch gone),
+      -- CR 509.1h's last sentence: "A creature remains blocked even if all the
+      -- creatures blocking it are removed from combat." The blocker here is
+      -- removed from the game entirely, not merely from combat, but the same
+      -- rule applies -- Damage.attackerAssignment reads Combat.blockers as the
+      -- record of blocked-ness and prunes it only at damage ASSIGNMENT time.
+      HU.testCase "CR 509.1h a blocked attacker stays blocked when its blocker's OWNER departs" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (attacker, g1) = S.addCreature piker S.alice S.threePlayerGame
+            (blocker, g2) = S.addCreature piker S.bob g1
+            combat =
+              (GameState.combat g2)
+                { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.bob),
+                  Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker)
+                }
+            blocked = g2 {GameState.combat = combat}
+            gone = Departure.depart Departure.Type.Conceded S.bob blocked
+        HU.assertEqual "the blocker's object is gone (it was bob's)" Nothing (Game.lookupObject blocker gone)
+        HU.assertEqual "but the attacker is still recorded as blocked" (Set.singleton blocker) (Combat.blockersOf attacker gone)
+        HU.assertBool "Combat.isBlocked agrees" (Combat.isBlocked attacker gone),
       HU.testCase "CR 800.1 a two-player game is not a multiplayer game, so CR 800.4a's object removal does not apply" $ do
         -- CR 800.1: "A multiplayer game is a game that begins with more than two
         -- players." CR 104.2a ends a two-player game the moment a player leaves,

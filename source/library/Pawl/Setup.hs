@@ -351,6 +351,34 @@ subgameStateFrom starter parent =
 -- cards keep their subgame ids, which are all above the parent supply
 -- (subgameStateFrom inherited it), so Map.union cannot collide; the id/timestamp
 -- supplies advance to the subgame high-water mark.
+--
+-- CR 729.4's second sentence keeps the subgame and the main game as separate
+-- populations: a player who leaves the SUBGAME has not left the main game, and
+-- nothing in the CR removes a card from a player's deck for losing a subgame --
+-- CR 729.5 says the opposite. But a subgame that itself began with more than two
+-- players is CR 800.1 multiplayer (a subgame can be multiplayer even when its
+-- departing player has only two OPPONENTS in the PARENT), so a departure inside
+-- it really does reach Departure.objectsLeaveWith (CR 800.4a) and delete every
+-- object that player owned in the subgame outright -- and `returned`, built only
+-- from `finalSub`'s surviving objects, has nothing left to funnel back for them.
+-- `recovered` restores exactly that set from the PARENT's pre-subgame copies.
+--
+-- The guard is on the CARD'S OWNER, not on whether its id merely fails to
+-- appear in `finalSub`'s objects: CR 400.7 mints a fresh id on every zone
+-- change (a draw, a cast, a death), including the opening-hand draws every
+-- subgame runs through startGameFromCards, so an id from `oldLibIds` going
+-- missing is the ORDINARY case for a card that is alive and well under a NEW
+-- id -- one `returned` already has. A real card's object is never deleted
+-- outright by anything other than Departure.objectsLeaveWith (CR 704.5d's
+-- `ceaseToExist` in Pawl.Sba guards on Source.OfToken and never fires for
+-- Source.OfCard), so the only players whose oldLibIds objects can legitimately
+-- need recovering are ones who (a) left the subgame and (b) left a subgame
+-- that was itself multiplayer, the same Departure.continuesAfterDeparture gate
+-- objectsLeaveWith itself is behind. Checking id-presence alone, without the
+-- owner/gate condition, was tried and rejected: it recovers a STILL-PLAYING
+-- player's merely-superseded ids right alongside a departed player's, handing
+-- the survivor a second, stale copy of every card they ever drew -- a
+-- duplication bug, not a fix.
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
   let isCard obj = case Object.source obj of
@@ -366,13 +394,22 @@ funnelBack finalSub parent =
             Object.counters = Map.empty
           }
       returned = fmap toLibraryCard (Map.filter isCard (GameState.objects finalSub))
-      libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) returned))
       oldLibIds =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
+      survivingSeats = Departure.stillPlayingInOrder finalSub
+      removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of
+        Nothing -> False
+        Just obj ->
+          Departure.continuesAfterDeparture finalSub
+            && notElem (Object.owner obj) survivingSeats
+            && Maybe.isNothing (Map.lookup oid (GameState.objects finalSub))
+      recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.filter removedByDeparture oldLibIds))
+      allReturned = Map.union returned recovered
+      libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) allReturned))
       keptParentObjects = Map.withoutKeys (GameState.objects parent) oldLibIds
    in parent
-        { GameState.objects = Map.union returned keptParentObjects,
+        { GameState.objects = Map.union allReturned keptParentObjects,
           GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) (GameState.turnOrder parent)),
           GameState.nextObjectId = max (GameState.nextObjectId parent) (GameState.nextObjectId finalSub),
           GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub)
