@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Departure as Departure
@@ -281,6 +282,60 @@ recordOffers p = case p of
       else pure MulliganDecision.Keep
   _ -> pure (S.identityAnswer p)
 
+-- alice's library with a Leyline of the Void on top and `n` Mountains under it;
+-- bob's is uniform Mountains. The Leyline is drawn into her opening hand, which
+-- is where CR 103.6 reads from.
+leylineGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+leylineGame leyline mountain n =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice n (addMany leyline S.alice 1 g0)
+   in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
+
+-- Both players open with a Leyline on top, so a test can watch turn order.
+leylineBothGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+leylineBothGame leyline mountain n =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice n (addMany leyline S.alice 1 g0)
+      withBoth = addMany mountain S.bob n (addMany leyline S.bob 1 withAlice)
+   in poolToLibrary S.bob (poolToLibrary S.alice withBoth)
+
+-- alice opens with TWO Leylines on top, so CR 103.6's "any such actions in any
+-- order" is observable: a single ask cannot place both.
+twoLeylineGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+twoLeylineGame leyline mountain n =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice n (addMany leyline S.alice 2 g0)
+   in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
+
+-- Takes every offered CR 103.6 action; keeps every hand.
+useOpeningAction :: Prompt.Prompt r -> r
+useOpeningAction p = case p of
+  Prompt.OpeningHandAction _ _ candidates -> Maybe.listToMaybe candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  _ -> S.identityAnswer p
+
+-- Declines every CR 103.6 action; keeps every hand.
+declineOpeningAction :: Prompt.Prompt r -> r
+declineOpeningAction p = case p of
+  Prompt.OpeningHandAction {} -> Nothing
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  _ -> S.identityAnswer p
+
+-- Records the prompt stream as tags, so a test can prove CR 103.6's window opens
+-- only once the whole CR 103.5 process is complete, and in turn order.
+recordOpeningOrder :: Prompt.Prompt r -> State.State [(Text.Text, PlayerId)] r
+recordOpeningOrder p = case p of
+  Prompt.DeclareMulligan _ pid _ -> do
+    State.modify' ((Text.pack "declare", pid) :)
+    pure MulliganDecision.Keep
+  Prompt.OpeningHandAction _ pid _ -> do
+    State.modify' ((Text.pack "opening", pid) :)
+    pure Nothing
+  _ -> pure (S.identityAnswer p)
+
 -- Records each DeclareMulligan's pid, so the test can assert a kept player is
 -- not asked again. Alice keeps immediately; bob mulligans twice then keeps.
 recordAsks :: Prompt.Prompt r -> State.State [PlayerId] r
@@ -517,6 +572,53 @@ tests registry =
           "two seats: every mulligan costs, from the first"
           [(0, 1), (1, 2), (2, 3)]
           (offersIn [S.alice, S.bob] (libraryGame mountain 20)),
+      HU.testCase "CR 103.6: the window opens only once the mulligan process is complete" $ do
+        leyline <- Registry.printing registry "Leyline of the Void"
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = leylineGame leyline mountain 20
+            (_, tags) = State.runState (Program.foldProgramM recordOpeningOrder (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+        HU.assertEqual
+          "both declarations, then alice's opening-hand window"
+          [(Text.pack "declare", S.alice), (Text.pack "declare", S.bob), (Text.pack "opening", S.alice)]
+          (reverse tags),
+      HU.testCase "CR 103.6a: taking the action puts the card onto the battlefield" $ do
+        leyline <- Registry.printing registry "Leyline of the Void"
+        mountain <- Registry.printing registry "Mountain"
+        let after = run useOpeningAction (leylineGame leyline mountain 20)
+        HU.assertEqual "alice's hand is one smaller" 6 (S.handSize S.alice after)
+        HU.assertEqual "and the Leyline is on the battlefield" 1 (length (Game.zoneMembers Zone.Battlefield S.alice after)),
+      HU.testCase "CR 103.6: declining leaves the card in hand" $ do
+        leyline <- Registry.printing registry "Leyline of the Void"
+        mountain <- Registry.printing registry "Mountain"
+        let after = run declineOpeningAction (leylineGame leyline mountain 20)
+        HU.assertEqual "a full opening hand" 7 (S.handSize S.alice after)
+        HU.assertEqual "and nothing on the battlefield" 0 (length (Game.zoneMembers Zone.Battlefield S.alice after)),
+      HU.testCase "CR 103.6: the starting player's window comes before the other player's" $ do
+        leyline <- Registry.printing registry "Leyline of the Void"
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = leylineBothGame leyline mountain 20
+            (_, tags) = State.runState (Program.foldProgramM recordOpeningOrder (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+            openings = reverse (fmap snd (filter (\(tag, _) -> tag == Text.pack "opening") tags))
+        HU.assertEqual "alice first, then bob" [S.alice, S.bob] openings,
+      HU.testCase "CR 103.6: 'any such actions in any order' -- the window re-offers until declined" $ do
+        leyline <- Registry.printing registry "Leyline of the Void"
+        mountain <- Registry.printing registry "Mountain"
+        let after = run useOpeningAction (twoLeylineGame leyline mountain 20)
+        HU.assertEqual "both Leylines are on the battlefield" 2 (length (Game.zoneMembers Zone.Battlefield S.alice after))
+        HU.assertEqual "and the hand is two smaller" 5 (S.handSize S.alice after),
+      HU.testCase "CR 103.6: no granting card means no prompt" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = libraryGame mountain 20
+            (_, tags) = State.runState (Program.foldProgramM recordOpeningOrder (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+        HU.assertEqual "no opening-hand prompt at all" [] (filter (\(tag, _) -> tag == Text.pack "opening") tags),
+      HU.testCase "CR 103.6: a game with an opening-hand action replays deterministically" $ do
+        leyline <- Registry.printing registry "Leyline of the Void"
+        mountain <- Registry.printing registry "Mountain"
+        let gs0 = leylineGame leyline mountain 20
+            ((_, recorded), responses) = Replay.record useOpeningAction gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
+            (_, replayed) = Replay.replay responses gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
+        HU.assertEqual "battlefield matches" (Game.zoneMembers Zone.Battlefield S.alice recorded) (Game.zoneMembers Zone.Battlefield S.alice replayed)
+        HU.assertEqual "hand matches" (S.handSize S.alice recorded) (S.handSize S.alice replayed),
       HU.testCase "CR 103.5c: a mulligan that bottoms nothing asks nothing" $ do
         -- Where the rules leave nothing to ask, don't prompt: choosing zero of
         -- seven cards has exactly one legal answer. Today the free mulligan is

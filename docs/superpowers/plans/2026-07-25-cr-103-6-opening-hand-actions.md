@@ -668,12 +668,12 @@ Expected: FAIL — `MkUnknownCard {slug = UnsafeSlug "leyline-of-the-void", …}
 
 The `SlotName` encoding above was checked against `Codec.slotNameToJson` (`Json.jText`, a bare string — **not** a tagged object) and against a committed card that already uses the opcode: `data/cards/aether-channeler.json` encodes `MoveToZone` as `["permanent", {"type": "Hand"}]`.
 
-- [ ] **Step 4: Run the tests to verify they pass.**
+- [x] **Step 4: Run the tests to verify they pass.**
 
 Run: `cabal test 2>&1 | tail -5`
 Expected: PASS, including `CardsSpec`'s whole-directory re-parse and slug sweeps.
 
-- [ ] **Step 5: Format, lint, and commit.**
+- [x] **Step 5: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -692,7 +692,7 @@ git commit -m "feat(cards): add Leyline of the Void, the CR 103.6a gate card (#1
 - Consumes: everything from Tasks 1–5.
 - Produces: `Mulligan.handWindow`, `Mulligan.openingHandActions :: HandActionPerformer -> [PlayerId] -> Game ()`.
 
-- [ ] **Step 1: Write the failing tests.** In `MulliganSpec`, add these fixtures beside the Serum Powder ones:
+- [x] **Step 1: Write the failing tests.** In `MulliganSpec`, add these fixtures beside the Serum Powder ones:
 
 ```haskell
 -- alice's library with a Leyline of the Void on top and `n` Mountains under it;
@@ -790,12 +790,12 @@ and these cases to the `tests` list (`Text` needs importing into `MulliganSpec`)
 
 **A two-Leyline case is deliberately omitted here** and added in Step 5 once the loop exists, because it is the one case that distinguishes a loop from a single ask.
 
-- [ ] **Step 2: Run the tests to verify they fail.**
+- [x] **Step 2: Run the tests to verify they fail.**
 
 Run: `cabal test 2>&1 | tail -30`
 Expected: compile error on `Prompt.OpeningHandAction` in the local answerers is impossible (Task 1 added it), so these fail at runtime: no `opening` tag is ever recorded, the battlefield stays empty, and the ordering assertions get `[]`.
 
-- [ ] **Step 3: Write the shared window loop.** In `source/library/Pawl/Mulligan.hs`, replace `mulliganWindow` with the parameterized `handWindow` and keep a thin CR 103.5b caller:
+- [x] **Step 3: Write the shared window loop.** In `source/library/Pawl/Mulligan.hs`, replace `mulliganWindow` with the parameterized `handWindow` and keep a thin CR 103.5b caller:
 
 ```haskell
 -- The shared CR 103.5b / CR 103.6 loop: offer this player every action their

@@ -11,6 +11,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.Decider as Decider
 import Pawl.Type.Effect (Effect)
 import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameState as GameState
@@ -50,6 +51,8 @@ openingHands perform owners = do
   -- 729.3's "regardless of any mulligans" means.
   Monad.forM_ owners (Monad.replicateM_ openingHand . Event.drawCard)
   mulliganRounds perform Map.empty owners
+  -- CR 103.6: the opening-hand window, after the WHOLE CR 103.5 process.
+  openingHandActions perform owners
 
 -- CR 103.5b / CR 103.6: the cards in this player's hand that grant an action
 -- from the window `field` names, each paired with the effects that action
@@ -68,26 +71,33 @@ actionsFor field pid gs =
           effects -> Just (oid, effects)
    in Maybe.mapMaybe withAction (Game.zoneMembers Zone.Hand pid gs)
 
--- CR 103.5b: offer this player every action their hand grants "any time [they]
--- could mulligan", repeatedly, until they decline or none is left. Performing
--- one is NOT taking a mulligan -- nothing is shuffled or bottomed and `counts`
--- is untouched -- so the caller's declaration still follows (CR 103.5b's last
--- sentence). Nothing in CR 103.5b or on the card limits a player to one action,
--- and a hand that redraws into a second granting card may use it here too.
+-- The shared CR 103.5b / CR 103.6 loop: offer this player every action their
+-- hand grants through `field`, on the `ask` channel, until they decline or none
+-- is left. Performing one is never a mulligan and never a cost -- it is the
+-- action itself. Both rules let a player act more than once (CR 103.5b sets no
+-- limit; CR 103.6 says "any such actions in any order"), which is why this
+-- recurses rather than asking once.
 --
--- Terminates even against an interpreter that never declines: each action moves
--- at least one card out of the hand for the rest of the game, so the deck
--- strictly shrinks, and an empty library redraws nothing -- leaving a hand with
--- no candidate, which ends the loop.
-mulliganWindow :: HandActionPerformer -> PlayerId -> Game ()
-mulliganWindow perform pid = do
-  candidates <- State.gets (actionsFor Card.mulliganAction pid)
+-- Terminates even against an interpreter that never declines: every action in
+-- the pool moves its card out of the hand -- CR 103.6a puts it onto the
+-- battlefield, CR 103.5b's exiles it -- so the candidate list strictly shrinks.
+--
+-- Passing the prompt constructor needs no extension: `ask`'s result type is the
+-- fixed `Prompt (Maybe ObjectId)`, not a polymorphic one.
+handWindow ::
+  (Card.Card -> [Effect Card.Card]) ->
+  (Decider.Decider -> PlayerId -> [ObjectId] -> Prompt.Prompt (Maybe ObjectId)) ->
+  HandActionPerformer ->
+  PlayerId ->
+  Game ()
+handWindow field ask perform pid = do
+  candidates <- State.gets (actionsFor field pid)
   case candidates of
     -- Where the rules leave nothing to ask, don't prompt.
     [] -> pure ()
     _ -> do
       decider <- State.gets (Decide.deciderFor pid)
-      answer <- Trans.lift (Program.prompt (Prompt.MulliganAction decider pid (fmap fst candidates)))
+      answer <- Trans.lift (Program.prompt (ask decider pid (fmap fst candidates)))
       case answer of
         Nothing -> pure ()
         Just oid -> case lookup oid candidates of
@@ -97,7 +107,19 @@ mulliganWindow perform pid = do
           Nothing -> pure ()
           Just effects -> do
             perform oid pid effects
-            mulliganWindow perform pid
+            handWindow field ask perform pid
+
+-- CR 103.6: "Once the mulligan process (see rule 103.5) is complete, the
+-- starting player may take any such actions in any order. Then each other player
+-- in turn order may do the same." `owners` is already in turn order with the
+-- starting player first, which is exactly that order.
+--
+-- A player who has left the game is not here to act: the rebuild paths derive
+-- `owners` from Departure.stillPlayingInOrder, so they get no window, exactly as
+-- they get no opening hand.
+openingHandActions :: HandActionPerformer -> [PlayerId] -> Game ()
+openingHandActions perform owners =
+  Monad.forM_ owners (handWindow Card.openingHandAction Prompt.OpeningHandAction perform)
 
 -- CR 103.5: repeat the declare-all-then-take-all round until no still-deciding
 -- player mulligans. `deciding` is the players who have NOT yet kept -- keeping is
@@ -115,7 +137,7 @@ mulliganRounds perform counts deciding = do
     -- would declare", and the declaration follows it. Reading the hand size
     -- after it is load-bearing: an action that empties the hand makes this a
     -- forced keep under CR 103.5's final sentence.
-    mulliganWindow perform pid
+    handWindow Card.mulliganAction Prompt.MulliganAction perform pid
     handSize <- State.gets (length . Game.zoneMembers Zone.Hand pid)
     if handSize <= 0
       then pure (pid, MulliganDecision.Keep)
