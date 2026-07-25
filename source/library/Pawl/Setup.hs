@@ -293,16 +293,34 @@ subgameStateFrom starter parent =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
       libObjects = Map.restrictKeys (GameState.objects parent) libIds
-      -- The pool is drawn from EVERY seat's main-game library, including a seat
-      -- whose player has left the game, while `order` below seats only the
-      -- players still in it (CR 729.4, #147). A departed player's cards ride
-      -- along inert: startGameFromCards builds subgame libraries for the seated
-      -- players only, so no subgame library holds them and nobody can draw them,
-      -- and funnelBack returns them to their owner's main-game library when the
-      -- subgame ends. Restricting this to the seated players instead would DELETE
-      -- those cards, because funnelBack rebuilds a main-game library out of the
-      -- subgame pool and drops the parent's old library objects -- a card that
-      -- never entered the subgame would have nothing to come back from.
+      -- The pool is drawn from EVERY seat in the parent's FULL roster
+      -- (GameState.turnOrder), never narrowed to Departure.stillPlayingInOrder
+      -- -- `order` below DOES narrow to the seated players (CR 729.4, #147), but
+      -- this pool must not, because funnelBack's oldLibIds is built the SAME way
+      -- over the SAME full roster, and the two have to agree: funnelBack drops
+      -- every id in that set from the parent's kept objects (Map.withoutKeys)
+      -- and rebuilds the returned set only from what actually survived the
+      -- subgame (`returned`, plus `recovered` for CR 800.4a departures -- see
+      -- funnelBack). Narrowing THIS pool to the seated players while funnelBack
+      -- keeps the full roster would let funnelBack drop a STILL-PLAYING player's
+      -- real library object that this pool never captured to fund a return for
+      -- -- destroying it, silently.
+      --
+      -- A departed seat's own share of this pool is, in practice, always empty
+      -- now, which is a change from before CR 800.4a landed (this same
+      -- milestone): Departure.objectsLeaveWith deletes a departing player's
+      -- library outright the instant they leave a CR 800.1 multiplayer game,
+      -- and a departure in a two-player game ends the whole game (CR 104.2a)
+      -- before any subgame could be built from it in the first place -- see
+      -- Pawl.Departure. (A restart INSIDE a subgame, Setup.restartGame, can
+      -- later shrink turnOrder below what it was at departure time, but it
+      -- never resurrects objects Departure.objectsLeaveWith already deleted, so
+      -- this stays true even then; funnelBack's own recovery guard relies on
+      -- the same fact.) So this is no longer about ferrying a departed player's
+      -- cards through the subgame inert so funnelBack can return them later --
+      -- there is nothing left of theirs to ferry -- it is purely the
+      -- bookkeeping symmetry with funnelBack described above, which has to hold
+      -- regardless of who is or isn't currently seated.
       order = rotateTo starter (Departure.stillPlayingInOrder parent)
       firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe order)
    in parent
@@ -372,13 +390,39 @@ subgameStateFrom starter parent =
 -- outright by anything other than Departure.objectsLeaveWith (CR 704.5d's
 -- `ceaseToExist` in Pawl.Sba guards on Source.OfToken and never fires for
 -- Source.OfCard), so the only players whose oldLibIds objects can legitimately
--- need recovering are ones who (a) left the subgame and (b) left a subgame
--- that was itself multiplayer, the same Departure.continuesAfterDeparture gate
--- objectsLeaveWith itself is behind. Checking id-presence alone, without the
--- owner/gate condition, was tried and rejected: it recovers a STILL-PLAYING
--- player's merely-superseded ids right alongside a departed player's, handing
--- the survivor a second, stale copy of every card they ever drew -- a
--- duplication bug, not a fix.
+-- need recovering are ones for whom objectsLeaveWith actually fired.
+--
+-- The test for THAT is "this owner has no object of any kind left anywhere in
+-- `finalSub`" -- not "Departure.continuesAfterDeparture finalSub", which was
+-- tried and rejected: that reads `finalSub`'s turnOrder at the END of the
+-- subgame, but objectsLeaveWith's own gate was decided at DEPARTURE time
+-- (Departure.hs), and the two can disagree. Setup.restartGame rewrites
+-- turnOrder to `Departure.stillPlayingInOrder`, DROPPING departed seats, and a
+-- restart can resolve inside a subgame (Effect.RestartGame, Resolve.hs;
+-- playSubgame's playGame honours restartSignal) -- so a three-seat subgame
+-- where bob departs (wiping him) followed by an in-subgame restart leaves
+-- `finalSub`'s own turnOrder at length 2, and continuesAfterDeparture on
+-- `finalSub` reads False even though bob's objects are gone. The owner-absence
+-- test doesn't have this problem: restartGame's startGameFromCards rebuilds
+-- `objects` from the pool that ALREADY EXISTS (Map.filter isCard, no owner
+-- restriction) -- it can carry a survivor's objects forward, but it can never
+-- resurrect a departed player's, because objectsLeaveWith already deleted
+-- every one of them before the restart ran. A departed owner therefore stays
+-- absent from `finalSub`'s objects through any number of intervening
+-- restarts, which is exactly the robustness this predicate needs.
+--
+-- It is also still correctly False for a player who merely decks out in a
+-- subgame that never reaches multiplayer (CR 800.1): there, objectsLeaveWith
+-- never fires at all (Departure.depart's own gate), so their drawn cards are
+-- untouched and still sit in `finalSub`'s objects under their post-draw ids --
+-- `returned` already has them, and the owner is not absent.
+--
+-- The explicit "id itself is still missing from finalSub" check used to be a
+-- separate third conjunct; it is now REDUNDANT and has been dropped: owner is
+-- invariant across a card's whole life (Event.changeZoneReturning carries it
+-- forward on every zone change), so if the owner has no object anywhere in
+-- `finalSub`, this specific `oid` -- which belongs to that same owner -- cannot
+-- be one of finalSub's objects either.
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
   let isCard obj = case Object.source obj of
@@ -397,13 +441,10 @@ funnelBack finalSub parent =
       oldLibIds =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
-      survivingSeats = Departure.stillPlayingInOrder finalSub
+      ownersPresentInSub = Set.fromList (fmap Object.owner (Map.elems (GameState.objects finalSub)))
       removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of
         Nothing -> False
-        Just obj ->
-          Departure.continuesAfterDeparture finalSub
-            && notElem (Object.owner obj) survivingSeats
-            && Maybe.isNothing (Map.lookup oid (GameState.objects finalSub))
+        Just obj -> Set.notMember (Object.owner obj) ownersPresentInSub
       recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.filter removedByDeparture oldLibIds))
       allReturned = Map.union returned recovered
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) allReturned))

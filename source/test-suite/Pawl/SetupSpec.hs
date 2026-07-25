@@ -427,6 +427,31 @@ subgameTests registry =
         HU.assertEqual "bob's 3-card library comes back whole" 3 (length (Game.zoneMembers Zone.Library S.bob after))
         HU.assertEqual "alice's library is unaffected" 3 (length (Game.zoneMembers Zone.Library S.alice after))
         HU.assertEqual "carol's library is unaffected" 3 (length (Game.zoneMembers Zone.Library S.carol after)),
+      -- The narrower door: continuesAfterDeparture reads `finalSub`'s turnOrder
+      -- at the END of the subgame, but objectsLeaveWith's own gate fired at
+      -- DEPARTURE time -- and a restart resolving INSIDE the subgame AFTER the
+      -- departure (Setup.restartGame, reachable via Effect.RestartGame /
+      -- Resolve.hs from a still-running subgame) rewrites turnOrder to
+      -- Departure.stillPlayingInOrder, which DROPS the departed seat. So by the
+      -- time funnelBack reads `finalSub`, its turnOrder is back down to two and
+      -- continuesAfterDeparture would read False even though bob's objects were
+      -- genuinely destroyed earlier. funnelBack's guard must not depend on
+      -- `finalSub`'s turnOrder at all for this reason.
+      HU.testCase "CR 729.5/800.4a a restart INSIDE the subgame, after the departure, does not un-recover the departed player's library" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let g0 = Setup.emptyGame S.threePlayers
+            g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
+            sub0 = Setup.subgameStateFrom S.alice g1
+            (_, seated) = Engine.runGamePure S.identityAnswer sub0 Setup.startGameFromCards
+            departedSub = Departure.depart Departure.Type.Lost S.bob seated
+            (_, restarted) = Engine.runGamePure S.identityAnswer departedSub (Setup.restartGame S.alice)
+            after = Setup.funnelBack restarted g1
+        HU.assertEqual "the in-subgame restart really did shrink finalSub's own turnOrder to two" 2 (length (GameState.turnOrder restarted))
+        HU.assertEqual "so the naive seam-at-the-end reading would (wrongly) say it is not multiplayer any more" False (Departure.continuesAfterDeparture restarted)
+        HU.assertEqual "bob still has nothing anywhere in the restarted subgame" [] (Map.keys (Map.filter (\o -> Object.owner o == S.bob) (GameState.objects restarted)))
+        HU.assertEqual "bob's 3-card library still comes back whole" 3 (length (Game.zoneMembers Zone.Library S.bob after))
+        HU.assertEqual "alice's library is unaffected" 3 (length (Game.zoneMembers Zone.Library S.alice after))
+        HU.assertEqual "carol's library is unaffected" 3 (length (Game.zoneMembers Zone.Library S.carol after)),
       HU.testCase "CR 729.2/729.4 #147: a subgame seats only the players still in the main game" $
         -- CR 729.2: "Each player takes all the cards in their main-game library,
         -- moves them to their subgame library, and shuffles them." Each player IN
