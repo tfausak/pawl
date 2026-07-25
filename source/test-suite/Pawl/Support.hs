@@ -83,6 +83,7 @@ import qualified Pawl.Type.RestartSignal as RestartSignal
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.Slug as Slug.Type
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
@@ -92,7 +93,6 @@ import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
-import qualified System.Directory as Directory
 import qualified System.Random as Random
 
 alice, bob :: PlayerId.PlayerId
@@ -1135,14 +1135,11 @@ stubView table oid =
 
 -- Every card file in a registry's root, by slug. The corpus-wide checks need
 -- the directory listing rather than a hand-kept list: a file nobody loads is
--- exactly the file a hand-kept list forgets.
+-- exactly the file a hand-kept list forgets. Kept as a String list because that
+-- is what the sweeps feed back to Registry.card; the enumeration itself is the
+-- library's since #167.
 corpusSlugs :: Registry.Type.Registry -> IO [String]
-corpusSlugs registry = do
-  entries <- Directory.listDirectory (Registry.Type.root registry)
-  let stem name = take (length name - 5) name
-  pure (List.sort (fmap stem (filter (List.isSuffixOf ".json") entries)))
+corpusSlugs registry = fmap (fmap (Text.unpack . Slug.Type.slugToText)) (Registry.slugs registry)
 
 allPrintings :: Registry.Type.Registry -> IO [Printing.Printing]
-allPrintings registry = do
-  slugs <- corpusSlugs registry
-  mapM (Registry.printing registry) slugs
+allPrintings = Registry.printings

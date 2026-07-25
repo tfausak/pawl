@@ -59,7 +59,6 @@ import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.Slug as Slug.Type
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
@@ -408,14 +407,13 @@ lintTests registry =
       -- then builds a path from that slug -- so a file whose stem is not itself a
       -- slugify fixed point is never opened by that path; a lookup would quietly
       -- open some OTHER file (or none) instead of raising the mismatch above.
-      -- Every committed file name must therefore already be its own slug.
+      -- Every committed file name must therefore already be its own slug, which
+      -- Registry.slugs enforces since #167: it raises UnslugifiableFile rather
+      -- than enumerating past such a file. Not sweeping over a listing here, then
+      -- -- succeeding at all IS the assertion, and it covers the whole directory.
       HU.testCase "every file name in data/cards is already a slug" $ do
-        stems <- S.corpusSlugs registry
-        let offenders =
-              filter
-                (Maybe.isNothing . Slug.Type.textToSlug . Text.pack)
-                stems
-        HU.assertEqual "no file name needs slugifying" [] offenders,
+        found <- Registry.slugs registry
+        HU.assertBool "the corpus is not empty" (not (null found)),
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $ do
         blaze <- Registry.printing registry "Blaze"
         let card = Printing.card blaze

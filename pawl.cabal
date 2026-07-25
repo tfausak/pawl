@@ -55,6 +55,7 @@ library
   build-depends:
     bytestring ^>=0.12,
     containers ^>=0.8,
+    directory ^>=1.3.10,
     parsec ^>=3.1.18,
     text ^>=2.1.3,
     transformers ^>=0.6.1,
@@ -120,6 +121,7 @@ library
     Pawl.Type.Condition
     Pawl.Type.ContinuousEffect
     Pawl.Type.ControllerRelation
+    Pawl.Type.CorruptCard
     Pawl.Type.Cost
     Pawl.Type.CostComponent
     Pawl.Type.Count
@@ -155,6 +157,8 @@ library
     Pawl.Type.ManaSymbol
     Pawl.Type.ManaType
     Pawl.Type.ManaUnit
+    Pawl.Type.MisfiledCard
+    Pawl.Type.MissingRoot
     Pawl.Type.Modal
     Pawl.Type.Mode
     Pawl.Type.ModeIndex
@@ -210,6 +214,9 @@ library
     Pawl.Type.TriggeredAbility
     Pawl.Type.TurnScope
     Pawl.Type.TypeLine
+    Pawl.Type.UnknownCard
+    Pawl.Type.UnslugifiableFile
+    Pawl.Type.UnslugifiableName
     Pawl.Type.Uses
     Pawl.Type.Zone
     Pawl.Type.ZoneChange

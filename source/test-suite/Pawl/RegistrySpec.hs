@@ -12,10 +12,16 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Type.Card as Card
+import qualified Pawl.Type.CorruptCard as CorruptCard
+import qualified Pawl.Type.MisfiledCard as MisfiledCard
+import qualified Pawl.Type.MissingRoot as MissingRoot
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Registry as Registry.Type
+import qualified Pawl.Type.Slug as Slug
+import qualified Pawl.Type.UnknownCard as UnknownCard
+import qualified Pawl.Type.UnslugifiableFile as UnslugifiableFile
+import qualified Pawl.Type.UnslugifiableName as UnslugifiableName
 import qualified System.Directory as Directory
-import qualified System.IO.Error as IOError
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -66,14 +72,25 @@ withInvalidUtf8Corpus label action = do
     (Directory.removeDirectoryRecursive dir)
     (Registry.new dir >>= action)
 
--- An IO action that must fail. tryIOError fixes the exception type without
--- ScopedTypeVariables, which this project does not enable.
-expectIOError :: String -> IO a -> HU.Assertion
-expectIOError label action = do
-  result <- IOError.tryIOError action
+-- An IO action that must fail with a specific exception VALUE. The `expected`
+-- argument fixes Exception.try's type, so no ScopedTypeVariables is needed --
+-- which is the point of the typed failures: a caller says which failure it means
+-- rather than matching prose (#167).
+expectException :: (Exception.Exception e, Eq e) => String -> e -> IO a -> HU.Assertion
+expectException label expected action = do
+  result <- Exception.try action
   case result of
-    Left _ -> pure ()
-    Right _ -> HU.assertFailure (label <> ": expected an IO error, got a card")
+    Left err -> HU.assertEqual label expected err
+    Right _ -> HU.assertFailure (label <> ": expected " <> show expected <> ", got a value")
+
+-- Like expectException where the payload is not worth pinning exactly (a parser
+-- message). The continuation's own field accessors fix the exception type.
+expectExceptionWith :: (Exception.Exception e) => String -> (e -> HU.Assertion) -> IO a -> HU.Assertion
+expectExceptionWith label check action = do
+  result <- Exception.try action
+  case result of
+    Left err -> check err
+    Right _ -> HU.assertFailure (label <> ": expected an exception, got a value")
 
 nameOf :: Printing.Printing -> Text.Text
 nameOf = Card.name . Printing.card
@@ -100,46 +117,109 @@ tests =
           Directory.removeFile (Registry.Type.root registry <> "/goblin-piker.json")
           second <- Registry.card registry "Goblin Piker"
           HU.assertEqual "served from the cache" first second,
-      HU.testCase "an unknown card fails loudly"
+      -- The three failure kinds the loader can raise were distinguishable only
+      -- by their message prose, so a caller wanting "unknown card X, did you
+      -- mean...?" versus "that file is broken" had to string-match a `show`
+      -- (#167). Each is now its own type, and these cases catch it AT that type
+      -- -- which is the assertion: catching UnknownCard cannot succeed on a
+      -- CorruptCard however similar the two messages are.
+      HU.testCase "an unknown card raises UnknownCard, naming the slug and the path it looked for"
         . withCorpus "missing" []
         $ \registry ->
-          expectIOError "missing file" (Registry.card registry "Goblin Piker"),
-      HU.testCase "a malformed file fails loudly"
+          expectExceptionWith
+            "missing file"
+            ( \err -> do
+                HU.assertEqual "names the slug" (Text.pack "goblin-piker") (Slug.slugToText (UnknownCard.slug err))
+                HU.assertEqual "names the path" (Registry.Type.root registry <> "/goblin-piker.json") (UnknownCard.path err)
+            )
+            (Registry.card registry "Goblin Piker"),
+      HU.testCase "a malformed file raises CorruptCard, not UnknownCard"
         . withCorpus "malformed" [("goblin-piker.json", Text.pack "{oh no")]
         $ \registry ->
-          expectIOError "malformed json" (Registry.card registry "Goblin Piker"),
-      HU.testCase "a file whose card is named something else fails loudly, naming both slugs" $ do
+          expectExceptionWith
+            "malformed json"
+            ( \err -> do
+                HU.assertEqual "names the path" (Registry.Type.root registry <> "/goblin-piker.json") (CorruptCard.path err)
+                HU.assertBool "says why" (not (Text.null (CorruptCard.reason err)))
+            )
+            (Registry.card registry "Goblin Piker"),
+      HU.testCase "a file whose card is named something else raises MisfiledCard, naming both slugs" $ do
         piker <- pikerJson
-        withCorpus "misfiled" [("bird-maiden.json", piker)] $ \registry -> do
-          result <- IOError.tryIOError (Registry.card registry "Bird Maiden")
-          case result of
-            Right _ -> HU.assertFailure "expected an IO error, got a card"
-            Left err -> do
-              HU.assertBool ("names the file's slug: " <> show err) (List.isInfixOf "bird-maiden" (show err))
-              HU.assertBool ("names the card's slug: " <> show err) (List.isInfixOf "goblin-piker" (show err)),
-      HU.testCase "a name with no alphanumerics fails loudly instead of reading .json"
+        withCorpus "misfiled" [("bird-maiden.json", piker)] $ \registry ->
+          expectExceptionWith
+            "misfiled card"
+            ( \err -> do
+                HU.assertEqual "names the path" (Registry.Type.root registry <> "/bird-maiden.json") (MisfiledCard.path err)
+                HU.assertEqual "names the file's slug" (Text.pack "bird-maiden") (Slug.slugToText (MisfiledCard.filedUnder err))
+                HU.assertEqual "names the card" (Text.pack "Goblin Piker") (MisfiledCard.name err)
+                HU.assertEqual "names the card's slug" (Just (Text.pack "goblin-piker")) (fmap Slug.slugToText (MisfiledCard.slugifiesTo err))
+            )
+            (Registry.card registry "Bird Maiden"),
+      HU.testCase "a name with no alphanumerics raises UnslugifiableName instead of reading .json"
         . withCorpus "empty-slug" []
         $ \registry ->
-          expectIOError "empty slug" (Registry.card registry "!!!"),
-      HU.testCase "a file with invalid UTF-8 bytes fails loudly, naming the path and the decode failure"
+          expectException
+            "empty slug"
+            (UnslugifiableName.MkUnslugifiableName (Text.pack "!!!"))
+            (Registry.card registry "!!!"),
+      HU.testCase "a file with invalid UTF-8 bytes raises CorruptCard naming the path and the decode failure"
         . withInvalidUtf8Corpus "invalid-utf8"
-        $ \registry -> do
-          result <- IOError.tryIOError (Registry.card registry "Goblin Piker")
-          case result of
-            Right _ -> HU.assertFailure "expected an IO error, got a card"
-            Left err -> do
-              -- Specifically the decodeUtf8' failure message, not merely any
-              -- IO error: an incomplete JSON payload (this file's contents)
-              -- would fail for an unrelated reason (missing fields) once
-              -- decoded, so this pins the decode branch rather than any
-              -- downstream one.
-              HU.assertBool ("names the path: " <> show err) (List.isInfixOf "goblin-piker.json" (show err))
-              HU.assertBool ("names the decode failure: " <> show err) (List.isInfixOf "not valid UTF-8" (show err)),
+        $ \registry ->
+          expectExceptionWith
+            "invalid utf-8"
+            ( \err -> do
+                HU.assertEqual "names the path" (Registry.Type.root registry <> "/goblin-piker.json") (CorruptCard.path err)
+                -- Specifically the decodeUtf8' failure, not merely any
+                -- CorruptCard: an incomplete JSON payload (this file's
+                -- contents) would fail for an unrelated reason (missing
+                -- fields) once decoded, so this pins the decode branch rather
+                -- than any downstream one.
+                HU.assertBool ("names the decode failure: " <> show err) (List.isInfixOf "not valid UTF-8" (Text.unpack (CorruptCard.reason err)))
+            )
+            (Registry.card registry "Goblin Piker"),
       HU.testCase "a failed load is not cached: fixing the file fixes the lookup" $ do
         piker <- pikerJson
         withCorpus "retry" [("goblin-piker.json", Text.pack "{oh no")] $ \registry -> do
-          expectIOError "malformed json" (Registry.card registry "Goblin Piker")
+          expectExceptionWith
+            "malformed json"
+            ( \err -> do
+                HU.assertEqual "names the path" (Registry.Type.root registry <> "/goblin-piker.json") (CorruptCard.path err)
+                HU.assertBool "says why" (not (Text.null (CorruptCard.reason err)))
+            )
+            (Registry.card registry "Goblin Piker")
           TextIO.writeFile (Registry.Type.root registry <> "/goblin-piker.json") piker
           c <- Registry.card registry "Goblin Piker"
-          HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.name c)
+          HU.assertEqual "name" (Text.pack "Goblin Piker") (Card.name c),
+      -- (b) A mistyped --cards-dir should fail once, at startup, rather than
+      -- once per card looked up (#167).
+      HU.testCase "a root that does not exist is rejected by new, not by the first lookup" $ do
+        tmp <- Directory.getTemporaryDirectory
+        let missing = tmp <> "/pawl-registry-spec-no-such-root"
+        Directory.removePathForcibly missing
+        expectException "missing root" (MissingRoot.MkMissingRoot missing) (Registry.new missing),
+      -- (a) A CLI, a scenario loader, a deckbuilder and a linter all want "every
+      -- card in this pool", which only the test suite could express before.
+      HU.testCase "slugs enumerates the pool in ascending order, ignoring non-.json entries" $ do
+        piker <- pikerJson
+        withCorpus
+          "enumerate"
+          [ ("goblin-piker.json", piker),
+            ("bird-maiden.json", piker),
+            ("README.md", Text.pack "not a card")
+          ]
+          $ \registry -> do
+            found <- Registry.slugs registry
+            HU.assertEqual "sorted, .json only" [Text.pack "bird-maiden", Text.pack "goblin-piker"] (fmap Slug.slugToText found),
+      HU.testCase "cards loads every card the pool enumerates" $ do
+        piker <- pikerJson
+        withCorpus "load-all" [("goblin-piker.json", piker)] $ \registry -> do
+          loaded <- Registry.cards registry
+          HU.assertEqual "one card, by name" [Text.pack "Goblin Piker"] (fmap Card.name loaded),
+      HU.testCase "a .json file whose stem is not a slug raises UnslugifiableFile" $ do
+        piker <- pikerJson
+        withCorpus "bad-stem" [("Goblin Piker.json", piker)] $ \registry ->
+          expectException
+            "unslugifiable file"
+            (UnslugifiableFile.MkUnslugifiableFile (Registry.Type.root registry <> "/Goblin Piker.json"))
+            (Registry.slugs registry)
     ]
