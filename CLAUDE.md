@@ -36,54 +36,45 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 ## Current work and tracking
 
 - **Status: M0–M5, the M5.5 count/compare interstitial, the M5.6 multiplayer
-  interstitial, and the CR 103.5b mulligan-window gap closure are complete.**
-  The closed-half milestones M0–M3g,
-  the M3.5 cards-as-data interstitial, all of M4 (M4a–M4h), all eleven phases
-  of M4.5 (the closed-half gap census), all of M5 (Controlling Another Player
-  CR 723, Restarting the Game CR 727, Subgames CR 729), the mulligan
-  gap-closure (CR 103.5), and M5.5 (count/compare — one `Count`/`Condition`
-  pair reading the CR 613 layer projection with no module cycle) have each
-  landed with their own distilled entry in `docs/progress.md`. **M5.6
-  (Multiplayer: CR 800 general + CR 806 free-for-all) is the newest and
-  settles `docs/design.md` §2.4's bet.** A three-player free-for-all now plays
-  end to end: `turnOrder` is the permanent seating roster (CR 800.5/806.3), a
-  departing player's objects and control-granting effects are removed per CR
-  800.4a, the defending player is chosen by a CR 507.1/703.4h turn-based
-  action rather than assumed, the monarch reassigns on departure (CR 725.4),
-  and CR 103.5c/103.8c's multiplayer setup rules (the free first mulligan, no
-  skipped first draw) are in place. The headline finding: §2.4's bet is
-  **half vindicated** — the data model (`turnOrder`, `players`,
-  `Count.playersFor`, `emptyGame`) needed no change at all, and
-  `PlayerRelation.Opponent`, the piece the bet's own wording predicted would be
-  largest, was not a piece at all; the *control flow* around a departure was
-  two-player-shaped in four concentrated places, which is what M5.6 closes.
-  Gate cards **Palace Jailer**, **Master Thief**, and **Silence** were all
-  already in the pool — no card data changed. Deliberately out of scope: CR
-  801's limited range of influence (always unlimited here), CR 802–805's
-  options, CR 806–811's other variants, and teams, all of which need a
-  format/variant concept pawl does not have (#175). **After M5.6, three
-  mulligan-adjacent gap closures landed** — all of `docs/superpowers/specs/` and
-  `plans/` dated 2026-07-25. **CR 103.5b (#182)**, a mulligan-declaration window
-  letting a card in hand act "any time you could mulligan", gated on **Serum
-  Powder**: adds `Effect.ExileHandThenDraw`, `Card.mulliganAction`,
-  `Prompt.MulliganAction`, and `Pawl.Type.HandActionPerformer` — the parameter
-  that breaks the `Resolve → Setup → Mulligan` cycle, since a game start now
-  performs opcodes. **#176**, which made `Prompt.DeclareMulligan` carry a
-  `MulliganOffer` (mulligans taken *and* what the next one costs, which CR
-  103.5c's free mulligan makes different numbers). **CR 103.6a (#149)**, the
-  opening-hand window that opens once the whole mulligan process completes,
-  gated on **Leyline of the Void**: adds `Card.openingHandAction`,
-  `Prompt.OpeningHandAction`, and `ControllerRelation.Opponents`, needs **no new
-  opcode** (`MoveToZone` on the reserved `self` slot is how this codebase says
-  "this permanent"), and splits the zone-change subject test owner-based per CR
-  400.3. **M6 (the transpiler) is next** (#9). M5.6's umbrella spec is
+  interstitial, three mulligan-adjacent gap closures (CR 103.5b/#182, #176, CR
+  103.6a/#149), and Auras phase (a) are complete.** The closed-half milestones
+  M0–M3g, the M3.5 cards-as-data interstitial, all of M4 (M4a–M4h), all eleven
+  phases of M4.5 (the closed-half gap census), all of M5 (Controlling Another
+  Player CR 723, Restarting the Game CR 727, Subgames CR 729), the mulligan
+  gap-closure (CR 103.5), M5.5 (count/compare), M5.6 (Multiplayer: CR 800
+  general + CR 806 free-for-all, settling `docs/design.md` §2.4's bet), and the
+  three mulligan-adjacent closures (a declaration-window action gated on Serum
+  Powder, `Prompt.DeclareMulligan` carrying its cost, and an opening-hand-window
+  action gated on Leyline of the Void) have each landed with their own
+  distilled entry in `docs/progress.md`. **Auras phase (a), the attachment
+  substrate (CR 303.4), is the newest — a card-driven unit, not a numbered
+  milestone, since Auras were the largest single hole in the card pool rather
+  than a scheduled phase.** Gate cards **Unholy Strength** (the first static
+  ability to reach through an attachment) and **Opalescence** (closing #114 for
+  free once `Subtype.Aura` existed): adds `Subtype.Aura`, `Card.enchant ::
+  Maybe TargetSpec`, `Object.attachedTo :: Maybe ObjectId` as base state seeded
+  as the object enters the battlefield, `Affected.Attached` (a third
+  affected-set kind, re-derived from the source's own state), and CR 704.5m's
+  `Sba.fallsOff`. **No new opcode** — an Aura's whole behaviour is a static
+  ability plus an entry rule. Two findings: the target-spec seam is not single
+  (`Target.fillableModes` and the D4 lint reach past `Card.allTargetSpecs` to
+  `Mode.targetSpecs`, so castability needed teaching separately from
+  targeting, per CR 601.2c), and an Aura spell is the first permanent spell in
+  this pool that can fizzle (`Pawl.Stack` previously sent every permanent
+  straight to the battlefield with no target check). Deferred: #187–#193
+  (Attach/CR 303.4j, non-resolution entry, multiple `enchant`, enchant-player,
+  CR 303.4d's chooser, face-down, Equipment/Fortification). **Phase (b) is
+  next**: layer-2 control granted by a static ability, gated on **Control
+  Magic**, closing #33 and #62. M5.6's umbrella spec is
   `docs/superpowers/specs/2026-07-24-m5.6-multiplayer-design.md`; its five
   phase plans are `docs/superpowers/plans/2026-07-24-m5.6a-turn-order-priority.md`,
   `docs/superpowers/plans/2026-07-25-m5.6b-setup-mulligans-restart-subgames.md`,
   `docs/superpowers/plans/2026-07-25-m5.6c-leaving-the-game-objects-monarch.md`,
   `docs/superpowers/plans/2026-07-25-m5.6d-combat-defending-player.md`, and
-  `docs/superpowers/plans/2026-07-25-m5.6e-close-out.md`; the distilled
-  per-milestone entries (gate cards, decisions, opcodes) are in
+  `docs/superpowers/plans/2026-07-25-m5.6e-close-out.md`. Auras phase (a)'s spec
+  and plan are `docs/superpowers/specs/2026-07-25-auras-design.md` and
+  `docs/superpowers/plans/2026-07-25-auras-a-attachment-substrate.md`; the
+  distilled per-milestone entries (gate cards, decisions, opcodes) are in
   `docs/progress.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —

@@ -413,8 +413,8 @@ tests registry =
         let damaged = S.markDamage humilityId 4 g2
             afterSba = S.settleSba damaged
         HU.assertBool "lethal damage destroys the animated enchantment" (not (Set.member humilityId (GameState.battlefield afterSba))),
-      -- Opalescence's card text says "each OTHER enchantment" (no rule number
-      -- -- CR 305.2 is the one-land-per-turn rule and is unrelated): Opalescence
+      -- Opalescence's card text says "each OTHER enchantment" (no rule number --
+      -- CR 305.2 is the one-land-per-turn rule and is unrelated): Opalescence
       -- does not animate itself. Since #163 that is the Not IsSource conjunct in
       -- the card's own affected-set Filter, evaluated against the candidate
       -- View's identity -- so it is the data file, not an engine field, that has

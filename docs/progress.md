@@ -2369,3 +2369,55 @@ its own gate card and spec, landed as it completes. Umbrella:
   and plan:
   `docs/superpowers/specs/2026-07-25-cr-103-6-opening-hand-actions-design.md` and
   `docs/superpowers/plans/2026-07-25-cr-103-6-opening-hand-actions.md`.
+
+- **Auras phase (a), the attachment substrate, is implemented** (a **card-driven
+  unit, not a numbered milestone** — Auras were the largest single hole in the
+  card pool, flagged at four separate code sites; no `docs/design.md` entry).
+  **Gate cards: Unholy Strength** (`{B}` Aura, "Enchanted creature gets +2/+1" —
+  the first static ability to reach through an attachment) **and Opalescence**
+  (closing #114: its "each other **non-Aura** enchantment" qualifier had been
+  unenforceable for want of the subtype, and enforcing it cost nothing once the
+  subtype existed). **What it establishes:** `Subtype.Aura` (CR 205.3h) is
+  appended, not inserted, so no existing card's `Ord`-canonical subtype list
+  moves. `Card.enchant :: Maybe TargetSpec` (CR 702.5a) is a `TargetSpec` rather
+  than a `Filter`, so CR 702.5d's enchant-player Auras will cost a field
+  widening later rather than a type change now. `Object.attachedTo :: Maybe
+  ObjectId` is **base state, not projected**, and is seeded as the object
+  *enters* rather than assigned after: CR 303.4 says an Aura "enters the
+  battlefield attached," and the CR 614.1c entry-replacement loop and the
+  `Moved` event both run before `changeZone` returns, so a post-hoc assignment
+  would race them. `Affected.Attached` is a third affected-set kind alongside
+  `TheseObjects` (fixed at resolution, CR 611.2c) and `Matching` (a per-candidate
+  predicate): it is re-derived each projection from the *source's own*
+  `attachedTo`, because "the enchanted permanent" is neither a fixed set nor a
+  predicate over candidates. **Two findings did the design work.** First, **the
+  target-spec seam is not single**: `Card.allTargetSpecs`/`modesTargetSpecs`
+  serve most consumers, but `Target.fillableModes` and the D4 lint reach past
+  them to `Mode.targetSpecs` directly. Merging the enchant slot in only
+  `Pawl.Card` would have left an Aura with no legal creature **castable**, then
+  countered on resolution for lacking one — when CR 601.2c means it could never
+  have been cast at all — so `fillableModes` grew an extra-slots parameter and
+  castability had to be taught the enchant slot separately from targeting.
+  Second, **an Aura spell is the first permanent spell in this pool that can
+  fizzle**: `Pawl.Stack` previously sent every permanent spell to the
+  battlefield with no target check at all, so `Resolve.targetsAllIllegal` was
+  extracted and consulted before an Aura enters (CR 608.2b), with
+  `Event.changeZoneAttaching` doing the entry-attached half of CR 303.4 when it
+  does not fizzle. CR 704.5m (an Aura attached to nothing, or to an illegal
+  object, falls off — `Sba.fallsOff`) falls off **one SBA pass later than its
+  creature**: CR 704.3 makes the passes simultaneous, so the pass that buries
+  the creature still judges the Aura against a state where that creature
+  existed; the tests pin both passes deliberately. **No new opcode**: an Aura's
+  entire behaviour is a static ability plus an entry rule. **Is-it-an-Aura
+  reads as a subtype classification, not an identity case** — the same closed-
+  half shape as the `Card.isPermanent` beside it — so the invariant holds.
+  Suite 1140 → 1153. **Deferred:** `Attach`/CR 303.4j, no opcode moves an Aura
+  already on the battlefield (#187); CR 303.4f/g/i, an Aura entering other than
+  by resolving as an Aura spell (#188); CR 702.5c, multiple `enchant` instances
+  (#189); CR 702.5d, enchant-player Auras — `Object.attachedTo` cannot name a
+  player, a modelling limit rather than a missing producer (#190); CR 303.4d,
+  the controller's choice when an effect would attach an Aura to more than one
+  legal thing (#191); CR 303.4k, an Aura turned face down (#192); CR
+  704.5n/704.5p, Equipment and Fortification (#193). Spec and plan:
+  `docs/superpowers/specs/2026-07-25-auras-design.md` and
+  `docs/superpowers/plans/2026-07-25-auras-a-attachment-substrate.md`.
