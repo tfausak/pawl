@@ -14,6 +14,7 @@ import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
@@ -299,7 +300,26 @@ restartTests registry =
               HU.assertEqual "restart: at 20 life" (Just 20) (S.lifeOf S.alice afterRestart)
               HU.assertEqual "subgame: bob is still departed" (Just (Status.Departed Departure.Type.Conceded)) (statusOf S.bob sub)
               HU.assertEqual "subgame: and nothing of his is reset" (Just 3) (S.lifeOf S.bob sub)
-              HU.assertEqual "subgame: alice is playing at 20 life" (Just 20) (S.lifeOf S.alice sub)
+              HU.assertEqual "subgame: alice is playing at 20 life" (Just 20) (S.lifeOf S.alice sub),
+      HU.testCase "CR 727.1 #147: a restart rebuilds only the players who were in the game when it ended" $ do
+        -- CR 727.1: "All players in that game when it ended then start a new
+        -- game." Bob left first, so the new game has two seats. Today he keeps
+        -- his seat in the rebuilt turn order, and startGameFromCards therefore
+        -- gives him a library, a shuffle and a 7-card opening hand.
+        mountain <- Registry.printing registry "Mountain"
+        let g0 = addMany mountain 8 S.carol (addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.threePlayers)))
+            g1 = Departure.depart Departure.Type.Conceded S.bob g0
+            after = snd (Engine.runGamePure S.identityAnswer g1 (Setup.restartGame S.alice))
+            libSizeOf pid = length (Game.zoneMembers Zone.Library pid after)
+        HU.assertEqual "two seats in the rebuilt order, in their seating order" [S.alice, S.carol] (GameState.turnOrder after)
+        HU.assertEqual "alice starts it (CR 727.1a)" S.alice (GameState.activePlayer after)
+        HU.assertBool "the active player is one of the rebuilt seats (totality)" (List.elem (GameState.activePlayer after) (GameState.turnOrder after))
+        HU.assertEqual "bob has no library" 0 (libSizeOf S.bob)
+        HU.assertEqual "bob drew no opening hand" 0 (S.handSize S.bob after)
+        HU.assertEqual "alice drew hers" 7 (S.handSize S.alice after)
+        HU.assertEqual "carol drew hers" 7 (S.handSize S.carol after)
+        HU.assertEqual "CR 800.1: the rebuilt game has two seats, so no free mulligan" 0 (Mulligan.freeMulligans after)
+        HU.assertEqual "CR 104.2a: two survivors, so the rebuild decides nothing" Nothing (GameState.result after)
     ]
 
 -- Move a player's pool onto their LIBRARY (subgameStateFrom reads the library

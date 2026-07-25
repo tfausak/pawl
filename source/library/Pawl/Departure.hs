@@ -2,6 +2,7 @@ module Pawl.Departure where
 
 import Control.Applicative ((<|>))
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import Pawl.Type.Departure (Departure)
 import Pawl.Type.Game (Game)
@@ -25,6 +26,20 @@ stillPlaying :: GameState -> [PlayerId]
 stillPlaying gs =
   let isPlaying entry = Player.status (snd entry) == Status.Playing
    in fmap fst (filter isPlaying (Map.toList (GameState.players gs)))
+
+-- Who is still in the game, in SEATING order.
+--
+-- stillPlaying reads the players map, so it comes back in PlayerId order.
+-- GameState.turnOrder is the permanent seating roster (CR 800.5, CR 806.3; see
+-- Pawl.Type.GameState), so anything that REBUILDS a turn order or walks seats
+-- needs this instead. The order is load-bearing, not cosmetic: CR 103.5 has the
+-- starting player declare their mulligan first, then each other player in turn
+-- order, and CR 727.1a / CR 729.2 rotate the rebuilt order to begin with the
+-- starting player.
+stillPlayingInOrder :: GameState -> [PlayerId]
+stillPlayingInOrder gs =
+  let playing = stillPlaying gs
+   in filter (\pid -> List.elem pid playing) (GameState.turnOrder gs)
 
 -- Mark a player as having left, with the reason they left. Pure, because the SBA
 -- pass folds it over several players before recomputing the outcome once.

@@ -10,6 +10,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Turn as Turn
@@ -138,10 +139,19 @@ newGame matchup = do
 -- definitions. Only Magic cards survive: an ability on the stack, a token, an
 -- emblem, or a trigger is not a card (CR 727.2 / 111.7) and ceases to exist.
 -- Shared by restart (CR 727) and, later, subgames (CR 729).
+--
+-- CR 727.1 / CR 729.2 rebuild the game for the players who are IN it, so a player
+-- who has left gets no library, no shuffle and no opening hand (#147); `owners` is
+-- the still-playing seats, in seating order, because CR 103.5's declaration round
+-- goes around the table in turn order. Their cards stay in the object pool -- CR
+-- 800.4a's object removal, which would take a departed player's objects out of the
+-- game with them, is not implemented (#172) -- but the library map is rebuilt from
+-- scratch for the owners only, so those cards sit in no library and nobody can
+-- draw them.
 startGameFromCards :: Game ()
 startGameFromCards = do
   gs <- State.get
-  let owners = GameState.turnOrder gs
+  let owners = Departure.stillPlayingInOrder gs
       isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
@@ -218,36 +228,46 @@ resetPlayers players =
 restartGame :: PlayerId -> Game ()
 restartGame starter = do
   State.modify' $ \gs ->
-    gs
-      { GameState.players = resetPlayers (GameState.players gs),
-        GameState.manaPool = Map.empty,
-        GameState.combat = Combat.emptyCombat,
-        GameState.events = Seq.empty,
-        GameState.scannedThrough = 0,
-        GameState.damageScannedThrough = 0,
-        GameState.delayedTriggers = Seq.empty,
-        GameState.continuousEffects = [],
-        GameState.replacements = [],
-        GameState.playerEffects = [],
-        GameState.turnOrder = rotateTo starter (GameState.turnOrder gs),
-        GameState.activePlayer = starter,
-        GameState.phase = Turn.firstPhase,
-        GameState.remaining = Turn.laterPhases,
-        GameState.priority = Nothing,
-        GameState.passes = 0,
-        GameState.turnNumber = 1,
-        GameState.result = Nothing,
-        -- CR 727.4: the game the caller was running has been replaced.
-        -- Engine.priorityLoop and Engine.runStep read this and unwind to the
-        -- rebuilt turn 1 rather than granting priority or advancing past it.
-        GameState.restartSignal = RestartSignal.Restarted,
-        GameState.drewFromEmpty = mempty,
-        GameState.landPlayed = mempty,
-        GameState.pendingControl = Map.empty,
-        GameState.activeControl = Nothing,
-        GameState.monarch = Nothing,
-        GameState.exiledUntilMonarch = Map.empty
-      }
+    -- CR 727.1: "All players in that game when it ended then start a new game
+    -- ..." -- so the rebuilt seating order is the players who were still in the
+    -- game, in their seats (#147), rotated to begin with `starter` (CR 727.1a).
+    let order = rotateTo starter (Departure.stillPlayingInOrder gs)
+     in gs
+          { GameState.players = resetPlayers (GameState.players gs),
+            GameState.manaPool = Map.empty,
+            GameState.combat = Combat.emptyCombat,
+            GameState.events = Seq.empty,
+            GameState.scannedThrough = 0,
+            GameState.damageScannedThrough = 0,
+            GameState.delayedTriggers = Seq.empty,
+            GameState.continuousEffects = [],
+            GameState.replacements = [],
+            GameState.playerEffects = [],
+            GameState.turnOrder = order,
+            -- CR 727.1a: "The starting player in the new game is the player who
+            -- controlled the spell or ability that restarted the game." Read back
+            -- off the rebuilt order, exactly as subgameStateFrom does, so the two
+            -- can never disagree and this always names a seat: rotateTo leaves an
+            -- order alone when `starter` is not in it, and the head is then the
+            -- first still-playing seat.
+            GameState.activePlayer = Maybe.fromMaybe starter (Maybe.listToMaybe order),
+            GameState.phase = Turn.firstPhase,
+            GameState.remaining = Turn.laterPhases,
+            GameState.priority = Nothing,
+            GameState.passes = 0,
+            GameState.turnNumber = 1,
+            GameState.result = Nothing,
+            -- CR 727.4: the game the caller was running has been replaced.
+            -- Engine.priorityLoop and Engine.runStep read this and unwind to the
+            -- rebuilt turn 1 rather than granting priority or advancing past it.
+            GameState.restartSignal = RestartSignal.Restarted,
+            GameState.drewFromEmpty = mempty,
+            GameState.landPlayed = mempty,
+            GameState.pendingControl = Map.empty,
+            GameState.activeControl = Nothing,
+            GameState.monarch = Nothing,
+            GameState.exiledUntilMonarch = Map.empty
+          }
   startGameFromCards
 
 -- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards ONLY --
