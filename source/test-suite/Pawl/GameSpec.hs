@@ -605,32 +605,23 @@ ruleTests registry =
          in do
               HU.assertEqual "bob is the subgame's active player" S.bob (GameState.activePlayer sub)
               HU.assertEqual "the subgame turn order begins with bob" [S.bob, S.alice] (GameState.turnOrder sub),
-      -- Three seats; bob has left. Alice and carol have 7 library cards each,
-      -- bob 3. The #147 half is still live: the CR 729.2 roll must offer only
-      -- [alice, carol], never bob, so he cannot be rolled to START the subgame.
-      --
-      -- The library half of this case predates CR 800.4a's landing (this same
-      -- milestone, Pawl.Departure.objectsLeaveWith): it used to pin that a
-      -- departed player's cards sat inert, "same objects, same order," across
-      -- a subgame that never touched them. That claim is no longer TRUE to
-      -- pin -- three seats is CR 800.1 multiplayer, so bob's departure itself
-      -- (Departure.depart, which `parent` already reflects) empties his
-      -- library outright, before Engine.playSubgame is even reached; exact
-      -- list equality on his library is now `[] == []` regardless of what the
-      -- subgame does, which is not a test of the subgame's behaviour. What IS
-      -- still worth pinning: CR 800.4a fired (his library is gone at `parent`,
-      -- not merely coincidentally empty), and the subgame -- which never seats
-      -- him -- does not somehow resurrect or repopulate it.
-      HU.testCase "CR 729.2/729.4 #147: a departed player is not offered as the subgame's first player, and CR 800.4a has already emptied their library" $ do
+      HU.testCase "CR 729.2/729.4 #147: a departed player is not offered as the subgame's first player, and has no library for the subgame to churn" $ do
+        -- Three seats; bob has left. CR 800.4a's first clause took his cards with
+        -- him, so what this case now pins is (a) the CR 729.2 roll offers only the
+        -- players still in the game, and (b) the subgame round trip does not
+        -- resurrect a departed player's library. The full-roster span in
+        -- Setup.subgameStateFrom and Setup.funnelBack still has to match; see the
+        -- comments at both sites.
         mountain <- Registry.printing registry "Mountain"
         let g0 = Setup.emptyGame S.threePlayers
             g1 = poolToLibraryG S.carol (poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 7 S.carol (addManyG mountain 3 S.bob (addManyG mountain 7 S.alice g0)))))
             parent = Departure.depart Departure.Type.Conceded S.bob g1
             ((_, after), rolls) = State.runState (Engine.runGame subgameRosterAnswer parent Engine.playSubgame) []
         HU.assertEqual "the roll offers only the players still in the game" [[S.alice, S.carol]] rolls
-        HU.assertEqual "CR 800.4a already emptied bob's library at the moment he left, before any subgame ran" [] (Game.zoneMembers Zone.Library S.bob parent)
-        HU.assertEqual "the subgame -- which never seats bob -- does not repopulate it" [] (Game.zoneMembers Zone.Library S.bob after)
-        HU.assertEqual "alice's and carol's libraries are unaffected by bob's absence" (7, 7) (length (Game.zoneMembers Zone.Library S.alice after), length (Game.zoneMembers Zone.Library S.carol after))
+        HU.assertEqual "CR 800.4a: bob's cards left the game with him" [] (Game.zoneMembers Zone.Library S.bob parent)
+        HU.assertEqual "and the subgame round trip does not give them back" [] (Game.zoneMembers Zone.Library S.bob after)
+        HU.assertEqual "alice's library came back whole" 7 (length (Game.zoneMembers Zone.Library S.alice after))
+        HU.assertEqual "and carol's" 7 (length (Game.zoneMembers Zone.Library S.carol after))
         HU.assertEqual "the main game is not decided by the subgame" Nothing (GameState.result after),
       HU.testCase "CR 729.1b/729.3 gameplay: alice casts a subgame spell, bob decks, bob takes 3" $ do
         -- alice has the {0} subgame sorcery in hand and an 8-card library; bob has
@@ -893,6 +884,17 @@ attackWithEverythingAnswer p = case p of
   Prompt.DeclareAttackers _ _ candidates -> candidates
   _ -> S.identityAnswer p
 
+-- Records the PlayerId of every DeclareAttackers ask and attacks with
+-- everything. The ASK is the observable: once CR 800.4a removes a departed
+-- player's permanents there is nothing for them to attack with, so an empty
+-- attackers map is no longer evidence that the CR 703.4i guard fired.
+declareAttackersAskAnswer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+declareAttackersAskAnswer p = case p of
+  Prompt.DeclareAttackers _ pid candidates -> do
+    State.modify' (\seen -> seen <> [pid])
+    pure candidates
+  _ -> pure (S.identityAnswer p)
+
 -- The single activated ability of a printing. Total: the fallback is
 -- unreachable in this fixture. Duplicated per this suite's convention of
 -- group-local helpers (CostSpec, ActivateSpec, ReplacementSpec each carry
@@ -968,6 +970,7 @@ turnOrderTests registry =
             gone = Departure.depart Departure.Type.Conceded S.bob armed
             after = S.runPure S.identityAnswer gone Engine.handoffTurn
          in do
+              HU.assertEqual "CR 800.4a's second clause already cleared it at bob's departure" Map.empty (GameState.pendingControl gone)
               HU.assertEqual "carol's turn began" S.carol (GameState.activePlayer after)
               HU.assertEqual "she is uncontrolled" Nothing (GameState.activeControl after)
               HU.assertEqual "and the stale entry is gone" Map.empty (GameState.pendingControl after),
@@ -1074,10 +1077,12 @@ turnOrderTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         let (_, board) = S.addCreature piker S.alice (S.threePlayerGame {GameState.phase = Phase.Combat CombatStep.DeclareAttackers})
             gone = Departure.depart Departure.Type.Conceded S.alice board
-            after = S.runPure attackWithEverythingAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))
-            control = S.runPure attackWithEverythingAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))
-        HU.assertBool "the departed active player is never asked to attack" (Map.null (Combat.Type.attackers (GameState.combat after)))
-        HU.assertBool "a playing active player IS asked -- the all-in answerer proves the prompt fires" (not (Map.null (Combat.Type.attackers (GameState.combat control)))),
+            ((_, after), askedAfter) = State.runState (Engine.runGame declareAttackersAskAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
+            ((_, control), askedControl) = State.runState (Engine.runGame declareAttackersAskAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
+        HU.assertEqual "the departed active player is never asked to attack" [] askedAfter
+        HU.assertEqual "a playing active player IS asked -- the guard is what did it" [S.alice] askedControl
+        HU.assertBool "and nothing attacked" (Map.null (Combat.Type.attackers (GameState.combat after)))
+        HU.assertBool "while the control run did attack" (not (Map.null (Combat.Type.attackers (GameState.combat control)))),
       HU.testCase "M5.6a gate: a three-player game survives a concede, and the departed seat still ends its durations" $
         -- Alice, bob, carol. Bob arms an "until your next turn" player effect
         -- (Silence's shape: an ActivePlayerEffect with Expiry.AtTurnOf bob), then

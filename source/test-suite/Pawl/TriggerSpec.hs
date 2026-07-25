@@ -795,19 +795,29 @@ orderingTests registry =
           -- The same walk with a third seat and a departure. Barbarian Outcast's
           -- state trigger (CR 603.8) needs no event, so one Outcast under each of
           -- alice, bob and carol -- none controlling a Swamp -- gives three
-          -- controllers with one trigger apiece. Bob has left the game, so his
-          -- seat is not in the APNAP rotation: he is never asked to order, and
-          -- his trigger is not placed. Unobservable at two players, where a
-          -- departure ends the game before any trigger is gathered.
-          HU.testCase "CR 101.4/603.3b APNAP skips a departed seat, and its triggers are not placed" $ do
+          -- controllers with one trigger apiece. The two ordering assertions are
+          -- the APNAP rotation itself: it starts at the active player and takes the
+          -- seats still in the game, so carol's trigger is placed after alice's.
+          -- Unobservable at two players, where a departure ends the game before any
+          -- trigger is gathered.
+          --
+          -- Bob's trigger is absent for a different reason than it once was: CR
+          -- 800.4a's first clause removes his Outcast with him, so the trigger
+          -- never exists to be filtered. Engine.apnapPlayers still filters his seat
+          -- out of the rotation -- see the still-playing filter there -- and the
+          -- assertion on his Outcast below is what keeps this case honest about
+          -- which rule did what.
+          HU.testCase "CR 101.4/603.3b APNAP rotates through the seats still in the game, and a departed seat's permanent is gone with it" $ do
             barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
             let gs0 = Setup.emptyGame S.threePlayers
                 (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
-                (_, gs2) = S.addCreature barbarianOutcast S.bob gs1
+                (bobsOutcast, gs2) = S.addCreature barbarianOutcast S.bob gs1
                 (_, gs3) = S.addCreature barbarianOutcast S.carol gs2
                 gone = Departure.depart Departure.Type.Conceded S.bob gs3
                 placed = snd (Engine.runGamePure S.identityAnswer gone Engine.placePendingTriggers)
                 controllerOf oid = fmap Object.owner (Game.lookupObject oid placed)
+            HU.assertBool "the fixture really gave bob one" (Maybe.isJust (Game.lookupObject bobsOutcast gs3))
+            HU.assertEqual "CR 800.4a: bob's Outcast left the game with him, so it has no trigger to place" Nothing (Game.lookupObject bobsOutcast gone)
             case GameState.stack placed of
               [top, bottom] -> do
                 HU.assertEqual "carol's trigger is on top -- placed second" (Just S.carol) (controllerOf top)
