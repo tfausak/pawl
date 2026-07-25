@@ -2302,3 +2302,29 @@ its own gate card and spec, landed as it completes. Umbrella:
   time — after the whole mulligan process — and are untouched. Spec and plan:
   `docs/superpowers/specs/2026-07-25-cr-103-5b-mulligan-actions-design.md` and
   `docs/superpowers/plans/2026-07-25-cr-103-5b-mulligan-actions.md`.
+
+- **The mulligan declaration now states its cost** (issue-driven gap closure
+  #176, done alongside the CR 103.5b work above while the mulligan code was
+  hot; no spec or plan). **What it establishes:** `Prompt.DeclareMulligan`
+  carried the raw number of mulligans TAKEN, which is the right number for CR
+  103.5c to subtract from but is not what a player deciding needs. The two
+  diverge exactly where M5.6b made them diverge: with CR 103.5c's free first
+  mulligan, a player at three seats who has taken one mulligan bottoms **zero**
+  cards, not one, and an answerer sees only the prompt payload, never the
+  `GameState`. The payload is now `Pawl.Type.MulliganOffer`, a record of
+  `taken` and `bottomCount` — a record rather than two adjacent `Natural`s,
+  which would be swappable in silence at the construction site and misreadable
+  at every answerer. **The drift guard is the real win:** `Mulligan.offerFor`
+  is the single place a raw count becomes a cost, and `takeMulligan` bottoms by
+  the same value it produces, so what the prompt promises and what the mulligan
+  charges cannot come apart. `bottomCount` is deliberately uncapped by hand
+  size: the redraw has not happened at declaration time, and `takeMulligan`'s
+  `min` against the redrawn hand is a totality guard, not a rule. **Not an
+  invariant breach either way** — the engine still only asks; this is the
+  quality of the information supplied, which is why it was filed rather than
+  folded into M5.6b. **Cheaper than the issue estimated:** it predicted a touch
+  of every exhaustive `Prompt` answerer, but 16 of the 24 sites match with
+  `Prompt.DeclareMulligan {}` and are arity-agnostic, so `Pawl.Support` and
+  `source/benchmark/Main.hs` did not change at all; only eight binding sites
+  did. Suite 1124 → 1125, the new case pinning that three seats and two seats
+  agree on `taken` at every step and disagree on the cost at every step.
