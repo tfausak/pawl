@@ -865,33 +865,123 @@ isCreatureOf oid gs = Set.member CardType.Creature (cardTypesOf oid gs)
 hasKeyword :: Keyword -> ObjectId -> GameState -> Bool
 hasKeyword keyword oid gs = Set.member keyword (keywordsOf oid gs)
 
--- CR 108.4 / 613.1b: the controller of an object is its owner, overridden by
--- layer-2 SetController continuous effects (last timestamp wins, CR 613.7). A
--- lean fold, not the full ProjectedCharacteristics pass -- control feeds combat,
--- mana and priority and is needed before P/T. Projection is the sole applier of
--- SetController (the case-on-Modification invariant). Nothing when the id is
--- unknown. Replaces Game.controllerOf (the M1b owner stand-in, now cashed).
+-- One control-granting static ability, flattened: the source that carries it and
+-- the timestamp its effect takes (CR 613.7a: a static ability's continuous effect
+-- has the timestamp of the object it is on).
+data ControlGrant = MkControlGrant
+  { cgSource :: ObjectId,
+    cgAffected :: Affected.Affected,
+    cgTimestamp :: Timestamp
+  }
+  deriving (Eq, Ord, Show)
+
+-- Every layer-2 control-granting STATIC ability on the battlefield, gathered once.
+--
+-- NOT `gather`. This must not project, and cannot: Projection.affects reads
+-- controllerOf to supply CR 109.5's "you" when matching a Filter, so a
+-- controllerOf built on gather would be mutually recursive with it. That
+-- restriction is exactly why Affected.Matching is unsupported below (#195).
+--
+-- Hoisted for the reason liveGiven's list is hoisted: controllerOf feeds combat,
+-- priority, mana and Projection.controls, and `controls` calls it once per
+-- battlefield object. Recomputing this list inside controllerOf would make
+-- `controls` quadratic in the battlefield, inside a loop the state-based-action
+-- sweep runs at every priority boundary.
+--
+-- Layer 6/Humility is invisible to this fold: a control-granting static ability
+-- stripped by LoseAllAbilities still appears here, because this walk reads the
+-- battlefield's printed cards directly rather than a layer-ordered projection
+-- (#196).
+controlGrants :: GameState -> [ControlGrant]
+controlGrants gs =
+  let setEffs = setLandSubtypeEffects gs
+      grantsOf permId = case Game.lookupObject permId gs of
+        Nothing -> []
+        Just permObj -> case Game.cardOf permId gs of
+          Nothing -> []
+          Just card ->
+            -- CR 305.7: a land whose subtype was SET has lost its rules text, so
+            -- it grants nothing. Same gate gather applies to every static ability.
+            if not (null setEffs) && not (liveGiven setEffs Set.empty permId gs)
+              then []
+              else
+                let isControl sa = case StaticAbility.modification sa of
+                      Modification.SetControllerToSource -> True
+                      _ -> False
+                    toGrant sa =
+                      MkControlGrant
+                        { cgSource = permId,
+                          cgAffected = StaticAbility.affected sa,
+                          cgTimestamp = Object.timestamp permObj
+                        }
+                 in fmap toGrant (filter isControl (Card.Type.staticAbilities card))
+   in concatMap grantsOf (Set.toList (GameState.battlefield gs))
+
+-- CR 108.4 / 613.1b: an object's controller is its owner, overridden by layer-2
+-- control effects, last timestamp wins (CR 613.7). TWO sources now: stored
+-- continuous effects (Effect.GainControl's baked SetController) and control-
+-- granting static abilities (Control Magic's derived SetControllerToSource).
+-- Both carry a Timestamp, so they merge into one maximum.
+--
+-- Still a lean fold, not the full ProjectedCharacteristics pass -- control feeds
+-- combat, mana and priority and is needed before P/T.
 controllerOf :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
-controllerOf oid gs = case Game.lookupObject oid gs of
+controllerOf oid gs = controllerOfGiven (controlGrants gs) Set.empty oid gs
+
+-- controllerOf with the grant list PRECOMPUTED and a visited set.
+--
+-- The visited set is the CR 613.8b loop-escape analog liveGiven already uses
+-- (#37), not an implementation of it: deriving a grant's player asks for its
+-- SOURCE's controller, which can re-enter this function. Re-entering an object
+-- already under question returns its owner -- so a cycle means no static ability
+-- wins and everything stays with its owner. Order-independent, like liveGiven's.
+controllerOfGiven :: [ControlGrant] -> Set ObjectId -> ObjectId -> GameState -> Maybe PlayerId.PlayerId
+controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
   Just obj ->
-    let names a = case a of
-          Affected.TheseObjects s -> Set.member oid s
-          _ -> False
-        setter eff = case ContinuousEffect.modification eff of
-          Modification.SetController pid
-            | names (ContinuousEffect.affected eff) -> Just (ContinuousEffect.timestamp eff, pid)
-          _ -> Nothing
-        setters = Maybe.mapMaybe setter (GameState.continuousEffects gs)
-     in case setters of
-          [] -> Just (Object.owner obj)
-          _ -> Just (snd (List.maximumBy (Ord.comparing fst) setters))
+    if Set.member oid visited
+      then Just (Object.owner obj)
+      else
+        let visited' = Set.insert oid visited
+            -- Does an affected set carried by `source` name `oid`? Parameterized
+            -- by the source because Affected.Attached is a question about the
+            -- SOURCE's state, and the stored and derived paths carry different
+            -- sources.
+            namesFrom source a = case a of
+              Affected.TheseObjects s -> Set.member oid s
+              -- CR 303.4m: the source's own attachment. No projection needed,
+              -- which is what keeps this fold lean.
+              Affected.Attached -> case Game.lookupObject source gs of
+                Nothing -> False
+                Just src -> Object.attachedTo src == Just oid
+              -- Needs a projection to evaluate, and this fold must not project
+              -- (see controlGrants). No card produces one (#195).
+              Affected.Matching _ -> False
+            storedSetter eff = case ContinuousEffect.modification eff of
+              Modification.SetController pid
+                | namesFrom (ContinuousEffect.source eff) (ContinuousEffect.affected eff) ->
+                    Just (ContinuousEffect.timestamp eff, pid)
+              _ -> Nothing
+            stored = Maybe.mapMaybe storedSetter (GameState.continuousEffects gs)
+            fromGrant g =
+              if not (namesFrom (cgSource g) (cgAffected g))
+                then Nothing
+                else case controllerOfGiven grants visited' (cgSource g) gs of
+                  Nothing -> Nothing
+                  Just who -> Just (cgTimestamp g, who)
+            derived = Maybe.mapMaybe fromGrant grants
+         in case stored <> derived of
+              [] -> Just (Object.owner obj)
+              setters -> Just (snd (List.maximumBy (Ord.comparing fst) setters))
 
--- The battlefield permanents a player controls (CR 108.4). The control-based
--- "your permanents" enumerator; consumers use it wherever they mean "you
--- control", replacing the owner-based Game.zoneMembers Battlefield.
+-- The battlefield permanents a player controls (CR 108.4). Computes the grant
+-- list ONCE and threads it, rather than letting each controllerOf rebuild it --
+-- the difference between linear and quadratic in the battlefield, in a function
+-- the state-based-action sweep calls at every priority boundary.
 controls :: PlayerId.PlayerId -> GameState -> [ObjectId]
-controls pid gs = filter (\oid -> controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs))
+controls pid gs =
+  let grants = controlGrants gs
+   in filter (\oid -> controllerOfGiven grants Set.empty oid gs == Just pid) (Set.toList (GameState.battlefield gs))
 
 -- CR 800.4a: does this stored effect give `pid` control of an object? The
 -- control-granting classification Pawl.Departure asks, so that the case on

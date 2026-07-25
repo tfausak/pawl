@@ -1,0 +1,74 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "enchant": {
+    "pool": {
+      "type": "Creatures"
+    }
+  },
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Control Magic",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [
+    {
+      "affected": {
+        "type": "Attached"
+      },
+      "modification": {
+        "type": "SetControllerToSource"
+      }
+    }
+  ],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Aura"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

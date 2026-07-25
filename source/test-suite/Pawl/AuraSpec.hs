@@ -10,6 +10,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -85,5 +86,43 @@ tests registry =
         let base = Setup.emptyGame S.bothPlayers
             (aura, gs) = S.addCreature unholyStrength S.alice base
             after = S.settleSba gs
-        HU.assertBool "never attached, so it falls off immediately" (not (Set.member aura (GameState.battlefield after)))
+        HU.assertBool "never attached, so it falls off immediately" (not (Set.member aura (GameState.battlefield after))),
+      -- CR 613.1b / 303.4e: Control Magic's static ability moves control of the
+      -- enchanted creature to the AURA's controller, and leaves the Aura itself alone.
+      HU.testCase "CR 613.1b: Control Magic gives the Aura's controller the creature" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, withCreature) = S.addCreature piker S.bob base
+            (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+            attached = S.attach aura creature withAura
+        HU.assertEqual "unattached, bob still controls it" (Just S.bob) (Projection.controllerOf creature withAura)
+        HU.assertEqual "attached, alice controls it" (Just S.alice) (Projection.controllerOf creature attached)
+        HU.assertEqual "the Aura's own controller is unchanged" (Just S.alice) (Projection.controllerOf aura attached)
+        HU.assertBool "and it is in alice's controls" (elem creature (Projection.controls S.alice attached))
+        HU.assertBool "no longer in bob's" (notElem creature (Projection.controls S.bob attached)),
+      -- CR 704.5m plus layer 2: destroying the Aura reverts control on the next
+      -- projection, because a static ability's effect exists only while its source is
+      -- on the battlefield (CR 604.2).
+      HU.testCase "CR 604.2: removing Control Magic reverts control" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, withCreature) = S.addCreature piker S.bob base
+            (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+            attached = S.attach aura creature withAura
+            gone = S.runPure S.identityAnswer attached (Event.changeZone aura Zone.Graveyard)
+        HU.assertEqual "alice controlled it" (Just S.alice) (Projection.controllerOf creature attached)
+        HU.assertEqual "bob controls it again" (Just S.bob) (Projection.controllerOf creature gone),
+      -- The whole path: cast, target, enter attached, control moves.
+      HU.testCase "CR 303.4: casting Control Magic takes the creature" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        let base = S.landsInPlay island 4
+            (creature, withCreature) = S.addCreature piker S.bob base
+            (gs, spellId) = S.handOne controlMagic withCreature
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "alice controls bob's creature" (Just S.alice) (Projection.controllerOf creature after)
     ]
