@@ -147,7 +147,7 @@ ruleOfLawTests registry =
         ruleOfLaw <- Registry.printing registry "Rule of Law"
         let (_, _, z, plain) = ruleOfLawBoard plains ruleOfLaw
             (rol, onBoard) = S.addCreature ruleOfLaw S.alice plain
-            castOne = S.withEvent (GameEvent.SpellCast S.alice) onBoard
+            castOne = S.withEvents [GameEvent.SpellCast S.alice] onBoard
             gone = S.runPure S.identityAnswer castOne (Event.destroy rol)
         HU.assertBool "prohibited while it stands" (PlayerEffect.prohibitsCasting S.alice castOne)
         HU.assertBool "not prohibited once it is gone" (not (PlayerEffect.prohibitsCasting S.alice gone))
@@ -163,7 +163,7 @@ ruleOfLawTests registry =
         let base = S.landsInPlay forest 7
             (_, withRuleOfLaw) = S.addCreature ruleOfLaw S.alice base
             (_, gs) = S.addLibraryCard panglacialWurm S.alice withRuleOfLaw
-            castOne = S.withEvent (GameEvent.SpellCast S.alice) gs
+            castOne = S.withEvents [GameEvent.SpellCast S.alice] gs
         -- Positive control: without it, the negative assertion below
         -- could pass merely because the Wurm was never offered at all.
         HU.assertEqual

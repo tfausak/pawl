@@ -134,7 +134,7 @@ logTests registry =
         restInPeace <- Registry.printing registry "Rest in Peace"
         let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
-            gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
+            gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
             ending = gs1 {GameState.remaining = Seq.empty}
             after = snd (Engine.runGamePure S.identityAnswer ending Engine.advance)
             isTrigger oid = case Game.lookupObject oid after of
@@ -189,13 +189,13 @@ scanTests registry =
         let (_, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             (pikerId, gs1) = S.addCreature piker S.bob gs0
             entered = ZoneChange.MkZoneChange pikerId Zone.Stack Zone.Battlefield
-            gs2 = S.withEvent (GameEvent.Moved entered (Projection.project pikerId gs1)) gs1
+            gs2 = S.withEvents [GameEvent.Moved entered (Projection.project pikerId gs1)] gs1
         HU.assertEqual "no trigger" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2))),
       HU.testCase "CR 603.6a a SelfEnters trigger still fires on its own entry" $ do
         restInPeace <- Registry.printing registry "Rest in Peace"
         let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
-            gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
+            gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
         case fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1) of
           [pt] -> do
             HU.assertEqual "source is RiP" ripId (PendingTrigger.source pt)
@@ -205,7 +205,7 @@ scanTests registry =
         restInPeace <- Registry.printing registry "Rest in Peace"
         let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             toGrave = ZoneChange.MkZoneChange ripId Zone.Battlefield Zone.Graveyard
-            gs1 = S.withEvent (GameEvent.Moved toGrave (Projection.project ripId gs0)) gs0
+            gs1 = S.withEvents [GameEvent.Moved toGrave (Projection.project ripId gs0)] gs0
         HU.assertEqual "no triggers" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1))),
       HU.testCase "SelfEnters matches only a battlefield destination" $
         let bearer = ObjectId.MkObjectId 1
@@ -227,9 +227,13 @@ scanTests registry =
             (rip2, gs1) = S.addCreature restInPeace S.alice gs0
             entered1 = ZoneChange.MkZoneChange rip1 Zone.Stack Zone.Battlefield
             entered2 = ZoneChange.MkZoneChange rip2 Zone.Stack Zone.Battlefield
-            gs2 = S.withEvent (GameEvent.Moved entered1 (Projection.project rip1 gs1)) gs1
-            gs3 = Event.recordEvent (GameEvent.Moved entered2 (Projection.project rip2 gs1)) gs2
-            triggers = fst (Event.gatherTriggers (Event.unscannedEvents gs3) gs3)
+            gs2 =
+              S.withEvents
+                [ GameEvent.Moved entered1 (Projection.project rip1 gs1),
+                  GameEvent.Moved entered2 (Projection.project rip2 gs1)
+                ]
+                gs1
+            triggers = fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2)
         HU.assertBool "rip1 has the lower id" (rip1 < rip2)
         HU.assertEqual "both triggers fired" 2 (length triggers)
         HU.assertEqual "sources in ascending ObjectId order" [rip1, rip2] (fmap PendingTrigger.source triggers),
@@ -303,7 +307,7 @@ sacrificeTests registry =
         restInPeace <- Registry.printing registry "Rest in Peace"
         let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
-            gs1 = S.withEvent (GameEvent.Moved entered (Projection.project ripId gs0)) gs0
+            gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
             placed = snd (Engine.runGamePure S.identityAnswer gs1 Engine.placePendingTriggers)
             bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid placed)
             selfOf oid = Map.lookup Binding.triggerSource (Binding.targetsOf (bindingsOn oid))
@@ -772,7 +776,7 @@ interveningTests registry =
       withZombie sarcomancy =
         let (sarcId, gs0) = S.addCreature sarcomancy S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange sarcId Zone.Stack Zone.Battlefield
-            gs1 = S.withEvent (GameEvent.Moved entered (Projection.project sarcId gs0)) gs0
+            gs1 = S.withEvents [GameEvent.Moved entered (Projection.project sarcId gs0)] gs0
          in (sarcId, resolveAll (settle gs1))
    in Tasty.testGroup
         "InterveningIf"

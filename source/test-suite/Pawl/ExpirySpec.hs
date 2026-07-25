@@ -280,7 +280,7 @@ masterThiefBoard darksteelMyr masterThief =
       (myrId, gs1) = S.addCreature darksteelMyr S.bob gs0
       (thiefId, gs2) = S.addCreature masterThief S.alice gs1
       entered = ZoneChange.MkZoneChange thiefId Zone.Stack Zone.Battlefield
-      gs3 = S.withEvent (GameEvent.Moved entered (Projection.project thiefId gs2)) gs2
+      gs3 = S.withEvents [GameEvent.Moved entered (Projection.project thiefId gs2)] gs2
    in (thiefId, myrId, gs3)
 
 -- Master Thief {2}{U}{U} Creature -- Human Rogue 2/2: "When this creature
@@ -397,28 +397,28 @@ monarchTests registry =
     [ HU.testCase "CR 725.2 the monarch draws at the beginning of their own end step" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (_, gs0) = S.addLibraryCard piker S.alice (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
-            began = S.withEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice) gs0
+            began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
             after = monarchResolveAll (monarchSettle began)
         HU.assertEqual "alice drew (one card now in hand)" 1 (length (Game.zoneMembers Zone.Hand S.alice after)),
       HU.testCase "CR 725.2 the end-step draw fires only on the monarch's own end step" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (_, gs0) = S.addLibraryCard piker S.bob (S.withMonarch S.bob (Setup.emptyGame S.bothPlayers))
             -- alice is the active player; her end step is not bob's (the monarch).
-            began = S.withEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice) gs0
+            began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
             after = monarchResolveAll (monarchSettle began)
         HU.assertEqual "bob did not draw on alice's end step" 0 (length (Game.zoneMembers Zone.Hand S.bob after)),
       HU.testCase "CR 725.2 combat damage to the monarch hands the crown to the damager's controller" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (bobCreature, gs0) = S.addCreature piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
             dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False DamageKind.Combat
-            began = S.withEvent (GameEvent.DamageDealt dmg) gs0
+            began = S.withEvents [GameEvent.DamageDealt dmg] gs0
             after = monarchResolveAll (monarchSettle began)
         HU.assertEqual "bob took the crown" (Just S.bob) (GameState.monarch after),
       HU.testCase "CR 725.2 noncombat damage to the monarch does not hand over the crown" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (bobCreature, gs0) = S.addCreature piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
             dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False DamageKind.Noncombat
-            began = S.withEvent (GameEvent.DamageDealt dmg) gs0
+            began = S.withEvents [GameEvent.DamageDealt dmg] gs0
             after = monarchResolveAll (monarchSettle began)
         HU.assertEqual "alice keeps the crown" (Just S.alice) (GameState.monarch after),
       HU.testCase "CR 725 Palace Jailer: ETB makes the caster monarch and exiles an opponent's creature until an opponent takes the crown" $ do
@@ -428,7 +428,7 @@ monarchTests registry =
             (victim, gs1) = S.addCreature piker S.bob gs0
             (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
             entered = ZoneChange.MkZoneChange jailer Zone.Stack Zone.Battlefield
-            gs3 = S.withEvent (GameEvent.Moved entered (Projection.project jailer gs2)) gs2
+            gs3 = S.withEvents [GameEvent.Moved entered (Projection.project jailer gs2)] gs2
             afterEtb = monarchResolveAll (monarchSettle gs3)
             -- caster stays monarch across a turn boundary: exile holds.
             heldExiled = monarchSettle afterEtb

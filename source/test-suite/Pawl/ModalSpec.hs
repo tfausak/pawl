@@ -328,7 +328,7 @@ triggerModalEtb :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState
 triggerModalEtb acPrinting pid gs0 =
   let (acId, gs1) = S.addCreature acPrinting pid gs0
       entered = ZoneChange.MkZoneChange acId Zone.Stack Zone.Battlefield
-   in (acId, S.withEvent (GameEvent.Moved entered (Projection.project acId gs1)) gs1)
+   in (acId, S.withEvents [GameEvent.Moved entered (Projection.project acId gs1)] gs1)
 
 triggerModalOf :: Printing.Printing -> Maybe (ModalT.Modal Card.Type.Card)
 triggerModalOf acPrinting = case Card.Type.triggeredAbilities (Printing.card acPrinting) of
@@ -424,7 +424,7 @@ triggerModalTests registry =
         let gs0 = S.landsInPlay mountain 2
             (smtId, gs1) = S.addCreature smtPrinting S.alice gs0
             entered = ZoneChange.MkZoneChange smtId Zone.Stack Zone.Battlefield
-            gs2 = S.withEvent (GameEvent.Moved entered (Projection.project smtId gs1)) gs1
+            gs2 = S.withEvents [GameEvent.Moved entered (Projection.project smtId gs1)] gs1
             answer :: Prompt.Prompt r -> r
             answer = S.identityAnswer
             placed = snd (Engine.runGamePure answer gs2 Engine.placePendingTriggers)

@@ -862,12 +862,16 @@ zoneChangesOf gs = Maybe.mapMaybe Event.movedOf (Foldable.toList (GameState.even
 emptyCharacteristics :: PC.ProjectedCharacteristics
 emptyCharacteristics = Projection.project (ObjectId.MkObjectId 999) (Setup.emptyGame bothPlayers)
 
--- A state carrying exactly one UNSCANNED event -- the hand-built-event fixture
--- shape a scan test needs (EventSpec and ModalSpec both build one).
-withEvent :: GameEvent.GameEvent -> GameState.GameState -> GameState.GameState
-withEvent event gs =
+-- A state whose UNSCANNED event log IS this list, in this order -- the
+-- hand-built-event fixture shape a scan test needs. Takes the whole list rather
+-- than one event because it REPLACES the log: the one-event `withEvent` this
+-- replaces read like an append, so nesting two calls silently dropped the first
+-- (#164), and the two-event case had to be spelled with a trailing
+-- Event.recordEvent.
+withEvents :: [GameEvent.GameEvent] -> GameState.GameState -> GameState.GameState
+withEvents events gs =
   gs
-    { GameState.events = Seq.singleton event,
+    { GameState.events = Seq.fromList events,
       GameState.scannedThrough = 0,
       GameState.damageScannedThrough = 0
     }
