@@ -386,7 +386,7 @@ git commit -m "feat(card): carry a CR 103.5b mulligan action on Card (#182)"
 - Consumes: `Effect.ExileHandThenDraw` (Task 2), `CardT.mulliganAction` (Task 3).
 - Produces: the printing `"Serum Powder"` in the registry.
 
-- [ ] **Step 1: Write the failing test.** In `source/test-suite/Pawl/CardsSpec.hs`, add this case next to the `clone.json` case in the same list:
+- [x] **Step 1: Write the failing test.** In `source/test-suite/Pawl/CardsSpec.hs`, add this case next to the `clone.json` case in the same list:
 
 ```haskell
       HU.testCase "serum-powder.json loads as a {3} artifact with a CR 103.5b mulligan action" $ do
@@ -398,12 +398,12 @@ git commit -m "feat(card): carry a CR 103.5b mulligan action on Card (#182)"
 
 `CardsSpec` may not yet import `Pawl.Type.Effect`; if not, add `import qualified Pawl.Type.Effect as Effect`.
 
-- [ ] **Step 2: Run the test to verify it fails.**
+- [x] **Step 2: Run the test to verify it fails.**
 
 Run: `cabal test 2>&1 | tail -30`
 Expected: FAIL — the registry throws `UnknownCard` for `"Serum Powder"`.
 
-- [ ] **Step 3: Write the card.** Create `data/cards/serum-powder.json`. Oracle text (Scryfall `ima/228`): `{3}` Artifact; `{T}: Add {C}.`; "Any time you could mulligan and this card is in your hand, you may exile all the cards from your hand, then draw that many cards."
+- [x] **Step 3: Write the card.** Create `data/cards/serum-powder.json`. Oracle text (Scryfall `ima/228`): `{3}` Artifact; `{T}: Add {C}.`; "Any time you could mulligan and this card is in your hand, you may exile all the cards from your hand, then draw that many cards."
 
 ```json
 {
@@ -481,12 +481,12 @@ Expected: FAIL — the registry throws `UnknownCard` for `"Serum Powder"`.
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass.**
+- [x] **Step 4: Run the tests to verify they pass.**
 
 Run: `cabal test 2>&1 | tail -20`
 Expected: PASS — including `Pawl.CardsSpec`'s "each committed file re-parses to its compiled card" and "every file name in data/cards is already a slug" sweeps, which now cover the new file.
 
-- [ ] **Step 5: Format, lint, and commit.**
+- [x] **Step 5: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

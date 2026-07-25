@@ -1,0 +1,73 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [
+          {
+            "type": "TapThis"
+          }
+        ],
+        "mana": []
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "AddMana",
+                "value": {
+                  "type": "Colorless"
+                }
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    }
+  ],
+  "mulliganAction": [
+    {
+      "type": "ExileHandThenDraw"
+    }
+  ],
+  "name": "Serum Powder",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Artifact"
+      }
+    ]
+  }
+}

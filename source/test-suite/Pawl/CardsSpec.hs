@@ -10,6 +10,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Card as CardT
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
@@ -34,7 +35,12 @@ tests registry =
         c <- Registry.card registry "Clone"
         HU.assertEqual "entry replacement" [ReplacementEffect.EntryR EntryRewrite.AsCopy] (CardT.replacementEffects c)
         HU.assertEqual "name" (Text.pack "Clone") (CardT.name c)
-        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Literal 0))) (CardT.power c)
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Literal 0))) (CardT.power c),
+      HU.testCase "serum-powder.json loads as a {3} artifact with a CR 103.5b mulligan action" $ do
+        c <- Registry.card registry "Serum Powder"
+        HU.assertEqual "name" (Text.pack "Serum Powder") (CardT.name c)
+        HU.assertEqual "the CR 103.5b action" [Effect.ExileHandThenDraw] (CardT.mulliganAction c)
+        HU.assertEqual "one activated ability, the {T}: Add {C} mana ability" 1 (length (CardT.activatedAbilities c))
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion
