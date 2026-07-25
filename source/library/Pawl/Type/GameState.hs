@@ -71,6 +71,21 @@ data GameState = MkGameState
     -- consult. The third carrier sharing that vocabulary. A permanent's printed
     -- player abilities are NOT here -- Pawl.PlayerEffect re-derives those live.
     playerEffects :: [ActivePlayerEffect],
+    -- The SEATING order (CR 800.5, CR 806.3), rotated so the starting player is
+    -- first (CR 103.1: "The game's default turn order begins with the starting
+    -- player and proceeds clockwise"). It lists every player who BEGAN this game
+    -- and is never shortened. Who is still IN the game is Departure.stillPlaying,
+    -- and every departure-aware read filters through that on top of this.
+    --
+    -- Three rules depend on a departed player keeping their seat:
+    --   * CR 800.4m -- the seat is how the handoff knows when a departed player's
+    --     turn WOULD have begun.
+    --   * CR 800.4a -- "priority passes to the next player in turn order who's
+    --     still in the game" needs the departed player's own position to find
+    --     their successor.
+    --   * CR 729.1b -- "each player who doesn't win the subgame" is the full
+    --     starting roster minus the winner.
+    -- Pruning on departure makes all three impossible and buys nothing.
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
     phase :: Phase,

@@ -10,6 +10,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Cards as Cards
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -148,7 +149,15 @@ setupTests registry =
         let gs = Setup.emptyGame S.bothPlayers
          in HU.assertEqual "empty command" mempty (GameState.command gs),
       HU.testCase "CR 725.1 a new game has no monarch" $
-        HU.assertEqual "no monarch" Nothing (GameState.monarch (Setup.emptyGame S.bothPlayers))
+        HU.assertEqual "no monarch" Nothing (GameState.monarch (Setup.emptyGame S.bothPlayers)),
+      HU.testCase "CR 800.5/806.3/103.1 emptyGame seats every player in the order given, starting player first" $
+        let gs = Setup.emptyGame S.threePlayers
+         in do
+              HU.assertEqual "seating order" [S.alice, S.bob, S.carol] (GameState.turnOrder gs)
+              HU.assertEqual "the starting player is active" S.alice (GameState.activePlayer gs)
+              HU.assertEqual "three seats in the players map" 3 (Map.size (GameState.players gs)),
+      HU.testCase "CR 800.1 a three-player game has three players still in it at the start" $
+        HU.assertEqual "all three playing" [S.alice, S.bob, S.carol] (Departure.stillPlaying S.threePlayerGame)
     ]
 
 greenBlackSetup :: Registry.Type.Registry -> IO GameState.GameState

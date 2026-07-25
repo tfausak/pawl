@@ -95,12 +95,26 @@ import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified System.Random as Random
 
-alice, bob :: PlayerId.PlayerId
+alice, bob, carol :: PlayerId.PlayerId
 alice = PlayerId.MkPlayerId 0
 bob = PlayerId.MkPlayerId 1
+carol = PlayerId.MkPlayerId 2
 
 bothPlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
 bothPlayers = alice NonEmpty.:| [bob]
+
+-- CR 800.1: a multiplayer game is one that BEGINS with more than two players.
+-- The two-player suite is not generalized -- two-player Magic is a supported,
+-- correct configuration with its own rules (CR 102.2, CR 103.8a) and the
+-- assertions describing it are accurate. A third seat is added alongside.
+threePlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
+threePlayers = alice NonEmpty.:| [bob, carol]
+
+-- The deckless three-seat board: turn order [alice, bob, carol], alice active,
+-- all three still playing. The base for unit-level departure, turn-order and
+-- priority tests, mirroring what `Setup.emptyGame bothPlayers` is for two.
+threePlayerGame :: GameState.GameState
+threePlayerGame = Setup.emptyGame threePlayers
 
 redRed :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 redRed registry = do

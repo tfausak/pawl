@@ -56,5 +56,20 @@ tests =
       HU.testCase "stillPlaying omits a departed player" $
         let gs = Setup.emptyGame S.bothPlayers
             after = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.alice)
-         in HU.assertEqual "only bob remains" [S.bob] (Departure.stillPlaying after)
+         in HU.assertEqual "only bob remains" [S.bob] (Departure.stillPlaying after),
+      HU.testCase "CR 800.4a/800.4m turnOrder is the SEATING roster: a departure does not shorten it" $
+        -- The whole of M5.6a rests on this. CR 800.4m needs the departed seat to
+        -- know when their turn WOULD have begun, and CR 800.4a's last sentence
+        -- needs their position to find their successor. Pruning turnOrder makes
+        -- both impossible; every read filters through stillPlaying instead.
+        let after = S.runPure S.identityAnswer S.threePlayerGame (Departure.leaveGame Departure.Type.Conceded S.bob)
+         in do
+              HU.assertEqual "bob keeps his seat" [S.alice, S.bob, S.carol] (GameState.turnOrder after)
+              HU.assertEqual "but is no longer playing" [S.alice, S.carol] (Departure.stillPlaying after),
+      HU.testCase "CR 104.2a one departure does not decide a three-player game" $
+        let after = S.runPure S.identityAnswer S.threePlayerGame (Departure.leaveGame Departure.Type.Conceded S.bob)
+            andAnother = S.runPure S.identityAnswer after (Departure.leaveGame Departure.Type.Conceded S.carol)
+         in do
+              HU.assertEqual "two survivors, no result" Nothing (GameState.result after)
+              HU.assertEqual "one survivor, alice wins" (Just (Result.Won S.alice)) (GameState.result andAnother)
     ]
