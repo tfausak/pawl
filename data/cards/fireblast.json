@@ -69,9 +69,6 @@
             "spec": {
               "pool": {
                 "type": "AnyTarget"
-              },
-              "exclusion": {
-                "type": "IncludesSource"
               }
             }
           }

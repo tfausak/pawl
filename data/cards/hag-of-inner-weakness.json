@@ -95,9 +95,6 @@
                     "value": {
                       "type": "Opponent"
                     }
-                  },
-                  "exclusion": {
-                    "type": "IncludesSource"
                   }
                 }
               }

@@ -46,15 +46,21 @@
       "affected": {
         "type": "Matching",
         "value": {
-          "exclusion": {
-            "type": "ExcludesSource"
-          },
-          "filter": {
-            "type": "HasCardType",
-            "value": {
-              "type": "Enchantment"
+          "type": "And",
+          "value": [
+            {
+              "type": "HasCardType",
+              "value": {
+                "type": "Enchantment"
+              }
+            },
+            {
+              "type": "Not",
+              "value": {
+                "type": "IsSource"
+              }
             }
-          }
+          ]
         }
       },
       "modification": {
@@ -68,15 +74,21 @@
       "affected": {
         "type": "Matching",
         "value": {
-          "exclusion": {
-            "type": "ExcludesSource"
-          },
-          "filter": {
-            "type": "HasCardType",
-            "value": {
-              "type": "Enchantment"
+          "type": "And",
+          "value": [
+            {
+              "type": "HasCardType",
+              "value": {
+                "type": "Enchantment"
+              }
+            },
+            {
+              "type": "Not",
+              "value": {
+                "type": "IsSource"
+              }
             }
-          }
+          ]
         }
       },
       "modification": {

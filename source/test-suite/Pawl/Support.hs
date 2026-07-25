@@ -54,7 +54,6 @@ import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Type.EndingStep as EndingStep
-import qualified Pawl.Type.Exclusion as Exclusion
 import qualified Pawl.Type.Expiry as Expiry
 import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.Game as Game.Type
@@ -455,7 +454,7 @@ youControlSource =
 continuousEffectAffects :: ObjectId.ObjectId -> ContinuousEffect.ContinuousEffect -> Bool
 continuousEffectAffects target eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects ids -> Set.member target ids
-  Affected.Matching _ _ -> False
+  Affected.Matching _ -> False
 
 -- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`.
 -- Object id 998 is a stand-in source: nothing in these tests reads the
@@ -975,7 +974,6 @@ anthemEmblemCard piker =
         [ StaticAbility.MkStaticAbility
             { StaticAbility.affected =
                 Affected.Matching
-                  Exclusion.IncludesSource
                   (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
               StaticAbility.modification =
                 Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1)

@@ -101,9 +101,6 @@
                     "value": {
                       "type": "Artifact"
                     }
-                  },
-                  "exclusion": {
-                    "type": "IncludesSource"
                   }
                 }
               }

@@ -16,7 +16,6 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.Exclusion as Exclusion
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Mana as Mana.Type
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -177,7 +176,7 @@ manaTests registry =
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.AddMana (ManaType.Colored Color.Green)]
-                      (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource))
+                      (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
                 }
          in HU.assertBool "targets -> not mana" (not (Mana.isManaAbility ab)),
       HU.testCase "CR 605.1a a damage ability is NOT a mana ability" $
@@ -187,7 +186,7 @@ manaTests registry =
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1)]
-                      (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource))
+                      (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
                 }
          in HU.assertBool "no mana produced -> not mana" (not (Mana.isManaAbility ab)),
       HU.testCase "CR 605 a settled Llanowar Elves is a green mana source" $ do

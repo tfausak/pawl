@@ -57,9 +57,6 @@
                     }
                   }
                 ]
-              },
-              "exclusion": {
-                "type": "IncludesSource"
               }
             }
           }

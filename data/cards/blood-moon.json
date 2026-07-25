@@ -37,29 +37,24 @@
       "affected": {
         "type": "Matching",
         "value": {
-          "exclusion": {
-            "type": "IncludesSource"
-          },
-          "filter": {
-            "type": "And",
-            "value": [
-              {
-                "type": "HasCardType",
+          "type": "And",
+          "value": [
+            {
+              "type": "HasCardType",
+              "value": {
+                "type": "Land"
+              }
+            },
+            {
+              "type": "Not",
+              "value": {
+                "type": "HasSupertype",
                 "value": {
-                  "type": "Land"
-                }
-              },
-              {
-                "type": "Not",
-                "value": {
-                  "type": "HasSupertype",
-                  "value": {
-                    "type": "Basic"
-                  }
+                  "type": "Basic"
                 }
               }
-            ]
-          }
+            }
+          ]
         }
       },
       "modification": {

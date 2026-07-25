@@ -23,14 +23,9 @@
       "affected": {
         "type": "Matching",
         "value": {
-          "exclusion": {
-            "type": "IncludesSource"
-          },
-          "filter": {
-            "type": "HasCardType",
-            "value": {
-              "type": "Land"
-            }
+          "type": "HasCardType",
+          "value": {
+            "type": "Land"
           }
         }
       },

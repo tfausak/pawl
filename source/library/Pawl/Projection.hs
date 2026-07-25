@@ -19,7 +19,6 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.Exclusion as Exclusion
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Keyword (Keyword)
@@ -187,8 +186,9 @@ data Gathered = MkGathered
 -- PARTIAL projection built by the layers below this one? A fixed set is a
 -- membership test; a dynamic set is a Filter evaluated against the PARTIAL
 -- characteristics, so a layer-4 type change is visible to a later layer.
--- ExcludesSource applies CR 305.2's "each other" (Opalescence does not animate
--- itself). CR 109.5: an affected-set filter's "you" is the effect's SOURCE's
+-- A Not IsSource conjunct in that Filter is CR 305.2's "each other"
+-- (Opalescence does not animate itself), matched against this View's own
+-- identity. CR 109.5: an affected-set filter's "you" is the effect's SOURCE's
 -- controller (the perspective), which ControlledBy compares against the affected
 -- object's own controller (the View's controller) -- the emblem anthem's
 -- "creatures you control" is the first affected set to reference a player.
@@ -197,18 +197,14 @@ data Gathered = MkGathered
 affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
 affects source oid a partial gs = case a of
   Affected.TheseObjects s -> Set.member oid s
-  Affected.Matching exclusion f ->
-    let notExcluded = case exclusion of
-          Exclusion.ExcludesSource -> oid /= source
-          Exclusion.IncludesSource -> True
-        -- CR 109.5: "you" on a continuous effect is the effect's SOURCE's
+  Affected.Matching f ->
+    let -- CR 109.5: "you" on a continuous effect is the effect's SOURCE's
         -- controller; ControlledBy compares the affected object's controller to
         -- it. controllerOf is a lean fold (owner overridden by SetController
         -- effects) that never recurses into project, so calling it here cannot
         -- loop.
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
-          && notExcluded
           && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
 
 -- CR 205.4a: supertypes are read from the printed type line (no modelled effect
@@ -398,7 +394,7 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
 --     READERS: under CR 613.3, devoid applies at the START of layer 5, so at
 --     layers 2, 3 and 4 the CR says a devoid object with {B} in its mana cost is
 --     still black, while this seed-based implementation already says colourless.
---     A Matching Exclusion (And [HasCardType Creature, HasColor c]) affected set
+--     A Matching (And [HasCardType Creature, HasColor c]) affected set
 --     (this phase's Affected/Filter) makes that gap expressible open-half data
 --     TODAY: a card pairing {"affected": {"type":"Matching", ...}} with a
 --     layer-4 AddCardType, a layer-3 ChangeSubtypeWord, or a layer-2 SetController

@@ -183,7 +183,7 @@ castSpell pid oid = do
             [only] -> pure only
             _ -> Trans.lift (Program.prompt (Prompt.ChooseCost decider pid oid payable))
           Monad.when (elem chosenCost payable) $ do
-            let sets = Target.legalSetsExcluding oid (Card.modesTargetSpecs chosenModes card) gs
+            let sets = Target.legalSets oid (Card.modesTargetSpecs chosenModes card) gs
             mAmount <-
               if Cost.hasVariable chosenCost
                 then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid)))

@@ -110,7 +110,7 @@ activateAbility pid srcId ability = do
   if not (Set.isSubsetOf chosenModes legal && Set.size chosenModes == fromIntegral count)
     then State.put gs
     else do
-      let sets = Target.legalSetsExcluding srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
+      let sets = Target.legalSets srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
       chosen <-
         if Map.null sets
           then pure Map.empty

@@ -35,7 +35,6 @@ import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Count as Count.Type
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.Exclusion as Exclusion
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 import qualified Pawl.Type.Filter as Filter.Type
@@ -424,7 +423,7 @@ lintTests registry =
         HU.assertEqual "name" (Text.pack "Blaze") (Card.Type.name card)
         HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Variable, red])) (Card.Type.manaCost card)
         HU.assertBool "sorcery, not instant" (not (Card.isInstant card))
-        HU.assertEqual "one AnyTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource)) (Card.allTargetSpecs card)
+        HU.assertEqual "one AnyTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) (Card.allTargetSpecs card)
         HU.assertEqual "effect deals X" [Effect.DealDamage (SlotName.MkSlotName (Text.pack "target")) Quantity.Type.X] (Card.allEffects card),
       HU.testCase "the lint itself catches a dangling reference" $
         let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (SlotName.MkSlotName (Text.pack "ghost")) (Quantity.Type.Literal 3))]
@@ -472,7 +471,7 @@ lintTests registry =
         lightningBolt <- Registry.printing registry "Lightning Bolt"
         let card = Printing.card lightningBolt
         HU.assertBool "an instant" (Card.isInstant card)
-        HU.assertEqual "one slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing Exclusion.IncludesSource)) (Card.allTargetSpecs card),
+        HU.assertEqual "one slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) (Card.allTargetSpecs card),
       -- The AbilityName half of the D4 dataflow lint (CR 603.7): an
       -- ArmDelayedTrigger naming an ability the card does not declare is a FAILING
       -- TEST, never a trigger that silently never fires. Equality, not subset: a
@@ -667,7 +666,7 @@ m4bCardTests registry =
         HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black, black])) (Card.Type.manaCost c)
         HU.assertBool "an instant" (Card.isInstant c)
         HU.assertEqual "effect destroys the target slot" [Effect.Destroy (SlotName.MkSlotName (Text.pack "target"))] (Card.allEffects c)
-        HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource)) (Card.allTargetSpecs c),
+        HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
       HU.testCase "Unsummon is a {U} Instant that bounces a target creature to hand" $ do
         unsummon <- Registry.printing registry "Unsummon"
         let c = Printing.card unsummon
@@ -679,7 +678,7 @@ m4bCardTests registry =
         let c = Printing.card angelicEdict
         HU.assertBool "not an instant" (not (Card.isInstant c))
         HU.assertEqual "effect exiles" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Exile] (Card.allEffects c)
-        HU.assertEqual "creature-or-enchantment slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasCardType CardType.Enchantment])) Exclusion.IncludesSource)) (Card.allTargetSpecs c),
+        HU.assertEqual "creature-or-enchantment slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasCardType CardType.Enchantment])))) (Card.allTargetSpecs c),
       HU.testCase "Divination is a {2}{U} Sorcery that draws two cards with no target" $ do
         divination <- Registry.printing registry "Divination"
         let c = Printing.card divination
@@ -689,12 +688,12 @@ m4bCardTests registry =
         tomeScour <- Registry.printing registry "Tome Scour"
         let c = Printing.card tomeScour
         HU.assertEqual "effect mills five" [Effect.Mill (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 5)] (Card.allEffects c)
-        HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing Exclusion.IncludesSource)) (Card.allTargetSpecs c),
+        HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.allTargetSpecs c),
       HU.testCase "Mind Rot is a {2}{B} Sorcery making a target player discard two" $ do
         mindRot <- Registry.printing registry "Mind Rot"
         let c = Printing.card mindRot
         HU.assertEqual "effect discards two" [Effect.Discard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 2)] (Card.allEffects c)
-        HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing Exclusion.IncludesSource)) (Card.allTargetSpecs c)
+        HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.allTargetSpecs c)
     ]
 
 m45p6CardTests :: Registry.Type.Registry -> Tasty.TestTree
@@ -723,7 +722,7 @@ m45p6CardTests registry =
                   (Foldable.toList (Mode.effects m))
                 HU.assertEqual
                   "one ArtifactTarget slot"
-                  (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource))
+                  (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))))
                   (Mode.targetSpecs m)
               _ -> HU.assertFailure "expected exactly one mode"
           _ -> HU.assertFailure "expected exactly one triggered ability",
@@ -752,7 +751,7 @@ m45p6CardTests registry =
                   (Foldable.toList (Mode.effects m))
                 HU.assertEqual
                   "one OpponentCreatureTarget slot"
-                  (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent)) Exclusion.IncludesSource))
+                  (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))))
                   (Mode.targetSpecs m)
               _ -> HU.assertFailure "expected exactly one mode"
           _ -> HU.assertFailure "expected exactly one triggered ability"

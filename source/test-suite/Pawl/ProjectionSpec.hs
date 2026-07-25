@@ -26,7 +26,6 @@ import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
-import qualified Pawl.Type.Exclusion as Exclusion
 import qualified Pawl.Type.Expiry as Expiry
 -- Pawl.Type.Filter aliased Filter.Type: the evaluator Pawl.Filter already claims
 -- the alias Filter above (documented phase exception).
@@ -357,7 +356,7 @@ tests registry =
             -- creatures. The grant reaches the land ONLY because the affected set
             -- is evaluated after layer 4.
             gs1 = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.AddCardType CardType.Creature) gs0
-            gs = withDynamicEffect (Affected.Matching Exclusion.IncludesSource (Filter.Type.HasCardType CardType.Creature)) (Timestamp.MkTimestamp 200) (Modification.GainKeyword Keyword.Flying) gs1
+            gs = withDynamicEffect (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (Timestamp.MkTimestamp 200) (Modification.GainKeyword Keyword.Flying) gs1
         HU.assertBool "land gained flying because it became a creature" (Projection.hasKeyword Keyword.Flying landId gs),
       HU.testCase "CR 305.7/613.8 Blood Moon strips Urborg: Urborg is only a Mountain (Blood Moon older)" $ do
         forest <- Registry.printing registry "Forest"
@@ -414,6 +413,20 @@ tests registry =
         let damaged = S.markDamage humilityId 4 g2
             afterSba = S.settleSba damaged
         HU.assertBool "lethal damage destroys the animated enchantment" (not (Set.member humilityId (GameState.battlefield afterSba))),
+      -- CR 305.2's "each OTHER enchantment": Opalescence does not animate
+      -- itself. Since #163 that is the Not IsSource conjunct in the card's own
+      -- affected-set Filter, evaluated against the candidate View's identity --
+      -- so it is the data file, not an engine field, that has to carry it.
+      HU.testCase "CR 305.2 Opalescence does not animate itself" $ do
+        humility <- Registry.printing registry "Humility"
+        opalescence <- Registry.printing registry "Opalescence"
+        let base = Setup.emptyGame S.bothPlayers
+            (opalescenceId, g1) = S.addCreature opalescence S.alice base
+            -- A second enchantment, so the effect is demonstrably live: it
+            -- animates Humility in the same state where it skips itself.
+            (humilityId, gs) = S.addCreature humility S.alice g1
+        HU.assertBool "the other enchantment IS animated" (Projection.isCreatureOf humilityId gs)
+        HU.assertBool "Opalescence is not" (not (Projection.isCreatureOf opalescenceId gs)),
       HU.testCase "CR 613 Humility + Opalescence: a real creature is 1/1 with no abilities" $ do
         piker <- Registry.printing registry "Goblin Piker"
         humility <- Registry.printing registry "Humility"
@@ -457,7 +470,7 @@ tests registry =
         piker <- Registry.printing registry "Goblin Piker"
         mountain <- Registry.printing registry "Mountain"
         let (pikerId, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
-            gsA = withDynamicEffect (Affected.Matching Exclusion.IncludesSource (Filter.Type.HasCardType CardType.Land)) (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Swamp) gs0
+            gsA = withDynamicEffect (Affected.Matching (Filter.Type.HasCardType CardType.Land)) (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Swamp) gs0
             gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.AddCardType CardType.Land) gsA
         HU.assertBool "timestamp-only: no Swamp yet (known-incomplete, tracked)" (not (Set.member Subtype.Swamp (Projection.subtypesOf pikerId gs))),
       HU.testCase "CR 614: Rest in Peace projects its graveyard->exile replacement" $ do

@@ -142,7 +142,6 @@ library
     Pawl.Type.EntryOption
     Pawl.Type.EntryRewrite
     Pawl.Type.EventShape
-    Pawl.Type.Exclusion
     Pawl.Type.Expiry
     Pawl.Type.Filter
     Pawl.Type.Game

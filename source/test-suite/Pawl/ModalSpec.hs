@@ -25,7 +25,6 @@ import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.Exclusion as Exclusion
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 import qualified Pawl.Type.Filter as Filter.Type
@@ -207,9 +206,10 @@ forcedTests registry =
         HU.assertEqual "alice at 17 (Bolt resolved, forced/unprompted mode selection)" (Just 17) (S.lifeOf S.alice after)
     ]
 
--- M4h task 1: (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource) + Target.selfExcludes /
--- legalSetsExcluding. No consumer is wired yet (that's a later M4h task) --
--- this proves the spec and the CR "another" exclusion helper in isolation.
+-- M4h task 1: Aether Channeler's "another nonland permanent" slot as data --
+-- Pool.Permanents narrowed by Not (HasCardType Land), with CR 601.2c's "another"
+-- as the Not IsSource conjunct (#163). This proves the spec and the exclusion in
+-- isolation; the wiring to a consumer is a later M4h task.
 nonlandPermanentTargetTests :: Registry.Type.Registry -> Tasty.TestTree
 nonlandPermanentTargetTests registry =
   Tasty.testGroup
@@ -219,18 +219,19 @@ nonlandPermanentTargetTests registry =
         mindslaver <- Registry.printing registry "Mindslaver"
         mountain <- Registry.printing registry "Mountain"
         let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
-            got = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource) gs
+            got = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land)))) gs
         HU.assertEqual
           "two nonland permanents, no land"
           (Set.fromList [Recipient.ToObject (S.creatureId gs), Recipient.ToObject (S.artifactId gs)])
           got,
-      HU.testCase "legalSetsExcluding drops the source (CR \"another\")" $ do
+      HU.testCase "Not IsSource drops the source (CR \"another\")" $ do
         piker <- Registry.printing registry "Goblin Piker"
         mindslaver <- Registry.printing registry "Mindslaver"
         mountain <- Registry.printing registry "Mountain"
         let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
-            specs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource)
-            got = Target.legalSetsExcluding (S.creatureId gs) specs gs
+            nonlandOther = Filter.Type.And [Filter.Type.Not (Filter.Type.HasCardType CardType.Land), Filter.Type.Not Filter.Type.IsSource]
+            specs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.Permanents (Just nonlandOther))
+            got = Target.legalSets (S.creatureId gs) specs gs
         HU.assertEqual
           "source excluded from its own set"
           (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (Set.singleton (Recipient.ToObject (S.artifactId gs))))

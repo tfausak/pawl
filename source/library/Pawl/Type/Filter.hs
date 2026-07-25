@@ -31,9 +31,10 @@ data Filter
   | ControlledBy PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- The candidate IS the evaluation's source object. Context-relative in the
     -- same way ControlledBy is: the Filter value carries no object id, and the
-    -- answer comes from the Context the caller supplies. CR 601.2c's "another"
-    -- (Pawl.Type.Exclusion) already names the source this way for target slots;
-    -- this makes the same relation available inside the predicate language.
+    -- answer comes from the Context the caller supplies. `Not IsSource` is how
+    -- CR 601.2c's "another" (a target slot) and CR 305.2's "each other" (a
+    -- continuous effect's affected set) are both written -- one relation, one
+    -- spelling, rather than a parallel Exclusion field on each (#163).
     IsSource
   | And [Filter]
   | Or [Filter]

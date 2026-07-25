@@ -44,9 +44,6 @@
             "spec": {
               "pool": {
                 "type": "Creatures"
-              },
-              "exclusion": {
-                "type": "IncludesSource"
               }
             }
           }

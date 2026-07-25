@@ -17,7 +17,6 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.Exclusion as Exclusion
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 import qualified Pawl.Type.Filter as Filter.Type
@@ -158,7 +157,7 @@ tests registry =
         let gs0 = Setup.emptyGame S.bothPlayers
             (ratsId, withRats) = S.addCreature typhoidRats S.alice gs0
             (pikerId, gs) = S.addCreature piker S.alice withRats
-            legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource) gs
+            legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))) gs
         HU.assertBool "the red Piker is legal" (Set.member (Recipient.ToCreature pikerId) legal)
         HU.assertBool "the black Rats are not" (not (Set.member (Recipient.ToCreature ratsId) legal)),
       HU.testCase "CR 702.114a a devoid creature with a black cost IS a legal nonblack target" $ do
@@ -166,7 +165,7 @@ tests registry =
         devoidDrone <- Registry.printing registry "Synthetic Devoid Drone"
         let gs0 = Setup.emptyGame S.bothPlayers
             (droneId, gs) = S.addCreature devoidDrone S.alice gs0
-            legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource) gs
+            legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))) gs
         HU.assertBool "colourless is nonblack" (Set.member (Recipient.ToCreature droneId) legal),
       HU.testCase "Doom Blade destroys a devoid creature whose mana cost is black" $ do
         swamp <- Registry.printing registry "Swamp"
@@ -198,7 +197,7 @@ tests registry =
         HU.assertEqual "after: out of Bad Moon's set, back to 1 power" (Just 1) (Projection.powerOf ratsId after)
         HU.assertBool
           "after: a legal Doom Blade target"
-          (Set.member (Recipient.ToCreature ratsId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource) after)),
+          (Set.member (Recipient.ToCreature ratsId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))) after)),
       HU.testCase "Aphotic Wisps makes a creature black, the mirror of Crimson Wisps" $ do
         swamp <- Registry.printing registry "Swamp"
         badMoon <- Registry.printing registry "Bad Moon"
@@ -215,7 +214,7 @@ tests registry =
         HU.assertBool "gained fear" (Projection.hasKeyword Keyword.Fear pikerId after)
         HU.assertBool
           "no longer a legal Doom Blade target"
-          (not (Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black))) Exclusion.IncludesSource) after))),
+          (not (Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))) after))),
       HU.testCase "CR 608.2b Doom Blade fizzles when its target becomes black in response" $ do
         -- The fizzle is only reachable through a colour change, and Aphotic Wisps
         -- is the one card in the pool that makes something BLACK.

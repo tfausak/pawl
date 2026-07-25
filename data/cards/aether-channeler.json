@@ -124,20 +124,28 @@
               {
                 "slot": "permanent",
                 "spec": {
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "Not",
+                        "value": {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Land"
+                          }
+                        }
+                      },
+                      {
+                        "type": "Not",
+                        "value": {
+                          "type": "IsSource"
+                        }
+                      }
+                    ]
+                  },
                   "pool": {
                     "type": "Permanents"
-                  },
-                  "filter": {
-                    "type": "Not",
-                    "value": {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Land"
-                      }
-                    }
-                  },
-                  "exclusion": {
-                    "type": "ExcludesSource"
                   }
                 }
               }

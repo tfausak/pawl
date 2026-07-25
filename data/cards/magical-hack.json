@@ -31,9 +31,6 @@
             "spec": {
               "pool": {
                 "type": "SpellsAndPermanents"
-              },
-              "exclusion": {
-                "type": "IncludesSource"
               }
             }
           }

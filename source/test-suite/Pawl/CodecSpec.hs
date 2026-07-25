@@ -44,7 +44,6 @@ import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.EventShape as EventShape
-import qualified Pawl.Type.Exclusion as Exclusion
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
 -- evaluator module Pawl.Filter is not imported here today, but the alias
 -- convention is fixed project-wide so a later import never collides.
@@ -158,12 +157,13 @@ tests registry =
             roundTrip "m2" Codec.modificationToJson Codec.jsonToModification (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)),
           HU.testCase "ChangeSubtypeWord" $
             roundTrip "m3" Codec.modificationToJson Codec.jsonToModification (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island),
-          HU.testCase "Affected round-trips (TheseObjects and Matching with both exclusions)" $
+          HU.testCase "Affected round-trips (TheseObjects, Matching, and Matching's \"each other\" shape)" $
             mapM_
               (roundTrip "affected" Codec.affectedToJson Codec.jsonToAffected)
               [ Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1, ObjectId.MkObjectId 2]),
-                Affected.Matching Exclusion.IncludesSource (Filter.Type.HasCardType CardType.Creature),
-                Affected.Matching Exclusion.ExcludesSource (Filter.Type.And [Filter.Type.HasCardType CardType.Enchantment, Filter.Type.Not (Filter.Type.HasSubtype Subtype.Mountain)])
+                Affected.Matching (Filter.Type.HasCardType CardType.Creature),
+                -- Opalescence's shape: CR 305.2's "each other" as Not IsSource.
+                Affected.Matching (Filter.Type.And [Filter.Type.HasCardType CardType.Enchantment, Filter.Type.Not (Filter.Type.HasSubtype Subtype.Mountain), Filter.Type.Not Filter.Type.IsSource])
               ]
         ],
       Tasty.testGroup
@@ -266,20 +266,20 @@ tests registry =
               (roundTrip "relation" Codec.playerRelationToJson Codec.jsonToPlayerRelation)
               [PlayerRelation.You, PlayerRelation.Opponent]
         ],
-      -- Sits beside "filter (P9)": a TargetSpec is Pool + Maybe Filter +
-      -- Exclusion, so these exercise the Filter arm above in its embedded
-      -- position. Covers a bare pool (Nothing filter, omitted key), a filtered
-      -- pool, and the ExcludesSource value that carries "another".
+      -- Sits beside "filter (P9)": a TargetSpec is Pool + Maybe Filter, so these
+      -- exercise the Filter arm above in its embedded position. Covers a bare
+      -- pool (Nothing filter, omitted key), a filtered pool, and the Not
+      -- IsSource conjunct that carries CR 601.2c's "another" (#163).
       Tasty.testGroup
         "target spec (P9)"
         [ HU.testCase "TargetSpec bare pool round-trips" $
-            let spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource
+            let spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing
              in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec)),
           HU.testCase "TargetSpec filtered pool round-trips" $
-            let spec = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)) Exclusion.IncludesSource
+            let spec = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))
              in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec)),
-          HU.testCase "TargetSpec ExcludesSource round-trips" $
-            let spec = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land))) Exclusion.ExcludesSource
+          HU.testCase "TargetSpec \"another\" (Not IsSource) round-trips" $
+            let spec = TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.Not (Filter.Type.HasCardType CardType.Land), Filter.Type.Not Filter.Type.IsSource]))
              in HU.assertEqual "preserved" (Right spec) (Codec.jsonToTargetSpec (Codec.targetSpecToJson spec))
         ],
       Tasty.testGroup
@@ -433,7 +433,7 @@ tests registry =
                   ( Seq.fromList
                       [ Mode.MkMode
                           (Seq.fromList [Effect.DealDamage (SlotName.MkSlotName (Text.pack "creature")) (Quantity.Literal 1)])
-                          (Map.singleton (SlotName.MkSlotName (Text.pack "creature")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing Exclusion.IncludesSource))
+                          (Map.singleton (SlotName.MkSlotName (Text.pack "creature")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
                       ]
                   )
                   (ModeSelection.ChooseExactly 1)
@@ -466,7 +466,7 @@ tests registry =
               (Card.allEffects card)
             HU.assertEqual
               "target spec"
-              (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.MkTargetSpec Pool.Spells Nothing Exclusion.IncludesSource))
+              (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.MkTargetSpec Pool.Spells Nothing))
               (Card.allTargetSpecs card)
         ],
       Tasty.testGroup

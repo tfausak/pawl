@@ -48,9 +48,6 @@
                 "value": {
                   "type": "Land"
                 }
-              },
-              "exclusion": {
-                "type": "IncludesSource"
               }
             }
           }

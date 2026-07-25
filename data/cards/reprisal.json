@@ -39,9 +39,6 @@
               "filter": {
                 "type": "PowerAtLeast",
                 "value": 4
-              },
-              "exclusion": {
-                "type": "IncludesSource"
               }
             }
           }

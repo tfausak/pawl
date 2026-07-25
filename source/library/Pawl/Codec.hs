@@ -46,7 +46,6 @@ import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.EventShape as EventShape
-import qualified Pawl.Type.Exclusion as Exclusion
 import qualified Pawl.Type.Filter as Filter
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.Json (Value (Array, Boolean, Null, Object))
@@ -803,29 +802,13 @@ jsonToPool =
       (Text.pack "SpellsAndPermanents", Pool.SpellsAndPermanents)
     ]
 
-exclusionToJson :: Exclusion.Exclusion -> Value
-exclusionToJson e = nullary . Text.pack $ case e of
-  Exclusion.IncludesSource -> "IncludesSource"
-  Exclusion.ExcludesSource -> "ExcludesSource"
-
-jsonToExclusion :: Value -> Either Text Exclusion.Exclusion
-jsonToExclusion =
-  decodeNullary
-    (Text.pack "Exclusion")
-    [ (Text.pack "IncludesSource", Exclusion.IncludesSource),
-      (Text.pack "ExcludesSource", Exclusion.ExcludesSource)
-    ]
-
--- The product shape: {"pool": <pool>, "filter": <filter | omitted>,
--- "exclusion": <exclusion>}. The filter key is omitted when Nothing (a bare
--- "target creature" narrows nothing), mirroring how optional fields are encoded
--- elsewhere.
+-- The product shape: {"pool": <pool>, "filter": <filter | omitted>}. The filter
+-- key is omitted when Nothing (a bare "target creature" narrows nothing),
+-- mirroring how optional fields are encoded elsewhere. CR 601.2c's "another" is
+-- a Not IsSource conjunct inside that filter, not a key of its own (#163).
 targetSpecToJson :: TargetSpec.TargetSpec -> Value
-targetSpecToJson (TargetSpec.MkTargetSpec pool restriction exclusion) =
-  let base =
-        [ (Text.pack "pool", poolToJson pool),
-          (Text.pack "exclusion", exclusionToJson exclusion)
-        ]
+targetSpecToJson (TargetSpec.MkTargetSpec pool restriction) =
+  let base = [(Text.pack "pool", poolToJson pool)]
       withFilter = case restriction of
         Nothing -> base
         Just f -> base <> [(Text.pack "filter", filterToJson f)]
@@ -835,11 +818,10 @@ jsonToTargetSpec :: Value -> Either Text TargetSpec.TargetSpec
 jsonToTargetSpec value = do
   ps <- Json.asObject value
   pool <- Json.field (Text.pack "pool") ps >>= jsonToPool
-  exclusion <- Json.field (Text.pack "exclusion") ps >>= jsonToExclusion
   restriction <- case Json.optField (Text.pack "filter") ps of
     Nothing -> Right Nothing
     Just v -> Just <$> jsonToFilter v
-  pure (TargetSpec.MkTargetSpec pool restriction exclusion)
+  pure (TargetSpec.MkTargetSpec pool restriction)
 
 turnScopeToJson :: TurnScope.TurnScope -> Value
 turnScopeToJson s = nullary . Text.pack $ case s of
@@ -1030,28 +1012,14 @@ withValue mv f = case mv of
 affectedToJson :: Affected.Affected -> Value
 affectedToJson a = case a of
   Affected.TheseObjects ids -> Json.tagged (Text.pack "TheseObjects") (Just (setTo objectIdToJson ids))
-  Affected.Matching exclusion f ->
-    Json.tagged
-      (Text.pack "Matching")
-      ( Just
-          ( Object
-              [ (Text.pack "exclusion", exclusionToJson exclusion),
-                (Text.pack "filter", filterToJson f)
-              ]
-          )
-      )
+  Affected.Matching f -> Json.tagged (Text.pack "Matching") (Just (filterToJson f))
 
 jsonToAffected :: Value -> Either Text Affected.Affected
 jsonToAffected value = do
   (t, mv) <- Json.tag value
   case Text.unpack t of
     "TheseObjects" -> withValue mv (fmap Affected.TheseObjects . setFrom jsonToObjectId)
-    "Matching" ->
-      withValue mv $ \v -> do
-        ps <- Json.asObject v
-        exclusion <- Json.field (Text.pack "exclusion") ps >>= jsonToExclusion
-        f <- Json.field (Text.pack "filter") ps >>= jsonToFilter
-        pure (Affected.Matching exclusion f)
+    "Matching" -> withValue mv (fmap Affected.Matching . jsonToFilter)
     _ -> Left (Text.pack "unknown Affected: " <> t)
 
 recipientToJson :: Recipient.Recipient -> Value

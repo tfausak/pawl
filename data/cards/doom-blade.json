@@ -44,9 +44,6 @@
                     "type": "Black"
                   }
                 }
-              },
-              "exclusion": {
-                "type": "IncludesSource"
               }
             }
           }

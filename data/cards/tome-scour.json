@@ -37,9 +37,6 @@
             "spec": {
               "pool": {
                 "type": "Players"
-              },
-              "exclusion": {
-                "type": "IncludesSource"
               }
             }
           }
