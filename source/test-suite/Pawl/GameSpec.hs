@@ -605,6 +605,28 @@ ruleTests registry =
          in do
               HU.assertEqual "bob is the subgame's active player" S.bob (GameState.activePlayer sub)
               HU.assertEqual "the subgame turn order begins with bob" [S.bob, S.alice] (GameState.turnOrder sub),
+      HU.testCase "CR 729.2/729.4 #147: a departed player is not offered as the subgame's first player, and their library is untouched" $ do
+        -- Three seats; bob has left. Alice and carol have 7 library cards each,
+        -- bob 3. Two failures today: the CR 729.2 roll offers [alice, bob, carol],
+        -- so bob can be rolled to START the subgame; and bob is one of
+        -- startGameFromCards's owners, so his 3 cards are shuffled into a subgame
+        -- library and drawn into a subgame hand -- coming back through funnelBack
+        -- with fresh ids (CR 400.7 mints a new object on every zone change) in
+        -- reversed order.
+        --
+        -- The assertion is exact list equality on his main-game library, which
+        -- catches both the reshuffle and the redraw.
+        mountain <- Registry.printing registry "Mountain"
+        let g0 = Setup.emptyGame S.threePlayers
+            g1 = poolToLibraryG S.carol (poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 7 S.carol (addManyG mountain 3 S.bob (addManyG mountain 7 S.alice g0)))))
+            parent = Departure.depart Departure.Type.Conceded S.bob g1
+            ((_, after), rolls) = State.runState (Engine.runGame subgameRosterAnswer parent Engine.playSubgame) []
+        HU.assertEqual "the roll offers only the players still in the game" [[S.alice, S.carol]] rolls
+        HU.assertEqual
+          "bob's main-game library came back untouched -- same objects, same order"
+          (Game.zoneMembers Zone.Library S.bob parent)
+          (Game.zoneMembers Zone.Library S.bob after)
+        HU.assertEqual "the main game is not decided by the subgame" Nothing (GameState.result after),
       HU.testCase "CR 729.1b/729.3 gameplay: alice casts a subgame spell, bob decks, bob takes 3" $ do
         -- alice has the {0} subgame sorcery in hand and an 8-card library; bob has
         -- a 3-card library (decks in the subgame, CR 729.3). alice casts through
@@ -1241,6 +1263,18 @@ firstPlayerAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 firstPlayerAnswer starter p = case p of
   Prompt.RandomFirstPlayer _ -> starter
   _ -> S.identityAnswer p
+
+-- Records the candidate list of every Prompt.RandomFirstPlayer, rolling the first
+-- candidate, and reverses every shuffle. The reversal is what makes "whose
+-- library was shuffled" observable at all: S.identityAnswer's Shuffle arm is the
+-- identity, so a library that was shuffled looks exactly like one that was not.
+subgameRosterAnswer :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+subgameRosterAnswer p = case p of
+  Prompt.RandomFirstPlayer order -> do
+    State.modify' (<> [NonEmpty.toList order])
+    pure (NonEmpty.head order)
+  Prompt.Shuffle ids -> pure (reverse ids)
+  _ -> pure (S.identityAnswer p)
 
 addManyG :: Printing.Printing -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 addManyG mountain n pid gs =

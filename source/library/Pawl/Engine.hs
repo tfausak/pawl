@@ -739,10 +739,11 @@ playSubgame :: Game Result
 playSubgame = do
   parent <- State.get
   -- CR 729.2: "Randomly determine which player goes first." The engine asks; the
-  -- interpreter rolls. Not asked when the answer is forced -- a lone player in
-  -- the turn order goes first no matter what randomness says, and where the
-  -- rules leave nothing to determine, don't prompt.
-  starter <- case NonEmpty.nonEmpty (GameState.turnOrder parent) of
+  -- interpreter rolls. Only the players still in the main game are in the subgame
+  -- (CR 729.4), so only they can be rolled (#147). Not asked when the answer is
+  -- forced -- a lone candidate goes first no matter what randomness says, and
+  -- where the rules leave nothing to determine, don't prompt.
+  starter <- case NonEmpty.nonEmpty (Departure.stillPlayingInOrder parent) of
     Nothing -> pure (GameState.activePlayer parent)
     Just order -> case order of
       only NonEmpty.:| [] -> pure only
@@ -750,8 +751,12 @@ playSubgame = do
   let sub0 = Setup.subgameStateFrom starter parent
   (result, finalSub) <- Trans.lift (State.runStateT (Setup.startGameFromCards >> playGame) sub0)
   State.modify' (Setup.funnelBack finalSub)
-  order <- State.gets GameState.turnOrder
-  Monad.forM_ order Mulligan.shuffleLibrary
+  -- CR 729.5: "each player takes all traditional cards they own that are in the
+  -- subgame ... puts them into their main-game library, then shuffles them." Each
+  -- player who was IN the subgame: a player outside it (CR 729.4) took nothing
+  -- into it and is not asked to shuffle their main-game library (#147).
+  seated <- State.gets Departure.stillPlayingInOrder
+  Monad.forM_ seated Mulligan.shuffleLibrary
   pure result
 
 playFrom :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game Result

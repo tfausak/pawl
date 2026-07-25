@@ -292,7 +292,17 @@ subgameStateFrom starter parent =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
       libObjects = Map.restrictKeys (GameState.objects parent) libIds
-      order = rotateTo starter (GameState.turnOrder parent)
+      -- The pool is drawn from EVERY seat's main-game library, including a seat
+      -- whose player has left the game, while `order` below seats only the
+      -- players still in it (CR 729.4, #147). A departed player's cards ride
+      -- along inert: startGameFromCards builds subgame libraries for the seated
+      -- players only, so no subgame library holds them and nobody can draw them,
+      -- and funnelBack returns them to their owner's main-game library when the
+      -- subgame ends. Restricting this to the seated players instead would DELETE
+      -- those cards, because funnelBack rebuilds a main-game library out of the
+      -- subgame pool and drops the parent's old library objects -- a card that
+      -- never entered the subgame would have nothing to come back from.
+      order = rotateTo starter (Departure.stillPlayingInOrder parent)
       firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe order)
    in parent
         { GameState.objects = libObjects,

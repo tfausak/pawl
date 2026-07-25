@@ -404,7 +404,19 @@ subgameTests registry =
         HU.assertEqual "the parent's non-library survivors are untouched (6 on the battlefield)" 6 battlefieldSurvivors
         HU.assertEqual "no object id collides (object count = survivors + returned cards)" (Map.size (GameState.objects after)) (battlefieldSurvivors + libCount S.alice + libCount S.bob)
         HU.assertEqual "the subgame genuinely minted fresh ids (drawCard's changeZone, CR 400.7)" True (GameState.nextObjectId finalSub > GameState.nextObjectId sub0)
-        HU.assertEqual "the id supply advanced to exactly the subgame high-water mark" (GameState.nextObjectId finalSub) (GameState.nextObjectId after)
+        HU.assertEqual "the id supply advanced to exactly the subgame high-water mark" (GameState.nextObjectId finalSub) (GameState.nextObjectId after),
+      HU.testCase "CR 729.2/729.4 #147: a subgame seats only the players still in the main game" $
+        -- CR 729.2: "Each player takes all the cards in their main-game library,
+        -- moves them to their subgame library, and shuffles them." Each player IN
+        -- the game -- CR 729.4: "All players not currently in the subgame are
+        -- considered outside the subgame." Today the rebuilt order is
+        -- rotateTo carol [alice, bob, carol] = [carol, alice, bob], with bob in it.
+        let g0 = Departure.depart Departure.Type.Conceded S.bob (Setup.emptyGame S.threePlayers)
+            sub = Setup.subgameStateFrom S.carol g0
+         in do
+              HU.assertEqual "two seats, rotated to the starter" [S.carol, S.alice] (GameState.turnOrder sub)
+              HU.assertEqual "carol goes first" S.carol (GameState.activePlayer sub)
+              HU.assertEqual "CR 800.1: a two-seat subgame is not a multiplayer game, so no free mulligan" 0 (Mulligan.freeMulligans sub)
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
