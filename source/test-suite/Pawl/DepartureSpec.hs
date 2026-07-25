@@ -3,24 +3,30 @@
 module Pawl.DepartureSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Departure as Departure
+import qualified Pawl.Game as Game
+import qualified Pawl.Registry as Registry
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Status as Status
+import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
 
-tests :: Tasty.TestTree
-tests =
+tests :: Registry.Type.Registry -> Tasty.TestTree
+tests registry =
   Tasty.testGroup
     "Departure"
     [ HU.testCase "CR 104.3a a conceding player leaves immediately, with Conceded as the reason" $
@@ -130,5 +136,41 @@ tests =
             gone = Departure.depart Departure.Type.Conceded S.carol board
          in do
               HU.assertEqual "nobody is left to become the monarch" Nothing (GameState.monarch gone)
-              HU.assertEqual "and the roster is untouched" [S.alice, S.bob, S.carol] (GameState.turnOrder gone)
+              HU.assertEqual "and the roster is untouched" [S.alice, S.bob, S.carol] (GameState.turnOrder gone),
+      HU.testCase "CR 800.4a a departing player's objects leave the game, from every zone that can hold one" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
+            (inHand, g2) = S.addHandCard mountain S.bob g1
+            (inLibrary, g3) = S.addLibraryCard mountain S.bob g2
+            (inGraveyard, g4) = S.addGraveyardCard mountain S.bob g3
+            (onStack, g5) = S.spellOnStack piker S.bob g4
+            (aliceKeeps, g6) = S.addCreature piker S.alice g5
+            gone = Departure.depart Departure.Type.Conceded S.bob g6
+        HU.assertEqual "bob's battlefield permanent is gone" Nothing (Game.lookupObject onField gone)
+        HU.assertEqual "bob's hand card is gone" Nothing (Game.lookupObject inHand gone)
+        HU.assertEqual "bob's library card is gone" Nothing (Game.lookupObject inLibrary gone)
+        HU.assertEqual "bob's graveyard card is gone" Nothing (Game.lookupObject inGraveyard gone)
+        HU.assertEqual "bob's spell on the stack is gone" Nothing (Game.lookupObject onStack gone)
+        HU.assertEqual "the shared battlefield set no longer names it" False (Set.member onField (GameState.battlefield gone))
+        HU.assertEqual "the stack list no longer names it" [] (filter (== onStack) (GameState.stack gone))
+        HU.assertEqual "nothing of bob's is left in any of his zones" [] (concatMap (\z -> Game.zoneMembers z S.bob gone) [Zone.Library, Zone.Hand, Zone.Graveyard, Zone.Battlefield, Zone.Exile, Zone.Command, Zone.Stack])
+        HU.assertEqual "and alice's permanent is untouched -- the sweep is keyed to the OWNER" (Just S.alice) (fmap Object.owner (Game.lookupObject aliceKeeps gone)),
+      HU.testCase "CR 800.1 a two-player game is not a multiplayer game, so CR 800.4a's object removal does not apply" $ do
+        -- CR 800.1: "A multiplayer game is a game that begins with more than two
+        -- players." CR 104.2a ends a two-player game the moment a player leaves,
+        -- so nothing INSIDE that game can see the difference -- but a two-player
+        -- SUBGAME is read after it ends. CR 729.5 has each player take the cards
+        -- they own in the subgame into their main-game library, and
+        -- Setup.funnelBack does that from the finished subgame's object pool. If
+        -- the loser's cards left the game, funnelBack would have nothing to
+        -- return and they would be destroyed.
+        piker <- Registry.printing registry "Goblin Piker"
+        let (onField, twoSeats) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+            (alsoOnField, threeSeats) = S.addCreature piker S.bob (Setup.emptyGame S.threePlayers)
+            twoGone = Departure.depart Departure.Type.Conceded S.bob twoSeats
+            threeGone = Departure.depart Departure.Type.Conceded S.bob threeSeats
+        HU.assertEqual "two seats: bob's Piker stays in the game" (Just S.bob) (fmap Object.owner (Game.lookupObject onField twoGone))
+        HU.assertEqual "three seats: it does not" Nothing (Game.lookupObject alsoOnField threeGone)
+        HU.assertEqual "and the seam agrees" [False, True] (fmap Departure.continuesAfterDeparture [twoSeats, threeSeats])
     ]

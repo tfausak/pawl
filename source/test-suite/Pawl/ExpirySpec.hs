@@ -347,6 +347,20 @@ masterThiefBoard darksteelMyr masterThief =
       gs3 = S.withEvents [GameEvent.Moved entered (Projection.project thiefId gs2)] gs2
    in (thiefId, myrId, gs3)
 
+-- The masterThiefBoard shape at three seats, resolved: alice's Master Thief has
+-- entered and its ETB has taken bob's Darksteel Myr (the only artifact on the
+-- board, so the CR 603.3d target choice is forced). Carol is the third seat, so
+-- either departure leaves a game with two players still in it and CR 104.2a does
+-- not end it -- which is the whole reason these two directions are only
+-- distinguishable at three seats.
+masterThiefThreeWay :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+masterThiefThreeWay darksteelMyr masterThief =
+  let (myrId, gs1) = S.addCreature darksteelMyr S.bob S.threePlayerGame
+      (thiefId, gs2) = S.addCreature masterThief S.alice gs1
+      entered = ZoneChange.MkZoneChange thiefId Zone.Stack Zone.Battlefield
+      gs3 = S.withEvents [GameEvent.Moved entered (Projection.project thiefId gs2)] gs2
+   in (thiefId, myrId, masterThiefResolveAll (masterThiefSettle gs3))
+
 -- Master Thief {2}{U}{U} Creature -- Human Rogue 2/2: "When this creature
 -- enters, gain control of target artifact for as long as you control this
 -- creature." CR 611.2b's own printed example; the three assertions below in
@@ -442,7 +456,28 @@ masterThiefTests registry =
         HU.assertEqual "bob has Master Thief" (Just S.bob) (Projection.controllerOf thief taken)
         HU.assertEqual "so the artifact goes back to its owner" (Just S.bob) (Projection.controllerOf myr swept)
         HU.assertEqual "at cleanup Master Thief comes home" (Just S.alice) (Projection.controllerOf thief returned)
-        HU.assertEqual "and the artifact does NOT" (Just S.bob) (Projection.controllerOf myr relatched)
+        HU.assertEqual "and the artifact does NOT" (Just S.bob) (Projection.controllerOf myr relatched),
+      -- CR 800.4a, third example: "If Bianca leaves the game, Serra Angel also
+      -- leaves the game." The stolen object is owned by the departing player, so
+      -- it goes with them -- the thief keeps nothing.
+      HU.testCase "CR 800.4a the stolen artifact's OWNER departs: the artifact leaves the game and Master Thief stays" $ do
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        masterThief <- Registry.printing registry "Master Thief"
+        let (thief, myr, stolen) = masterThiefThreeWay darksteelMyr masterThief
+            gone = Departure.depart Departure.Type.Conceded S.bob stolen
+        HU.assertEqual "alice really had it before bob left" (Just S.alice) (Projection.controllerOf myr stolen)
+        HU.assertEqual "the Myr is gone from the game" Nothing (Game.lookupObject myr gone)
+        HU.assertEqual "so it has no controller" Nothing (Projection.controllerOf myr gone)
+        HU.assertBool "Master Thief is still on the battlefield" (Maybe.isJust (Game.lookupObject thief gone))
+        HU.assertEqual "under alice" (Just S.alice) (Projection.controllerOf thief gone)
+        -- The stored SetController effect stays, with an `affected` set naming an
+        -- object that no longer exists. It is inert: Projection.controllerOf
+        -- returns Nothing for an unknown id, and GameState.nextObjectId is
+        -- monotone so the id is never reused. Pinned rather than tidied, because
+        -- CR 800.4a ends only the effects that GIVE the departing player control
+        -- and this one gives control to alice, who is still here.
+        HU.assertEqual "the effect that named it is still stored, and inert" 1 (length (GameState.continuousEffects gone))
+        HU.assertEqual "CR 104.2a: two survivors, so the game continues" Nothing (GameState.result gone)
     ]
 
 -- CR 725.2: the monarch's inherent end-step draw -- a triggered ability that

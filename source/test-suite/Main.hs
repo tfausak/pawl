@@ -58,7 +58,7 @@ testTree registry =
       MulliganSpec.tests registry,
       DamageSpec.tests registry,
       DecideSpec.tests,
-      DepartureSpec.tests,
+      DepartureSpec.tests registry,
       EventSpec.tests registry,
       ExpirySpec.tests registry,
       ReplaySpec.tests registry,

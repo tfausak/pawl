@@ -4,11 +4,16 @@ import Control.Applicative ((<|>))
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Pawl.Game as Game
 import qualified Pawl.Monarch as Monarch
+import qualified Pawl.Type.Combat as Combat
 import Pawl.Type.Departure (Departure)
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Object as Object
+import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Result (Result)
@@ -53,8 +58,85 @@ stillPlayingInOrder gs =
 depart :: Departure -> PlayerId -> GameState -> GameState
 depart reason pid gs =
   let lose p = p {Player.status = Status.Departed reason}
-      flipped = gs {GameState.players = Map.adjust lose pid (GameState.players gs)}
+      -- CR 800.4a's own ordering ("Then ... Then ...") is load-bearing, so the
+      -- clauses are composed in the rule's order and nothing here reorders them.
+      -- They run BEFORE the status flip, as the rule's later clauses read
+      -- "objects still controlled by that player".
+      settled = if continuesAfterDeparture gs then objectsLeaveWith pid gs else gs
+      flipped = settled {GameState.players = Map.adjust lose pid (GameState.players settled)}
    in Monarch.reassignOnDeparture pid (stillPlayingInOrder flipped) flipped
+
+-- CR 800.4: "Unlike two-player games, multiplayer games can continue after one
+-- or more players have left the game." CR 800.1: "A multiplayer game is a game
+-- that begins with more than two players." GameState.turnOrder is the roster the
+-- game BEGAN with and is never shortened (see Pawl.Type.GameState), so counting
+-- seats answers "begins with" directly: a three-player game down to two
+-- survivors still continues, and a rebuilt game (CR 727.1, CR 729.2) is seated
+-- from the players who were in the game it came from and so answers for itself.
+--
+-- CR 800.4a's object removal is the one clause where this gate is OBSERVABLE
+-- rather than merely vacuous. Inside a two-player game CR 104.2a ends the game
+-- the moment a player leaves, so nothing there can see it -- but a two-player
+-- SUBGAME is read after it ends: CR 729.5 has each player take the cards they
+-- own in the subgame into their main-game library, and Setup.funnelBack does
+-- that from the finished subgame's object pool. Removing the loser's cards would
+-- destroy them.
+--
+-- A bare Bool, following Engine.skipsDraw: a proposition whose name is the
+-- proposition, read by one `if`, with no third state to model. It names the
+-- CAPABILITY rather than the cause, which is the seam M5.6b established.
+continuesAfterDeparture :: GameState -> Bool
+continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
+
+-- CR 800.4a, first clause: "all objects (see rule 109) owned by that player
+-- leave the game". Every id the player owns is deleted from GameState.objects
+-- and from every collection that can name one -- the zones, the combat record,
+-- and the CR 725 exile watch.
+--
+-- Leaving the game is not a zone change, so this does not funnel through
+-- Pawl.Event: no Moved event, no CR 616 replacement, no trigger. Pawl.Sba's
+-- CR 704.5d token `ceaseToExist` is the same shape for the same reason.
+--
+-- Three things it deliberately does NOT touch, each because CR 800.4a does not
+-- reach them:
+--
+--   * GameState.continuousEffects, GameState.replacements and
+--     GameState.playerEffects. CR 109.1 lists what an object is -- "an ability on
+--     the stack, a card, a copy of a card, a token, a spell, a permanent, or an
+--     emblem" -- and a stored continuous effect is none of them, so the first
+--     clause does not end one just because its source left. The effects this rule
+--     DOES end are the control-granting ones, which is the next clause
+--     (controlEffectsEnd). A departing player's Giant Growth on someone else's
+--     creature keeps its +3/+3 until cleanup.
+--
+--   * GameState.delayedTriggers. A delayed triggered ability that has not
+--     triggered is not on the stack, so by CR 109.1 it is not an object either.
+--     It stays, it triggers, and CR 800.4d is what stops it reaching the stack --
+--     which is exactly what CR 800.4d's own Astral Slide example describes. The
+--     filter is in Engine.placePendingTriggers.
+--
+--   * an exiledUntilMonarch entry whose VALUE is the departing player. That
+--     effect survives its controller's departure: CR 800.4a ends only effects
+--     which give that player control, and an exile grants none. Only an entry
+--     whose KEY -- the exiled object itself -- is owned by the departing player is
+--     dropped, because that object is leaving. What "an opponent" then means is
+--     CR 800.4i, read at Pawl.Monarch.returnExiledForMonarch.
+objectsLeaveWith :: PlayerId -> GameState -> GameState
+objectsLeaveWith pid gs =
+  let owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid) (GameState.objects gs))
+      leave :: GameState -> ObjectId -> GameState
+      leave g oid =
+        let g1 = Game.removeFromCombat oid (Game.removeFromZones pid oid g)
+            combat = GameState.combat g1
+         in g1
+              { GameState.objects = Map.delete oid (GameState.objects g1),
+                -- Game.removeFromCombat clears attackers and blockers; CR 510.4's
+                -- first-strike snapshot is the third combat collection that can
+                -- name an id and has no helper of its own.
+                GameState.combat = combat {Combat.struckFirst = fmap (Set.delete oid) (Combat.struckFirst combat)},
+                GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1)
+              }
+   in List.foldl' leave gs owned
 
 -- CR 104.2a: "A player still in the game wins the game if that player's opponents
 -- have all left the game."
