@@ -35,42 +35,40 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 
 ## Current work and tracking
 
-- **Status: M0–M5 and the M5.5 count/compare interstitial are complete.** The
-  closed-half milestones M0–M3g, the M3.5 cards-as-data interstitial, the whole
-  of M4 (M4a–M4h), all eleven phases of M4.5 (the closed-half gap census: the
-  layer system, event history, replacement/CR 616, durations, player and
-  rules-modifying continuous effects, cost generalization, the `Pawl.Type.Filter`
-  predicate language, player counters, and the command zone + emblems + monarch),
-  and all of M5 (Controlling Another Player CR 723 via Mindslaver, Restarting the
-  Game CR 727, Subgames CR 729 — a subgame is
-  `Trans.lift (runStateT (startGameFromCards >> playGame) sub0)`, a function call
-  where XMage needs a second engine) have landed, plus the mulligan gap-closure
-  (CR 103.5). **M5.5 (count/compare) is the newest and closes out the closed
-  half's flagged surface.** It collapses the two hand-carved per-card types
-  `StateCondition` and `CountSpec` into one `Count = MkCount Scope Filter
-  Aggregation`, with a single-constructor `Condition = MkCondition Count
-  Comparison Quantity`. Its load-bearing proof: a count can read the CR 613
-  layer-system projection without a module cycle or non-termination — `Pawl.Count`
-  owns the fold parameterized by an injected `ViewOf = ObjectId -> Maybe
-  Filter.View` (so it never imports `Pawl.Projection`), and inside the layer fold
-  `Projection.viewUpTo` supplies candidates projected through the layers already
-  applied (`projectUpTo bound = projectWith (< bound)`), a strictly-decreasing
-  bound that terminates by construction and is a deliberate **approximation** of
-  CR 613.8 (#157). Gate cards: **Nightmare** (a `*/*` CDA counting Swamps you
-  control — reads subtype at layer 4 and control at layer 2, so Urborg and Blood
-  Moon, both in the pool, are real falsifiers) and **Sudden Impact** (a count
-  whose perspective is the *target* player, not "you"). `Filter` gained the
-  context-relative `IsSource` atom (so CR 611.2b's "for as long as you control
-  this" is `count{battlefield, IsSource ∧ ControlledBy You} == 1` and `Condition`
-  needs no escape hatch); M4.5's #34 was fixed in passing (a static ability's
-  count reads the source's controller, a CDA the object's own). **The closed half
-  is now functionally complete for its flagged surface; M6 (the transpiler) is
-  next** — count/compare landed here precisely because it is one of the highest-
-  frequency constructs in the oracle corpus, so M6 translates it rather than
-  discovering it. The umbrella specs are
-  `docs/superpowers/specs/2026-07-23-m5-player-control-restart-subgames-design.md`
-  and `docs/superpowers/specs/2026-07-24-m5.5-count-compare-design.md`; the
-  distilled per-milestone entries (gate cards, decisions, opcodes) are in
+- **Status: M0–M5, the M5.5 count/compare interstitial, and the M5.6
+  multiplayer interstitial are complete.** The closed-half milestones M0–M3g,
+  the M3.5 cards-as-data interstitial, all of M4 (M4a–M4h), all eleven phases
+  of M4.5 (the closed-half gap census), all of M5 (Controlling Another Player
+  CR 723, Restarting the Game CR 727, Subgames CR 729), the mulligan
+  gap-closure (CR 103.5), and M5.5 (count/compare — one `Count`/`Condition`
+  pair reading the CR 613 layer projection with no module cycle) have each
+  landed with their own distilled entry in `docs/progress.md`. **M5.6
+  (Multiplayer: CR 800 general + CR 806 free-for-all) is the newest and
+  settles `docs/design.md` §2.4's bet.** A three-player free-for-all now plays
+  end to end: `turnOrder` is the permanent seating roster (CR 800.5/806.3), a
+  departing player's objects and control-granting effects are removed per CR
+  800.4a, the defending player is chosen by a CR 507.1/703.4h turn-based
+  action rather than assumed, the monarch reassigns on departure (CR 725.4),
+  and CR 103.5c/103.8c's multiplayer setup rules (the free first mulligan, no
+  skipped first draw) are in place. The headline finding: §2.4's bet is
+  **half vindicated** — the data model (`turnOrder`, `players`,
+  `Count.playersFor`, `emptyGame`) needed no change at all, and
+  `PlayerRelation.Opponent`, the piece the bet's own wording predicted would be
+  largest, was not a piece at all; the *control flow* around a departure was
+  two-player-shaped in four concentrated places, which is what M5.6 closes.
+  Gate cards **Palace Jailer**, **Master Thief**, and **Silence** were all
+  already in the pool — no card data changed. Deliberately out of scope: CR
+  801's limited range of influence (always unlimited here), CR 802–805's
+  options, CR 806–811's other variants, and teams, all of which need a
+  format/variant concept pawl does not have (#175). **M6 (the transpiler) is
+  next** (#9). The umbrella spec is
+  `docs/superpowers/specs/2026-07-24-m5.6-multiplayer-design.md`; its five
+  phase plans are `docs/superpowers/plans/2026-07-24-m5.6a-turn-order-priority.md`,
+  `docs/superpowers/plans/2026-07-25-m5.6b-setup-mulligans-restart-subgames.md`,
+  `docs/superpowers/plans/2026-07-25-m5.6c-leaving-the-game-objects-monarch.md`,
+  `docs/superpowers/plans/2026-07-25-m5.6d-combat-defending-player.md`, and
+  `docs/superpowers/plans/2026-07-25-m5.6e-close-out.md`; the distilled
+  per-milestone entries (gate cards, decisions, opcodes) are in
   `docs/progress.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —
