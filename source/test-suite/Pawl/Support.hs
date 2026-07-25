@@ -151,7 +151,11 @@ matchups registry = do
   rr <- redRed registry
   gb <- greenBlack registry
   bb <- blueBlack registry
-  pure [rr, gb, bb]
+  -- CR 800.1: the three-seat matchup. Every invariant that holds at two seats
+  -- must hold at three, and this is the cheapest possible broad falsifier for
+  -- that -- one list entry buys a whole played-out three-player game per seed.
+  tw <- threeWayMirror registry
+  pure [rr, gb, bb, tw]
 
 -- A 60-basic-land mirror: no spell can be cast and no creature can attack, so the
 -- only loss condition reachable is CR 704.5b deck-out. Used by the durable

@@ -1,15 +1,19 @@
 -- Covers cross-cutting universal QuickCheck invariants (true for every seed).
 module Pawl.PropertySpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Source as Source
 import qualified Test.Tasty as Tasty
@@ -29,11 +33,13 @@ nextIdOf :: GameState.GameState -> Integer
 nextIdOf gs = case GameState.nextObjectId gs of
   ObjectId.MkObjectId n -> toInteger n
 
--- The card-backed objects (Source.OfCard) are conserved at 120 across a game
--- (CR 400.7 mints a fresh id per zone change but never a new card). Tokens
--- (Source.OfToken) legitimately come and go, so they are excluded -- a surviving
--- token at game end must not read as a conservation break (M4c).
-cardBackedCount :: GameState.GameState -> Int
+-- How many card-backed objects (Source.OfCard) the game state holds. CR 400.7
+-- mints a fresh id per zone change but never a new card, so this is conserved
+-- across a game except where CR 800.4a removes a departed player's objects --
+-- see expectedCardBacked. Tokens (Source.OfToken) legitimately come and go, so they
+-- are excluded -- a surviving token at game end must not read as a conservation
+-- break (M4c).
+cardBackedCount :: GameState.GameState -> Integer
 cardBackedCount gs =
   let fromCard obj = case Object.source obj of
         Source.OfCard _ -> True
@@ -42,23 +48,62 @@ cardBackedCount gs =
         Source.OfTrigger _ _ -> False
         Source.OfEmblem _ -> False
         Source.OfInherentTrigger _ _ -> False
-   in length (filter fromCard (Map.elems (GameState.objects gs)))
+   in toInteger (length (filter fromCard (Map.elems (GameState.objects gs))))
+
+-- Every card the matchup deals out. Ids are only ever minted, never reclaimed,
+-- so this is the minted-id floor no matter who leaves.
+deckTotal :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> Integer
+deckTotal matchup = sum (fmap (toInteger . Setup.deckSize . snd) (NonEmpty.toList matchup))
+
+-- How many card-backed objects the finished game SHOULD hold, which is not a
+-- constant once there can be more than two seats.
+--
+-- CR 800.4a: "When a player leaves the game, all objects (see rule 109) owned by
+-- that player leave the game". Leaving the game is not a zone change, so those
+-- objects are not moved anywhere -- Departure.objectsLeaveWith deletes them --
+-- and the conserved quantity is therefore one deck per player STILL IN THE GAME,
+-- not one per seat. A free-for-all (CR 806.1) ends when CR 104.2a leaves one
+-- player, i.e. after two departures at three seats, so a three-way mirror ends
+-- at 60 rather than 180.
+--
+-- CR 800.1: "A multiplayer game is a game that begins with more than two
+-- players." Only such a game continues after a departure
+-- (Departure.continuesAfterDeparture), so at two seats CR 800.4a's removal never
+-- runs, both players' cards outlive the game's end, and the whole matchup is
+-- conserved -- which is why every two-player expectation here is still 120. That
+-- asymmetry is deliberate on the engine's side too: a two-player SUBGAME is read
+-- after it ends (CR 729.5), and deleting the loser's cards would destroy them.
+--
+-- The seat count is counted from the MATCHUP rather than asked of
+-- Departure.continuesAfterDeparture on purpose. Reusing the engine's own gate
+-- here would make this expectation agree with a wrong gate instead of catching
+-- one: a gate that fired at two seats would delete the loser's 60 cards and this
+-- would happily expect 60.
+expectedCardBacked :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> GameState.GameState -> Integer
+expectedCardBacked matchup gs =
+  let seats = NonEmpty.toList matchup
+      sized pid = case lookup pid seats of
+        Nothing -> 0
+        Just deck -> toInteger (Setup.deckSize deck)
+   in if NonEmpty.length matchup > 2
+        then sum (fmap sized (Departure.stillPlaying gs))
+        else deckTotal matchup
 
 -- Every universal invariant, judged against ONE played-out game. They share the
 -- fixture deliberately: five separate properties each calling runRandomGame
 -- played five times the games to answer the same five questions. Each arm is
 -- labelled so a failure names the invariant that broke.
-universalInvariants :: GameState.GameState -> QC.Property
-universalInvariants gs =
+universalInvariants :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> GameState.GameState -> QC.Property
+universalInvariants matchup gs =
   QC.conjoin
-    [ QC.counterexample "conservation: 120 card-backed objects at end" $
-        cardBackedCount gs QC.=== 120,
+    [ QC.counterexample "conservation: card-backed objects still owned by a player in the game (CR 800.4a)" $
+        cardBackedCount gs QC.=== expectedCardBacked matchup gs,
       -- The invariant that matters most now. Combat is the first thing that can
       -- end a game before the library runs out.
       QC.counterexample "every game terminates with a result" $
         QC.property (Maybe.isJust (GameState.result gs)),
-      QC.counterexample "at least 120 ids were minted" $
-        QC.property (nextIdOf gs >= 120),
+      QC.counterexample ("at least " <> show (deckTotal matchup) <> " ids were minted") $
+        QC.property (nextIdOf gs >= deckTotal matchup),
       QC.counterexample "no mana floats at the end" $
         GameState.manaPool gs QC.=== Map.empty,
       -- Replaces M0's "no life changes". Nothing here GAINS life, so any
@@ -76,7 +121,7 @@ propertyTests registry =
     $ [ QC.testProperty "every matchup upholds every universal invariant" $
           \s -> QC.ioProperty $ do
             ms <- S.matchups registry
-            pure (QC.conjoin (fmap (\m -> universalInvariants (S.runRandomGame m s)) ms)),
+            pure (QC.conjoin (fmap (\m -> universalInvariants m (S.runRandomGame m s)) ms)),
         -- Durable structural property: with a deck that can only ever deck out (60
         -- basic lands, no spells, no attackers), every seed's game ends AND ends by
         -- a player drawing from an empty library (CR 704.5b) -- never by any other
