@@ -40,6 +40,7 @@ import qualified Pawl.Type.Effect as Effect
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.Layer as Layer
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
@@ -340,6 +341,22 @@ triggeredAbilityCounts ability =
 -- are: a NEW Card field, or a new CostComponent/PlayerEffect arm, that can carry
 -- a Quantity or Count would bypass this lint silently. When you add a field that
 -- can hold either, add it here.
+-- Every effect a card can RESOLVE: its spell's modes, its activated and
+-- triggered abilities' modes, and its delayed abilities' modes. Deliberately
+-- wider than Card.allEffects (spell modes only) -- a stored continuous effect
+-- can be created from any of these, which is what the control lint below is
+-- about. Static abilities are absent on purpose: a static ability's
+-- modification is never stored.
+--
+-- Hand-maintained, with cardCounts' caveat: a NEW Card field holding effects
+-- must be added here too.
+cardResolutionEffects :: Card.Type.Card -> [Effect.Effect Card.Type.Card]
+cardResolutionEffects card =
+  Card.allEffects card
+    <> concatMap (Modal.allEffects . ActivatedAbility.modal) (Card.Type.activatedAbilities card)
+    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Card.Type.triggeredAbilities card)
+    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Card.Type.delayedAbilities card))
+
 cardCounts :: Card.Type.Card -> [Count.Type.Count]
 cardCounts card =
   concatMap quantityCounts (Maybe.maybeToList (Card.Type.characteristicPT card))
@@ -546,6 +563,32 @@ lintTests registry =
         HU.assertEqual "Aura iff enchant" [] (fmap (Card.Type.name . Printing.card) offenders),
       -- Pawl.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
       -- mode declaring it would be silently shadowed.
+      -- #199: no card authors a layer-2 control modification into an effect that
+      -- RESOLVES, because a stored control grant is the one shape CR 800.4a's
+      -- second clause cannot end. Projection.givesControlTo recognizes a stored
+      -- grant by its baked PlayerId; SetControllerToSource carries none (its
+      -- player is the source's controller, CR 109.5), so a stored one would
+      -- survive a departure the rule says ends it. See Pawl.Departure's proofs.
+      --
+      -- BOTH control constructors, not just the payload-free one: baking a
+      -- PlayerId into static card text is equally unreal, since a card cannot
+      -- know who is playing. Control on a card belongs on a STATIC ability
+      -- (Control Magic), which the projection re-derives and never stores.
+      --
+      -- Asked as an EQUALITY on Layer through Projection.layer -- the sanctioned
+      -- classification -- rather than by casing on Modification, which only
+      -- Pawl.Projection may do. Layer.Control is exactly the two control
+      -- constructors, so this covers a third one automatically.
+      --
+      -- A codec-level rejection would be the wrong shape: jsonToModification is
+      -- shared with staticAbilities, which Control Magic legitimately uses.
+      HU.testCase "no card authors a control modification into a resolving effect (#199)" $ do
+        ps <- S.allPrintings registry
+        let offends effect = case effect of
+              Effect.ModifyTarget _ modification _ -> Projection.layer modification == Layer.Control
+              _ -> False
+            offenders = filter (any offends . cardResolutionEffects . Printing.card) ps
+        HU.assertEqual "control belongs on a static ability, never in a stored effect" [] (fmap (Card.Type.name . Printing.card) offenders),
       HU.testCase "no mode declares a slot named enchant" $ do
         ps <- S.allPrintings registry
         let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Card.Type.spell c))

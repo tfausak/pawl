@@ -69,9 +69,9 @@ depart reason pid gs =
       -- continuous effects and the battlefield's static abilities -- see
       -- nonCardStackObjectsCease for the full list -- and none of those is a
       -- player's status), and continuesAfterDeparture reads GameState.turnOrder,
-      -- which the flip does not touch. The flip's position is load-bearing only for the monarch
-      -- call below, which Monarch.reassignOnDeparture requires to have already
-      -- happened -- see its own haddock.
+      -- which the flip does not touch. The flip's position is load-bearing only
+      -- for the monarch call below, which Monarch.reassignOnDeparture requires
+      -- to have already happened -- see its own haddock.
       settled =
         if continuesAfterDeparture gs
           then remainingControlledExiled pid (nonCardStackObjectsCease pid (controlEffectsEnd pid (objectsLeaveWith pid gs)))
@@ -263,11 +263,13 @@ controlEffectsEnd pid gs =
 -- induction over it. Projection.controllerOfGiven carries a visited set that
 -- grows on every step and returns the object's OWNER when it revisits, so the
 -- recursion terminates on a finite object pool, and every leaf it terminates on
--- is source 1 or source 2 -- both of which cannot be `pid`. Hence no object of
--- any kind, on the stack or off it, still reads as controlled by `pid`. That
--- covers the case clause 1 alone does not: a departing player who CONTROLS a
--- control-granting Aura they do not OWN. The Aura stays, but whatever made it
--- theirs was source 2 or another source-3 step, and the induction closes both.
+-- is source 1, source 2, or a source that has itself been deleted (which
+-- answers Nothing, and Nothing is not Just `pid`) -- none of which can be
+-- `pid`. Hence no object of any kind, on the stack or off it, still reads as
+-- controlled by `pid`. That covers the case clause 1 alone does not: a
+-- departing player who CONTROLS a control-granting Aura they do not OWN. The
+-- Aura stays, but whatever made it theirs was source 2 or another source-3
+-- step, and the induction closes both.
 --
 -- Written anyway, so a FOURTH source of control could not silently skip a
 -- clause of this rule -- nothing would warn.
@@ -315,12 +317,18 @@ nonCardStackObjectsCease pid gs =
 --     is fixed when it is cast. No later write can turn an object `pid` does
 --     not own into one they do, so clause 1's deletion is exhaustive and stays
 --     so.
---   * Modification has exactly one construction site for SetController with a
---     baked player -- Resolve.hs's Effect.GainControl arm, whose payload is
---     always the granting effect's source's controller at resolution. It is the
---     only shape clause 2 can recognize by payload, and it is the only stored
---     shape there is: SetControllerToSource carries no player, and no card in
---     the pool authors one into a stored effect (#199).
+--   * Clause 2 recognizes a control-granting effect by its PAYLOAD, not by
+--     where it was built: Projection.givesControlTo asks whether a stored
+--     SetController names `pid`, so the NUMBER of construction sites is
+--     irrelevant and adding one cannot weaken the induction. (Do not read this
+--     as "there is only one site" -- Resolve.hs's Effect.GainControl arm bakes
+--     the source's controller at resolution per CR 611.2c, and Codec.hs also
+--     builds one when decoding card JSON.) What the induction needs is
+--     narrower: that every STORED layer-2 grant carries a baked player, so
+--     matching on the payload is exhaustive over them. The one shape that
+--     would not is SetControllerToSource, which carries no player and which
+--     card JSON could reach through Effect.ModifyTarget; no card does, and
+--     Pawl.CardSpec lints the pool to keep it that way (#199).
 --
 -- Empty by construction, for the reason just given -- which is also why
 -- nonCardStackObjectsCease is empty. Written anyway, so a fourth source of

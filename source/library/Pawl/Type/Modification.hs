@@ -27,7 +27,12 @@ data Modification
   | -- layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
     -- effect creation (CR 611.2c) by Resolve.applyEffect (GainControl) -- it is
     -- the effect's source's controller, never chosen. Applied only by
-    -- Projection.controllerOf. Never appears in card JSON (runtime-only).
+    -- Projection.controllerOf.
+    --
+    -- Meant to be runtime-only, and nothing ENFORCES that in the type: the
+    -- codec round-trips the PlayerId, so card JSON could author one into an
+    -- Effect.ModifyTarget. Baking a PlayerId into static card text is
+    -- meaningless, so Pawl.CardSpec lints the pool against it (#199).
     SetController PlayerId
   | -- layer 2, CR 613.1b: this object's controller becomes the controller of THIS
     -- effect's SOURCE. Payload-free because the player is DERIVED at projection

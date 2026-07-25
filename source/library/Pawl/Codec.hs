@@ -883,9 +883,10 @@ objectIdToJson (ObjectId.MkObjectId n) = natTo n
 jsonToObjectId :: Value -> Either Text ObjectId.ObjectId
 jsonToObjectId value = ObjectId.MkObjectId <$> natFrom value
 
--- SetController's PlayerId is runtime-only (never in card JSON, since a
--- SetController effect is baked at GainControl resolution, never authored on a
--- card), but the codec must stay total. Mirrors ObjectId's Natural encoding
+-- SetController's PlayerId is meant to be runtime-only (a SetController effect
+-- is baked at GainControl resolution, not authored on a card), but the codec
+-- must stay total, so this arm ACCEPTS one from card JSON and Pawl.CardSpec
+-- lints the pool against it instead (#199). Mirrors ObjectId's Natural encoding
 -- (natTo/natFrom), not a bare Integer: PlayerId wraps a Natural (no partial
 -- fromInteger on a negative wire value).
 playerIdToJson :: PlayerId.PlayerId -> Value
