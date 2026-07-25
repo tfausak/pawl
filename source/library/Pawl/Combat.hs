@@ -4,6 +4,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -196,6 +197,49 @@ blockersOf oid gs = Map.findWithDefault Set.empty oid (Combat.blockers (GameStat
 -- honoured (#28). No library caller today -- CombatSpec is the only reader.
 isBlocked :: ObjectId -> GameState -> Bool
 isBlocked oid gs = not (Set.null (blockersOf oid gs))
+
+-- CR 507.1 / CR 703.4h: immediately after the beginning of combat step begins,
+-- the active player chooses one of their opponents, and that player becomes the
+-- defending player. The turn-based action does not use the stack (CR 507.1), which
+-- is why this is a plain Game () and not an ability.
+--
+-- Runs before any trigger, by construction rather than by arrangement:
+-- Engine.runStep calls runTurnBasedActions before priorityLoop, and it is
+-- priorityLoop's settleForPriority that first places a triggered ability.
+--
+-- Not prompted with one candidate (#169): CR 507.1's condition is a multiplayer
+-- game, and a two-player game's defending player is CR 506.2's nonactive player
+-- with nothing to ask.
+--
+-- No candidates means the action does not happen and Combat.defender stays
+-- Nothing, which declareAttackers reads as no attack being possible. Unreachable
+-- in a running game -- the last opponent leaving ends it (CR 104.2a) -- and
+-- NonEmpty is what makes the prompt's fallback total rather than this branch.
+--
+-- An answer outside the candidate list is a broken interpreter, not a game state,
+-- and degrades to the first candidate: always legal, least eventful, and the same
+-- shape Setup.subgameStateFrom uses for an out-of-order starting player.
+chooseDefender :: Game ()
+chooseDefender = do
+  gs <- State.get
+  let pid = GameState.activePlayer gs
+  -- CR 800.4j: a turn whose active player has left continues without one, so the
+  -- action the rules assign to the active player has nobody to perform it.
+  Monad.when (List.elem pid (Departure.stillPlaying gs)) $
+    case NonEmpty.nonEmpty (attackableOpponents gs) of
+      Nothing -> pure ()
+      Just candidates -> do
+        chosen <- case candidates of
+          only NonEmpty.:| [] -> pure only
+          _ -> do
+            let decider = Decide.deciderFor pid gs
+            answer <- Trans.lift (Program.prompt (Prompt.ChooseDefender decider pid candidates))
+            pure $
+              if List.elem answer (NonEmpty.toList candidates)
+                then answer
+                else NonEmpty.head candidates
+        State.modify' $ \g ->
+          g {GameState.combat = (GameState.combat g) {Combat.defender = Just chosen}}
 
 -- CR 508.1: the active player chooses which creatures attack, then they become
 -- tapped and attacking (CR 508.1f).

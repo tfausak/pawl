@@ -214,11 +214,12 @@ runTurnBasedActions phase = do
   active <- State.gets GameState.activePlayer
   -- CR 800.4j: a turn whose player has left the game "continues to its
   -- completion without an active player", so the turn-based actions the rules
-  -- assign to THE ACTIVE PLAYER -- untap (CR 703.4c), draw (CR 703.4d), declare
-  -- attackers (CR 703.4i), the cleanup discard (CR 703.4n) -- have nobody to
-  -- perform them. Declare blockers (CR 703.4j) belongs to the defending player,
-  -- and CR 703.4p's damage/until-end-of-turn sweep is the GAME's action, not the
-  -- active player's; neither is guarded.
+  -- assign to THE ACTIVE PLAYER -- untap (CR 703.4c), draw (CR 703.4d), choose
+  -- the defending player (CR 703.4h/CR 507.1), declare attackers (CR 703.4i),
+  -- the cleanup discard (CR 703.4n) -- have nobody to perform them. Declare
+  -- blockers (CR 703.4j) belongs to the defending player, and CR 703.4p's
+  -- damage/until-end-of-turn sweep is the GAME's action, not the active
+  -- player's; neither is guarded.
   hasActive <- State.gets (\gs -> List.elem active (Departure.stillPlaying gs))
   case phase of
     Phase.Beginning BeginningStep.Untap -> Monad.when hasActive $ do
@@ -229,6 +230,9 @@ runTurnBasedActions phase = do
     Phase.Beginning BeginningStep.DrawStep -> Monad.when hasActive $ do
       skip <- State.gets skipsDraw
       Monad.unless skip (Event.drawCard active)
+    -- CR 703.4h: choose the defending player. The active player's action
+    -- (CR 507.1), so it takes the same guard as the others.
+    Phase.Combat CombatStep.BeginningOfCombat -> Monad.when hasActive Combat.chooseDefender
     Phase.Combat CombatStep.DeclareAttackers -> do
       Monad.when hasActive (Combat.declareAttackers active)
       -- CR 508.8: with the attacker set now final, drop the two combat steps that

@@ -5,6 +5,7 @@
 -- keywords (flying, reach, defender, vigilance, haste, first/double strike).
 module Pawl.CombatSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -23,6 +24,7 @@ import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Combat as Combat.Type
+import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.Duration as Duration
@@ -34,7 +36,9 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
@@ -247,13 +251,102 @@ defenderTests registry =
           _ -> HU.assertFailure "fixture should have two creatures"
     ]
 
+-- Answers Prompt.ChooseDefender with a named player and records that it was
+-- asked; everything else delegates, so the wildcard keeps this out of the
+-- -Werror exhaustiveness net.
+choosesDefender :: PlayerId.PlayerId -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+choosesDefender who p = case p of
+  Prompt.ChooseDefender _ asker _ -> do
+    State.modify' (\seen -> seen <> [asker])
+    pure who
+  _ -> pure (S.identityAnswer p)
+
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderTests, which is the Defender KEYWORD (CR 702.3b).
 defendingPlayerTests :: Tasty.TestTree
 defendingPlayerTests =
   Tasty.testGroup
     "DefendingPlayer"
-    [ HU.testCase "CR 506.2a the candidates are every other player still in the game" $
+    [ HU.testCase "CR 703.4h/507.1 the active player chooses which opponent is the defending player" $
+        -- THREE seats: the whole point. Discriminating against the behaviour this
+        -- phase replaces -- taking the head of the candidate list -- because carol
+        -- is not the head. Under head-of-list the answer is ignored and bob
+        -- defends, so this exact assertion cannot pass.
+        --
+        -- State.runState (State s a) s0 :: (a, s): here `a` is the GameState
+        -- returned by execStateT/foldProgramM and `s` is choosesDefender's own
+        -- accumulator, so the tuple comes back (after, asked).
+        let (after, asked) =
+              State.runState
+                (Program.foldProgramM (choosesDefender S.carol) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) S.threePlayerGame))
+                []
+         in do
+              HU.assertEqual "carol is the defending player" (Just S.carol) (Combat.Type.defender (GameState.combat after))
+              HU.assertEqual "and alice, the active player, is who was asked" [S.alice] asked,
+      HU.testCase "CR 506.2 two players: the nonactive player defends and nobody is asked" $
+        -- The elision, asserted explicitly rather than inferred from the suite
+        -- staying green. CR 507.1's condition is a MULTIPLAYER game; CR 506.2's
+        -- second sentence settles a two-player game with nothing to ask.
+        -- Discriminating twice over: an implementation that prompted anyway would
+        -- put alice in `asked`, and one that skipped the prompt AND the write
+        -- would leave Nothing, which Task 4 turns into "no attack is possible".
+        let (after, asked) =
+              State.runState
+                (Program.foldProgramM (choosesDefender S.alice) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) (Setup.emptyGame S.bothPlayers)))
+                []
+         in do
+              HU.assertEqual "bob defends" (Just S.bob) (Combat.Type.defender (GameState.combat after))
+              HU.assertEqual "nobody was asked" [] asked,
+      HU.testCase "CR 507.1 a multiplayer game down to one opponent is not asked either" $
+        -- The case #169 is actually about: CR 703.4h still applies (the game BEGAN
+        -- with three players, CR 800.1), and the choice has one candidate.
+        -- Discriminating against an elision keyed on the SEAT COUNT rather than on
+        -- the candidate count -- that version would prompt here.
+        let gone = Departure.depart Departure.Type.Conceded S.carol S.threePlayerGame
+            (after, asked) =
+              State.runState
+                (Program.foldProgramM (choosesDefender S.carol) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) gone))
+                []
+         in do
+              HU.assertEqual "bob, the only one left" (Just S.bob) (Combat.Type.defender (GameState.combat after))
+              HU.assertEqual "nobody was asked" [] asked,
+      HU.testCase "CR 507.1 with no opponents left the action does not happen at all" $
+        -- Not reachable in a running game (CR 104.2a ends it), but the branch has
+        -- to be total and NonEmpty is why. Discriminating against an
+        -- implementation that built the prompt from an empty list.
+        let alone = Departure.depart Departure.Type.Conceded S.carol (Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame)
+            (after, asked) =
+              State.runState
+                (Program.foldProgramM (choosesDefender S.bob) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) alone))
+                []
+         in do
+              HU.assertEqual "nobody defends" Nothing (Combat.Type.defender (GameState.combat after))
+              HU.assertEqual "nobody was asked" [] asked,
+      HU.testCase "CR 800.4j a turn whose active player has left chooses no defending player" $
+        -- CR 800.4j: the turn continues without an active player, so the actions
+        -- the rules assign to the active player have nobody to perform them.
+        -- THREE seats, so that two opponents survive and the choice would
+        -- otherwise be a real prompt -- at two seats the elision would hide the
+        -- guard entirely.
+        let gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
+            (after, asked) =
+              State.runState
+                (Program.foldProgramM (choosesDefender S.carol) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) gone))
+                []
+         in do
+              HU.assertEqual "no defending player" Nothing (Combat.Type.defender (GameState.combat after))
+              HU.assertEqual "and nobody was asked" [] asked,
+      HU.testCase "CR 507.1 an answer that is not one of the candidates falls back to the first" $
+        -- A broken interpreter, not a game state: it names the ACTIVE player.
+        -- Discriminating against `defender = Just answer` unchecked, which would
+        -- let alice attack herself and, once Task 4 lands, deal combat damage to
+        -- the attacking player.
+        let (after, _) =
+              State.runState
+                (Program.foldProgramM (choosesDefender S.alice) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) S.threePlayerGame))
+                []
+         in HU.assertEqual "the first candidate, never the active player" (Just S.bob) (Combat.Type.defender (GameState.combat after)),
+      HU.testCase "CR 506.2a the candidates are every other player still in the game" $
         -- Three seats, because two cannot tell "the chosen opponent" from "the
         -- only opponent". Discriminating: an implementation that forgot to drop
         -- the active player would answer [alice, bob, carol].
