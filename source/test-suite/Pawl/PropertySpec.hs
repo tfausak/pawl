@@ -80,6 +80,22 @@ deckTotal matchup = sum (fmap (toInteger . Setup.deckSize . snd) (NonEmpty.toLis
 -- here would make this expectation agree with a wrong gate instead of catching
 -- one: a gate that fired at two seats would delete the loser's 60 cards and this
 -- would happily expect 60.
+--
+-- The per-seat SET, by contrast, is Departure.stillPlaying, which is engine
+-- state. That is deliberate and it is still a cross-check, because the two
+-- sides read DIFFERENT fields of GameState: stillPlaying folds Player.status,
+-- while cardBackedCount folds GameState.objects. Whichever half of a departure
+-- goes wrong on its own is caught -- CR 800.4a removing an undeparted player's
+-- objects, or removing too few or too many of a departed one's, moves the
+-- actual count without moving the expectation, and a status flip with no
+-- removal moves the expectation without moving the count.
+--
+-- What this arm cannot see is a LOCKSTEP bug: something that marks the wrong
+-- player departed AND deletes exactly that player's objects moves both sides
+-- together and stays green. That case is covered by the three-seat lands-only
+-- property below, whose `Set.size decked === 2` is computed from
+-- GameState.drewFromEmpty -- a third, independent field -- and whose winner
+-- check reads GameState.result.
 expectedCardBacked :: NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> GameState.GameState -> Integer
 expectedCardBacked matchup gs =
   let seats = NonEmpty.toList matchup
