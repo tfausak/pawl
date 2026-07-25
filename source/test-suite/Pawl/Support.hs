@@ -1005,6 +1005,12 @@ countOnBattlefieldByName wanted pid gs =
 damageOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural.Natural
 damageOf oid gs = fmap Object.damage (Game.lookupObject oid gs)
 
+-- Projection.powerOf and Projection.toughnessOf, paired -- the shape an
+-- Aura/pump-effect assertion wants (a single "is it a 4/2" check) rather than
+-- two separate equalities. Nothing if either projects to Nothing.
+powerToughnessOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe (Integer, Integer)
+powerToughnessOf oid gs = (,) <$> Projection.powerOf oid gs <*> Projection.toughnessOf oid gs
+
 markDamage :: ObjectId.ObjectId -> Natural.Natural -> GameState.GameState -> GameState.GameState
 markDamage oid n gs =
   gs {GameState.objects = Map.adjust (\o -> o {Object.damage = n}) oid (GameState.objects gs)}

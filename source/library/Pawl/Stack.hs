@@ -2,6 +2,7 @@ module Pawl.Stack where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Map.Strict as Map
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Cast as Cast
@@ -16,7 +17,9 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
+import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.Result (Result)
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
@@ -46,9 +49,25 @@ resolveTopWith runSubgame = do
       Nothing -> State.put gs {GameState.stack = rest}
       Just obj -> case Object.source obj of
         Source.OfCard printing ->
-          if Card.isPermanent (Printing.card printing)
-            then Event.changeZone oid Zone.Battlefield
-            else Resolve.resolveSpellWith runSubgame oid
+          let card = Printing.card printing
+           in if not (Card.isPermanent card)
+                then Resolve.resolveSpellWith runSubgame oid
+                else
+                  if not (Card.isAura card)
+                    then Event.changeZone oid Zone.Battlefield
+                    else -- CR 303.4a made this spell target, so CR 608.2b applies to
+                    -- it -- the first PERMANENT spell in this pool for which that
+                    -- is true. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off
+                    -- the type line (CR 205.3h), the same closed-half
+                    -- classification as is-it-a-permanent above it. Not a case on
+                    -- the card's identity.
+                      if Resolve.targetsAllIllegal oid gs
+                        then Event.changeZone oid Zone.Graveyard
+                        else
+                          -- CR 303.4: an Aura ENTERS attached, so the target is
+                          -- seeded into the new incarnation rather than written
+                          -- after the move (see Event.changeZoneAttaching).
+                          Monad.void (Event.changeZoneAttaching oid Zone.Battlefield (enchantedBy oid gs))
         -- A token is never on the stack (created onto the battlefield, never cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
         Source.OfAbility srcId ability -> do
@@ -93,3 +112,17 @@ resolveTopWith runSubgame = do
 -- with a PlaySubgame effect would draw. Engine's live loop uses resolveTopWith.
 resolveTop :: Game ()
 resolveTop = resolveTopWith Resolve.noSubgame
+
+-- The ObjectId an Aura spell's enchant slot names (CR 303.4a). Nothing when the
+-- slot is unbound, which CR 303.4a makes unreachable for a cast Aura -- the slot
+-- is a required target. A ToPlayer recipient is likewise unreachable while
+-- Card.enchant is restricted to object pools; it is REJECTED rather than guessed
+-- at, because CR 702.5d's enchant-player Auras need Object.attachedTo widened
+-- before they can be attached at all (#190).
+enchantedBy :: ObjectId -> GameState.GameState -> Maybe ObjectId
+enchantedBy oid gs = case Game.lookupObject oid gs of
+  Nothing -> Nothing
+  Just obj -> case Map.lookup Card.enchantSlot (Binding.targetsOf (Object.bindings obj)) of
+    Just (Recipient.ToCreature target) -> Just target
+    Just (Recipient.ToObject target) -> Just target
+    _ -> Nothing

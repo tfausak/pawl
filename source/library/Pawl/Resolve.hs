@@ -308,6 +308,31 @@ effectsOf oid gs = case Game.lookupObject oid gs of
       let chosen = Binding.modesOf (Object.bindings obj)
        in fmap (rewriteEffect (Projection.textChangesAffecting oid gs)) (Card.modesEffects chosen card)
 
+-- CR 608.2b: are ALL of this spell's targets illegal? "For every instance of the
+-- word 'target'" -- so a spell with no target spec never fizzles, and one with
+-- several survives if any one is still legal. Reserved slots (a trigger's source,
+-- a token this resolution minted) are not targets and cannot make a spell fizzle;
+-- they are vacuously legal.
+--
+-- Shared by the ordinary spell path (resolveSpellWith) and the Aura path
+-- (Pawl.Stack), which is the whole point of it being a function: an Aura spell is
+-- the first PERMANENT spell that can be countered on resolution, and a second
+-- copy of this logic would drift.
+targetsAllIllegal :: ObjectId -> GameState -> Bool
+targetsAllIllegal oid gs = case Game.lookupObject oid gs of
+  Nothing -> False
+  Just obj -> case Game.cardOf oid gs of
+    Nothing -> False
+    Just card ->
+      let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) card
+          chosen = Binding.targetsOf (Object.bindings obj)
+          legalSlot slot recipient = case Map.lookup slot specs of
+            Nothing -> True
+            Just spec -> Target.stillLegal oid recipient spec gs
+          legality = Map.mapWithKey legalSlot chosen
+          targeted = Map.restrictKeys legality (Map.keysSet specs)
+       in not (Map.null specs) && not (or (Map.elems targeted))
+
 -- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if
 -- the spell has slots and ALL are now illegal, it does not resolve -- it moves
 -- to the graveyard with no effect applied (the fizzle). Otherwise the effects
@@ -333,7 +358,6 @@ resolveSpellWith runSubgame oid = do
         -- unchosen mode's slot was never filled and is not part of this
         -- resolution's legality question.
         let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) card
-            chosen = Binding.targetsOf (Object.bindings obj)
             legalSlot slot recipient = case Map.lookup slot specs of
               -- CR 608.2b is about TARGETS. A slot with no target spec is a
               -- RESERVED binding -- the trigger's source (Pawl.Binding.triggerSource),
@@ -341,12 +365,7 @@ resolveSpellWith runSubgame oid = do
               -- never have become an illegal target.
               Nothing -> True
               Just spec -> Target.stillLegal oid recipient spec gs
-            legality = Map.mapWithKey legalSlot chosen
-            -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
-            -- reserved slots above cannot rescue a spell whose every target is gone.
-            targeted = Map.restrictKeys legality (Map.keysSet specs)
-            fizzles = not (Map.null specs) && not (or (Map.elems targeted))
-         in if fizzles
+         in if targetsAllIllegal oid gs
               then Event.changeZone oid Zone.Graveyard
               else do
                 -- CR 405.4: a spell's controller is the player who cast it,

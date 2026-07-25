@@ -1,4 +1,5 @@
 import qualified Pawl.ActivateSpec as ActivateSpec
+import qualified Pawl.AuraSpec as AuraSpec
 import qualified Pawl.BindingSpec as BindingSpec
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.CardsSpec as CardsSpec
@@ -83,5 +84,6 @@ testTree registry =
       TriggerSpec.tests registry,
       FilterSpec.tests,
       RegistrySpec.tests,
-      SlugSpec.tests
+      SlugSpec.tests,
+      AuraSpec.tests registry
     ]
