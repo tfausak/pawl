@@ -299,6 +299,17 @@ runRecordingBlockers gs =
   let (after, seen) = State.runState (Program.foldProgramM recordingBlockers (State.execStateT Combat.declareBlockers gs)) ([], [])
    in (seen, after)
 
+-- An interpreter that answers Prompt.ChooseDefender with `who` and everything
+-- else with S.aggressiveAnswer. Lifted to top level (rather than a `let` inside
+-- the test) so its type is the ordinary rank-1 `PlayerId -> forall r. Prompt r ->
+-- r` -- the forall sits to the right of the first arrow, so this needs no
+-- RankNTypes on attackTo itself; partially applying `attackTo who` then gives
+-- exactly the `forall r. Prompt.Prompt r -> r` that S.runCombat expects.
+attackTo :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+attackTo who p = case p of
+  Prompt.ChooseDefender {} -> who
+  _ -> S.aggressiveAnswer p
+
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderTests, which is the Defender KEYWORD (CR 702.3b).
 defendingPlayerTests :: Registry.Type.Registry -> Tasty.TestTree
@@ -506,7 +517,33 @@ defendingPlayerTests registry =
         HU.assertEqual "only carol was asked" [S.carol] asked
         -- And bob's untapped creature is never offered, per CR 509.1a.
         HU.assertEqual "bob's creature is in no candidate list" [] (filter (\oid -> elem oid bobs) offeredBlockers)
-        HU.assertEqual "carol's block was recorded" 1 (Map.size (Combat.Type.blockers (GameState.combat after)))
+        HU.assertEqual "carol's block was recorded" 1 (Map.size (Combat.Type.blockers (GameState.combat after))),
+      HU.testCase "CR 725.2/507.1 the crown follows whichever opponent was chosen as the defending player" $ do
+        -- CR 725.2's second inherent ability: "Whenever a creature deals combat
+        -- damage to the monarch, its controller becomes the monarch." bob is the
+        -- monarch. alice attacks with an unblocked 2/1; the two runs differ ONLY
+        -- in the answer to Prompt.ChooseDefender.
+        --
+        -- Discriminating: run A is what the deleted head-of-list behaviour did
+        -- whatever the answer, so run A alone proves nothing. Run B is
+        -- unreachable under it, and the pair is the proof.
+        piker <- Registry.printing registry "Goblin Piker"
+        let (board, _, _, _) = S.threePlayerCombat [piker] [] []
+            crowned = S.withMonarch S.bob board
+            hitBob = S.runCombat (attackTo S.bob) crowned
+            hitCarol = S.runCombat (attackTo S.carol) crowned
+        HU.assertEqual "bob starts as the monarch" (Just S.bob) (GameState.monarch crowned)
+        -- Run A: attacking the monarch takes the crown.
+        HU.assertEqual "bob took 2" (Just 18) (S.lifeOf S.bob hitBob)
+        HU.assertEqual "carol was untouched" (Just 20) (S.lifeOf S.carol hitBob)
+        HU.assertEqual "alice is the monarch" (Just S.alice) (GameState.monarch hitBob)
+        -- Run B: attacking the other opponent does not.
+        HU.assertEqual "carol took 2" (Just 18) (S.lifeOf S.carol hitCarol)
+        HU.assertEqual "bob was untouched" (Just 20) (S.lifeOf S.bob hitCarol)
+        HU.assertEqual "bob keeps the crown" (Just S.bob) (GameState.monarch hitCarol)
+        -- And neither run ended the game, so both really played a whole combat.
+        HU.assertEqual "no result in run A" Nothing (GameState.result hitBob)
+        HU.assertEqual "no result in run B" Nothing (GameState.result hitCarol)
     ]
 
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
