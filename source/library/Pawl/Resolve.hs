@@ -76,6 +76,7 @@ slotsOf effect = case effect of
   Effect.AddMana _ -> Set.empty
   Effect.Search _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
+  Effect.ExileHandThenDraw -> Set.empty
   Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
   Effect.Destroy slot -> Set.singleton slot
@@ -117,6 +118,7 @@ readsX = any effectReadsX
       Effect.AddMana _ -> False
       Effect.Search _ -> False
       Effect.ExileAllGraveyards -> False
+      Effect.ExileHandThenDraw -> False
       Effect.RestartGame -> False
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy _ -> False
@@ -150,6 +152,7 @@ manaProduced effect = case effect of
   Effect.ChangeText _ -> Nothing
   Effect.Search _ -> Nothing
   Effect.ExileAllGraveyards -> Nothing
+  Effect.ExileHandThenDraw -> Nothing
   Effect.RestartGame -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.Destroy _ -> Nothing
@@ -183,6 +186,7 @@ searchesLibrary effect = case effect of
   Effect.ChangeText _ -> False
   Effect.AddMana _ -> False
   Effect.ExileAllGraveyards -> False
+  Effect.ExileHandThenDraw -> False
   Effect.RestartGame -> False
   Effect.ControlPlayerNextTurn _ -> False
   Effect.Destroy _ -> False
@@ -257,6 +261,7 @@ rewriteEffect pairs effect = case effect of
   Effect.AddMana _ -> effect
   Effect.Search _ -> effect
   Effect.ExileAllGraveyards -> effect
+  Effect.ExileHandThenDraw -> effect
   Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy _ -> effect
@@ -556,6 +561,19 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     gs <- State.get
     let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Map.keys (GameState.players gs))
     Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) gyCards
+  -- CR 103.5b (Serum Powder): "exile all the cards from your hand, then draw
+  -- that many cards." The count is the hand size BEFORE the exile, which is why
+  -- this is one opcode and not an exile followed by a Draw.
+  --
+  -- Both halves go through the usual funnels: Event.changeZone mints each exiled
+  -- card a fresh incarnation (CR 400.7), and Event.drawCard flags a draw from an
+  -- empty library, so a short deck still loses at the first upkeep (CR 727.3 /
+  -- 729.3) exactly as the mulligan redraw already does.
+  Effect.ExileHandThenDraw -> do
+    gs <- State.get
+    let handIds = Game.zoneMembers Zone.Hand controller gs
+    Monad.mapM_ (\oid -> Event.changeZone oid Zone.Exile) handIds
+    Monad.replicateM_ (length handIds) (Event.drawCard controller)
   -- CR 727.1/727.1a: restart the game. The starting player of the new game is
   -- this ability's controller (CR 727.1a), which applyEffect already holds as
   -- `controller`; the rebuild lives in Setup (game construction). The engine

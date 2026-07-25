@@ -168,7 +168,7 @@ Serum Powder's payload. One commit, because a new `Effect` constructor breaks al
 - Consumes: nothing from Task 1.
 - Produces: `Effect.ExileHandThenDraw :: Effect card` (nullary).
 
-- [ ] **Step 1: Write the failing tests.** In `source/test-suite/Pawl/ResolveSpec.hs`, add this case to the top-level test list (anywhere in it; next to the Rest in Peace case near line 621 is a natural home):
+- [x] **Step 1: Write the failing tests.** In `source/test-suite/Pawl/ResolveSpec.hs`, add this case to the top-level test list (anywhere in it; next to the Rest in Peace case near line 621 is a natural home):
 
 ```haskell
       HU.testCase "CR 103.5b ExileHandThenDraw exiles the whole hand, then draws that many" $ do
@@ -193,12 +193,12 @@ In `source/test-suite/Pawl/CodecSpec.hs`, add this case next to the existing `"E
             roundTrip "e-powder" Codec.effectToJson Codec.jsonToEffect Effect.ExileHandThenDraw,
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail to COMPILE.**
+- [x] **Step 2: Run the tests to verify they fail to COMPILE.**
 
 Run: `cabal build pawl-test-suite --enable-tests 2>&1 | tail -20`
 Expected: compile error — `Data constructor not in scope: Effect.ExileHandThenDraw`.
 
-- [ ] **Step 3: Add the opcode.** In `source/library/Pawl/Type/Effect.hs`, append after `PlaySubgame SlotName`:
+- [x] **Step 3: Add the opcode.** In `source/library/Pawl/Type/Effect.hs`, append after `PlaySubgame SlotName`:
 
 ```haskell
   | -- CR 103.5b (Serum Powder): exile every card in the resolving controller's
@@ -215,7 +215,7 @@ Expected: compile error — `Data constructor not in scope: Effect.ExileHandThen
     ExileHandThenDraw
 ```
 
-- [ ] **Step 4: Add the eight classification arms.** Each is a one-liner beside the module's existing `Effect.ExileAllGraveyards` arm.
+- [x] **Step 4: Add the eight classification arms.** Each is a one-liner beside the module's existing `Effect.ExileAllGraveyards` arm.
 
 `source/library/Pawl/Codec.hs` — in `effectToJson` (beside line 1199) and `jsonToEffect` (beside line 1236):
 
@@ -243,7 +243,7 @@ Expected: compile error — `Data constructor not in scope: Effect.ExileHandThen
   Effect.ExileHandThenDraw -> []
 ```
 
-- [ ] **Step 5: Implement the opcode.** In `source/library/Pawl/Resolve.hs`'s `applyEffectWith`, add an arm beside `Effect.ExileAllGraveyards` (around line 555):
+- [x] **Step 5: Implement the opcode.** In `source/library/Pawl/Resolve.hs`'s `applyEffectWith`, add an arm beside `Effect.ExileAllGraveyards` (around line 555):
 
 ```haskell
   -- CR 103.5b (Serum Powder): "exile all the cards from your hand, then draw
@@ -261,12 +261,12 @@ Expected: compile error — `Data constructor not in scope: Effect.ExileHandThen
     Monad.replicateM_ (length handIds) (Event.drawCard controller)
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass.**
+- [x] **Step 6: Run the tests to verify they pass.**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -20`
 Expected: warning-free build; both new cases pass.
 
-- [ ] **Step 7: Format, lint, and commit.**
+- [x] **Step 7: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

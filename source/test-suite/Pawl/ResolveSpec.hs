@@ -649,6 +649,19 @@ resolveTests registry =
             resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
         HU.assertEqual "bob's graveyard is empty" 0 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
         HU.assertEqual "ability ceased" Nothing (Game.lookupObject abilId resolved),
+      HU.testCase "CR 103.5b ExileHandThenDraw exiles the whole hand, then draws that many" $ do
+        mountain <- Registry.printing registry "Mountain"
+        swamp <- Registry.printing registry "Swamp"
+        let g0 = Setup.emptyGame S.bothPlayers
+            (_, g1) = S.addHandCard mountain S.alice g0
+            (_, g2) = S.addHandCard swamp S.alice g1
+            g3 = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) g2 (replicate 5 ())
+            after =
+              S.runPure S.identityAnswer g3 $
+                Resolve.applyEffect S.noSource S.alice Map.empty Map.empty Map.empty Effect.ExileHandThenDraw
+        HU.assertEqual "the hand is refilled to the size it had" 2 (S.handSize S.alice after)
+        HU.assertEqual "both old cards went to exile" 2 (length (Game.zoneMembers Zone.Exile S.alice after))
+        HU.assertEqual "and the library is two shorter" 3 (length (Game.zoneMembers Zone.Library S.alice after)),
       HU.testCase "CR 723.1: Mindslaver's ability installs pending control, promoted next turn" $ do
         mindslaver <- Registry.printing registry "Mindslaver"
         let g0 = Setup.emptyGame S.bothPlayers

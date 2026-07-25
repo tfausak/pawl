@@ -207,4 +207,16 @@ data Effect card
     -- through the per-effect binding re-read in resolveSpellWith. Generic: the
     -- engine reaches subgames through this opcode, never Shahrazad's identity.
     PlaySubgame SlotName
+  | -- CR 103.5b (Serum Powder): exile every card in the resolving controller's
+    -- hand, then draw that many cards. Targetless and controller-scoped, the
+    -- ExileAllGraveyards / Draw shape.
+    --
+    -- ONE opcode rather than an exile composed with a Draw: "that many" is the
+    -- hand size BEFORE the exile, so a following Draw would read a hand that is
+    -- already empty. Splitting it needs a Count that reads a value produced
+    -- earlier in the same resolution, which nothing else wants.
+    --
+    -- The card granting the action is itself in the hand and is exiled with the
+    -- rest: CR 103.5b's action is not a cost, and nothing sets it aside.
+    ExileHandThenDraw
   deriving (Eq, Ord, Show)
