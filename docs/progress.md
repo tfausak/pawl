@@ -2155,8 +2155,13 @@ its own gate card and spec, landed as it completes. Umbrella:
     concedes mid-cycle, carol receives priority, the game continues, and bob's
     until-your-next-turn effect ends at the seat where his turn would have begun.
     Decision proved: `turnOrder` is the permanent seating roster (CR 800.5, CR
-    806.3) and is never shortened — CR 800.4m, CR 800.4a's priority clause, and CR
-    729.1b's non-winner set all depend on a departed player keeping their seat.
+    806.3) and is never shortened — CR 800.4m, CR 800.4a's priority clause, and
+    the subgame outcome CR 729.1b lets an effect export into the main game all
+    depend on a departed player keeping their seat. (CR 729.1b names no set; its
+    own example is that "the effect may say that something happens in the main
+    game to the winner or loser of the subgame". The non-winner set is
+    Shahrazad's *card* text — "each player who doesn't win the subgame" — derived
+    as the starting roster minus the winner, #138.)
     Added: `Expiry.dropAtTurnOf` replacing `dropAtHandoff`, the CR 800.4k/800.4m
     `handoffTurn` seat walk, `nextStillPlaying`'s full-order lookup and the
     concede `passes` reset, `Engine.priorityHolder` (CR 800.4j), the CR
@@ -2210,16 +2215,42 @@ its own gate card and spec, landed as it completes. Umbrella:
     game; and the three-seat lands-only property now needs **two** deck-outs to
     find a winner — the headline falsifier, covering the seat walk, the priority
     handoff, CR 800.4a, the pass count, and `outcomeAfterLeaving` at once. Also
-    swept four stale or unverified rule citations, closing #173.
+    swept four stale or unverified rule citations, closing #173. Decision
+    proved: CR 800.4j is a priority rule and licenses nothing about turn-based
+    actions — the rule that reaches a departed active player's rules-required
+    choice is CR 800.4h, "If a rule requires a player who has left the game to
+    make a choice, the next player in turn order makes that choice" — so the
+    three sites that had cited CR 800.4j alone were corrected. That leaves the
+    milestone's one **live** rules divergence, now on the record: the CR
+    507.1/703.4h defending-player choice does arise when the active player has
+    departed — their opponents are still in the game, so there is a real choice
+    among them — and pawl resolves it silently as "nobody defends" instead of
+    handing it to the next seat. The divergence is **unobservable, not
+    vacuous**: CR 506.2's first sentence makes the attacking player the active
+    player and CR 800.4a leaves a departed player controlling no creature, so a
+    defender installed under CR 800.4h would be written and never read.
+    Behaviour is unchanged; the divergence is filed as **#181** — together with
+    the four latent clauses (CR 800.4c/f/g and general 800.4i) that spec §8
+    promised issues for and never got — and cited at the four code sites that
+    depend on it. Two duplication findings were settled as declined with
+    cross-references rather than removed: the doubled CR 800.4j active-player
+    guard (`Engine.runTurnBasedActions` and `Combat.chooseDefender`) keeps both
+    copies, and the seat walk shared in shape by `Monarch.reassignOnDeparture`
+    and `Engine.nextStillPlaying` stays duplicated, because the two differ in
+    anchor, in totality (CR 725.4's third sentence needs a `Maybe`) and in
+    whether the still-playing seats are injected.
 
   **The headline finding:** `docs/design.md` §2.4's bet is **half vindicated**.
   The data model — `turnOrder`, `players`, `Departure.outcomeAfterLeaving`,
   `Count.playersFor`, `emptyGame` — was N-player-shaped throughout, and
   `PlayerRelation.Opponent`, the piece the bet's own wording predicted would be
   largest, was not a piece at all: all three sites that resolve an opponent
-  relation were already set-shaped and already correct. The *control flow*
-  around a departure was two-player-shaped in four concentrated places, which is
-  what this phase closes. `Pawl.Type.Result` is deliberately **not** widened —
+  relation were already relation-shaped rather than next-seat-shaped, and
+  already correct. (Only one of the three, `Count.playersFor`, folds a player
+  *set*; `PlayerEffect.inScope` and `Filter.matches`'s `ControlledBy` arm each
+  test one candidate at a time, which is why neither had a set size to get
+  wrong.) The *control flow* around a departure was two-player-shaped in four
+  concentrated places, which is what M5.6 closes. `Pawl.Type.Result` is deliberately **not** widened —
   CR 104.1/104.2a/104.4a give a free-for-all exactly one outcome, and the
   per-player outcome already lives in `Player.status`. CR 801's limited range of
   influence is never used and no field exists for it — every rule under it is
