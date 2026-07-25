@@ -607,7 +607,7 @@ priorityLoop = do
                             -- SUCCESSOR even though leaveGame has already run.
                             --
                             -- CR 117.4 defines passing "in succession" as passing
-                            -- "without taking any actions in between passing." A
+                            -- without taking any actions in between passing. A
                             -- concession is an action that
                             -- changes the board (CR 800.4a removes the departing
                             -- player's objects from the game), so the passes already

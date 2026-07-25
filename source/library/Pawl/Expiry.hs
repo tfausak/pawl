@@ -111,7 +111,8 @@ sweepConditional = do
         }
   pure changed
 
--- CR 611.2a: "until your next turn" ends as that player's turn begins.
+-- CR 611.2a: a duration a spell or ability states lasts as long as it says, so
+-- an until-your-next-turn duration ends as that player's turn begins.
 --
 -- Takes the player EXPLICITLY rather than reading GameState.activePlayer,
 -- because CR 800.4m needs this to fire for a seat whose turn does not begin:
