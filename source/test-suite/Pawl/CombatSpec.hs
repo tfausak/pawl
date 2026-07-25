@@ -397,10 +397,32 @@ defendingPlayerTests registry =
         -- THREE seats, so that two opponents survive and the choice would
         -- otherwise be a real prompt -- at two seats the elision would hide the
         -- guard entirely.
+        --
+        -- This drives Engine.runTurnBasedActions, and the guard exists at BOTH
+        -- ends of that call (Engine.hs's hasActive and chooseDefender's own test),
+        -- so this case passes with either one alone and isolates neither. The
+        -- sibling case below is the one that isolates chooseDefender's; the
+        -- engine-side copy is redundant on this path and has nothing to isolate.
         let gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
             (after, asked) =
               State.runState
                 (Program.foldProgramM (choosesDefender S.carol) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) gone))
+                []
+         in do
+              HU.assertEqual "no defending player" Nothing (Combat.Type.defender (GameState.combat after))
+              HU.assertEqual "and nobody was asked" [] asked,
+      HU.testCase "CR 800.4j chooseDefender called directly still chooses nobody" $
+        -- The same rule at the other end of the call, reached WITHOUT
+        -- Engine.runTurnBasedActions so that only chooseDefender's own membership
+        -- test can be responsible. Discriminating exactly that line: with it gone,
+        -- alice -- who has left the game -- is asked, and carol becomes the
+        -- defending player on a turn CR 800.4j says has no active player to choose
+        -- one. Three seats again, so two candidates survive alice's departure and
+        -- the single-candidate elision (#169) cannot be what suppresses the ask.
+        let gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
+            (after, asked) =
+              State.runState
+                (Program.foldProgramM (choosesDefender S.carol) (State.execStateT Combat.chooseDefender gone))
                 []
          in do
               HU.assertEqual "no defending player" Nothing (Combat.Type.defender (GameState.combat after))
@@ -448,9 +470,7 @@ defendingPlayerTests registry =
         -- that reset only attackers and blockers would leave Just carol here, and
         -- the next combat phase would inherit a stale defender.
         let busy = S.threePlayerGame {GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defender = Just S.carol}}
-         in do
-              HU.assertEqual "set" (Just S.carol) (Combat.Type.defender (GameState.combat busy))
-              HU.assertEqual "and cleared at end of combat" Nothing (Combat.Type.defender (GameState.combat (Combat.clearCombat busy))),
+         in HU.assertEqual "cleared at end of combat" Nothing (Combat.Type.defender (GameState.combat (Combat.clearCombat busy))),
       HU.testCase "CR 508.1 every attacker attacks the CHOSEN defending player" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (board, mine, _, _) = S.threePlayerCombat [piker, piker] [piker] [piker]
