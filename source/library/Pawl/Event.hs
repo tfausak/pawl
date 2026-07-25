@@ -462,6 +462,11 @@ isPlayerRecipient r = case r of
 eventTriggers :: [GameEvent] -> GameState -> [PendingTrigger]
 eventTriggers events gs =
   let projected = Projection.projectAll gs
+      -- The control-grant list is the same for every permanent in this scan
+      -- (same reason projected is computed once): Projection.controllerOf
+      -- would otherwise rebuild it, and re-run its liveGiven fixpoint, once
+      -- per battlefield object.
+      grants = Projection.controlGrants gs
       onBattlefield =
         Maybe.mapMaybe
           ( \oid -> case Map.lookup oid projected of
@@ -470,11 +475,11 @@ eventTriggers events gs =
               -- oid drawn from that set has an entry.
               Nothing -> Nothing
               -- CR 603.3a: controlled by whoever controls the source when it
-              -- triggers. Projection.controllerOf reads control AT THE SCAN
+              -- triggers. Projection.controllerOfGiven reads control AT THE SCAN
               -- BOUNDARY, not at the moment the underlying event fired (#47) --
               -- unobservable today because nothing changes control between an
               -- event and the CR 117.5 boundary.
-              Just pc -> fmap (\ctrl -> (oid, ctrl, PC.triggeredAbilities pc)) (Projection.controllerOf oid gs)
+              Just pc -> fmap (\ctrl -> (oid, ctrl, PC.triggeredAbilities pc)) (Projection.controllerOfGiven grants Set.empty oid gs)
           )
           (Set.toAscList (GameState.battlefield gs))
       forOne event (oid, ctrl, abilities) =
@@ -501,7 +506,11 @@ eventTriggers events gs =
 -- that could is the one that must revisit this.
 stateTriggers :: GameState -> [PendingTrigger]
 stateTriggers gs =
-  let -- Suppression is scoped to (source, ability): `Object.source obj ==
+  let -- The control-grant list is the same for every permanent this scan
+      -- walks; computed once here rather than once per oid inside forOne,
+      -- the same hoist eventTriggers' `grants` binding makes just above.
+      grants = Projection.controlGrants gs
+      -- Suppression is scoped to (source, ability): `Object.source obj ==
       -- Source.OfTrigger srcId ab` compares BOTH the source object's id and
       -- the ability, so two permanents bearing the identical triggered
       -- ability (e.g. two Barbarian Outcasts) suppress independently -- one
@@ -531,7 +540,7 @@ stateTriggers gs =
               -- as though it were an instance of the first (#55).
               Just obj -> Object.source obj == Source.OfTrigger srcId ab
          in any isInstance (GameState.stack gs)
-      forOne oid = case Projection.controllerOf oid gs of
+      forOne oid = case Projection.controllerOfGiven grants Set.empty oid gs of
         Nothing -> []
         -- CR 603.3a: a triggered ability is controlled by whoever controls
         -- its source; CR 109.5 is what makes "you" in the condition mean that

@@ -275,7 +275,10 @@ nonCardStackObjectsCease pid gs =
 -- leaves-the-battlefield trigger on this move is therefore not emitted (#179).
 remainingControlledExiled :: PlayerId -> GameState -> GameState
 remainingControlledExiled pid gs =
-  let theirs = filter (\oid -> Projection.controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs))
+  let -- Projection.controls already hoists the control-grant list once rather
+      -- than rebuilding it per battlefield object; free to take here too, even
+      -- though this runs once per departure rather than in a hot loop.
+      theirs = Projection.controls pid gs
       exileOne g oid = case Game.lookupObject oid g of
         Nothing -> g
         Just obj ->
