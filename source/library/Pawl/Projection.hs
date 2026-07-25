@@ -197,6 +197,11 @@ data Gathered = MkGathered
 affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
 affects source oid a partial gs = case a of
   Affected.TheseObjects s -> Set.member oid s
+  -- CR 303.4m: read the SOURCE's attachment, not the candidate's. An unattached
+  -- source names nothing, so the set is empty and the effect applies to no one.
+  Affected.Attached -> case Game.lookupObject source gs of
+    Nothing -> False
+    Just src -> Object.attachedTo src == Just oid
   Affected.Matching f ->
     let -- CR 109.5: "you" on a continuous effect is the effect's SOURCE's
         -- controller; ControlledBy compares the affected object's controller to

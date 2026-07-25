@@ -1017,6 +1017,7 @@ affectedToJson :: Affected.Affected -> Value
 affectedToJson a = case a of
   Affected.TheseObjects ids -> Json.tagged (Text.pack "TheseObjects") (Just (setTo objectIdToJson ids))
   Affected.Matching f -> Json.tagged (Text.pack "Matching") (Just (filterToJson f))
+  Affected.Attached -> Json.tagged (Text.pack "Attached") Nothing
 
 jsonToAffected :: Value -> Either Text Affected.Affected
 jsonToAffected value = do
@@ -1024,6 +1025,7 @@ jsonToAffected value = do
   case Text.unpack t of
     "TheseObjects" -> withValue mv (fmap Affected.TheseObjects . setFrom jsonToObjectId)
     "Matching" -> withValue mv (fmap Affected.Matching . jsonToFilter)
+    "Attached" -> pure Affected.Attached
     _ -> Left (Text.pack "unknown Affected: " <> t)
 
 recipientToJson :: Recipient.Recipient -> Value

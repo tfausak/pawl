@@ -561,6 +561,7 @@ continuousEffectAffects :: ObjectId.ObjectId -> ContinuousEffect.ContinuousEffec
 continuousEffectAffects target eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects ids -> Set.member target ids
   Affected.Matching _ -> False
+  Affected.Attached -> False
 
 -- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`.
 -- Object id 998 is a stand-in source: nothing in these tests reads the

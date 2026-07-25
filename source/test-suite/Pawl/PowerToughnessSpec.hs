@@ -117,10 +117,12 @@ tests registry =
         -- it proves the clearing.
         --
         -- What WOULD distinguish: a "loses all abilities" card that does not also
-        -- set P/T. The Aura family (Darksteel Mutation and kin) is blocked on
-        -- Attach; Soul Sculptor needs layer-4 card-type REPLACEMENT; Dress Down
-        -- needs Flash, a beginning-of-end-step trigger (P4) and Sacrifice. See the
-        -- P3b spec, section 8.
+        -- set P/T. Attachment itself has landed (Pawl.Type.Object.attachedTo,
+        -- Affected.Attached), but the Darksteel Mutation family still needs
+        -- layer-4 card-type REPLACEMENT (turning the enchanted creature into a
+        -- 0/0), which does not exist yet; Soul Sculptor needs the same
+        -- layer-4 REPLACEMENT; Dress Down needs Flash, a beginning-of-end-step
+        -- trigger (P4) and Sacrifice. See the P3b spec, section 8.
         lightningBolt <- Registry.printing registry "Lightning Bolt"
         tarmogoyf <- Registry.printing registry "Tarmogoyf"
         humility <- Registry.printing registry "Humility"
@@ -459,5 +461,15 @@ tests registry =
             gs = S.withHumility humility g3
         HU.assertEqual "no CDA survives layer 6" Nothing (PC.characteristicPT (Projection.project nightId gs))
         HU.assertEqual "1 power" (Just 1) (Projection.powerOf nightId gs)
-        HU.assertEqual "1 toughness" (Just 1) (Projection.toughnessOf nightId gs)
+        HU.assertEqual "1 toughness" (Just 1) (Projection.toughnessOf nightId gs),
+      HU.testCase "CR 303.4m: an attached Unholy Strength gives the enchanted creature +2/+1" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        let base = Setup.emptyGame S.bothPlayers
+            -- Goblin Piker is a 2/1.
+            (creature, withCreature) = S.addCreature piker S.bob base
+            (aura, withAura) = S.addCreature unholyStrength S.alice withCreature
+            attached = S.attach aura creature withAura
+        HU.assertEqual "unattached, the ability names nothing" (Just 2, Just 1) (Projection.powerOf creature withAura, Projection.toughnessOf creature withAura)
+        HU.assertEqual "attached, +2/+1" (Just 4, Just 2) (Projection.powerOf creature attached, Projection.toughnessOf creature attached)
     ]

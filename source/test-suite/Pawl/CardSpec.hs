@@ -22,6 +22,7 @@ import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
@@ -532,7 +533,23 @@ lintTests registry =
         let card = Printing.card piker
         HU.assertEqual "no enchant spec" Nothing (Card.Type.enchant card)
         HU.assertBool "not an Aura" (not (Card.isAura card))
-        HU.assertEqual "no enchant slot" Map.empty (Card.enchantSpecs card)
+        HU.assertEqual "no enchant slot" Map.empty (Card.enchantSpecs card),
+      -- CR 303.4 / 702.5a: the biconditional. An Aura without enchant has no legal
+      -- target and could never be cast; a non-Aura with enchant declares a restriction
+      -- nothing reads. The D4 lint cannot see either, because it walks
+      -- Mode.targetSpecs and the enchant slot is not there (#184's shape).
+      HU.testCase "a card is an Aura iff it declares an enchant ability" $ do
+        ps <- S.allPrintings registry
+        let offends c = Card.isAura c /= Maybe.isJust (Card.Type.enchant c)
+            offenders = filter (offends . Printing.card) ps
+        HU.assertEqual "Aura iff enchant" [] (fmap (Card.Type.name . Printing.card) offenders),
+      -- Pawl.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
+      -- mode declaring it would be silently shadowed.
+      HU.testCase "no mode declares a slot named enchant" $ do
+        ps <- S.allPrintings registry
+        let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Card.Type.spell c))
+            offenders = filter (offends . Printing.card) ps
+        HU.assertEqual "the enchant slot is never hand-declared" [] (fmap (Card.Type.name . Printing.card) offenders)
     ]
 
 m2bCardTests :: Registry.Type.Registry -> Tasty.TestTree
@@ -878,8 +895,34 @@ m55CardTests registry =
           _ -> HU.assertFailure "expected exactly one triggered ability"
     ]
 
+-- The Auras phase (a) gate card: CR 303.4m's Attached affected-set, proven by a
+-- real Aura on a real creature rather than a synthetic fixture.
+auraCardTests :: Registry.Type.Registry -> Tasty.TestTree
+auraCardTests registry =
+  Tasty.testGroup
+    "Auras"
+    [ HU.testCase "Unholy Strength is a {B} Aura enchanting a creature for +2/+1" $ do
+        p <- Registry.printing registry "Unholy Strength"
+        let card = Printing.card p
+            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [black])) (Card.Type.manaCost card)
+        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine card))
+        HU.assertEqual "subtypes" (Set.singleton Subtype.Aura) (TypeLine.subtypes (Card.Type.typeLine card))
+        HU.assertBool "is an Aura" (Card.isAura card)
+        -- CR 702.5a: "Enchant creature" -- the whole creature pool, unnarrowed.
+        HU.assertEqual "enchant creature" (Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.Type.enchant card)
+        -- CR 303.4m: "enchanted creature gets +2/+1" -- layer 7c on whatever it is
+        -- attached to.
+        HU.assertEqual
+          "one +2/+1 static ability on the enchanted permanent"
+          [StaticAbility.MkStaticAbility Affected.Attached (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 1))]
+          (Card.Type.staticAbilities card)
+        -- CR 303.4: an Aura spell has no spell effects; it enters attached.
+        HU.assertEqual "no spell effects" [] (Card.allEffects card)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry]
