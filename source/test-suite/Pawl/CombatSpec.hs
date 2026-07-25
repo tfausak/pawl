@@ -26,6 +26,7 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
@@ -261,6 +262,20 @@ choosesDefender who p = case p of
     pure who
   _ -> pure (S.identityAnswer p)
 
+-- Sibling of choosesDefender that records the prompt's Decider instead of its
+-- PlayerId subject. CR 723.1/723.5: while a player is controlled, their
+-- controller makes their choices, and Combat.chooseDefender's
+-- `Decide.deciderFor pid gs` is what routes ChooseDefender there. choosesDefender
+-- above discards the Decider entirely, so it cannot tell that routing apart from
+-- a regression to the raw active-player id; this helper is what makes the
+-- Decider observable without touching the six existing cases.
+choosesDefenderRecordingDecider :: PlayerId.PlayerId -> Prompt.Prompt r -> State.State [Decider.Decider] r
+choosesDefenderRecordingDecider who p = case p of
+  Prompt.ChooseDefender decider _ _ -> do
+    State.modify' (\seen -> seen <> [decider])
+    pure who
+  _ -> pure (S.identityAnswer p)
+
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderTests, which is the Defender KEYWORD (CR 702.3b).
 defendingPlayerTests :: Tasty.TestTree
@@ -283,6 +298,37 @@ defendingPlayerTests =
          in do
               HU.assertEqual "carol is the defending player" (Just S.carol) (Combat.Type.defender (GameState.combat after))
               HU.assertEqual "and alice, the active player, is who was asked" [S.alice] asked,
+      HU.testCase "CR 723.1 a controlled active player's choice of defender routes to their controller" $
+        -- THREE seats (alice active, bob, carol) with carol controlling alice
+        -- (Mindslaver-style: GameState.activeControl = Just (MkDecider carol)),
+        -- the established fixture idiom for a controlled player -- the same shape
+        -- GameSpec's CR 723.6 concede test (GameSpec.hs:811-858) and DecideSpec's
+        -- CR 723.3 case (DecideSpec.hs:19-23) both set up. Three seats, not two, so
+        -- attackableOpponents is [bob, carol] -- a REAL choice -- rather than
+        -- CR 506.2's one-candidate elision, which would never build a prompt at all
+        -- and so could never discriminate the Decider on one.
+        --
+        -- CR 723.1: "The affected player is controlled during the entire turn"
+        -- (the rest of the rule scopes this to the player's own next turn, which
+        -- does not change the point here). Combined with CR 723.5 (the controller
+        -- makes the controlled player's choices) and CR 723.3 (the controlled
+        -- player is still the active player), alice remains the active player
+        -- named in the prompt but carol is who must be asked. Combat.chooseDefender
+        -- gets this right by computing `Decide.deciderFor pid gs` rather than
+        -- defaulting to `Decider.MkDecider pid`.
+        --
+        -- Discriminates exactly that regression: a `chooseDefender` that used
+        -- `Decider.MkDecider pid` (the raw active player, alice) instead of
+        -- `Decide.deciderFor pid gs` would record `[Decider.MkDecider S.alice]`
+        -- below -- handing alice's own choice back to her, which is the CR 723.1
+        -- violation this test exists to catch -- and none of the other six cases in
+        -- this group sets activeControl, so none of them would notice.
+        let controlled = S.threePlayerGame {GameState.activeControl = Just (Decider.MkDecider S.carol)}
+            (_, deciders) =
+              State.runState
+                (Program.foldProgramM (choosesDefenderRecordingDecider S.bob) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) controlled))
+                []
+         in HU.assertEqual "carol, alice's controller, is who was asked" [Decider.MkDecider S.carol] deciders,
       HU.testCase "CR 506.2 two players: the nonactive player defends and nobody is asked" $
         -- The elision, asserted explicitly rather than inferred from the suite
         -- staying green. CR 507.1's condition is a MULTIPLAYER game; CR 506.2's

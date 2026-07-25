@@ -218,7 +218,11 @@ isBlocked oid gs = not (Set.null (blockersOf oid gs))
 --
 -- An answer outside the candidate list is a broken interpreter, not a game state,
 -- and degrades to the first candidate: always legal, least eventful, and the same
--- shape Setup.subgameStateFrom uses for an out-of-order starting player.
+-- SHAPE (degrade totally rather than fail) Setup.subgameStateFrom uses for an
+-- out-of-order starting player -- and the same VALUE Replay.defaultAnswer gives
+-- this very prompt (NonEmpty.head candidates). The two must agree: a diverging
+-- fallback here would be an invisible bug, since neither path can observe the
+-- other.
 chooseDefender :: Game ()
 chooseDefender = do
   gs <- State.get
