@@ -207,6 +207,20 @@ returnExiledForMonarch = do
 -- this module may not import Pawl.Departure to ask. Same injected-value idiom
 -- Pawl.Count uses for its ViewOf.
 --
+-- Engine.nextStillPlaying walks the same seating order, for CR 800.4a's
+-- priority successor -- a different rule, but the same shape of walk -- and
+-- this is deliberately NOT a call to it, for three reasons that would each
+-- become a parameter if it were: it anchors on the ACTIVE seat and excludes
+-- it (the active player's own case is the branch below), where
+-- nextStillPlaying anchors on the DEPARTING seat and includes it in its wrap
+-- so it can return that seat; this function is partial in the seat it finds
+-- (`next :: Maybe PlayerId`), because CR 725.4's third sentence needs the
+-- game to be able to continue with no monarch, where nextStillPlaying is
+-- total; and `playing` is injected here (see above), where nextStillPlaying
+-- reads Departure.stillPlaying directly, because this module may not import
+-- Pawl.Departure. Changing either walk without checking the other risks
+-- reintroducing this duplication with a mismatch baked in.
+--
 -- Called with `leaving` ALREADY marked departed, so "is leaving the game" and
 -- "has left the game" are one test: the rule's first two sentences collapse to
 -- "is the active player still in the game?". CR 800.4j is why "there is no

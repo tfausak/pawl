@@ -101,6 +101,19 @@ nextInOrder order pid = case dropWhile (/= pid) order of
 -- correct implementation for the ordinary pass case, where `pid` is still
 -- playing and the answer is unchanged.
 --
+-- Monarch.reassignOnDeparture walks the same seating order, for CR 725.4's
+-- monarch successor -- a different rule, but the same shape of walk -- and
+-- this is deliberately NOT shared with it, for three reasons: this function
+-- anchors on the DEPARTING seat (`pid`) and includes it in the wrap, so it
+-- can return that seat, where reassignOnDeparture anchors on the ACTIVE seat
+-- and excludes it; this function is total in PlayerId, where
+-- reassignOnDeparture must return a Maybe because CR 725.4's third sentence
+-- lets the game continue with no monarch; and this function reads
+-- Departure.stillPlaying directly, where reassignOnDeparture takes `playing`
+-- injected, because Pawl.Monarch may not import Pawl.Departure. Changing
+-- either walk without checking the other risks reintroducing this
+-- duplication with a mismatch baked in.
+--
 -- Total: falls back to `pid` when nobody is still playing.
 nextStillPlaying :: GameState -> PlayerId -> PlayerId
 nextStillPlaying gs pid =
@@ -244,13 +257,26 @@ runTurnBasedActions phase = do
     -- CR 703.4h: choose the defending player. The active player's action
     -- (CR 507.1), so it takes the same guard as the others.
     --
-    -- Combat.chooseDefender applies the IDENTICAL test itself. On this path that
-    -- makes hasActive the redundant copy -- removing it changes nothing anything
-    -- can observe, and no test discriminates it -- while removing the function's
-    -- makes every direct caller wrong and reddens CombatSpec's direct-call case.
-    -- Kept because this arm is where the enumeration of CR 800.4j's actions above
-    -- lives, and reading the guard off the list is how the next arm gets it right.
-    -- Neither copy is safe to delete without reading the other.
+    -- hasActive and chooseDefender's own guard are the same value BY
+    -- EQUIVALENCE, not merely observed to agree: hasActive is bound once, at
+    -- the top of this function, from the GameState in scope here; only a pure
+    -- `case` on `phase` runs between that bind and this arm; and
+    -- Combat.chooseDefender opens with its own State.get and computes the
+    -- identical `List.elem (GameState.activePlayer gs) (Departure.stillPlaying
+    -- gs)` over that same state. A green suite is deliberately not what this
+    -- rests on -- the declareAttackers arm below carries a guard (CR 703.4i)
+    -- that was once wrongly called dead code on exactly that basis, and review
+    -- found it load-bearing at two seats a direct call can reach but the game
+    -- loop cannot.
+    --
+    -- Removal is therefore safe on this path, and still declined: this arm is
+    -- where the enumeration of CR 800.4j's actions above is read off, and an
+    -- arm silently missing the wrapper while that list still names it would be
+    -- the worse artifact. chooseDefender's own copy is untouched by this
+    -- decision -- M5.6d's review ruled it load-bearing for a direct caller
+    -- that has no engine wrapper (a spec, or a second combat phase spliced by
+    -- an effect) -- and its comment states this same argument from the other
+    -- end.
     Phase.Combat CombatStep.BeginningOfCombat -> Monad.when hasActive Combat.chooseDefender
     Phase.Combat CombatStep.DeclareAttackers -> do
       Monad.when hasActive (Combat.declareAttackers active)

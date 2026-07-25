@@ -233,12 +233,16 @@ chooseDefender = do
   -- rather than a vacuous case (#181); the argument is on Pawl.Type.Combat's
   -- defender field and is not repeated here.
   --
-  -- Engine.runTurnBasedActions applies the identical test before calling this, so
-  -- on the engine's path the two are redundant. This is the copy that carries the
-  -- rule for a DIRECT caller -- a spec, or a second combat phase spliced by an
-  -- effect -- and the only one a test can discriminate, which CombatSpec's
-  -- direct-call case does. Do not delete it as redundant; the engine-side comment
-  -- says the same thing from the other end.
+  -- Engine.runTurnBasedActions binds the identical test (hasActive) before
+  -- calling this, so on the engine's path the two guards are the same value BY
+  -- EQUIVALENCE -- the mechanism (what runs between the bind and the call, and
+  -- why the predicate here is the same expression) is argued at that site, not
+  -- here. Redundant on that path, and declined for a reason that is not a green
+  -- suite: this is the copy a DIRECT caller depends on -- a spec, or a second
+  -- combat phase spliced by an effect, neither of which goes through Engine's
+  -- guard -- and CombatSpec's direct-call case is the test that discriminates
+  -- it. Do not delete it as redundant; Engine.runTurnBasedActions's comment
+  -- states this same argument from the other end.
   Monad.when (List.elem pid (Departure.stillPlaying gs)) $
     case NonEmpty.nonEmpty (attackableOpponents gs) of
       Nothing -> pure ()
