@@ -31,8 +31,10 @@ import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Zone as Zone
 
--- CR 601.3a / 302.1: a creature spell may be cast only when its controller could
--- cast a sorcery -- a main phase of their own turn, with an empty stack. (The
+-- CR 302.1 / 307.1: a creature spell may be cast only when its controller could
+-- cast a sorcery -- a main phase of their own turn, with an empty stack. Both
+-- rules spell that window out in the same words; "sorcery speed" is the
+-- colloquial name for it and appears nowhere in the rules. (The
 -- priority requirement is implicit: the engine only offers actions to the player
 -- who holds priority.)
 --
@@ -45,7 +47,7 @@ sorcerySpeed pid gs =
     && null (GameState.stack gs)
 
 -- CR 117.1a / 304.1: an instant is castable whenever its controller has
--- priority; anything else needs sorcery speed (CR 601.3a). Priority is
+-- priority; anything else needs sorcery speed (CR 302.1 / 307.1). Priority is
 -- implicit: the engine only offers actions to the priority holder.
 timingOk :: PlayerId -> ObjectId -> GameState -> Bool
 timingOk pid oid gs = case Game.cardOf oid gs of

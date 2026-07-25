@@ -237,18 +237,18 @@ castTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         let (gs, oid) = S.pikerInHand mountain piker 1 Phase.PrecombatMain
         HU.assertBool "unaffordable" (not (Cast.castable S.alice oid gs)),
-      HU.testCase "CR 601.3a no creature spell in the upkeep" $ do
+      HU.testCase "CR 302.1 no creature spell in the upkeep" $ do
         mountain <- Registry.printing registry "Mountain"
         piker <- Registry.printing registry "Goblin Piker"
         let (gs, oid) = S.pikerInHand mountain piker 2 (Phase.Beginning BeginningStep.Upkeep)
         HU.assertBool "wrong timing" (not (Cast.castable S.alice oid gs)),
-      HU.testCase "CR 601.3a no creature spell with a non-empty stack" $ do
+      HU.testCase "CR 302.1 no creature spell with a non-empty stack" $ do
         mountain <- Registry.printing registry "Mountain"
         piker <- Registry.printing registry "Goblin Piker"
         let (gs, oid) = S.pikerInHand mountain piker 2 Phase.PrecombatMain
             busy = gs {GameState.stack = [ObjectId.MkObjectId 999]}
         HU.assertBool "stack not empty" (not (Cast.castable S.alice oid busy)),
-      HU.testCase "CR 601.3a a non-active player cannot cast at sorcery speed" $ do
+      HU.testCase "CR 302.1 a non-active player cannot cast at sorcery speed" $ do
         mountain <- Registry.printing registry "Mountain"
         piker <- Registry.printing registry "Goblin Piker"
         let (gs, oid) = S.pikerInHand mountain piker 2 Phase.PrecombatMain

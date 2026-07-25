@@ -208,7 +208,7 @@ an atomic shortcut, so the shape holds when mana abilities multiply.
 
 ### `Pawl.Cast`
 
-`Action.Cast ObjectId` is legal only at sorcery speed (CR 601.3a): a main phase,
+`Action.Cast ObjectId` is legal only at sorcery speed (CR 302.1 / 307.1): a main phase,
 the active player, an **empty stack**, and an affordable cost. This is the same
 timing gate as the land special action, and is factored as such.
 
@@ -333,7 +333,7 @@ property-based and integration-style tests that assert `GameState` after actions
 
 - *CR 305.6* — a Mountain's red mana ability is derived from its subtype.
 - *CR 500.4* — the pool is empty at the end of each step.
-- *CR 601.3a* — a creature spell is illegal in the upkeep, and illegal with a
+- *CR 302.1* — a creature spell is illegal in the upkeep, and illegal with a
   non-empty stack.
 - *CR 117.3c* — the caster retains priority after casting.
 - *CR 117.4* — a full round of passes resolves the top of the stack rather than

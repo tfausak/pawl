@@ -812,7 +812,7 @@ silenceTests registry =
         mountain <- Registry.printing registry "Mountain"
         piker <- Registry.printing registry "Goblin Piker"
         let (silenceId, bobsPiker, carolsPiker, before) = threeSeatSilenceBoard plains silence mountain piker
-            -- Goblin Piker is a creature, so CR 601.3a's sorcery speed applies: it is
+            -- Goblin Piker is a creature, so CR 302.1's timing applies: it is
             -- offered only to the ACTIVE player (Cast.sorcerySpeed). `before` is
             -- alice's own main phase (she needs no such window: Silence is an
             -- instant), so bob and carol's positive controls are checked against a

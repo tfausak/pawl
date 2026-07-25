@@ -391,7 +391,7 @@ defendingPlayerTests registry =
          in do
               HU.assertEqual "nobody defends" Nothing (Combat.Type.defender (GameState.combat after))
               HU.assertEqual "nobody was asked" [] asked,
-      HU.testCase "CR 800.4j a turn whose active player has left chooses no defending player" $
+      HU.testCase "CR 800.4h #181 a turn whose active player has left chooses no defending player, diverging from the next-seat reassignment" $
         -- CR 800.4j: the turn continues without an active player, so the action
         -- the rules assign to the active player has no subject. CR 800.4j is a
         -- priority rule and licenses no more than that; CR 800.4h would hand the
