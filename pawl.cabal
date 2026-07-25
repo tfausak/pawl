@@ -13,6 +13,9 @@ extra-doc-files:
   CHANGELOG.md
   README.md
 
+data-files:
+  data/cards/*.json
+
 source-repository head
   location: https://github.com/tfausak/pawl
   type: git
@@ -210,6 +213,16 @@ library
     Pawl.Type.Zone
     Pawl.Type.ZoneChange
     Pawl.Type.ZoneChangePattern
+
+  -- Cabal-generated; exposes getDataDir / getDataFileName for the data-files
+  -- declared above. Lives in the library (not each consuming stanza) so that a
+  -- single Pawl.Registry.defaultRoot can use it and every caller just calls
+  -- that function.
+  other-modules:
+    Paths_pawl
+
+  autogen-modules:
+    Paths_pawl
 
   hs-source-dirs: source/library
 

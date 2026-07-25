@@ -9,6 +9,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
+import qualified Paths_pawl as Paths
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
 import qualified Pawl.Type.Card as Card
@@ -23,6 +24,14 @@ new root = do
       { Registry.root = root,
         Registry.cache = cache
       }
+
+-- The card corpus's default root: data/cards declared as cabal data-files,
+-- resolved through the cabal-generated Paths_pawl so an installed pawl (not
+-- just an in-place checkout) finds its cards. A default, not a hidden global:
+-- 'new' still takes an explicit FilePath, so this is something callers opt
+-- into, and a future CLI's --cards-dir can pass something else entirely.
+defaultRoot :: IO FilePath
+defaultRoot = Paths.getDataFileName "data/cards"
 
 -- A card by name ("Goblin Piker") or by slug ("goblin-piker") -- slugify is
 -- idempotent, so both are the same lookup. Parsed at most once per registry; a

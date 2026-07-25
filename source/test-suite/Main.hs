@@ -39,7 +39,8 @@ import qualified Test.Tasty as Tasty
 
 main :: IO ()
 main = do
-  registry <- Registry.new "data/cards"
+  root <- Registry.defaultRoot
+  registry <- Registry.new root
   Tasty.defaultMain (testTree registry)
 
 testTree :: Registry.Type.Registry -> Tasty.TestTree

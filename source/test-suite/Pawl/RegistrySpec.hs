@@ -38,7 +38,9 @@ withCorpus label files action = do
 -- corpus. Read rather than inlined so this spec never becomes a second source
 -- of truth for a card's contents.
 pikerJson :: IO Text.Text
-pikerJson = TextIO.readFile "data/cards/goblin-piker.json"
+pikerJson = do
+  root <- Registry.defaultRoot
+  TextIO.readFile (root <> "/goblin-piker.json")
 
 -- Like withCorpus, but writes a single file's raw bytes rather than Text:
 -- withCorpus cannot express a file containing invalid UTF-8, since Text.Text

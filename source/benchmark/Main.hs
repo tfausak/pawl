@@ -185,7 +185,8 @@ loadRedDeck registry = do
 
 main :: IO ()
 main = do
-  registry <- Registry.new "data/cards"
+  root <- Registry.defaultRoot
+  registry <- Registry.new root
   deck <- loadRedDeck registry
   Bench.defaultMain
     [ Bench.bench "goldfish 2p" $ Bench.whnf (goldfish deck) 0,
