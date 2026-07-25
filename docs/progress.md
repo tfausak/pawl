@@ -2196,7 +2196,10 @@ its own gate card and spec, landed as it completes. Umbrella:
     `Combat.defender`, `Combat.attackableOpponents`, `Combat.chooseDefender` (CR
     507.1/703.4h), `Prompt.ChooseDefender` + `Response.ChoseDefender` with their
     `Replay` arms and every answerer arm, `S.threePlayerCombat`; deleted `Combat
-    .defendingPlayers`. Narrows #59; files #169, #170, #171, #180.
+    .defendingPlayers`. Narrows #59; files #180. (#169, #170 and #171 predate
+    this phase — filed at spec-authoring time — and are re-verified or left
+    untouched here, not newly filed; see the M5.6d completion comment on
+    #172.)
   - **e — close-out.** The `Opponent` axis proved at three seats rather than
     asserted (Silence stops both opponents; a `ControlledBy Opponent` pool spans
     both boards; a `Relative Opponent` count folds both zones), with the
