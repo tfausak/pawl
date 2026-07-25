@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
@@ -21,6 +22,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
+import qualified Pawl.Type.MulliganOffer as MulliganOffer
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import Pawl.Type.PlayerId (PlayerId)
@@ -67,8 +69,8 @@ keepAnswer p = case p of
 -- Mulligan while fewer than `k` taken, then keep. Bottom the first `count`.
 mulliganUpTo :: Int -> Prompt.Prompt r -> r
 mulliganUpTo k p = case p of
-  Prompt.DeclareMulligan _ _ taken ->
-    if fromIntegral taken < k then MulliganDecision.Mulligan else MulliganDecision.Keep
+  Prompt.DeclareMulligan _ _ offer ->
+    if fromIntegral (MulliganOffer.taken offer) < k then MulliganDecision.Mulligan else MulliganDecision.Keep
   _ -> S.identityAnswer p
 
 run :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
@@ -155,7 +157,7 @@ orderedLibraryGame mountain printings =
 -- chosen set.
 bottomReversedAnswer :: Prompt.Prompt r -> r
 bottomReversedAnswer p = case p of
-  Prompt.DeclareMulligan _ pid taken -> if pid == S.alice && taken < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep
+  Prompt.DeclareMulligan _ pid offer -> if pid == S.alice && MulliganOffer.taken offer < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> reverse (take (fromIntegral count) hand)
   _ -> S.identityAnswer p
 
@@ -227,8 +229,8 @@ shortPowderGame powder mountain =
 powderThenMulliganOnce :: Prompt.Prompt r -> r
 powderThenMulliganOnce p = case p of
   Prompt.MulliganAction _ _ candidates -> Maybe.listToMaybe candidates
-  Prompt.DeclareMulligan _ pid taken ->
-    if pid == S.alice && taken < 1 then MulliganDecision.Mulligan else MulliganDecision.Keep
+  Prompt.DeclareMulligan _ pid offer ->
+    if pid == S.alice && MulliganOffer.taken offer < 1 then MulliganDecision.Mulligan else MulliganDecision.Keep
   _ -> S.identityAnswer p
 
 -- Declines every window and mulligans once (alice only), recording how many
@@ -240,9 +242,9 @@ recordWindowRound p = case p of
   Prompt.MulliganAction {} -> do
     State.modify' (\(n, seen) -> (n, n : seen))
     pure Nothing
-  Prompt.DeclareMulligan _ pid taken -> do
+  Prompt.DeclareMulligan _ pid offer -> do
     State.modify' (\(n, seen) -> (n + 1, seen))
-    pure (if pid == S.alice && taken < 1 then MulliganDecision.Mulligan else MulliganDecision.Keep)
+    pure (if pid == S.alice && MulliganOffer.taken offer < 1 then MulliganDecision.Mulligan else MulliganDecision.Keep)
   -- Bottoms the LAST card, not the first. S.identityAnswer bottoms the first,
   -- which here is the Powder the mulligan just drew -- it would land at the
   -- library bottom and round 2 would have nothing to offer, so the test would
@@ -258,17 +260,31 @@ recordWindowPlayers p = case p of
   Prompt.MulliganAction _ pid _ -> do
     State.modify' (pid :)
     pure Nothing
-  Prompt.DeclareMulligan _ pid taken ->
-    pure (if pid == S.bob && taken < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep)
+  Prompt.DeclareMulligan _ pid offer ->
+    pure (if pid == S.bob && MulliganOffer.taken offer < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep)
+  _ -> pure (S.identityAnswer p)
+
+-- Records alice's offer at each of her declarations, chronologically reversed,
+-- and mulligans her twice before keeping; everyone else keeps at once. What the
+-- offer SAYS is the point: `taken` and the cards the next mulligan would bottom
+-- are different numbers once CR 103.5c's free mulligan exists.
+recordOffers :: Prompt.Prompt r -> State.State [(Natural, Natural)] r
+recordOffers p = case p of
+  Prompt.DeclareMulligan _ pid offer ->
+    if pid == S.alice
+      then do
+        State.modify' ((MulliganOffer.taken offer, MulliganOffer.bottomCount offer) :)
+        pure (if MulliganOffer.taken offer < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep)
+      else pure MulliganDecision.Keep
   _ -> pure (S.identityAnswer p)
 
 -- Records each DeclareMulligan's pid, so the test can assert a kept player is
 -- not asked again. Alice keeps immediately; bob mulligans twice then keeps.
 recordAsks :: Prompt.Prompt r -> State.State [PlayerId] r
 recordAsks p = case p of
-  Prompt.DeclareMulligan _ pid taken -> do
+  Prompt.DeclareMulligan _ pid offer -> do
     State.modify' (pid :)
-    pure (if pid == S.bob && taken < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep)
+    pure (if pid == S.bob && MulliganOffer.taken offer < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep)
   _ -> pure (S.identityAnswer p)
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
@@ -468,6 +484,22 @@ tests registry =
             two = asksIn [S.alice, S.bob] (libraryGame mountain 20)
         HU.assertEqual "three seats: alice may take eight mulligans" 8 (length (filter (== S.alice) three))
         HU.assertEqual "two seats: seven, unchanged" 7 (length (filter (== S.alice) two)),
+      HU.testCase "CR 103.5c: the declaration says what the mulligan COSTS, not just how many were taken" $ do
+        -- The two seat counts agree on `taken` at every step and disagree on the
+        -- cost at every step: three seats get CR 103.5c's free first mulligan,
+        -- so alice's opening declaration offers (taken 0, bottom 0) where a
+        -- two-player game offers (taken 0, bottom 1). An answerer holding only
+        -- the raw count cannot tell those apart, which is what #176 was about.
+        mountain <- Registry.printing registry "Mountain"
+        let offersIn owners gs0 = reverse (snd (State.runState (Program.foldProgramM recordOffers (State.runStateT (Mulligan.openingHands S.performer owners) gs0)) []))
+        HU.assertEqual
+          "three seats: the first mulligan is free, so it bottoms nothing"
+          [(0, 0), (1, 1), (2, 2)]
+          (offersIn [S.alice, S.bob, S.carol] (libraryGame3 mountain 20))
+        HU.assertEqual
+          "two seats: every mulligan costs, from the first"
+          [(0, 1), (1, 2), (2, 3)]
+          (offersIn [S.alice, S.bob] (libraryGame mountain 20)),
       HU.testCase "CR 103.5c: a mulligan that bottoms nothing asks nothing" $ do
         -- Where the rules leave nothing to ask, don't prompt: choosing zero of
         -- seven cards has exactly one legal answer. Today the free mulligan is

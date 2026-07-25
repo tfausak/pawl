@@ -25,6 +25,7 @@ import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
+import qualified Pawl.Type.MulliganOffer as MulliganOffer
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
@@ -83,7 +84,8 @@ combatReplayTests =
                 p = Prompt.ChooseEntryOption decider S.alice oid options
              in HU.assertEqual "round trip" (Just (1 :: Natural.Natural)) (Replay.decode p (Replay.encode p 1)),
           HU.testCase "DeclareMulligan records and replays a MulliganDecision" $
-            let p = Prompt.DeclareMulligan decider S.alice 0
+            let offer = MulliganOffer.MkMulliganOffer {MulliganOffer.taken = 0, MulliganOffer.bottomCount = 1}
+                p = Prompt.DeclareMulligan decider S.alice offer
              in HU.assertEqual "round trip" (Just MulliganDecision.Mulligan) (Replay.decode p (Replay.encode p MulliganDecision.Mulligan)),
           HU.testCase "Bottom records and replays an ordered [ObjectId]" $
             let p = Prompt.Bottom decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8] 1

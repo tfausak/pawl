@@ -13,6 +13,7 @@ import Pawl.Type.Decider (Decider)
 import Pawl.Type.EntryOption (EntryOption)
 import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.MulliganDecision (MulliganDecision)
+import Pawl.Type.MulliganOffer (MulliganOffer)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
@@ -221,15 +222,19 @@ data Prompt r where
   -- is genuinely choosing. Asked ONLY when two or more candidates are payable;
   -- one is forced, and where the rules leave nothing to ask, don't prompt.
   ChooseCost :: Decider -> PlayerId -> ObjectId -> [Cost] -> Prompt Cost
-  -- CR 103.5: whether this player takes a mulligan. The Natural is how many
-  -- mulligans they have ALREADY taken (0 on the first round), so an interpreter
-  -- can show "you will bottom N if you mulligan". Asked in turn order, once per
-  -- round, only while the player's current hand is > 0 cards (CR 103.5 final
-  -- sentence: no mulligans past a zero-card hand). A player who has kept is never
-  -- asked again (CR 103.5: keeping is terminal). Carries a Decider like every
-  -- other player-facing prompt; at game setup activeControl is Nothing, so it is
-  -- the player themselves (CR 723 satisfied for free).
-  DeclareMulligan :: Decider -> PlayerId -> Natural -> Prompt MulliganDecision
+  -- CR 103.5: whether this player takes a mulligan. The MulliganOffer carries
+  -- both halves of what a player at a table can see -- how many mulligans they
+  -- have already taken, and how many cards taking another would bottom. Those
+  -- diverge under CR 103.5c's free first mulligan, which is why the payload is
+  -- not the raw count it used to be (#176).
+  --
+  -- Asked in turn order, once per round, only while the player's current hand is
+  -- > 0 cards (CR 103.5 final sentence: no mulligans past a zero-card hand). A
+  -- player who has kept is never asked again (CR 103.5: keeping is terminal).
+  -- Carries a Decider like every other player-facing prompt; at game setup
+  -- activeControl is Nothing, so it is the player themselves (CR 723 satisfied
+  -- for free).
+  DeclareMulligan :: Decider -> PlayerId -> MulliganOffer -> Prompt MulliganDecision
   -- CR 103.5: after redrawing, put `count` cards from `hand` on the bottom of the
   -- library, in the player's chosen order. The [ObjectId] is the redrawn hand;
   -- the answer is an ordered list of exactly `count` of those ids (first-listed

@@ -166,6 +166,7 @@ library
     Pawl.Type.Modification
     Pawl.Type.MonarchTarget
     Pawl.Type.MulliganDecision
+    Pawl.Type.MulliganOffer
     Pawl.Type.MulliganPerformer
     Pawl.Type.Object
     Pawl.Type.ObjectId

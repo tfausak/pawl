@@ -51,6 +51,7 @@ import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
+import qualified Pawl.Type.MulliganOffer as MulliganOffer
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
@@ -1465,7 +1466,7 @@ firstPlayerAnswer starter p = case p of
 -- observable if someone actually takes one.
 mulliganOnceAnswer :: Prompt.Prompt r -> r
 mulliganOnceAnswer p = case p of
-  Prompt.DeclareMulligan _ _ taken -> if taken < 1 then MulliganDecision.Mulligan else MulliganDecision.Keep
+  Prompt.DeclareMulligan _ _ offer -> if MulliganOffer.taken offer < 1 then MulliganDecision.Mulligan else MulliganDecision.Keep
   _ -> S.identityAnswer p
 
 -- Records the candidate list of every Prompt.RandomFirstPlayer, rolling the first

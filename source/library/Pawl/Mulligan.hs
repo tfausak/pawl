@@ -15,6 +15,7 @@ import Pawl.Type.Effect (Effect)
 import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
+import qualified Pawl.Type.MulliganOffer as MulliganOffer
 import Pawl.Type.MulliganPerformer (MulliganPerformer)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
@@ -120,8 +121,8 @@ mulliganRounds perform counts deciding = do
       then pure (pid, MulliganDecision.Keep)
       else do
         decider <- State.gets (Decide.deciderFor pid)
-        let taken = Map.findWithDefault 0 pid counts
-        decision <- Trans.lift (Program.prompt (Prompt.DeclareMulligan decider pid taken))
+        offer <- State.gets (offerFor counts pid)
+        decision <- Trans.lift (Program.prompt (Prompt.DeclareMulligan decider pid offer))
         pure (pid, decision)
   let mulliganers = fmap fst (filter (\(_, d) -> d == MulliganDecision.Mulligan) decisions)
   case mulliganers of
@@ -158,6 +159,26 @@ mulliganRounds perform counts deciding = do
 freeMulligans :: GameState.GameState -> Numeric.Natural.Natural
 freeMulligans gs = if length (GameState.turnOrder gs) > 2 then 1 else 0
 
+-- CR 103.5 / 103.5c: what this player is told at their declaration -- the raw
+-- number of mulligans they have taken, and how many cards taking one more would
+-- put on the bottom of their library.
+--
+-- THE one place that turns a raw count into a cost. Both readers go through it:
+-- Prompt.DeclareMulligan reports it, and takeMulligan bottoms by it, so what a
+-- player is promised and what the mulligan actually costs cannot drift (#176).
+offerFor :: Map.Map PlayerId Numeric.Natural.Natural -> PlayerId -> GameState.GameState -> MulliganOffer.MulliganOffer
+offerFor counts pid gs =
+  let taken = Map.findWithDefault 0 pid counts
+      free = freeMulligans gs
+      count = taken + 1
+   in MulliganOffer.MkMulliganOffer
+        { MulliganOffer.taken = taken,
+          -- CR 103.5c: the free mulligans do not count. Natural subtraction is
+          -- partial below zero, so the comparison is explicit rather than
+          -- clamped after the fact.
+          MulliganOffer.bottomCount = if count > free then count - free else 0
+        }
+
 -- CR 103.5: one player takes a mulligan -- shuffle the hand back, redraw a full
 -- hand, then bottom "a number of those cards equal to the number of times that
 -- player has taken a mulligan", in the player's chosen order, less the free
@@ -170,12 +191,12 @@ takeMulligan counts pid = do
   Monad.forM_ handIds (\oid -> Event.changeZone oid Zone.Library)
   shuffleLibrary pid
   Monad.replicateM_ openingHand (Event.drawCard pid)
-  free <- State.gets freeMulligans
-  let count = Map.findWithDefault 0 pid counts + 1
-      -- CR 103.5c: the free mulligans do not count. Natural subtraction is
-      -- partial below zero, so the comparison is explicit rather than clamped
-      -- after the fact.
-      counted = if count > free then count - free else 0
+  -- The SAME offer the declaration prompt reported (offerFor is a pure function
+  -- of `counts`, `pid` and the seat roster, none of which the redraw above
+  -- touches), so this bottoms exactly what the player was promised.
+  offer <- State.gets (offerFor counts pid)
+  let count = MulliganOffer.taken offer + 1
+      counted = MulliganOffer.bottomCount offer
   newHand <- State.gets (Game.zoneMembers Zone.Hand pid)
   let n = min (fromIntegral counted) (length newHand)
   bottomChosen <-
