@@ -33,9 +33,10 @@ shuffleLibrary pid = do
 
 -- CR 103.5: draw opening hands, then run the declaration/mulligan/bottom round
 -- loop to completion. Assumes each player's library is already built and
--- shuffled. The per-player mulligan count is a local Map (absent = 0): no in-game
--- effect asks how many mulligans a player took (CR 103.5c would -- deferred, #148),
--- so it never enters GameState. `owners` is in turn order (starting player first).
+-- shuffled. The per-player mulligan count is a local Map (absent = 0): the only
+-- reader is this loop, which needs it for the number of cards bottomed (CR 103.5)
+-- less the free allowance (CR 103.5c), so it never enters GameState. `owners` is
+-- in turn order (starting player first).
 openingHands :: [PlayerId] -> Game ()
 openingHands owners = do
   -- CR 103.5 sentence 1: every player draws a full opening hand. A short library
@@ -77,24 +78,56 @@ mulliganRounds counts deciding = do
       -- Kept players have dropped out; only this round's mulliganers decide again.
       mulliganRounds counts' mulliganers
 
--- CR 103.5: one player takes a mulligan -- shuffle hand back, redraw a full hand,
--- then bottom `count` cards (count = mulligans now taken) in the player's order.
+-- CR 103.5c / CR 800.6: how many of a player's mulligans are free -- do not count
+-- toward the number of cards that player puts on the bottom of their library, or
+-- toward the number of mulligans they may take. CR 800.6: "In a multiplayer game,
+-- the first mulligan a player takes doesn't count toward the number of cards that
+-- player will put on the bottom of their library or the number of mulligans that
+-- player may take."
+--
+-- CR 800.1: "A multiplayer game is a game that begins with more than two
+-- players." BEGINS with, not currently has. GameState.turnOrder is the permanent
+-- seating roster (see Pawl.Type.GameState), so counting seats answers that
+-- directly, and a game that drops to two players by departure keeps its free
+-- mulligan. A rebuilt game (CR 727.1 restart, CR 729.2 subgame) is seated from
+-- the players who were in the game it came from, so it answers for itself.
+--
+-- A Natural rather than a Bool: the caller subtracts this, and a Bool would not
+-- say WHAT to subtract. CR 103.5c grants the same allowance for a second,
+-- independent reason -- any Brawl game (CR 903.12g) -- which pawl has no way to
+-- know it is playing (#174), so the seat count is the only cause today. A
+-- format layer redefines this function rather than chasing call sites.
+freeMulligans :: GameState.GameState -> Numeric.Natural.Natural
+freeMulligans gs = if length (GameState.turnOrder gs) > 2 then 1 else 0
+
+-- CR 103.5: one player takes a mulligan -- shuffle the hand back, redraw a full
+-- hand, then bottom "a number of those cards equal to the number of times that
+-- player has taken a mulligan", in the player's chosen order, less the free
+-- allowance (CR 103.5c, freeMulligans). The RAW count is what goes back into the
+-- map and what Prompt.DeclareMulligan reports: it is the number of mulligans
+-- taken, which is what CR 103.5c subtracts FROM.
 takeMulligan :: Map.Map PlayerId Numeric.Natural.Natural -> PlayerId -> Game (Map.Map PlayerId Numeric.Natural.Natural)
 takeMulligan counts pid = do
   handIds <- State.gets (Game.zoneMembers Zone.Hand pid)
   Monad.forM_ handIds (\oid -> Event.changeZone oid Zone.Library)
   shuffleLibrary pid
   Monad.replicateM_ openingHand (Event.drawCard pid)
+  free <- State.gets freeMulligans
   let count = Map.findWithDefault 0 pid counts + 1
+      -- CR 103.5c: the free mulligans do not count. Natural subtraction is
+      -- partial below zero, so the comparison is explicit rather than clamped
+      -- after the fact.
+      counted = if count > free then count - free else 0
   newHand <- State.gets (Game.zoneMembers Zone.Hand pid)
-  let n = min (fromIntegral count) (length newHand)
+  let n = min (fromIntegral counted) (length newHand)
   bottomChosen <-
-    if length newHand >= 2
+    if n > 0 && length newHand >= 2
       then do
         decider <- State.gets (Decide.deciderFor pid)
         Trans.lift (Program.prompt (Prompt.Bottom decider pid newHand (fromIntegral n)))
-      else -- CR 103.5: with a hand of 0 or 1 there is one possible outcome; where the
-      -- rules leave nothing to ask, don't prompt -- bottom whatever is there.
+      else -- CR 103.5: with nothing to bottom (a free mulligan, CR 103.5c) or a
+      -- hand of 0 or 1, there is exactly one possible outcome; where the rules
+      -- leave nothing to ask, don't prompt -- bottom whatever `n` names.
         pure (take n newHand)
   Monad.forM_ bottomChosen (\oid -> Event.changeZone oid Zone.Library)
   pure (Map.insert pid count counts)

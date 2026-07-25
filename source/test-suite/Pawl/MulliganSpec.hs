@@ -9,6 +9,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
@@ -16,6 +17,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.Object as Object
@@ -25,6 +27,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Registry as Registry.Type
+import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -69,6 +72,35 @@ mulliganUpTo k p = case p of
 
 run :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 run answer gs = snd (Engine.runGamePure answer gs (Mulligan.openingHands [S.alice, S.bob]))
+
+-- CR 800.1: the three-seat twin of libraryGame -- n Mountains in each of the
+-- three players' libraries, nothing elsewhere. The SEAT COUNT is what CR 103.5c
+-- reads (through Mulligan.freeMulligans), so this must be built from
+-- S.threePlayers: a two-seat game with a third player's cards in it is not a
+-- multiplayer game.
+libraryGame3 :: Printing.Printing -> Int -> GameState.GameState
+libraryGame3 mountain n =
+  let g0 = Setup.emptyGame S.threePlayers
+      addMany pid g = List.foldl' (\h _ -> snd (S.addCreature mountain pid h)) g (replicate n ())
+   in poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany S.carol (addMany S.bob (addMany S.alice g0)))))
+
+-- run, for three seats. CR 103.5: the declaration order is the turn order, so
+-- the list is [alice, bob, carol] and not a set.
+run3 :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+run3 answer gs = snd (Engine.runGamePure answer gs (Mulligan.openingHands [S.alice, S.bob, S.carol]))
+
+-- Always mulligan, recording every player asked. How many times a player is
+-- ASKED is how pawl expresses CR 103.5's limit ("A player can take mulligans
+-- until their opening hand would be zero cards, after which they may not take
+-- further mulligans"): a hand of zero is a forced keep and is never asked. So
+-- counting asks is how CR 103.5c's second clause -- the free mulligan does not
+-- count toward the number of mulligans a player may take -- becomes observable.
+recordAlwaysMulligan :: Prompt.Prompt r -> State.State [PlayerId] r
+recordAlwaysMulligan p = case p of
+  Prompt.DeclareMulligan _ pid _ -> do
+    State.modify' (pid :)
+    pure MulliganDecision.Mulligan
+  _ -> pure (S.identityAnswer p)
 
 -- Alice's library in an explicit, non-uniform order of 20 pairwise-DISTINCT
 -- printings, so an individual library card can be told apart by its printed
@@ -214,5 +246,56 @@ tests registry =
             addMany pid n g = List.foldl' (\h _ -> snd (S.addCreature mountain pid h)) g (replicate n ())
             gs0 = poolToLibrary S.bob (poolToLibrary S.alice (addMany S.bob 5 (addMany S.alice 20 g0)))
             after = run (mulliganUpTo 1) gs0
-        HU.assertBool "bob drew from an empty library" (Set.member S.bob (GameState.drewFromEmpty after))
+        HU.assertBool "bob drew from an empty library" (Set.member S.bob (GameState.drewFromEmpty after)),
+      HU.testCase "CR 103.5c/800.6: one free mulligan at three seats, none at two" $ do
+        HU.assertEqual "three seats: the first mulligan is free" 1 (Mulligan.freeMulligans S.threePlayerGame)
+        HU.assertEqual "two seats: none is" 0 (Mulligan.freeMulligans (Setup.emptyGame S.bothPlayers)),
+      HU.testCase "CR 800.1: a game that BEGAN with three players keeps its free mulligan after a departure" $
+        -- CR 800.1: "A multiplayer game is a game that begins with more than two
+        -- players." Begins with, not currently has. GameState.turnOrder is the
+        -- permanent seating roster, so this stays 1 with two survivors; an
+        -- implementation that counted Departure.stillPlaying would answer 0.
+        HU.assertEqual
+          "still one free mulligan with two survivors"
+          1
+          (Mulligan.freeMulligans (Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame)),
+      HU.testCase "CR 103.5c: the first mulligan bottoms nothing and the second bottoms one" $ do
+        -- Two runs over the same three-seat board. Today both bottom one more
+        -- card than they should: takeMulligan bottoms `count` unconditionally,
+        -- so the first mulligan leaves a hand of 6 and the second a hand of 5.
+        mountain <- Registry.printing registry "Mountain"
+        let once = run3 (mulliganUpTo 1) (libraryGame3 mountain 20)
+            twice = run3 (mulliganUpTo 2) (libraryGame3 mountain 20)
+        HU.assertEqual "alice's free first mulligan keeps all seven" 7 (S.handSize S.alice once)
+        HU.assertEqual "bob's too" 7 (S.handSize S.bob once)
+        HU.assertEqual "carol's too" 7 (S.handSize S.carol once)
+        HU.assertEqual "and nothing went to the bottom of alice's library" 13 (libSize S.alice once)
+        HU.assertEqual "the second mulligan bottoms exactly one" 6 (S.handSize S.alice twice)
+        HU.assertEqual "two-player: unchanged, the first mulligan bottoms one" 6 (S.handSize S.alice (run (mulliganUpTo 1) (libraryGame mountain 20))),
+      HU.testCase "CR 103.5c second clause: the free mulligan does not count toward the limit either" $ do
+        -- Hand + library is 20 throughout, so the redraw is always a full seven
+        -- and the process ends exactly when the bottomed count reaches seven.
+        -- Two seats: hands run 6,5,4,3,2,1,0 -- seven asks. Three seats: the
+        -- first is free, so 7,6,5,4,3,2,1,0 -- eight asks. Today both give
+        -- seven, because the free allowance does not exist.
+        mountain <- Registry.printing registry "Mountain"
+        let asksIn owners gs0 = snd (State.runState (Program.foldProgramM recordAlwaysMulligan (State.runStateT (Mulligan.openingHands owners) gs0)) [])
+            three = asksIn [S.alice, S.bob, S.carol] (libraryGame3 mountain 20)
+            two = asksIn [S.alice, S.bob] (libraryGame mountain 20)
+        HU.assertEqual "three seats: alice may take eight mulligans" 8 (length (filter (== S.alice) three))
+        HU.assertEqual "two seats: seven, unchanged" 7 (length (filter (== S.alice) two)),
+      HU.testCase "CR 103.5c: a mulligan that bottoms nothing asks nothing" $ do
+        -- Where the rules leave nothing to ask, don't prompt: choosing zero of
+        -- seven cards has exactly one legal answer. Today the free mulligan is
+        -- not free, so each of the three players is asked to bottom one card and
+        -- three Response.PutOnBottom entries are recorded.
+        mountain <- Registry.printing registry "Mountain"
+        let bottomsIn owners gs0 =
+              let (_, log_) = Replay.record (mulliganUpTo 1) gs0 (Mulligan.openingHands owners)
+                  isBottom r = case r of
+                    Response.PutOnBottom _ -> True
+                    _ -> False
+               in length (filter isBottom log_)
+        HU.assertEqual "three seats: no bottom choice is asked for a free mulligan" 0 (bottomsIn [S.alice, S.bob, S.carol] (libraryGame3 mountain 20))
+        HU.assertEqual "two seats: both players are still asked" 2 (bottomsIn [S.alice, S.bob] (libraryGame mountain 20))
     ]
