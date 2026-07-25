@@ -843,7 +843,26 @@ turnOrderTests =
             after = S.runPure S.identityAnswer gone Engine.handoffTurn
          in do
               HU.assertEqual "the active player is unchanged" S.alice (GameState.activePlayer after)
-              HU.assertEqual "no turn began" 1 (GameState.turnNumber after)
+              HU.assertEqual "no turn began" 1 (GameState.turnNumber after),
+      HU.testCase "CR 800.4b a pending control whose decider has left is not promoted" $
+        -- bob Mindslavered carol; bob then left the game. When carol's turn
+        -- begins, she is NOT controlled: "If a player would be controlled by a
+        -- player who has left the game, they aren't."
+        let armed = S.threePlayerGame {GameState.pendingControl = Map.singleton S.carol (Decider.MkDecider S.bob)}
+            gone = Departure.depart Departure.Type.Conceded S.bob armed
+            after = S.runPure S.identityAnswer gone Engine.handoffTurn
+         in do
+              HU.assertEqual "carol's turn began" S.carol (GameState.activePlayer after)
+              HU.assertEqual "she is uncontrolled" Nothing (GameState.activeControl after)
+              HU.assertEqual "and the stale entry is gone" Map.empty (GameState.pendingControl after),
+      HU.testCase "CR 723.1b a pending control whose decider is still playing IS promoted" $
+        -- The control assertion: the same board with bob still in the game. If
+        -- this passed either way, the case above would prove nothing.
+        let armed = S.threePlayerGame {GameState.pendingControl = Map.singleton S.bob (Decider.MkDecider S.alice)}
+            after = S.runPure S.identityAnswer armed Engine.handoffTurn
+         in do
+              HU.assertEqual "bob's turn began" S.bob (GameState.activePlayer after)
+              HU.assertEqual "alice controls him" (Just (Decider.MkDecider S.alice)) (GameState.activeControl after)
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
