@@ -2,7 +2,7 @@
 
 -- Covers Pawl.Game, Pawl.Engine, and Pawl.Action: zones and changeZone, legal
 -- actions, object facts, engine steps, and engine-rule integration (priority
--- rounds, the CR 103.7a draw skip, CR 514.2 discard, CR 704.5b deck-out).
+-- rounds, the CR 103.8a draw skip, CR 514.2 discard, CR 704.5b deck-out).
 module Pawl.GameSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -372,11 +372,11 @@ ruleTests registry =
         mountain <- Registry.printing registry "Mountain"
         piker <- Registry.printing registry "Goblin Piker"
         HU.assertEqual "alice twice, then bob" [S.alice, S.alice, S.bob] (take 3 (askedPlayers mountain piker)),
-      HU.testCase "CR 103.7a starting player skips first draw" $ do
+      HU.testCase "CR 103.8a starting player skips first draw" $ do
         gs <- aliceFirstDraw registry
         HU.assertEqual "hand" 7 (S.handSize S.alice gs)
         HU.assertEqual "library" 53 (librarySize S.alice gs),
-      HU.testCase "CR 103.7a only the starting player skips" $ do
+      HU.testCase "CR 103.8a only the starting player skips" $ do
         gs <- bobFirstDraw registry
         HU.assertEqual "hand" 8 (S.handSize S.bob gs)
         HU.assertEqual "library" 52 (librarySize S.bob gs),
@@ -551,7 +551,7 @@ ruleTests registry =
       -- engine only asks. Both players get libraries of EXACTLY seven, so each
       -- opening hand (CR 103.5) empties its library without drawing from empty:
       -- nobody loses during setup. The starting player then skips their first
-      -- draw (CR 103.7a), so the OTHER player is the one who draws from an empty
+      -- draw (CR 103.8a), so the OTHER player is the one who draws from an empty
       -- library on turn 2 and decks (CR 704.5b) -- the subgame's winner is
       -- exactly whoever the roll started. Flipping the answer flips the winner,
       -- which is what makes the determination observable rather than cosmetic.
@@ -575,7 +575,7 @@ ruleTests registry =
               _ -> False
          in HU.assertEqual "no first-player roll was recorded" 0 (length (filter isRoll log_)),
       HU.testCase "CR 103.1/729.2: the subgame's turn order is rotated to begin with the starting player" $
-        -- Not just activePlayer: Engine.skipsDraw (CR 103.7a) reads the HEAD of
+        -- Not just activePlayer: Engine.skipsDraw (CR 103.8a) reads the HEAD of
         -- the turn order, so a subgame that set one without the other would hand
         -- the skip to the wrong player.
         let sub = Setup.subgameStateFrom S.bob (Setup.emptyGame S.bothPlayers)

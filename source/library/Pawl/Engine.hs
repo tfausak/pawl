@@ -150,7 +150,7 @@ discardToHandSize pid = do
             toDiscard = take excess (filter inHand chosen)
         Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toDiscard
 
--- CR 103.7a: the starting player skips their first draw step.
+-- CR 103.8a: the starting player skips their first draw step.
 skipsDraw :: GameState -> Bool
 skipsDraw gs =
   GameState.turnNumber gs == 1

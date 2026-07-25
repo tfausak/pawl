@@ -241,7 +241,7 @@ restartGame starter = do
 -- (Engine.playSubgame asks Prompt.RandomFirstPlayer); `starter` is what it rolled.
 -- CR 103.1: the turn order is rotated to begin with them, exactly as CR 727.1a's
 -- restart does -- rotating rather than only setting activePlayer is load-bearing,
--- because Engine.skipsDraw (CR 103.7a) tests the HEAD of the turn order. Total: a
+-- because Engine.skipsDraw (CR 103.8a) tests the HEAD of the turn order. Total: a
 -- `starter` outside the order leaves it alone (rotateTo), and activePlayer is read
 -- back off the rotated order, so the two can never disagree.
 subgameStateFrom :: PlayerId -> GameState -> GameState
