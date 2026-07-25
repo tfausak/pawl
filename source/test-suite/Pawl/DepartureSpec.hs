@@ -255,5 +255,46 @@ tests registry =
         HU.assertEqual "bob controls nothing" [] (controlledBy S.bob)
         HU.assertEqual "nothing of his is left on the stack -- his spell IS a card, so clause 1 is what removed it" [] (GameState.stack gone)
         HU.assertEqual "alice's Myr survived and reverted to her" (Just S.alice) (Projection.controllerOf aliceMyr gone)
-        HU.assertEqual "CR 104.2a: two survivors, so the game continues" Nothing (GameState.result gone)
+        HU.assertEqual "CR 104.2a: two survivors, so the game continues" Nothing (GameState.result gone),
+      -- CR 800.4a with control from a STATIC ability (CR 613.1b) rather than a
+      -- stored effect -- the third source of control, which the clause-3 and
+      -- clause-4 proofs in Pawl.Departure have to survive. Alice owns AND
+      -- controls the Control Magic, so clause 1 carries it out of the game with
+      -- her and the static ability goes with its source (CR 611.3b); clause 2
+      -- never has to look at it.
+      HU.testCase "CR 800.4a: a departing player's own Control Magic leaves with her and releases the creature" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        let (creature, withCreature) = S.addCreature piker S.bob S.threePlayerGame
+            (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+            attached = S.attach aura creature withAura
+            after = Departure.depart Departure.Type.Conceded S.alice attached
+        HU.assertEqual "alice controlled it before she left" (Just S.alice) (Projection.controllerOf creature attached)
+        HU.assertEqual "the Aura left the game with her" Nothing (Game.lookupObject aura after)
+        HU.assertEqual "and bob has his creature back" (Just S.bob) (Projection.controllerOf creature after)
+        HU.assertEqual "which is control returning, not an exile -- clause 4 found nothing" (Just Zone.Battlefield) (fmap Object.zone (Game.lookupObject creature after)),
+      -- The case clause 1 does NOT cover: the departing player CONTROLS a
+      -- control-granting source they do not OWN. Bob has stolen alice's Control
+      -- Magic (a stored SetController), and it is enchanting carol's creature, so
+      -- CR 109.5's "you" for the Aura's static ability reads as bob. Clause 1
+      -- removes nothing here -- bob owns neither object. Clause 2 ends the stored
+      -- SetController naming bob, which hands the Aura back to alice, and CR
+      -- 611.3a's "isn't locked in" then re-derives the grant to alice. So the
+      -- creature is never "still controlled by" bob and clause 4 does not exile
+      -- it -- which is the chain nonCardStackObjectsCease and
+      -- remainingControlledExiled rely on being closed.
+      HU.testCase "CR 800.4a: a departing player's stolen Control Magic reverts to its owner, taking the creature with it" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        let (creature, withCreature) = S.addCreature piker S.carol S.threePlayerGame
+            (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+            attached = S.attach aura creature withAura
+            stolen = S.giveControl aura S.bob attached
+            after = Departure.depart Departure.Type.Conceded S.bob stolen
+        HU.assertEqual "bob controlled the Aura he does not own" (Just S.bob) (Projection.controllerOf aura stolen)
+        HU.assertEqual "and so controlled carol's creature through it" (Just S.bob) (Projection.controllerOf creature stolen)
+        HU.assertEqual "the Aura is alice's again -- she owns it and clause 1 did not touch it" (Just S.alice) (Projection.controllerOf aura after)
+        HU.assertEqual "so the static ability now grants the creature to alice" (Just S.alice) (Projection.controllerOf creature after)
+        HU.assertEqual "neither was exiled: nothing was still controlled by bob" (Just Zone.Battlefield, Just Zone.Battlefield) (fmap Object.zone (Game.lookupObject aura after), fmap Object.zone (Game.lookupObject creature after))
+        HU.assertEqual "bob controls nothing" [] (Projection.controls S.bob after)
     ]

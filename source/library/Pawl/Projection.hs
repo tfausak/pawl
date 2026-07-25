@@ -1015,10 +1015,14 @@ controls pid gs =
 givesControlTo :: PlayerId.PlayerId -> ContinuousEffect.ContinuousEffect -> Bool
 givesControlTo pid eff = case ContinuousEffect.modification eff of
   Modification.SetController who -> who == pid
-  -- A STORED ContinuousEffect never carries this: it is producible only by a
-  -- static ability, which the projection re-derives and never stores. CR 800.4a's
-  -- second clause ends stored effects, so there is nothing here to end -- the
-  -- static-ability path is handled by clause 1 removing the source object (see
-  -- Pawl.Departure).
+  -- This one names no player, so it cannot be classified from the effect alone:
+  -- CR 109.5 makes its player the current controller of the effect's SOURCE,
+  -- which needs a GameState this function does not take. False is right for
+  -- every state pawl can reach -- the constructor is authored only on Control
+  -- Magic's static ability, which the projection re-derives and never stores, so
+  -- no stored effect carries it. The residual case (card JSON authoring one into
+  -- an Effect.ModifyTarget) is #199, and it does not endanger CR 800.4a's third
+  -- and fourth clauses either way, because a derived player is the source's
+  -- controller -- see the induction in Pawl.Departure.
   Modification.SetControllerToSource -> False
   _ -> False

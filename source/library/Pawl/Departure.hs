@@ -65,10 +65,11 @@ depart reason pid gs =
       -- CR 800.4a's own ordering ("Then ... Then ...") is load-bearing, so the
       -- clauses are composed in the rule's order and nothing here reorders them.
       -- They run before the status flip, and THAT much is arbitrary: no clause
-      -- reads Player.status (Projection.controllerOf is an object's owner
-      -- overridden by a layer-2 SetController and nothing else), and
-      -- continuesAfterDeparture reads GameState.turnOrder, which the flip does
-      -- not touch. The flip's position is load-bearing only for the monarch
+      -- reads Player.status (Projection.controllerOf reads owners, stored
+      -- continuous effects and the battlefield's static abilities -- see
+      -- nonCardStackObjectsCease for the full list -- and none of those is a
+      -- player's status), and continuesAfterDeparture reads GameState.turnOrder,
+      -- which the flip does not touch. The flip's position is load-bearing only for the monarch
       -- call below, which Monarch.reassignOnDeparture requires to have already
       -- happened -- see its own haddock.
       settled =
@@ -183,7 +184,7 @@ objectsLeaveWith pid gs =
 -- CR 800.4a, second clause: "any effects which give that player control of any
 -- objects or players end."
 --
--- Three carriers, because pawl has three ways to give control:
+-- Three carriers, because pawl STORES control in three places:
 --
 --   * a stored layer-2 SetController continuous effect (Master Thief, Act of
 --     Treason -- both in the pool). Projection.givesControlTo makes the match, so
@@ -194,6 +195,24 @@ objectsLeaveWith pid gs =
 --     a player who has left the game, they aren't", says the same thing one step
 --     later at Engine.beginTurnOf's promotion. Two rules, one outcome; neither is
 --     the other's spare.
+--
+-- Control has a FOURTH source that is deliberately absent from that list: a
+-- layer-2 control-granting STATIC ability (Control Magic's
+-- Modification.SetControllerToSource, CR 613.1b), which
+-- Projection.controlGrants re-derives from the battlefield at every projection
+-- and never stores. There is nothing here to filter, and filtering is not what
+-- the rule wants either. CR 611.3b: a static ability's continuous effect
+-- "applies at all times that the permanent generating it is on the
+-- battlefield", and CR 611.3a: it "isn't 'locked in'". CR 109.5 fixes what it
+-- says -- "For a static ability, [you] is the current controller of the object
+-- it's on". So the effect stops giving the departing player control exactly
+-- when its SOURCE stops being theirs, which the other clauses already do: if
+-- they OWN the source it left with the first clause, and if they merely
+-- CONTROLLED it, the effect that gave them the source is a stored carrier this
+-- clause just ended, and the grant re-derives to the source's new controller
+-- on the next projection. One residual divergence, unreachable in this pool:
+-- a stored SetControllerToSource, which card JSON could author through
+-- Effect.ModifyTarget, is not ended here (#199).
 --
 -- CR 800.4a is immediate: "It happens as soon as the player leaves the game."
 -- Master Thief's ForAsLongAs condition would eventually drop its effect through
@@ -218,11 +237,40 @@ controlEffectsEnd pid gs =
 -- and left with the first clause.
 --
 -- Empty by construction once the first two clauses have run, and the proof is
--- worth writing down rather than trusting: Projection.controllerOf is an object's
--- OWNER overridden by a layer-2 SetController and nothing else, the first clause
--- deleted every object the departing player owned, and the second deleted every
--- SetController naming them. Written anyway, so a second source of control could
--- not silently skip a clause of this rule -- nothing would warn.
+-- worth writing down rather than trusting -- it is stated once here and
+-- remainingControlledExiled leans on the same statement, because the two
+-- clauses ask the same question of different zones.
+--
+-- Projection.controllerOf has THREE sources, and the claim is that after
+-- clauses 1 and 2 none of them can answer `pid` for any surviving object,
+-- anywhere:
+--
+--   1. the object's OWNER, the default. Object.owner is baked at creation and
+--      never mutated, and the first clause deleted every object `pid` owned, so
+--      no surviving object has this answer.
+--   2. a stored layer-2 SetController, whose PlayerId is BAKED at resolution
+--      (CR 611.2c). The second clause deleted every stored effect whose payload
+--      is `pid`, whichever object it affects, so no surviving effect has this
+--      answer.
+--   3. a layer-2 control-granting STATIC ability
+--      (Modification.SetControllerToSource, CR 613.1b), which
+--      Projection.controlGrants re-derives from the battlefield. This one names
+--      no player: CR 109.5's "you" for a static ability is "the current
+--      controller of the object it's on", so its answer is
+--      controllerOf(source) -- the same question one object further along.
+--
+-- Source 3 is therefore not a base case but a recursion, and the proof is an
+-- induction over it. Projection.controllerOfGiven carries a visited set that
+-- grows on every step and returns the object's OWNER when it revisits, so the
+-- recursion terminates on a finite object pool, and every leaf it terminates on
+-- is source 1 or source 2 -- both of which cannot be `pid`. Hence no object of
+-- any kind, on the stack or off it, still reads as controlled by `pid`. That
+-- covers the case clause 1 alone does not: a departing player who CONTROLS a
+-- control-granting Aura they do not OWN. The Aura stays, but whatever made it
+-- theirs was source 2 or another source-3 step, and the induction closes both.
+--
+-- Written anyway, so a FOURTH source of control could not silently skip a
+-- clause of this rule -- nothing would warn.
 nonCardStackObjectsCease :: PlayerId -> GameState -> GameState
 nonCardStackObjectsCease pid gs =
   let notACard oid = case Game.lookupObject oid gs of
@@ -252,23 +300,30 @@ nonCardStackObjectsCease pid gs =
 -- "the stack was just swept, so the battlefield is the whole search" --
 -- nonCardStackObjectsCease's sweep explicitly skips cards, so a controlled
 -- SPELL would still be sitting on the stack if that were the only reason. The
--- real reason is unconditional: Object.owner is baked in at creation for
--- every kind of stack object and never mutated afterward -- Activate.hs:80
--- stamps the activating player (CR 113.8, activated ability), Engine.hs:321
--- stamps the triggering ability's controller (CR 113.8/603.3a, triggered
--- ability), Monarch.hs:138 stamps the inherent monarch trigger's controller
--- the same way, and a spell's owner is fixed when it is cast. Modification is
--- a flat sum with exactly one construction site for SetController
--- (Resolve.hs:880, Effect.GainControl, whose payload is always the granting
--- effect's source's controller at resolution). So once clause 1 has deleted
--- every object `pid` OWNS and clause 2 has ended every SetController naming
--- `pid` (regardless of which object it targets), Projection.controllerOf's
--- two cases -- owner, or the latest SetController naming this object -- can
--- both no longer read as `pid`, for any object of any kind, on the stack or
--- off it. The stack contributes nothing to this clause's search either way.
+-- real reason is nonCardStackObjectsCease's induction, which is unconditional
+-- over Projection.controllerOf's three sources and therefore says the same
+-- thing about a stack object as about a battlefield one. The stack contributes
+-- nothing to this clause's search either way.
+--
+-- Two premises of that induction live here, at the sites that would break them:
+--
+--   * Object.owner is baked in at creation for every kind of stack object and
+--     never mutated afterward -- Activate.hs stamps the activating player
+--     (CR 113.8, activated ability), Engine.hs stamps the triggering ability's
+--     controller (CR 113.8/603.3a, triggered ability), Monarch.hs stamps the
+--     inherent monarch trigger's controller the same way, and a spell's owner
+--     is fixed when it is cast. No later write can turn an object `pid` does
+--     not own into one they do, so clause 1's deletion is exhaustive and stays
+--     so.
+--   * Modification has exactly one construction site for SetController with a
+--     baked player -- Resolve.hs's Effect.GainControl arm, whose payload is
+--     always the granting effect's source's controller at resolution. It is the
+--     only shape clause 2 can recognize by payload, and it is the only stored
+--     shape there is: SetControllerToSource carries no player, and no card in
+--     the pool authors one into a stored effect (#199).
 --
 -- Empty by construction, for the reason just given -- which is also why
--- nonCardStackObjectsCease is empty. Written anyway, so a second source of
+-- nonCardStackObjectsCease is empty. Written anyway, so a fourth source of
 -- control could not silently skip a clause of this rule -- nothing would
 -- warn. The exile is a direct move rather than an
 -- Event.changeZone: this function is pure, so it cannot funnel, and a
