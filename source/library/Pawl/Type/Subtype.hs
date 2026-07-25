@@ -37,4 +37,9 @@ data Subtype
   | Elf -- CR 205.3m (a creature type; Glistener Elf's)
   | Nightmare -- CR 205.3m (a creature type; Nightmare's own)
   | Horse -- CR 205.3m (a creature type; Nightmare's)
+  | -- CR 205.3h (an ENCHANTMENT type, not a creature type -- the first non-land,
+    -- non-creature subtype in this pool). Appended rather than grouped with the
+    -- other enchantment types, of which there are none, so every existing card's
+    -- Ord-canonical subtype list is unchanged.
+    Aura
   deriving (Eq, Ord, Show)

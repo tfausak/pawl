@@ -107,6 +107,8 @@ manaTests registry =
       HU.testCase "CR 305.6 Island taps blue, Plains taps white" $ do
         HU.assertEqual "island" (Just (ManaType.Colored Color.Blue)) (Mana.subtypeMana Subtype.Island)
         HU.assertEqual "plains" (Just (ManaType.Colored Color.White)) (Mana.subtypeMana Subtype.Plains),
+      HU.testCase "CR 205.3h: Aura is an enchantment type, so it has no CR 305.6 intrinsic mana" $
+        HU.assertEqual "no mana" Nothing (Mana.subtypeMana Subtype.Aura),
       HU.testCase "an empty pool starts empty" $ do
         mountain <- Registry.printing registry "Mountain"
         HU.assertEqual "empty" 0 (poolSize S.alice (S.landsInPlay mountain 2)),

@@ -92,6 +92,10 @@ subtypeMana subtype = case subtype of
   -- CR 205.3m: Horse is a creature type, not a basic land type, so CR 305.6's
   -- intrinsic mana ability never applies to it.
   Subtype.Horse -> Nothing
+  -- CR 205.3h: Aura is an enchantment type. CR 305.6's intrinsic mana ability is
+  -- a property of BASIC LAND types only, so this is Nothing for the same reason
+  -- every creature type above is.
+  Subtype.Aura -> Nothing
 
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
 -- PLUS every projected activated ability that is a mana ability (CR 605.1a),
