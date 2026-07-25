@@ -2,6 +2,7 @@ module Pawl.Monarch where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -164,3 +165,46 @@ returnExiledForMonarch = do
                 _ <- Event.changeZoneReturning oid Zone.Battlefield
                 State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g)})
               pure True
+
+-- CR 725.4: "If the monarch leaves the game, the active player becomes the
+-- monarch at the same time as that player leaves the game. If the active player
+-- is leaving the game or if there is no active player, the next player in turn
+-- order who can become the monarch becomes the monarch. If no player still in
+-- the game can become the monarch, the game continues with no monarch."
+--
+-- `playing` is the still-playing seats in SEATING order, injected by the caller
+-- rather than computed here: Pawl.Departure calls this at the moment of
+-- departure (CR 725.4's "at the same time as that player leaves the game"), so
+-- this module may not import Pawl.Departure to ask. Same injected-value idiom
+-- Pawl.Count uses for its ViewOf.
+--
+-- Called with `leaving` ALREADY marked departed, so "is leaving the game" and
+-- "has left the game" are one test: the rule's first two sentences collapse to
+-- "is the active player still in the game?". CR 800.4j is why "there is no
+-- active player" needs no separate arm -- a turn whose active player has left
+-- continues with GameState.activePlayer still naming their seat, so the absence
+-- of an active player IS that seat having departed.
+--
+-- "the next player in turn order" is read as the next seat after the ACTIVE
+-- player's, because the active player's seat is the only position in the turn
+-- order the rule gives to count from.
+--
+-- "who can become the monarch" is read as "is still in the game": no card in the
+-- pool prevents a player from becoming the monarch, and the phrase exists for
+-- cards that do (#N -- replace with the issue filed in Task 11).
+reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
+reassignOnDeparture leaving playing gs =
+  if GameState.monarch gs /= Just leaving
+    then gs
+    else
+      let active = GameState.activePlayer gs
+          walk = case List.break (== active) (GameState.turnOrder gs) of
+            (before, _ : after) -> after <> before
+            (before, []) -> before
+          next = List.find (\pid -> List.elem pid playing) walk
+       in gs
+            { GameState.monarch =
+                if List.elem active playing
+                  then Just active
+                  else next
+            }

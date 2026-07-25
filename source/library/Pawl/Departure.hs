@@ -4,6 +4,7 @@ import Control.Applicative ((<|>))
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Pawl.Monarch as Monarch
 import Pawl.Type.Departure (Departure)
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
@@ -41,12 +42,19 @@ stillPlayingInOrder gs =
   let playing = stillPlaying gs
    in filter (\pid -> List.elem pid playing) (GameState.turnOrder gs)
 
--- Mark a player as having left, with the reason they left. Pure, because the SBA
--- pass folds it over several players before recomputing the outcome once.
+-- Mark a player as having left, with the reason they left, and perform
+-- everything the rules attach to that moment. Pure, because the CR 704.5 pass
+-- folds it over several players before recomputing the outcome once.
+--
+-- CR 725.4 belongs INSIDE this function, not after it: "the active player becomes
+-- the monarch at the same time as that player leaves the game." Both doors --
+-- Departure.leaveGame (CR 104.3a) and Pawl.Sba's fold (CR 704.5) -- get it by
+-- construction rather than by remembering to call it.
 depart :: Departure -> PlayerId -> GameState -> GameState
 depart reason pid gs =
   let lose p = p {Player.status = Status.Departed reason}
-   in gs {GameState.players = Map.adjust lose pid (GameState.players gs)}
+      flipped = gs {GameState.players = Map.adjust lose pid (GameState.players gs)}
+   in Monarch.reassignOnDeparture pid (stillPlayingInOrder flipped) flipped
 
 -- CR 104.2a: "A player still in the game wins the game if that player's opponents
 -- have all left the game."

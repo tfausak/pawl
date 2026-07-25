@@ -71,5 +71,46 @@ tests =
             andAnother = S.runPure S.identityAnswer after (Departure.leaveGame Departure.Type.Conceded S.carol)
          in do
               HU.assertEqual "two survivors, no result" Nothing (GameState.result after)
-              HU.assertEqual "one survivor, alice wins" (Just (Result.Won S.alice)) (GameState.result andAnother)
+              HU.assertEqual "one survivor, alice wins" (Just (Result.Won S.alice)) (GameState.result andAnother),
+      -- CR 725.4: "If the monarch leaves the game, the active player becomes the
+      -- monarch at the same time as that player leaves the game."
+      HU.testCase "CR 725.4 the monarch departs on someone else's turn: the active player takes the crown" $
+        let board = S.withMonarch S.bob S.threePlayerGame
+            gone = Departure.depart Departure.Type.Conceded S.bob board
+         in do
+              HU.assertEqual "alice is the active player on this board" S.alice (GameState.activePlayer board)
+              HU.assertEqual "so alice is the monarch" (Just S.alice) (GameState.monarch gone),
+      -- CR 725.4: "If the active player is leaving the game or if there is no
+      -- active player, the next player in turn order who can become the monarch
+      -- becomes the monarch."
+      HU.testCase "CR 725.4 the monarch departs on their own turn: the next seat in turn order takes the crown" $
+        let board = S.withMonarch S.alice S.threePlayerGame
+            gone = Departure.depart Departure.Type.Conceded S.alice board
+         in HU.assertEqual "bob, the seat after alice's" (Just S.bob) (GameState.monarch gone),
+      HU.testCase "CR 725.4 the walk past the active player's seat skips a seat that has already departed" $
+        -- alice is the active player and has already left, so there is no active
+        -- player to crown; carol is the monarch and leaves too. The walk starts
+        -- after alice's seat: bob, then carol. Bob is the only one still in the
+        -- game, so bob takes the crown. Discriminating: a walk anchored on the
+        -- DEPARTING MONARCH's seat instead of the active player's would find
+        -- alice first and, on filtering her out, still land on bob -- so the
+        -- second assertion pins the anchor by making the two disagree.
+        let board = S.withMonarch S.carol (Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame)
+            gone = Departure.depart Departure.Type.Conceded S.carol board
+         in do
+              HU.assertEqual "alice is still the active player's seat (CR 800.4j)" S.alice (GameState.activePlayer gone)
+              HU.assertEqual "bob takes the crown" (Just S.bob) (GameState.monarch gone),
+      -- CR 725.4: "If no player still in the game can become the monarch, the
+      -- game continues with no monarch."
+      HU.testCase "CR 725.4 the last player standing is the monarch and leaves: no monarch, and no partial head" $
+        let twoGone =
+              Departure.depart
+                Departure.Type.Conceded
+                S.bob
+                (Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame)
+            board = S.withMonarch S.carol twoGone
+            gone = Departure.depart Departure.Type.Conceded S.carol board
+         in do
+              HU.assertEqual "nobody is left to become the monarch" Nothing (GameState.monarch gone)
+              HU.assertEqual "and the roster is untouched" [S.alice, S.bob, S.carol] (GameState.turnOrder gone)
     ]
