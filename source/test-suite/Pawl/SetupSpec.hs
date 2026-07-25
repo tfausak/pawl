@@ -320,6 +320,10 @@ restartTests registry =
         HU.assertEqual "carol drew hers" 7 (S.handSize S.carol after)
         HU.assertEqual "CR 800.1: the rebuilt game has two seats, so no free mulligan" 0 (Mulligan.freeMulligans after)
         HU.assertEqual "CR 104.2a: two survivors, so the rebuild decides nothing" Nothing (GameState.result after)
+        -- #172's orphan, retired. Before CR 800.4a's object removal, bob's eight
+        -- cards stayed in GameState.objects after the restart -- in no library and
+        -- undrawable, but counted. Twenty-four objects for sixteen cards in play.
+        HU.assertEqual "no orphaned objects survive the rebuild" 16 (Game.objectCount after)
     ]
 
 -- Move a player's pool onto their LIBRARY (subgameStateFrom reads the library

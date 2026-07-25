@@ -546,6 +546,12 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- Rest in Peace's ETB: exile every card in every graveyard (CR 400.7 each move
   -- funnels through changeZone). A graveyard->exile move matches no M3f
   -- replacement or trigger, so no cascade.
+  --
+  -- The loop spans every player in the map, including one who has left the game,
+  -- and that is masked rather than correct: CR 800.4a took every object a
+  -- departing player owns out of the game, so Game.zoneMembers finds nothing in
+  -- their graveyard and the extra iteration moves nothing. Left as-is for the
+  -- same reason Count.playersFor is -- see the argument there.
   Effect.ExileAllGraveyards -> do
     gs <- State.get
     let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Map.keys (GameState.players gs))

@@ -143,12 +143,10 @@ newGame matchup = do
 -- CR 727.1 / CR 729.2 rebuild the game for the players who are IN it, so a player
 -- who has left gets no library, no shuffle and no opening hand (#147); `owners` is
 -- the still-playing seats, in seating order, because CR 103.5's declaration round
--- goes around the table in turn order. Their cards stay in the object pool -- CR
--- 800.4a's object removal, which would take a departed player's objects out of the
--- game with them, is not implemented (#172) -- but the library map is rebuilt from
--- scratch for the owners only, so those cards sit in no library and nobody can
--- draw them. The one visible artifact of this: those orphaned objects stay in
--- GameState.objects, so they inflate Game.objectCount until #172 removes them.
+-- goes around the table in turn order. Their cards are not here to skip: CR 800.4a
+-- takes every object a departing player owns out of the game with them
+-- (Departure.objectsLeaveWith), so a rebuild has nothing of theirs left in the
+-- object pool to orphan.
 startGameFromCards :: Game ()
 startGameFromCards = do
   gs <- State.get
@@ -321,6 +319,22 @@ subgameStateFrom starter parent =
       -- there is nothing left of theirs to ferry -- it is purely the
       -- bookkeeping symmetry with funnelBack described above, which has to hold
       -- regardless of who is or isn't currently seated.
+      --
+      -- Named plainly: `libIds` here and funnelBack's `oldLibIds` MUST compute
+      -- the identical id set, and today they do, by construction -- both are the
+      -- same expression (`concatMap` over each `GameState.library parent` entry,
+      -- keyed by `GameState.turnOrder parent`) applied to the same `parent`
+      -- value, because playSubgame's outer state is untouched while the subgame
+      -- runs (CR 729.1a), so the `parent` funnelBack later reads back is this
+      -- `parent` argument, unchanged. The match is a maintenance invariant, not a
+      -- live gap: nothing today lets the two expressions drift apart, but an edit
+      -- that changed one side's roster (e.g. narrowing it to seated players)
+      -- without the other would reintroduce exactly the silent-destruction risk
+      -- described above. This is a SEPARATE concern from a player who departs
+      -- INSIDE the subgame, after this pool is already fixed -- that is
+      -- funnelBack's `recovered` pass, which is driven by the owner's absence
+      -- from the FINISHED subgame's own objects, not by anything this pool
+      -- captured for them at the start; see funnelBack's haddock.
       order = rotateTo starter (Departure.stillPlayingInOrder parent)
       firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe order)
    in parent
@@ -365,10 +379,13 @@ subgameStateFrom starter parent =
 -- subgame objects and the subgame's zones cease to exist -- they are simply not
 -- carried over. The parent's non-library objects (hand, battlefield, graveyard,
 -- ...) are untouched: the main game continues from where it was discontinued. The
--- old parent library objects are dropped (they moved into the subgame). Returned
--- cards keep their subgame ids, which are all above the parent supply
--- (subgameStateFrom inherited it), so Map.union cannot collide; the id/timestamp
--- supplies advance to the subgame high-water mark.
+-- old parent library objects are dropped (they moved into the subgame).
+-- `oldLibIds` spans the parent's FULL seating roster, matching
+-- subgameStateFrom's `libIds` -- see the comment there for why the two
+-- expressions must stay identical. Returned cards keep their subgame ids, which
+-- are all above the parent supply (subgameStateFrom inherited it), so Map.union
+-- cannot collide; the id/timestamp supplies advance to the subgame high-water
+-- mark.
 --
 -- CR 729.4's second sentence keeps the subgame and the main game as separate
 -- populations: a player who leaves the SUBGAME has not left the main game, and

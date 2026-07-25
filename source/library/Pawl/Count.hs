@@ -71,6 +71,16 @@ aggregate aggregation views = case aggregation of
 -- CR 400.1: whose copy of the zone. Nothing when the reference cannot be
 -- resolved -- a Relative with no perspective, or a slot that is unbound or bound
 -- to something that is not a player.
+--
+-- `everyone` is every player in the map, INCLUDING one who has left the game, and
+-- that is masked rather than correct. It is unobservable: CR 800.4a takes every
+-- object a departing player owns out of the game, and no site can mint a new one
+-- owned by them afterwards, so Game.zoneMembers returns [] for every zone of
+-- theirs and a departed player contributes nothing to any fold here. It is not
+-- fixed, because a filter would need Departure.stillPlaying and this module
+-- cannot import Pawl.Departure -- Departure reaches Pawl.Monarch, Pawl.Event and
+-- Pawl.Projection, and Pawl.Projection imports this module -- so the alternative
+-- is duplicating that status predicate here.
 playersFor :: Filter.Context -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
 playersFor context gs ref =
   let everyone = Map.keys (GameState.players gs)
@@ -80,9 +90,11 @@ playersFor context gs ref =
           you <- Filter.perspective context
           case relation of
             PlayerRelation.You -> Just [you]
-            -- CR 102.2: in a two-player game a player's opponent is the other
-            -- player. CR 102.3 makes a teammate NOT an opponent, so this
-            -- carries the pool's standing two-player assumption.
+            -- Every other player. Not a two-player shortcut: in a free-for-all
+            -- the players compete as individuals and every other player is an
+            -- opponent by construction (CR 806.1). CR 102.3 makes a TEAMMATE not
+            -- an opponent, which is the only reading this is wrong for, and pawl
+            -- has no teams (#175).
             PlayerRelation.Opponent -> Just (filter (/= you) everyone)
         PlayerRef.InSlot name -> do
           src <- Filter.source context
