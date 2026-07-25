@@ -83,8 +83,11 @@ data GameState = MkGameState
     --   * CR 800.4a -- "priority passes to the next player in turn order who's
     --     still in the game" needs the departed player's own position to find
     --     their successor.
-    --   * CR 729.1b -- "each player who doesn't win the subgame" is the full
-    --     starting roster minus the winner.
+    --   * CR 729.1b lets a subgame's outcome mean something in the main game --
+    --     "the effect may say that something happens in the main game to the
+    --     winner or loser of the subgame". Its real customer is Shahrazad, whose
+    --     own text is "each player who doesn't win the subgame", so the set that
+    --     effect needs is the full starting roster minus the winner (#138).
     -- Pruning on departure makes all three impossible and buys nothing.
     turnOrder :: [PlayerId],
     activePlayer :: PlayerId,
