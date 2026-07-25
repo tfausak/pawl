@@ -111,12 +111,18 @@ legalSets source specs gs = fmap (\spec -> legalRecipients source spec gs) specs
 -- (a mode with no slots is trivially fillable). Self-exclusion ("another") is
 -- honored because it lives in the slot's own Filter, so a mode whose only
 -- nonland-permanent target is the source itself is NOT fillable. Shared by
--- spells (Cast) and abilities (Activate/Engine).
-fillableModes :: ObjectId -> Modal.Modal Card -> GameState -> Set ModeIndex
-fillableModes source modal gs =
+-- spells (Cast) and abilities (Activate/Engine). `extra` is the slots EVERY
+-- mode carries in addition to its own -- CR 303.4a's enchant slot, which is
+-- declared by the card rather than by a mode, and which castability must see
+-- or an Aura with no legal creature would be castable and then countered on
+-- resolution (CR 601.2c says it could never have been cast). An ability has no
+-- enchant spec and passes Map.empty, which makes that a fact of the call
+-- rather than a special case here.
+fillableModes :: ObjectId -> Map SlotName TargetSpec -> Modal.Modal Card -> GameState -> Set ModeIndex
+fillableModes source extra modal gs =
   let ms = Foldable.toList (Modal.modes modal)
       fillable i m =
-        let sets = legalSets source (Mode.targetSpecs m) gs
+        let sets = legalSets source (Map.union extra (Mode.targetSpecs m)) gs
          in if any Set.null (Map.elems sets)
               then Nothing
               else Just (ModeIndex.MkModeIndex (fromIntegral i))

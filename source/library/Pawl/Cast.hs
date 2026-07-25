@@ -67,7 +67,7 @@ targetable oid gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card ->
     let count = Modal.selectionCount (Card.Type.spell card)
-     in Set.size (Target.fillableModes oid (Card.Type.spell card) gs) >= fromIntegral count
+     in Set.size (Target.fillableModes oid (Card.enchantSpecs card) (Card.Type.spell card) gs) >= fromIntegral count
 
 -- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
 -- affordable when it is payable with X=0 (the caster may always choose 0)
@@ -159,7 +159,7 @@ castSpell pid oid = do
     Nothing -> pure ()
     Just card -> do
       let decider = Decide.deciderFor pid gs
-          legal = Target.fillableModes oid (Card.Type.spell card) gs
+          legal = Target.fillableModes oid (Card.enchantSpecs card) (Card.Type.spell card) gs
           count = Modal.selectionCount (Card.Type.spell card)
       -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
       -- unprompted) exactly when there is nothing to choose -- as many legal

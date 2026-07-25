@@ -31,14 +31,24 @@ import qualified Pawl.Type.TypeLine as TypeLine
 allEffects :: Card.Card -> [Effect Card.Card]
 allEffects card = Modal.allEffects (Card.spell card)
 
+-- CR 303.4a: an Aura spell's target is defined by its enchant ability, not by a
+-- mode -- an Aura's spell payload is a single empty mode. Merging here is what
+-- puts the enchant slot in front of Cast's prompt (Cast.hs) and Resolve's CR
+-- 608.2b re-validation (Resolve.hs) without either learning what an Aura is.
+--
+-- Union is left-biased, and the CardSpec lint holds that no mode declares this
+-- slot name, so the bias is never exercised.
+--
 -- The union of every mode's target specs (slot names are unique across a
 -- card's modes by authoring discipline; the D4 lint enforces per-mode
 -- resolution).
 allTargetSpecs :: Card.Card -> Map SlotName TargetSpec
-allTargetSpecs card = Modal.allTargetSpecs (Card.spell card)
+allTargetSpecs card = Map.union (enchantSpecs card) (Modal.allTargetSpecs (Card.spell card))
 
 -- The target specs of one mode by index (CR 700.2c: only the chosen mode's
--- slots). Nothing if the index is out of range (total).
+-- slots). Nothing if the index is out of range (total). The enchant slot is
+-- NOT part of this -- it answers "what does mode i declare", and CR 303.4a's
+-- slot is declared by the card, not by any mode.
 modeTargetSpecs :: ModeIndex.ModeIndex -> Card.Card -> Maybe (Map SlotName TargetSpec)
 modeTargetSpecs idx card = Modal.modeTargetSpecs idx (Card.spell card)
 
@@ -48,10 +58,11 @@ modeTargetSpecs idx card = Modal.modeTargetSpecs idx (Card.spell card)
 modesEffects :: Set.Set ModeIndex.ModeIndex -> Card.Card -> [Effect Card.Card]
 modesEffects chosen card = Modal.modesEffects chosen (Card.spell card)
 
--- CR 601.2c/700.2c: the target specs of the CHOSEN modes only (union). Only
--- these slots are prompted at cast and re-validated at CR 608.2b.
+-- CR 601.2c/700.2c: the target specs of the CHOSEN modes only (union), plus
+-- the card's enchant slot (CR 303.4a) if it has one. Only these slots are
+-- prompted at cast and re-validated at CR 608.2b.
 modesTargetSpecs :: Set.Set ModeIndex.ModeIndex -> Card.Card -> Map SlotName TargetSpec
-modesTargetSpecs chosen card = Modal.modesTargetSpecs chosen (Card.spell card)
+modesTargetSpecs chosen card = Map.union (enchantSpecs card) (Modal.modesTargetSpecs chosen (Card.spell card))
 
 isLand :: Card.Card -> Bool
 isLand c = Set.member CardType.Land (TypeLine.types (Card.typeLine c))
@@ -102,7 +113,7 @@ enchantSlot :: SlotName
 enchantSlot = SlotName.MkSlotName (Text.pack "enchant")
 
 -- CR 303.4a / 702.5a: the enchant ability's target spec as a one-entry slot map,
--- empty for every non-Aura. Merged into the two functions below, and passed to
+-- empty for every non-Aura. Merged into the two functions above, and passed to
 -- Target.fillableModes by Pawl.Cast so castability accounts for it.
 enchantSpecs :: Card.Card -> Map SlotName TargetSpec
 enchantSpecs card = case Card.enchant card of

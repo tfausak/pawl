@@ -28,6 +28,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Target as Target
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
@@ -36,6 +37,7 @@ import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaType as ManaType
+import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -598,11 +600,46 @@ modalCastTests registry =
         HU.assertBool "no mode is fillable" (not (Cast.castable S.alice oid gs0))
     ]
 
+-- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
+-- card, not by a mode -- Unholy Strength (the Auras gate card) has one empty
+-- mode and a Card.Type.enchant of "target creature" (CardSpec's auraCardTests).
+-- Task 6 merges Card.enchantSpecs into allTargetSpecs/modesTargetSpecs and
+-- teaches Target.fillableModes the extra slots a card declares outside its
+-- modes, so castability sees the enchant slot too -- without either function
+-- learning what an Aura is.
+auraTargetTests :: Registry.Type.Registry -> Tasty.TestTree
+auraTargetTests registry =
+  Tasty.testGroup
+    "AuraTarget"
+    [ HU.testCase "CR 303.4a: an Aura spell targets, so it prompts for the creature it enchants" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        let base = S.landsInPlay swamp 1
+            (creature, withCreature) = S.addCreature piker S.bob base
+            (gs, spellId) = S.handOne unholyStrength withCreature
+            specs = Card.modesTargetSpecs (Set.singleton (ModeIndex.MkModeIndex 0)) (Printing.card unholyStrength)
+        HU.assertEqual "one slot, the enchant slot" (Map.keysSet specs) (Set.singleton Card.enchantSlot)
+        HU.assertEqual
+          "its legal set is the one creature"
+          (Map.singleton Card.enchantSlot (Set.singleton (Recipient.ToCreature creature)))
+          (Target.legalSets spellId specs gs),
+      -- CR 601.2c: a spell whose required target has no legal choice cannot be
+      -- cast at all. Reading only Mode.targetSpecs would call this castable and
+      -- let it be countered on resolution instead.
+      HU.testCase "CR 601.2c: an Aura with no creature on the battlefield is not castable" $ do
+        swamp <- Registry.printing registry "Swamp"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        let base = S.landsInPlay swamp 1
+            (gs, spellId) = S.handOne unholyStrength base
+        HU.assertBool "not castable with an empty board" (not (Cast.castable S.alice spellId gs))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Cast"
-    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry]
+    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry, auraTargetTests registry]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

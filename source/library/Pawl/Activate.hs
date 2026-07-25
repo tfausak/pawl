@@ -62,7 +62,7 @@ activatable pid srcId ability gs =
     && elem ability (abilitiesFor srcId gs)
     && not (Mana.isManaAbility ability)
     && tapSicknessOk srcId ability gs
-    && Set.size (Target.fillableModes srcId (ActivatedAbility.modal ability) gs)
+    && Set.size (Target.fillableModes srcId Map.empty (ActivatedAbility.modal ability) gs)
       >= fromIntegral (Modal.selectionCount (ActivatedAbility.modal ability))
     && Cost.canPay pid srcId (ActivatedAbility.cost ability) gs
 
@@ -99,7 +99,7 @@ activateAbility pid srcId ability = do
       -- existing single-mode ability is exactly {ModeIndex 0}, so this stamp
       -- stays behavior-identical to the pre-modal ability. A real choice (more
       -- legal modes than the selection demands) issues ChooseModes (M4h Task 4).
-      legal = Target.fillableModes srcId (ActivatedAbility.modal ability) gs
+      legal = Target.fillableModes srcId Map.empty (ActivatedAbility.modal ability) gs
       count = Modal.selectionCount (ActivatedAbility.modal ability)
   State.put onStack
   chosenModes <-

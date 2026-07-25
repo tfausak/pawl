@@ -413,7 +413,7 @@ placeOne pending = do
       (ts, gs2) = Game.freshTimestamp gs1
       decider = Decide.deciderFor controller gs
       modal = TriggeredAbility.modal ability
-      legal = Target.fillableModes srcId modal gs
+      legal = Target.fillableModes srcId Map.empty modal gs
       count = Modal.selectionCount modal
       obj =
         Object.MkObject
