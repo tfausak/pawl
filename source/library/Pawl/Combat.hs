@@ -288,9 +288,15 @@ declareAttackers pid = do
 -- them. Both need the attack-multiple-players option, which pawl has no options
 -- concept to read (#175).
 --
--- No still-playing guard: a defending player who left the game has had every
--- object they owned removed by CR 800.4a, so legalBlockers finds nothing for them
--- and the inner Monad.unless short-circuits.
+-- No still-playing guard: at three or more seats, a defending player who left
+-- the game has had every object they owned removed by CR 800.4a, so
+-- legalBlockers finds nothing for them and the inner Monad.unless
+-- short-circuits. At two seats CR 800.4a never runs at all -- CR 800.1 gates it
+-- on "more than two players" (Departure.continuesAfterDeparture) -- but CR
+-- 104.2a ends the game the instant a player's last opponent leaves, which
+-- Sba.checkSba records as GameState.result and Engine.playGame's loop reads
+-- before ever calling declareBlockers again; see GameSpec.hs's
+-- CR 800.4j/703.4i test for the state that leaves unreachable in play.
 declareBlockers :: Game ()
 declareBlockers = do
   start <- State.get
