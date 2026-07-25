@@ -22,6 +22,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -37,6 +38,7 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameEvent as GameEvent
@@ -759,6 +761,27 @@ orderingTests registry =
               [top, bottom] -> do
                 HU.assertEqual "the OTHER player's trigger is on top -- placed second" (Just S.bob) (controllerOf top)
                 HU.assertEqual "the active player's (alice's) trigger is at the bottom -- placed first" (Just S.alice) (controllerOf bottom)
+              other -> HU.assertFailure ("expected exactly two triggers on the stack, got " <> show (length other)),
+          -- The same walk with a third seat and a departure. Barbarian Outcast's
+          -- state trigger (CR 603.8) needs no event, so one Outcast under each of
+          -- alice, bob and carol -- none controlling a Swamp -- gives three
+          -- controllers with one trigger apiece. Bob has left the game, so his
+          -- seat is not in the APNAP rotation: he is never asked to order, and
+          -- his trigger is not placed. Unobservable at two players, where a
+          -- departure ends the game before any trigger is gathered.
+          HU.testCase "CR 101.4/603.3b APNAP skips a departed seat, and its triggers are not placed" $ do
+            barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
+            let gs0 = Setup.emptyGame S.threePlayers
+                (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
+                (_, gs2) = S.addCreature barbarianOutcast S.bob gs1
+                (_, gs3) = S.addCreature barbarianOutcast S.carol gs2
+                gone = Departure.depart Departure.Type.Conceded S.bob gs3
+                placed = snd (Engine.runGamePure S.identityAnswer gone Engine.placePendingTriggers)
+                controllerOf oid = fmap Object.owner (Game.lookupObject oid placed)
+            case GameState.stack placed of
+              [top, bottom] -> do
+                HU.assertEqual "carol's trigger is on top -- placed second" (Just S.carol) (controllerOf top)
+                HU.assertEqual "the active player's (alice's) is at the bottom -- placed first" (Just S.alice) (controllerOf bottom)
               other -> HU.assertFailure ("expected exactly two triggers on the stack, got " <> show (length other))
         ]
 
