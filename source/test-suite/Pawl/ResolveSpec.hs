@@ -224,6 +224,24 @@ targetTests registry =
             legal = Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs2
         HU.assertEqual "only the opponent's creature" (Set.singleton (Recipient.ToCreature theirs)) legal
         HU.assertBool "not the source's controller's own" (not (Set.member (Recipient.ToCreature mine) legal)),
+      HU.testCase "CR 806.1 at three seats a ControlledBy Opponent pool spans BOTH opponents' creatures" $ do
+        -- Palace Jailer's second trigger targets a creature an opponent controls.
+        -- At three seats that is a choice across two boards, and the engine must
+        -- offer all of it. DISCRIMINATING: a relation resolved as "the next seat"
+        -- offers only bob's, and carol is deliberately the far seat -- so an
+        -- implementation that took one opponent fails on the set equality, not on
+        -- a membership check that a superset would also satisfy.
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        let gs0 = Setup.emptyGame S.threePlayers
+            (mine, gs1) = S.addCreature piker S.alice gs0
+            (bobs, gs2) = S.addCreature warMammoth S.bob gs1
+            (carols, gs3) = S.addCreature piker S.carol gs2
+            legal = Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs3
+        HU.assertEqual
+          "exactly bob's and carol's, and nothing of alice's"
+          (Set.fromList [Recipient.ToCreature bobs, Recipient.ToCreature carols])
+          legal,
       HU.testCase "CR 613.1b OpponentCreatureTarget follows PROJECTED control, not ownership" $ do
         piker <- Registry.printing registry "Goblin Piker"
         warMammoth <- Registry.printing registry "War Mammoth"

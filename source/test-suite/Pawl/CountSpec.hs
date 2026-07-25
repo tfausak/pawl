@@ -108,6 +108,37 @@ tests registry =
           "Alice's one"
           (Just 1)
           (Count.evaluate viewOf (Filter.MkContext (Just S.bob) Nothing) gs count),
+      HU.testCase "CR 806.1 at three seats Relative Opponent folds BOTH opponents' zones" $ do
+        -- Nightmare's shape (a count of Swamps you control) read from the OTHER
+        -- side: from alice's perspective, a count of Swamps an opponent controls
+        -- must fold bob's zone and carol's. DISCRIMINATING: the answer is 3, and
+        -- every wrong reading gives a different number -- one opponent gives 1 or
+        -- 2, and including the perspective gives 4. A two-seat board cannot
+        -- separate those, which is why the sibling case above tops out at 1.
+        swampPrinting <- Registry.printing registry "Swamp"
+        let gs0 = Setup.emptyGame S.threePlayers
+            (a1, gs1) = S.addCreature swampPrinting S.alice gs0
+            (b1, gs2) = S.addCreature swampPrinting S.bob gs1
+            (c1, gs3) = S.addCreature swampPrinting S.carol gs2
+            (c2, gs) = S.addCreature swampPrinting S.carol gs3
+            swamp = Set.singleton Subtype.Swamp
+            land = Set.singleton CardType.Land
+            viewOf =
+              S.stubView
+                [ (a1, land, swamp, Just S.alice),
+                  (b1, land, swamp, Just S.bob),
+                  (c1, land, swamp, Just S.carol),
+                  (c2, land, swamp, Just S.carol)
+                ]
+            count =
+              Count.Type.MkCount
+                (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
+                (Filter.Type.HasSubtype Subtype.Swamp)
+                Aggregation.Objects
+        HU.assertEqual
+          "bob's one plus carol's two, and none of alice's"
+          (Just 3)
+          (Count.evaluate viewOf (Filter.MkContext (Just S.alice) Nothing) gs count),
       HU.testCase "CR 109.5 Relative with no perspective is undeterminable" $
         let gs = Setup.emptyGame S.bothPlayers
             count =
