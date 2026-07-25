@@ -286,7 +286,7 @@ git commit -m "feat(effect): add ExileHandThenDraw, Serum Powder's CR 103.5b pay
 - Consumes: `Effect.ExileHandThenDraw` (Task 2).
 - Produces: `CardT.mulliganAction :: Card -> [Effect Card]`.
 
-- [ ] **Step 1: Write the failing tests.** In `source/test-suite/Pawl/CodecSpec.hs`, add both cases next to the existing `"a Card carrying player abilities round-trips"` / `"an empty playerAbilities list is omitted from the JSON"` pair (around lines 233–248):
+- [x] **Step 1: Write the failing tests.** In `source/test-suite/Pawl/CodecSpec.hs`, add both cases next to the existing `"a Card carrying player abilities round-trips"` / `"an empty playerAbilities list is omitted from the JSON"` pair (around lines 233–248):
 
 ```haskell
           HU.testCase "a Card carrying a CR 103.5b mulligan action round-trips" $ do
@@ -308,12 +308,12 @@ git commit -m "feat(effect): add ExileHandThenDraw, Serum Powder's CR 103.5b pay
 
 `CodecSpec` may not yet import `Pawl.Type.Effect`; if not, add `import qualified Pawl.Type.Effect as Effect` to its import block.
 
-- [ ] **Step 2: Run the tests to verify they fail to COMPILE.**
+- [x] **Step 2: Run the tests to verify they fail to COMPILE.**
 
 Run: `cabal build pawl-test-suite --enable-tests 2>&1 | tail -20`
 Expected: compile error — `CardT.mulliganAction` is not a field of `Card`.
 
-- [ ] **Step 3: Add the field.** In `source/library/Pawl/Type/Card.hs`, append inside `MkCard` after `playerAbilities`:
+- [x] **Step 3: Add the field.** In `source/library/Pawl/Type/Card.hs`, append inside `MkCard` after `playerAbilities`:
 
 ```haskell
     -- CR 103.5b: the effects of this card's "any time you could mulligan"
@@ -332,7 +332,7 @@ Expected: compile error — `CardT.mulliganAction` is not a field of `Card`.
 
 Note: `#N` is a placeholder replaced in Task 7 with the real issue number — do not leave it as `#N` at the end of the plan. `Pawl.Type.Card` already imports `Effect` for other fields? It does **not** — add `import Pawl.Type.Effect (Effect)` to its import block.
 
-- [ ] **Step 4: Wire the codec.** In `source/library/Pawl/Codec.hs`:
+- [x] **Step 4: Wire the codec.** In `source/library/Pawl/Codec.hs`:
 
 `cardToJson` — append another optional-key block after the `alternativeCosts` one:
 
@@ -353,7 +353,7 @@ Note: `#N` is a placeholder replaced in Task 7 with the real issue number — do
         CardT.mulliganAction = mulliganAction
 ```
 
-- [ ] **Step 5: Update the four `MkCard` record literals.** Each needs the new field; all four fixtures declare no mulligan action:
+- [x] **Step 5: Update the four `MkCard` record literals.** Each needs the new field; all four fixtures declare no mulligan action:
 
 ```haskell
                   Card.Type.mulliganAction = [],
@@ -362,12 +362,12 @@ Note: `#N` is a placeholder replaced in Task 7 with the real issue number — do
 Run: `grep -n "MkCard" source/test-suite/Pawl/CardSpec.hs source/test-suite/Pawl/ResolveSpec.hs`
 Expected: 4 hits (CardSpec 1, ResolveSpec 3). Each literal gets the field.
 
-- [ ] **Step 6: Run the tests to verify they pass.**
+- [x] **Step 6: Run the tests to verify they pass.**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -20`
 Expected: warning-free build; both new codec cases pass, and every existing card file still round-trips byte-identically (`Pawl.CardsSpec`'s whole-directory sweep proves the omit-when-empty half).
 
-- [ ] **Step 7: Format, lint, and commit.**
+- [x] **Step 7: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run

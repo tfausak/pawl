@@ -9,6 +9,7 @@ import Pawl.Type.CastingPermission (CastingPermission)
 import Pawl.Type.Color (Color)
 import Pawl.Type.Cost (Cost)
 import Pawl.Type.CostComponent (CostComponent)
+import Pawl.Type.Effect (Effect)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
 import Pawl.Type.Modal (Modal)
@@ -127,6 +128,18 @@ data Card = MkCard
     -- Tower). The sibling of staticAbilities on the axis CR 613.10/613.11 put
     -- OUTSIDE the layer system, so these are read by Pawl.PlayerEffect and never
     -- by Pawl.Projection. Empty for every other printing.
-    playerAbilities :: [PlayerStaticAbility]
+    playerAbilities :: [PlayerStaticAbility],
+    -- CR 103.5b: the effects of this card's "any time you could mulligan"
+    -- action, in written order. Empty for every printing but Serum Powder.
+    --
+    -- Read DIRECTLY from the card and never through the projection -- the
+    -- castingPermissions / additionalCosts precedent: the ability functions in
+    -- the HAND (CR 113.6), where the CR 613 layer system does not reach.
+    --
+    -- An empty list means NO action, not an action that does nothing: the two
+    -- are indistinguishable in play, so the ambiguity costs nothing.
+    --
+    -- One action per card. A printing declaring two is unrepresentable (#N).
+    mulliganAction :: [Effect Card]
   }
   deriving (Eq, Ord, Show)

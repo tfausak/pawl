@@ -1636,6 +1636,10 @@ cardToJson c =
                then []
                else [(Text.pack "alternativeCosts", listTo costToJson (CardT.alternativeCosts c))]
            )
+        <> ( if null (CardT.mulliganAction c)
+               then []
+               else [(Text.pack "mulliganAction", listTo effectToJson (CardT.mulliganAction c))]
+           )
     )
 
 getOpt :: Text -> [(Text, Value)] -> Value
@@ -1684,6 +1688,7 @@ jsonToCard value = do
   playerAbilities <- listFromDefault jsonToPlayerStaticAbility (getOpt (Text.pack "playerAbilities") ps)
   additionalCosts <- listFromDefault jsonToCostComponent (getOpt (Text.pack "additionalCosts") ps)
   alternativeCosts <- listFromDefault jsonToCost (getOpt (Text.pack "alternativeCosts") ps)
+  mulliganAction <- listFromDefault jsonToEffect (getOpt (Text.pack "mulliganAction") ps)
   pure
     CardT.MkCard
       { CardT.name = name,
@@ -1703,7 +1708,8 @@ jsonToCard value = do
         CardT.delayedAbilities = delayed,
         CardT.playerAbilities = playerAbilities,
         CardT.additionalCosts = additionalCosts,
-        CardT.alternativeCosts = alternativeCosts
+        CardT.alternativeCosts = alternativeCosts,
+        CardT.mulliganAction = mulliganAction
       }
 
 printingToJson :: Printing.Printing -> Value

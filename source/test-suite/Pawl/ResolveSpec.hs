@@ -457,6 +457,7 @@ resolveTests registry =
                   Card.Type.castingPermissions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
+                  Card.Type.mulliganAction = [],
                   Card.Type.additionalCosts = [],
                   Card.Type.alternativeCosts = []
                 }
@@ -791,6 +792,7 @@ resolveTests registry =
                   Card.Type.castingPermissions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
+                  Card.Type.mulliganAction = [],
                   Card.Type.additionalCosts = [],
                   Card.Type.alternativeCosts = []
                 }
@@ -844,6 +846,7 @@ resolveTests registry =
                   Card.Type.castingPermissions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
+                  Card.Type.mulliganAction = [],
                   Card.Type.additionalCosts = [],
                   Card.Type.alternativeCosts = []
                 }

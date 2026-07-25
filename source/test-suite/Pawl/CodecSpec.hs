@@ -247,7 +247,22 @@ tests registry =
             HU.assertEqual "the fixture really has none" [] (CardT.playerAbilities base)
             case J.asObject (Codec.cardToJson base) of
               Left err -> HU.assertFailure (Text.unpack err)
-              Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "playerAbilities") (fmap fst pairs))
+              Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "playerAbilities") (fmap fst pairs)),
+          HU.testCase "a Card carrying a CR 103.5b mulligan action round-trips" $ do
+            bloodMoon <- Registry.printing registry "Blood Moon"
+            let base = Printing.card bloodMoon
+                c = base {CardT.mulliganAction = [Effect.ExileHandThenDraw]}
+            roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
+          -- Byte-stability: an empty list must not appear in the rendered JSON,
+          -- or every committed card file changes. The same posture
+          -- playerAbilities and additionalCosts already take.
+          HU.testCase "an empty mulliganAction list is omitted from the JSON" $ do
+            bloodMoon <- Registry.printing registry "Blood Moon"
+            let base = Printing.card bloodMoon
+            HU.assertEqual "the fixture really has none" [] (CardT.mulliganAction base)
+            case J.asObject (Codec.cardToJson base) of
+              Left err -> HU.assertFailure (Text.unpack err)
+              Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "mulliganAction") (fmap fst pairs))
         ],
       Tasty.testGroup
         "filter (P9)"

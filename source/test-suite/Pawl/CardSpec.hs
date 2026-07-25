@@ -217,6 +217,7 @@ cardTests registry =
                   Card.Type.castingPermissions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
+                  Card.Type.mulliganAction = [],
                   Card.Type.additionalCosts = [],
                   Card.Type.alternativeCosts = []
                 }
