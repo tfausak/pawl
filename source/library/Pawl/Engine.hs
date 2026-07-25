@@ -113,6 +113,23 @@ nextStillPlaying gs pid =
         h : _ -> h
         [] -> pid
 
+-- CR 800.4j: "If a player leaves the game during their turn, that turn continues
+-- to its completion without an active player. If the active player would receive
+-- priority, instead the next player in turn order receives priority, or the top
+-- object on the stack resolves, or the phase or step ends, whichever is
+-- appropriate."
+--
+-- GameState.activePlayer is deliberately NOT widened to a Maybe: the turn still
+-- BELONGS to that seat -- CR 800.4m's durations and CR 101.4's APNAP anchor both
+-- reference it -- and making it optional would ripple through every consumer to
+-- express something none of them needs. This one helper covers the difference.
+priorityHolder :: GameState -> PlayerId
+priorityHolder gs =
+  let active = GameState.activePlayer gs
+   in if List.elem active (Departure.stillPlaying gs)
+        then active
+        else nextStillPlaying gs active
+
 checkSba :: Game ()
 checkSba = Sba.checkStateBasedActions
 
@@ -407,8 +424,9 @@ settleForPriority = do
 
 priorityLoop :: Game ()
 priorityLoop = do
-  active <- State.gets GameState.activePlayer
-  State.modify' $ \gs -> gs {GameState.priority = Just active, GameState.passes = 0}
+  -- CR 800.4j: the active player, unless they have left the game.
+  holder <- State.gets priorityHolder
+  State.modify' $ \gs -> gs {GameState.priority = Just holder, GameState.passes = 0}
   -- settleForPriority (CR 117.5) runs where the board can CHANGE -- once at entry,
   -- and after each resolution or board-changing action -- never after a bare
   -- priority pass. A pass leaves the game state untouched, so re-running the SBA
@@ -477,7 +495,7 @@ priorityLoop = do
                                 _ -> do
                                   Stack.resolveTopWith playSubgame
                                   settleForPriority
-                                  State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (GameState.activePlayer g)})
+                                  State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (priorityHolder g)})
                                   loop
                               else do
                                 State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}

@@ -814,8 +814,8 @@ concedeTests registry =
 -- that does NOT end the game. Every case here needs three seats: at two players
 -- a departure ends the game before the next thing happens, which is exactly why
 -- these defects survived five milestones.
-turnOrderTests :: Tasty.TestTree
-turnOrderTests =
+turnOrderTests :: Registry.Type.Registry -> Tasty.TestTree
+turnOrderTests registry =
   Tasty.testGroup
     "TurnOrder (CR 800.4)"
     [ HU.testCase "CR 800.4k a departed player's turn does not begin" $
@@ -903,14 +903,36 @@ turnOrderTests =
          in do
               HU.assertEqual "alice, then bob, then CAROL, then alice again" [S.alice, S.bob, S.carol, S.alice] asks
               HU.assertEqual "bob departed by conceding" (Just (Status.Departed Departure.Type.Conceded)) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
-              HU.assertEqual "the game continues" Nothing (GameState.result after)
+              HU.assertEqual "the game continues" Nothing (GameState.result after),
+      HU.testCase "CR 800.4j the active player having left does not stop the turn: priority starts at the next seat" $
+        -- Alice left during her own turn. The turn continues to its completion
+        -- WITHOUT an active player: alice is never asked, bob is asked first.
+        let gone = Departure.depart Departure.Type.Conceded S.alice (S.threePlayerGame {GameState.phase = Phase.PrecombatMain})
+            ((_, after), asks) = State.runState (Engine.runGame (concedeOrderAnswer S.carol) gone Engine.priorityLoop) []
+         in do
+              HU.assertEqual "priorityHolder skips the departed active player" S.bob (Engine.priorityHolder gone)
+              HU.assertEqual "bob is asked first, alice never" [S.bob, S.carol] (take 2 asks)
+              HU.assertBool "alice was never asked" (notElem S.alice asks)
+              HU.assertEqual "the turn still belongs to alice's seat" S.alice (GameState.activePlayer after),
+      HU.testCase "CR 800.4j after a resolution, priority returns to the next seat, not the departed active player" $ do
+        -- The second site: the post-resolution re-grant. Carol's Goblin Piker is
+        -- on the stack, alice (the active player) has left. Bob and carol pass,
+        -- the Piker resolves, and priority is re-granted to BOB. Without
+        -- priorityHolder the third ask would be alice's.
+        piker <- Registry.printing registry "Goblin Piker"
+        let (_, withSpell) = S.spellOnStack piker S.carol S.threePlayerGame
+            gone = Departure.depart Departure.Type.Conceded S.alice (withSpell {GameState.phase = Phase.PrecombatMain})
+            ((_, after), asks) = State.runState (Engine.runGame (concedeOrderAnswer S.alice) gone Engine.priorityLoop) []
+        HU.assertEqual "bob, carol, then bob AGAIN -- never alice" [S.bob, S.carol, S.bob, S.carol] asks
+        HU.assertEqual "the spell resolved" 0 (length (GameState.stack after))
+        HU.assertEqual "carol's Piker is on the battlefield" 1 (S.creaturesInPlay S.carol after)
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Game"
-    [gameTests registry, actionTests registry, objectFactTests registry, engineTests registry, ruleTests registry, restartReentryTests registry, concedeTests registry, turnOrderTests]
+    [gameTests registry, actionTests registry, objectFactTests registry, engineTests registry, ruleTests registry, restartReentryTests registry, concedeTests registry, turnOrderTests registry]
 
 -- One Lightning Bolt in bob's hand.
 handBobBolt :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
