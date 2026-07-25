@@ -141,7 +141,7 @@ newGame matchup = do
 -- Shared by restart (CR 727) and, later, subgames (CR 729).
 --
 -- CR 727.1 / CR 729.2 rebuild the game for the players who are IN it, so a player
--- who has left gets no library, no shuffle and no opening hand (#147); `owners` is
+-- who has left gets no library, no shuffle and no opening hand (fixed by #147); `owners` is
 -- the still-playing seats, in seating order, because CR 103.5's declaration round
 -- goes around the table in turn order. Their cards are not here to skip: CR 800.4a
 -- takes every object a departing player owns out of the game with them
@@ -196,7 +196,7 @@ rotateTo starter order = case break (== starter) order of
 -- 103" -- a player who left before it ended is not one of them. CR 729.4: "All
 -- players not currently in the subgame are considered outside the subgame." So
 -- their Status.Departed survives the rebuild, and nothing else about them is
--- touched either: they are not starting a game (#147).
+-- touched either: they are not starting a game (fixed by #147).
 --
 -- They keep their entry in the map rather than being deleted, so every Map.lookup
 -- on a PlayerId that still names them stays total. Which players are IN the
@@ -229,7 +229,7 @@ restartGame starter = do
   State.modify' $ \gs ->
     -- CR 727.1: "All players in that game when it ended then start a new game
     -- ..." -- so the rebuilt seating order is the players who were still in the
-    -- game, in their seats (#147), rotated to begin with `starter` (CR 727.1a).
+    -- game, in their seats (fixed by #147), rotated to begin with `starter` (CR 727.1a).
     let order = rotateTo starter (Departure.stillPlayingInOrder gs)
      in gs
           { GameState.players = resetPlayers (GameState.players gs),
@@ -293,7 +293,7 @@ subgameStateFrom starter parent =
       libObjects = Map.restrictKeys (GameState.objects parent) libIds
       -- The pool is drawn from EVERY seat in the parent's FULL roster
       -- (GameState.turnOrder), never narrowed to Departure.stillPlayingInOrder
-      -- -- `order` below DOES narrow to the seated players (CR 729.4, #147), but
+      -- -- `order` below DOES narrow to the seated players (CR 729.4, fixed by #147), but
       -- this pool must not, because funnelBack's oldLibIds is built the SAME way
       -- over the SAME full roster, and the two have to agree: funnelBack drops
       -- every id in that set from the parent's kept objects (Map.withoutKeys)

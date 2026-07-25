@@ -809,7 +809,7 @@ playSubgame = do
   parent <- State.get
   -- CR 729.2: "Randomly determine which player goes first." The engine asks; the
   -- interpreter rolls. Only the players still in the main game are in the subgame
-  -- (CR 729.4), so only they can be rolled (#147). Not asked when the answer is
+  -- (CR 729.4), so only they can be rolled (fixed by #147). Not asked when the answer is
   -- forced -- a lone candidate goes first no matter what randomness says, and
   -- where the rules leave nothing to determine, don't prompt.
   starter <- case NonEmpty.nonEmpty (Departure.stillPlayingInOrder parent) of
@@ -823,7 +823,7 @@ playSubgame = do
   -- CR 729.5: "each player takes all traditional cards they own that are in the
   -- subgame ... puts them into their main-game library, then shuffles them." Each
   -- player who was IN the subgame: a player outside it (CR 729.4) took nothing
-  -- into it and is not asked to shuffle their main-game library (#147).
+  -- into it and is not asked to shuffle their main-game library (fixed by #147).
   seated <- State.gets Departure.stillPlayingInOrder
   Monad.forM_ seated Mulligan.shuffleLibrary
   pure result

@@ -56,7 +56,7 @@ import qualified Pawl.Type.ZoneChange as ZoneChange
 -- CR 608.2i: append one entry to the turn-scoped log. The single APPEND point --
 -- Engine.handoffTurn clears the log at turn end, Setup.emptyGame and the test
 -- fixture Support.oneMountainState both seed it empty, and the test helper
--- Support.withEvent sets it directly; none of those append.
+-- Support.withEvents sets it directly; none of those append.
 recordEvent :: GameEvent -> GameState -> GameState
 recordEvent event gs = gs {GameState.events = GameState.events gs Seq.|> event}
 
