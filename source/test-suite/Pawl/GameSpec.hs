@@ -871,23 +871,21 @@ concedeTests registry =
     ]
 
 -- M5.6a / CR 800.4: the turn order and priority control flow around a departure
--- that does NOT end the game. Every case here needs three seats: at two players
+-- that does NOT end the game. Most cases here need three seats: at two players
 -- a departure ends the game before the next thing happens, which is exactly why
--- these defects survived five milestones.
+-- these defects survived five milestones. One case below is the exception on
+-- purpose -- it needs exactly two, to reach a state three seats cannot.
+--
 -- S.identityAnswer returns [] for Prompt.DeclareAttackers, so it cannot tell a
--- SKIPPED prompt from an ANSWERED one that legally attacks with nothing. This
--- attacks with everything offered instead, so a non-empty attacker map is
--- proof the prompt fired. No new Prompt constructor lands in this phase, so
--- the wildcard keeps this answerer out of the -Werror exhaustiveness net.
-attackWithEverythingAnswer :: Prompt.Prompt r -> r
-attackWithEverythingAnswer p = case p of
-  Prompt.DeclareAttackers _ _ candidates -> candidates
-  _ -> S.identityAnswer p
-
+-- SKIPPED prompt from an ANSWERED one that legally attacks with nothing.
 -- Records the PlayerId of every DeclareAttackers ask and attacks with
--- everything. The ASK is the observable: once CR 800.4a removes a departed
--- player's permanents there is nothing for them to attack with, so an empty
--- attackers map is no longer evidence that the CR 703.4i guard fired.
+-- everything offered. The ASK is the observable, not the resulting attackers
+-- map: once CR 800.4a removes a departed player's permanents there is nothing
+-- for them to attack with, so an empty attackers map alone is no longer
+-- evidence that the CR 703.4i guard fired (a two-player board sidesteps that
+-- narrowing entirely -- see the load-bearing case below). No new Prompt
+-- constructor lands in this phase, so the wildcard keeps this answerer out of
+-- the -Werror exhaustiveness net.
 declareAttackersAskAnswer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
 declareAttackersAskAnswer p = case p of
   Prompt.DeclareAttackers _ pid candidates -> do
@@ -1075,14 +1073,43 @@ turnOrderTests registry =
               HU.assertEqual "a playing active player's land play IS cleared" Set.empty (GameState.landPlayed control),
       HU.testCase "CR 800.4j/703.4i a departed active player is not asked to declare attackers" $ do
         piker <- Registry.printing registry "Goblin Piker"
-        let (_, board) = S.addCreature piker S.alice (S.threePlayerGame {GameState.phase = Phase.Combat CombatStep.DeclareAttackers})
+        let (pikerId, board) = S.addCreature piker S.alice (S.threePlayerGame {GameState.phase = Phase.Combat CombatStep.DeclareAttackers})
             gone = Departure.depart Departure.Type.Conceded S.alice board
             ((_, after), askedAfter) = State.runState (Engine.runGame declareAttackersAskAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
             ((_, control), askedControl) = State.runState (Engine.runGame declareAttackersAskAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
-        HU.assertEqual "the departed active player is never asked to attack" [] askedAfter
-        HU.assertEqual "a playing active player IS asked -- the guard is what did it" [S.alice] askedControl
+        -- At three seats, CR 800.4a has already stripped her battlefield by the
+        -- time this step runs -- checked directly below, not inferred from the
+        -- ask -- so askedAfter == [] is over-determined: it holds with or
+        -- without the hasActive guard in Engine.runTurnBasedActions, because
+        -- Combat.declareAttackers has nothing to offer her regardless. The
+        -- sibling case that isolates the guard itself needs a board CR 800.4a
+        -- does NOT empty, which only happens at two seats -- see "the
+        -- declare-attackers guard is load-bearing at two seats" below.
+        HU.assertEqual "CR 800.4a: her Piker left the game with her" Nothing (Game.lookupObject pikerId gone)
+        HU.assertEqual "so there is nothing left to ask her about" [] askedAfter
+        HU.assertEqual "a playing active player WITH a real candidate IS asked" [S.alice] askedControl
         HU.assertBool "and nothing attacked" (Map.null (Combat.Type.attackers (GameState.combat after)))
         HU.assertBool "while the control run did attack" (not (Map.null (Combat.Type.attackers (GameState.combat control)))),
+      HU.testCase "CR 800.4j/703.4i the declare-attackers guard is load-bearing at two seats, where the game loop cannot reach this state" $ do
+        -- At two seats Departure.continuesAfterDeparture is False (CR 800.1's
+        -- "more than two players"), so NONE of CR 800.4a's four clauses run:
+        -- alice keeps her Piker, and Projection.controls still names her its
+        -- controller -- checked directly below, the mirror of the three-seat
+        -- case's Nothing. That state is unreachable through actual play: CR
+        -- 104.2a ends a two-player game the instant alice leaves it, so
+        -- Engine.priorityLoop and Engine.runStep can never call
+        -- runTurnBasedActions for her again. This case calls it directly
+        -- instead, the same way the CR 800.4b sibling further above isolates
+        -- the promotion guard for a state CR 800.4a makes unreachable in play.
+        -- Deleting the hasActive guard here does not just change what is
+        -- asked -- her Piker actually attacks.
+        piker <- Registry.printing registry "Goblin Piker"
+        let (pikerId, board) = S.addCreature piker S.alice ((Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.Combat CombatStep.DeclareAttackers})
+            gone = Departure.depart Departure.Type.Conceded S.alice board
+            ((_, after), askedAfter) = State.runState (Engine.runGame declareAttackersAskAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
+        HU.assertEqual "she still controls her Piker -- CR 800.4a never ran at two seats" [pikerId] (Projection.controls S.alice gone)
+        HU.assertEqual "the guard is what keeps her from being asked, not an empty board" [] askedAfter
+        HU.assertBool "and nothing attacked" (Map.null (Combat.Type.attackers (GameState.combat after))),
       HU.testCase "M5.6a gate: a three-player game survives a concede, and the departed seat still ends its durations" $
         -- Alice, bob, carol. Bob arms an "until your next turn" player effect
         -- (Silence's shape: an ActivePlayerEffect with Expiry.AtTurnOf bob), then

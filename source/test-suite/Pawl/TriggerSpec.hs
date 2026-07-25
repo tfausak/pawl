@@ -807,7 +807,7 @@ orderingTests registry =
           -- out of the rotation -- see the still-playing filter there -- and the
           -- assertion on his Outcast below is what keeps this case honest about
           -- which rule did what.
-          HU.testCase "CR 101.4/603.3b APNAP rotates through the seats still in the game, and a departed seat's permanent is gone with it" $ do
+          HU.testCase "CR 101.4/603.3b APNAP orders the two remaining players' triggers starting at the active player, and a departed seat's permanent is gone with it" $ do
             barbarianOutcast <- Registry.printing registry "Barbarian Outcast"
             let gs0 = Setup.emptyGame S.threePlayers
                 (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
