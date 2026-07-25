@@ -148,6 +148,15 @@ landsOnly registry = do
   mountain <- Registry.printing registry "Mountain"
   pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) bothPlayers)
 
+-- CR 800.1: the three-seat twin of redRed -- one red deck each for alice, bob and
+-- carol. Setup.mirror is already NonEmpty-shaped, so the seat count is the only
+-- difference. The three-seat setup rules (CR 103.5c's free first mulligan, CR
+-- 103.8c's first draw) are what this exists to exercise.
+threeWayMirror :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+threeWayMirror registry = do
+  deck <- Cards.redDeck registry
+  pure (Setup.mirror deck threePlayers)
+
 isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True

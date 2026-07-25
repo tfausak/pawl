@@ -751,7 +751,27 @@ ruleTests registry =
             gStart = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
             ((_, after), log_) = Replay.record subgameAnswer gStart Engine.priorityLoop
             (_, replayed) = Replay.replay log_ gStart Engine.priorityLoop
-        HU.assertEqual "a subgame replays deterministically (the reason PlaySubgame is not a Prompt, CR 729 / M0 determinism)" after replayed
+        HU.assertEqual "a subgame replays deterministically (the reason PlaySubgame is not a Prompt, CR 729 / M0 determinism)" after replayed,
+      HU.testCase "M5.6b gate: three-player setup -- a free first mulligan (CR 103.5c) and no first-turn draw skip (CR 103.8c)" $ do
+        -- A real newGame at three seats: build and shuffle three 60-card
+        -- libraries, draw opening hands, run the CR 103.5 round loop with every
+        -- player taking exactly one mulligan, then run turn one's draw step.
+        --
+        -- CR 103.5c: the first mulligan does not count toward the number of cards
+        -- bottomed, so every player keeps seven and nothing goes back to the
+        -- library -- today each keeps six and bottoms one. CR 103.8c: the
+        -- starting player does not skip the first draw -- today alice skips.
+        matchup <- S.threeWayMirror registry
+        let g0 = Setup.emptyGame (fmap fst matchup)
+            afterSetup = snd (Engine.runGamePure mulliganOnceAnswer g0 (Setup.newGame matchup))
+            afterDraw = snd (Engine.runGamePure mulliganOnceAnswer afterSetup S.drawStep)
+        HU.assertEqual "alice's free mulligan bottomed nothing" 7 (S.handSize S.alice afterSetup)
+        HU.assertEqual "bob's did not either" 7 (S.handSize S.bob afterSetup)
+        HU.assertEqual "nor carol's" 7 (S.handSize S.carol afterSetup)
+        HU.assertEqual "so alice's library is 60 less her seven, with nothing bottomed back" 53 (librarySize S.alice afterSetup)
+        HU.assertEqual "CR 103.8c: alice draws on turn one" 8 (S.handSize S.alice afterDraw)
+        HU.assertEqual "and her library is one lower for it" 52 (librarySize S.alice afterDraw)
+        HU.assertEqual "the draw step is alice's alone" 7 (S.handSize S.bob afterDraw)
     ]
 
 -- #133 / CR 104.3a. Concede is a special action, not a card, so the gate is
@@ -1262,6 +1282,13 @@ subgameAnswer p = case p of
 firstPlayerAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 firstPlayerAnswer starter p = case p of
   Prompt.RandomFirstPlayer _ -> starter
+  _ -> S.identityAnswer p
+
+-- Take exactly one mulligan, then keep. CR 103.5c's free first mulligan is only
+-- observable if someone actually takes one.
+mulliganOnceAnswer :: Prompt.Prompt r -> r
+mulliganOnceAnswer p = case p of
+  Prompt.DeclareMulligan _ _ taken -> if taken < 1 then MulliganDecision.Mulligan else MulliganDecision.Keep
   _ -> S.identityAnswer p
 
 -- Records the candidate list of every Prompt.RandomFirstPlayer, rolling the first
