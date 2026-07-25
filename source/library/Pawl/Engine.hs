@@ -480,10 +480,10 @@ priorityLoop = do
 handoffTurn :: Game ()
 handoffTurn = State.modify' $ \gs ->
   let newActive = nextInOrder (GameState.turnOrder gs) (GameState.activePlayer gs)
-   in -- CR 611.2a: with activePlayer already advanced, drop every "until your
-      -- next turn" effect belonging to the player whose turn just began. The
-      -- transition IS the event, known exactly here; see Pawl.Expiry.
-      Expiry.dropAtHandoff $
+   in -- CR 611.2a: drop every "until your next turn" effect belonging to the
+      -- player whose turn just began. The transition IS the event, known
+      -- exactly here; see Pawl.Expiry.
+      Expiry.dropAtTurnOf newActive $
         gs
           { GameState.activePlayer = newActive,
             GameState.turnNumber = GameState.turnNumber gs + 1,

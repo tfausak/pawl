@@ -89,7 +89,7 @@ armTests =
 handoffTests :: Tasty.TestTree
 handoffTests =
   Tasty.testGroup
-    "DropAtHandoff"
+    "DropAtTurnOf"
     [ HU.testCase "CR 611.2a an AtTurnOf effect ends as that player's turn begins, not before" $
         let gs0 = Setup.emptyGame S.bothPlayers
             -- alice is the active player; the effect ends at ALICE's next turn.
@@ -109,7 +109,23 @@ handoffTests =
         let gs0 = Setup.emptyGame S.bothPlayers
             armed = effectWith (Expiry.Type.AtTurnOf S.bob) gs0
             bobsTurn = S.runPure S.identityAnswer armed Engine.handoffTurn
-         in HU.assertEqual "bob's turn ends bob's effect" [] (GameState.continuousEffects bobsTurn)
+         in HU.assertEqual "bob's turn ends bob's effect" [] (GameState.continuousEffects bobsTurn),
+      HU.testCase "CR 611.2a dropAtTurnOf ends the NAMED player's AtTurnOf effects, whoever is active" $
+        -- alice is the active player throughout; the sweep is told to fire for
+        -- BOB, and does. That divorce from GameState.activePlayer is the whole
+        -- generalization -- it is what lets CR 800.4m fire at a seat whose turn
+        -- never begins.
+        let gs0 = S.threePlayerGame
+            armed = effectWith (Expiry.Type.AtTurnOf S.alice) (effectWith (Expiry.Type.AtTurnOf S.bob) gs0)
+            after = Expiry.dropAtTurnOf S.bob armed
+         in do
+              HU.assertEqual "alice is still the active player" S.alice (GameState.activePlayer after)
+              HU.assertEqual "only alice's effect survives" [Expiry.Type.AtTurnOf S.alice] (fmap ContinuousEffect.expiry (GameState.continuousEffects after)),
+      HU.testCase "CR 611.2a dropAtTurnOf touches no other expiry" $
+        let gs0 = S.threePlayerGame
+            armed = effectWith Expiry.Type.Never (effectWith Expiry.Type.AtCleanup (effectWith (Expiry.Type.AtTurnOf S.bob) gs0))
+            after = Expiry.dropAtTurnOf S.bob armed
+         in HU.assertEqual "Never and AtCleanup both survive" 2 (length (GameState.continuousEffects after))
     ]
 
 cleanupTests :: Registry.Type.Registry -> Tasty.TestTree

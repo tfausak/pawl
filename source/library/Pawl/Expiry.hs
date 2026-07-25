@@ -111,22 +111,28 @@ sweepConditional = do
         }
   pure changed
 
--- CR 611.2a: "until your next turn" ends as that player's turn begins. Run at
--- the turn handoff, AFTER activePlayer has been updated, so "a turn began and
--- its active player is p" IS "p's next turn began" -- including when p created
--- the effect on their own turn (the handoff is the only caller, so this never
--- runs during the creating turn) and including extra turns. No per-effect
--- watermark is needed and none is stored.
+-- CR 611.2a: "until your next turn" ends as that player's turn begins.
 --
--- Dropping here is observably identical to dropping "as the turn begins": CR
--- 500.12 (no game events occur between turns), CR 502.4 (no priority during
--- untap) and CR 704.3 (no state-based-action check without a player about to
--- receive priority) leave nothing that could observe the difference. The first
--- observation point is the upkeep step (CR 503.1).
-dropAtHandoff :: GameState -> GameState
-dropAtHandoff gs =
+-- Takes the player EXPLICITLY rather than reading GameState.activePlayer,
+-- because CR 800.4m needs this to fire for a seat whose turn does not begin:
+-- "When a player leaves the game, any continuous effects with durations that
+-- last until that player's next turn ... will last until that turn would have
+-- begun. They neither expire immediately nor last indefinitely." Engine's turn
+-- handoff walks the seating order and calls this at every seat it passes, so a
+-- departed player's durations end at their seat rather than never.
+--
+-- Dropping at the handoff is observably identical to dropping "as the turn
+-- begins": CR 500.12 (no game events occur between turns), CR 502.4 (no priority
+-- during untap) and CR 704.3 (no state-based-action check without a player about
+-- to receive priority) leave nothing that could observe the difference. The
+-- first observation point is the upkeep step (CR 503.1).
+--
+-- One sweep over the three carriers, as the neighbouring sweeps do. AtCleanup,
+-- Never and While are untouched.
+dropAtTurnOf :: PlayerId -> GameState -> GameState
+dropAtTurnOf pid gs =
   let survives expiry = case expiry of
-        Expiry.AtTurnOf pid -> pid /= GameState.activePlayer gs
+        Expiry.AtTurnOf p -> p /= pid
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         Expiry.While _ _ -> True
