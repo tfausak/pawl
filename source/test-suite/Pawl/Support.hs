@@ -178,6 +178,7 @@ isCreatureRecipient r = case r of
 -- Identity interpreter: shuffle returns ids unchanged; actions never occur here.
 identityAnswer :: Prompt.Prompt r -> r
 identityAnswer p = case p of
+  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -211,6 +212,7 @@ castAnswer p = case p of
   Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
+  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -255,6 +257,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
@@ -284,6 +287,7 @@ playLandAnswer p = case p of
   Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
+  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -318,6 +322,15 @@ playLandAnswer p = case p of
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
 randomAnswer p = case p of
   Prompt.Concede _ -> pure Concession.Continues
+  -- CR 507.1: the one interpreter with a real generator, so the defending-player
+  -- choice is a genuine draw rather than the head of the list. S.pickPlayer keeps
+  -- an out-of-range draw total.
+  Prompt.ChooseDefender _ _ candidates -> do
+    g <- State.get
+    let players = NonEmpty.toList candidates
+        (i, g') = Random.uniformR (0, length players - 1) g
+    State.put g'
+    pure (pickPlayer candidates i)
   Prompt.DeclareAttackers _ _ ids -> do
     g <- State.get
     let (keep, g') = Random.uniformR (0, length ids) g

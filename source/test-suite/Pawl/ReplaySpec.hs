@@ -140,6 +140,31 @@ combatReplayTests =
               "the head"
               S.alice
               (Replay.defaultAnswer (Prompt.RandomFirstPlayer (S.alice NonEmpty.:| [S.bob]))),
+          -- CR 507.1 / 703.4h: the defending-player choice round-trips like every
+          -- other prompt. NonEmpty because the action only runs when there is at
+          -- least one candidate.
+          HU.testCase "ChooseDefender round-trips through the transcript" $
+            let p = Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol])
+             in do
+                  HU.assertEqual "carol round trips" (Just S.carol) (Replay.decode p (Replay.encode p S.carol))
+                  -- Discriminating: both legs must round-trip. A decode that
+                  -- ignored the response and returned the head would pass the
+                  -- carol leg only by accident of which one was written first.
+                  HU.assertEqual "bob round trips" (Just S.bob) (Replay.decode p (Replay.encode p S.bob)),
+          HU.testCase "a first-player roll does not decode as a defender choice" $
+            -- Discriminating: this is the assertion that fails if ChooseDefender
+            -- reuses Response.DeterminedFirstPlayer instead of getting its own
+            -- constructor. Both carry a PlayerId, so the types would not object.
+            let p = Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol])
+             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.DeterminedFirstPlayer S.bob)),
+          HU.testCase "a short transcript defends with the first candidate" $
+            -- Discriminating against a defaultAnswer that returned the active
+            -- player, or a candidate not on the offered list: the first candidate
+            -- is always legal, since the prompt is only asked with candidates.
+            HU.assertEqual
+              "the head"
+              S.bob
+              (Replay.defaultAnswer (Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol]))),
           -- #133: the concede channel round-trips like every other prompt. Note
           -- the prompt takes a PlayerId and NO Decider (CR 723.6).
           HU.testCase "Concede round-trips both ways" $

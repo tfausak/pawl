@@ -24,6 +24,12 @@ data Response
     -- serialized so a DecisionLog replays that roll deterministically.
     DeterminedFirstPlayer PlayerId
   | ChoseDiscard [ObjectId]
+  | -- CR 507.1: the opponent the active player chose to attack, serialized so a
+    -- DecisionLog replays a multiplayer combat deterministically. Its own
+    -- constructor rather than a reuse of DeterminedFirstPlayer: decode's job is to
+    -- return Nothing for a response that does not match the prompt being asked,
+    -- and two prompts sharing a constructor cannot do that.
+    ChoseDefender PlayerId
   | DeclaredAttackers [ObjectId]
   | DeclaredBlockers (Map ObjectId ObjectId)
   | AssignedCombatDamage (Map Recipient Natural)

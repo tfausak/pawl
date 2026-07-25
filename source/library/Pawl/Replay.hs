@@ -30,6 +30,7 @@ encode p answer = case p of
   Prompt.ChooseAction {} -> Response.ChoseAction answer
   Prompt.Concede _ -> Response.Conceded answer
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
+  Prompt.ChooseDefender {} -> Response.ChoseDefender answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
   Prompt.DeclareBlockers {} -> Response.DeclaredBlockers answer
   Prompt.AssignCombatDamage {} -> Response.AssignedCombatDamage answer
@@ -72,6 +73,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseDiscard {} -> case response of
     Response.ChoseDiscard ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseDefender {} -> case response of
+    Response.ChoseDefender pid -> Just pid
     _ -> Nothing
   Prompt.DeclareAttackers {} -> case response of
     Response.DeclaredAttackers ids -> Just ids
@@ -142,6 +146,10 @@ defaultAnswer p = case p of
   -- when a transcript runs short.
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  -- CR 507.1: the first candidate is always a legal answer (the prompt is only
+  -- asked with candidates) and is the least eventful fallback when a transcript
+  -- runs short. NonEmpty.head is total.
+  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   -- Declining to attack or block is always legal, and is the least eventful
   -- thing a fallback can do.
   Prompt.DeclareAttackers {} -> []

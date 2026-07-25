@@ -402,6 +402,7 @@ answerX3 p = case p of
 -- CR 514.2 test proves the prompted choice is actually honored.
 discardLastAnswer :: Prompt.Prompt r -> r
 discardLastAnswer p = case p of
+  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -612,6 +613,7 @@ castFirstOption p = case p of
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -654,6 +656,7 @@ castPanglacial p = case p of
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->

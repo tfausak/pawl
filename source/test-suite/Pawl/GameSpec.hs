@@ -313,6 +313,7 @@ librarySize pid gs = length (Game.zoneMembers Zone.Library pid gs)
 recordingAnswer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
 recordingAnswer p = case p of
   Prompt.Concede _ -> pure Concession.Continues
+  Prompt.ChooseDefender _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.DeclareAttackers {} -> pure []
   Prompt.DeclareBlockers {} -> pure Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -1225,6 +1226,7 @@ slaveAnswer p = case p of
   Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->

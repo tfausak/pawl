@@ -53,6 +53,21 @@ data Prompt r where
   RandomFirstPlayer :: NonEmpty PlayerId -> Prompt PlayerId
   -- CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
   ChooseDiscard :: Decider -> PlayerId -> [ObjectId] -> Natural -> Prompt [ObjectId]
+  -- CR 507.1 / 703.4h: immediately after the beginning of combat step begins, the
+  -- active player chooses one of their opponents, and that player becomes the
+  -- defending player. The NonEmpty is the candidates (Combat.attackableOpponents);
+  -- the answer is the one chosen.
+  --
+  -- NonEmpty, not [], for the same reason Setup.emptyGame and RandomFirstPlayer
+  -- take one: the answer has to come from somewhere and a fallback must be total.
+  -- No opponents at all cannot arise while the game is running -- the last one
+  -- leaving ends it (CR 104.2a) -- and is handled by not performing the action,
+  -- which leaves Combat.defender at Nothing and therefore no legal attackers.
+  --
+  -- Not asked when there is exactly one candidate (#169). CR 507.1 makes the
+  -- choice exist only in a multiplayer game; a two-player game gets its defending
+  -- player from CR 506.2's second sentence with nothing to ask.
+  ChooseDefender :: Decider -> PlayerId -> NonEmpty PlayerId -> Prompt PlayerId
   -- CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
   -- attack. Whom they attack is not asked: M1b has exactly one opponent and no
   -- planeswalkers, so there is nothing to choose (#59).
