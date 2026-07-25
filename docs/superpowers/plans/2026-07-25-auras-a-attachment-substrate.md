@@ -72,7 +72,7 @@ The subtype alone. One commit, because the constructor breaks three exhaustive m
 
 **Append the constructor at the END of the declaration.** `Subtype`'s `Ord` is declaration order, and card JSON stores subtypes in `Ord`-canonical order — a whole-pool test re-parses each `data/cards/*.json` and compares against the codec's canonical emission. Inserting in the middle would reorder existing cards' lists and fail that test.
 
-- [ ] **Step 0: File the phase's deferral issues, so later tasks cite real numbers**
+- [x] **Step 0: File the phase's deferral issues, so later tasks cite real numbers**
 
 Do this **first**, not at the end: Tasks 2, 3 and 7 each leave a code comment citing one of these, and a comment carrying a placeholder is exactly the drift the tracker exists to prevent. One `gh issue create` per spec §9 entry, each carrying status, rationale and expiry trigger, labelled `gap` or `elision` plus `expires:card-driven`:
 
@@ -86,7 +86,7 @@ Do this **first**, not at the end: Tasks 2, 3 and 7 each leave a code comment ci
 
 Record the seven numbers before continuing; every `(#N)` below refers to one of them.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/ManaSpec.hs`, inside the existing `subtypeMana` group:
 
@@ -95,12 +95,12 @@ HU.testCase "CR 205.3h: Aura is an enchantment type, so it has no CR 305.6 intri
   HU.assertEqual "no mana" Nothing (Mana.subtypeMana Subtype.Aura),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `Data constructor not in scope: Subtype.Aura`.
 
-- [ ] **Step 3: Add the constructor**
+- [x] **Step 3: Add the constructor**
 
 At the end of `data Subtype` in `source/library/Pawl/Type/Subtype.hs`, after `Horse`:
 
@@ -112,7 +112,7 @@ At the end of `data Subtype` in `source/library/Pawl/Type/Subtype.hs`, after `Ho
     Aura
 ```
 
-- [ ] **Step 4: Add the three exhaustive arms**
+- [x] **Step 4: Add the three exhaustive arms**
 
 `source/library/Pawl/Mana.hs`, at the end of `subtypeMana`'s case:
 
@@ -135,12 +135,12 @@ and in `jsonToSubtype`'s `decodeNullary` pair list:
     (Text.pack "Aura", Subtype.Aura),
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add source/library/Pawl/Type/Subtype.hs source/library/Pawl/Mana.hs source/library/Pawl/Codec.hs source/test-suite/Pawl/ManaSpec.hs
@@ -163,7 +163,7 @@ The carrier and its readers. No behaviour yet — a card can *declare* an enchan
 **Interfaces:**
 - Produces: `Card.Type.enchant :: Card -> Maybe TargetSpec`; `Pawl.Card.isAura :: Card -> Bool`; `Pawl.Card.enchantSlot :: SlotName`; `Pawl.Card.enchantSpecs :: Card -> Map SlotName TargetSpec`. Consumed by Tasks 4 and 6.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/CardSpec.hs`, in the lint group:
 
@@ -176,12 +176,12 @@ HU.testCase "a card with no enchant ability declares no enchant slot" $ do
   HU.assertEqual "no enchant slot" Map.empty (Card.enchantSpecs card),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `enchant`, `isAura` and `enchantSpecs` are not in scope.
 
-- [ ] **Step 3: Add the field**
+- [x] **Step 3: Add the field**
 
 In `source/library/Pawl/Type/Card.hs`, add to the import list `import Pawl.Type.TargetSpec (TargetSpec)`, and add the field after `castingPermissions`:
 
@@ -201,7 +201,7 @@ In `source/library/Pawl/Type/Card.hs`, add to the import list `import Pawl.Type.
 
 `#N` is **issue 3** from Task 1 Step 0 (CR 702.5c). Write the real number; never commit a literal `#N`, and never write the expiry into the comment.
 
-- [ ] **Step 4: Add the codec arms**
+- [x] **Step 4: Add the codec arms**
 
 In `source/library/Pawl/Codec.hs`, in `cardToJson`, alongside the `characteristicPT` block (the exact precedent — a `Maybe` field omitted when absent):
 
@@ -222,7 +222,7 @@ and in the `MkCard` record: `CardT.enchant = enchant,`.
 
 **No existing `data/cards/*.json` file changes** — absent decodes to `Nothing`.
 
-- [ ] **Step 5: Add the classifications**
+- [x] **Step 5: Add the classifications**
 
 In `source/library/Pawl/Card.hs` (add `import qualified Pawl.Type.SlotName as SlotName`, `import qualified Data.Text as Text`, `import qualified Pawl.Type.Subtype as Subtype`):
 
@@ -252,12 +252,12 @@ enchantSpecs card = case Card.enchant card of
   Just spec -> Map.singleton enchantSlot spec
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free. Every `MkCard` record literal in the test suite fails to compile until it gains `Card.Type.enchant = Nothing`; fix each one the compiler names.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl/Type/Card.hs source/library/Pawl/Card.hs source/library/Pawl/Codec.hs source/test-suite/
@@ -283,7 +283,7 @@ Base state plus the entry seam. CR 303.4 says an Aura *enters* attached, so the 
 **Interfaces:**
 - Produces: `Object.attachedTo :: Maybe ObjectId`; `Event.changeZoneAttaching :: ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)`; `S.attach :: ObjectId -> ObjectId -> GameState -> GameState`. Consumed by Tasks 4, 7 and 8.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/EventSpec.hs`. Two Goblin Pikers, deliberately — this asserts that CR 400.7 clears the FIELD, which is true of every object regardless of type, and it must not wait on the Aura printing Task 4 adds:
 
@@ -304,12 +304,12 @@ HU.testCase "CR 400.7: a zone change forgets attachment" $ do
 
 Note the `Just (Just host)` — `Game.lookupObject` returns `Maybe Object` and `attachedTo` is itself a `Maybe`, so `fmap` produces a nested `Maybe`. Match whatever `Game.lookupObject`'s actual signature gives you.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `Object.attachedTo` and `S.attach` are not in scope.
 
-- [ ] **Step 3: Add the field**
+- [x] **Step 3: Add the field**
 
 In `source/library/Pawl/Type/Object.hs`, add `import Pawl.Type.ObjectId (ObjectId)` and the field after `counters`:
 
@@ -335,7 +335,7 @@ In `source/library/Pawl/Type/Object.hs`, add `import Pawl.Type.ObjectId (ObjectI
 
 Add `Object.attachedTo = Nothing` to the six `Object.MkObject` literals the compiler names (`Setup.hs:102`, `Monarch.hs:137`, `Activate.hs:79`, `Engine.hs:419`, `Resolve.hs:792`, `Event.hs:320`).
 
-- [ ] **Step 4: Seed it through the zone change**
+- [x] **Step 4: Seed it through the zone change**
 
 In `source/library/Pawl/Event.hs`, rename the body and add the seeded entry point:
 
@@ -361,7 +361,7 @@ changeZoneAttaching oid requestedDest seed = do
 
 `changeZone` is unchanged (`Monad.void (changeZoneReturning oid requestedDest)`), so **every existing call site is untouched**.
 
-- [ ] **Step 5: Add the test fixture**
+- [x] **Step 5: Add the test fixture**
 
 In `source/test-suite/Pawl/Support.hs`:
 
@@ -376,12 +376,12 @@ attach rider host gs =
    in gs {GameState.objects = Map.adjust set rider (GameState.objects gs)}
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl/ source/test-suite/Pawl/
@@ -410,7 +410,7 @@ Scryfall-verified 2026-07-25: `Unholy Strength` — `{B}` — `Enchantment — A
 
 Adding the card costs exactly one file. The registry loads cards on demand by name, and `S.allPrintings` sweeps `data/cards/`, so the new file gets whole-pool codec round-trip coverage automatically — there is no list to append to.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/CardSpec.hs`:
 
@@ -475,12 +475,12 @@ If `S.powerToughnessOf` does not exist, use whatever accessor the neighbouring c
 
 While you are in `PowerToughnessSpec.hs`, note the comment at line 120 recording that the Aura family "is blocked on Attach". Half of that is now false — the Darksteel Mutation family needs layer-4 card-type *replacement*, not `Attach`. Correct the comment to say what is actually still missing; do not delete the whole note.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `Affected.Attached` is not in scope.
 
-- [ ] **Step 3: Add the constructor**
+- [x] **Step 3: Add the constructor**
 
 In `source/library/Pawl/Type/Affected.hs`:
 
@@ -500,7 +500,7 @@ In `source/library/Pawl/Type/Affected.hs`:
 
 Extend the module's own header comment to describe three kinds rather than two.
 
-- [ ] **Step 4: Add the projection arm**
+- [x] **Step 4: Add the projection arm**
 
 In `source/library/Pawl/Projection.hs`, in `affects`:
 
@@ -514,7 +514,7 @@ In `source/library/Pawl/Projection.hs`, in `affects`:
 
 Then fix every other exhaustive `Affected` match the compiler names. The one at `Projection.hs:865` (inside `controllerOf`) keeps its existing `_ -> False` default — phase (b) is what teaches control to read static abilities, and adding `Attached` there now would be dead code.
 
-- [ ] **Step 5: Add the codec arms**
+- [x] **Step 5: Add the codec arms**
 
 In `source/library/Pawl/Codec.hs`:
 
@@ -530,7 +530,7 @@ and in `jsonToAffected`:
 
 Match the exact shape the neighbouring nullary tags use — check how another payload-free tagged constructor decodes in this module before writing the arm.
 
-- [ ] **Step 6: Write the card**
+- [x] **Step 6: Write the card**
 
 `data/cards/unholy-strength.json`. Field order is alphabetical, matching every other file in the directory:
 
@@ -611,12 +611,12 @@ Match the exact shape the neighbouring nullary tags use — check how another pa
 
 Check `targetSpecToJson` and the `Affected` encoder in `Pawl.Codec` for the exact key names, and correct the `enchant` and `affected` objects above to match what the encoders actually emit — the whole-pool canonical-emission test will tell you immediately if they do not.
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add data/cards/unholy-strength.json source/library/Pawl/ source/test-suite/Pawl/
@@ -641,7 +641,7 @@ An Aura printing now exists, so the qualifier is testable for the first time.
 
 Opalescence reads "Each other non-Aura enchantment is a creature in addition to its other types and has base power and toughness each equal to its mana value." Both of its static abilities carry the same affected set; **both** get the new conjunct.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/ProjectionSpec.hs`, in the Opalescence group:
 
@@ -660,12 +660,12 @@ HU.testCase "Opalescence does not animate an Aura" $ do
   HU.assertBool "a non-Aura enchantment IS animated" (Projection.isCreatureOf ripId gs),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test`
 Expected: FAIL — "the Aura stays a non-creature" is False; Opalescence animates it.
 
-- [ ] **Step 3: Add the qualifier**
+- [x] **Step 3: Add the qualifier**
 
 In `data/cards/opalescence.json`, in **both** static abilities' `affected.value.value` array, append a third conjunct:
 
@@ -683,16 +683,16 @@ In `data/cards/opalescence.json`, in **both** static abilities' `affected.value.
 
 so each `And` reads `[HasCardType Enchantment, Not IsSource, Not (HasSubtype Aura)]`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal test`
 Expected: PASS.
 
-- [ ] **Step 5: Retire the citations**
+- [x] **Step 5: Retire the citations**
 
 Delete the `(#114)` comment at `source/test-suite/Pawl/ProjectionSpec.hs:455` and the sentence it guards. While the file is open, fix the neighbouring comment that attributes "each OTHER enchantment" to *CR 305.2* — 305.2 is the one-land-per-turn rule; Opalescence's "each other" is card text with no rule number.
 
-- [ ] **Step 6: Commit and close the issue**
+- [x] **Step 6: Commit and close the issue**
 
 ```bash
 git add data/cards/opalescence.json source/test-suite/Pawl/ProjectionSpec.hs
@@ -717,7 +717,7 @@ The merge, plus `Target.fillableModes`'s extra-slots parameter. Without the seco
 - Consumes: `Card.enchantSpecs`, `Card.enchantSlot` (Task 2); the Unholy Strength printing (Task 4).
 - Produces: `Target.fillableModes :: ObjectId -> Map SlotName TargetSpec -> Modal.Modal Card -> GameState -> Set ModeIndex` (note the **new second parameter**).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/CastSpec.hs`:
 
@@ -748,12 +748,12 @@ HU.testCase "CR 601.2c: an Aura with no creature on the battlefield is not casta
 
 Use whatever the castability predicate at `Cast.hs:70` is actually named; if it is not exported as `canCast`, assert against the expression that line uses.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test`
 Expected: the first case FAILS (`specs` is empty — the merge does not exist); the second FAILS (the Aura is reported castable).
 
-- [ ] **Step 3: Merge the enchant slot into the two spec functions**
+- [x] **Step 3: Merge the enchant slot into the two spec functions**
 
 In `source/library/Pawl/Card.hs`:
 
@@ -774,7 +774,7 @@ modesTargetSpecs chosen card = Map.union (enchantSpecs card) (Modal.modesTargetS
 
 Leave `modeTargetSpecs` (singular, by index) alone — it answers "what does mode *i* declare", which the enchant slot is not part of.
 
-- [ ] **Step 4: Teach `fillableModes` the extra slots**
+- [x] **Step 4: Teach `fillableModes` the extra slots**
 
 In `source/library/Pawl/Target.hs`:
 
@@ -798,7 +798,7 @@ fillableModes source extra modal gs =
    in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Int ..] ms))
 ```
 
-- [ ] **Step 5: Update the five callers**
+- [x] **Step 5: Update the five callers**
 
 `Cast.hs:70` and `Cast.hs:162` pass the card's enchant slots:
 
@@ -814,12 +814,12 @@ Target.fillableModes srcId Map.empty (ActivatedAbility.modal ability) gs
 
 Fix the two test-suite callers the compiler names (`ReplaySpec.hs:230`, `ModalSpec.hs:140` and `:408`) the same way — abilities, so `Map.empty`.
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl/ source/test-suite/Pawl/
@@ -846,7 +846,7 @@ The end-to-end path, and the phase's headline test.
 
 `AuraSpec` heads with a comment listing the modules it covers, exposes `tests :: TestTree`, and is added to `Main.hs`'s `testTree` **and** to the test-suite `other-modules` list in `pawl.cabal` by hand.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `source/test-suite/Pawl/AuraSpec.hs` with the standard header comment and:
 
@@ -882,12 +882,12 @@ HU.testCase "CR 608.2b: an Aura spell whose target left is countered on resoluti
   HU.assertEqual "the Aura is in its owner's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test`
 Expected: the first case FAILS (the Aura enters unattached — `attachedTo` is `Nothing`); the second FAILS (the Aura enters the battlefield instead of the graveyard).
 
-- [ ] **Step 3: Extract the fizzle test**
+- [x] **Step 3: Extract the fizzle test**
 
 In `source/library/Pawl/Resolve.hs`, lift the `specs`/`chosen`/`legalSlot`/`fizzles` computation out of `resolveSpellWith` (currently `Resolve.hs:335-348`) into a top-level function, and have `resolveSpellWith` call it. One implementation, so the Aura path and the ordinary spell path cannot drift:
 
@@ -920,7 +920,7 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
 
 Keep `resolveSpellWith`'s existing per-effect re-read of `legalSlot` exactly as it is — that is a different question (which *individual* slot is legal for this effect) and must not be folded into the all-or-nothing test.
 
-- [ ] **Step 4: Add the Stack branch**
+- [x] **Step 4: Add the Stack branch**
 
 In `source/library/Pawl/Stack.hs`, replace the `Source.OfCard` arm:
 
@@ -965,16 +965,16 @@ enchantedBy oid gs = case Game.lookupObject oid gs of
     _ -> Nothing
 ```
 
-- [ ] **Step 5: Wire the new spec module**
+- [x] **Step 5: Wire the new spec module**
 
 Add `Pawl.AuraSpec` to `source/test-suite/Pawl/Main.hs`'s `testTree` and to the test-suite `other-modules` list in `pawl.cabal`.
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add source/library/Pawl/ source/test-suite/Pawl/ pawl.cabal
@@ -999,7 +999,7 @@ The state-based action, and the stale comment it falsifies.
 
 **The two-pass behaviour is the assertion, not an accident.** SBAs are simultaneous: `performStateBasedActions` judges every object against the *pre-pass* projection (`Sba.hs:117-120`). When the enchanted creature dies in pass N, the Aura's illegality was judged against the state in which that creature was still on the battlefield — so the Aura survives pass N and falls off in pass N+1. CR 704.3 repeats the check until no state-based action is performed, which is what makes that correct rather than a bug.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/AuraSpec.hs`:
 
@@ -1038,12 +1038,12 @@ HU.testCase "CR 704.5m: an unattached Aura on the battlefield goes to the gravey
 
 If `S.markDamage` does not exist, use whatever the neighbouring destruction tests use to mark damage and match its signature.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test`
 Expected: FAIL — the Aura stays on the battlefield after both passes.
 
-- [ ] **Step 3: Add the state-based action**
+- [x] **Step 3: Add the state-based action**
 
 In `source/library/Pawl/Sba.hs`, add the predicate:
 
@@ -1099,7 +1099,7 @@ and add it to `acted`:
       acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras)
 ```
 
-- [ ] **Step 4: Correct the stale comment**
+- [x] **Step 4: Correct the stale comment**
 
 `Sba.hs:98-100` currently claims "One pass is enough in M1b: a creature dying cannot cause another SBA, because nothing gains or loses life when a creature dies. Revisit when it can." That is now false. Replace it:
 
@@ -1118,12 +1118,12 @@ and add it to `acted`:
 
 Verify by inspection that every path that can bury a creature reaches `Engine`'s settle loop rather than calling `checkStateBasedActions` once. If one does not, that is a bug this task fixes — not a test to weaken.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add source/library/Pawl/Sba.hs source/test-suite/Pawl/AuraSpec.hs
@@ -1142,25 +1142,25 @@ The bookkeeping that closes it out. The deferral issues were filed in Task 1 Ste
 **Files:**
 - Modify: `docs/progress.md`, `CLAUDE.md`
 
-- [ ] **Step 1: Verify no placeholder citation survived**
+- [x] **Step 1: Verify no placeholder citation survived**
 
 Run: `grep -rn '(#N' source/ docs/superpowers/plans/2026-07-25-auras-a-attachment-substrate.md`
 Expected: hits **only** inside the plan file, never inside `source/`. Any hit under `source/` is a comment that shipped without a real issue number — fix it before continuing.
 
-- [ ] **Step 2: Record the phase**
+- [x] **Step 2: Record the phase**
 
 Add one `docs/progress.md` entry in the established format — what this phase *established*, its gate card, the decisions it proved, and the types it added (`Object.attachedTo`, `Card.enchant`, `Subtype.Aura`, `Affected.Attached`, `Event.changeZoneAttaching`, `Resolve.targetsAllIllegal`, `Target.fillableModes`'s extra-slots parameter). Note that it added **no new opcode**: an Aura's whole behaviour is a static ability plus an entry rule.
 
 **Replace** `CLAUDE.md`'s status bullet — never append. Milestone history goes in `progress.md`.
 
-- [ ] **Step 3: Verify the phase is complete**
+- [x] **Step 3: Verify the phase is complete**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free from a clean build — the only definitive check, since incremental builds hide warnings from unchanged modules. This is the one place a `cabal clean` is worth its cost.
 
 Confirm #114 is closed and the seven deferral issues from Task 1 Step 0 are open.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/progress.md CLAUDE.md
@@ -1170,7 +1170,7 @@ hooky run
 git commit -m "docs(auras): record the attachment substrate"
 ```
 
-- [ ] **Step 5: Confirm every step is ticked**
+- [x] **Step 5: Confirm every step is ticked**
 
 Run: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-25-auras-a-attachment-substrate.md`
 Expected: `0`. Use *that* grep, not `grep -c -- '- \[ \]'` — this plan's header quotes the checkbox syntax in prose, so the naive grep can never reach zero.
