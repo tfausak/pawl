@@ -62,7 +62,11 @@ data Prompt r where
   -- take one: the answer has to come from somewhere and a fallback must be total.
   -- No opponents at all cannot arise while the game is running -- the last one
   -- leaving ends it (CR 104.2a) -- and is handled by not performing the action,
-  -- which leaves Combat.defender at Nothing and therefore no legal attackers.
+  -- which leaves Combat.defender at Nothing and therefore no attack possible --
+  -- the same wording Combat.declareAttackers' own comment uses, and deliberately
+  -- not a claim about legality: Combat.canAttack never reads this field, so the
+  -- creatures remain legal attackers (CR 508.1a) and what does not happen is the
+  -- CR 508.1 declaration.
   --
   -- Not asked when there is exactly one candidate (#169). CR 507.1 makes the
   -- choice exist only in a multiplayer game; a two-player game gets its defending

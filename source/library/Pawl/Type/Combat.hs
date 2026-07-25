@@ -42,13 +42,20 @@ data Combat = MkCombat
     -- a turn-based action immediately after the beginning of combat step begins
     -- (CR 703.4h, CR 507.1) by Pawl.Combat.chooseDefender.
     --
-    -- Nothing before that action has run, and again after Pawl.Combat.clearCombat.
-    -- The designation is scoped to the combat phase -- CR 506.2's sentences all
-    -- begin "During the combat phase" -- and CR 703.4h makes the choice per
-    -- beginning-of-combat step, so a turn with a second combat phase (CR 506.7c)
-    -- chooses again rather than inheriting. Nothing also means NO ATTACK IS
-    -- POSSIBLE, which is the right answer and not a fallback: a turn whose active
-    -- player has left the game (CR 800.4j) never performs the action.
+    -- Nothing before that action has run, and again once Pawl.Combat.clearCombat
+    -- has run. The RULES scope the designation to the combat phase -- CR 506.2's
+    -- sentences all begin "During the combat phase" -- and CR 703.4h makes the
+    -- choice per beginning-of-combat step, so a turn with a second combat phase
+    -- (CR 500.8 is what adds one) chooses again rather than inheriting.
+    --
+    -- pawl's lifetime is one step SHORTER than the rules': clearCombat runs from
+    -- Engine.runTurnBasedActions' end of combat step arm, i.e. as that step
+    -- BEGINS, so the field reads Nothing for the whole of a step that CR 511.3's
+    -- second sentence still places inside the combat phase (#180).
+    --
+    -- Nothing also means NO ATTACK IS POSSIBLE, which is the right answer and not
+    -- a fallback: a turn whose active player has left the game (CR 800.4j) never
+    -- performs the action.
     --
     -- Maybe PlayerId, not a set. CR 802 (attack multiple players) is the option
     -- that makes several players defenders at once, and CR 802.4 then has each of

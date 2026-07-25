@@ -232,6 +232,14 @@ runTurnBasedActions phase = do
       Monad.unless skip (Event.drawCard active)
     -- CR 703.4h: choose the defending player. The active player's action
     -- (CR 507.1), so it takes the same guard as the others.
+    --
+    -- Combat.chooseDefender applies the IDENTICAL test itself. On this path that
+    -- makes hasActive the redundant copy -- removing it changes nothing anything
+    -- can observe, and no test discriminates it -- while removing the function's
+    -- makes every direct caller wrong and reddens CombatSpec's direct-call case.
+    -- Kept because this arm is where the enumeration of CR 800.4j's actions above
+    -- lives, and reading the guard off the list is how the next arm gets it right.
+    -- Neither copy is safe to delete without reading the other.
     Phase.Combat CombatStep.BeginningOfCombat -> Monad.when hasActive Combat.chooseDefender
     Phase.Combat CombatStep.DeclareAttackers -> do
       Monad.when hasActive (Combat.declareAttackers active)

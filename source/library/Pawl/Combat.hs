@@ -47,6 +47,10 @@ emptyCombat =
 -- being attacking and blocking creatures. Resetting `defender` alongside them is
 -- CR 506.2, not CR 511.3: the designation is scoped to the combat phase, so it
 -- cannot survive the phase ending.
+--
+-- Engine.runTurnBasedActions calls this from its end of combat step arm, i.e. as
+-- that step BEGINS -- one step earlier than CR 511.3's boundary, and earlier than
+-- either rule's scope ends (#180).
 clearCombat :: GameState -> GameState
 clearCombat gs = gs {GameState.combat = emptyCombat}
 
@@ -69,8 +73,9 @@ skipEmptyCombat gs =
 -- opponent. CR 806.1: in a free-for-all the players compete as individuals, so
 -- every other player is an opponent. CR 102.3 is the one reading this is wrong
 -- for -- a teammate is not an opponent -- and pawl has no teams to express
--- (#175). Same argument Count.playersFor and Filter.matches carry for the
--- Opponent axis, phrased the same way on purpose.
+-- (#175). Same argument Count.playersFor's PlayerRelation.Opponent arm carries,
+-- phrased the same way on purpose. Filter.matches has an Opponent arm too, but it
+-- carries no such note and is deliberately not cited here as though it did.
 --
 -- SEATING order (Departure.stillPlayingInOrder), not player-id order: the seating
 -- roster is the game's own ordering for anything player-shaped (CR 800.5), and
@@ -222,6 +227,13 @@ chooseDefender = do
   let pid = GameState.activePlayer gs
   -- CR 800.4j: a turn whose active player has left continues without one, so the
   -- action the rules assign to the active player has nobody to perform it.
+  --
+  -- Engine.runTurnBasedActions applies the identical test before calling this, so
+  -- on the engine's path the two are redundant. This is the copy that carries the
+  -- rule for a DIRECT caller -- a spec, or a second combat phase spliced by an
+  -- effect -- and the only one a test can discriminate, which CombatSpec's
+  -- direct-call case does. Do not delete it as redundant; the engine-side comment
+  -- says the same thing from the other end.
   Monad.when (List.elem pid (Departure.stillPlaying gs)) $
     case NonEmpty.nonEmpty (attackableOpponents gs) of
       Nothing -> pure ()
