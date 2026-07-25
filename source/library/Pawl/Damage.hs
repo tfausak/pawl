@@ -46,6 +46,18 @@ removeAllDamage gs =
   let clear obj = obj {Object.damage = 0}
    in gs {GameState.objects = fmap clear (GameState.objects gs)}
 
+-- CR 506.4: "A permanent is removed from combat if it leaves the battlefield".
+-- The liveness test every combat-damage read shares, because the combat record
+-- outlives the objects it names: an id in GameState.combat is a live combat
+-- participant only while its object is on the battlefield. Two ways off it --
+-- destroyed inside CR 510.4's two-step window, or deleted outright when its
+-- owner left the game (CR 800.4a's first clause) -- so the predicate is on the
+-- ZONE, not on mere existence: Event.destroy leaves the object in the graveyard.
+onBattlefield :: ObjectId -> GameState -> Bool
+onBattlefield oid gs = case Game.lookupObject oid gs of
+  Just obj -> Object.zone obj == Zone.Battlefield
+  Nothing -> False
+
 -- CR 510.1e / 702.19b, as a pure predicate over the whole assignment. Legal iff it
 -- totals power, uses only legal recipients, and -- the trample implication -- the
 -- defender got damage ONLY if every blocker is at its lethal threshold. The
@@ -113,9 +125,6 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
             -- blocked-ness (#28) -- so the liveness filter belongs here, at
             -- assignment, and nowhere else. Same predicate dealCombatDamage uses
             -- to decide which creatures assign.
-            onBattlefield oid = case Game.lookupObject oid gs of
-              Just obj -> Object.zone obj == Zone.Battlefield
-              Nothing -> False
             toDefender :: [DamageEvent.DamageEvent]
             toDefender =
               if defenderIsPlaying
@@ -126,7 +135,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
         if Set.null recorded
           then -- CR 510.1b: never blocked, so it hits what it is attacking.
             pure toDefender
-          else case filter onBattlefield (Set.toList recorded) of
+          else case filter (\oid -> onBattlefield oid gs) (Set.toList recorded) of
             -- Blocked, but nothing is blocking it now. CR 702.19d: a trampler
             -- assigns everything to the defending player, "as though all blocking
             -- creatures have been assigned lethal damage". CR 510.1c: anything
@@ -167,7 +176,26 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                       else []
                   )
 
--- CR 510.1d: a blocking creature assigns its damage to the creature it blocks.
+-- CR 510.1d: "A blocking creature assigns combat damage to the creatures it's
+-- blocking. If it isn't currently blocking any creatures (if, for example, they
+-- were destroyed or removed from combat), it assigns no combat damage."
+--
+-- That second sentence is the liveness filter on the ATTACKER, and it is the
+-- mirror of the CR 510.1c filter attackerAssignment applies to the blockers:
+-- CR 506.4 removes a permanent from combat when it leaves the battlefield, so
+-- once the attacker is gone these creatures are blocking nothing. Reachable two
+-- ways -- the attacker destroyed inside CR 510.4's two-step window, and its
+-- owner leaving the game (CR 800.4a's first clause deletes the object).
+--
+-- The filter belongs HERE and not in Departure.objectsLeaveWith, for the same
+-- reason CR 510.1c's does: Combat.blockers is keyed by the attacker and its key
+-- IS the record of blocked-ness that CR 509.1h's last sentence protects (#28),
+-- so pruning it would be reading the rule backwards, and it would fix only the
+-- departure route and not the destroyed one. Without the filter a blocker emits
+-- a DamageEvent addressed to an object that is not on the battlefield: marking
+-- it is a no-op once the id is gone, but the event still enters the CR 608.2i
+-- history and still runs its own CR 616.1 replacement loop, where it could
+-- spend a one-shot shield on damage the rules say was never assigned.
 blockerAssignment :: GameState -> (ObjectId, Set.Set ObjectId) -> [DamageEvent.DamageEvent]
 blockerAssignment gs (attacker, blockers) =
   let assign blocker = case Projection.powerOf blocker gs of
@@ -176,7 +204,9 @@ blockerAssignment gs (attacker, blockers) =
             then []
             else [DamageEvent.MkDamageEvent blocker (Recipient.ToCreature attacker) (fromInteger p) (Projection.hasKeyword Keyword.Deathtouch blocker gs) (Projection.hasKeyword Keyword.Infect blocker gs) DamageKind.Combat]
         Nothing -> []
-   in concatMap assign (Set.toList blockers)
+   in if onBattlefield attacker gs
+        then concatMap assign (Set.toList blockers)
+        else []
 
 -- CR 510.2: gather all combat damage before applying any of it (simultaneity).
 gatherCombatDamage :: (ObjectId -> Bool) -> Game [DamageEvent.DamageEvent]
@@ -259,26 +289,24 @@ dealCombatDamage = do
           (Set.unions (Map.elems (Combat.Type.blockers combat)))
       striking oid = Projection.hasKeyword Keyword.FirstStrike oid gs || Projection.hasKeyword Keyword.DoubleStrike oid gs
       strikers = Set.filter striking participants
-      onBattlefield oid = case Game.lookupObject oid gs of
-        Just obj -> Object.zone obj == Zone.Battlefield
-        Nothing -> False
+      alive oid = onBattlefield oid gs
   case Combat.Type.struckFirst combat of
     Nothing
       -- CR 510.4 does not apply: no striker, so one step and everyone deals.
       | Set.null strikers -> do
-          dealWave onBattlefield
+          dealWave alive
           pure False
       -- CR 510.4: a striker is present. This is the first of two steps; only
       -- first strikers and double strikers deal, and a second step follows.
       | otherwise -> do
           State.modify' (\g -> g {GameState.combat = (GameState.combat g) {Combat.Type.struckFirst = Just strikers}})
-          dealWave (\oid -> onBattlefield oid && Set.member oid strikers)
+          dealWave (\oid -> alive oid && Set.member oid strikers)
           pure True
     -- CR 510.4 second step: those that had neither first strike nor double strike
     -- as the first step began (not in the snapshot), plus those that currently
     -- have double strike -- and are still on the battlefield.
     Just snapshot -> do
-      dealWave (\oid -> onBattlefield oid && (Set.notMember oid snapshot || Projection.hasKeyword Keyword.DoubleStrike oid gs))
+      dealWave (\oid -> alive oid && (Set.notMember oid snapshot || Projection.hasKeyword Keyword.DoubleStrike oid gs))
       pure False
 
 -- Gather this wave's damage under `assigns` and apply it.

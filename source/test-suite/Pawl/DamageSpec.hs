@@ -606,6 +606,72 @@ departedBlockerTests registry =
           _ -> HU.assertFailure "fixture did not build two blockers"
     ]
 
+-- The mirror of killBlockerMidCombat: the ATTACKER is gone by the combat damage
+-- step. CR 506.4 removes it from combat, so by CR 510.1d its blockers are
+-- blocking nothing -- but Combat.blockers is keyed BY the attacker and that key
+-- is never pruned (CR 509.1h, #28), so the stale key is what reaches
+-- Damage.blockerAssignment.
+killAttackerMidCombat :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+killAttackerMidCombat victim gs =
+  S.runPure S.aggressiveAnswer gs $ do
+    Combat.declareAttackers S.alice
+    Combat.declareBlockers
+    Event.destroy victim
+    Monad.void Damage.dealCombatDamage
+
+departedAttackerTests :: Registry.Type.Registry -> Tasty.TestTree
+departedAttackerTests registry =
+  Tasty.testGroup
+    "Departed attackers (CR 510.1d)"
+    [ HU.testCase "CR 510.1d a blocker whose attacker was destroyed mid-combat assigns no combat damage" $ do
+        -- CR 510.1d: "A blocking creature assigns combat damage to the creatures
+        -- it's blocking. If it isn't currently blocking any creatures (if, for
+        -- example, they were destroyed or removed from combat), it assigns no
+        -- combat damage." The attacker is destroyed between declare blockers and
+        -- the combat damage step -- CR 506.4 removes it from combat.
+        --
+        -- What the assertion catches: an implementation that filters only the
+        -- BLOCKER (Damage.blockerAssignment's Projection.powerOf reads the
+        -- blocker, which is alive) and so emits a DamageEvent addressed to the
+        -- dead attacker. Marking that damage is a no-op the moment the object is
+        -- gone from GameState.objects, so the mark is NOT the observable -- the
+        -- CR 608.2i history is. The control leg proves the assertion is not
+        -- vacuous: with the attacker alive the same board records exactly that
+        -- event.
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, _) = S.combatBoardOf [piker] [piker]
+        case mine of
+          attacker : _ -> do
+            HU.assertEqual "nothing was addressed to the destroyed attacker" [] (damageEventsTo attacker (killAttackerMidCombat attacker gs))
+            HU.assertEqual "and with the attacker alive the blocker DOES hit it -- the filter is what did it" [2] (fmap DamageEvent.amount (damageEventsTo attacker (S.fightWith S.aggressiveAnswer gs)))
+          [] -> HU.assertFailure "fixture did not build an attacker",
+      HU.testCase "CR 510.1d a blocker whose attacker left the game assigns no combat damage" $ do
+        -- The departure route to the same stale key. Three seats, because at two
+        -- the concession ends the game (CR 104.2a). CR 800.4a's first clause
+        -- deletes alice's attacker outright and drops its Combat.attackers entry,
+        -- but the Combat.blockers KEY survives -- deliberately, since CR 509.1h's
+        -- last sentence is about the blockers' side of that record (#28) -- so
+        -- bob's blocker is still handed a dead attacker to hit.
+        piker <- Registry.printing registry "Goblin Piker"
+        let (attacker, b1) = S.addCreature piker S.alice S.threePlayerGame
+            (blocker, b2) = S.addCreature piker S.bob b1
+            fighting =
+              b2
+                { GameState.combat =
+                    Combat.Type.MkCombat
+                      { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.bob),
+                        Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker),
+                        Combat.Type.struckFirst = Nothing
+                      }
+                }
+            gone = Departure.depart Departure.Type.Conceded S.alice fighting
+            (assignedAfter, _) = S.runPureWith S.identityAnswer gone (Damage.gatherCombatDamage (const True))
+            (assignedBefore, _) = S.runPureWith S.identityAnswer fighting (Damage.gatherCombatDamage (const True))
+        HU.assertBool "CR 509.1h: the blockers key really is still there, so this is the live path" (Map.member attacker (Combat.Type.blockers (GameState.combat gone)))
+        HU.assertEqual "no assignment names the departed attacker" [] (filter (\ev -> DamageEvent.target ev == Recipient.ToCreature attacker) assignedAfter)
+        HU.assertEqual "and with alice still in the game the blocker's hit is assigned -- the filter is what did it" [2] (fmap DamageEvent.amount (filter (\ev -> DamageEvent.target ev == Recipient.ToCreature attacker) assignedBefore))
+    ]
+
 -- CR 800.4e: "If combat damage would be assigned to a player who has left the
 -- game, that damage isn't assigned." attackerAssignment reads the defender's
 -- status at two independent sites -- the unblocked/trample-through toDefender
@@ -787,6 +853,7 @@ tests registry =
       assignmentLegalityTests,
       trampleTests registry,
       departedBlockerTests registry,
+      departedAttackerTests registry,
       departedDefenderTests registry,
       trampleDeathtouchTests registry,
       sbaTests,
