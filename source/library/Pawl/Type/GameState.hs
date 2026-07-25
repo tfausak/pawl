@@ -71,11 +71,15 @@ data GameState = MkGameState
     -- consult. The third carrier sharing that vocabulary. A permanent's printed
     -- player abilities are NOT here -- Pawl.PlayerEffect re-derives those live.
     playerEffects :: [ActivePlayerEffect],
-    -- The SEATING order (CR 800.5, CR 806.3), rotated so the starting player is
-    -- first (CR 103.1: "The game's default turn order begins with the starting
-    -- player and proceeds clockwise"). It lists every player who BEGAN this game
-    -- and is never shortened. Who is still IN the game is Departure.stillPlaying,
-    -- and every departure-aware read filters through that on top of this.
+    -- The seating order -- CR 800.5 (or CR 806.3 for Grand Melee) only says
+    -- players determine SOME seating order, "by any mutually agreeable
+    -- method"; it does not say turnOrder is it. That comes from CR 103.1's
+    -- last sentence, which does: "The game's default turn order begins with
+    -- the starting player and proceeds clockwise" -- so this field is that
+    -- seating order, rotated so the starting player is first. It lists every
+    -- player who BEGAN this game and is never shortened. Who is still IN the
+    -- game is Departure.stillPlaying, and every departure-aware read filters
+    -- through that on top of this.
     --
     -- Three rules depend on a departed player keeping their seat:
     --   * CR 800.4m -- the seat is how the handoff knows when a departed player's

@@ -829,6 +829,32 @@ attackWithEverythingAnswer p = case p of
   Prompt.DeclareAttackers _ _ candidates -> candidates
   _ -> S.identityAnswer p
 
+-- The single activated ability of a printing. Total: the fallback is
+-- unreachable in this fixture. Duplicated per this suite's convention of
+-- group-local helpers (CostSpec, ActivateSpec, ReplacementSpec each carry
+-- their own).
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+  ab : _ -> ab
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p))
+
+-- Records every player asked Prompt.Concede, in order -- the
+-- concedeOrderAnswer shape -- and drives alice through exactly one Activate
+-- of Greed's ability, then Pass for everyone (including alice, on any later
+-- ask: by then she can no longer afford the cost, so Greed's Activate is not
+-- offered). Prompt.Concede is asked of the priority holder before anything
+-- else, so the recorded order IS the order priority moved in -- including a
+-- stale holder who has already departed, which is exactly what the CR 800.4a
+-- guard below is for.
+greedThenPassAnswer :: ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+greedThenPassAnswer greedId ability p = case p of
+  Prompt.Concede asked -> do
+    State.modify' (\seen -> seen <> [asked])
+    pure Concession.Continues
+  Prompt.ChooseAction _ pid actions ->
+    pure (if pid == S.alice && List.elem (A.Activate greedId ability) actions then A.Activate greedId ability else A.Pass)
+  _ -> pure (S.identityAnswer p)
+
 turnOrderTests :: Registry.Type.Registry -> Tasty.TestTree
 turnOrderTests registry =
   Tasty.testGroup
@@ -1001,7 +1027,35 @@ turnOrderTests registry =
               HU.assertBool "the step ran to its end and advanced" (GameState.phase afterStep /= Phase.PrecombatMain)
               HU.assertEqual "bob's effect did NOT end when he left" 1 (length (GameState.playerEffects afterStep))
               HU.assertEqual "carol takes the next turn, bob's seat is skipped" S.carol (GameState.activePlayer afterHandoff)
-              HU.assertEqual "and bob's effect ended at bob's seat -- not never" [] (GameState.playerEffects afterHandoff)
+              HU.assertEqual "and bob's effect ended at bob's seat -- not never" [] (GameState.playerEffects afterHandoff),
+      HU.testCase "CR 800.4a a player who departs paying a cost is not asked again" $ do
+        -- Alice controls Greed and one Swamp at exactly 2 life. She activates
+        -- Greed ({B}, Pay 2 life: Draw a card -- CR 119.4 makes paying her last
+        -- 2 life legal), which leaves her at 0 life. Every Play/Cast/Activate
+        -- arm writes GameState.priority BEFORE settleForPriority runs the SBA
+        -- pass that departs her (CR 704.5a), so without the CR 800.4a guard the
+        -- next `loop` iteration would find `priority = Just alice` and ask the
+        -- departed alice again. With the guard it re-derives the holder via
+        -- nextStillPlaying and asks bob, the next seat still in the game,
+        -- instead.
+        swamp <- Registry.printing registry "Swamp"
+        greed <- Registry.printing registry "Greed"
+        let (_, withSwamp) = S.addCreature swamp S.alice S.threePlayerGame
+            (greedId, withGreed) = S.addCreature greed S.alice withSwamp
+            gs =
+              withGreed
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice,
+                  GameState.players = Map.adjust (\p -> p {Player.life = 2}) S.alice (GameState.players withGreed)
+                }
+            ((_, after), asks) = State.runState (Engine.runGame (greedThenPassAnswer greedId (theAbility greed)) gs Engine.priorityLoop) []
+        HU.assertEqual "alice activates Greed, then BOB is asked -- not alice again" [S.alice, S.bob] (take 2 asks)
+        HU.assertBool "alice is never asked again after departing" (notElem S.alice (drop 1 asks))
+        HU.assertEqual
+          "alice departed by paying her last 2 life"
+          (Just (Status.Departed Departure.Type.Lost))
+          (fmap Player.status (Map.lookup S.alice (GameState.players after)))
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree

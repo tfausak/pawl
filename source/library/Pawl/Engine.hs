@@ -468,72 +468,90 @@ priorityLoop = do
                 gs <- State.get
                 case GameState.priority gs of
                   Nothing -> pure ()
-                  Just p -> do
-                    -- CR 104.3a: asked before anything else, and keyed to `p` -- the
-                    -- TRUE player, never `Decide.deciderFor p`. Prompt.Concede carries
-                    -- no Decider precisely so this cannot be got wrong (CR 723.6): a
-                    -- controller may not concede for the player they control, though
-                    -- that player may still concede themselves.
-                    concession <- Trans.lift (Program.prompt (Prompt.Concede p))
-                    case concession of
-                      Concession.Concedes -> do
-                        -- CR 104.3a: leaves the game IMMEDIATELY. Not a state-based
-                        -- action (that is CR 104.3b), so it does not wait for a settle,
-                        -- and nothing goes on the stack -- there is nothing to respond
-                        -- to. leaveGame settles CR 104.2a on the spot; the loop's own
-                        -- `finished` check then unwinds on the next iteration.
-                        Departure.leaveGame Departure.Type.Conceded p
-                        -- CR 800.4a: priority passes to the next player in turn
-                        -- order who's still in the game. nextStillPlaying looks
-                        -- `p` up in the full seating order, so it finds p's
-                        -- SUCCESSOR even though leaveGame has already run.
-                        --
-                        -- CR 117.4 requires "all players pass without taking any
-                        -- actions in between." A concession is an action that
-                        -- changes the board (CR 800.4a removes the departing
-                        -- player's objects from the game), so the passes already
-                        -- counted this cycle no longer form a succession and the
-                        -- count restarts -- as it does in the Play/Cast/Activate
-                        -- arms below. The CR does not settle this directly; not
-                        -- resetting risks resolving a spell that a player who has
-                        -- just watched a board disappear would have responded to,
-                        -- and resetting costs at most one redundant pass prompt.
-                        State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (nextStillPlaying g p)})
-                        loop
-                      Concession.Continues -> do
-                        let decider = Decide.deciderFor p gs
-                            actions = Action.legalActions p gs
-                        chosen <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
-                        case chosen of
-                          Action.Type.Pass -> do
-                            let passes = GameState.passes gs + 1
-                                playing = length (Departure.stillPlaying gs)
-                            if passes >= fromIntegral playing
-                              then case GameState.stack gs of
-                                [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
-                                _ -> do
-                                  Stack.resolveTopWith playSubgame
-                                  settleForPriority
-                                  State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (priorityHolder g)})
-                                  loop
-                              else do
-                                State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}
+                  Just p ->
+                    if List.elem p (Departure.stillPlaying gs)
+                      then do
+                        -- CR 104.3a: asked before anything else, and keyed to `p` -- the
+                        -- TRUE player, never `Decide.deciderFor p`. Prompt.Concede carries
+                        -- no Decider precisely so this cannot be got wrong (CR 723.6): a
+                        -- controller may not concede for the player they control, though
+                        -- that player may still concede themselves.
+                        concession <- Trans.lift (Program.prompt (Prompt.Concede p))
+                        case concession of
+                          Concession.Concedes -> do
+                            -- CR 104.3a: leaves the game IMMEDIATELY. Not a state-based
+                            -- action (that is CR 104.3b), so it does not wait for a settle,
+                            -- and nothing goes on the stack -- there is nothing to respond
+                            -- to. leaveGame settles CR 104.2a on the spot; the loop's own
+                            -- `finished` check then unwinds on the next iteration.
+                            Departure.leaveGame Departure.Type.Conceded p
+                            -- CR 800.4a: priority passes to the next player in turn
+                            -- order who's still in the game. nextStillPlaying looks
+                            -- `p` up in the full seating order, so it finds p's
+                            -- SUCCESSOR even though leaveGame has already run.
+                            --
+                            -- CR 117.4 defines passing "in succession" as passing
+                            -- "without taking any actions in between passing." A
+                            -- concession is an action that
+                            -- changes the board (CR 800.4a removes the departing
+                            -- player's objects from the game), so the passes already
+                            -- counted this cycle no longer form a succession and the
+                            -- count restarts -- as it does in the Play/Cast/Activate
+                            -- arms below. The CR does not settle this directly; not
+                            -- resetting risks resolving a spell that a player who has
+                            -- just watched a board disappear would have responded to,
+                            -- and resetting costs at most one redundant pass prompt.
+                            State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (nextStillPlaying g p)})
+                            loop
+                          Concession.Continues -> do
+                            let decider = Decide.deciderFor p gs
+                                actions = Action.legalActions p gs
+                            chosen <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
+                            case chosen of
+                              Action.Type.Pass -> do
+                                let passes = GameState.passes gs + 1
+                                    playing = length (Departure.stillPlaying gs)
+                                if passes >= fromIntegral playing
+                                  then case GameState.stack gs of
+                                    [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
+                                    _ -> do
+                                      Stack.resolveTopWith playSubgame
+                                      settleForPriority
+                                      State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (priorityHolder g)})
+                                      loop
+                                  else do
+                                    State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}
+                                    loop
+                              Action.Type.Play oid -> do
+                                Event.changeZone oid Zone.Battlefield
+                                State.modify' (\g -> g {GameState.landPlayed = Set.insert p (GameState.landPlayed g), GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
                                 loop
-                          Action.Type.Play oid -> do
-                            Event.changeZone oid Zone.Battlefield
-                            State.modify' (\g -> g {GameState.landPlayed = Set.insert p (GameState.landPlayed g), GameState.passes = 0, GameState.priority = Just p})
-                            settleForPriority
-                            loop
-                          Action.Type.Cast oid -> do
-                            Cast.castSpell p oid
-                            State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
-                            settleForPriority
-                            loop
-                          Action.Type.Activate oid ability -> do
-                            Activate.activateAbility p oid ability
-                            State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
-                            settleForPriority
-                            loop
+                              Action.Type.Cast oid -> do
+                                Cast.castSpell p oid
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
+                              Action.Type.Activate oid ability -> do
+                                Activate.activateAbility p oid ability
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
+                      else do
+                        -- CR 800.4a (last sentence): "If the player who left the
+                        -- game had priority at the time they left, priority passes
+                        -- to the next player in turn order who's still in the
+                        -- game." p was written as the holder and then departed --
+                        -- e.g. paying a life cost inside settleForPriority (CR
+                        -- 119.4) -- before ever being asked anything.
+                        -- Departure.depart does not touch GameState.priority, so
+                        -- the stale `Just p` would otherwise survive to the Concede
+                        -- prompt below. nextStillPlaying scans the full seating
+                        -- roster and is correct for a departed argument (see its
+                        -- haddock), so the successor is found without asking p
+                        -- anything.
+                        State.modify' (\g -> g {GameState.priority = Just (nextStillPlaying g p)})
+                        loop
   settleForPriority
   loop
 
