@@ -651,7 +651,37 @@ delayedTests registry =
                     Just obj -> Binding.modesOf (Object.bindings obj)
                     Nothing -> Set.empty
                   [] -> Set.empty
-             in HU.assertEqual "the ability's own mode (0), not the captured spell's mode (7)" (Set.singleton (ModeIndex.MkModeIndex 0)) placedModes
+             in HU.assertEqual "the ability's own mode (0), not the captured spell's mode (7)" (Set.singleton (ModeIndex.MkModeIndex 0)) placedModes,
+          -- CR 800.4d: "If a triggered ability that would be controlled by a
+          -- player who has left the game would be put onto the stack, it isn't
+          -- put on the stack." CR 800.4d's own example is a delayed ability, and
+          -- so is this: Tidal Wave's "Sacrifice it at the beginning of the next
+          -- end step", armed by bob, whose controller is baked in at arming
+          -- (CR 603.7d) and so survives him. CR 603.7b still spends its one shot:
+          -- the example's Hypnotic Specter "never returns to the battlefield."
+          --
+          -- Three seats, because at two the departure ends the game before an end
+          -- step can arrive.
+          HU.testCase "CR 800.4d a departed player's delayed ability triggers, is consumed, and is not put on the stack" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let (_, l1) = S.addCreature island S.bob S.threePlayerGame
+                (_, l2) = S.addCreature island S.bob l1
+                (_, l3) = S.addCreature island S.bob l2
+                (waveId, l4) = S.addHandCard tidalWave S.bob l3
+                ready = l4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+                cast = S.runPure S.identityAnswer ready (Cast.castSpell S.bob waveId)
+                armed = S.runPure S.identityAnswer cast Engine.priorityLoop
+                gone = Departure.depart Departure.Type.Conceded S.bob armed
+                began = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gone {GameState.phase = endStep})
+                (placedAny, placed) = S.runPureWith S.identityAnswer began Engine.placePendingTriggers
+                (controlAny, control) = S.runPureWith S.identityAnswer (Event.recordEvent (GameEvent.StepBegan endStep S.alice) (armed {GameState.phase = endStep})) Engine.placePendingTriggers
+            HU.assertEqual "the fixture really armed one delayed ability" 1 (Seq.length (GameState.delayedTriggers armed))
+            HU.assertEqual "bob's ability is not put on the stack" [] (GameState.stack placed)
+            HU.assertEqual "CR 603.7b: it still triggered, so its one shot is spent" 0 (Seq.length (GameState.delayedTriggers placed))
+            HU.assertEqual "with bob still in the game the SAME ability IS placed -- the filter is what did it" 1 (length (GameState.stack control))
+            HU.assertEqual "nothing reached the stack, so placePendingTriggers honestly reports it placed nothing" False placedAny
+            HU.assertEqual "with bob still in the game, something genuinely got placed" True controlAny
         ]
 
 -- CR 603.3b: "that player puts them on the stack in any order they choose". The

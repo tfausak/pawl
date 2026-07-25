@@ -271,6 +271,26 @@ runTurnBasedActions phase = do
 -- scannedThrough makes an event fire its triggers once (CR 603.2c) WITHOUT
 -- discarding the record. Targets are chosen as the ability is placed (CR 603.3d).
 -- Returns whether any were placed.
+--
+-- CR 800.4d: "If a triggered ability that would be controlled by a player who
+-- has left the game would be put onto the stack, it isn't put on the stack."
+-- No separate filter is needed here: `orderPending` groups `pending` by
+-- `apnapPlayers`, which already restricts every group to a still-playing
+-- controller (Departure.stillPlaying), so a PendingTrigger whose controller
+-- has left never appears in `ordered` and `placeOne` never sees it. A delayed
+-- ability is the only carrier that can reach this with a departed controller
+-- -- see Pawl.Departure's objectsLeaveWith haddock -- because
+-- eventTriggers/stateTriggers re-derive the controller live from
+-- Projection.controllerOf, and a departed player controls nothing after CR
+-- 800.4a. The entry is still CONSUMED regardless: `surviving` above already
+-- dropped it from delayedTriggers, because CR 603.7b spends the one shot on
+-- the trigger event, which happened.
+--
+-- The Bool this returns is computed from `ordered`, not the pre-filter
+-- `pending`, so it still tells the truth ("were any placed") in exactly the
+-- case CR 800.4d creates: a departed player's delayed ability firing with
+-- nothing else pending would otherwise report `True` on a step that put
+-- nothing on the stack.
 placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
@@ -288,7 +308,7 @@ placePendingTriggers = do
   ordered <- orderPending pending
   Monad.mapM_ placeOne ordered
   Monad.mapM_ (\(p, ab, b) -> Monarch.placeInherent p ab b) inherent
-  pure (not (null pending) || not (null inherent))
+  pure (not (null ordered) || not (null inherent))
 
 -- Put one triggered ability on the stack as a fresh OfTrigger object, choosing
 -- its mode(s) and their targets as it is placed (CR 603.3d). This mirrors
