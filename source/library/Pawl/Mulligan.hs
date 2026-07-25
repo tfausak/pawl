@@ -51,19 +51,19 @@ openingHands perform owners = do
   Monad.forM_ owners (Monad.replicateM_ openingHand . Event.drawCard)
   mulliganRounds perform Map.empty owners
 
--- CR 103.5b: the cards in this player's hand that grant an action they may take
--- at their mulligan declaration, each paired with the effects that action
+-- CR 103.5b / CR 103.6: the cards in this player's hand that grant an action
+-- from the window `field` names, each paired with the effects that action
 -- performs. A CLASSIFICATION, not an identity test: this asks whether the card
 -- declares an action, never which card it is.
 --
 -- Read straight off the card (Game.cardOf) and never through the projection --
--- the Card.castingPermissions precedent: the ability functions in the HAND (CR
--- 113.6), where the CR 613 layer system does not reach.
-actionsFor :: PlayerId -> GameState.GameState -> [(ObjectId, [Effect Card.Card])]
-actionsFor pid gs =
+-- the Card.castingPermissions precedent: these abilities function in the HAND
+-- (CR 113.6), where the CR 613 layer system does not reach.
+actionsFor :: (Card.Card -> [Effect Card.Card]) -> PlayerId -> GameState.GameState -> [(ObjectId, [Effect Card.Card])]
+actionsFor field pid gs =
   let withAction oid = case Game.cardOf oid gs of
         Nothing -> Nothing
-        Just card -> case Card.mulliganAction card of
+        Just card -> case field card of
           [] -> Nothing
           effects -> Just (oid, effects)
    in Maybe.mapMaybe withAction (Game.zoneMembers Zone.Hand pid gs)
@@ -81,7 +81,7 @@ actionsFor pid gs =
 -- no candidate, which ends the loop.
 mulliganWindow :: MulliganPerformer -> PlayerId -> Game ()
 mulliganWindow perform pid = do
-  candidates <- State.gets (actionsFor pid)
+  candidates <- State.gets (actionsFor Card.mulliganAction pid)
   case candidates of
     -- Where the rules leave nothing to ask, don't prompt.
     [] -> pure ()

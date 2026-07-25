@@ -218,6 +218,7 @@ cardTests registry =
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
                   Card.Type.mulliganAction = [],
+                  Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
                   Card.Type.alternativeCosts = []
                 }

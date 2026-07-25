@@ -262,7 +262,19 @@ tests registry =
             HU.assertEqual "the fixture really has none" [] (CardT.mulliganAction base)
             case J.asObject (Codec.cardToJson base) of
               Left err -> HU.assertFailure (Text.unpack err)
-              Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "mulliganAction") (fmap fst pairs))
+              Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "mulliganAction") (fmap fst pairs)),
+          HU.testCase "a Card carrying a CR 103.6 opening-hand action round-trips" $ do
+            bloodMoon <- Registry.printing registry "Blood Moon"
+            let base = Printing.card bloodMoon
+                c = base {CardT.openingHandAction = [Effect.MoveToZone Binding.triggerSource Zone.Battlefield]}
+            roundTrip "card" Codec.cardToJson Codec.jsonToCard c,
+          HU.testCase "an empty openingHandAction list is omitted from the JSON" $ do
+            bloodMoon <- Registry.printing registry "Blood Moon"
+            let base = Printing.card bloodMoon
+            HU.assertEqual "the fixture really has none" [] (CardT.openingHandAction base)
+            case J.asObject (Codec.cardToJson base) of
+              Left err -> HU.assertFailure (Text.unpack err)
+              Right pairs -> HU.assertBool "key absent" (notElem (Text.pack "openingHandAction") (fmap fst pairs))
         ],
       Tasty.testGroup
         "filter (P9)"

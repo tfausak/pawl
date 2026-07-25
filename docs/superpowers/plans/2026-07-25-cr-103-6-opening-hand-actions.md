@@ -299,12 +299,12 @@ In the `TokenR` arm's inline `case` (around line 231):
       (Text.pack "Opponents", ControllerRelation.Opponents)
 ```
 
-- [ ] **Step 7: Build and test.**
+- [x] **Step 7: Build and test.**
 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -5`
 Expected: warning-free; all four new cases pass. **If the owner-vs-controller case passes even with a controller-based test, the fixture is wrong, not the claim** — verify by temporarily pointing the `ZoneChangeR` arm back at `matchesController` and watching that one case fail.
 
-- [ ] **Step 8: Format, lint, and commit.**
+- [x] **Step 8: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -323,7 +323,7 @@ git commit -m "feat(replacement): add ControllerRelation.Opponents, owner-based 
 **Interfaces:**
 - Produces: `CardT.openingHandAction :: Card -> [Effect Card]`; `Mulligan.actionsFor :: (Card.Card -> [Effect Card.Card]) -> PlayerId -> GameState -> [(ObjectId, [Effect Card.Card])]`.
 
-- [ ] **Step 1: Write the failing tests.** In `source/test-suite/Pawl/CodecSpec.hs`, beside the two `mulliganAction` cases:
+- [x] **Step 1: Write the failing tests.** In `source/test-suite/Pawl/CodecSpec.hs`, beside the two `mulliganAction` cases:
 
 ```haskell
           HU.testCase "a Card carrying a CR 103.6 opening-hand action round-trips" $ do
@@ -342,12 +342,12 @@ git commit -m "feat(replacement): add ControllerRelation.Opponents, owner-based 
 
 Add `import qualified Pawl.Binding as Binding` and `import qualified Pawl.Type.Zone as Zone` to `CodecSpec` if absent.
 
-- [ ] **Step 2: Run the tests to verify they fail to COMPILE.**
+- [x] **Step 2: Run the tests to verify they fail to COMPILE.**
 
 Run: `cabal build pawl-test-suite --enable-tests 2>&1 | tail -20`
 Expected: `CardT.openingHandAction` is not a field of `Card`.
 
-- [ ] **Step 3: Add the field.** In `source/library/Pawl/Type/Card.hs`, after `mulliganAction`:
+- [x] **Step 3: Add the field.** In `source/library/Pawl/Type/Card.hs`, after `mulliganAction`:
 
 ```haskell
     -- CR 103.6: the effects of this card's opening-hand action, in written
@@ -369,7 +369,7 @@ Expected: `CardT.openingHandAction` is not a field of `Card`.
     openingHandAction :: [Effect Card]
 ```
 
-- [ ] **Step 4: Wire the codec.** In `cardToJson`, another optional-key block after the `mulliganAction` one:
+- [x] **Step 4: Wire the codec.** In `cardToJson`, another optional-key block after the `mulliganAction` one:
 
 ```haskell
         <> ( if null (CardT.openingHandAction c)
@@ -388,12 +388,12 @@ In `jsonToCard`, the binding and the record field:
         CardT.openingHandAction = openingHandAction
 ```
 
-- [ ] **Step 5: Add the field to the four `MkCard` literals.**
+- [x] **Step 5: Add the field to the four `MkCard` literals.**
 
 Run: `grep -n "Card.Type.mulliganAction" source/test-suite/Pawl/CardSpec.hs source/test-suite/Pawl/ResolveSpec.hs`
 Expected: 4 hits. Each gains a sibling `Card.Type.openingHandAction = [],`.
 
-- [ ] **Step 6: Generalize `actionsFor` to take the field selector.** In `source/library/Pawl/Mulligan.hs`:
+- [x] **Step 6: Generalize `actionsFor` to take the field selector.** In `source/library/Pawl/Mulligan.hs`:
 
 ```haskell
 -- CR 103.5b / CR 103.6: the cards in this player's hand that grant an action

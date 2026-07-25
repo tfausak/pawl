@@ -140,6 +140,22 @@ data Card = MkCard
     -- are indistinguishable in play, so the ambiguity costs nothing.
     --
     -- One action per card. A printing declaring two is unrepresentable (#183).
-    mulliganAction :: [Effect Card]
+    mulliganAction :: [Effect Card],
+    -- CR 103.6: the effects of this card's opening-hand action, in written
+    -- order -- what "you may begin the game with it on the battlefield" (CR
+    -- 103.6a) does when the player takes it. Empty for every printing but
+    -- Leyline of the Void.
+    --
+    -- Read DIRECTLY from the card and never through the projection, the
+    -- mulliganAction / castingPermissions precedent: the ability functions in
+    -- the HAND (CR 113.6), where the CR 613 layer system does not reach.
+    --
+    -- The SIBLING of mulliganAction, not a reuse: the two windows are at
+    -- different times (CR 103.5b sits AT a declaration, CR 103.6 opens once the
+    -- whole mulligan process is complete), and a card that acts at one must not
+    -- be offered at the other.
+    --
+    -- One action per card, the same shape and the same caveat (#183).
+    openingHandAction :: [Effect Card]
   }
   deriving (Eq, Ord, Show)
