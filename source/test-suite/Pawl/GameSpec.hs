@@ -386,6 +386,23 @@ ruleTests registry =
         gs <- bobFirstDraw registry
         HU.assertEqual "hand" 8 (S.handSize S.bob gs)
         HU.assertEqual "library" 52 (librarySize S.bob gs),
+      HU.testCase "CR 103.8c/800.7 nobody skips the first draw in a three-player game" $
+        -- CR 103.8a's skip is a TWO-player rule: "In a two-player game, the
+        -- player who plays first skips the draw step ... of their first turn."
+        -- CR 103.8c: "In all other multiplayer games, no player skips the draw
+        -- step of their first turn." Alice heads the three-seat order and is
+        -- active on turn 1, so today she skips and this fails.
+        --
+        -- Neither fixture has a library, so the attempted draw is observable as
+        -- drewFromEmpty -- Event.drawCard flags a draw from an empty library.
+        -- turnNumber is 1 from Setup.emptyGame, which is load-bearing: it is
+        -- skipsDraw's first conjunct.
+        let atDrawStep gs = gs {GameState.phase = Phase.Beginning BeginningStep.DrawStep}
+            afterThree = S.runPure S.identityAnswer (atDrawStep S.threePlayerGame) S.drawStep
+            afterTwo = S.runPure S.identityAnswer (atDrawStep (Setup.emptyGame S.bothPlayers)) S.drawStep
+         in do
+              HU.assertBool "CR 103.8c: alice draws on turn one at three seats" (Set.member S.alice (GameState.drewFromEmpty afterThree))
+              HU.assertBool "CR 103.8a: alice still skips at two seats" (not (Set.member S.alice (GameState.drewFromEmpty afterTwo))),
       HU.testCase "CR 514.2 discard to hand size" $ do
         gs <- bobAfterCleanup registry
         HU.assertEqual "hand" 7 (S.handSize S.bob gs),

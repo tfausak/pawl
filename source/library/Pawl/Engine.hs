@@ -184,10 +184,27 @@ discardToHandSize pid = do
             toDiscard = take excess (filter inHand chosen)
         Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toDiscard
 
--- CR 103.8a: the starting player skips their first draw step.
+-- CR 103.8a: "In a two-player game, the player who plays first skips the draw
+-- step (see rule 504, "Draw Step") of their first turn." CR 103.8c: "In all
+-- other multiplayer games, no player skips the draw step of their first turn."
+-- CR 800.7 says the same from the multiplayer side.
+--
+-- CR 800.1: "A multiplayer game is a game that begins with more than two
+-- players." GameState.turnOrder is the permanent seating roster (see
+-- Pawl.Type.GameState), so counting seats answers "begins with" directly: a
+-- three-player game that has dropped to two survivors still does not skip, and a
+-- rebuilt game (CR 727.1, CR 729.2) is seated from the players who were in the
+-- game it came from and so answers for itself. Not more than two seats is CR
+-- 103.8a's arm, which is also where a degenerate one-seat subgame lands.
+--
+-- CR 103.8b grants the same skip to a TEAM in a Two-Headed Giant game -- the same
+-- capability for a third reason, which would be another arm of this function.
+-- pawl has no teams or variants to read from (#175), so nothing else needs
+-- to know.
 skipsDraw :: GameState -> Bool
 skipsDraw gs =
   GameState.turnNumber gs == 1
+    && length (GameState.turnOrder gs) <= 2
     && case GameState.turnOrder gs of
       starter : _ -> starter == GameState.activePlayer gs
       [] -> False
