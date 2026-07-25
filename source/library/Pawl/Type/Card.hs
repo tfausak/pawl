@@ -18,6 +18,7 @@ import Pawl.Type.Power (Power)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.StaticAbility (StaticAbility)
+import Pawl.Type.TargetSpec (TargetSpec)
 import Pawl.Type.Toughness (Toughness)
 import Pawl.Type.TriggeredAbility (TriggeredAbility)
 import Pawl.Type.TypeLine (TypeLine)
@@ -90,6 +91,17 @@ data Card = MkCard
     -- permission functions in the library (CR 113.6), where the CR 613 layer
     -- system does not reach. Empty for all but Panglacial Wurm.
     castingPermissions :: [CastingPermission],
+    -- CR 702.5a: this card's `enchant` ability -- "Enchant [object or player]"
+    -- -- which "restricts what an Aura spell can target and what an Aura can
+    -- enchant". Nothing for every card that is not an Aura; the CardSpec lint
+    -- family holds the biconditional (Aura iff enchant) in both directions.
+    --
+    -- A TargetSpec, not a Filter, because CR 702.5d's enchant-player Auras need
+    -- the Pool axis and TargetSpec already is {pool, filter}.
+    --
+    -- SINGULAR: CR 702.5c's "multiple instances of enchant, all of them apply"
+    -- is unrepresentable, and no card in this pool prints two (#189).
+    enchant :: Maybe TargetSpec,
     -- CR 118.8: this card's printed additional costs -- "a cost listed in a
     -- spell's rules text ... that its controller must pay at the same time they
     -- pay the spell's mana cost" (Village Rites). Empty for every other

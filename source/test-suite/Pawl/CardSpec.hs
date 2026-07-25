@@ -220,7 +220,8 @@ cardTests registry =
                   Card.Type.mulliganAction = [],
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
-                  Card.Type.alternativeCosts = []
+                  Card.Type.alternativeCosts = [],
+                  Card.Type.enchant = Nothing
                 }
          in do
               HU.assertBool "not a permanent" (not (Card.isPermanent card))
@@ -525,7 +526,13 @@ lintTests registry =
               filter
                 (cardOffendsSharedZoneScope . Printing.card)
                 ps
-        HU.assertEqual "no shared-zone scope with a non-EachPlayer ref" [] (fmap (Card.Type.name . Printing.card) offenders)
+        HU.assertEqual "no shared-zone scope with a non-EachPlayer ref" [] (fmap (Card.Type.name . Printing.card) offenders),
+      HU.testCase "a card with no enchant ability declares no enchant slot" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let card = Printing.card piker
+        HU.assertEqual "no enchant spec" Nothing (Card.Type.enchant card)
+        HU.assertBool "not an Aura" (not (Card.isAura card))
+        HU.assertEqual "no enchant slot" Map.empty (Card.enchantSpecs card)
     ]
 
 m2bCardTests :: Registry.Type.Registry -> Tasty.TestTree

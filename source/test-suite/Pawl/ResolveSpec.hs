@@ -460,7 +460,8 @@ resolveTests registry =
                   Card.Type.mulliganAction = [],
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
-                  Card.Type.alternativeCosts = []
+                  Card.Type.alternativeCosts = [],
+                  Card.Type.enchant = Nothing
                 }
         HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))
         HU.assertEqual "textChangeSlots" [slot] (Resolve.textChangeSlots card),
@@ -796,7 +797,8 @@ resolveTests registry =
                   Card.Type.mulliganAction = [],
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
-                  Card.Type.alternativeCosts = []
+                  Card.Type.alternativeCosts = [],
+                  Card.Type.enchant = Nothing
                 }
             spellObj =
               Object.MkObject
@@ -851,7 +853,8 @@ resolveTests registry =
                   Card.Type.mulliganAction = [],
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
-                  Card.Type.alternativeCosts = []
+                  Card.Type.alternativeCosts = [],
+                  Card.Type.enchant = Nothing
                 }
             spellObj =
               Object.MkObject

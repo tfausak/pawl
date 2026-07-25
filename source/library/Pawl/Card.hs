@@ -7,12 +7,15 @@ module Pawl.Card where
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import Pawl.Type.SlotName (SlotName)
+import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.Subtype as Subtype
 import Pawl.Type.TargetSpec (TargetSpec)
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TypeLine as TypeLine
@@ -81,3 +84,27 @@ isPermanent c = any isPermanentType (Set.toList (TypeLine.types (Card.typeLine c
 -- read half of the delayed-ability dataflow lint, as allEffects is for the spell.
 delayedEffects :: Card.Card -> [Effect Card.Card]
 delayedEffects card = concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Card.delayedAbilities card))
+
+-- CR 205.3h / 303.4: is this card an Aura? A SUBTYPE read off the printed type
+-- line, exactly the kind of closed-half classification isPermanent is -- NOT a
+-- case on the card's identity. Pawl.Stack dispatches on it (CR 303.4's "an Aura
+-- enters the battlefield attached"), which is the one place the difference
+-- between an Aura and any other enchantment is a rules difference.
+isAura :: Card.Card -> Bool
+isAura c = Set.member Subtype.Aura (TypeLine.subtypes (Card.typeLine c))
+
+-- CR 303.4a: the slot an Aura spell's required target is bound under. A genuine
+-- target, so it lives in the ordinary target namespace and is NOT one of
+-- Pawl.Binding's reserved names -- those exist precisely because they are not
+-- targets. The CardSpec lint holds that no mode declares this name, which is
+-- what makes the merge below collision-free.
+enchantSlot :: SlotName
+enchantSlot = SlotName.MkSlotName (Text.pack "enchant")
+
+-- CR 303.4a / 702.5a: the enchant ability's target spec as a one-entry slot map,
+-- empty for every non-Aura. Merged into the two functions below, and passed to
+-- Target.fillableModes by Pawl.Cast so castability accounts for it.
+enchantSpecs :: Card.Card -> Map SlotName TargetSpec
+enchantSpecs card = case Card.enchant card of
+  Nothing -> Map.empty
+  Just spec -> Map.singleton enchantSlot spec

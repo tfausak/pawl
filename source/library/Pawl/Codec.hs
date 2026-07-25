@@ -1648,6 +1648,10 @@ cardToJson c =
                then []
                else [(Text.pack "openingHandAction", listTo effectToJson (CardT.openingHandAction c))]
            )
+        <> ( case CardT.enchant c of
+               Nothing -> []
+               Just spec -> [(Text.pack "enchant", targetSpecToJson spec)]
+           )
     )
 
 getOpt :: Text -> [(Text, Value)] -> Value
@@ -1698,6 +1702,7 @@ jsonToCard value = do
   alternativeCosts <- listFromDefault jsonToCost (getOpt (Text.pack "alternativeCosts") ps)
   mulliganAction <- listFromDefault jsonToEffect (getOpt (Text.pack "mulliganAction") ps)
   openingHandAction <- listFromDefault jsonToEffect (getOpt (Text.pack "openingHandAction") ps)
+  enchant <- maybeFrom jsonToTargetSpec (getOpt (Text.pack "enchant") ps)
   pure
     CardT.MkCard
       { CardT.name = name,
@@ -1719,7 +1724,8 @@ jsonToCard value = do
         CardT.additionalCosts = additionalCosts,
         CardT.alternativeCosts = alternativeCosts,
         CardT.mulliganAction = mulliganAction,
-        CardT.openingHandAction = openingHandAction
+        CardT.openingHandAction = openingHandAction,
+        CardT.enchant = enchant
       }
 
 printingToJson :: Printing.Printing -> Value
