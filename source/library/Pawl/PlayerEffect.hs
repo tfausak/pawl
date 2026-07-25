@@ -42,10 +42,16 @@ import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
 inScope :: PlayerId -> PlayerId -> PlayerScope -> Bool
 inScope pid controller scope = case scope of
   PlayerScope.You -> pid == controller
-  -- CR 102.2: "In a two-player game, a player's opponent is the other
-  -- player." `pid /= controller` is exactly that, but only in a two-player
-  -- game -- CR 102.3 makes a teammate NOT an opponent in a team game, so this
-  -- carries an unstated two-player assumption.
+  -- Every other player. Not a two-player shortcut: CR 806.1 has a free-for-all's
+  -- players compete as individuals against each other, so every other player is
+  -- an opponent by construction and `pid /= controller` is exactly that. CR 102.2
+  -- says the same thing for two players; the predicate serves both.
+  --
+  -- CR 102.3 is the ONE reading this is wrong for -- in a game between teams a
+  -- teammate is not an opponent -- and pawl has no teams to express (#175).
+  --
+  -- Pinned at three seats by PlayerEffectSpec's "CR 806.1 at three seats
+  -- Silence stops BOTH opponents, and still spares the caster".
   PlayerScope.Opponents -> pid /= controller
   -- Thalia's ruling: "including your own".
   PlayerScope.EachPlayer -> True

@@ -51,6 +51,18 @@ matches context view predicate = case predicate of
   Filter.PowerAtLeast n -> case power view of
     Nothing -> False
     Just p -> p >= n
+  -- Every other player is an Opponent by construction: CR 806.1 has a
+  -- free-for-all's players compete as individuals against each other, and CR
+  -- 102.2 says the same for two players -- one predicate, `c /= p`, serves
+  -- both. CR 102.3's teams are the ONE reading it is wrong for, and pawl has
+  -- none to express (#175). Unlike Pawl.Count.playersFor, which folds a player
+  -- SET, this arm tests one candidate `View` at a time, so there is no set
+  -- here to get the size of wrong. `controller view == Nothing` off the
+  -- battlefield is already covered by View's own haddock (vacuously False,
+  -- the same posture PowerAtLeast takes).
+  --
+  -- Pinned at three seats by ResolveSpec's "CR 806.1 at three seats a
+  -- ControlledBy Opponent pool spans BOTH opponents' creatures".
   Filter.ControlledBy relation -> case (controller view, perspective context) of
     (Just c, Just p) -> case relation of
       PlayerRelation.You -> c == p
