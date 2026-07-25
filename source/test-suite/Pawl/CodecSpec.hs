@@ -387,6 +387,17 @@ tests registry =
                       }
                     Zone.Exile
              in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
+          -- Leyline of the Void's shape: the relation that distinguishes it from
+          -- Rest in Peace has to survive the wire too.
+          HU.testCase "a ZoneChangeR carrying Opponents round-trips" $
+            let re =
+                  ReplacementEffect.ZoneChangeR
+                    ZoneChangePattern.MkZoneChangePattern
+                      { ZoneChangePattern.whenDestination = Zone.Graveyard,
+                        ZoneChangePattern.whoseObject = ControllerRelation.Opponents
+                      }
+                    Zone.Exile
+             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
           HU.testCase "a CounterR replacement round-trips (pattern and scaling are data)" $
             let re =
                   ReplacementEffect.CounterR

@@ -457,13 +457,15 @@ controllerRelationToJson :: ControllerRelation.ControllerRelation -> Value
 controllerRelationToJson r = nullary . Text.pack $ case r of
   ControllerRelation.Yours -> "Yours"
   ControllerRelation.Anyones -> "Anyones"
+  ControllerRelation.Opponents -> "Opponents"
 
 jsonToControllerRelation :: Value -> Either Text ControllerRelation.ControllerRelation
 jsonToControllerRelation =
   decodeNullary
     (Text.pack "ControllerRelation")
     [ (Text.pack "Yours", ControllerRelation.Yours),
-      (Text.pack "Anyones", ControllerRelation.Anyones)
+      (Text.pack "Anyones", ControllerRelation.Anyones),
+      (Text.pack "Opponents", ControllerRelation.Opponents)
     ]
 
 playerRelationToJson :: PlayerRelation.PlayerRelation -> Value

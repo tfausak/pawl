@@ -28,6 +28,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Replay as Replay
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -37,10 +38,13 @@ import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Combat as Combat
+import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.Duration as Duration
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.Expiry as Expiry
@@ -63,8 +67,11 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Response as Response
+import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -165,6 +172,22 @@ newestNamed :: Text.Text -> GameState.GameState -> Maybe ObjectId.ObjectId
 newestNamed wanted gs =
   let named oid = fmap Card.name (Game.cardOf oid gs) == Just wanted
    in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
+
+-- Leyline of the Void's redirect, as a floating replacement: any card headed for
+-- an OPPONENT's graveyard is exiled instead. CR 400.3 makes that graveyard the
+-- card's OWNER's, which is what Replacement.matchesZoneOwner tests.
+leylineShape :: ObjectId.ObjectId -> Timestamp.Timestamp -> ActiveReplacement.ActiveReplacement
+leylineShape src ts =
+  ActiveReplacement.MkActiveReplacement
+    { ActiveReplacement.effect =
+        ReplacementEffect.ZoneChangeR
+          (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents)
+          Zone.Exile,
+      ActiveReplacement.source = src,
+      ActiveReplacement.timestamp = ts,
+      ActiveReplacement.expiry = Expiry.Never,
+      ActiveReplacement.uses = Uses.Unlimited
+    }
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
@@ -485,6 +508,35 @@ tests registry =
         -- Built as rules-level data (a floating EntryR ChoiceOf with one
         -- option, seeded via S.addReplacement) rather than a synthetic card
         -- file: no printed card in the pool has a single-option choice.
+        HU.testCase "CR 400.3 an Opponents zone-change redirect exiles an opponent's card, not your own" $ do
+          -- Leyline of the Void's shape without the Leyline: a floating redirect
+          -- whose source alice controls. Bob's card is exiled on the way to his
+          -- graveyard; alice's own reaches hers untouched.
+          pikerPrinting <- Registry.printing registry "Goblin Piker"
+          let (src, g1) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
+              (mine, g2) = S.addCreature pikerPrinting S.alice g1
+              (theirs, g3) = S.addCreature pikerPrinting S.bob g2
+              g4 = S.addReplacement (leylineShape src (fst (Game.freshTimestamp g3))) g3
+              after = S.runPure S.identityAnswer g4 (Event.changeZone mine Zone.Graveyard >> Event.changeZone theirs Zone.Graveyard)
+          HU.assertEqual "alice's own card reaches her graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+          HU.assertEqual "bob's does not" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+          HU.assertEqual "it was exiled instead" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
+        HU.testCase "CR 400.3 the zone-change subject is the card's OWNER, not its controller" $ do
+          -- A card alice OWNS but bob CONTROLS still dies to alice's graveyard
+          -- (CR 400.3), so alice's own redirect must not exile it. A
+          -- controller-based test would, which is the case this pins.
+          pikerPrinting <- Registry.printing registry "Goblin Piker"
+          let slot = SlotName.MkSlotName (Text.pack "target")
+              (src, g1) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
+              (oid, g2) = S.addCreature pikerPrinting S.alice g1
+              g3 = S.addReplacement (leylineShape src (fst (Game.freshTimestamp g2))) g2
+              stolen =
+                S.runPure S.identityAnswer g3 $
+                  Resolve.applyEffect S.noSource S.bob Map.empty (Map.singleton slot True) (Map.singleton slot (Recipient.ToObject oid)) (Effect.GainControl Duration.Indefinite slot)
+              after = S.runPure S.identityAnswer stolen (Event.changeZone oid Zone.Graveyard)
+          HU.assertEqual "bob really did take control of it" (Just S.bob) (Projection.controllerOf oid stolen)
+          HU.assertEqual "it reaches its OWNER's graveyard, unexiled" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+          HU.assertEqual "and nothing was exiled" 0 (length (Game.zoneMembers Zone.Exile S.alice after)),
         HU.testCase "CR 208.2b a single-option ChoiceOf is not a choice and must not prompt" $ do
           pikerPrinting <- Registry.printing registry "Goblin Piker"
           let (piker, g1) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)

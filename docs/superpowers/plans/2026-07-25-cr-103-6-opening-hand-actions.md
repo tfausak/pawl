@@ -133,7 +133,7 @@ Expected: 13 hits. Pure answerers get `Prompt.OpeningHandAction {} -> Nothing`; 
 Run: `cabal build all --enable-tests --enable-benchmarks 2>&1 | tail -20 && cabal test 2>&1 | tail -5`
 Expected: warning-free; the suite passes including the new round-trip.
 
-- [ ] **Step 8: Format, lint, and commit.**
+- [x] **Step 8: Format, lint, and commit.**
 
 ```bash
 git add -A && hooky fix && git add -A && hooky run
@@ -153,7 +153,7 @@ Leyline's second ability needs a relation the type cannot express, and the share
 **Interfaces:**
 - Produces: `ControllerRelation.Opponents`; `Replacement.matchesZoneOwner :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> Bool`.
 
-- [ ] **Step 1: Write the failing tests.** In `source/test-suite/Pawl/ReplacementSpec.hs`, add these two cases to the top-level list. They build a Rest-in-Peace-shaped redirect with the new relation and check both halves of §3.5's claim. Add whatever imports the file lacks (`ReplacementEffect`, `ZoneChangePattern`, `ControllerRelation`, `Zone`, `Event`, `Game`, `Departure` are the likely ones — follow the file's existing aliases).
+- [x] **Step 1: Write the failing tests.** In `source/test-suite/Pawl/ReplacementSpec.hs`, add these two cases to the top-level list. They build a Rest-in-Peace-shaped redirect with the new relation and check both halves of §3.5's claim. Add whatever imports the file lacks (`ReplacementEffect`, `ZoneChangePattern`, `ControllerRelation`, `Zone`, `Event`, `Game`, `Departure` are the likely ones — follow the file's existing aliases).
 
 ```haskell
       HU.testCase "CR 400.3: an Opponents zone-change redirect exiles an opponent's card, not your own" $ do
@@ -209,12 +209,12 @@ In `source/test-suite/Pawl/CodecSpec.hs`, extend the existing `ControllerRelatio
               ),
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail to COMPILE.**
+- [x] **Step 2: Run the tests to verify they fail to COMPILE.**
 
 Run: `cabal build pawl-test-suite --enable-tests 2>&1 | tail -20`
 Expected: `Data constructor not in scope: ControllerRelation.Opponents`.
 
-- [ ] **Step 3: Add the constructor.** In `source/library/Pawl/Type/ControllerRelation.hs`:
+- [x] **Step 3: Add the constructor.** In `source/library/Pawl/Type/ControllerRelation.hs`:
 
 ```haskell
 data ControllerRelation
@@ -232,7 +232,7 @@ data ControllerRelation
   deriving (Eq, Ord, Show)
 ```
 
-- [ ] **Step 4: Split the zone-change subject test.** In `source/library/Pawl/Replacement.hs`, change the `ZoneChangeR` arm of `applies` to call the new function:
+- [x] **Step 4: Split the zone-change subject test.** In `source/library/Pawl/Replacement.hs`, change the `ZoneChangeR` arm of `applies` to call the new function:
 
 ```haskell
         (ReplacementEffect.ZoneChangeR pat _, ProposedEvent.WouldChangeZone zc) ->
@@ -269,7 +269,7 @@ matchesZoneOwner gs src rel oid =
           _ -> False
 ```
 
-- [ ] **Step 5: Add the two remaining `Opponents` arms.** `-Werror` will name both. In `matchesController`:
+- [x] **Step 5: Add the two remaining `Opponents` arms.** `-Werror` will name both. In `matchesController`:
 
 ```haskell
   -- CR 102.1: no producer today -- a counter pattern scoped to an opponent's
@@ -289,7 +289,7 @@ In the `TokenR` arm's inline `case` (around line 231):
               Nothing -> False
 ```
 
-- [ ] **Step 6: Add the codec arms.** In `source/library/Pawl/Codec.hs`:
+- [x] **Step 6: Add the codec arms.** In `source/library/Pawl/Codec.hs`:
 
 ```haskell
   ControllerRelation.Opponents -> "Opponents"

@@ -211,7 +211,7 @@ applies gs event candidate =
    in case (ReplacementCandidate.effect candidate, event) of
         (ReplacementEffect.ZoneChangeR pat _, ProposedEvent.WouldChangeZone zc) ->
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
-            && matchesController gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
+            && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
         (ReplacementEffect.DamageR pat _, ProposedEvent.WouldDealDamage de) ->
           case DamagePattern.whichKind pat of
             -- CR 615.1: no kind named means every damage event.
@@ -234,6 +234,11 @@ applies gs event candidate =
             -- CR 109.5: "under YOUR control" -- the tokens' controller is the
             -- effect source's controller.
             ControllerRelation.Yours -> Projection.controllerOf src gs == Just pid
+            -- CR 102.1: no producer today -- tokens created under an opponent's
+            -- control.
+            ControllerRelation.Opponents -> case Projection.controllerOf src gs of
+              Just you -> pid /= you
+              Nothing -> False
         -- Every row below falls through to False, because an arm ABOVE already
         -- matches every event of that class -- a row below only fires for a
         -- MISMATCHED class (e.g. a DestructionR candidate offered a
@@ -256,6 +261,37 @@ matchesController :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> 
 matchesController gs src rel oid = case rel of
   ControllerRelation.Anyones -> True
   ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
+  -- CR 102.1: no producer today -- a counter or token pattern scoped to an
+  -- opponent's permanents. Controller-based, unlike matchesZoneOwner below.
+  ControllerRelation.Opponents -> case (Projection.controllerOf oid gs, Projection.controllerOf src gs) of
+    (Just theirs, Just yours) -> theirs /= yours
+    _ -> False
+
+-- CR 614.1: does this ZONE CHANGE's object satisfy the pattern's relation?
+--
+-- The subject is the object's OWNER, not its controller, and that is a rules
+-- fact rather than a convenience: CR 400.3 ("if an object would go to any
+-- library, graveyard, or hand other than its owner's, it goes to its owner's
+-- corresponding zone") and CR 404.1 make the destination zone the owner's, so
+-- Leyline of the Void's "an opponent's graveyard" asks who OWNS the card. A
+-- creature its controller stole with Act of Treason still dies to its owner's
+-- graveyard, which a controller-based test would get backwards.
+--
+-- Split out of matchesController, which stays controller-based for CR 109.5's
+-- "you" on a counter or token pattern. No committed card pairs a ZoneChangeR
+-- with anything but Anyones (Rest in Peace), which answers True either way, so
+-- the split changed no behavior in the pool when it landed.
+matchesZoneOwner :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> Bool
+matchesZoneOwner gs src rel oid =
+  let ownerOf o = fmap Object.owner (Game.lookupObject o gs)
+   in case rel of
+        ControllerRelation.Anyones -> True
+        ControllerRelation.Yours -> ownerOf oid == Projection.controllerOf src gs
+        ControllerRelation.Opponents -> case (ownerOf oid, Projection.controllerOf src gs) of
+          (Just owner, Just you) -> owner /= you
+          -- An unknown owner or a sourceless effect admits nothing rather than
+          -- everything: a redirect with no controller has no opponents.
+          _ -> False
 
 -- Which permanents a pattern admits, matched through the lower Pawl.Filter over
 -- the PROJECTED view: creature-ness (CR 205.2b / 300.2 / 613.1d, so an
