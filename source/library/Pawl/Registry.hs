@@ -12,9 +12,11 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Paths_pawl as Paths
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
+import qualified Pawl.Slug as Slug
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Registry as Registry
+import qualified Pawl.Type.Slug as Slug.Type
 
 new :: FilePath -> IO Registry.Registry
 new root = do
@@ -38,15 +40,14 @@ defaultRoot = Paths.getDataFileName "data/cards"
 -- failed load is not cached, so a fixed file is picked up by the next lookup.
 card :: Registry.Registry -> String -> IO Card.Card
 card registry name =
-  let slug = Codec.slugify (Text.pack name)
-   in if Text.null slug
-        then ioError (userError ("registry: " <> show name <> " has no slug"))
-        else MVar.modifyMVar (Registry.cache registry) $ \cached ->
-          case Map.lookup slug cached of
-            Just c -> pure (cached, c)
-            Nothing -> do
-              c <- load registry slug
-              pure (Map.insert slug c cached, c)
+  case Slug.slugify (Text.pack name) of
+    Nothing -> ioError (userError ("registry: " <> show name <> " has no slug"))
+    Just slug -> MVar.modifyMVar (Registry.cache registry) $ \cached ->
+      case Map.lookup slug cached of
+        Just c -> pure (cached, c)
+        Nothing -> do
+          c <- load registry slug
+          pure (Map.insert slug c cached, c)
 
 printing :: Registry.Registry -> String -> IO Printing.Printing
 printing registry name = fmap Printing.MkPrinting (card registry name)
@@ -63,9 +64,9 @@ printing registry name = fmap Printing.MkPrinting (card registry name)
 -- The name check is the one thing a per-card load can assert that no sweep has
 -- to: a file's own `name` field must slugify back to the name it is filed
 -- under, or a lookup would quietly serve a different card than it was asked for.
-load :: Registry.Registry -> Text.Text -> IO Card.Card
+load :: Registry.Registry -> Slug.Type.Slug -> IO Card.Card
 load registry slug =
-  let path = Registry.root registry <> "/" <> Text.unpack slug <> ".json"
+  let path = Registry.root registry <> "/" <> Text.unpack (Slug.Type.slugToText slug) <> ".json"
    in do
         bytes <- ByteString.readFile path
         case Encoding.decodeUtf8' bytes of
@@ -74,18 +75,19 @@ load registry slug =
             case Json.parse contents >>= Codec.jsonToCard of
               Left err -> ioError (userError (path <> ": " <> Text.unpack err))
               Right c ->
-                let actual = Codec.slugify (Card.name c)
-                 in if actual == slug
+                let actual = Slug.slugify (Card.name c)
+                    actualText = maybe "nothing" (Text.unpack . Slug.Type.slugToText) actual
+                 in if actual == Just slug
                       then pure c
                       else
                         ioError
                           ( userError
                               ( path
                                   <> ": filed under "
-                                  <> Text.unpack slug
+                                  <> Text.unpack (Slug.Type.slugToText slug)
                                   <> " but the card is named "
                                   <> Text.unpack (Card.name c)
                                   <> ", which slugifies to "
-                                  <> Text.unpack actual
+                                  <> actualText
                               )
                           )

@@ -10,7 +10,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
-import qualified Pawl.Codec as Codec
 -- The logic module, alongside Pawl.Type.Modal below: unambiguous under one
 -- alias because the two modules export disjoint names (TriggerSpec's
 -- precedent), and Modal.allEffects is how this lint reaches an activated or
@@ -61,6 +60,7 @@ import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.Slug as Slug.Type
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
@@ -414,7 +414,7 @@ lintTests registry =
         stems <- S.corpusSlugs registry
         let offenders =
               filter
-                (\stem -> Codec.slugify (Text.pack stem) /= Text.pack stem)
+                (Maybe.isNothing . Slug.Type.textToSlug . Text.pack)
                 stems
         HU.assertEqual "no file name needs slugifying" [] offenders,
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $ do

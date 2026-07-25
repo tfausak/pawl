@@ -32,6 +32,7 @@ import qualified Pawl.ReplacementSpec as ReplacementSpec
 import qualified Pawl.ReplaySpec as ReplaySpec
 import qualified Pawl.ResolveSpec as ResolveSpec
 import qualified Pawl.SetupSpec as SetupSpec
+import qualified Pawl.SlugSpec as SlugSpec
 import qualified Pawl.TriggerSpec as TriggerSpec
 import qualified Pawl.TurnSpec as TurnSpec
 import qualified Pawl.Type.Registry as Registry.Type
@@ -81,5 +82,6 @@ testTree registry =
       ColorSpec.tests registry,
       TriggerSpec.tests registry,
       FilterSpec.tests,
-      RegistrySpec.tests
+      RegistrySpec.tests,
+      SlugSpec.tests
     ]

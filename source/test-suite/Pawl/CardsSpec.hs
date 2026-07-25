@@ -1,4 +1,4 @@
--- Covers data/cards/*.json and Pawl.Codec.slugify.
+-- Covers data/cards/*.json and Pawl.Slug.slugify.
 module Pawl.CardsSpec where
 
 import qualified Data.ByteString as ByteString
@@ -7,6 +7,7 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Codec as Codec
 import qualified Pawl.Json as Json
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
@@ -15,11 +16,12 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.Slug as Slug.Type
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-slugOf :: Printing.Printing -> Text.Text
-slugOf = Codec.slugify . CardT.name . Printing.card
+slugOf :: Printing.Printing -> Maybe Slug.Type.Slug
+slugOf = Slug.slugify . CardT.name . Printing.card
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
@@ -36,24 +38,29 @@ tests registry =
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion
-checkFile registry p = do
-  let path = Registry.Type.root registry <> "/" <> Text.unpack (slugOf p) <> ".json"
-  -- Read as bytes and decoded as UTF-8 explicitly, matching Pawl.Registry.load:
-  -- Data.Text.IO.readFile decodes using the locale encoding, which is ASCII
-  -- under LC_ALL=C, so this would otherwise die on khabal-ghoul.json's "á".
-  bytes <- ByteString.readFile path
-  case Encoding.decodeUtf8' bytes of
-    Left err -> HU.assertFailure (path <> ": not valid UTF-8: " <> show err)
-    Right contents ->
-      case Json.parse contents of
-        -- Unreachable: S.allPrintings would have failed in IO first.
-        Left err -> HU.assertFailure (path <> ": " <> Text.unpack err)
-        Right value ->
-          -- The loader reads everything the file says and invents nothing:
-          -- re-encoding the loaded printing reproduces the file's meaning. Compared
-          -- up to key order and whitespace, because JSON objects are unordered and
-          -- formatting is not part of the contract. The corpus is committed
-          -- pretty-printed (`jq -S .`) while Json.render emits compact output, so
-          -- this can never quietly regress into a byte comparison: every file would
-          -- fail at once.
-          HU.assertEqual path (Json.sortKeys value) (Json.sortKeys (Codec.printingToJson p))
+checkFile registry p =
+  case slugOf p of
+    -- Unreachable: every committed card's name slugifies, since Registry.card
+    -- already had to slugify it (via Pawl.Slug.slugify) to fetch this printing.
+    Nothing -> HU.assertFailure (Text.unpack (CardT.name (Printing.card p)) <> ": does not slugify")
+    Just slug -> do
+      let path = Registry.Type.root registry <> "/" <> Text.unpack (Slug.Type.slugToText slug) <> ".json"
+      -- Read as bytes and decoded as UTF-8 explicitly, matching Pawl.Registry.load:
+      -- Data.Text.IO.readFile decodes using the locale encoding, which is ASCII
+      -- under LC_ALL=C, so this would otherwise die on khabal-ghoul.json's "á".
+      bytes <- ByteString.readFile path
+      case Encoding.decodeUtf8' bytes of
+        Left err -> HU.assertFailure (path <> ": not valid UTF-8: " <> show err)
+        Right contents ->
+          case Json.parse contents of
+            -- Unreachable: S.allPrintings would have failed in IO first.
+            Left err -> HU.assertFailure (path <> ": " <> Text.unpack err)
+            Right value ->
+              -- The loader reads everything the file says and invents nothing:
+              -- re-encoding the loaded printing reproduces the file's meaning. Compared
+              -- up to key order and whitespace, because JSON objects are unordered and
+              -- formatting is not part of the contract. The corpus is committed
+              -- pretty-printed (`jq -S .`) while Json.render emits compact output, so
+              -- this can never quietly regress into a byte comparison: every file would
+              -- fail at once.
+              HU.assertEqual path (Json.sortKeys value) (Json.sortKeys (Codec.printingToJson p))
