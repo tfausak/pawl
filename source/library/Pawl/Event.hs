@@ -121,11 +121,21 @@ placeObject pid mkObj dest = do
 changeZone :: ObjectId -> Zone -> Game ()
 changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest)
 
--- changeZone's body, returning the destination incarnation's id: Just newId on a
--- completed move (CR 400.7 minted a fresh id), Nothing when the id is unknown or
--- the CR 616.1 replacement loop cancelled the move (`resolved == Nothing`).
+-- changeZoneReturning's body, returning the destination incarnation's id: Just
+-- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
+-- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
+-- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = do
+changeZoneReturning oid requestedDest = changeZoneAttaching oid requestedDest Nothing
+
+-- changeZoneReturning with an attachment seed. CR 303.4: "An Aura enters the
+-- battlefield attached to an object or player" -- attachment is a property of
+-- entering, not a step after it. The entry replacement loop (CR 614.1c) and the
+-- Moved event both run before this function returns, so an Aura attached
+-- afterward would be unattached during both. No card in this pool can observe
+-- the difference today; the seed buys the ordering rather than a passing test.
+changeZoneAttaching :: ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)
+changeZoneAttaching oid requestedDest seed = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -172,7 +182,7 @@ changeZoneReturning oid requestedDest = do
         Nothing -> pure Nothing
         Just settled -> do
           let dest = ZoneChange.to settled
-              mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.timestamp = ts}
+              mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.timestamp = ts}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
@@ -326,6 +336,7 @@ createTokens controller card n = do
                 Object.sickness = Sickness.Sick,
                 Object.bindings = Map.empty,
                 Object.counters = Map.empty,
+                Object.attachedTo = Nothing,
                 Object.timestamp = ts
               }
       ids <- Monad.replicateM (fromIntegral count) (placeObject owner mkObj Zone.Battlefield)

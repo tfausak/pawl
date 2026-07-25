@@ -4,6 +4,7 @@ import Data.Map.Strict (Map)
 import Numeric.Natural (Natural)
 import Pawl.Type.Binding (Binding)
 import Pawl.Type.CounterKind (CounterKind)
+import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Sickness (Sickness)
 import Pawl.Type.SlotName (SlotName)
@@ -40,6 +41,21 @@ data Object = MkObject
     -- +1/+1 or -1/-1 count feeds P/T via the projection (CR 122.1a / 613.4c); both
     -- kinds present trigger the CR 704.5q annihilation SBA.
     counters :: Map CounterKind Natural,
+    -- CR 303.4b: the object this permanent is attached to -- what CR 303.4b calls
+    -- "enchanted". Nothing for every permanent that is not an attached Aura.
+    --
+    -- BASE state, not projected: attachment is a fact about the object, and no CR
+    -- 613 layer reads or writes it. Per-incarnation, like damage and counters:
+    -- changeZone resets it, because CR 400.7 makes the moved object a new one with
+    -- no memory of what it enchanted.
+    --
+    -- One direction only. "What is attached to me" is derived by scanning the
+    -- battlefield, the posture Projection.controls already takes toward control,
+    -- so there is no reverse index to keep consistent across zone changes.
+    --
+    -- Maybe ObjectId, not a Recipient: CR 702.5d's enchant-player Auras cannot be
+    -- expressed and need this widened (#190).
+    attachedTo :: Maybe ObjectId,
     -- CR 613.7d: when this object entered its current zone. A static ability's
     -- continuous effect shares this timestamp (CR 613.7a); stamped fresh on every
     -- zone change (CR 400.7 makes each a new object). Read by the projection when

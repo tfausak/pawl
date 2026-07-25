@@ -482,6 +482,7 @@ handInPlay printing board =
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
    in ( g2

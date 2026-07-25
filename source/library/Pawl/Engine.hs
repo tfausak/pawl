@@ -425,6 +425,7 @@ placeOne pending = do
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}

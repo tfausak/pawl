@@ -488,6 +488,7 @@ addCreature printing pid gs =
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -642,6 +643,7 @@ addToken card pid gs =
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -666,6 +668,7 @@ addLibraryCard printing pid gs =
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -690,6 +693,7 @@ addGraveyardCard printing pid gs =
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -715,6 +719,7 @@ addHandCard printing pid gs =
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
    in ( oid,
@@ -756,6 +761,7 @@ landsInPlay land n =
                   Object.sickness = Sickness.Settled,
                   Object.bindings = Map.empty,
                   Object.counters = Map.empty,
+                  Object.attachedTo = Nothing,
                   Object.timestamp = ts
                 }
          in gs2
@@ -779,6 +785,7 @@ handOne printing base =
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
    in ( gs2
@@ -808,6 +815,7 @@ pikerInHand land piker n ph =
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
       gs3 =
@@ -1096,6 +1104,15 @@ addCounter kind n oid gs =
   let bump obj = obj {Object.counters = Map.insertWith (+) kind n (Object.counters obj)}
    in gs {GameState.objects = Map.adjust bump oid (GameState.objects gs)}
 
+-- CR 303.4b: attach `rider` to `host` directly, without casting. A STATE fixture
+-- (the shape addCreature and withEffect already have), not a synthetic card --
+-- every printing a caller passes is real. Type-agnostic on purpose: CR 400.7's
+-- reset is a property of the field, so the CR 400.7 test does not need an Aura.
+attach :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+attach rider host gs =
+  let set obj = obj {Object.attachedTo = Just host}
+   in gs {GameState.objects = Map.adjust set rider (GameState.objects gs)}
+
 -- Put `n` counters of a player-counter kind directly onto a player, bypassing
 -- the diversion/effect that would add them -- so an SBA or cost test can set up
 -- poison or energy without resolving anything.
@@ -1163,6 +1180,7 @@ oneMountainState mountain ph =
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = Timestamp.MkTimestamp 0
           }
    in GameState.MkGameState
@@ -1238,6 +1256,7 @@ spellOnStack printing pid gs =
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
    in ( oid,

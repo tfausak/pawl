@@ -798,6 +798,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               Object.sickness = Sickness.Settled,
               Object.bindings = Map.empty,
               Object.counters = Map.empty,
+              Object.attachedTo = Nothing,
               Object.timestamp = ts
             }
     _ <- Event.placeObject controller mkObj Zone.Command

@@ -156,6 +156,7 @@ gameTests registry =
                   Object.sickness = Sickness.Sick,
                   Object.bindings = Map.empty,
                   Object.counters = Map.empty,
+                  Object.attachedTo = Nothing,
                   -- changeZone draws a fresh timestamp; oneMountainState's
                   -- nextTimestamp starts at 1 (object 0 already holds 0).
                   Object.timestamp = Timestamp.MkTimestamp 1
@@ -1315,6 +1316,7 @@ handBobBolt lightningBolt gs =
             Object.sickness = Sickness.Settled,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
@@ -1563,6 +1565,7 @@ restartOnStack mountain =
             Object.sickness = Sickness.Settled,
             Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
             Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
             Object.timestamp = ts
           }
    in g4

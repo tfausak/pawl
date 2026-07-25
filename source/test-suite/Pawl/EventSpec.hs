@@ -208,5 +208,17 @@ tests registry =
       HU.testCase "it does not match noncombat damage to a player" $
         let bearer = ObjectId.MkObjectId 1
             ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False DamageKind.Noncombat)
-         in HU.assertBool "no match" (not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev))
+         in HU.assertBool "no match" (not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)),
+      HU.testCase "CR 400.7: a zone change forgets attachment" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        let base = S.landsInPlay plains 1
+            (host, withHost) = S.addCreature piker S.bob base
+            (rider, withRider) = S.addCreature piker S.alice withHost
+            attached = S.attach rider host withRider
+            bounced = S.runPure S.identityAnswer attached (Event.changeZone rider Zone.Hand)
+            moved = filter (\o -> Object.zone o == Zone.Hand) (Map.elems (GameState.objects bounced))
+        HU.assertEqual "attached before the move" (Just (Just host)) (fmap Object.attachedTo (Game.lookupObject rider attached))
+        HU.assertEqual "one card in hand" 1 (length moved)
+        HU.assertEqual "the new incarnation is unattached" [Nothing] (fmap Object.attachedTo moved)
     ]
