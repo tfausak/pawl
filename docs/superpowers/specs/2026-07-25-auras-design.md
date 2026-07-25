@@ -178,28 +178,48 @@ object when `Nothing` on the way out. **No existing `data/cards/*.json` changes.
 than beside `Pawl.Binding`'s well-known names because those are *reserved* —
 they exist precisely because they are not targets — and this one is. A lint
 forbids any card's own `targetSpecs` from declaring that name, so the merge can
-never shadow a declared slot. That is the whole integration: `Cast.hs:188`
-builds the cast-time prompt from
+never shadow a declared slot. `Cast.hs:188` builds the cast-time prompt from
 `Card.modesTargetSpecs`, and `Resolve.hs:335` re-validates from the same
-function, so CR 303.4a and CR 608.2b both fall out **with no new call site**.
+function, so CR 303.4a's target and CR 608.2b's re-validation both fall out of
+the merge.
 
 The enchant slot is a genuine target (CR 303.4a says so), so it lives in the
 ordinary target namespace — it is *not* a reserved slot in `Pawl.Binding`'s sense
 (`variableX`, `chosenModes`, `copySource`, `triggerSource`, `you`), all of which
 exist precisely because they are *not* targets.
 
-**This trips the D4 lint, by design, and the lint must be taught.**
-`CardSpec.hs:376` states the rule as an equality: *every slot an effect reads is
-declared, and every declared slot is read* — "a spec no effect reads is a dead
-target". An Aura's spell payload is a single empty mode, so its enchant slot is
-declared and read by no `Effect`. The lint gains an Aura arm: the enchant slot is
-read by the **attach step** (§3.4), which is rules machinery rather than an
-opcode, so it is subtracted from the read-slots side, and a *positive* assertion
-is added in its place — **every card with `Subtype.Aura` declares an `enchant`
-spec, and every card declaring one is an Aura** (CR 303.4 / 702.5a). Weakening
-the equality to a subset is not acceptable: it would silently retire the
-dead-target half for every card in the pool. This is the same lint-coverage
-shape #184 already records for `Card.mulliganAction`.
+**But the seam is not single, and that is the trap this section exists to
+name.** Two consumers reach *past* `Card.allTargetSpecs`/`Card.modesTargetSpecs`
+and read `Mode.targetSpecs` straight off each mode. Merging in `Pawl.Card` is
+invisible to both:
+
+1. **`Target.fillableModes` (`Target.hs:119`) — a correctness bug if missed.**
+   Castability is `Set.size (Target.fillableModes …) >= count` (`Cast.hs:70`).
+   Reading only `Mode.targetSpecs`, it would judge an Aura with *no legal
+   creature on the battlefield* to be castable, and the spell would then be
+   countered on resolution — when CR 601.2c means it could never have been cast
+   at all. `fillableModes` therefore takes a new
+   `Map SlotName TargetSpec` parameter of slots every mode carries in addition
+   to its own; `Cast` passes the card's enchant slot, and the three ability
+   callers (`Activate.hs:65`, `Activate.hs:101`, `Engine.hs:416`) pass
+   `Map.empty`. An ability has no enchant spec, and the empty map makes that a
+   fact of the call rather than a special case in the body.
+
+2. **The D4 dataflow lint (`CardSpec.hs:376-398`) — a coverage gap, not a
+   break.** `modeOffends` reads `Mode.targetSpecs m` and `cardOffends` walks
+   `Modal.modes (Card.spell card)`, so the lint never calls
+   `Card.allTargetSpecs` and the enchant slot is simply outside its reach. The
+   equality (*every slot an effect reads is declared, and every declared slot is
+   read*) keeps holding untouched — an Aura's empty spell mode declares nothing
+   and reads nothing.
+
+   So nothing must be *weakened*; something must be *added*. Two positive
+   assertions take the enchant slot's place: **every card with `Subtype.Aura`
+   declares an `enchant` spec, and every card declaring one is an Aura** (CR
+   303.4 / 702.5a), and **no mode declares a slot named `enchant`**, which is
+   what makes the merge in §3.3 collision-free. This is the same lint-coverage
+   shape #184 records for `Card.mulliganAction`: a new `Card` field lands
+   outside the lint family unless it is deliberately walked in.
 
 ### 3.4 Resolution: `Stack`'s third branch, and the first fizzling permanent spell
 
@@ -227,13 +247,31 @@ because it looks like a violation at a glance:
    second copy that can drift.
 2. If it fizzles: `Event.changeZone oid Zone.Graveyard` — CR 608.2b's own
    sentence, and the same call `resolveSpellWith:350` already makes.
-3. Otherwise `Event.changeZone oid Zone.Battlefield` as today, then set
-   `attachedTo` on the **new** battlefield object. CR 400.7 makes it a new object
-   with a new id; `Resolve.newestBattlefieldOf` (`Resolve.hs:1021`) is the
-   existing way to name it. The bound value is a `Recipient`, so the `ObjectId`
-   is taken from its `ToCreature`/`ToObject` tag; a `ToPlayer` cannot arise while
-   `Card.enchant` is restricted to object pools, and is rejected rather than
-   guessed at — CR 702.5d is deferral 4 in §9.
+3. Otherwise the Aura **enters already attached**, which CR 303.4 states as a
+   property of entering ("An Aura *enters the battlefield attached* to an object
+   or player") rather than as a step after it. `Event.changeZoneReturning`
+   (`Event.hs:127`) builds the new incarnation with
+   `mkObj ts = obj {…}` and then, *before returning*, runs the CR 614.1c entry
+   replacement loop and records the `Moved` event. Attaching after it returns
+   would make the Aura unattached during both. So `changeZoneReturning` gains a
+   seed parameter — `changeZoneAttaching :: ObjectId -> Zone -> Maybe ObjectId ->
+   Game (Maybe ObjectId)`, with `changeZoneReturning oid z = changeZoneAttaching
+   oid z Nothing` — and the seed is written into `mkObj`. Every existing call
+   site is untouched.
+
+   No card in this pool can observe the difference (no entry replacement or ETB
+   trigger reads attachment), so this buys ordering correctness rather than a
+   passing test. It is cheap enough to be worth taking now instead of leaving a
+   latent ordering bug for the first card that does look.
+
+   The bound value is a `Recipient`, so the `ObjectId` is taken from its
+   `ToCreature`/`ToObject` tag; a `ToPlayer` cannot arise while `Card.enchant` is
+   restricted to object pools, and is rejected rather than guessed at — CR 702.5d
+   is deferral 4 in §9.
+
+   `mkObj` must also **reset `attachedTo` to the seed on every other zone
+   change** (CR 400.7: the new object has no memory), which is the same reset
+   `damage`, `sickness`, `bindings` and `counters` already get on that line.
 
 ### 3.5 `Affected.Attached`
 
@@ -479,7 +517,10 @@ done until a card exercises it in a gameplay-level test.
 | `Pawl.Type.Subtype` | `Aura` constructor |
 | `Pawl.Type.Affected` | `Attached` constructor |
 | `Pawl.Type.Modification` | `SetControllerToSource` constructor |
-| `Pawl.Card` | `isAura`; `allTargetSpecs`/`modesTargetSpecs` merge the enchant slot |
+| `Pawl.Card` | `isAura`, `enchantSlot`, `enchantSpecs`; `allTargetSpecs`/`modesTargetSpecs` merge the enchant slot |
+| `Pawl.Target` | `fillableModes` takes the extra-slots map (§3.3) |
+| `Pawl.Activate`, `Pawl.Engine` | three `fillableModes` callers pass `Map.empty` |
+| `Pawl.Event` | `changeZoneAttaching`; `attachedTo` reset in `mkObj` |
 | `Pawl.Stack` | the Aura resolution branch |
 | `Pawl.Resolve` | fizzle test extracted to a shared helper |
 | `Pawl.Sba` | CR 704.5m; the stale one-pass comment |
