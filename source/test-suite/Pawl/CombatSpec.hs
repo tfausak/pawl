@@ -392,9 +392,12 @@ defendingPlayerTests registry =
               HU.assertEqual "nobody defends" Nothing (Combat.Type.defender (GameState.combat after))
               HU.assertEqual "nobody was asked" [] asked,
       HU.testCase "CR 800.4j a turn whose active player has left chooses no defending player" $
-        -- CR 800.4j: the turn continues without an active player, so the actions
-        -- the rules assign to the active player have nobody to perform them.
-        -- THREE seats, so that two opponents survive and the choice would
+        -- CR 800.4j: the turn continues without an active player, so the action
+        -- the rules assign to the active player has no subject. CR 800.4j is a
+        -- priority rule and licenses no more than that; CR 800.4h would hand the
+        -- choice to the next player in turn order rather than drop it, so what is
+        -- asserted here is pawl's unobservable divergence from CR 800.4h (#181),
+        -- not a rules-required outcome. THREE seats, so that two opponents survive and the choice would
         -- otherwise be a real prompt -- at two seats the elision would hide the
         -- guard entirely.
         --

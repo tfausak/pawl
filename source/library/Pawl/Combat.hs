@@ -226,7 +226,12 @@ chooseDefender = do
   gs <- State.get
   let pid = GameState.activePlayer gs
   -- CR 800.4j: a turn whose active player has left continues without one, so the
-  -- action the rules assign to the active player has nobody to perform it.
+  -- action the rules assign to the active player has no subject. CR 800.4j is a
+  -- priority rule and stops there; CR 800.4h is the one that would hand this
+  -- choice -- required of the active player by CR 507.1 and CR 703.4h -- to the
+  -- next player in turn order. pawl skips it, which is an unobservable divergence
+  -- rather than a vacuous case (#181); the argument is on Pawl.Type.Combat's
+  -- defender field and is not repeated here.
   --
   -- Engine.runTurnBasedActions applies the identical test before calling this, so
   -- on the engine's path the two are redundant. This is the copy that carries the

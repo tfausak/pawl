@@ -216,10 +216,21 @@ runTurnBasedActions phase = do
   -- completion without an active player", so the turn-based actions the rules
   -- assign to THE ACTIVE PLAYER -- untap (CR 703.4c), draw (CR 703.4d), choose
   -- the defending player (CR 703.4h/CR 507.1), declare attackers (CR 703.4i),
-  -- the cleanup discard (CR 703.4n) -- have nobody to perform them. Declare
+  -- the cleanup discard (CR 703.4n) -- have no subject. Declare
   -- blockers (CR 703.4j) belongs to the defending player, and CR 703.4p's
   -- damage/until-end-of-turn sweep is the GAME's action, not the active
   -- player's; neither is guarded.
+  --
+  -- CR 800.4j alone does not license skipping any of them; it is a PRIORITY
+  -- rule. CR 800.4h is what reaches the CHOICES on that list -- a choice a rule
+  -- requires of a player who has left is made by the next player in turn order --
+  -- and skipping them instead diverges from it (#181). The list splits three
+  -- ways: the draw is not a choice at all, so CR 800.4h never reaches it; untap
+  -- and the cleanup discard are choices over the departed player's own permanents
+  -- and hand, and declare attackers over their creatures, all of which CR 800.4a
+  -- took, so those three are vacuous; only the defending-player choice is real,
+  -- and it is unobservable rather than vacuous for the reason on
+  -- Pawl.Type.Combat's defender field.
   hasActive <- State.gets (\gs -> List.elem active (Departure.stillPlaying gs))
   case phase of
     Phase.Beginning BeginningStep.Untap -> Monad.when hasActive $ do

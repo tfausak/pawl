@@ -54,8 +54,20 @@ data Combat = MkCombat
     -- second sentence still places inside the combat phase (#180).
     --
     -- Nothing also means NO ATTACK IS POSSIBLE, which is the right answer and not
-    -- a fallback: a turn whose active player has left the game (CR 800.4j) never
-    -- performs the action.
+    -- a fallback: a turn whose active player has left the game never performs the
+    -- action. CR 800.4j is only why there is no active player to perform it --
+    -- that rule is about PRIORITY and says nothing about turn-based actions.
+    -- CR 800.4h is the one that speaks to this action: the defending player is a
+    -- choice a RULE (CR 507.1, CR 703.4h) requires of a player who has left, and
+    -- CR 800.4h gives it to the next player in turn order. pawl skips it instead,
+    -- resolving the choice silently rather than reassigning it (#181).
+    --
+    -- The divergence is UNOBSERVABLE, not vacuous -- there really is a choice
+    -- among the departed player's surviving opponents. It cannot be seen because
+    -- the field would be written and never read: CR 506.2's first sentence makes
+    -- the attacking player the active player, and after CR 800.4a a departed
+    -- player controls no creature, so no creature can attack under any defending
+    -- player CR 800.4h would install.
     --
     -- Maybe PlayerId, not a set. CR 802 (attack multiple players) is the option
     -- that makes several players defenders at once, and CR 802.4 then has each of
