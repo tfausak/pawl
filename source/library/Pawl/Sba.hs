@@ -163,8 +163,14 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
 -- Creatures-with-no-Filter shape holds regardless (a shortcut that would go
 -- silently wrong the day it stops holding), this falls through to the general,
 -- slower Target.stillLegal, which reuses the SAME legality Cast/Resolve already
--- judge and is correct for every Pool/Filter combination -- just not the one
--- this function exists to make fast.
+-- judge.
+--
+-- That fallback is general in its POOL and FILTER, not in its recipient TAG: it
+-- still hard-codes Recipient.ToCreature, which is what Pool.Creatures produces
+-- (Target.creatureRecipients). A Pool.Permanents enchant spec tags candidates
+-- ToObject instead, so the membership test would fail and wrongly bury the Aura.
+-- The tag must be derived from the spec's own Pool before a second enchant pool
+-- exists (#190).
 stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> TargetSpec.TargetSpec -> ObjectId -> Bool
 stillLegalEnchant pcs gs source spec target = case spec of
   TargetSpec.MkTargetSpec Pool.Creatures Nothing ->
