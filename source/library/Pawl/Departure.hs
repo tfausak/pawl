@@ -136,7 +136,7 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     triggered is not on the stack, so by CR 109.1 it is not an object either.
 --     It stays, it triggers, and CR 800.4d is what stops it reaching the stack --
 --     which is exactly what CR 800.4d's own Astral Slide example describes. The
---     filter is in Engine.placePendingTriggers.
+--     filter is in Engine.apnapPlayers.
 --
 --   * an exiledUntilMonarch entry whose VALUE is the departing player. That
 --     effect survives its controller's departure: CR 800.4a ends only effects

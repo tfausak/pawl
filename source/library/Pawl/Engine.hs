@@ -272,25 +272,41 @@ runTurnBasedActions phase = do
 -- discarding the record. Targets are chosen as the ability is placed (CR 603.3d).
 -- Returns whether any were placed.
 --
--- CR 800.4d: "If a triggered ability that would be controlled by a player who
--- has left the game would be put onto the stack, it isn't put on the stack."
--- No separate filter is needed here: `orderPending` groups `pending` by
--- `apnapPlayers`, which already restricts every group to a still-playing
--- controller (Departure.stillPlaying), so a PendingTrigger whose controller
--- has left never appears in `ordered` and `placeOne` never sees it. A delayed
--- ability is the only carrier that can reach this with a departed controller
--- -- see Pawl.Departure's objectsLeaveWith haddock -- because
+-- CR 800.4d, SECOND sentence: "If a triggered ability that would be
+-- controlled by a player who has left the game would be put onto the stack,
+-- it isn't put on the stack." No separate filter is needed here:
+-- `orderPending` groups `pending` by `apnapPlayers`, which already restricts
+-- every group to a still-playing controller (Departure.stillPlaying), so a
+-- PendingTrigger whose controller has left never appears in `ordered` and
+-- `placeOne` never sees it. Under the pipeline `orderPending` feeds --
+-- `apnapPlayers` -> `orderFor` -> `permute`, none of which can ever
+-- INTRODUCE an entry -- a delayed ability is the only carrier that can reach
+-- this with a departed controller (once more than two players are seated,
+-- Departure.continuesAfterDeparture; at two, CR 800.4a's clauses never run
+-- and CR 104.2a ends the game before an end step returns, so the question is
+-- moot there, and apnapPlayers's filter would catch it regardless if it
+-- somehow arose) -- see Pawl.Departure's objectsLeaveWith haddock -- because
 -- eventTriggers/stateTriggers re-derive the controller live from
 -- Projection.controllerOf, and a departed player controls nothing after CR
 -- 800.4a. The entry is still CONSUMED regardless: `surviving` above already
 -- dropped it from delayedTriggers, because CR 603.7b spends the one shot on
--- the trigger event, which happened.
+-- the trigger event, which happened. (The monarch's `inherent` triggers below
+-- bypass this pipeline entirely and are argued safe separately, at their own
+-- gather site.)
 --
 -- The Bool this returns is computed from `ordered`, not the pre-filter
 -- `pending`, so it still tells the truth ("were any placed") in exactly the
 -- case CR 800.4d creates: a departed player's delayed ability firing with
 -- nothing else pending would otherwise report `True` on a step that put
 -- nothing on the stack.
+--
+-- NOT implemented: CR 800.4d's FIRST sentence ("If an object that would be
+-- owned by a player who has left the game would be created in any zone, it
+-- isn't created") and CR 800.4b's token-creation and
+-- put-onto-the-battlefield sentences. `Event.createTokens` is the unguarded
+-- producer -- it takes one player and uses it for both control and
+-- ownership, so for tokens CR 800.4d's first sentence and CR 800.4b's second
+-- sentence coincide exactly and one guard would satisfy both (#177).
 placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
@@ -299,6 +315,12 @@ placePendingTriggers = do
       -- CR 725.2: the monarch's inherent triggers hang on no object, so the
       -- normal ObjectId-sourced pending pipeline can't carry them. Gather them
       -- from the SAME unscanned-event snapshot, before the watermark bump.
+      -- They bypass orderPending/apnapPlayers entirely, so CR 800.4d's filter
+      -- above does not cover this path -- but no separate guard is needed
+      -- here either: Monarch.reassignOnDeparture runs inside Departure.depart
+      -- with Departure.stillPlayingInOrder, so the crown can never rest on a
+      -- departed seat in the first place, and inherentMonarchPending's
+      -- controller is always the current monarch.
       inherent = Monarch.inherentMonarchPending evs gs
   State.put
     gs
