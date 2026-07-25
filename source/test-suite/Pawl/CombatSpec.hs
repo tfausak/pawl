@@ -10,14 +10,12 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
@@ -28,8 +26,6 @@ import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Departure as Departure.Type
-import qualified Pawl.Type.Duration as Duration
-import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.Expiry as Expiry
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -41,10 +37,8 @@ import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Sickness as Sickness
-import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
@@ -604,24 +598,16 @@ controlChangeSicknessTests :: Registry.Type.Registry -> Tasty.TestTree
 controlChangeSicknessTests registry =
   Tasty.testGroup
     "ControlChangeSickness"
-    [ -- SYNTHETIC (labeled crutch, spec §4): a "steal until end of turn, no haste"
-      -- effect. A real card would grant haste (masking CR 302.6) or be an Aura
-      -- (Attach, out of M4.5 scope). Retired by the Auras / Control Magic phase (#33).
-      HU.testCase "CR 302.6 a creature that just changed control is summoning sick (no haste)" $ do
+    [ HU.testCase "CR 302.6 a creature that just changed control is summoning sick (no haste)" $ do
         piker <- Registry.printing registry "Goblin Piker"
-        let (oid, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
-            slot = SlotName.MkSlotName (Text.pack "target")
-            steal =
-              Resolve.applyEffect
-                oid
-                S.alice
-                Map.empty
-                (Map.singleton slot True)
-                (Map.singleton slot (Recipient.ToCreature oid))
-                (Effect.GainControl Duration.UntilEndOfTurn slot)
-            after = snd (Engine.runGamePure S.identityAnswer base steal)
-        HU.assertEqual "alice controls it" (Just S.alice) (Projection.controllerOf oid after)
-        HU.assertBool "but it is summoning sick, so it cannot attack this turn" (not (Combat.canAttack S.alice oid after))
+        controlMagic <- Registry.printing registry "Control Magic"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, withCreature) = S.addCreature piker S.bob base
+            (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+            attached = S.attach aura creature withAura
+            sick = S.resick creature attached
+        HU.assertEqual "alice controls it" (Just S.alice) (Projection.controllerOf creature sick)
+        HU.assertBool "but it is summoning sick, so it cannot attack this turn" (not (Combat.canAttack S.alice creature sick))
     ]
 
 -- Declare attackers with everything, then hand back the state and the ids.
