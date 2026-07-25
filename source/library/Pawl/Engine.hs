@@ -195,19 +195,28 @@ skipsDraw gs =
 runTurnBasedActions :: Phase.Phase -> Game ()
 runTurnBasedActions phase = do
   active <- State.gets GameState.activePlayer
+  -- CR 800.4j: a turn whose player has left the game "continues to its
+  -- completion without an active player", so the turn-based actions the rules
+  -- assign to THE ACTIVE PLAYER -- untap (CR 703.4c), draw (CR 703.4d), declare
+  -- attackers (CR 703.4i), the cleanup discard (CR 703.4n) -- have nobody to
+  -- perform them. Declare blockers (CR 703.4j) belongs to the defending player,
+  -- and CR 703.4p's damage/until-end-of-turn sweep is the GAME's action, not the
+  -- active player's; neither is guarded.
+  hasActive <- State.gets (List.elem active . Departure.stillPlaying)
   case phase of
-    Phase.Beginning BeginningStep.Untap -> do
+    Phase.Beginning BeginningStep.Untap -> Monad.when hasActive $ do
       untapAll active
       settleAll active
       State.modify' $ \gs ->
         gs {GameState.landPlayed = Set.delete active (GameState.landPlayed gs)}
-    Phase.Beginning BeginningStep.DrawStep -> do
+    Phase.Beginning BeginningStep.DrawStep -> Monad.when hasActive $ do
       skip <- State.gets skipsDraw
       Monad.unless skip (Event.drawCard active)
     Phase.Combat CombatStep.DeclareAttackers -> do
-      Combat.declareAttackers active
+      Monad.when hasActive (Combat.declareAttackers active)
       -- CR 508.8: with the attacker set now final, drop the two combat steps that
-      -- have nothing to do if nobody attacked.
+      -- have nothing to do if nobody attacked. NOT guarded: a turn with no active
+      -- player declares no attackers, which is precisely 508.8's condition.
       State.modify' Combat.skipEmptyCombat
     Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers
     Phase.Combat CombatStep.CombatDamage -> do
@@ -220,9 +229,10 @@ runTurnBasedActions phase = do
     -- CR 511.3: creatures stop being attacking and blocking.
     Phase.Combat CombatStep.EndOfCombat -> State.modify' Combat.clearCombat
     Phase.Ending EndingStep.Cleanup -> do
-      discardToHandSize active
+      Monad.when hasActive (discardToHandSize active)
       -- CR 514.2: damage wears off AND until-end-of-turn effects end,
-      -- simultaneously. One sweep over both carriers (Pawl.Expiry).
+      -- simultaneously. One sweep over both carriers (Pawl.Expiry). NOT
+      -- guarded: CR 703.4p is the game's action, not the active player's.
       State.modify' Damage.removeAllDamage
       State.modify' Expiry.dropAtCleanup
     _ -> pure ()

@@ -32,6 +32,8 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Combat as Combat.Type
+import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Decider as Decider
@@ -814,6 +816,16 @@ concedeTests registry =
 -- that does NOT end the game. Every case here needs three seats: at two players
 -- a departure ends the game before the next thing happens, which is exactly why
 -- these defects survived five milestones.
+-- S.identityAnswer returns [] for Prompt.DeclareAttackers, so it cannot tell a
+-- SKIPPED prompt from an ANSWERED one that legally attacks with nothing. This
+-- attacks with everything offered instead, so a non-empty attacker map is
+-- proof the prompt fired. No new Prompt constructor lands in this phase, so
+-- the wildcard keeps this answerer out of the -Werror exhaustiveness net.
+attackWithEverythingAnswer :: Prompt.Prompt r -> r
+attackWithEverythingAnswer p = case p of
+  Prompt.DeclareAttackers _ _ candidates -> candidates
+  _ -> S.identityAnswer p
+
 turnOrderTests :: Registry.Type.Registry -> Tasty.TestTree
 turnOrderTests registry =
   Tasty.testGroup
@@ -925,7 +937,39 @@ turnOrderTests registry =
             ((_, after), asks) = State.runState (Engine.runGame (concedeOrderAnswer S.alice) gone Engine.priorityLoop) []
         HU.assertEqual "bob, carol, then bob AGAIN -- never alice" [S.bob, S.carol, S.bob, S.carol] asks
         HU.assertEqual "the spell resolved" 0 (length (GameState.stack after))
-        HU.assertEqual "carol's Piker is on the battlefield" 1 (S.creaturesInPlay S.carol after)
+        HU.assertEqual "carol's Piker is on the battlefield" 1 (S.creaturesInPlay S.carol after),
+      HU.testCase "CR 800.4j/703.4d a departed active player does not draw" $
+        -- With no library, a draw flags drewFromEmpty -- so "did not draw" is
+        -- directly observable without building a deck.
+        let base = S.threePlayerGame {GameState.phase = Phase.Beginning BeginningStep.DrawStep, GameState.turnNumber = 2}
+            gone = Departure.depart Departure.Type.Conceded S.alice base
+            after = S.runPure S.identityAnswer gone S.drawStep
+            control = S.runPure S.identityAnswer base S.drawStep
+         in do
+              HU.assertBool "a departed active player never attempts the draw" (not (Set.member S.alice (GameState.drewFromEmpty after)))
+              HU.assertBool "but a playing one does -- the guard is what did it" (Set.member S.alice (GameState.drewFromEmpty control)),
+      HU.testCase "CR 800.4j/703.4c a departed active player's untap step does nothing" $
+        -- landPlayed is the observable part of the untap step that needs no
+        -- permanents: it is cleared for the active player each untap.
+        let base =
+              S.threePlayerGame
+                { GameState.phase = Phase.Beginning BeginningStep.Untap,
+                  GameState.landPlayed = Set.singleton S.alice
+                }
+            gone = Departure.depart Departure.Type.Conceded S.alice base
+            after = S.runPure S.identityAnswer gone (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+            control = S.runPure S.identityAnswer base (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+         in do
+              HU.assertEqual "no untap-step action happened" (Set.singleton S.alice) (GameState.landPlayed after)
+              HU.assertEqual "a playing active player's land play IS cleared" Set.empty (GameState.landPlayed control),
+      HU.testCase "CR 800.4j/703.4i a departed active player is not asked to declare attackers" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (_, board) = S.addCreature piker S.alice (S.threePlayerGame {GameState.phase = Phase.Combat CombatStep.DeclareAttackers})
+            gone = Departure.depart Departure.Type.Conceded S.alice board
+            after = S.runPure attackWithEverythingAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))
+            control = S.runPure attackWithEverythingAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))
+        HU.assertBool "the departed active player is never asked to attack" (Map.null (Combat.Type.attackers (GameState.combat after)))
+        HU.assertBool "a playing active player IS asked -- the all-in answerer proves the prompt fires" (not (Map.null (Combat.Type.attackers (GameState.combat control))))
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
