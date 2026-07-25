@@ -95,10 +95,11 @@ import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified System.Random as Random
 
-alice, bob, carol :: PlayerId.PlayerId
+alice, bob, carol, dave :: PlayerId.PlayerId
 alice = PlayerId.MkPlayerId 0
 bob = PlayerId.MkPlayerId 1
 carol = PlayerId.MkPlayerId 2
+dave = PlayerId.MkPlayerId 3
 
 bothPlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
 bothPlayers = alice NonEmpty.:| [bob]
@@ -115,6 +116,17 @@ threePlayers = alice NonEmpty.:| [bob, carol]
 -- priority tests, mirroring what `Setup.emptyGame bothPlayers` is for two.
 threePlayerGame :: GameState.GameState
 threePlayerGame = Setup.emptyGame threePlayers
+
+-- A fourth seat, alongside threePlayers, for cases where three seats cannot
+-- distinguish two candidate answers (a departure walk with only one
+-- still-playing seat left has nowhere else to land, whoever it's anchored on).
+fourPlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
+fourPlayers = alice NonEmpty.:| [bob, carol, dave]
+
+-- The deckless four-seat board: turn order [alice, bob, carol, dave], alice
+-- active, all four still playing. Mirrors threePlayerGame for a fourth seat.
+fourPlayerGame :: GameState.GameState
+fourPlayerGame = Setup.emptyGame fourPlayers
 
 redRed :: Registry.Type.Registry -> IO (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 redRed registry = do

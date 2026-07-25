@@ -89,17 +89,35 @@ tests =
          in HU.assertEqual "bob, the seat after alice's" (Just S.bob) (GameState.monarch gone),
       HU.testCase "CR 725.4 the walk past the active player's seat skips a seat that has already departed" $
         -- alice is the active player and has already left, so there is no active
-        -- player to crown; carol is the monarch and leaves too. The walk starts
-        -- after alice's seat: bob, then carol. Bob is the only one still in the
-        -- game, so bob takes the crown. Discriminating: a walk anchored on the
-        -- DEPARTING MONARCH's seat instead of the active player's would find
-        -- alice first and, on filtering her out, still land on bob -- so the
-        -- second assertion pins the anchor by making the two disagree.
+        -- player to crown; carol is the monarch and leaves too. This pins that a
+        -- departed active player falls through to the walk at all (the first
+        -- assertion) and that the result on THIS three-seat board is bob (the
+        -- second). It does NOT pin which seat the walk is anchored on: with only
+        -- one still-playing seat left (bob), any starting point in a circular
+        -- scan finds it first -- a walk anchored on the DEPARTING MONARCH's seat
+        -- instead of the active player's would also land on bob. The four-seat
+        -- case below is what actually discriminates the two anchor readings.
         let board = S.withMonarch S.carol (Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame)
             gone = Departure.depart Departure.Type.Conceded S.carol board
          in do
               HU.assertEqual "alice is still the active player's seat (CR 800.4j)" S.alice (GameState.activePlayer gone)
               HU.assertEqual "bob takes the crown" (Just S.bob) (GameState.monarch gone),
+      -- CR 725.4: the anchor-discriminating case. Four seats, not three: once the
+      -- active player and the monarch have both departed, three seats leave only
+      -- one still-playing candidate (see the previous case's comment), so any
+      -- anchor lands on it. Here, after alice (active) and carol (monarch) both
+      -- leave, TWO seats are still playing (bob, dave), and the two readings
+      -- disagree: anchored on the ACTIVE player's seat (alice's), the walk is
+      -- [bob, carol, dave] and bob is first still playing; anchored on the
+      -- DEPARTING MONARCH's seat (carol's) instead, the walk is [dave, alice, bob]
+      -- and dave is first still playing. Swapping this module's
+      -- `List.break (== active)` for `List.break (== leaving)` makes this fail
+      -- with "expected: Just bob, got: Just dave".
+      HU.testCase "CR 725.4 four seats: the walk is anchored on the active player's seat, not the departing monarch's" $
+        let aliceGone = Departure.depart Departure.Type.Conceded S.alice S.fourPlayerGame
+            board = S.withMonarch S.carol aliceGone
+            gone = Departure.depart Departure.Type.Conceded S.carol board
+         in HU.assertEqual "bob, the seat after alice's -- dave would be the seat after carol's" (Just S.bob) (GameState.monarch gone),
       -- CR 725.4: "If no player still in the game can become the monarch, the
       -- game continues with no monarch."
       HU.testCase "CR 725.4 the last player standing is the monarch and leaves: no monarch, and no partial head" $
