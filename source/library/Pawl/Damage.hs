@@ -98,8 +98,10 @@ blockerThreshold gs attacker blocker =
 -- about the source AS THE DAMAGE IS DEALT -- last known information, since the
 -- source may be gone by the time the CR 704.5h SBA or a later reader asks.
 --
--- The library's only DamageEvent constructor call, so no assignment site can
--- capture two riders and forget the third.
+-- Every damage the engine deals is built here -- the only other constructor call
+-- in the library is Pawl.Codec's decoder, which rebuilds an event rather than
+-- originating one -- so no assignment site can capture two riders and forget the
+-- third.
 damageEvent :: GameState -> DamageKind.DamageKind -> ObjectId -> Recipient.Recipient -> Natural -> DamageEvent.DamageEvent
 damageEvent gs kind source target amount =
   DamageEvent.MkDamageEvent
