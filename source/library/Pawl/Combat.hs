@@ -101,7 +101,7 @@ canAttack pid oid gs = case Game.lookupObject oid gs of
       -- CR 302.6, relaxed by CR 702.10b: a creature with haste can attack even if
       -- it hasn't been controlled continuously since its controller's most recent
       -- turn began.
-      && (Object.sickness obj == Sickness.Settled || Projection.hasKeyword Keyword.Haste oid gs)
+      && (Object.sickness obj == Sickness.Settled pid || Projection.hasKeyword Keyword.Haste oid gs)
       && isCreatureObject oid gs
       -- CR 702.3b: a creature with defender can't attack. It may still block --
       -- 702.3b says nothing about blocking.

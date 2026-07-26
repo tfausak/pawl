@@ -485,7 +485,7 @@ addCreature printing pid gs =
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled,
+            Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
@@ -499,8 +499,8 @@ addCreature printing pid gs =
       )
 
 -- Install a SetController continuous effect (CR 108.4) making pid the
--- controller of oid, and settle it (Sickness.Settled) so a test that exercises
--- control isolates control from summoning sickness.
+-- controller of oid, and settle it under pid (Sickness.Settled pid) so a test
+-- that exercises control isolates control from summoning sickness.
 giveControl :: ObjectId.ObjectId -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 giveControl oid pid gs =
   let (ts, g1) = Game.freshTimestamp gs
@@ -512,7 +512,7 @@ giveControl oid pid gs =
             ContinuousEffect.modification = Modification.SetController pid,
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
-      settle o = o {Object.sickness = Sickness.Settled}
+      settle o = o {Object.sickness = Sickness.Settled pid}
    in g1
         { GameState.continuousEffects = eff : GameState.continuousEffects g1,
           GameState.objects = Map.adjust settle oid (GameState.objects g1)
@@ -641,7 +641,7 @@ addToken card pid gs =
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled,
+            Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
@@ -717,7 +717,7 @@ addHandCard printing pid gs =
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled,
+            Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
@@ -759,7 +759,7 @@ landsInPlay land n =
                   Object.zone = Zone.Battlefield,
                   Object.tapped = TapState.Untapped,
                   Object.damage = 0,
-                  Object.sickness = Sickness.Settled,
+                  Object.sickness = Sickness.Settled alice,
                   Object.bindings = Map.empty,
                   Object.counters = Map.empty,
                   Object.attachedTo = Nothing,
@@ -783,7 +783,7 @@ handOne printing base =
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled,
+            Object.sickness = Sickness.Settled alice,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
@@ -813,7 +813,7 @@ pikerInHand land piker n ph =
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled,
+            Object.sickness = Sickness.Settled alice,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
@@ -1120,15 +1120,6 @@ attach rider host gs =
   let set obj = obj {Object.attachedTo = Just host}
    in gs {GameState.objects = Map.adjust set rider (GameState.objects gs)}
 
--- CR 302.6: set an object's sickness to Sick directly, without a zone change. A
--- STATE fixture (the shape attach already is), not the synthetic
--- Resolve.applyEffect/GainControl path -- this only needs the summoning-sick flag
--- set, not a control change, so it reaches straight for the field.
-resick :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-resick oid gs =
-  let set obj = obj {Object.sickness = Sickness.Sick}
-   in gs {GameState.objects = Map.adjust set oid (GameState.objects gs)}
-
 -- Put `n` counters of a player-counter kind directly onto a player, bypassing
 -- the diversion/effect that would add them -- so an SBA or cost test can set up
 -- poison or energy without resolving anything.
@@ -1269,7 +1260,7 @@ spellOnStack printing pid gs =
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled,
+            Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,

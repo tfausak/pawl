@@ -13,6 +13,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
@@ -598,20 +599,42 @@ controlChangeSicknessTests :: Registry.Type.Registry -> Tasty.TestTree
 controlChangeSicknessTests registry =
   Tasty.testGroup
     "ControlChangeSickness"
-    [ -- S.resick FORCES sickness here rather than deriving it from the attach --
-      -- a live Control Magic control change does not itself re-Sick the
-      -- creature (#198), so this pins the intended CR 302.6 behavior, not the
-      -- engine's current one.
+    [ -- A live steal, with nothing forced: bob's Piker settles under bob at his
+      -- untap step, then alice's Control Magic takes it. CR 302.6 asks whether
+      -- ALICE has controlled it continuously since HER most recent turn began,
+      -- and she has not -- the settle it carries is bob's, not hers.
       HU.testCase "CR 302.6 a creature that just changed control is summoning sick (no haste)" $ do
         piker <- Registry.printing registry "Goblin Piker"
         controlMagic <- Registry.printing registry "Control Magic"
         let base = Setup.emptyGame S.bothPlayers
             (creature, withCreature) = S.addCreature piker S.bob base
-            (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+            settled = S.runPure S.identityAnswer withCreature (Engine.settleAll S.bob)
+            (aura, withAura) = S.addCreature controlMagic S.alice settled
             attached = S.attach aura creature withAura
-            sick = S.resick creature attached
-        HU.assertEqual "alice controls it" (Just S.alice) (Projection.controllerOf creature sick)
-        HU.assertBool "but it is summoning sick, so it cannot attack this turn" (not (Combat.canAttack S.alice creature sick))
+        HU.assertEqual "alice controls it" (Just S.alice) (Projection.controllerOf creature attached)
+        HU.assertBool "but it is summoning sick, so it cannot attack this turn" (not (Combat.canAttack S.alice creature attached)),
+      -- CR 302.6 asks for control held CONTINUOUSLY. bob's Control Magic takes
+      -- alice's settled Piker; alice later removes the Aura and gets the Piker
+      -- back (CR 604.2). Control is hers again and was hers when her turn began,
+      -- but not for the whole span between, so she still may not attack with it.
+      --
+      -- Reachable with the pool as it stands: Control Magic is a sorcery-speed
+      -- Aura, so bob can only cast it on his own turn, and alice can only answer
+      -- it on hers -- after her untap step has already passed.
+      HU.testCase "CR 302.6 control that leaves and returns is not continuous" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, withCreature) = S.addCreature piker S.alice base
+            settled = S.runPure S.identityAnswer withCreature (Engine.settleAll S.alice)
+            (aura, withAura) = S.addCreature controlMagic S.bob settled
+            -- The steal is observed the next time the board settles, which is
+            -- every point a player could get priority (CR 117.5).
+            stolen = S.runPure S.identityAnswer (S.attach aura creature withAura) Engine.settleForPriority
+            returned = S.runPure S.identityAnswer stolen (Event.changeZone aura Zone.Graveyard)
+        HU.assertEqual "bob held it" (Just S.bob) (Projection.controllerOf creature stolen)
+        HU.assertEqual "alice has it back" (Just S.alice) (Projection.controllerOf creature returned)
+        HU.assertBool "but not continuously, so it cannot attack" (not (Combat.canAttack S.alice creature returned))
     ]
 
 -- Declare attackers with everything, then hand back the state and the ids.

@@ -144,8 +144,10 @@ manaSources pid gs =
         Nothing -> False
         Just obj ->
           -- CR 302.6: a sick creature can't use a {T} mana ability. A land is
-          -- never sick-gated. (M3e mana abilities all cost {T}.)
-          not (Set.member CardType.Creature (Projection.cardTypesOf oid gs) && Object.sickness obj == Sickness.Sick)
+          -- never sick-gated. (M3e mana abilities all cost {T}.) Keyed to `pid`:
+          -- the creature must have settled under the player reaching for the
+          -- mana, not under whoever held it before (#198).
+          not (Set.member CardType.Creature (Projection.cardTypesOf oid gs) && Object.sickness obj /= Sickness.Settled pid)
       isSource oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaTypesOf oid gs)) && notSickCreature oid

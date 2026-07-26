@@ -156,21 +156,59 @@ untapAll pid = do
 -- CR 302.6: permanents the active player has controlled since their turn began
 -- are no longer summoning sick. The untap step is where that becomes true.
 --
--- Control-change re-sickening is handled (M4.5 P1): `GainControl` re-Sicks its
--- target at resolution, and this settle now iterates `Projection.controls`, so
--- it clears sickness for whoever currently controls the permanent, not its
--- owner. That reading is control-duration-agnostic: an until-end-of-turn
--- effect (Act of Treason) always wears off (CR 514.2) before the thief's own
--- next untap step, so the creature settles back under its owner there, but an
--- Aura's static ability (Control Magic) grants control INDEFINITELY, so the
--- creature can still be the thief's at their own untap step and settles for
--- them instead -- covered by CR 302.6 (#62) in `Pawl.AuraSpec`.
+-- The record names `pid`, so it answers CR 302.6 only for `pid` -- the rule's
+-- subject is a player ("under ITS CONTROLLER'S control since THEIR most recent
+-- turn began"), and a settle made for one player says nothing about another.
+--
+-- It iterates `Projection.controls`, so it settles for whoever currently
+-- controls the permanent, not its owner. That reading is control-duration-
+-- agnostic: an until-end-of-turn effect (Act of Treason) always wears off
+-- (CR 514.2) before the thief's own next untap step, so the creature settles
+-- back under its owner there, but an Aura's static ability (Control Magic)
+-- grants control INDEFINITELY, so the creature can still be the thief's at
+-- their own untap step and settles for them instead -- covered by CR 302.6
+-- (#62) in `Pawl.AuraSpec`.
 settleAll :: PlayerId -> Game ()
 settleAll pid = do
   gs <- State.get
-  let settle obj = obj {Object.sickness = Sickness.Settled}
+  let settle obj = obj {Object.sickness = Sickness.Settled pid}
       ids = Projection.controls pid gs
   State.put gs {GameState.objects = foldr (Map.adjust settle) (GameState.objects gs) ids}
+
+-- CR 302.6 asks for control held CONTINUOUSLY, so a settle must not outlive the
+-- control it was made about. This drops any `Settled p` on the battlefield whose
+-- object `p` no longer controls.
+--
+-- It samples rather than hooks because control is DERIVED: `Projection.controllerOf`
+-- reads Control Magic's static ability live, so a control change has no event to
+-- hang a re-sickening on -- there is no moment to observe (#198). Running it from
+-- `settleForPriority` samples at every point CR 117.5 lets a player observe the
+-- board, which is every point the answer could matter.
+--
+-- It only ever CLEARS. That asymmetry is what makes the sampling sound: a
+-- discrepancy proves control changed, so clearing is always right, while
+-- granting from a sample would invent continuity across the gap between two
+-- samples. It is also what catches control leaving and returning inside one turn
+-- (bob's Control Magic, then alice's Angelic Edict on it): the record is gone by
+-- the time control comes back, and only alice's next untap step restores it.
+--
+-- Battlefield-scoped: nothing off the battlefield has a controller to compare
+-- against, and CR 302.6 is a restriction on permanents.
+--
+-- One `controllerOf` per battlefield object per settle, so this joins the
+-- per-priority-boundary paths that project per object (#200).
+checkControlContinuity :: Game ()
+checkControlContinuity = do
+  gs <- State.get
+  let interrupted oid objs = case Map.lookup oid objs of
+        Nothing -> objs
+        Just obj -> case Object.sickness obj of
+          Sickness.Sick -> objs
+          Sickness.Settled p ->
+            if Projection.controllerOf oid gs == Just p
+              then objs
+              else Map.insert oid obj {Object.sickness = Sickness.Sick} objs
+  State.put gs {GameState.objects = foldr interrupted (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
 
 -- CR 514.2. Non-identical cards now share a hand (Mountains and Pikers), so
 -- trimming front-of-hand would be the engine choosing what to pitch -- policy in
@@ -423,7 +461,7 @@ placeOne pending = do
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled,
+            Object.sickness = Sickness.Settled controller,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
@@ -557,6 +595,11 @@ settleForPriority = do
   returned <- Monarch.returnExiledForMonarch
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
+  -- Last, and for the same reason the conditional sweep runs first: it must read
+  -- the control this settle leaves behind, not the control some earlier step saw.
+  -- Outside the recursion guard on purpose -- it never makes further work, so it
+  -- is not a reason to loop, and it must run even on a pass where nothing fired.
+  checkControlContinuity
   Monad.when (swept || returned || acted || placed) settleForPriority
 
 priorityLoop :: Game ()

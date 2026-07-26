@@ -33,12 +33,16 @@ import qualified Pawl.Type.Zone as Zone
 -- sick. Reads projected creature-ness -- a land (Evolving Wilds) is never sick-
 -- gated. Asks Pawl.Cost for the CLASSIFICATION rather than matching a component
 -- constructor here.
-tapSicknessOk :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
-tapSicknessOk srcId ability gs =
+--
+-- Keyed to `pid`, the player trying to activate: CR 302.6 asks whether the
+-- creature has been under THEIR control since THEIR most recent turn began, so a
+-- settle recorded for anyone else does not answer it (#198).
+tapSicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+tapSicknessOk pid srcId ability gs =
   let needsTap = Cost.requiresTapSymbol (ActivatedAbility.cost ability)
       isCreature = Set.member CardType.Creature (Projection.cardTypesOf srcId gs)
       settled = case Game.lookupObject srcId gs of
-        Just obj -> Object.sickness obj == Sickness.Settled
+        Just obj -> Object.sickness obj == Sickness.Settled pid
         Nothing -> False
    in not (needsTap && isCreature && not settled)
 
@@ -61,7 +65,7 @@ activatable pid srcId ability gs =
   Projection.controllerOf srcId gs == Just pid
     && elem ability (abilitiesFor srcId gs)
     && not (Mana.isManaAbility ability)
-    && tapSicknessOk srcId ability gs
+    && tapSicknessOk pid srcId ability gs
     && Set.size (Target.fillableModes srcId Map.empty (ActivatedAbility.modal ability) gs)
       >= fromIntegral (Modal.selectionCount (ActivatedAbility.modal ability))
     && Cost.canPay pid srcId (ActivatedAbility.cost ability) gs
@@ -82,7 +86,7 @@ activateAbility pid srcId ability = do
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled,
+            Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,

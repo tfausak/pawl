@@ -8,6 +8,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -201,6 +202,19 @@ manaTests registry =
         let (elfId, g0) = S.addCreature llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
             sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) elfId (GameState.objects g0)}
         HU.assertBool "sick elf excluded" (notElem elfId (Mana.manaSources S.alice sick)),
+      -- CR 302.6's other half, and the same trap #198 sprang on attacking: bob's
+      -- Elves settled under BOB, so the settle it carries says nothing about
+      -- alice. Stealing it does not hand her a mana source this turn.
+      HU.testCase "CR 302.6 a stolen Llanowar Elves is not a mana source for the thief" $ do
+        llanowarElves <- Registry.printing registry "Llanowar Elves"
+        controlMagic <- Registry.printing registry "Control Magic"
+        let (elfId, g0) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
+            settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
+            (aura, withAura) = S.addCreature controlMagic S.alice settled
+            stolen = S.attach aura elfId withAura
+        HU.assertBool "bob could tap it" (elem elfId (Mana.manaSources S.bob settled))
+        HU.assertBool "alice controls it now" (elem elfId (Projection.controls S.alice stolen))
+        HU.assertBool "but it is sick for her, so it is not her mana source" (notElem elfId (Mana.manaSources S.alice stolen)),
       HU.testCase "mana from a controlled permanent goes to its controller, not owner" $ do
         llanowarElves <- Registry.printing registry "Llanowar Elves"
         let (oid, base) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)

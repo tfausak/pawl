@@ -87,6 +87,19 @@ tests registry =
         let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
             sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) srcId (GameState.objects g0), GameState.priority = Just S.alice}
         HU.assertBool "no Activate offered" (not (any isActivate (Action.legalActions S.alice sick))),
+      -- CR 302.6 keyed to the ACTIVATING player, not to the object: bob's
+      -- Sorcerer has settled under bob, and alice's Control Magic does not
+      -- inherit that settle along with the creature (#198).
+      HU.testCase "CR 302.6 a stolen creature's {T} ability is not offered to the thief" $ do
+        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+        controlMagic <- Registry.printing registry "Control Magic"
+        let (srcId, g0) = S.addCreature prodigalSorcerer S.bob (Setup.emptyGame S.bothPlayers)
+            settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
+            (aura, withAura) = S.addCreature controlMagic S.alice settled
+            stolen = (S.attach aura srcId withAura) {GameState.priority = Just S.alice}
+        HU.assertBool "bob could have activated it" (any isActivate (Action.legalActions S.bob settled {GameState.priority = Just S.bob}))
+        HU.assertBool "alice controls it now" (Projection.controllerOf srcId stolen == Just S.alice)
+        HU.assertBool "but no Activate is offered to her" (not (any isActivate (Action.legalActions S.alice stolen))),
       HU.testCase "CR 602 a settled Prodigal Sorcerer's ability IS offered" $ do
         prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
         let (_, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)

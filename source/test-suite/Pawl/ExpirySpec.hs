@@ -409,7 +409,7 @@ masterThiefTests registry =
         -- This is the discriminator settleForPriority's sweepConditional
         -- can't launder away: it proves nothing was EVER stored, not
         -- merely that nothing survived the sweep.
-        HU.assertEqual "and was never re-Sicked" (Just Sickness.Settled) (fmap Object.sickness (Game.lookupObject myr after)),
+        HU.assertEqual "and was never re-Sicked" (Just (Sickness.Settled S.bob)) (fmap Object.sickness (Game.lookupObject myr after)),
       -- Ruling: "If Master Thief ceases to be under your control before its
       -- ability resolves, you won't gain control of the targeted artifact at
       -- all." Falsifies the CONTROL half of S.youControlSource's
@@ -438,7 +438,7 @@ masterThiefTests registry =
         HU.assertEqual "nothing was stored for the artifact" [] (filter (S.continuousEffectAffects myr) (GameState.continuousEffects after))
         -- CR 302.6: a control-change stored by GainControl re-Sicks the
         -- target; the duration never starting must leave that untouched.
-        HU.assertEqual "and was never re-Sicked" (Just Sickness.Settled) (fmap Object.sickness (Game.lookupObject myr after)),
+        HU.assertEqual "and was never re-Sicked" (Just (Sickness.Settled S.bob)) (fmap Object.sickness (Game.lookupObject myr after)),
       -- Ruling: "If another player gains control of Master Thief, its
       -- control-change effect ends. Regaining control of Master Thief won't
       -- cause you to regain control of the artifact." THE FALSIFIER: an
