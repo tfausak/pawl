@@ -814,7 +814,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               Object.zone = Zone.Command,
               Object.tapped = TapState.Untapped,
               Object.damage = 0,
-              Object.sickness = Sickness.Settled,
+              Object.sickness = Sickness.Settled controller,
               Object.bindings = Map.empty,
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
@@ -928,6 +928,9 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                   -- effect's source's controller), baked in now -- derived, never
                   -- chosen. CR 302.6: the new controller has not controlled the
                   -- permanent continuously, so it is re-Sicked.
+                  --
+                  -- Not conditioned on control actually moving, so targeting a
+                  -- permanent you already control re-Sicks it too (#206).
                   let (ts, gs1) = Game.freshTimestamp gs
                       eff =
                         ContinuousEffect.MkContinuousEffect

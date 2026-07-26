@@ -25,7 +25,10 @@ data Object = MkObject
     --
     -- Removed at cleanup (CR 514.2). Per-incarnation state: reset by changeZone.
     damage :: Natural,
-    -- CR 302.6. Per-incarnation state: reset by changeZone.
+    -- CR 302.6, carrying WHICH player the permanent settled under -- the rule's
+    -- subject is a player, not the object. Per-incarnation state: reset by
+    -- changeZone. Not purely stored: Engine.checkControlContinuity drops the
+    -- claim when the derived controller stops matching it.
     sickness :: Sickness,
     -- CR 601.2: the choices bound while casting, by slot name. Empty for
     -- everything but a spell or ability on the stack. Per-incarnation state:

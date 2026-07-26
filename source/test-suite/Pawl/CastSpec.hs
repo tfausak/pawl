@@ -79,7 +79,7 @@ sicknessTests registry =
         let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
             sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
             after = snd (Engine.runGamePure S.identityAnswer sick (Engine.settleAll S.alice))
-        HU.assertEqual "settled" (Just Sickness.Settled) (sicknessOf oid after),
+        HU.assertEqual "settled" (Just (Sickness.Settled S.alice)) (sicknessOf oid after),
       HU.testCase "CR 302.6 settling does not touch the other player's permanents" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
@@ -481,7 +481,7 @@ handInPlay printing board =
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.damage = 0,
-            Object.sickness = Sickness.Settled,
+            Object.sickness = Sickness.Settled S.alice,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,

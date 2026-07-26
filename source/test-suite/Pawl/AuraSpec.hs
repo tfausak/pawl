@@ -132,19 +132,19 @@ tests registry =
       -- creature can attack. Act of Treason could never test this -- its control ends
       -- at cleanup (CR 514.2), long before the thief's untap step.
       --
-      -- S.resick FORCES sickness rather than exercising a live control change:
-      -- attaching Control Magic does not itself re-Sick the creature (#198), so
-      -- this test starts from the sick state a real steal SHOULD produce and
-      -- checks only the settle, not the attach.
+      -- The whole span, with nothing forced: the Piker settles under bob, the
+      -- steal makes it sick again for alice, and only HER untap step settles it
+      -- for her. The middle assertion is what #198 got wrong.
       HU.testCase "CR 302.6 (#62): a creature held under indefinite control settles at the thief's untap step" $ do
         piker <- Registry.printing registry "Goblin Piker"
         controlMagic <- Registry.printing registry "Control Magic"
         let base = Setup.emptyGame S.bothPlayers
             (creature, withCreature) = S.addCreature piker S.bob base
-            (aura, withAura) = S.addCreature controlMagic S.alice withCreature
-            attached = S.attach aura creature withAura
-            sick = S.resick creature attached
-            settled = S.runPure S.identityAnswer sick (Engine.settleAll S.alice)
-        HU.assertEqual "alice controls it" (Just S.alice) (Projection.controllerOf creature settled)
+            settledForBob = S.runPure S.identityAnswer withCreature (Engine.settleAll S.bob)
+            (aura, withAura) = S.addCreature controlMagic S.alice settledForBob
+            stolen = S.attach aura creature withAura
+            settled = S.runPure S.identityAnswer stolen (Engine.settleAll S.alice)
+        HU.assertEqual "alice controls it" (Just S.alice) (Projection.controllerOf creature stolen)
+        HU.assertBool "the turn she steals it, it cannot attack" (not (Combat.canAttack S.alice creature stolen))
         HU.assertBool "and it has settled under her control, so it can attack" (Combat.canAttack S.alice creature settled)
     ]
