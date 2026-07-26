@@ -1699,7 +1699,7 @@ gainPlayerCountersTests registry =
     [ HU.testCase "CR 107.14 GainPlayerCounters gives the resolving controller energy" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-            act = Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.GainPlayerCounters PlayerCounterKind.Energy (Quantity.Literal 2))
+            act = Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
             after = S.runPure S.identityAnswer gs0 act
         HU.assertEqual "alice has two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
     ]

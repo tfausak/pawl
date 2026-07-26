@@ -9,6 +9,7 @@ import Pawl.Type.Modification (Modification)
 import Pawl.Type.MonarchTarget (MonarchTarget)
 import Pawl.Type.PlayerCounterKind (PlayerCounterKind)
 import Pawl.Type.PlayerEffect (PlayerEffect)
+import Pawl.Type.PlayerRef (PlayerRef)
 import Pawl.Type.PlayerScope (PlayerScope)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
@@ -159,11 +160,21 @@ data Effect card
     -- many (reused from M4a; a future X-counter card rides ChooseX). The counter's
     -- P/T effect is applied by the projection (CR 122.1a / 613.4c), not here.
     PutCounters CounterKind Quantity SlotName
-  | -- CR 122 / 107.14: the resolving controller ("you") gains N counters of a
-    -- player-counter kind. Targetless, like Draw. Subsumes any self-scoped
-    -- player counter (energy, experience, rad) without a new opcode. A TARGETED
-    -- player-counter effect needs a recipient (#120).
-    GainPlayerCounters PlayerCounterKind Quantity
+  | -- CR 122 / 107.14: the players the PlayerRef names each get N counters of a
+    -- player-counter kind. Subsumes any self-scoped player counter (energy,
+    -- experience, rad) as `Relative You` -- Longtusk Cub's "you get {E}{E}" --
+    -- without a new opcode.
+    --
+    -- The PlayerRef is what lets a player OTHER than the resolving controller
+    -- receive them: CR 702.70a's "that player gets N poison counters" is
+    -- `InSlot Binding.triggerPlayer`, reading the player the trigger's own event
+    -- named. PlayerRef, not PlayerScope, for the reason PlayerRef's own comment
+    -- gives -- only PlayerRef can name a binding slot.
+    --
+    -- Still targetless in itself: a slot this reads may have been filled by
+    -- TARGETING (CR 601.2c), which is how a future "target player gets two
+    -- poison counters" is written, but nothing here demands it (#120).
+    GainPlayerCounters PlayerRef PlayerCounterKind Quantity
   | -- CR 701.26b: untap the slot's target permanent. Single-target (Act of
     -- Treason's "untap that creature"); mass/conditional untap is future.
     Untap SlotName

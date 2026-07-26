@@ -91,6 +91,24 @@ triggerSource = SlotName.MkSlotName (Text.pack "self")
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
 
+-- CR 603.2: the reserved slot under which the PLAYER an event trigger's event
+-- names is bound -- "that player" in CR 702.70a's "whenever this creature deals
+-- combat damage to a player, that player gets N poison counters". Stamped by
+-- Pawl.Event.eventBindings as the trigger is gathered, so the ability's payload
+-- reads an ordinary slot rather than needing a "the damaged player" opcode.
+--
+-- Distinct from `you` (CR 109.5, the ability's CONTROLLER): the player the
+-- event names is generally an opponent, and in a multiplayer game which
+-- opponent is not derivable from the controller at all.
+--
+-- Not a target (nothing was chosen), so CR 608.2b has nothing to re-validate --
+-- Resolve.resolveEffects' legalSlot answers True for any slot with no target
+-- spec, which is how this slot stays readable at resolution. The same "no
+-- card's targetSpecs may name it" caveat `you` carries applies here, and is
+-- unenforced for the same reason.
+triggerPlayer :: SlotName
+triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -111,7 +129,13 @@ setTriggerSource oid = Map.insert triggerSource (toObject oid)
 -- Bind a player under the reserved you slot. A dedicated single-purpose slot,
 -- so this insert never clobbers another binding (setCopy's posture).
 setYou :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
-setYou pid = Map.insert you (Binding.empty {Binding.target = Just (Recipient.ToPlayer pid)})
+setYou pid = Map.insert you (toPlayer pid)
+
+-- Bind a player under the reserved triggerPlayer slot. A dedicated
+-- single-purpose slot, so this insert never clobbers another binding (setCopy's
+-- posture).
+setTriggerPlayer :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
+setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
 
 -- The modes chosen for a spell, read from its binding environment. Empty when
 -- absent (defensive; cast always stamps it, forced or prompted).

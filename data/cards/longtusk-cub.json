@@ -91,6 +91,12 @@
                 "type": "GainPlayerCounters",
                 "value": [
                   {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
                     "type": "Energy"
                   },
                   {

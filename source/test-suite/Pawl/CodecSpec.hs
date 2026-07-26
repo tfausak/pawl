@@ -116,6 +116,13 @@ tests registry =
             roundTrip "toxic 1" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Toxic 1)
             roundTrip "toxic 2" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Toxic 2)
             HU.assertBool "toxic 1 and toxic 2 encode differently" (Codec.keywordToJson (Keyword.Toxic 1) /= Codec.keywordToJson (Keyword.Toxic 2)),
+          -- CR 702.70a's N rides the constructor the same way. The two payloaded
+          -- keywords must not share a tag, or Snake Cult Initiation would decode
+          -- as toxic 3.
+          HU.testCase "Keyword.Poisonous carries its N" $ do
+            roundTrip "poisonous 1" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Poisonous 1)
+            roundTrip "poisonous 3" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Poisonous 3)
+            HU.assertBool "poisonous 3 is not toxic 3" (Codec.keywordToJson (Keyword.Poisonous 3) /= Codec.keywordToJson (Keyword.Toxic 3)),
           HU.testCase "PlayerCounterKind" $ do
             roundTrip "energy" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Energy
             roundTrip "poison" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Poison,
@@ -201,8 +208,12 @@ tests registry =
               Codec.effectToJson
               Codec.jsonToEffect
               (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells),
-          HU.testCase "GainPlayerCounters" $
-            roundTrip "gpc" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters PlayerCounterKind.Energy (Quantity.Literal 2)),
+          -- Every PlayerRef shape the opcode accepts: the self-scoped one every
+          -- card in the pool uses, and the slot read CR 702.70a's "that player"
+          -- needs.
+          HU.testCase "GainPlayerCounters" $ do
+            roundTrip "gpc" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
+            roundTrip "gpc slot" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) PlayerCounterKind.Poison (Quantity.Literal 3)),
           HU.testCase "CreateEmblem" $ do
             piker <- Registry.printing registry "Goblin Piker"
             roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card piker)),

@@ -317,8 +317,9 @@ jsonToSupertype =
       (Text.pack "Legendary", Supertype.Legendary)
     ]
 
--- Not decodeNullary's table shape any more: CR 702.164a's toxic carries an N, so
--- this is the tagged-with-an-optional-payload case jsonToQuantity uses.
+-- Not decodeNullary's table shape any more: CR 702.164a's toxic and CR 702.70a's
+-- poisonous each carry an N, so this is the tagged-with-an-optional-payload case
+-- jsonToQuantity uses.
 keywordToJson :: Keyword.Keyword -> Value
 keywordToJson k = case k of
   Keyword.Deathtouch -> nullary (Text.pack "Deathtouch")
@@ -332,6 +333,7 @@ keywordToJson k = case k of
   Keyword.Trample -> nullary (Text.pack "Trample")
   Keyword.Vigilance -> nullary (Text.pack "Vigilance")
   Keyword.Fear -> nullary (Text.pack "Fear")
+  Keyword.Poisonous n -> Json.tagged (Text.pack "Poisonous") (Just (natTo n))
   Keyword.Infect -> nullary (Text.pack "Infect")
   Keyword.Devoid -> nullary (Text.pack "Devoid")
   Keyword.Toxic n -> Json.tagged (Text.pack "Toxic") (Just (natTo n))
@@ -351,6 +353,7 @@ jsonToKeyword value = do
     ("Trample", _) -> Right Keyword.Trample
     ("Vigilance", _) -> Right Keyword.Vigilance
     ("Fear", _) -> Right Keyword.Fear
+    ("Poisonous", Just v) -> Keyword.Poisonous <$> natFrom v
     ("Infect", _) -> Right Keyword.Infect
     ("Devoid", _) -> Right Keyword.Devoid
     ("Toxic", Just v) -> Keyword.Toxic <$> natFrom v
@@ -1245,7 +1248,7 @@ effectToJson e = case e of
   Effect.Create q c (Just s) -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c, slotNameToJson s]))
   Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array [durationToJson d, usesToJson u, replacementEffectToJson re]))
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
-  Effect.GainPlayerCounters k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array [playerCounterKindToJson k, quantityToJson q]))
+  Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array [playerRefToJson r, playerCounterKindToJson k, quantityToJson q]))
   Effect.Untap s -> Json.tagged (Text.pack "Untap") (Just (slotNameToJson s))
   Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array [durationToJson d, slotNameToJson s]))
   Effect.ArmDelayedTrigger n -> Json.tagged (Text.pack "ArmDelayedTrigger") (Just (abilityNameToJson n))
@@ -1302,8 +1305,8 @@ jsonToEffect value = do
       Just (Array [k, q, s]) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s
       _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")
     "GainPlayerCounters" -> case mv of
-      Just (Array [k, q]) -> Effect.GainPlayerCounters <$> jsonToPlayerCounterKind k <*> jsonToQuantity q
-      _ -> Left (Text.pack "GainPlayerCounters expects [playerCounterKind, quantity]")
+      Just (Array [r, k, q]) -> Effect.GainPlayerCounters <$> jsonToPlayerRef r <*> jsonToPlayerCounterKind k <*> jsonToQuantity q
+      _ -> Left (Text.pack "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]")
     "Untap" -> withValue mv (fmap Effect.Untap . jsonToSlotName)
     "GainControl" -> case mv of
       Just (Array [d, s]) -> Effect.GainControl <$> jsonToDuration d <*> jsonToSlotName s

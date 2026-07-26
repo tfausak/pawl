@@ -81,6 +81,7 @@ library
     Pawl.Filter
     Pawl.Game
     Pawl.Json
+    Pawl.Keyword
     Pawl.Mana
     Pawl.Modal
     Pawl.Monarch

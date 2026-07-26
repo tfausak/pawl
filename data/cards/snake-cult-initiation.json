@@ -1,0 +1,69 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "enchant": {
+    "pool": {
+      "type": "Creatures"
+    }
+  },
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Snake Cult Initiation",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [
+    {
+      "affected": {
+        "type": "Attached"
+      },
+      "modification": {
+        "type": "GainKeyword",
+        "value": {
+          "type": "Poisonous",
+          "value": 3
+        }
+      }
+    }
+  ],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Aura"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

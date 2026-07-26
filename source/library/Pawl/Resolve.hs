@@ -48,6 +48,9 @@ import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
+import Pawl.Type.PlayerRef (PlayerRef)
+import qualified Pawl.Type.PlayerRef as PlayerRef
+import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity.Type
@@ -63,6 +66,15 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import Pawl.Type.TargetSpec (TargetSpec)
 import qualified Pawl.Type.Zone as Zone
+
+-- The slots a PlayerRef reads. Only InSlot names one; EachPlayer and Relative
+-- are answered from the evaluation context alone. Factored out of slotsOf below
+-- so the recursion into PlayerRef is stated once.
+playerRefSlots :: PlayerRef -> Set SlotName
+playerRefSlots ref = case ref of
+  PlayerRef.EachPlayer -> Set.empty
+  PlayerRef.Relative _ -> Set.empty
+  PlayerRef.InSlot slot -> Set.singleton slot
 
 -- THE ONE LEGITIMATE HOME of `case effect of`: this module is the VM's opcode
 -- semantics (design.md section 1). Everything else asks classifications. The
@@ -91,7 +103,7 @@ slotsOf effect = case effect of
   Effect.Replace {} -> Set.empty
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ _ slot -> Set.singleton slot
-  Effect.GainPlayerCounters {} -> Set.empty
+  Effect.GainPlayerCounters ref _ _ -> playerRefSlots ref
   Effect.Untap slot -> Set.singleton slot
   Effect.GainControl _ slot -> Set.singleton slot
   Effect.ArmDelayedTrigger _ -> Set.empty
@@ -132,7 +144,7 @@ readsX = any effectReadsX
       Effect.Replace {} -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
-      Effect.GainPlayerCounters _ quantity -> quantity == Quantity.Type.X
+      Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
       Effect.Untap _ -> False
       Effect.GainControl _ _ -> False
       Effect.ArmDelayedTrigger _ -> False
@@ -941,26 +953,45 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           -- (Hardened Scales, Doubling Season) get their opportunity.
           Just n -> Monad.when (n > 0) (Event.putCounters target kind (fromInteger n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
-  Effect.GainPlayerCounters kind quantity -> do
+  Effect.GainPlayerCounters ref kind quantity -> do
     gs <- State.get
     let viewOf = Projection.fullView gs
         context = Filter.MkContext (Just controller) (Just source)
+        -- The recipients. A slot's legality is asked the way every other slot
+        -- read asks it (CR 608.2b): a slot filled by targeting that has since
+        -- become illegal names nobody, and a RESERVED slot -- the trigger's
+        -- "that player" -- has no target spec, so legalSlot already answered
+        -- True for it.
+        recipients = case ref of
+          PlayerRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+            (Just (Recipient.ToPlayer pid), True) -> [pid]
+            _ -> [] -- an unfilled, illegal, or non-player slot: no-op
+          PlayerRef.Relative PlayerRelation.You -> [controller]
+          PlayerRef.Relative PlayerRelation.Opponent -> filter (/= controller) everyone
+          PlayerRef.EachPlayer -> everyone
+        -- Not filtered to the players still in the game, matching
+        -- Count.playersFor's seat list and unobservable for the same reason: no
+        -- card in the pool reaches the two arms that use it. See that function's
+        -- comment for the one-line change whenever one does.
+        everyone = Map.keys (GameState.players gs)
     case Quantity.evaluate viewOf context gs source quantity of
       Just n
         | n > 0 ->
-            -- CR 122 / 107.14: the resolving controller gains n counters of
-            -- kind, directly on the player record -- targetless, unlike
-            -- PutCounters' funnel through a slot.
-            State.modify'
-              ( \g ->
-                  g
-                    { GameState.players =
-                        Map.adjust
-                          (\p -> p {Player.counters = Map.insertWith (+) kind (fromInteger n) (Player.counters p)})
-                          controller
-                          (GameState.players g)
-                    }
-              )
+            -- CR 122 / 107.14: each recipient gets n counters of kind, directly
+            -- on the player record -- no funnel of PutCounters' kind, since CR
+            -- 614's counter replacements have no player-counter producer yet
+            -- (#122).
+            Monad.forM_ recipients $ \pid ->
+              State.modify'
+                ( \g ->
+                    g
+                      { GameState.players =
+                          Map.adjust
+                            (\p -> p {Player.counters = Map.insertWith (+) kind (fromInteger n) (Player.counters p)})
+                            pid
+                            (GameState.players g)
+                      }
+                )
       _ -> pure ()
   Effect.Untap slot ->
     State.modify' $ \gs ->

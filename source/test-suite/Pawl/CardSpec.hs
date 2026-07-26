@@ -83,6 +83,7 @@ m2aCardTests :: Registry.Type.Registry -> Tasty.TestTree
 m2aCardTests registry =
   let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+      black = ManaSymbol.OfType (ManaType.Colored Color.Black)
    in Tasty.testGroup
         "M2aCards"
         [ HU.testCase "Bird Maiden is a {2}{R} 1/2 Human Bird with flying" $ do
@@ -141,6 +142,20 @@ m2aCardTests registry =
             HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
             HU.assertEqual "toxic 2, and nothing else" (Set.singleton (Keyword.Toxic 2)) (Card.Type.keywords c)
             HU.assertEqual "subtypes" (Set.fromList [Subtype.Phyrexian, Subtype.Elf, Subtype.Scout]) (TypeLine.subtypes (Card.Type.typeLine c)),
+          -- "Enchanted creature has poisonous 3", so the keyword is on the
+          -- Aura's layer-6 GRANT and not in its own printed keyword set -- the
+          -- distinction the assertions below draw.
+          HU.testCase "Snake Cult Initiation is a {3}{B} Aura granting poisonous 3" $ do
+            initiation <- Registry.printing registry "Snake Cult Initiation"
+            let c = Printing.card initiation
+            HU.assertEqual "name" (Text.pack "Snake Cult Initiation") (Card.Type.name c)
+            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, black]) (Card.Type.manaCost c)
+            HU.assertBool "is an Aura" (Card.isAura c)
+            HU.assertEqual "no printed keywords of its own" Set.empty (Card.Type.keywords c)
+            HU.assertEqual
+              "one static ability: the enchanted creature gains poisonous 3"
+              [StaticAbility.MkStaticAbility Affected.Attached (Modification.GainKeyword (Keyword.Poisonous 3))]
+              (Card.Type.staticAbilities c),
           HU.testCase "every M2a printing carries exactly its keyword" $
             mapM_
               ( \(name, keyword) -> do
@@ -322,7 +337,7 @@ effectCounts effect = case effect of
   Effect.Replace duration _ _ -> durationCounts duration
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
-  Effect.GainPlayerCounters _ quantity -> quantityCounts quantity
+  Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
   Effect.Untap _ -> []
   Effect.GainControl duration _ -> durationCounts duration
   Effect.ArmDelayedTrigger _ -> []
