@@ -3,6 +3,7 @@ module Pawl.Mulligan where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -35,7 +36,8 @@ shuffleLibrary :: PlayerId -> Game ()
 shuffleLibrary pid = do
   gs <- State.get
   let ids = Game.zoneMembers Zone.Library pid gs
-  shuffled <- Trans.lift (Program.prompt (Prompt.Shuffle ids))
+  answer <- Trans.lift (Program.prompt (Prompt.Shuffle ids))
+  let shuffled = Game.honourShuffle ids answer
   State.put gs {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library gs)}
 
 -- CR 103.5: draw opening hands, then run the declaration/mulligan/bottom round
@@ -225,7 +227,17 @@ takeMulligan counts pid = do
     if n > 0 && length newHand >= 2
       then do
         decider <- State.gets (Decide.deciderFor pid)
-        Trans.lift (Program.prompt (Prompt.Bottom decider pid newHand (fromIntegral n)))
+        answer <- Trans.lift (Program.prompt (Prompt.Bottom decider pid newHand (fromIntegral n)))
+        -- CR 103.5: the cards bottomed come from THIS hand, and there are exactly
+        -- `n` of them. Filtered, not trusted (#222); a short answer is topped up
+        -- from the front of the hand rather than bottoming too few.
+        -- nub, not just filter: an answer naming one card twice would otherwise
+        -- bottom it twice, and the second changeZone is a no-op on an id that has
+        -- already moved -- so the hand would end up one card too big rather than
+        -- visibly wrong.
+        let kept = take n (List.nub (filter (\oid -> List.elem oid newHand) answer))
+            topUp = take (n - length kept) (filter (\oid -> List.notElem oid kept) newHand)
+        pure (kept <> topUp)
       else -- CR 103.5: with nothing to bottom (a free mulligan, CR 103.5c) or a
       -- hand of 0 or 1, there is exactly one possible outcome; where the rules
       -- leave nothing to ask, don't prompt -- bottom whatever `n` names.
