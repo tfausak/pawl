@@ -15,6 +15,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.AbilityName as AbilityName
+import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.BeginningStep as BeginningStep
@@ -199,6 +200,12 @@ tests registry =
             roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card piker)),
           HU.testCase "BecomeMonarch" $
             roundTrip "e" Codec.effectToJson Codec.jsonToEffect (Effect.BecomeMonarch MonarchTarget.TheController),
+          -- Both constructors, even though the encoder only ever emits
+          -- SorcerySpeed (AnyTime is the absent key on a card). Round-tripping
+          -- the pair is what keeps the decoder honest about the form it accepts.
+          HU.testCase "ActivationTiming round-trips both ways" $ do
+            roundTrip "timing" Codec.activationTimingToJson Codec.jsonToActivationTiming ActivationTiming.AnyTime
+            roundTrip "timing" Codec.activationTimingToJson Codec.jsonToActivationTiming ActivationTiming.SorcerySpeed,
           HU.testCase "ExileUntilMonarch" $
             roundTrip "eum" Codec.effectToJson Codec.jsonToEffect (Effect.ExileUntilMonarch (SlotName.MkSlotName (Text.pack "target"))),
           HU.testCase "PlaySubgame round-trips" $

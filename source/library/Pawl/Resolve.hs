@@ -869,7 +869,6 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- it onto that object" -- so this relocates a source that is already attached
   -- elsewhere, which is the whole reason the opcode exists: an Aura attaches once,
   -- as it enters, and nothing could move it afterwards (#187).
-
   Effect.Attach slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of

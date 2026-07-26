@@ -58,16 +58,10 @@ abilitiesFor = Projection.abilitiesOf
 
 -- CR 307.5: does this ability's timing rider permit activating it right now?
 --
--- The rule defines "only as a sorcery" exactly, and narrowly: "it means only that
--- the player must have priority, it must be during the main phase of their turn,
--- and the stack must be empty."
---
--- Three facts about the game state, and deliberately NOTHING else. CR 307.5's
--- last sentence is the trap: "The player doesn't need to have a sorcery card they
--- could cast. Effects that would preclude that player from casting a sorcery
--- spell don't affect the player's capability to perform that action." So this
--- must not consult Cast.castableSpells or any casting prohibition (Rule of Law,
--- Silence) -- a player under Silence may still equip.
+-- The window itself is Turn.sorcerySpeedWindow, shared with CR 307.1's casting
+-- gate: two rules, the same three conjuncts, one copy. Its haddock carries the
+-- rule text and the reason no prohibition may be consulted -- a player under
+-- Silence may still equip.
 --
 -- Priority is not re-checked here: the only caller is Action.legalActions, which
 -- the priority loop asks only of the player who has priority.
@@ -81,10 +75,7 @@ abilitiesFor = Projection.abilitiesOf
 timingOk :: PlayerId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 timingOk pid ability gs = case ActivatedAbility.timing ability of
   ActivationTiming.AnyTime -> True
-  ActivationTiming.SorcerySpeed ->
-    GameState.activePlayer gs == pid
-      && Turn.isMainPhase (GameState.phase gs)
-      && null (GameState.stack gs)
+  ActivationTiming.SorcerySpeed -> Turn.sorcerySpeedWindow pid gs
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability (mana abilities are handled at
