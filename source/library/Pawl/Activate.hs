@@ -66,12 +66,9 @@ abilitiesFor = Projection.abilitiesOf
 -- Priority is not re-checked here: the only caller is Action.legalActions, which
 -- the priority loop asks only of the player who has priority.
 --
--- That also bounds what this gate GUARANTEES. Engine.priorityLoop acts on the
--- interpreter's chosen action without checking it came from the offered list, so
--- an interpreter can name a sorcery-speed activation at instant speed and be
--- obeyed (#219). This makes the ability un-OFFERED, which is the half that lives
--- here; enforcing it is that issue's job, and it bounds every other gate in
--- activatable the same way.
+-- This gate makes the ability un-OFFERED. Engine.priorityLoop is what makes that
+-- binding: it rejects an action the interpreter was not offered, so a
+-- sorcery-speed activation named at instant speed does not happen either (#219).
 timingOk :: PlayerId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 timingOk pid ability gs = case ActivatedAbility.timing ability of
   ActivationTiming.AnyTime -> True
