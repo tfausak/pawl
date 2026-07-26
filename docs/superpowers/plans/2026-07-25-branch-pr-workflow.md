@@ -47,7 +47,7 @@ Task order matters: the PR template (Task 1) and `workflow.md` (Task 2) are what
 - Consumes: nothing.
 - Produces: the path `.github/pull_request_template.md`, referenced by name in Task 2 (`docs/workflow.md`) and Task 4 (`CONTRIBUTING.md`). GitHub auto-populates PR bodies from this exact path — do not rename it.
 
-- [ ] **Step 1: Verify the template does not exist yet**
+- [x] **Step 1: Verify the template does not exist yet**
 
 Run:
 ```bash
@@ -55,7 +55,7 @@ ls .github/pull_request_template.md
 ```
 Expected: `No such file or directory`. (If it exists, stop — the plan's assumption is wrong.)
 
-- [ ] **Step 2: Create the template**
+- [x] **Step 2: Create the template**
 
 Create `.github/pull_request_template.md` with exactly this content:
 
@@ -104,7 +104,7 @@ What is not implemented, with the issue filed and (#N) cited at the code site.
 -->
 ```
 
-- [ ] **Step 3: Stage, format, and lint**
+- [x] **Step 3: Stage, format, and lint**
 
 Run:
 ```bash
@@ -115,7 +115,7 @@ hooky run
 ```
 Expected: hooks pass. If file hygiene complains about trailing whitespace or a missing final newline, fix it and rerun.
 
-- [ ] **Step 4: Verify the checked-in template has no trailing whitespace**
+- [x] **Step 4: Verify the checked-in template has no trailing whitespace**
 
 Run:
 ```bash
@@ -123,7 +123,7 @@ grep -n ' $' .github/pull_request_template.md
 ```
 Expected: no output (exit status 1).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "chore(github): add a pull request template
@@ -149,7 +149,7 @@ Part of #202"
 
 **Note:** this file absorbs the card-driven loop guidance that currently exists only in untracked `_scratch/post-m5-phase2-card-loop.md`. `_scratch/` is gitignored, so those scratch files need no git action — they are superseded, and may be deleted locally or left alone.
 
-- [ ] **Step 1: Confirm what the current file claims, so the rewrite is a real replacement**
+- [x] **Step 1: Confirm what the current file claims, so the rewrite is a real replacement**
 
 Run:
 ```bash
@@ -158,7 +158,7 @@ grep -c 'milestone' docs/workflow.md
 ```
 Expected: title `# The milestone loop`, and a nonzero count (currently 12). This count going to a small number is the check in Step 4.
 
-- [ ] **Step 2: Replace the entire file**
+- [x] **Step 2: Replace the entire file**
 
 Overwrite `docs/workflow.md` with exactly this content:
 
@@ -332,7 +332,7 @@ built-in version of the same split.
 | Prior-art evidence | `prior-art-lessons.md`, cited § only |
 ```
 
-- [ ] **Step 3: Stage, format, and lint**
+- [x] **Step 3: Stage, format, and lint**
 
 Run:
 ```bash
@@ -343,7 +343,7 @@ hooky run
 ```
 Expected: hooks pass.
 
-- [ ] **Step 4: Verify the retired vocabulary is gone and the new content is present**
+- [x] **Step 4: Verify the retired vocabulary is gone and the new content is present**
 
 Run:
 ```bash
@@ -353,7 +353,7 @@ grep -n 'Output: `docs/superpowers' docs/workflow.md
 ```
 Expected: `# The development loop`; count `1`; and **no output** from the third grep — the old "Output:" lines pointing at spec/plan paths must be gone.
 
-- [ ] **Step 5: Verify the internal doc references resolve**
+- [x] **Step 5: Verify the internal doc references resolve**
 
 `workflow.md` lives in `docs/`, so its relative references must resolve from there.
 
@@ -365,7 +365,7 @@ ls docs/design.md docs/progress.md docs/rules.txt docs/prior-art-lessons.md
 ```
 Expected: all six paths exist.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "docs(workflow): replace the milestone loop with the development loop
@@ -392,7 +392,7 @@ Part of #202"
 
 **Why this task matters beyond tidiness:** `CLAUDE.md` is auto-loaded into every session *and every subagent spawn*. The status bullet is currently ~60 lines of Auras implementation detail. Removing it is a recurring context saving, not a cosmetic edit.
 
-- [ ] **Step 1: Confirm the current size, so the reduction is measurable**
+- [x] **Step 1: Confirm the current size, so the reduction is measurable**
 
 Run:
 ```bash
@@ -401,7 +401,7 @@ sed -n '36,40p' CLAUDE.md
 ```
 Expected: 244 lines total; the section header `## Current work and tracking` followed by the long `- **Status: M0–M5, ...` bullet.
 
-- [ ] **Step 2: Replace the status and tracking bullets**
+- [x] **Step 2: Replace the status and tracking bullets**
 
 Replace everything from line 36's `## Current work and tracking` through line 110 (the bullet ending `Follow it for all\n  milestone work.`) with:
 
@@ -423,7 +423,7 @@ Replace everything from line 36's `## Current work and tracking` through line 11
 
 **Keep the three bullets that follow unchanged** — "Keywords are closed half…", "Outstanding work is tracked in GitHub Issues…", and "File the issue, cite it inline…". They are evergreen and were not part of the milestone framing.
 
-- [ ] **Step 3: Verify the deleted range removed only what was intended**
+- [x] **Step 3: Verify the deleted range removed only what was intended**
 
 Run:
 ```bash
@@ -434,7 +434,7 @@ grep -c 'Control Magic' CLAUDE.md
 ```
 Expected: `1`, `1`, `1`, and `0`. The first three bullets survive; the Auras implementation detail is gone.
 
-- [ ] **Step 4: Rewrite the "Executing a plan" section**
+- [x] **Step 4: Rewrite the "Executing a plan" section**
 
 Replace the section that begins `## Executing a plan` and runs through the bullet ending `Where the rules leave nothing to ask, don't prompt.` with:
 
@@ -469,7 +469,7 @@ full loop; the load-bearing rules:
   carries an issue. Where the rules leave nothing to ask, don't prompt.
 ```
 
-- [ ] **Step 5: Verify the section rename and the size reduction**
+- [x] **Step 5: Verify the section rename and the size reduction**
 
 Run:
 ```bash
@@ -480,7 +480,7 @@ wc -l CLAUDE.md
 ```
 Expected: `0`, `1`, `0`, and a total well under 200 lines (down from 244).
 
-- [ ] **Step 6: Verify no reference to the retired loop survives**
+- [x] **Step 6: Verify no reference to the retired loop survives**
 
 Run:
 ```bash
@@ -488,7 +488,7 @@ grep -n 'milestone workflow\|milestone loop\|session-per-phase' CLAUDE.md
 ```
 Expected: no output.
 
-- [ ] **Step 7: Stage, format, and lint**
+- [x] **Step 7: Stage, format, and lint**
 
 Run:
 ```bash
@@ -499,7 +499,7 @@ hooky run
 ```
 Expected: hooks pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git commit -m "docs(claude): point at the issue tracker instead of milestone history
@@ -526,7 +526,7 @@ Part of #202"
 
 **Audience note:** `CONTRIBUTING.md` is written for a human outside contributor, not for an agent. Keep it shorter and less prescriptive than `workflow.md`, and do not mention agents, subagents, or model tiering.
 
-- [ ] **Step 1: Confirm the stale claim is present**
+- [x] **Step 1: Confirm the stale claim is present**
 
 Run:
 ```bash
@@ -534,7 +534,7 @@ grep -n 'There is no test suite yet' CONTRIBUTING.md
 ```
 Expected: a hit on line 27. (There are 1162 tests — the claim is years-of-work out of date.)
 
-- [ ] **Step 2: Correct the testing claim**
+- [x] **Step 2: Correct the testing claim**
 
 Replace line 27, which reads:
 
@@ -558,7 +558,7 @@ cabal build all --enable-tests --enable-benchmarks
 ```
 `````
 
-- [ ] **Step 3: Add the Workflow section**
+- [x] **Step 3: Add the Workflow section**
 
 Insert immediately **before** the `## Commits and versioning` heading:
 
@@ -588,7 +588,7 @@ closes the issue.
 `docs/workflow.md` has the longer version, including how work is picked.
 ```
 
-- [ ] **Step 4: Verify both edits landed**
+- [x] **Step 4: Verify both edits landed**
 
 Run:
 ```bash
@@ -598,7 +598,7 @@ grep -n '^## ' CONTRIBUTING.md
 ```
 Expected: `0`; `1`; and a heading list in which `## Workflow` appears immediately before `## Commits and versioning`.
 
-- [ ] **Step 5: Stage, format, and lint**
+- [x] **Step 5: Stage, format, and lint**
 
 Run:
 ```bash
@@ -609,7 +609,7 @@ hooky run
 ```
 Expected: hooks pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "docs(contributing): document the branch and pull request workflow
@@ -637,7 +637,7 @@ Part of #202"
 
 **Why both in one task:** each is a single paragraph asserting the same fact — the milestone era ended — and a reviewer would accept or reject them together.
 
-- [ ] **Step 1: Confirm both stale states**
+- [x] **Step 1: Confirm both stale states**
 
 Run:
 ```bash
@@ -646,7 +646,7 @@ grep -n 'This file is' docs/progress.md
 ```
 Expected: a hit in `design.md` around line 176 (its claim predates M5, M5.5, M5.6 and Auras), and a hit near the top of `progress.md`.
 
-- [ ] **Step 2: Freeze `progress.md`**
+- [x] **Step 2: Freeze `progress.md`**
 
 Insert this paragraph after the intro paragraph that ends `history does not change.` and before the `- **M0 is complete**` bullet:
 
@@ -658,7 +658,7 @@ issue it closes are the record, and no further entries are appended here. See
 `workflow.md`.
 ```
 
-- [ ] **Step 3: Correct `design.md` §3**
+- [x] **Step 3: Correct `design.md` §3**
 
 Replace line 176 in full:
 
@@ -674,7 +674,7 @@ This section **was** the forward plan, and is now largely the record of the path
 
 Keep it as a single line: `design.md` is written with one paragraph per line, unwrapped. Do not re-wrap it.
 
-- [ ] **Step 4: Verify both edits, and that design.md's one-paragraph-per-line style survived**
+- [x] **Step 4: Verify both edits, and that design.md's one-paragraph-per-line style survived**
 
 Run:
 ```bash
@@ -685,7 +685,7 @@ awk 'NR==176 {print NF}' docs/design.md
 ```
 Expected: `0`; `1`; `1`; and a word count well above 40 on line 176, confirming the paragraph is still one unwrapped line.
 
-- [ ] **Step 5: Stage, format, and lint**
+- [x] **Step 5: Stage, format, and lint**
 
 Run:
 ```bash
@@ -696,7 +696,7 @@ hooky run
 ```
 Expected: hooks pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "docs: close the milestone log and correct the path's status
@@ -721,7 +721,7 @@ Part of #202"
 - Consumes: every preceding task.
 - Produces: an open PR against `main`, and the plan's own completion.
 
-- [ ] **Step 1: Confirm the branch state**
+- [x] **Step 1: Confirm the branch state**
 
 Run:
 ```bash
@@ -730,7 +730,7 @@ git log --oneline main..HEAD
 ```
 Expected: a clean working tree, and six commits — the spec plus Tasks 1–5.
 
-- [ ] **Step 2: Sweep the tracked docs for surviving references to the retired process**
+- [x] **Step 2: Sweep the tracked docs for surviving references to the retired process**
 
 Run:
 ```bash
@@ -743,7 +743,7 @@ Expected: hits only where the retirement is being *described* (`docs/workflow.md
 
 Files under `docs/superpowers/plans/` and `specs/` are excluded on purpose: they are the frozen historical record and must not be rewritten.
 
-- [ ] **Step 3: Verify the plan's own progress check**
+- [x] **Step 3: Verify the plan's own progress check**
 
 Run:
 ```bash
@@ -751,7 +751,7 @@ grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-25-branch-pr-workfl
 ```
 Expected: `0`. Use *that* grep, not `grep -c -- '- \[ \]'` — this file quotes checkbox syntax in prose and in the PR template, so the naive grep can never reach zero.
 
-- [ ] **Step 4: Verify the build is untouched**
+- [x] **Step 4: Verify the build is untouched**
 
 This plan changes no Haskell. Confirm rather than assume:
 
@@ -760,17 +760,17 @@ git diff --stat main..HEAD -- source/ pawl.cabal
 ```
 Expected: no output — no file under `source/` and not `pawl.cabal` was modified.
 
-- [ ] **Step 5: Run `/code-review` on the branch**
+- [x] **Step 5: Run `/code-review` on the branch**
 
 Per `docs/workflow.md`'s step 4, audit the branch diff before opening the PR. For a documentation-only branch the invariant audit is trivially satisfied (no Haskell changed), so the review's real job is: does any doc now *state* something false about the rules, the ruleset, or the engine? Fix findings on the branch.
 
-- [ ] **Step 6: Push the branch**
+- [x] **Step 6: Push the branch**
 
 ```bash
 git push -u origin 202-branch-pr-workflow
 ```
 
-- [ ] **Step 7: Open the pull request**
+- [x] **Step 7: Open the pull request**
 
 `Rules basis` is not applicable — a documentation change cites no CR rules — so
 state that explicitly rather than deleting the heading silently. `Verification`
@@ -831,7 +831,7 @@ EOF
 )"
 ```
 
-- [ ] **Step 8: Report and stop**
+- [x] **Step 8: Report and stop**
 
 Report the PR URL and its CI status. **Do not merge it, do not enable auto-merge, and do not start another unit** — only the repository owner merges.
 
