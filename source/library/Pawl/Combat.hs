@@ -14,6 +14,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Summoning as Summoning
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.CardType as CardType
@@ -29,7 +30,6 @@ import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Zone as Zone
 
@@ -101,7 +101,7 @@ canAttack pid oid gs = case Game.lookupObject oid gs of
       -- CR 302.6, relaxed by CR 702.10b: a creature with haste can attack even if
       -- it hasn't been controlled continuously since its controller's most recent
       -- turn began.
-      && (Object.sickness obj == Sickness.Settled pid || Projection.hasKeyword Keyword.Haste oid gs)
+      && Summoning.settledOrHasty pid oid gs
       && isCreatureObject oid gs
       -- CR 702.3b: a creature with defender can't attack. It may still block --
       -- 702.3b says nothing about blocking.

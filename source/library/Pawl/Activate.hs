@@ -11,6 +11,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Summoning as Summoning
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card
@@ -36,18 +37,16 @@ import qualified Pawl.Type.Zone as Zone
 --
 -- Keyed to `pid`, the player trying to activate: CR 302.6 asks whether the
 -- creature has been under THEIR control since THEIR most recent turn began, so a
--- settle recorded for anyone else does not answer it (#198).
+-- settle recorded for anyone else does not answer it (#198). CR 702.10c's haste
+-- exemption comes with it, from the shared predicate.
 --
--- CR 702.10c's haste exemption is not applied here (#205), and the untap symbol
--- has no cost component to classify (#204).
+-- The untap symbol has no cost component to classify, so CR 302.6's {Q} half is
+-- unreachable here (#204).
 tapSicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 tapSicknessOk pid srcId ability gs =
   let needsTap = Cost.requiresTapSymbol (ActivatedAbility.cost ability)
       isCreature = Set.member CardType.Creature (Projection.cardTypesOf srcId gs)
-      settled = case Game.lookupObject srcId gs of
-        Just obj -> Object.sickness obj == Sickness.Settled pid
-        Nothing -> False
-   in not (needsTap && isCreature && not settled)
+   in not (needsTap && isCreature && not (Summoning.settledOrHasty pid srcId gs))
 
 -- The abilities to consider activating. Task 5: the card's PRINTED abilities.
 -- Task 9 switches the body to `Projection.abilitiesOf srcId gs` so Humility
