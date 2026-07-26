@@ -24,10 +24,11 @@ defender keyword, the branch might be called `123-implement-defender`.
 Ideally changes follow TDD by writing a failing test first, seeing it fail, and
 then writing code to make it pass.
 
-Keep PRs as drafts until they're ready for review. Please do not force push to
-a branch after opening a PR. Merges are squashed, so a branch's internal
-history is working state rather than a record. Commit as often as is
-convenient.
+Open PRs as drafts, and mark them ready for review once they're finished. A draft means
+the work is still moving; leaving a finished one as a draft just stalls it.
+Please do not force push to a branch after opening a PR. Merges are squashed,
+so a branch's internal history is working state rather than a record. Commit as
+often as is convenient.
 
 Typically each PR will close one issue. However sometimes a single PR will
 close multiple issues. Other times one issue may require multiple PRs, in

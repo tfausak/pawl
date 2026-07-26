@@ -47,9 +47,13 @@ front-loads tens of thousands of tokens before the first question.
 `CONTRIBUTING.md` has the loop — issue, branch, TDD, draft PR — and it applies
 to agents as written. What it doesn't say:
 
-- **Run `/code-review` on the branch before opening the PR.** That is the
-  invariant audit and the rules-correctness pass, and it reliably catches real
-  defects. Fix the findings on the branch.
+- **Self-review the branch before opening the PR**, and fix the findings on the
+  branch. At minimum: re-check every CR citation against `docs/rules.txt`, and
+  re-read every comment the change touched for prose the rewrite made wrong —
+  those two reliably catch real defects here. Scale the effort to the diff. A
+  mechanical refactor does not need a fleet of subagents; a subtle rules change
+  does. `/code-review` is one way to run it, but its recipe is fixed and written
+  for a PR that does not exist yet at this point.
 - **The PR body carries the case for merging**, since only the owner merges and
   your work terminates at opening a PR likely to be merged. Give: what changed
   and why, with `Closes #N`; the CR citations behind it, each checked against
@@ -57,9 +61,12 @@ to agents as written. What it doesn't say:
   verified (build warning-clean, `hooky run` clean, suite count before → after,
   and the proving test); whether the diff makes the rules core case on an
   effect's *identity* — an explicit "no" is cheap; and what was deferred.
-- **Report the PR and stop.** Don't wait for CI. Don't start the next unit
-  either: one unit at a time in the single checkout, since two branches would
-  contend for `HEAD`.
+- **Mark the PR ready for review, then report it and stop.** Open it as a draft,
+  but flip it once the self-review's findings are pushed and the suite is green —
+  that is what "ready for review" means, and a finished PR left as a draft is
+  waiting on nobody. Don't wait for CI. Don't start the next unit either: one
+  unit at a time in the single checkout, since two branches would contend for
+  `HEAD`.
 - **Most of what's left is card-driven** — it fires when a card demands it, so
   the backlog is a menu rather than a queue. Never build one speculatively. Per
   `design.md` §4, an effect is not done until a card exercises it in a
@@ -89,6 +96,10 @@ dev shell (`nix develop` or direnv).
   unchanged modules; when you need a definitive check, `cabal clean` first —
   never poke at paths inside `dist-newstyle`.
 - `cabal test` — the `tasty` suite. `cabal bench` and `cabal repl` as usual.
+- **One build at a time.** `jobs: $ncpus` already saturates the machine, so a
+  second concurrent build buys nothing and can lose: two of them racing on the
+  same `dist-newstyle` have left it broken mid-write. If you dispatch subagents,
+  tell them not to build or test — you are already doing it for them.
 - `hooky fix` then `hooky run` — format and lint. Acts on **staged** files only:
   `git add` first, or it reports "hooks skipped" and checks nothing. `hooky fix`
   reformats, so stage again before `hooky run`.
