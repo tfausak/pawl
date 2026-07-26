@@ -531,14 +531,14 @@ monarchTests registry =
       HU.testCase "CR 725.2 combat damage to the monarch hands the crown to the damager's controller" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (bobCreature, gs0) = S.addCreature piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
-            dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False DamageKind.Combat
+            dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False 0 DamageKind.Combat
             began = S.withEvents [GameEvent.DamageDealt dmg] gs0
             after = monarchResolveAll (monarchSettle began)
         HU.assertEqual "bob took the crown" (Just S.bob) (GameState.monarch after),
       HU.testCase "CR 725.2 noncombat damage to the monarch does not hand over the crown" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (bobCreature, gs0) = S.addCreature piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
-            dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False DamageKind.Noncombat
+            dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False 0 DamageKind.Noncombat
             began = S.withEvents [GameEvent.DamageDealt dmg] gs0
             after = monarchResolveAll (monarchSettle began)
         HU.assertEqual "alice keeps the crown" (Just S.alice) (GameState.monarch after),

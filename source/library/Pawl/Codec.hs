@@ -247,6 +247,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Horse -> "Horse"
   Subtype.Aura -> "Aura"
   Subtype.Equipment -> "Equipment"
+  Subtype.Scout -> "Scout"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -288,7 +289,8 @@ jsonToSubtype =
       (Text.pack "Nightmare", Subtype.Nightmare),
       (Text.pack "Horse", Subtype.Horse),
       (Text.pack "Aura", Subtype.Aura),
-      (Text.pack "Equipment", Subtype.Equipment)
+      (Text.pack "Equipment", Subtype.Equipment),
+      (Text.pack "Scout", Subtype.Scout)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -304,40 +306,44 @@ jsonToSupertype =
       (Text.pack "Legendary", Supertype.Legendary)
     ]
 
+-- Not decodeNullary's table shape any more: CR 702.164a's toxic carries an N, so
+-- this is the tagged-with-an-optional-payload case jsonToQuantity uses.
 keywordToJson :: Keyword.Keyword -> Value
-keywordToJson k = nullary . Text.pack $ case k of
-  Keyword.Deathtouch -> "Deathtouch"
-  Keyword.Defender -> "Defender"
-  Keyword.DoubleStrike -> "DoubleStrike"
-  Keyword.FirstStrike -> "FirstStrike"
-  Keyword.Flying -> "Flying"
-  Keyword.Haste -> "Haste"
-  Keyword.Indestructible -> "Indestructible"
-  Keyword.Reach -> "Reach"
-  Keyword.Trample -> "Trample"
-  Keyword.Vigilance -> "Vigilance"
-  Keyword.Fear -> "Fear"
-  Keyword.Infect -> "Infect"
-  Keyword.Devoid -> "Devoid"
+keywordToJson k = case k of
+  Keyword.Deathtouch -> nullary (Text.pack "Deathtouch")
+  Keyword.Defender -> nullary (Text.pack "Defender")
+  Keyword.DoubleStrike -> nullary (Text.pack "DoubleStrike")
+  Keyword.FirstStrike -> nullary (Text.pack "FirstStrike")
+  Keyword.Flying -> nullary (Text.pack "Flying")
+  Keyword.Haste -> nullary (Text.pack "Haste")
+  Keyword.Indestructible -> nullary (Text.pack "Indestructible")
+  Keyword.Reach -> nullary (Text.pack "Reach")
+  Keyword.Trample -> nullary (Text.pack "Trample")
+  Keyword.Vigilance -> nullary (Text.pack "Vigilance")
+  Keyword.Fear -> nullary (Text.pack "Fear")
+  Keyword.Infect -> nullary (Text.pack "Infect")
+  Keyword.Devoid -> nullary (Text.pack "Devoid")
+  Keyword.Toxic n -> Json.tagged (Text.pack "Toxic") (Just (natTo n))
 
 jsonToKeyword :: Value -> Either Text Keyword.Keyword
-jsonToKeyword =
-  decodeNullary
-    (Text.pack "Keyword")
-    [ (Text.pack "Deathtouch", Keyword.Deathtouch),
-      (Text.pack "Defender", Keyword.Defender),
-      (Text.pack "DoubleStrike", Keyword.DoubleStrike),
-      (Text.pack "FirstStrike", Keyword.FirstStrike),
-      (Text.pack "Flying", Keyword.Flying),
-      (Text.pack "Haste", Keyword.Haste),
-      (Text.pack "Indestructible", Keyword.Indestructible),
-      (Text.pack "Reach", Keyword.Reach),
-      (Text.pack "Trample", Keyword.Trample),
-      (Text.pack "Vigilance", Keyword.Vigilance),
-      (Text.pack "Fear", Keyword.Fear),
-      (Text.pack "Infect", Keyword.Infect),
-      (Text.pack "Devoid", Keyword.Devoid)
-    ]
+jsonToKeyword value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Deathtouch", _) -> Right Keyword.Deathtouch
+    ("Defender", _) -> Right Keyword.Defender
+    ("DoubleStrike", _) -> Right Keyword.DoubleStrike
+    ("FirstStrike", _) -> Right Keyword.FirstStrike
+    ("Flying", _) -> Right Keyword.Flying
+    ("Haste", _) -> Right Keyword.Haste
+    ("Indestructible", _) -> Right Keyword.Indestructible
+    ("Reach", _) -> Right Keyword.Reach
+    ("Trample", _) -> Right Keyword.Trample
+    ("Vigilance", _) -> Right Keyword.Vigilance
+    ("Fear", _) -> Right Keyword.Fear
+    ("Infect", _) -> Right Keyword.Infect
+    ("Devoid", _) -> Right Keyword.Devoid
+    ("Toxic", Just v) -> Keyword.Toxic <$> natFrom v
+    _ -> Left (Text.pack "unknown Keyword: " <> t)
 
 zoneToJson :: Zone.Zone -> Value
 zoneToJson z = nullary . Text.pack $ case z of
@@ -1072,6 +1078,7 @@ damageEventToJson ev =
       (Text.pack "amount", natTo (DamageEvent.amount ev)),
       (Text.pack "dealtByDeathtouch", Json.jBool (DamageEvent.dealtByDeathtouch ev)),
       (Text.pack "dealtByInfect", Json.jBool (DamageEvent.dealtByInfect ev)),
+      (Text.pack "dealtByToxic", natTo (DamageEvent.dealtByToxic ev)),
       (Text.pack "kind", damageKindToJson (DamageEvent.kind ev))
     ]
 
@@ -1083,6 +1090,7 @@ jsonToDamageEvent value = do
   a <- Json.field (Text.pack "amount") ps >>= natFrom
   d <- Json.field (Text.pack "dealtByDeathtouch") ps >>= jsonToBoolDefault False
   i <- Json.field (Text.pack "dealtByInfect") ps >>= jsonToBoolDefault False
+  x <- Json.field (Text.pack "dealtByToxic") ps >>= natFrom
   k <- Json.field (Text.pack "kind") ps >>= jsonToDamageKind
   pure
     DamageEvent.MkDamageEvent
@@ -1091,6 +1099,7 @@ jsonToDamageEvent value = do
         DamageEvent.amount = a,
         DamageEvent.dealtByDeathtouch = d,
         DamageEvent.dealtByInfect = i,
+        DamageEvent.dealtByToxic = x,
         DamageEvent.kind = k
       }
 

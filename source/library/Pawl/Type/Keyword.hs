@@ -1,5 +1,7 @@
 module Pawl.Type.Keyword where
 
+import Numeric.Natural (Natural)
+
 -- CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302.
 --
@@ -16,9 +18,9 @@ module Pawl.Type.Keyword where
 -- Devoid (702.114, a characteristic-defining ability that makes an object
 -- colourless); P10 adds Infect (702.90, a deal-time damage-diversion bit).
 --
--- Grows a parameterized constructor at the punchlist: Landwalk Subtype (702.14),
--- and later Protection Quality (702.16) and Ward Cost (702.21). A `data`, not an
--- enum, so that is an addition rather than a reshape.
+-- Toxic (702.164) is the first PARAMETERIZED constructor, exactly the addition
+-- the `data`-not-an-enum choice was made for; Landwalk Subtype (702.14),
+-- Protection Quality (702.16) and Ward Cost (702.21) follow the same shape.
 data Keyword
   = Deathtouch -- 702.2
   | Defender -- 702.3
@@ -33,6 +35,12 @@ data Keyword
   | Fear -- 702.36
   | Infect -- 702.90
   | Devoid -- 702.114
+  | -- 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
+    -- a number." N rides the constructor, so `Toxic 1` and `Toxic 2` are
+    -- distinct members of a keyword Set and CR 702.164b's total toxic value is
+    -- their sum (Pawl.Projection.totalToxic). Two toxic abilities with the SAME
+    -- N collapse into one set member and are under-counted (#224).
+    Toxic Natural
   deriving (Eq, Ord, Show)
 
 -- Devoid is read only at the projection SEED (Projection.baseColorsOf), not as a

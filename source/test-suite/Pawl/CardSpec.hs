@@ -74,19 +74,22 @@ import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-redCost :: [ManaSymbol.ManaSymbol] -> Maybe ManaCost.ManaCost
-redCost symbols = Just (ManaCost.MkManaCost symbols)
+-- Not red-specific despite its first callers: just the Maybe wrapper every
+-- printed mana cost needs (CR 202.1).
+costOf :: [ManaSymbol.ManaSymbol] -> Maybe ManaCost.ManaCost
+costOf symbols = Just (ManaCost.MkManaCost symbols)
 
 m2aCardTests :: Registry.Type.Registry -> Tasty.TestTree
 m2aCardTests registry =
   let red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+      green = ManaSymbol.OfType (ManaType.Colored Color.Green)
    in Tasty.testGroup
         "M2aCards"
         [ HU.testCase "Bird Maiden is a {2}{R} 1/2 Human Bird with flying" $ do
             birdMaiden <- Registry.printing registry "Bird Maiden"
             let c = Printing.card birdMaiden
             HU.assertEqual "name" (Text.pack "Bird Maiden") (Card.Type.name c)
-            HU.assertEqual "cost" (redCost [ManaSymbol.Generic 2, red]) (Card.Type.manaCost c)
+            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2, red]) (Card.Type.manaCost c)
             HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power c)
             HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c)
             HU.assertEqual
@@ -97,28 +100,28 @@ m2aCardTests registry =
             nimbleBirdsticker <- Registry.printing registry "Nimble Birdsticker"
             let c = Printing.card nimbleBirdsticker
             HU.assertEqual "name" (Text.pack "Nimble Birdsticker") (Card.Type.name c)
-            HU.assertEqual "cost" (redCost [ManaSymbol.Generic 2, red]) (Card.Type.manaCost c)
+            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2, red]) (Card.Type.manaCost c)
             HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
             HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness c),
           HU.testCase "Ogre Sentry is a {1}{R} 3/3 Ogre Warrior with defender" $ do
             ogreSentry <- Registry.printing registry "Ogre Sentry"
             let c = Printing.card ogreSentry
             HU.assertEqual "name" (Text.pack "Ogre Sentry") (Card.Type.name c)
-            HU.assertEqual "cost" (redCost [ManaSymbol.Generic 1, red]) (Card.Type.manaCost c)
+            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1, red]) (Card.Type.manaCost c)
             HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 3))) (Card.Type.power c)
             HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness c),
           HU.testCase "Windseeker Centaur is a {1}{R}{R} 2/2 Centaur with vigilance" $ do
             windseekerCentaur <- Registry.printing registry "Windseeker Centaur"
             let c = Printing.card windseekerCentaur
             HU.assertEqual "name" (Text.pack "Windseeker Centaur") (Card.Type.name c)
-            HU.assertEqual "cost" (redCost [ManaSymbol.Generic 1, red, red]) (Card.Type.manaCost c)
+            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1, red, red]) (Card.Type.manaCost c)
             HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
             HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c),
           HU.testCase "Goblin Chariot is a {2}{R} 2/2 Goblin Warrior with haste" $ do
             goblinChariot <- Registry.printing registry "Goblin Chariot"
             let c = Printing.card goblinChariot
             HU.assertEqual "name" (Text.pack "Goblin Chariot") (Card.Type.name c)
-            HU.assertEqual "cost" (redCost [ManaSymbol.Generic 2, red]) (Card.Type.manaCost c)
+            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2, red]) (Card.Type.manaCost c)
             HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
             HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c),
           HU.testCase "Glistener Elf is a {G} 1/1 Phyrexian Elf Warrior with infect" $ do
@@ -129,6 +132,15 @@ m2aCardTests registry =
             HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
             HU.assertBool "has infect" (elem Keyword.Infect (Card.Type.keywords c))
             HU.assertEqual "subtypes" (Set.fromList [Subtype.Phyrexian, Subtype.Elf, Subtype.Warrior]) (TypeLine.subtypes (Card.Type.typeLine c)),
+          HU.testCase "Branchblight Stalker is a {1}{G} 3/1 Phyrexian Elf Scout with toxic 2" $ do
+            stalker <- Registry.printing registry "Branchblight Stalker"
+            let c = Printing.card stalker
+            HU.assertEqual "name" (Text.pack "Branchblight Stalker") (Card.Type.name c)
+            HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1, green]) (Card.Type.manaCost c)
+            HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 3))) (Card.Type.power c)
+            HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
+            HU.assertEqual "toxic 2, and nothing else" (Set.singleton (Keyword.Toxic 2)) (Card.Type.keywords c)
+            HU.assertEqual "subtypes" (Set.fromList [Subtype.Phyrexian, Subtype.Elf, Subtype.Scout]) (TypeLine.subtypes (Card.Type.typeLine c)),
           HU.testCase "every M2a printing carries exactly its keyword" $
             mapM_
               ( \(name, keyword) -> do

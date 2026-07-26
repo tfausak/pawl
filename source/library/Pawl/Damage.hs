@@ -92,6 +92,32 @@ blockerThreshold gs attacker blocker =
         then 1
         else lethal
 
+-- One damage event, with its deal-time riders read off the projection HERE
+-- rather than re-derived when they are consumed: each is a fact about the source
+-- AS THE DAMAGE IS DEALT, and the source may be gone by the time the CR 704.5h
+-- SBA or a later reader asks. CR 702.2e and CR 702.90d say so outright for
+-- deathtouch and infect ("its last known information is used to determine
+-- whether it had" the keyword). Rule 702.164 has NO such clause, so toxic's
+-- total value (CR 702.164b) is captured by analogy rather than by citation --
+-- observably the same today, since applyDamage runs in the same instant, and it
+-- keeps the CR 608.2i record self-contained.
+--
+-- Every damage the engine deals is built here -- the only other constructor call
+-- in the library is Pawl.Codec's decoder, which rebuilds an event rather than
+-- originating one -- so no assignment site can capture two riders and forget the
+-- third.
+damageEvent :: GameState -> DamageKind.DamageKind -> ObjectId -> Recipient.Recipient -> Natural -> DamageEvent.DamageEvent
+damageEvent gs kind source target amount =
+  DamageEvent.MkDamageEvent
+    { DamageEvent.source = source,
+      DamageEvent.target = target,
+      DamageEvent.amount = amount,
+      DamageEvent.dealtByDeathtouch = Projection.hasKeyword Keyword.Deathtouch source gs,
+      DamageEvent.dealtByInfect = Projection.hasKeyword Keyword.Infect source gs,
+      DamageEvent.dealtByToxic = Projection.totalToxic source gs,
+      DamageEvent.kind = kind
+    }
+
 -- What one attacking creature assigns, as damage events carrying the source.
 -- CR 510.1a: a creature that would assign 0 or less assigns none, so events all
 -- carry amount > 0.
@@ -129,7 +155,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
               if defenderIsPlaying
                 then case target of
                   AttackTarget.OfPlayer defender ->
-                    [DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer defender) power (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat]
+                    [damageEvent gs DamageKind.Combat attacker (Recipient.ToPlayer defender) power]
                 else []
         if Set.null recorded
           then -- CR 510.1b: never blocked, so it hits what it is attacking.
@@ -147,7 +173,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
             -- trample blocker WITH excess fails this guard and falls to the prompt arm.
             [blocker]
               | not trample || power <= blockerThreshold gs attacker blocker ->
-                  pure [DamageEvent.MkDamageEvent attacker (Recipient.ToCreature blocker) power (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat]
+                  pure [damageEvent gs DamageKind.Combat attacker (Recipient.ToCreature blocker) power]
             blockers -> case Projection.controllerOf attacker gs of
               Nothing -> pure []
               -- CR 702.19b: the excess is assigned "as its controller chooses," so the
@@ -167,7 +193,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                     (Program.prompt (Prompt.AssignCombatDamage decider pid attacker thresholds power))
                 -- CR 510.1e / 702.19b: reject-not-repair (NOT the CR 733 human-error
                 -- rewind). An illegal answer assigns nothing. See the M2c spec, §4.
-                let toEvent (recipient, n) = DamageEvent.MkDamageEvent attacker recipient n (Projection.hasKeyword Keyword.Deathtouch attacker gs) (Projection.hasKeyword Keyword.Infect attacker gs) DamageKind.Combat
+                let toEvent (recipient, n) = damageEvent gs DamageKind.Combat attacker recipient n
                     positive (_, n) = n > 0
                 pure
                   ( if legalAssignment thresholds power chosen
@@ -201,7 +227,7 @@ blockerAssignment gs (attacker, blockers) =
         Just p ->
           if p <= 0
             then []
-            else [DamageEvent.MkDamageEvent blocker (Recipient.ToCreature attacker) (fromInteger p) (Projection.hasKeyword Keyword.Deathtouch blocker gs) (Projection.hasKeyword Keyword.Infect blocker gs) DamageKind.Combat]
+            else [damageEvent gs DamageKind.Combat blocker (Recipient.ToCreature attacker) (fromInteger p)]
         Nothing -> []
    in if onBattlefield attacker gs
         then concatMap assign (Set.toList blockers)
@@ -258,13 +284,30 @@ applyDamage events = do
               let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
                in g {GameState.objects = Map.adjust hurt oid (GameState.objects g)}
         Recipient.ToPlayer pid ->
-          if DamageEvent.dealtByInfect ev
-            then -- CR 120.3b / 702.90b: poison counters, no life loss.
-              let poison player = player {Player.counters = Map.insertWith (+) PlayerCounterKind.Poison (DamageEvent.amount ev) (Player.counters player)}
-               in g {GameState.players = Map.adjust poison pid (GameState.players g)}
-            else
-              let drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
-               in g {GameState.players = Map.adjust drain pid (GameState.players g)}
+          -- The two poison diversions are different shapes and BOTH apply. CR
+          -- 120.3b / 702.90b: infect REPLACES the damage's result with poison
+          -- counters, so no life is lost. CR 120.3g / 702.164c: toxic gives the
+          -- damaged player the source's total toxic value in poison "in
+          -- addition to the damage's other results" -- on top of the life loss,
+          -- or on top of infect's poison when a source has both.
+          --
+          -- The damaged PLAYER gets the counters, not the source's controller,
+          -- who is merely who performs it (CR 120.3b/120.3g's phrasing). And
+          -- toxic is scoped to COMBAT damage, so a noncombat event's captured
+          -- value is deliberately ignored.
+          let toxic = case DamageEvent.kind ev of
+                DamageKind.Combat -> DamageEvent.dealtByToxic ev
+                DamageKind.Noncombat -> 0
+              givePoison n player =
+                if n == 0
+                  then player
+                  else player {Player.counters = Map.insertWith (+) PlayerCounterKind.Poison n (Player.counters player)}
+              drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
+              hit player =
+                if DamageEvent.dealtByInfect ev
+                  then givePoison (DamageEvent.amount ev + toxic) player
+                  else givePoison toxic (drain player)
+           in g {GameState.players = Map.adjust hit pid (GameState.players g)}
         Recipient.ToObject _ -> g
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.

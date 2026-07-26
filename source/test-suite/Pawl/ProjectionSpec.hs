@@ -148,6 +148,19 @@ tests registry =
         let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
             gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.GainKeyword Keyword.Deathtouch) gs0
         HU.assertBool "has deathtouch" (Projection.hasKeyword Keyword.Deathtouch oid gs),
+      -- CR 702.164b's own example: "If a creature with toxic 2 gains toxic 1 due
+      -- to another effect, its total toxic value is 3." The two abilities are
+      -- distinct Set members, so they sum rather than shadow each other.
+      HU.testCase "CR 702.164b total toxic value is the SUM of a creature's toxic abilities" $ do
+        stalker <- Registry.printing registry "Branchblight Stalker"
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        let (oid, gs0) = S.addCreature stalker S.bob (S.landsInPlay mountain 1)
+            (plain, gs1) = S.addCreature piker S.bob gs0
+            gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.GainKeyword (Keyword.Toxic 1)) gs1
+        HU.assertEqual "printed toxic 2 alone" 2 (Projection.totalToxic oid gs1)
+        HU.assertEqual "toxic 2 plus a granted toxic 1" 3 (Projection.totalToxic oid gs)
+        HU.assertEqual "a creature without toxic has a total toxic value of zero" 0 (Projection.totalToxic plain gs),
       HU.testCase "CR 613 layer 7b SetBasePowerToughness makes a Piker 1/1" $ do
         piker <- Registry.printing registry "Goblin Piker"
         mountain <- Registry.printing registry "Mountain"

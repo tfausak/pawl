@@ -106,6 +106,7 @@ subtypeMana subtype = case subtype of
   -- CR 301.5: Equipment is an ARTIFACT type, so CR 305.6's intrinsic mana ability
   -- never applies to it either.
   Subtype.Equipment -> Nothing
+  Subtype.Scout -> Nothing
 
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
 -- PLUS every projected activated ability that is a mana ability (CR 605.1a),

@@ -35,6 +35,10 @@ data Card = MkCard
     -- redundant -- a per-keyword fact, true of everything through M2c, and NOT
     -- true out in the tail (two Wards both trigger; Rampage stacks).
     --
+    -- The tail has arrived, partly: CR 702.164b's toxic SUMS rather than being
+    -- redundant, which the Set handles for distinct values (toxic 2 and toxic 1
+    -- are distinct members) and gets wrong for equal ones (#224).
+    --
     -- The closed half must read this through Pawl.Projection.keywordsOf, never
     -- directly: layer 6 grants and removes abilities at M3.
     keywords :: Set Keyword,

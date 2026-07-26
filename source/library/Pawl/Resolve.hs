@@ -29,7 +29,6 @@ import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
@@ -41,7 +40,6 @@ import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.HandActionPerformer as HandActionPerformer
-import qualified Pawl.Type.Keyword as Keyword
 import Pawl.Type.ManaType (ManaType)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
@@ -506,7 +504,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- The applied effect IS the event (the M3a spec, section 4):
             -- constructing this DamageEvent and funneling it is the whole
             -- application. CR 120.3e / 120.3a live in applyDamage.
-            Damage.applyDamage [DamageEvent.MkDamageEvent source recipient (fromInteger n) (Projection.hasKeyword Keyword.Deathtouch source gs) (Projection.hasKeyword Keyword.Infect source gs) DamageKind.Noncombat]
+            Damage.applyDamage [Damage.damageEvent gs DamageKind.Noncombat source recipient (fromInteger n)]
       _ -> pure ()
   Effect.ModifyTarget duration modification slot ->
     State.modify' $ \gs ->

@@ -272,8 +272,8 @@ tests registry =
               -- this assertion (Fog prevents a whole batch, not just one event) does
               -- not need.
               batch =
-                [ DamageEvent.MkDamageEvent victimA (Recipient.ToCreature victimA) 2 False False DamageKind.Combat,
-                  DamageEvent.MkDamageEvent victimB (Recipient.ToCreature victimB) 2 False False DamageKind.Combat
+                [ DamageEvent.MkDamageEvent victimA (Recipient.ToCreature victimA) 2 False False 0 DamageKind.Combat,
+                  DamageEvent.MkDamageEvent victimB (Recipient.ToCreature victimB) 2 False False 0 DamageKind.Combat
                 ]
               after = S.runPure S.identityAnswer resolved (Damage.applyDamage batch)
           HU.assertEqual "the first attacker's damage was prevented" (Just 0) (S.damageOf victimA after)

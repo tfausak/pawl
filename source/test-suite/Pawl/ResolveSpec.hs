@@ -980,8 +980,8 @@ resolveTests registry =
             (gs1, fogId) = S.handOne fog gs0
             cast = snd (Engine.runGamePure S.identityAnswer gs1 (Cast.castSpell S.alice fogId))
             resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-            combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Combat])
-            spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Noncombat])
+            combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 DamageKind.Combat])
+            spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 DamageKind.Noncombat])
         HU.assertEqual "Fog installed one replacement" 1 (length (GameState.replacements resolved))
         HU.assertEqual "combat damage prevented (the cancel shape)" (Just 0) (S.damageOf victim combat)
         -- The falsifier: a tag-blind Fog would also blunt this spell damage.
@@ -1321,7 +1321,7 @@ indestructibleTests registry =
         let (myrId, gs) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
             -- Zero marked damage (so 704.5g is silent) plus a deathtouch event isolates
             -- the 704.5h path; indestructible must guard it too (CR 700.4).
-            wounded = S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True False DamageKind.Combat)] gs
+            wounded = S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True False 0 DamageKind.Combat)] gs
             after = S.settleSba wounded
         HU.assertEqual "Myr survives deathtouch" 1 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $ do
