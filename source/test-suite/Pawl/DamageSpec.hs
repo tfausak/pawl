@@ -129,7 +129,7 @@ creatureSbaTests registry =
             -- A real 2/1 Piker (bob's) is the damage source; alice's 1/1 token takes 2.
             (srcId, gs1) = S.addCreature piker S.bob base
             (tokId, gs2) = S.addToken goblinCard S.alice gs1
-            damaged = S.runPure S.identityAnswer gs2 (Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False False DamageKind.Combat])
+            damaged = S.runPure S.identityAnswer gs2 (Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False False 0 DamageKind.Combat])
             settled = S.settleSba damaged
         HU.assertEqual "the token is gone from the battlefield" 0 (S.creaturesInPlay S.alice settled)
         HU.assertEqual "and NOT sitting in a graveyard (the falsifier)" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled)),
@@ -139,7 +139,7 @@ creatureSbaTests registry =
             (victim, gs0) = S.addCreature piker S.alice base -- 2/1
             shielded = S.addRegenShield victim gs0
             -- 2 combat damage is lethal to a 2/1; the shield replaces the CR 704.5g destruction.
-            damaged = S.runPure S.identityAnswer shielded (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Combat])
+            damaged = S.runPure S.identityAnswer shielded (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 DamageKind.Combat])
             settled = S.settleSba damaged
         HU.assertEqual "survived (regenerated)" True (Set.member victim (GameState.battlefield settled))
         case Game.lookupObject victim settled of
@@ -188,8 +188,8 @@ damageTests registry =
                   ActiveReplacement.uses = Uses.Unlimited
                 }
             withShield = S.addReplacement shield gs0
-            combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Combat])
-            spell = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False DamageKind.Noncombat])
+            combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 DamageKind.Combat])
+            spell = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 DamageKind.Noncombat])
         HU.assertEqual "combat damage prevented -- none marked" (Just 0) (S.damageOf victim combat)
         HU.assertEqual "combat damage prevented -- no event recorded" [] (S.damageEventsOf combat)
         HU.assertEqual "noncombat damage still dealt" (Just 2) (S.damageOf victim spell),
@@ -214,7 +214,7 @@ infectTests registry =
     [ HU.testCase "CR 120.3b infect damage to a player becomes poison, not life loss" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-            ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True DamageKind.Combat
+            ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True 0 DamageKind.Combat
             after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
         HU.assertEqual "bob has three poison" 3 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
         HU.assertEqual "bob's life unchanged" (Just 20) (S.lifeOf S.bob after)
@@ -223,7 +223,7 @@ infectTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
             (victim, gs1) = S.addCreature piker S.bob gs0
-            ev = DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False True DamageKind.Combat
+            ev = DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False True 0 DamageKind.Combat
             after = S.runPure S.identityAnswer gs1 (Damage.applyDamage [ev])
         HU.assertEqual "two -1/-1 counters" (Just 2) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject victim after))
         HU.assertEqual "no marked damage" (Just 0) (S.damageOf victim after),
@@ -246,6 +246,60 @@ infectTests registry =
             HU.assertEqual "one -1/-1 counter before SBA" (Just 1) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject blocker fought))
             HU.assertEqual "no marked damage on the blocker" (Just 0) (S.damageOf blocker fought)
             HU.assertEqual "blocker buried by 704.5f" 1 (length (Game.zoneMembers Zone.Graveyard S.bob settled))
+    ]
+
+toxicTests :: Registry.Type.Registry -> Tasty.TestTree
+toxicTests registry =
+  Tasty.testGroup
+    "Toxic"
+    [ HU.testCase "CR 120.3g toxic poison is IN ADDITION to the damage, not instead of it" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False 2 DamageKind.Combat
+            after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
+        HU.assertEqual "bob has two poison" 2 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+        HU.assertEqual "bob still lost the three life" (Just 17) (S.lifeOf S.bob after)
+        HU.assertEqual "the source's controller gains no poison" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
+      HU.testCase "CR 120.3g toxic gives no poison on NONCOMBAT damage" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False 2 DamageKind.Noncombat
+            after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
+        HU.assertEqual "bob has no poison" 0 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+        HU.assertEqual "bob lost the three life" (Just 17) (S.lifeOf S.bob after),
+      -- CR 120.3b and 120.3g compose: infect REPLACES the damage with poison,
+      -- toxic ADDS its own on top, so a source with both gives amount + N and
+      -- still drains no life. No card in the pool has both, so the event is
+      -- hand-built.
+      HU.testCase "CR 120.3b/120.3g infect and toxic stack: poison is amount plus N, and no life is lost" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True 2 DamageKind.Combat
+            after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
+        HU.assertEqual "bob has five poison" 5 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+        HU.assertEqual "bob's life unchanged" (Just 20) (S.lifeOf S.bob after),
+      HU.testCase "CR 702.164c Branchblight Stalker poisons an unblocked player AND drains its life" $ do
+        stalker <- Registry.printing registry "Branchblight Stalker"
+        let (gs, _, _) = S.combatBoardOf [stalker] []
+            after = S.fightWith S.aggressiveAnswer gs
+        HU.assertEqual "bob has two poison" 2 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+        HU.assertEqual "bob took the three damage too" (Just 17) (S.lifeOf S.bob after)
+        HU.assertEqual "alice (controller) has no poison" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
+      -- CR 120.3g is scoped to combat damage dealt TO A PLAYER: a blocked toxic
+      -- creature hands its poison to nobody, and marks its blocker normally --
+      -- toxic is not infect, so the blocker takes damage, not -1/-1 counters.
+      HU.testCase "CR 120.3g a blocked Branchblight Stalker gives no poison and marks its blocker" $ do
+        stalker <- Registry.printing registry "Branchblight Stalker"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, blockers) = S.combatBoardOf [stalker] [piker]
+            fought = S.fightWith S.aggressiveAnswer gs
+        HU.assertEqual "bob has no poison" 0 (S.playerCounterOf PlayerCounterKind.Poison S.bob fought)
+        HU.assertEqual "bob's life unchanged" (Just 20) (S.lifeOf S.bob fought)
+        case blockers of
+          [] -> HU.assertFailure "fixture should have a blocker"
+          blocker : _ -> do
+            HU.assertEqual "three damage marked on the blocker" (Just 3) (S.damageOf blocker fought)
+            HU.assertEqual "no -1/-1 counters" (Just 0) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject blocker fought))
     ]
 
 sbaBase :: GameState.GameState
@@ -290,9 +344,9 @@ damageEventTests registry =
           (a : _, b : _) -> do
             HU.assertEqual "two events" 2 (length events)
             HU.assertBool "attacker hit blocker for 2" $
-              elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2 False False DamageKind.Combat) events
+              elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2 False False 0 DamageKind.Combat) events
             HU.assertBool "blocker hit attacker for 2" $
-              elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False False DamageKind.Combat) events
+              elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False False 0 DamageKind.Combat) events
           _ -> HU.assertFailure "fixture should have one creature per side",
       HU.testCase "an unblocked 2/1 emits a ToPlayer event" $ do
         piker <- Registry.printing registry "Goblin Piker"
@@ -302,7 +356,7 @@ damageEventTests registry =
           a : _ ->
             HU.assertEqual
               "one player event"
-              [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False False DamageKind.Combat]
+              [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat]
               (S.damageEventsOf after)
           _ -> HU.assertFailure "fixture should have an attacker"
     ]
@@ -862,5 +916,6 @@ tests registry =
       sbaTests,
       creatureSbaTests registry,
       infectTests registry,
+      toxicTests registry,
       m2cPropertyTests registry
     ]

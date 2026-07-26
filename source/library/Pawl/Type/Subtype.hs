@@ -47,4 +47,7 @@ data Subtype
     -- creature." Appended LAST because Ord here is declaration order and the
     -- corpus stores each card's subtypes in Ord-canonical order.
     Equipment
+  | -- CR 205.3m (a creature type; Branchblight Stalker's). Appended last, for
+    -- the reason Equipment's comment gives.
+    Scout
   deriving (Eq, Ord, Show)

@@ -22,6 +22,13 @@ data DamageEvent = MkDamageEvent
     -- CR 702.90d: whether the source had infect WHEN THIS DAMAGE WAS DEALT
     -- (last known information), captured exactly as dealtByDeathtouch is.
     dealtByInfect :: Bool,
+    -- CR 702.164b: the source's TOTAL TOXIC VALUE when this damage was dealt,
+    -- captured exactly as the two bits above are. Zero for a source without
+    -- toxic, which is every source but Branchblight Stalker. Read by
+    -- Pawl.Damage.applyDamage, and only for COMBAT damage dealt to a player --
+    -- CR 120.3g scopes toxic to that alone, so a noncombat event carries the
+    -- value and ignores it.
+    dealtByToxic :: Natural,
     -- CR 510 vs CR 608: combat damage or not. Set at deal time -- Damage tags
     -- Combat, Resolve's DealDamage tags Noncombat. Read by Replacement.applies's
     -- DamageR arm (CR 615.1's damage pattern).

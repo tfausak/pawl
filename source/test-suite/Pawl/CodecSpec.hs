@@ -108,6 +108,12 @@ tests registry =
             roundTrip "kw" Codec.keywordToJson Codec.jsonToKeyword Keyword.Trample,
           HU.testCase "Keyword.Infect" $
             roundTrip "infect" Codec.keywordToJson Codec.jsonToKeyword Keyword.Infect,
+          -- CR 702.164a's N rides the constructor, so this is the first keyword
+          -- that is not a bare tag.
+          HU.testCase "Keyword.Toxic carries its N" $ do
+            roundTrip "toxic 1" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Toxic 1)
+            roundTrip "toxic 2" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Toxic 2)
+            HU.assertBool "toxic 1 and toxic 2 encode differently" (Codec.keywordToJson (Keyword.Toxic 1) /= Codec.keywordToJson (Keyword.Toxic 2)),
           HU.testCase "PlayerCounterKind" $ do
             roundTrip "energy" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Energy
             roundTrip "poison" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Poison,
@@ -547,7 +553,7 @@ tests registry =
               "damage"
               Codec.gameEventToJson
               Codec.jsonToGameEvent
-              (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True False DamageKind.Combat)),
+              (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True False 0 DamageKind.Combat)),
           HU.testCase "GameEvent.StepBegan round-trips" $
             roundTrip "step" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice),
           HU.testCase "GameEvent.SpellCast round-trips" $

@@ -7,6 +7,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Count as Count
 import qualified Pawl.Filter as Filter
@@ -878,6 +879,21 @@ isCreatureOf oid gs = Set.member CardType.Creature (cardTypesOf oid gs)
 
 hasKeyword :: Keyword -> ObjectId -> GameState -> Bool
 hasKeyword keyword oid gs = Set.member keyword (keywordsOf oid gs)
+
+-- CR 702.164b: "A creature's total toxic value is the sum of all N values of
+-- toxic abilities that creature has." Not hasKeyword's question -- toxic is
+-- parameterized, so there is no single member to ask about -- but the same
+-- projection posture: the sum is taken over the POST-LAYER keyword set, so a
+-- Humility'd creature has none.
+--
+-- Two toxic abilities with the same N collapse into one Set member and are
+-- under-counted (#224).
+totalToxic :: ObjectId -> GameState -> Natural
+totalToxic oid gs =
+  let value keyword = case keyword of
+        Keyword.Toxic n -> n
+        _ -> 0
+   in sum (fmap value (Set.toList (keywordsOf oid gs)))
 
 -- One control-granting static ability, flattened: the source that carries it and
 -- the timestamp its effect takes (CR 613.7a: a static ability's continuous effect
