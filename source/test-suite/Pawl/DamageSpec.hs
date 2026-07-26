@@ -725,6 +725,99 @@ departedBlockerTests registry =
           _ -> HU.assertFailure "fixture did not build two blockers"
     ]
 
+-- CR 509.1h at whole-card level: alice attacks, bob blocks, and a REAL Lightning Bolt
+-- -- cast, paid for, targeted, resolved off the stack, with the CR 704.5g SBA
+-- doing the killing -- removes the blocker before the combat damage step. The
+-- direct-call twin above (killBlockerMidCombat) reaches the same state through
+-- Event.destroy; this one proves the door a player actually uses gets there too.
+--
+-- `blocks` routes the whole board's blockers at the first attacker (or declines,
+-- for the control leg). The state is split at the SBA because S.settleSba is a
+-- plain GameState -> GameState, not a Game action.
+boltBlockerMidCombat :: Bool -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+boltBlockerMidCombat blocks bolt blocker gs =
+  let aimedAtBlocker :: Prompt.Prompt r -> r
+      aimedAtBlocker p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature blocker)) sets
+        Prompt.DeclareBlockers {} | not blocks -> Map.empty
+        _ -> S.aggressiveAnswer p
+      declared =
+        S.runPure aimedAtBlocker gs $ do
+          Combat.declareAttackers S.alice
+          Combat.declareBlockers
+          Cast.castSpell S.alice bolt
+          Monad.void Stack.resolveTop
+   in S.runPure S.aggressiveAnswer (S.settleSba declared) (Monad.void Damage.dealCombatDamage)
+
+-- CR 509.1h's last sentence -- "A creature remains blocked even if all the
+-- creatures blocking it are removed from combat" -- is a STATUS the declaration
+-- confers, not a running count of who is still blocking. Combat.blockers spells it
+-- with the attacker's KEY, and the two ways the set behind that key can empty out
+-- are covered here: the blocker destroyed (the key survives untouched, and
+-- Damage.attackerAssignment's liveness filter drops it), and the blocker removed
+-- from combat by regenerating (CR 506.4/701.19a: Game.removeFromCombat empties the
+-- set but keeps the key).
+--
+-- Both end at the same observable: the attacker assigns no combat damage at all
+-- (CR 510.1c), so the defending player takes nothing. Reading emptiness as
+-- unblocked -- the bug this group pins -- lets the attacker through instead.
+blockedStaysBlockedTests :: Registry.Type.Registry -> Tasty.TestTree
+blockedStaysBlockedTests registry =
+  Tasty.testGroup
+    "Blocked stays blocked (CR 509.1h)"
+    [ HU.testCase "CR 510.1c a blocker Bolted after blocks are declared leaves the attacker blocked, so the defender takes nothing" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        let (board, mine, theirs) = S.combatBoardOf [piker] [piker]
+            (_, withLand) = S.addCreature mountain S.alice board
+            (bolt, gs) = S.addHandCard lightningBolt S.alice withLand
+        case (mine, theirs) of
+          (attacker : _, blocker : _) -> do
+            let after = boltBlockerMidCombat True bolt blocker gs
+                -- The control leg: the SAME Bolt on the SAME blocker, but bob
+                -- declines to block. Nothing is blocking either way, so this is
+                -- what discriminates "blocked with no blockers left" (assigns
+                -- nothing) from "never blocked" (assigns to the player) -- without
+                -- it, an engine that simply never dealt this damage would pass.
+                unblocked = boltBlockerMidCombat False bolt blocker gs
+            HU.assertBool "the Bolt killed the blocker" (not (Set.member blocker (GameState.battlefield after)))
+            HU.assertBool "the attacker is still blocked" (Combat.isBlocked attacker after)
+            HU.assertEqual "so bob takes nothing" (Just 20) (S.lifeOf S.bob after)
+            HU.assertBool "unblocked control leg: not blocked" (not (Combat.isBlocked attacker unblocked))
+            HU.assertEqual "unblocked control leg: bob takes the Piker's 2" (Just 18) (S.lifeOf S.bob unblocked)
+          _ -> HU.assertFailure "fixture did not build an attacker and a blocker",
+      HU.testCase "CR 701.19a a blocker that regenerates is removed from combat, and the attacker is STILL blocked" $ do
+        -- Drudge Skeletons blocks, then regenerates off alice's Bolt. CR 701.19a's
+        -- rewrite ends with "If it's an attacking or blocking creature, remove it
+        -- from combat," so unlike the destroyed blocker above this one is still on
+        -- the battlefield and is genuinely removed from combat rather than merely
+        -- dead. The shield is seeded rather than activated: what is under test is
+        -- CR 509.1h, and bob paying {B} for his own ability is ActivateSpec's
+        -- subject.
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+        let (board, mine, theirs) = S.combatBoardOf [piker] [drudgeSkeletons]
+            (_, withLand) = S.addCreature mountain S.alice board
+            (bolt, gs0) = S.addHandCard lightningBolt S.alice withLand
+        case (mine, theirs) of
+          (attacker : _, blocker : _) -> do
+            let after = boltBlockerMidCombat True bolt blocker (S.addRegenShield blocker gs0)
+            HU.assertBool "CR 701.19a: the Skeletons survived the Bolt" (Set.member blocker (GameState.battlefield after))
+            HU.assertEqual "CR 701.19a: and its damage was removed" (Just 0) (S.damageOf blocker after)
+            HU.assertEqual "CR 506.4: it is no longer blocking anything" Set.empty (Combat.blockersOf attacker after)
+            HU.assertBool "CR 509.1h: but the attacker remains blocked" (Combat.isBlocked attacker after)
+            HU.assertEqual "CR 510.1c: so it assigns no combat damage and bob takes nothing" (Just 20) (S.lifeOf S.bob after)
+            HU.assertEqual "CR 510.1d: and the regenerated blocker assigns nothing back" (Just 0) (S.damageOf attacker after)
+            -- The Bolt's own 3 is in the history too, so this filters to combat
+            -- damage: what must be absent is the attacker hitting a creature the
+            -- rules say is no longer blocking it (CR 510.1c).
+            HU.assertEqual "and no COMBAT damage was addressed to it either" [] (filter (\ev -> DamageEvent.kind ev == DamageKind.Combat) (damageEventsTo blocker after))
+          _ -> HU.assertFailure "fixture did not build an attacker and a blocker"
+    ]
+
 -- The mirror of killBlockerMidCombat: the ATTACKER is gone by the combat damage
 -- step. CR 506.4 removes it from combat, so by CR 510.1d its blockers are
 -- blocking nothing -- but Combat.blockers is keyed BY the attacker and that key
@@ -769,8 +862,8 @@ departedAttackerTests registry =
         -- the concession ends the game (CR 104.2a). CR 800.4a's first clause
         -- deletes alice's attacker outright and drops its Combat.attackers entry,
         -- but the Combat.blockers KEY survives -- deliberately, since CR 509.1h's
-        -- last sentence is about the blockers' side of that record (#28) -- so
-        -- bob's blocker is still handed a dead attacker to hit.
+        -- last sentence is about the blockers' side of that record -- so bob's
+        -- blocker is still handed a dead attacker to hit.
         piker <- Registry.printing registry "Goblin Piker"
         let (attacker, b1) = S.addCreature piker S.alice S.threePlayerGame
             (blocker, b2) = S.addCreature piker S.bob b1
@@ -975,6 +1068,7 @@ tests registry =
       assignmentLegalityTests,
       trampleTests registry,
       departedBlockerTests registry,
+      blockedStaysBlockedTests registry,
       departedAttackerTests registry,
       departedDefenderTests registry,
       trampleDeathtouchTests registry,

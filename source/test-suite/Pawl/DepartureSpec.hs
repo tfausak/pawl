@@ -181,8 +181,9 @@ tests registry =
       -- CR 509.1h's last sentence: "A creature remains blocked even if all the
       -- creatures blocking it are removed from combat." The blocker here is
       -- removed from the game entirely, not merely from combat, but the same
-      -- rule applies -- Damage.attackerAssignment reads Combat.blockers as the
-      -- record of blocked-ness and prunes it only at damage ASSIGNMENT time.
+      -- rule applies -- the attacker's KEY in Combat.blockers is the record of
+      -- blocked-ness (Combat.isBlocked), and Damage.attackerAssignment filters the
+      -- gone id out at damage ASSIGNMENT time rather than here.
       HU.testCase "CR 509.1h a blocked attacker stays blocked when its blocker's OWNER departs" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (attacker, g1) = S.addCreature piker S.alice S.threePlayerGame

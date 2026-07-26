@@ -56,6 +56,22 @@ zoneMembers zone pid gs =
 -- CR 701.19a: if a permanent is attacking or blocking, remove it from combat.
 -- Edits the GameState.combat maps directly. It lives here, in the lowest layer,
 -- because Pawl.Replacement needs it and must never import Pawl.Event.
+--
+-- The blockers map is edited two different ways on purpose, and the difference is
+-- CR 509.1h's last sentence: "A creature remains blocked even if all the creatures
+-- blocking it are removed from combat."
+--
+--   * As an ATTACKER (the key), oid stops being attacking and blocked outright --
+--     CR 506.4's "stops being an attacking, blocking, blocked, and/or unblocked
+--     creature" -- so Map.delete drops the whole entry.
+--   * As a BLOCKER (a member of some attacker's set), Set.delete removes only the
+--     membership. `fmap` KEEPS the key, and that is load-bearing rather than
+--     incidental: an attacker's key surviving with an empty set is exactly how
+--     "blocked, but nothing is currently blocking it" is spelled, which is what
+--     Combat.isBlocked reads and what CR 510.1c's "if no creatures are currently
+--     blocking it ... it assigns no combat damage" then applies to. Map.filter-ing
+--     the emptied entries away would silently turn the attacker unblocked and let
+--     its damage through to the defending player.
 removeFromCombat :: ObjectId -> GameState -> GameState
 removeFromCombat oid gs =
   let c = GameState.combat gs

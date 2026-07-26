@@ -187,14 +187,30 @@ legalBlockDeclaration pid declaration gs =
           && fearAllows blocker attacker gs
    in all ok (Map.toList declaration)
 
+-- Who is CURRENTLY blocking this attacker -- not whether it is blocked. The two
+-- questions come apart (see isBlocked), and a reader that wants blocked-ness must
+-- ask isBlocked rather than test this for emptiness.
 blockersOf :: ObjectId -> GameState -> Set ObjectId
 blockersOf oid gs = Map.findWithDefault Set.empty oid (Combat.blockers (GameState.combat gs))
 
--- CR 509.1h: a creature remains blocked even if its blockers leave. This derives
--- blocked-ness from the map rather than storing it, so a departed blocker is not
--- honoured (#28). No library caller today -- CombatSpec is the only reader.
+-- CR 509.1h: "An attacking creature with one or more creatures declared as
+-- blockers for it becomes a blocked creature ... A creature remains blocked even
+-- if all the creatures blocking it are removed from combat."
+--
+-- So blocked-ness is a STATUS that the declaration confers once, not a running
+-- count of who is still blocking. The map's KEY is that status -- declareBlockers
+-- creates it and only Game.removeFromCombat's Map.delete arm (the attacker itself
+-- leaving combat, CR 506.4) and Combat.clearCombat ever drop it. The SET behind
+-- the key is the separate CR 510.1c question of who is currently blocking, and it
+-- can empty out while the key stays: a regenerated blocker (CR 701.19a) is deleted
+-- from it, and a blocker that merely died is filtered out at assignment time.
+--
+-- Testing the set for emptiness instead is the bug this replaced: a Goblin Piker
+-- blocked by a Drudge Skeletons that regenerated before the combat damage step
+-- became "unblocked" and hit the defending player for 2. DamageSpec's
+-- "Blocked stays blocked" group is what proves it, both ways the set can empty.
 isBlocked :: ObjectId -> GameState -> Bool
-isBlocked oid gs = not (Set.null (blockersOf oid gs))
+isBlocked oid gs = Map.member oid (Combat.blockers (GameState.combat gs))
 
 -- CR 507.1 / CR 703.4h: immediately after the beginning of combat step begins,
 -- the active player chooses one of their opponents, and that player becomes the
