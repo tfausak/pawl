@@ -46,6 +46,7 @@ import qualified Pawl.Type.Keyword as Keyword
 import Pawl.Type.ManaType (ManaType)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
+import qualified Pawl.Type.MonarchWatch as MonarchWatch
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Player as Player
@@ -847,12 +848,22 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         Just target -> do
           -- CR 400.7: exile the target through the funnel; register the resulting
           -- incarnation for return when an opponent of `controller` (CR 102.2)
-          -- becomes the monarch.
+          -- BECOMES the monarch. The monarch as of right now is stamped into the
+          -- watch, so an opponent who already holds the crown at this moment does
+          -- not discharge it -- Palace Jailer's ruling is explicit that the
+          -- creature "won't immediately return just because an opponent is the
+          -- monarch" (#171).
           mNew <- Event.changeZoneReturning target Zone.Exile
           case mNew of
             Nothing -> pure ()
-            Just newId ->
-              State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId controller (GameState.exiledUntilMonarch g)})
+            Just newId -> do
+              monarchNow <- State.gets GameState.monarch
+              let watch =
+                    MonarchWatch.MkMonarchWatch
+                      { MonarchWatch.controller = controller,
+                        MonarchWatch.lastMonarch = monarchNow
+                      }
+              State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
       _ -> pure ()
   Effect.Counter slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

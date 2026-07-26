@@ -166,6 +166,7 @@ library
     Pawl.Type.ModeSelection
     Pawl.Type.Modification
     Pawl.Type.MonarchTarget
+    Pawl.Type.MonarchWatch
     Pawl.Type.MulliganDecision
     Pawl.Type.MulliganOffer
     Pawl.Type.Object

@@ -17,6 +17,7 @@ import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.Decider as Decider
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.MonarchWatch as MonarchWatch
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
@@ -174,7 +175,7 @@ tests registry =
       HU.testCase "CR 725 an exiledUntilMonarch entry KEYED on the departing player's own object is dropped" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
-            exiled = g1 {GameState.exiledUntilMonarch = Map.singleton onField S.alice}
+            exiled = g1 {GameState.exiledUntilMonarch = Map.singleton onField (MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.lastMonarch = Nothing})}
             gone = Departure.depart Departure.Type.Conceded S.bob exiled
         HU.assertEqual "the entry keyed on bob's own (now-gone) object is dropped" Map.empty (GameState.exiledUntilMonarch gone),
       -- CR 509.1h's last sentence: "A creature remains blocked even if all the
