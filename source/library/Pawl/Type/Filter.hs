@@ -7,10 +7,12 @@ import Pawl.Type.Subtype (Subtype)
 import Pawl.Type.Supertype (Supertype)
 
 -- A first-order, non-recursive-in-meaning-but-finitely-recursive-in-structure
--- predicate over one object, expressed as data and evaluated by one generic
+-- predicate over one candidate -- an object, or (CR 115.1) a player, since a
+-- target may be either -- expressed as data and evaluated by one generic
 -- matcher (Pawl.Filter.matches) that never learns which effect produced it. Its
 -- atoms case on CHARACTERISTICS (card type, supertype, colour, subtype, power,
--- controller) exactly as the rules already case on a CardType -- casing on a
+-- controller, and for a player candidate its identity) exactly as the rules
+-- already case on a CardType -- casing on a
 -- characteristic classification is legitimate; the invariant forbids only casing
 -- on an EFFECT's identity, which this type never does.
 --
@@ -37,6 +39,18 @@ data Filter
     -- number) are both written -- one relation, one spelling, rather than a
     -- parallel Exclusion field on each (#163).
     IsSource
+  | -- CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
+    -- "target opponent". Context-relative in exactly the way ControlledBy is: it
+    -- carries no player id, and the answer comes from the Context the caller
+    -- supplies.
+    --
+    -- Separate from ControlledBy rather than a reuse of it, because they ask
+    -- about different things: ControlledBy asks who controls an OBJECT candidate,
+    -- and this asks who the candidate IS. CR 109.1's list of what an object is
+    -- has no "player" in it, and CR 108.4 gives a controller only to a card
+    -- representing a permanent or spell -- so the two are never both answerable
+    -- for one candidate.
+    IsPlayer PlayerRelation
   | And [Filter]
   | Or [Filter]
   | Not Filter

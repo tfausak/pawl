@@ -37,8 +37,9 @@ import qualified Pawl.Type.Zone as Zone
 -- 109.5): "a creature an opponent controls" is a ControlledBy Opponent filter,
 -- and a source that has left the battlefield has no projected controller, which
 -- yields Nothing and matches nothing -- the EMPTY set, not last known information
--- (#85). A Filter ranges only over objects, never players, so a ToPlayer
--- recipient is never narrowed. CR 601.2c's "another" is applied here too, as the
+-- (#85). A player candidate is narrowed by the same fold, through the IsPlayer
+-- atom (#168), and inherits that posture: "target opponent" from a source with no
+-- projected controller has no legal targets either. CR 601.2c's "another" is applied here too, as the
 -- Filter's own Not IsSource (#163) -- so it drops whichever tag the Pool
 -- produced, and re-validation sees the same rule selection did.
 legalRecipients :: ObjectId -> TargetSpec -> GameState -> Set Recipient
@@ -46,12 +47,17 @@ legalRecipients source spec gs =
   let TargetSpec.MkTargetSpec pool restriction = spec
       context = Filter.MkContext (Projection.controllerOf source gs) (Just source)
       keep recipient = case recipient of
-        Recipient.ToPlayer _ -> True -- CR 115: a Filter ranges over objects; it never narrows a player.
-        Recipient.ToCreature oid -> narrows oid
-        Recipient.ToObject oid -> narrows oid
-      narrows oid = case restriction of
+        -- CR 115.1: a player candidate is narrowed too ("target opponent"), by a
+        -- Filter that asks about the player rather than about an object -- the
+        -- IsPlayer atom (#168). Every object-shaped atom is vacuously False
+        -- against a player view, so a spec that says "target creature you
+        -- control" cannot accidentally admit a player.
+        Recipient.ToPlayer pid -> against (Filter.playerView pid)
+        Recipient.ToCreature oid -> against (Projection.viewOfObject oid gs)
+        Recipient.ToObject oid -> against (Projection.viewOfObject oid gs)
+      against view = case restriction of
         Nothing -> True
-        Just f -> Filter.matches context (Projection.viewOfObject oid gs) f
+        Just f -> Filter.matches context view f
    in Set.filter keep (basePool pool gs)
 
 -- The closed part: build the pool's base recipient set over zones, tagging each

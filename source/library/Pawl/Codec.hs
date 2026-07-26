@@ -494,6 +494,7 @@ filterToJson filter_ = case filter_ of
   Filter.HasSubtype s -> Json.tagged (Text.pack "HasSubtype") (Just (subtypeToJson s))
   Filter.PowerAtLeast n -> Json.tagged (Text.pack "PowerAtLeast") (Just (Json.jInt n))
   Filter.ControlledBy r -> Json.tagged (Text.pack "ControlledBy") (Just (playerRelationToJson r))
+  Filter.IsPlayer r -> Json.tagged (Text.pack "IsPlayer") (Just (playerRelationToJson r))
   Filter.IsSource -> nullary (Text.pack "IsSource")
   Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (fmap filterToJson fs)))
   Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (fmap filterToJson fs)))
@@ -509,6 +510,7 @@ jsonToFilter value = do
     ("HasSubtype", Just v) -> Filter.HasSubtype <$> jsonToSubtype v
     ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Json.asInteger v
     ("ControlledBy", Just v) -> Filter.ControlledBy <$> jsonToPlayerRelation v
+    ("IsPlayer", Just v) -> Filter.IsPlayer <$> jsonToPlayerRelation v
     ("IsSource", _) -> Right Filter.IsSource
     ("And", Just (Array vs)) -> Filter.And <$> traverse jsonToFilter vs
     ("Or", Just (Array vs)) -> Filter.Or <$> traverse jsonToFilter vs

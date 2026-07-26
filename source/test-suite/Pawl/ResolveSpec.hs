@@ -21,6 +21,7 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Monarch as Monarch
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
@@ -225,6 +226,54 @@ targetTests registry =
             legal = Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs2
         HU.assertEqual "only the opponent's creature" (Set.singleton (Recipient.ToCreature theirs)) legal
         HU.assertBool "not the source's controller's own" (not (Set.member (Recipient.ToCreature mine) legal)),
+      -- CR 115.1 / 109.5: "target OPPONENT". Until Ravenous Rats there was no
+      -- card in the pool that narrowed a PLAYER target, so Target.legalRecipients
+      -- kept every player unconditionally (#168). Three seats, so "an opponent"
+      -- is a real set rather than the only other player.
+      HU.testCase "CR 115.1 a Players pool narrowed by IsPlayer Opponent excludes the source's controller" $ do
+        ravenousRats <- Registry.printing registry "Ravenous Rats"
+        let (src, gs) = S.addCreature ravenousRats S.alice (Setup.emptyGame S.threePlayers)
+            spec = TargetSpec.MkTargetSpec Pool.Players (Just (Filter.Type.IsPlayer PlayerRelation.Opponent))
+            legal = Target.legalRecipients src spec gs
+        HU.assertEqual
+          "exactly bob and carol, never alice"
+          (Set.fromList [Recipient.ToPlayer S.bob, Recipient.ToPlayer S.carol])
+          legal,
+      -- The card itself, so the narrowing is proven through the real target spec
+      -- the JSON carries rather than one hand-built in the test.
+      HU.testCase "CR 115.1 Ravenous Rats' entry trigger may only target an opponent" $ do
+        ravenousRats <- Registry.printing registry "Ravenous Rats"
+        let (src, gs) = S.addCreature ravenousRats S.bob (Setup.emptyGame S.threePlayers)
+            -- The slot lives on the ENTRY TRIGGER, not the spell, so
+            -- Card.allTargetSpecs (which covers the spell and the enchant slot)
+            -- is the wrong door -- read the ability the card actually prints.
+            specs = fmap (Modal.allTargetSpecs . TriggeredAbility.modal) (Card.Type.triggeredAbilities (Printing.card ravenousRats))
+        case concatMap Map.elems specs of
+          [spec] ->
+            HU.assertEqual
+              "bob is excluded from his own Rats' trigger"
+              (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.carol])
+              (Target.legalRecipients src spec gs)
+          _ -> HU.assertFailure "Ravenous Rats should declare exactly one target slot",
+      -- The gameplay-level proof design.md section 4 asks for: an opcode is not
+      -- done until a card exercises it end to end. Ravenous Rats enters, its
+      -- trigger is placed and targeted from the narrowed set, and an OPPONENT
+      -- loses a card from hand -- not alice, who cast it.
+      HU.testCase "CR 115.1 Ravenous Rats' entry trigger makes an opponent discard, never its own controller" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        ravenousRats <- Registry.printing registry "Ravenous Rats"
+        let base0 = S.landsInPlay swamp 2
+            -- Both players hold a card, so "whose hand shrank" is a real question.
+            (_, base1) = S.addHandCard piker S.bob base0
+            (gs, spellId) = S.handOne ravenousRats base1
+            aliceBefore = S.handSize S.alice gs
+            bobBefore = S.handSize S.bob gs
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
+        HU.assertEqual "bob discarded one" (bobBefore - 1) (S.handSize S.bob settled)
+        HU.assertEqual "alice lost only the Rats she cast" (aliceBefore - 1) (S.handSize S.alice settled)
+        HU.assertEqual "the Rats resolved onto the battlefield" 1 (S.countOnBattlefieldByName (Text.pack "Ravenous Rats") S.alice settled),
       HU.testCase "CR 806.1 at three seats a ControlledBy Opponent pool spans BOTH opponents' creatures" $ do
         -- Palace Jailer's second trigger targets a creature an opponent controls.
         -- At three seats that is a choice across two boards, and the engine must

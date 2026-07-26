@@ -11,8 +11,9 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 
 -- The characteristics a Filter atom consults. Supplied by the projection on the
--- battlefield/stack, and by the printed card off the battlefield (the two
--- builders live in Pawl.Projection). `power` and `controller` are Nothing off the
+-- battlefield/stack and by the printed card off the battlefield (both builders
+-- live in Pawl.Projection), or by `playerView` below when the candidate is a
+-- player rather than an object. `power` and `controller` are Nothing off the
 -- battlefield -- a card in a library has neither under the rules that matter here
 -- -- so PowerAtLeast / ControlledBy are vacuously False there, which no search
 -- filter uses.
@@ -26,9 +27,32 @@ data View = MkView
     -- Which object this view is OF. Nothing for a printed card off the
     -- battlefield, which is not an object -- so IsSource is vacuously False
     -- there, the same posture power and controller already take.
-    identity :: Maybe ObjectId.ObjectId
+    identity :: Maybe ObjectId.ObjectId,
+    -- Which PLAYER this view is of, when the candidate is a player rather than
+    -- an object (CR 115.1's "target opponent"). Nothing for every object view --
+    -- so IsPlayer is vacuously False there, and every object-shaped field above
+    -- is vacuously False on a player view. The two candidate kinds share one
+    -- View type rather than splitting it, because Filter.matches folds And/Or/Not
+    -- over whatever it is given and would otherwise need two trees.
+    playerIdentity :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Show)
+
+-- The view of a PLAYER candidate: no card types, no colours, no controller --
+-- a player is not an object (CR 109.1) and has none of those. Only the player's
+-- own identity is answerable, which is exactly what IsPlayer asks.
+playerView :: PlayerId.PlayerId -> View
+playerView pid =
+  MkView
+    { cardTypes = Set.empty,
+      supertypes = Set.empty,
+      colors = Set.empty,
+      subtypes = Set.empty,
+      power = Nothing,
+      controller = Nothing,
+      identity = Nothing,
+      playerIdentity = Just pid
+    }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and
 -- which object the surrounding effect comes from. Both are Nothing when no
@@ -70,6 +94,15 @@ matches context view predicate = case predicate of
     _ -> False
   Filter.IsSource -> case (identity view, source context) of
     (Just oid, Just src) -> oid == src
+    _ -> False
+  -- CR 115.1's "target opponent". Same "every other player is an opponent"
+  -- reading the ControlledBy arm above argues for, and wrong for the same one
+  -- case (CR 102.3's teams, #175). Vacuously False for an object candidate,
+  -- which has no playerIdentity, and for a match with no perspective.
+  Filter.IsPlayer relation -> case (playerIdentity view, perspective context) of
+    (Just candidate, Just you) -> case relation of
+      PlayerRelation.You -> candidate == you
+      PlayerRelation.Opponent -> candidate /= you
     _ -> False
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs

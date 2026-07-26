@@ -294,7 +294,8 @@ viewOfCard card =
           -- A printed card off the battlefield is not an object, so it has no
           -- identity for IsSource to compare -- the same vacuous posture power
           -- and controller already take here.
-          Filter.identity = Nothing
+          Filter.identity = Nothing,
+          Filter.playerIdentity = Nothing
         }
 
 -- Shared assembly: fill a View from a projection's characteristics plus the
@@ -308,7 +309,8 @@ viewOfCharacteristics oid pc controller gs =
       Filter.subtypes = PC.subtypes pc,
       Filter.power = PC.power pc,
       Filter.controller = controller,
-      Filter.identity = Just oid
+      Filter.identity = Just oid,
+      Filter.playerIdentity = Nothing
     }
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result -- the value the layer fold
