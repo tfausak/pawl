@@ -24,7 +24,7 @@ defender keyword, the branch might be called `123-implement-defender`.
 Ideally changes follow TDD by writing a failing test first, seeing it fail, and
 then writing code to make it pass.
 
-Open PRs as drafts, and mark them ready for review once they are. A draft means
+Open PRs as drafts, and mark them ready for review once they're finished. A draft means
 the work is still moving; leaving a finished one as a draft just stalls it.
 Please do not force push to a branch after opening a PR. Merges are squashed,
 so a branch's internal history is working state rather than a record. Commit as
