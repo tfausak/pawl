@@ -20,6 +20,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Effect as Effect
@@ -198,7 +199,8 @@ manaTests registry =
         let ab =
               ActivatedAbility.MkActivatedAbility
                 { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
-                  ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaType.Colored Color.Green)] Map.empty
+                  ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaType.Colored Color.Green)] Map.empty,
+                  ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
          in HU.assertBool "mana ability" (Mana.isManaAbility ab),
       HU.testCase "CR 605.1a an ability that targets is NOT a mana ability" $
@@ -208,7 +210,8 @@ manaTests registry =
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.AddMana (ManaType.Colored Color.Green)]
-                      (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
+                      (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)),
+                  ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
          in HU.assertBool "targets -> not mana" (not (Mana.isManaAbility ab)),
       HU.testCase "CR 605.1a a damage ability is NOT a mana ability" $
@@ -218,7 +221,8 @@ manaTests registry =
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1)]
-                      (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
+                      (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)),
+                  ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
          in HU.assertBool "no mana produced -> not mana" (not (Mana.isManaAbility ab)),
       HU.testCase "CR 605 a settled Llanowar Elves is a green mana source" $ do

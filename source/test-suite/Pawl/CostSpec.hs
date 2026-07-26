@@ -30,6 +30,7 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as Action.Type
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Cost as Cost.Type
@@ -70,7 +71,7 @@ import qualified Test.Tasty.HUnit as HU
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p))
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p)) ActivationTiming.AnyTime
 
 doorTests :: Registry.Type.Registry -> Tasty.TestTree
 doorTests registry =

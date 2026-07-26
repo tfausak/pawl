@@ -31,6 +31,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Combat as Combat.Type
@@ -914,7 +915,7 @@ declareAttackersAskAnswer p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p))
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Card.Type.spell (Printing.card p)) ActivationTiming.AnyTime
 
 -- Records every player asked Prompt.Concede, in order -- the
 -- concedeOrderAnswer shape -- and drives alice through exactly one Activate
@@ -1560,7 +1561,8 @@ restartOnStack mountain =
             ActivatedAbility.modal =
               Modal.MkModal
                 (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty))
-                (ModeSelection.ChooseExactly 1)
+                (ModeSelection.ChooseExactly 1),
+            ActivatedAbility.timing = ActivationTiming.AnyTime
           }
       abilObj =
         Object.MkObject

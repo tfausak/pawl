@@ -17,6 +17,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Json as Json
 import qualified Pawl.Type.AbilityName as AbilityName
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.BeginningStep as BeginningStep
@@ -1375,9 +1376,29 @@ jsonToCost value = do
 
 activatedAbilityToJson :: ActivatedAbility.ActivatedAbility CardT.Card -> Value
 activatedAbilityToJson aa =
-  Object
+  Object $
     [ (Text.pack "cost", costToJson (ActivatedAbility.cost aa)),
       (Text.pack "modal", modalToJson (ActivatedAbility.modal aa))
+    ]
+      -- CR 307.5: emitted only for a restricted ability, so the absence of the
+      -- key means "no timing rider" -- the same optional-field shape Card.enchant
+      -- takes, and it leaves every card without one byte-identical.
+      <> ( case ActivatedAbility.timing aa of
+             ActivationTiming.AnyTime -> []
+             ActivationTiming.SorcerySpeed -> [(Text.pack "timing", activationTimingToJson (ActivatedAbility.timing aa))]
+         )
+
+activationTimingToJson :: ActivationTiming.ActivationTiming -> Value
+activationTimingToJson t = nullary . Text.pack $ case t of
+  ActivationTiming.AnyTime -> "AnyTime"
+  ActivationTiming.SorcerySpeed -> "SorcerySpeed"
+
+jsonToActivationTiming :: Value -> Either Text ActivationTiming.ActivationTiming
+jsonToActivationTiming =
+  decodeNullary
+    (Text.pack "ActivationTiming")
+    [ (Text.pack "AnyTime", ActivationTiming.AnyTime),
+      (Text.pack "SorcerySpeed", ActivationTiming.SorcerySpeed)
     ]
 
 jsonToActivatedAbility :: Value -> Either Text (ActivatedAbility.ActivatedAbility CardT.Card)
@@ -1385,7 +1406,10 @@ jsonToActivatedAbility value = do
   ps <- Json.asObject value
   c <- Json.field (Text.pack "cost") ps >>= jsonToCost
   m <- Json.field (Text.pack "modal") ps >>= jsonToModal
-  pure (ActivatedAbility.MkActivatedAbility c m)
+  t <- case Json.optField (Text.pack "timing") ps of
+    Nothing -> pure ActivationTiming.AnyTime
+    Just v -> jsonToActivationTiming v
+  pure (ActivatedAbility.MkActivatedAbility c m t)
 
 replacementEffectToJson :: ReplacementEffect.ReplacementEffect -> Value
 replacementEffectToJson re = case re of

@@ -41,6 +41,9 @@
           "type": "ChooseExactly",
           "value": 1
         }
+      },
+      "timing": {
+        "type": "SorcerySpeed"
       }
     }
   ],
