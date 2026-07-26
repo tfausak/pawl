@@ -109,8 +109,8 @@ nextInOrder order pid = case dropWhile (/= pid) order of
 -- and excludes it; this function is total in PlayerId, where
 -- reassignOnDeparture must return a Maybe because CR 725.4's third sentence
 -- lets the game continue with no monarch; and this function reads
--- Departure.stillPlaying directly, where reassignOnDeparture takes `playing`
--- injected, because Pawl.Monarch may not import Pawl.Departure. Changing
+-- Game.stillPlaying directly, where reassignOnDeparture takes `playing`
+-- injected so the departing caller's snapshot is explicit. Changing
 -- either walk without checking the other risks reintroducing this
 -- duplication with a mismatch baked in.
 --
@@ -118,7 +118,7 @@ nextInOrder order pid = case dropWhile (/= pid) order of
 nextStillPlaying :: GameState -> PlayerId -> PlayerId
 nextStillPlaying gs pid =
   let order = GameState.turnOrder gs
-      playing = Departure.stillPlaying gs
+      playing = Game.stillPlaying gs
       -- The cyclic scan: everyone after `pid`, then the whole order again so the
       -- wrap is covered. A `pid` absent from the order simply starts at the head.
       scan = drop 1 (dropWhile (/= pid) order) <> order
@@ -139,7 +139,7 @@ nextStillPlaying gs pid =
 priorityHolder :: GameState -> PlayerId
 priorityHolder gs =
   let active = GameState.activePlayer gs
-   in if List.elem active (Departure.stillPlaying gs)
+   in if List.elem active (Game.stillPlaying gs)
         then active
         else nextStillPlaying gs active
 
@@ -290,7 +290,7 @@ runTurnBasedActions phase = do
   -- took, so those three are vacuous; only the defending-player choice is real,
   -- and it is unobservable rather than vacuous for the reason on
   -- Pawl.Type.Combat's defender field.
-  hasActive <- State.gets (\gs -> List.elem active (Departure.stillPlaying gs))
+  hasActive <- State.gets (\gs -> List.elem active (Game.stillPlaying gs))
   case phase of
     Phase.Beginning BeginningStep.Untap -> Monad.when hasActive $ do
       untapAll active
@@ -308,7 +308,7 @@ runTurnBasedActions phase = do
     -- the top of this function, from the GameState in scope here; only a pure
     -- `case` on `phase` runs between that bind and this arm; and
     -- Combat.chooseDefender opens with its own State.get and computes the
-    -- identical `List.elem (GameState.activePlayer gs) (Departure.stillPlaying
+    -- identical `List.elem (GameState.activePlayer gs) (Game.stillPlaying
     -- gs)` over that same state. A green suite is deliberately not what this
     -- rests on -- the declareAttackers arm below carries a guard (CR 703.4i)
     -- that was once wrongly called dead code on exactly that basis, and review
@@ -371,7 +371,7 @@ runTurnBasedActions phase = do
 -- controlled by a player who has left the game would be put onto the stack,
 -- it isn't put on the stack." No separate filter is needed here:
 -- `orderPending` groups `pending` by `apnapPlayers`, which already restricts
--- every group to a still-playing controller (Departure.stillPlaying), so a
+-- every group to a still-playing controller (Game.stillPlaying), so a
 -- PendingTrigger whose controller has left never appears in `ordered` and
 -- `placeOne` never sees it. Under the pipeline `orderPending` feeds --
 -- `apnapPlayers` -> `orderFor` -> `permute`, none of which can ever
@@ -395,15 +395,15 @@ runTurnBasedActions phase = do
 -- nothing else pending would otherwise report `True` on a step that put
 -- nothing on the stack.
 --
--- NOT implemented: CR 800.4d's FIRST sentence ("If an object that would be
--- owned by a player who has left the game would be created in any zone, it
--- isn't created") and CR 800.4b's SECOND sentence ("If a token would be
--- created under the control of a player who has left the game, no token is
--- created"). `Event.createTokens` is the unguarded producer -- it takes one
--- player and uses it for both control and ownership, so for tokens those two
--- sentences coincide exactly and one guard would satisfy both (#177); a token
--- is also the only object in this pool that either sentence has a producer
--- for at all.
+-- CR 800.4d's FIRST sentence ("If an object that would be owned by a player who
+-- has left the game would be created in any zone, it isn't created") and CR
+-- 800.4b's SECOND sentence ("If a token would be created under the control of a
+-- player who has left the game, no token is created") are both enforced by the
+-- guard at the head of `Event.createTokens`: it takes one player and uses it for
+-- both control and ownership, so for a token those two sentences coincide and
+-- one guard satisfies both. A token is the only object in this pool that either
+-- sentence has a producer for at all, and this function's own delayed-trigger
+-- path is how a departed player still reaches that producer.
 --
 -- CR 800.4b's THIRD sentence (an object put onto the battlefield or the stack
 -- under a departed player's control) is producerless, so nothing tracks it:
@@ -421,7 +421,7 @@ placePendingTriggers = do
       -- They bypass orderPending/apnapPlayers entirely, so CR 800.4d's filter
       -- above does not cover this path -- but no separate guard is needed
       -- here either: Monarch.reassignOnDeparture runs inside Departure.depart
-      -- with Departure.stillPlayingInOrder, so the crown can never rest on a
+      -- with Game.stillPlayingInOrder, so the crown can never rest on a
       -- departed seat in the first place, and inherentMonarchPending's
       -- controller is always the current monarch.
       inherent = Monarch.inherentMonarchPending evs gs
@@ -531,7 +531,7 @@ apnapPlayers gs pending =
       -- departed seats. A player who has left the game is not in APNAP order and
       -- is never asked to order triggers (CR 800.4a leaves them nothing to
       -- control in the first place, which this does not depend on).
-      playing = Departure.stillPlaying gs
+      playing = Game.stillPlaying gs
       controls pid = List.elem pid playing && any (\pt -> PendingTrigger.controller pt == pid) pending
    in filter controls rotated
 
@@ -642,7 +642,7 @@ priorityLoop = do
                 case GameState.priority gs of
                   Nothing -> pure ()
                   Just p ->
-                    if List.elem p (Departure.stillPlaying gs)
+                    if List.elem p (Game.stillPlaying gs)
                       then do
                         -- CR 104.3a: asked before anything else, and keyed to `p` -- the
                         -- TRUE player, never `Decide.deciderFor p`. Prompt.Concede carries
@@ -683,7 +683,7 @@ priorityLoop = do
                             case chosen of
                               Action.Type.Pass -> do
                                 let passes = GameState.passes gs + 1
-                                    playing = length (Departure.stillPlaying gs)
+                                    playing = length (Game.stillPlaying gs)
                                 if passes >= fromIntegral playing
                                   then case GameState.stack gs of
                                     [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
@@ -759,7 +759,7 @@ walkToNextTurn seatsLeft seat gs =
     else
       let next = nextInOrder (GameState.turnOrder gs) seat
           swept = Expiry.dropAtTurnOf next gs
-       in if List.elem next (Departure.stillPlaying swept)
+       in if List.elem next (Game.stillPlaying swept)
             then beginTurnOf next swept
             else walkToNextTurn (seatsLeft - 1) next swept
 
@@ -781,7 +781,7 @@ beginTurnOf pid gs =
         Nothing -> Nothing
         Just decider -> case decider of
           Decider.MkDecider d ->
-            if List.elem d (Departure.stillPlaying gs)
+            if List.elem d (Game.stillPlaying gs)
               then Just decider
               else Nothing
    in gs
@@ -911,7 +911,7 @@ playSubgame = do
   -- (CR 729.4), so only they can be rolled (fixed by #147). Not asked when the answer is
   -- forced -- a lone candidate goes first no matter what randomness says, and
   -- where the rules leave nothing to determine, don't prompt.
-  starter <- case NonEmpty.nonEmpty (Departure.stillPlayingInOrder parent) of
+  starter <- case NonEmpty.nonEmpty (Game.stillPlayingInOrder parent) of
     Nothing -> pure (GameState.activePlayer parent)
     Just order -> case order of
       only NonEmpty.:| [] -> pure only
@@ -923,7 +923,7 @@ playSubgame = do
   -- subgame ... puts them into their main-game library, then shuffles them." Each
   -- player who was IN the subgame: a player outside it (CR 729.4) took nothing
   -- into it and is not asked to shuffle their main-game library (fixed by #147).
-  seated <- State.gets Departure.stillPlayingInOrder
+  seated <- State.gets Game.stillPlayingInOrder
   Monad.forM_ seated Mulligan.shuffleLibrary
   pure result
 

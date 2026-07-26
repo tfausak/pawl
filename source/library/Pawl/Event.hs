@@ -10,6 +10,7 @@ module Pawl.Event where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -327,8 +328,30 @@ sacrifice oid = do
 -- scenario in the test pool would still pass. CR 616.1g's own worked example
 -- (a token copy of Voice of All) needs a token WITH an entry replacement to
 -- exercise, and no such card is in this pool (#73).
+-- CR 800.4b, sentence 2: "If a token would be created under the control of a
+-- player who has left the game, no token is created." Also CR 800.4d's first
+-- sentence ("If an object that would be owned by a player who has left the game
+-- would be created in any zone, it isn't created"): this function takes ONE
+-- player and uses it for both control and ownership, so for a token those two
+-- sentences coincide and this single guard satisfies both.
+--
+-- Before Replacement.resolveTokens, not after. The rule says no token is CREATED,
+-- not that one is created and then removed, so nothing may be minted and nothing
+-- may be spent getting there -- resolveTokens consumes replacement use counts (CR
+-- 614.3), and burning one on a token that the rules say never existed would be a
+-- second, quieter violation. Guarding the parameter rather than the resolved
+-- owner is exact today because no producer can move a token's controller as it is
+-- created (#69); if CR 616.1b's control-modifying entry replacements ever gain
+-- one, this check has to move after them and become a re-check.
 createTokens :: PlayerId -> Card -> Natural -> Game [ObjectId]
 createTokens controller card n = do
+  gs <- State.get
+  if List.notElem controller (Game.stillPlaying gs)
+    then pure []
+    else createTokensFor controller card n
+
+createTokensFor :: PlayerId -> Card -> Natural -> Game [ObjectId]
+createTokensFor controller card n = do
   resolved <- Replacement.resolveTokens controller card n
   case resolved of
     Nothing -> pure []

@@ -77,7 +77,7 @@ aggregate aggregation views = case aggregation of
 -- object a departing player owns out of the game, and no site can mint a new one
 -- owned by them afterwards, so Game.zoneMembers returns [] for every zone of
 -- theirs and a departed player contributes nothing to any fold here. It is not
--- fixed, because a filter would need Departure.stillPlaying and this module
+-- fixed, because a filter would need Game.stillPlaying and this module
 -- cannot import Pawl.Departure -- Departure reaches Pawl.Monarch, Pawl.Event and
 -- Pawl.Projection, and Pawl.Projection imports this module -- so the alternative
 -- is duplicating that status predicate here.

@@ -5,7 +5,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
-import qualified Pawl.Departure as Departure
+import qualified Pawl.Game as Game
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Deck as Deck
@@ -81,7 +81,7 @@ deckTotal matchup = sum (fmap (toInteger . Setup.deckSize . snd) (NonEmpty.toLis
 -- one: a gate that fired at two seats would delete the loser's 60 cards and this
 -- would happily expect 60.
 --
--- The per-seat SET, by contrast, is Departure.stillPlaying, which is engine
+-- The per-seat SET, by contrast, is Game.stillPlaying, which is engine
 -- state. That is deliberate and it is still a cross-check, because the two
 -- sides read DIFFERENT fields of GameState: stillPlaying folds Player.status,
 -- while cardBackedCount folds GameState.objects. Whichever half of a departure
@@ -103,7 +103,7 @@ expectedCardBacked matchup gs =
         Nothing -> 0
         Just deck -> toInteger (Setup.deckSize deck)
    in if NonEmpty.length matchup > 2
-        then sum (fmap sized (Departure.stillPlaying gs))
+        then sum (fmap sized (Game.stillPlaying gs))
         else deckTotal matchup
 
 -- Every universal invariant, judged against ONE played-out game. They share the

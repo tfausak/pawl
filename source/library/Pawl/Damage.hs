@@ -10,7 +10,6 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Decide as Decide
-import qualified Pawl.Departure as Departure
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
@@ -117,7 +116,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
             -- who cannot take it and then lose that damage, rather than never
             -- offering the choice.
             defenderIsPlaying = case target of
-              AttackTarget.OfPlayer defender -> List.elem defender (Departure.stillPlaying gs)
+              AttackTarget.OfPlayer defender -> List.elem defender (Game.stillPlaying gs)
         let recorded = Combat.blockersOf attacker gs
             -- CR 510.1c: damage goes only to the creatures CURRENTLY blocking.
             -- The recorded set is deliberately NOT pruned when a blocker leaves --

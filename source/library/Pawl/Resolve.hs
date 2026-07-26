@@ -13,7 +13,6 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
-import qualified Pawl.Departure as Departure
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Filter as Filter
@@ -616,7 +615,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- (#139), which retires the synthetic gate.
   -- Shahrazad's Oracle text scopes the loser to "each player who doesn't win
   -- the subgame" -- so the roster the loser is drawn from is the players who
-  -- were actually seated for the subgame, i.e. Departure.stillPlayingInOrder,
+  -- were actually seated for the subgame, i.e. Game.stillPlayingInOrder,
   -- not the main game's full seating (GameState.turnOrder). A player who
   -- departed the main game before this effect resolved never played the
   -- subgame -- Setup.subgameStateFrom seats only stillPlayingInOrder -- so
@@ -624,7 +623,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- about them ever touched the subgame.
   Effect.PlaySubgame slot -> do
     result <- runSubgame
-    order <- State.gets Departure.stillPlayingInOrder
+    order <- State.gets Game.stillPlayingInOrder
     case result of
       Result.Won winner -> case List.find (/= winner) order of
         Just loser -> State.modify' (bindLoserSlot source slot loser)
@@ -929,7 +928,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- already run and does not run again. Without this guard the
             -- permanent would simply sit on the battlefield controlled by a
             -- player who is not in the game.
-            | List.notElem controller (Departure.stillPlaying gs) -> gs
+            | List.notElem controller (Game.stillPlaying gs) -> gs
             | otherwise -> case Expiry.arm controller source duration gs of
                 -- CR 611.2b: the duration never started -- no control effect is
                 -- stored, and nothing is re-Sicked, because control never changed.
