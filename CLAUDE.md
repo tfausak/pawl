@@ -38,8 +38,7 @@ Design notes live in `docs/`:
 | Rules ground truth | `rules.txt`, grepped by rule number — never memory |
 | Prior-art evidence | `prior-art-lessons.md`, cited § only |
 | What the milestone era established | `progress.md` (frozen), newest first |
-| A landed unit's authoritative detail | its spec, then its plan, under `superpowers/` |
-
+| A landed unit's authoritative detail | its spec, then its plan, under `docs/superpowers/` |
 Read these by section, on demand. Reading a whole doc "for context"
 front-loads tens of thousands of tokens before the first question.
 
