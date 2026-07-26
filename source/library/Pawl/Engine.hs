@@ -939,7 +939,11 @@ playSubgame = do
     Nothing -> pure (GameState.activePlayer parent)
     Just order -> case order of
       only NonEmpty.:| [] -> pure only
-      _ -> Trans.lift (Program.prompt (Prompt.RandomFirstPlayer order))
+      _ -> do
+        answer <- Trans.lift (Program.prompt (Prompt.RandomFirstPlayer order))
+        -- Filtered, not trusted (#222): a subgame cannot start with a player who
+        -- is not seated in it.
+        pure (if List.elem answer (NonEmpty.toList order) then answer else NonEmpty.head order)
   let sub0 = Setup.subgameStateFrom starter parent
   (result, finalSub) <- Trans.lift (State.runStateT (Setup.startGameFromCards Resolve.performHandAction >> playGame) sub0)
   State.modify' (Setup.funnelBack finalSub)

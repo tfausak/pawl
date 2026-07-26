@@ -24,6 +24,7 @@ import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Test.Tasty as Tasty
@@ -47,6 +48,15 @@ newest = Maybe.listToMaybe . List.sortOn Ord.Down
 -- Answers the as-enters copy choice with the highest-id legal target (the most
 -- recently entered creature), declining only when none is legal. Delegates every
 -- other prompt to S.identityAnswer.
+-- Names a copy target that was never offered -- the lying interpreter #222 is
+-- about. legalCopyTargets is the ONLY thing enforcing CR 614.12a's same-batch
+-- exclusion, so an unchecked answer would let a Clone copy something it may not.
+copyForbidden :: ObjectId -> Prompt.Prompt r -> r
+copyForbidden wanted p = case p of
+  Prompt.ChooseCopyTarget {} -> Just wanted
+  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
+  _ -> S.identityAnswer p
+
 copyNewest :: Prompt.Prompt r -> r
 copyNewest p = case p of
   Prompt.ChooseCopyTarget _ _ _ legal -> newest legal
@@ -85,6 +95,18 @@ tests registry =
             (_, staged) = S.spellOnStack clone S.alice gs0
             resolved = resolveAndSettle copyNewest staged
         HU.assertEqual "the 0/0 Clone is gone (state-based action)" Nothing (cloneOnBattlefield resolved),
+      -- #222: with no creature on the battlefield there are no legal copy
+      -- targets at all, so an interpreter naming one must be refused -- the Clone
+      -- enters as a 0/0 and dies exactly as it does when it declines. Same
+      -- fixture as the "no creature to copy" test above, so the only variable is
+      -- the answer.
+      HU.testCase "#222 a copy target that was never offered is refused" $ do
+        clone <- Registry.printing registry "Clone"
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, staged) = S.spellOnStack clone S.alice gs0
+            phantom = ObjectId.MkObjectId 9999
+            resolved = resolveAndSettle (copyForbidden phantom) staged
+        HU.assertEqual "the Clone copied nothing and died as a 0/0" Nothing (cloneOnBattlefield resolved),
       HU.testCase "Clone copies base P/T, not a counter-boosted P/T (CR 707.2 falsifier)" $ do
         piker <- Registry.printing registry "Goblin Piker"
         clone <- Registry.printing registry "Clone"

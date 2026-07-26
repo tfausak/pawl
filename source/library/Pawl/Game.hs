@@ -143,7 +143,7 @@ stillPlayingInOrder gs =
   let playing = stillPlaying gs
    in filter (\pid -> List.elem pid playing) (GameState.turnOrder gs)
 
--- CR 701.19a: "To shuffle a library or a face-down pile of cards, randomize the
+-- CR 701.24a: "To shuffle a library or a face-down pile of cards, randomize the
 -- cards within it so that no player knows their order." Randomising an ORDER is a
 -- permutation -- the cards that were there are the cards that are there.
 --

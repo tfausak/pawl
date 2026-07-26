@@ -477,7 +477,16 @@ apply batch candidate event =
           Nothing -> pure (Just event)
           Just controller -> do
             let decider = Decide.deciderFor controller gs
-            chosen <- Trans.lift (Program.prompt (Prompt.ChooseCopyTarget decider controller oid (legalCopyTargets batch oid gs)))
+            let legal = legalCopyTargets batch oid gs
+            answer <- Trans.lift (Program.prompt (Prompt.ChooseCopyTarget decider controller oid legal))
+            -- FILTERED, NOT TRUSTED (#222). legalCopyTargets is the ONLY thing
+            -- enforcing CR 614.12a's same-batch exclusion -- Clone's own ruling,
+            -- "If Clone somehow enters at the same time as another creature, Clone
+            -- can't become a copy of that creature" -- so honouring an unoffered
+            -- answer would let a Clone copy a sibling token entering beside it.
+            let chosen = case answer of
+                  Just src | List.elem src legal -> Just src
+                  _ -> Nothing
             case chosen of
               Nothing -> pure (Just event)
               Just src2 -> do

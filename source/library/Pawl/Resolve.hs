@@ -590,8 +590,9 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           -- CR 701.23a: the card found is one the search's own filter admits.
           -- Filtered, not trusted (#222): naming a card the filter excluded, or one
           -- that is not in the library at all, finds nothing rather than fetching
-          -- it. "Fails to find" is already a legal outcome (#57's Nothing arm), so
-          -- rejecting needs no new branch downstream.
+          -- it. CR 701.23b makes that a legal outcome in its own right -- "that
+          -- player isn't required to find some or all of those cards even if
+          -- they're present" -- so rejecting needs no new branch downstream.
           let found = case answer of
                 Just oid | List.elem oid matches -> Just oid
                 _ -> Nothing

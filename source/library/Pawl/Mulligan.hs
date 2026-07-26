@@ -231,8 +231,13 @@ takeMulligan counts pid = do
         -- CR 103.5: the cards bottomed come from THIS hand, and there are exactly
         -- `n` of them. Filtered, not trusted (#222); a short answer is topped up
         -- from the front of the hand rather than bottoming too few.
-        let kept = take n (filter (\oid -> List.elem oid newHand) answer)
-        pure (kept <> take (n - length kept) (filter (\oid -> List.notElem oid kept) newHand))
+        -- nub, not just filter: an answer naming one card twice would otherwise
+        -- bottom it twice, and the second changeZone is a no-op on an id that has
+        -- already moved -- so the hand would end up one card too big rather than
+        -- visibly wrong.
+        let kept = take n (List.nub (filter (\oid -> List.elem oid newHand) answer))
+            topUp = take (n - length kept) (filter (\oid -> List.notElem oid kept) newHand)
+        pure (kept <> topUp)
       else -- CR 103.5: with nothing to bottom (a free mulligan, CR 103.5c) or a
       -- hand of 0 or 1, there is exactly one possible outcome; where the rules
       -- leave nothing to ask, don't prompt -- bottom whatever `n` names.
