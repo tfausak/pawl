@@ -114,7 +114,8 @@ legalAttackers pid gs = filter (\oid -> canAttack pid oid gs) (Projection.contro
 -- defending player.
 --
 -- Summoning sickness is NOT a blocking restriction. CR 302.6 restricts attacking
--- and activated abilities with the tap symbol, and says nothing about blocking.
+-- and activated abilities with the tap or untap symbol, and says nothing about
+-- blocking.
 canBlock :: PlayerId -> ObjectId -> GameState -> Bool
 canBlock pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False

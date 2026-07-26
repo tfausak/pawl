@@ -628,8 +628,8 @@ controlChangeSicknessTests registry =
             (creature, withCreature) = S.addCreature piker S.alice base
             settled = S.runPure S.identityAnswer withCreature (Engine.settleAll S.alice)
             (aura, withAura) = S.addCreature controlMagic S.bob settled
-            -- The steal is observed the next time the board settles, which is
-            -- every point a player could get priority (CR 117.5).
+            -- The steal is observed the next time the board settles -- the CR
+            -- 117.5 sweep, which runs wherever the board can change.
             stolen = S.runPure S.identityAnswer (S.attach aura creature withAura) Engine.settleForPriority
             returned = S.runPure S.identityAnswer stolen (Event.changeZone aura Zone.Graveyard)
         HU.assertEqual "bob held it" (Just S.bob) (Projection.controllerOf creature stolen)

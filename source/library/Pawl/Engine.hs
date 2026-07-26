@@ -179,11 +179,14 @@ settleAll pid = do
 -- control it was made about. This drops any `Settled p` on the battlefield whose
 -- object `p` no longer controls.
 --
--- It samples rather than hooks because control is DERIVED: `Projection.controllerOf`
--- reads Control Magic's static ability live, so a control change has no event to
--- hang a re-sickening on -- there is no moment to observe (#198). Running it from
--- `settleForPriority` samples at every point CR 117.5 lets a player observe the
--- board, which is every point the answer could matter.
+-- It samples rather than hooks because control is DERIVED: a control-granting
+-- static ability (Control Magic's `SetControllerToSource`) is re-read live by the
+-- projection, so a control change has no event to hang a re-sickening on -- there
+-- is no moment to observe (#198). `settleForPriority` is where it samples, which
+-- is every point the board can CHANGE rather than literally every priority grant;
+-- a bare priority pass leaves the state untouched, so the previous sample already
+-- saw this exact board. That is the same reading the settle loop's own header
+-- defends for the CR 117.5 state-based-action check.
 --
 -- It only ever CLEARS. That asymmetry is what makes the sampling sound: a
 -- discrepancy proves control changed, so clearing is always right, while
@@ -195,17 +198,21 @@ settleAll pid = do
 -- Battlefield-scoped: nothing off the battlefield has a controller to compare
 -- against, and CR 302.6 is a restriction on permanents.
 --
--- One `controllerOf` per battlefield object per settle, so this joins the
--- per-priority-boundary paths that project per object (#200).
+-- Hoists the grant list and calls `controllerOfGiven`, exactly as
+-- `Projection.controls` does -- linear in the battlefield rather than one
+-- `controlGrants` scan per object. That is not only speed: `settleAll` writes
+-- through `Projection.controls`, so deriving the check the same way makes the
+-- two structurally unable to disagree about who controls what.
 checkControlContinuity :: Game ()
 checkControlContinuity = do
   gs <- State.get
-  let interrupted oid objs = case Map.lookup oid objs of
+  let grants = Projection.controlGrants gs
+      interrupted oid objs = case Map.lookup oid objs of
         Nothing -> objs
         Just obj -> case Object.sickness obj of
           Sickness.Sick -> objs
           Sickness.Settled p ->
-            if Projection.controllerOf oid gs == Just p
+            if Projection.controllerOfGiven grants Set.empty oid gs == Just p
               then objs
               else Map.insert oid obj {Object.sickness = Sickness.Sick} objs
   State.put gs {GameState.objects = foldr interrupted (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
@@ -564,11 +571,16 @@ permute xs order =
 -- CR 117.5: each time a player would receive priority, sweep expired "for as
 -- long as" effects, perform state-based actions, then put triggered abilities
 -- on the stack, repeating until none of the three does anything. Then priority
--- is granted (by the caller). The repeat is gated on three cheap booleans --
--- whether the conditional sweep changed anything, whether an SBA fired and
--- whether a trigger was placed -- so a settle that changes nothing (the common
--- case) costs one board projection and one length comparison per carrier, NOT
--- a deep GameState equality check.
+-- is granted (by the caller). The repeat is gated on four cheap booleans --
+-- whether the conditional sweep changed anything, whether a monarch exile
+-- returned, whether an SBA fired and whether a trigger was placed -- so a settle
+-- that changes nothing (the common case) costs one board projection and one
+-- length comparison per carrier, NOT a deep GameState equality check.
+--
+-- On top of that, every pass pays one CR 302.6 control-continuity scan
+-- (checkControlContinuity), which is linear in the battlefield and runs
+-- unconditionally, because a derived control change has nothing else to notice
+-- it. That is a real addition to this path's cost, not a free rider.
 --
 -- CR 611.2b's condition is checked continuously, and CR 704.3 makes "whenever
 -- a player would get priority" the coarsest moment anything could observe it,

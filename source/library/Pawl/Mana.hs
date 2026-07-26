@@ -147,6 +147,8 @@ manaSources pid gs =
           -- never sick-gated. (M3e mana abilities all cost {T}.) Keyed to `pid`:
           -- the creature must have settled under the player reaching for the
           -- mana, not under whoever held it before (#198).
+          --
+          -- CR 702.10c's haste exemption is not applied here (#205).
           not (Set.member CardType.Creature (Projection.cardTypesOf oid gs) && Object.sickness obj /= Sickness.Settled pid)
       isSource oid = case Game.lookupObject oid gs of
         Nothing -> False

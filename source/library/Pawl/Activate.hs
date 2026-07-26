@@ -37,6 +37,9 @@ import qualified Pawl.Type.Zone as Zone
 -- Keyed to `pid`, the player trying to activate: CR 302.6 asks whether the
 -- creature has been under THEIR control since THEIR most recent turn began, so a
 -- settle recorded for anyone else does not answer it (#198).
+--
+-- CR 702.10c's haste exemption is not applied here (#205), and the untap symbol
+-- has no cost component to classify (#204).
 tapSicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 tapSicknessOk pid srcId ability gs =
   let needsTap = Cost.requiresTapSymbol (ActivatedAbility.cost ability)
