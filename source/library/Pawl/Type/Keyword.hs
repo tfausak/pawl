@@ -19,8 +19,14 @@ import Numeric.Natural (Natural)
 -- colourless); P10 adds Infect (702.90, a deal-time damage-diversion bit).
 --
 -- Toxic (702.164) is the first PARAMETERIZED constructor, exactly the addition
--- the `data`-not-an-enum choice was made for; Landwalk Subtype (702.14),
--- Protection Quality (702.16) and Ward Cost (702.21) follow the same shape.
+-- the `data`-not-an-enum choice was made for; Poisonous (702.70) is the second,
+-- and Landwalk Subtype (702.14), Protection Quality (702.16) and Ward Cost
+-- (702.21) follow the same shape.
+--
+-- A keyword is not necessarily a STATIC ability: rule 702.70 spells poisonous
+-- out as a TRIGGERED one. What it grants is still a citation and not an effect
+-- identity, so Pawl.Keyword may read this constructor and mint rule 702.70a's
+-- ability from it -- see that module.
 --
 -- Multiplicity is NOT this type's problem: an object can have the same keyword
 -- ability twice, which Pawl.Type.ProjectedCharacteristics.keywords carries as a
@@ -38,6 +44,14 @@ data Keyword
   | Trample -- 702.19
   | Vigilance -- 702.20
   | Fear -- 702.36
+  | -- 702.70a: "Poisonous is a triggered ability. 'Poisonous N' means 'Whenever
+    -- this creature deals combat damage to a player, that player gets N poison
+    -- counters.'" N rides the constructor, as Toxic's does. Unlike toxic, the
+    -- N values are NOT summed: CR 702.70b says each instance triggers
+    -- separately, so `Poisonous 1` twice is two abilities and two triggers --
+    -- which is what Pawl.Keyword.triggeredAbilitiesOf builds from the
+    -- projection's per-keyword count.
+    Poisonous Natural
   | Infect -- 702.90
   | Devoid -- 702.114
   | -- 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is

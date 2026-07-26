@@ -871,8 +871,19 @@ replacementsAffecting gs =
         then []
         else concatMap forOne onBattlefield
 
--- CR 603 / 613 layer 6: an object's triggered abilities after the layer system,
--- the same projection posture as abilitiesOf. A Humility'd creature has none.
+-- CR 603 / 613 layer 6: an object's PRINTED-AND-GRANTED triggered abilities after
+-- the layer system, the same projection posture as abilitiesOf. A Humility'd
+-- creature has none.
+--
+-- NOT the whole list: rule 702.70's poisonous is a triggered ability the RULES
+-- give an object for holding a keyword, and Pawl.Keyword.triggeredAbilitiesOf
+-- mints those from PC.keywords instead. Pawl.Event's event scan adds them; a
+-- reader that wants every triggered ability an object has must do the same.
+-- Deliberately not folded into PC.triggeredAbilities: that field is built DURING
+-- the layer fold, while the mint has to read the FINISHED keyword counts, which
+-- only exist once the fold is over. Deriving after the fold is also what makes
+-- Humility free -- LoseAllAbilities empties PC.keywords, so there is nothing left
+-- to mint from.
 triggeredAbilitiesOf :: ObjectId -> GameState -> [TriggeredAbility Card.Type.Card]
 triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 

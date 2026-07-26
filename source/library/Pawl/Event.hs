@@ -16,11 +16,14 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Binding as Binding
 import qualified Pawl.Condition as Condition
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
+import qualified Pawl.Keyword as Keyword
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
+import Pawl.Type.Binding (Binding)
 import Pawl.Type.Card (Card)
 import qualified Pawl.Type.CounterKind as CounterKind
 import Pawl.Type.DamageEvent (DamageEvent)
@@ -33,7 +36,7 @@ import Pawl.Type.GameEvent (GameEvent)
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.Keyword as Keyword.Type
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PendingTrigger (PendingTrigger)
@@ -42,6 +45,7 @@ import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
@@ -226,7 +230,7 @@ destroy oid = do
   case Game.lookupObject oid gs of
     Nothing -> pure ()
     Just _ ->
-      if Projection.hasKeyword Keyword.Indestructible oid gs
+      if Projection.hasKeyword Keyword.Type.Indestructible oid gs
         then pure ()
         else do
           settled <- Replacement.resolveDestruction oid
@@ -449,6 +453,30 @@ matchesTrigger bearer you cond event = case cond of
   -- Pawl.Monarch.inherentMatch, not here.
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
 
+-- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
+-- the environment in which the ability's "that player" / "that creature" is
+-- read. Called only for an (ability, event) pair `matchesTrigger` has already
+-- said yes to, so an arm here may assume its condition's shape matched; a
+-- mismatched pair contributes nothing rather than being an error.
+--
+-- Separate from `matchesTrigger` rather than folded into a `Maybe bindings`
+-- return, because the two have different customers: a DELAYED ability
+-- (delayedPending) matches against several events at once and carries the
+-- environment CAPTURED when it was armed (CR 603.7c), which is not this.
+--
+-- The parallel for a SOURCELESS inherent ability is Pawl.Monarch.inherentMatch,
+-- which binds its own event's creature; there is no shared matcher because that
+-- one has no bearer to scope the match to.
+eventBindings :: TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
+eventBindings cond event = case (cond, event) of
+  -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
+  (TriggerCondition.SelfDealsCombatDamageToPlayer, GameEvent.DamageDealt ev) ->
+    case DamageEvent.target ev of
+      Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid Map.empty
+      Recipient.ToCreature _ -> Map.empty
+      Recipient.ToObject _ -> Map.empty
+  _ -> Map.empty
+
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
 isPlayerRecipient :: Recipient.Recipient -> Bool
@@ -507,12 +535,20 @@ eventTriggers events gs =
               -- BOUNDARY, not at the moment the underlying event fired (#47) --
               -- unobservable today because nothing changes control between an
               -- event and the CR 117.5 boundary.
-              Just pc -> fmap (\ctrl -> (oid, ctrl, PC.triggeredAbilities pc)) (Projection.controllerOfGiven grants Set.empty oid gs)
+              -- CR 702.70a: a keyword can BE a triggered ability, so the
+              -- permanent's abilities are its printed-and-granted ones plus the
+              -- ones rule 702 mints from its keywords. Derived from the
+              -- POST-LAYER counts, so Humility takes them away and an Aura's
+              -- layer-6 grant adds them without either being special-cased.
+              Just pc ->
+                fmap
+                  (\ctrl -> (oid, ctrl, PC.triggeredAbilities pc <> Keyword.triggeredAbilitiesOf (PC.keywords pc)))
+                  (Projection.controllerOfGiven grants Set.empty oid gs)
           )
           (Set.toAscList (GameState.battlefield gs))
       forOne event (oid, ctrl, abilities) =
         let fires ab = matchesTrigger oid ctrl (TriggeredAbility.condition ab) event
-            pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab Map.empty
+            pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
          in fmap pend (filter fires abilities)
    in concatMap (\event -> concatMap (forOne event) onBattlefield) events
 
