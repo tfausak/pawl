@@ -88,9 +88,10 @@ status check: **`Test`**. `Ormolu`, `HLint`, `Gild`, `Cabal` and `Bench` run on
 every PR but cannot block a merge. There are no bypass actors — the owner's
 admin rights do not exempt them.
 
-**That looseness is deliberate. Do not "fix" it.** `hooky` runs those same
-checks locally as a pre-commit hook, so they are enforced where the work
-happens; and keeping them non-blocking means an outside contributor's PR with
+**That looseness is deliberate. Do not "fix" it.** `hooky` runs the formatting
+and lint checks — `Ormolu`, `HLint`, `Gild`, `Cabal` — locally as a pre-commit
+hook, so they are enforced where the work happens; and keeping them
+non-blocking means an outside contributor's PR with
 bad formatting can be merged and tidied afterward rather than bounced. A red
 `Ormolu` on an agent-authored PR is not a policy hole — it means `hooky` was
 skipped, which is a bug in the work. **Every check should be green at
