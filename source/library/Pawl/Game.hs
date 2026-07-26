@@ -142,3 +142,23 @@ stillPlayingInOrder :: GameState -> [PlayerId]
 stillPlayingInOrder gs =
   let playing = stillPlaying gs
    in filter (\pid -> List.elem pid playing) (GameState.turnOrder gs)
+
+-- CR 701.19a: "To shuffle a library or a face-down pile of cards, randomize the
+-- cards within it so that no player knows their order." Randomising an ORDER is a
+-- permutation -- the cards that were there are the cards that are there.
+--
+-- FILTERED, NOT TRUSTED, the posture Combat.declareAttackers and
+-- Engine.priorityLoop take toward their own answers (#219). This one matters more
+-- than most: a shuffle answer BECOMES the zone, so an unchecked answer can
+-- duplicate a card, drop one, or name an id that was never in the library --
+-- inventing or destroying objects outright rather than merely breaking a rule
+-- (#222).
+--
+-- Sorted comparison, so a genuine reordering is honoured and only a change of
+-- CONTENTS is refused. Rejecting keeps the existing order, which is the
+-- reject-not-repair posture rather than an attempt to guess what was meant.
+honourShuffle :: [ObjectId] -> [ObjectId] -> [ObjectId]
+honourShuffle offered answer =
+  if List.sort answer == List.sort offered
+    then answer
+    else offered

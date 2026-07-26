@@ -677,6 +677,30 @@ resolveTests registry =
             resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
         HU.assertEqual "the basic land is offered and fetched to the battlefield" 1 (S.countOnBattlefieldByName (Text.pack "Mountain") S.alice resolved)
         HU.assertBool "the nonland is not offered -- it remains in the library" (elem pikerId (Game.zoneMembers Zone.Library S.alice resolved)),
+      -- #222: CR 701.23a's filter defines what the search may find. An
+      -- interpreter that names a card the filter excluded must find nothing --
+      -- "fails to find" is already a legal outcome, so rejecting needs no new
+      -- branch. Same fixture as the test above, so the only variable is the answer.
+      HU.testCase "#222 a search that names a card the filter excluded fetches nothing" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        let base = Setup.emptyGame S.bothPlayers
+            (_, g0) = S.addLibraryCard mountain S.alice base
+            (pikerId, g1) = S.addLibraryCard piker S.alice g0
+            ability =
+              ActivatedAbility.MkActivatedAbility
+                (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                ActivationTiming.AnyTime
+            (abilId, g2) = Game.freshObjectId g1
+            (ts, g3) = Game.freshTimestamp g2
+            abilObj =
+              Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
+            g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
+            resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
+        HU.assertEqual "the Piker was NOT fetched to the battlefield" 0 (S.countOnBattlefieldByName (Text.pack "Goblin Piker") S.alice resolved)
+        HU.assertBool "it is still in the library" (elem pikerId (Game.zoneMembers Zone.Library S.alice resolved))
+        HU.assertEqual "and nothing else was fetched either" 0 (S.countOnBattlefieldByName (Text.pack "Mountain") S.alice resolved),
       HU.testCase "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
         restInPeace <- Registry.printing registry "Rest in Peace"
         piker <- Registry.printing registry "Goblin Piker"
@@ -1076,6 +1100,13 @@ findFirst p = case p of
   Prompt.SearchLibrary _ _ matches -> case matches of
     m : _ -> Just m
     [] -> Nothing
+  _ -> S.identityAnswer p
+
+-- Names a card the search filter did NOT admit -- the lying interpreter #222 is
+-- about. Parameterised so the test can point it at a specific nonland.
+findForbidden :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+findForbidden wanted p = case p of
+  Prompt.SearchLibrary {} -> Just wanted
   _ -> S.identityAnswer p
 
 findNothing :: Prompt.Prompt r -> r

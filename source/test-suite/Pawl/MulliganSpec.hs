@@ -345,6 +345,54 @@ recordAsks p = case p of
     pure (if pid == S.bob && MulliganOffer.taken offer < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep)
   _ -> pure (S.identityAnswer p)
 
+-- #222: an answer that is not a permutation of the library must not become the
+-- library. CR 701.19a defines a shuffle as randomising the order of the cards
+-- that are there -- not as replacing them.
+-- Answers Prompt.Shuffle with a fixed list, whatever was offered -- the lying
+-- interpreter #222 is about. Top-level so it stays polymorphic in the prompt's
+-- result type; a `let` binding would not.
+shuffleAnswering :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+shuffleAnswering answer p = case p of
+  Prompt.Shuffle _ -> answer
+  _ -> S.identityAnswer p
+
+-- An HONEST interpreter: a genuine permutation of what it was offered.
+reversingShuffle :: Prompt.Prompt r -> r
+reversingShuffle p = case p of
+  Prompt.Shuffle ids -> reverse ids
+  _ -> S.identityAnswer p
+
+trustedShuffleTests :: Registry.Type.Registry -> Tasty.TestTree
+trustedShuffleTests registry =
+  Tasty.testGroup
+    "TrustedShuffle"
+    [ HU.testCase "#222 a shuffle answer that duplicates a card is refused" $ do
+        forest <- Registry.printing registry "Forest"
+        let (a, g1) = S.addLibraryCard forest S.alice (Setup.emptyGame S.bothPlayers)
+            (b, gs) = S.addLibraryCard forest S.alice g1
+            -- The interpreter returns one card twice: a library that would gain a
+            -- card and lose one.
+            after = S.runPure (shuffleAnswering [a, a]) gs (Mulligan.shuffleLibrary S.alice)
+        HU.assertEqual "the library still holds both cards, once each" [a, b] (List.sort (Game.zoneMembers Zone.Library S.alice after)),
+      HU.testCase "#222 a shuffle answer naming a card that was never there is refused" $ do
+        forest <- Registry.printing registry "Forest"
+        let (a, g1) = S.addLibraryCard forest S.alice (Setup.emptyGame S.bothPlayers)
+            (b, gs) = S.addLibraryCard forest S.alice g1
+            phantom = ObjectId.MkObjectId 9999
+            after = S.runPure (shuffleAnswering [a, phantom]) gs (Mulligan.shuffleLibrary S.alice)
+        HU.assertEqual "no invented card entered the library" [a, b] (List.sort (Game.zoneMembers Zone.Library S.alice after)),
+      -- The control: an honest permutation IS honoured, so the guard cannot pass
+      -- by ignoring every answer.
+      HU.testCase "#222 an honest permutation is honoured" $ do
+        forest <- Registry.printing registry "Forest"
+        let (a, g1) = S.addLibraryCard forest S.alice (Setup.emptyGame S.bothPlayers)
+            (b, gs) = S.addLibraryCard forest S.alice g1
+            before = Game.zoneMembers Zone.Library S.alice gs
+            after = S.runPure reversingShuffle gs (Mulligan.shuffleLibrary S.alice)
+        HU.assertEqual "the fixture really has two cards" [a, b] (List.sort before)
+        HU.assertEqual "the order is the reversal the interpreter asked for" (reverse before) (Game.zoneMembers Zone.Library S.alice after)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
@@ -632,5 +680,6 @@ tests registry =
                     _ -> False
                in length (filter isBottom log_)
         HU.assertEqual "three seats: no bottom choice is asked for a free mulligan" 0 (bottomsIn [S.alice, S.bob, S.carol] (libraryGame3 mountain 20))
-        HU.assertEqual "two seats: both players are still asked" 2 (bottomsIn [S.alice, S.bob] (libraryGame mountain 20))
+        HU.assertEqual "two seats: both players are still asked" 2 (bottomsIn [S.alice, S.bob] (libraryGame mountain 20)),
+      trustedShuffleTests registry
     ]

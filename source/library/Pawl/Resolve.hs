@@ -586,12 +586,20 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           gs <- State.get
           let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
               decider = Decide.deciderFor controller gs
-          found <- Trans.lift (Program.prompt (Prompt.SearchLibrary decider controller matches))
+          answer <- Trans.lift (Program.prompt (Prompt.SearchLibrary decider controller matches))
+          -- CR 701.23a: the card found is one the search's own filter admits.
+          -- Filtered, not trusted (#222): naming a card the filter excluded, or one
+          -- that is not in the library at all, finds nothing rather than fetching
+          -- it. "Fails to find" is already a legal outcome (#57's Nothing arm), so
+          -- rejecting needs no new branch downstream.
+          let found = case answer of
+                Just oid | List.elem oid matches -> Just oid
+                _ -> Nothing
           mapM_ putTapped found
           -- CR 701.23: shuffle the (possibly reduced) library afterward.
           lib <- State.gets (Game.zoneMembers Zone.Library controller)
-          shuffled <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
-          State.modify' (reorderLibrary controller shuffled)
+          shuffleAnswer <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
+          State.modify' (reorderLibrary controller (Game.honourShuffle lib shuffleAnswer))
   -- Rest in Peace's ETB: exile every card in every graveyard (CR 400.7 each move
   -- funnels through changeZone). A graveyard->exile move matches no M3f
   -- replacement or trigger, so no cascade.
