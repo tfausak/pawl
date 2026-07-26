@@ -207,16 +207,19 @@ pay pid oid cost = do
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     Nothing -> pure Payment.Unpaid
-    Just manaCost -> case Mana.payCost pid manaCost before of
-      Nothing -> pure Payment.Unpaid
-      Just afterMana -> do
-        State.put afterMana
-        outcome <- payComponents pid oid (Cost.components cost)
-        case outcome of
-          Payment.Paid -> pure Payment.Paid
-          Payment.Unpaid -> do
-            State.put before
-            pure Payment.Unpaid
+    -- CR 601.2g: Mana.payCost now PROMPTS for which sources to activate, so it is
+    -- monadic and restores the pre-payment state itself when it cannot be paid.
+    Just manaCost -> do
+      paidMana <- Mana.payCost pid manaCost
+      if not paidMana
+        then pure Payment.Unpaid
+        else do
+          outcome <- payComponents pid oid (Cost.components cost)
+          case outcome of
+            Payment.Paid -> pure Payment.Paid
+            Payment.Unpaid -> do
+              State.put before
+              pure Payment.Unpaid
 
 payComponents :: PlayerId -> ObjectId -> [CostComponent.CostComponent] -> Game Payment.Payment
 payComponents pid oid components = case components of

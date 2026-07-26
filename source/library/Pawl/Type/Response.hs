@@ -30,6 +30,8 @@ data Response
     -- return Nothing for a response that does not match the prompt being asked,
     -- and two prompts sharing a constructor cannot do that.
     ChoseDefender PlayerId
+  | -- CR 601.2g: the mana source the player chose to tap.
+    ChoseManaSource ObjectId
   | DeclaredAttackers [ObjectId]
   | DeclaredBlockers (Map ObjectId ObjectId)
   | AssignedCombatDamage (Map Recipient Natural)

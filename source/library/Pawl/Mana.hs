@@ -1,11 +1,15 @@
 module Pawl.Mana where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.Class as Trans
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
@@ -15,6 +19,7 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Mana (Mana)
@@ -30,6 +35,8 @@ import qualified Pawl.Type.ManaUnit as ManaUnit
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.Prompt as Prompt
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
@@ -162,7 +169,8 @@ manaSources pid gs =
 --
 -- Takes the first mana type the object can produce. A Mountain produces exactly
 -- one, so there is no choice to make. A source that can produce more than one
--- type (any dual land) makes this a real decision that must become a Prompt (#12).
+-- TYPE (any dual land) makes that a real decision needing its own prompt (#124).
+-- Which SOURCE to tap is a separate question, and payCost asks it.
 tapForMana :: ObjectId -> GameState -> GameState
 tapForMana oid gs = case Game.lookupObject oid gs of
   Nothing -> gs
@@ -229,23 +237,84 @@ spend cost (Mana.MkMana units) =
         afterGeneric <- Monad.foldM takeAny afterTyped [1 .. generic]
         pure (Mana.MkMana afterGeneric)
 
--- Produce mana by tapping sources front-of-list until the cost is covered, then
--- spend it. Nothing when it cannot be covered.
+-- CR 601.2g: "If the total cost includes a mana payment, the player then has a
+-- chance to activate mana abilities." Reached from an ability too, by CR 602.2b
+-- ("the remainder of the process ... is identical to ... 601.2b-i").
 --
--- This elides a choice, and that is legitimate ONLY because the sources are
--- INDISTINGUISHABLE: every Mountain produces exactly one red unit, so picking
--- among them is canonicalization, not a decision -- there is no policy to have.
--- The engine makes no player choices; strategy belongs to the interpreter. The
--- moment sources differ in any way a player could care about, this must become a
--- real Prompt (#12).
-payCost :: PlayerId -> ManaCost -> GameState -> Maybe GameState
-payCost pid cost gs =
+-- Returns whether it was paid; on failure nothing is spent, which is CR 601.2h's
+-- "Partial payments are not allowed" rather than mere tidiness. The prompts
+-- themselves are NOT rolled back -- they live in the Program, outside the state --
+-- so a failed payment still asked its questions. Unreachable in practice, because
+-- every caller pre-checks the pure canPay.
+--
+-- One prompt per source tapped, against a shrinking candidate list, rather than
+-- one prompt for a whole subset: a cost needing {G}{G} is two decisions, and the
+-- second is made knowing the first.
+payCost :: PlayerId -> ManaCost -> Game Bool
+payCost pid cost = do
+  before <- State.get
+  paid <- tapUntilPaid
+  Monad.unless paid (State.put before)
+  pure paid
+  where
+    tapUntilPaid = do
+      gs <- State.get
+      case spend cost (poolOf pid gs) of
+        Just left -> do
+          State.put (setPool pid left gs)
+          pure True
+        Nothing -> case manaSources pid gs of
+          [] -> pure False
+          candidate : rest -> do
+            oid <- chooseSource pid (candidate NonEmpty.:| rest) gs
+            State.put (tapForMana oid gs)
+            tapUntilPaid
+
+-- Which source to tap next.
+--
+-- Asked whenever there is more than one candidate, and elided ONLY when there is
+-- exactly one -- where no choice exists to make. That is a deliberately blunt
+-- reading of CLAUDE.md's "eliding a prompt is legitimate only for
+-- indistinguishable options": it never has to be right about what
+-- indistinguishable MEANS.
+--
+-- The obvious cheaper rule -- elide when every candidate is a copy of the same
+-- card -- is unsound in this pool, and the counterexamples are ordinary. Two
+-- Llanowar Elves are one card, but one may be equipped with Bonesplitter or
+-- enchanted, one may carry +1/+1 counters (Battlegrowth, Longtusk Cub), one may
+-- be borrowed until end of turn by Act of Treason, and one may be blocking (CR
+-- 506.4 does not remove a creature from combat for tapping). Each of those makes
+-- the choice real. `Game.cardOf` compares PRINTED identity and cannot see any of
+-- it, so that rule would suppress exactly the prompts the invariant exists to
+-- force. An extra question is cheap; a missing one is the engine deciding (#217).
+--
+-- FILTERED, NOT TRUSTED, the posture Combat.declareAttackers and
+-- Cost.payComponents already take: an answer outside the offered set is rejected
+-- and the head is used instead. That is not only hygiene -- tapForMana is a no-op
+-- on an unknown or mana-less id, so honouring a bogus answer would leave the
+-- state unchanged and loop forever.
+chooseSource :: PlayerId -> NonEmpty.NonEmpty ObjectId -> GameState -> Game ObjectId
+chooseSource pid candidates gs = case candidates of
+  only NonEmpty.:| [] -> pure only
+  _ -> do
+    answer <- Trans.lift (Program.prompt (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates))
+    pure $
+      if List.elem answer (NonEmpty.toList candidates)
+        then answer
+        else NonEmpty.head candidates
+
+-- CR 118.3: can this cost be paid at all? Pure, because Action.legalActions asks
+-- it while merely ENUMERATING actions, where prompting would be absurd. The
+-- greedy walk is sound for the question it answers: every mana source in this
+-- pool produces exactly one mana of one type (a source offering a colour CHOICE
+-- is #124), so the order they are tapped in cannot change WHETHER the cost is
+-- affordable -- only which permanents end up tapped, which is payCost's business
+-- and the player's choice.
+canPay :: PlayerId -> ManaCost -> GameState -> Bool
+canPay pid cost gs =
   let tapUntilPaid remaining state = case spend cost (poolOf pid state) of
-        Just left -> Just (setPool pid left state)
+        Just _ -> True
         Nothing -> case remaining of
-          [] -> Nothing
+          [] -> False
           oid : rest -> tapUntilPaid rest (tapForMana oid state)
    in tapUntilPaid (manaSources pid gs) gs
-
-canPay :: PlayerId -> ManaCost -> GameState -> Bool
-canPay pid cost gs = Maybe.isJust (payCost pid cost gs)
