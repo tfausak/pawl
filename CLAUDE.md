@@ -35,79 +35,17 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 
 ## Current work and tracking
 
-- **Status: M0–M5, the M5.5 count/compare interstitial, the M5.6 multiplayer
-  interstitial, three mulligan-adjacent gap closures (CR 103.5b/#182, #176, CR
-  103.6a/#149), and Auras (CR 303.4, phases (a) and (b), both complete) are
-  done.** The closed-half milestones M0–M3g, the M3.5 cards-as-data
-  interstitial, all of M4 (M4a–M4h), all eleven phases of M4.5 (the
-  closed-half gap census), all of M5 (Controlling Another Player CR 723,
-  Restarting the Game CR 727, Subgames CR 729), the mulligan gap-closure (CR
-  103.5), M5.5 (count/compare), M5.6 (Multiplayer: CR 800 general + CR 806
-  free-for-all, settling `docs/design.md` §2.4's bet), and the three
-  mulligan-adjacent closures (a declaration-window action gated on Serum
-  Powder, `Prompt.DeclareMulligan` carrying its cost, and an opening-hand-window
-  action gated on Leyline of the Void) have each landed with their own
-  distilled entry in `docs/progress.md`. **Auras is the newest — a card-driven
-  unit, not a numbered milestone, since Auras were the largest single hole in
-  the card pool rather than a scheduled phase.** Phase (a), the attachment
-  substrate, gate cards **Unholy Strength** (the first static ability to reach
-  through an attachment) and **Opalescence** (closing #114 for free once
-  `Subtype.Aura` existed): adds `Subtype.Aura`, `Card.enchant :: Maybe
-  TargetSpec`, `Object.attachedTo :: Maybe ObjectId` as base state seeded as
-  the object enters the battlefield, `Affected.Attached` (a third
-  affected-set kind, re-derived from the source's own state), and CR 704.5m's
-  `Sba.fallsOff`. Phase (b), control granted by a static ability, gate card
-  **Control Magic**, closing **#33** and **#62**: adds the payload-free
-  `Modification.SetControllerToSource` (CR 613.1b) — payload-free because card
-  data cannot name a `PlayerId`, unlike `SetController`, which bakes its player
-  at resolution — and rebuilds `Projection.controllerOf` to merge stored
-  continuous effects with control-granting static abilities read straight off
-  battlefield permanents under CR 613.7's timestamp ordering, with a
-  `liveGiven`-shaped cycle escape (#37's shape) and hoisting so the
-  state-based-action sweep stays linear rather than quadratic in the
-  battlefield. Also re-derived, not merely reworded, two of
-  `Pawl.Departure`'s CR 800.4a proofs whose premises phase (b) invalidated.
-  **No new opcode across either phase**
-  — an Aura's whole behaviour is a static ability plus an entry rule. **The
-  limitation that stays open, stated plainly rather than softened: #198** — a
-  *derived* control change does not re-Sick the creature (`Object.sickness` is
-  event-written state with no hook for a static ability's control grant, unlike
-  `Effect.GainControl`'s explicit resolution-time re-Sick), so **Control Magic
-  currently lets its controller attack with the stolen creature the same
-  turn** — CR 302.6-incorrect on the live path until #198 lands as its own
-  unit. Deferred besides #198: #187–#193 from phase (a) (Attach/CR 303.4j,
-  non-resolution entry, multiple `enchant`, enchant-player, CR 303.4d's
-  chooser, face-down, Equipment/Fortification); #195 (a control grant with an
-  `Affected.Matching` set), #196 (layer 6/Humility does not stop a
-  control-granting static ability), #197 (`controllerOf` can loop through a
-  `Matching`/`ControlledBy` filter — held off today only by laziness), #199 (CR
-  800.4a clause 2 versus a stored `SetControllerToSource`, unreachable in this
-  pool and pool-wide linted against), and #200 (pre-existing
-  O(battlefield²) per-priority-boundary paths, not caused by this phase) from
-  phase (b). M5.6's umbrella spec is
-  `docs/superpowers/specs/2026-07-24-m5.6-multiplayer-design.md`; its five
-  phase plans are `docs/superpowers/plans/2026-07-24-m5.6a-turn-order-priority.md`,
-  `docs/superpowers/plans/2026-07-25-m5.6b-setup-mulligans-restart-subgames.md`,
-  `docs/superpowers/plans/2026-07-25-m5.6c-leaving-the-game-objects-monarch.md`,
-  `docs/superpowers/plans/2026-07-25-m5.6d-combat-defending-player.md`, and
-  `docs/superpowers/plans/2026-07-25-m5.6e-close-out.md`. Auras' spec is
-  `docs/superpowers/specs/2026-07-25-auras-design.md`; its two phase plans are
-  `docs/superpowers/plans/2026-07-25-auras-a-attachment-substrate.md` and
-  `docs/superpowers/plans/2026-07-25-auras-b-control-magic.md`. **M6 (the
-  transpiler, #9) is next.** The distilled per-milestone entries (gate cards,
-  decisions, opcodes) are in `docs/progress.md`.
-- The **milestone completion log** — one distilled entry per milestone with
-  its gate card, the decision it proved, and the opcodes/types it added —
-  lives in `docs/progress.md`. It records what each milestone *established*,
-  not what is left to do; outstanding work is in GitHub Issues. The
-  forward path (M0–M7 and the letter/phase splits) is `docs/design.md` §3;
-  each milestone's authoritative detail is its spec and plan under
-  `docs/superpowers/{specs,plans}/`. **Maintain the status bullet above by
-  replacing it, never appending** — milestone history goes in
-  `progress.md`, not here.
-- The **milestone workflow** — the session-per-phase loop, model tiering,
-  and context discipline — is `docs/workflow.md`. Follow it for all
-  milestone work.
+- **Status: the closed half is built.** M0–M5.6 have landed, together with the
+  M3.5 cards-as-data and M5.5 count/compare interstitials, M4.5's closed-half
+  gap census, the mulligan-adjacent closures, and the card-driven **Auras**
+  unit. `docs/progress.md` is the frozen record of what each established.
+  **Work is now issue-driven, not milestone-driven** — `gh issue list` says
+  what is next. M6 (the transpiler) and M7 (interpreters) are ordinary issues,
+  #9 and #10.
+- **The development workflow is `docs/workflow.md`** — pick an issue, branch,
+  TDD, `/code-review`, open a PR, stop. **One PR per logical chunk of work.
+  Never commit to `main`, never merge a PR, never push to `main`** — `main`'s
+  ruleset requires a pull request, and only the repository owner merges.
 - **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
   the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
   `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
@@ -177,29 +115,34 @@ dev shell (`nix develop` or direnv).
    validation. Cite the rule number in the code comment so the next reader can
    check your work.
 
-## Executing a plan
+## Working a unit
 
-Plans live in `docs/superpowers/plans/`. Work tasks **strictly in order**; each is
-one small complete commit on `main`.
+Work happens on a branch and lands as a pull request. `docs/workflow.md` is the
+full loop; the load-bearing rules:
 
-- **TDD is not optional:** write each failing test and actually run it to watch it
-  fail before implementing. Tick each `- [ ]` as you finish that step.
-- **Progress check:** `grep -c -- '- \[ \] \*\*Step' <plan>` must reach `0`. Use
-  *that* grep, not `grep -c -- '- \[ \]'` — the plan template's line 3 quotes the
-  checkbox syntax in prose, so the naive grep can never reach 0, and asking it to
-  is unsatisfiable without editing the plan.
-- **Never** edit the plan, weaken an assertion, or delete a test to make a check
-  pass. If the plan looks wrong, **stop and say so** — it has been wrong before.
-  A test failing against correct code is a plan bug: fix the plan's test, not the
-  engine.
-- A milestone's **exit criterion** may legitimately retire a property (M1b kills
-  M0's "no life changes"). That is the milestone landing, not a regression — the
-  plan says so explicitly where it applies.
-- The two invariants outrank the plan: the engine never cases on a card's
+- **One PR per logical chunk of work**, usually one issue. A large issue may
+  span several PRs — each independently mergeable, each leaving `main` green;
+  only the last says `Closes #N`, the others `Part of #N`.
+- **Branch from current `main`**, named `<issue>-<slug>`, e.g.
+  `29-combat-damage-departed-blockers`.
+- **TDD is not optional:** write each failing test and actually run it to watch
+  it fail before implementing.
+- **Commit granularity inside a branch does not matter** — squash merge
+  collapses it. Commit as often as is convenient.
+- **Run `/code-review` on the branch before opening the PR** — the invariant
+  audit and the rules-correctness pass. Fix findings on the branch.
+- **Every CI check green at hand-off.** Only `Test` blocks a merge, and that
+  looseness is deliberate (`workflow.md` says why); a red `Ormolu` means
+  `hooky` was skipped, which is a bug in the work.
+- A spec or plan is **optional, not ceremony** — write one when the unit
+  warrants it and commit it in the same PR. If you are following a plan: tasks
+  strictly in order, and **never** edit the plan, weaken an assertion, or
+  delete a test to make a check pass. If the plan looks wrong, **stop and say
+  so** — it has been wrong before.
+- The two invariants outrank everything: the engine never cases on a card's
   identity (only classifications), and never makes a player's choice. Eliding a
   prompt is legitimate only for indistinguishable options, and every elision
-  carries a documented expiry naming the milestone that kills it. Where the rules
-  leave nothing to ask, don't prompt.
+  carries an issue. Where the rules leave nothing to ask, don't prompt.
 
 ## Code conventions
 
