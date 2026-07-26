@@ -1298,11 +1298,47 @@ turnOrderTests registry =
         HU.assertEqual "neither run ended the game" (Nothing, Nothing) (GameState.result hitBob, GameState.result hitCarol)
     ]
 
+-- #219: Action.legalActions computes what is legal; the priority loop must not
+-- act on anything else. Every gate the enumeration applies -- the controller
+-- check, CR 302.6's tap-sickness gate, cost payability, CR 307.5 timing -- is
+-- only as strong as this.
+trustedActionTests :: Registry.Type.Registry -> Tasty.TestTree
+trustedActionTests registry =
+  Tasty.testGroup
+    "TrustedActions"
+    [ -- CR 302.6: a summoning-sick creature's {T} ability cannot be activated.
+      -- legalActions already refuses to offer it; this pins that NAMING it anyway
+      -- does not work either.
+      HU.testCase "#219 an activation that was never offered is refused" $ do
+        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+        let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+            -- Summoning sick, so the ability is genuinely illegal to activate.
+            sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) srcId (GameState.objects g0), GameState.priority = Just S.alice}
+            ability = theAbility prodigalSorcerer
+            offered = Action.legalActions S.alice sick
+            after = snd (State.evalState (Engine.runGame (illegalActivationAnswer srcId ability) sick Engine.priorityLoop) False)
+        HU.assertBool "the engine really does not offer it" (notElem (A.Activate srcId ability) offered)
+        HU.assertEqual "and naming it puts nothing on the stack" [] (GameState.stack after)
+        HU.assertEqual "the Sorcerer is not tapped" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject srcId after)),
+      -- The control: the SAME interpreter, the same board, but settled -- so the
+      -- activation is legal and must go through. Without this, a guard that
+      -- refused every activation would pass the test above.
+      HU.testCase "#219 the same activation IS honoured once it is legal" $ do
+        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+        let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+            settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.alice)
+            ready = settled {GameState.priority = Just S.alice}
+            ability = theAbility prodigalSorcerer
+            after = snd (State.evalState (Engine.runGame (illegalActivationAnswer srcId ability) ready Engine.priorityLoop) False)
+        HU.assertBool "it is offered now" (elem (A.Activate srcId ability) (Action.legalActions S.alice ready))
+        HU.assertEqual "so the Sorcerer taps" (Just TapState.Tapped) (fmap Object.tapped (Game.lookupObject srcId after))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Game"
-    [gameTests registry, actionTests registry, objectFactTests registry, engineTests registry, ruleTests registry, restartReentryTests registry, concedeTests registry, turnOrderTests registry]
+    [gameTests registry, actionTests registry, objectFactTests registry, engineTests registry, ruleTests registry, restartReentryTests registry, concedeTests registry, turnOrderTests registry, trustedActionTests registry]
 
 -- One Lightning Bolt in bob's hand.
 handBobBolt :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
@@ -1398,6 +1434,45 @@ controlCombatAnswer p = case p of
       r : _ -> Map.singleton r n
       [] -> Map.empty
   _ -> slaveAnswer p
+
+-- An interpreter that names an action it was never offered. CR-wise this is not
+-- a rules question at all: Action.legalActions computes what is legal, and the
+-- priority loop must not act on anything else (#219). pawl's boundary is an
+-- interpreter that may be an LLM, and a plausible-looking illegal action is
+-- exactly what such an interpreter produces.
+-- Stateful, and it must be: an answerer that returns Activate for EVERY
+-- ChooseAction never lets the priority loop terminate. This one names the
+-- activation once and passes forever after, which is also the honest model of an
+-- interpreter that tries something illegal and then gives up.
+illegalActivationAnswer :: ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Prompt.Prompt r -> State.State Bool r
+illegalActivationAnswer oid ability p = case p of
+  Prompt.ChooseAction {} -> do
+    tried <- State.get
+    if tried
+      then pure A.Pass
+      else do
+        State.put True
+        pure (A.Activate oid ability)
+  -- Aim Prodigal Sorcerer's ping at a PLAYER. S.identityAnswer takes the lowest
+  -- recipient, which is the Sorcerer itself -- and a 1/1 pinging itself dies, so
+  -- the board this test wants to inspect would not exist by the time it looked.
+  Prompt.ChooseTargets _ _ _ sets ->
+    pure (Map.mapMaybe (\candidates -> pickPlayerRecipient candidates) sets)
+  _ -> pure (S.identityAnswer p)
+
+-- The lowest ToPlayer recipient in a legal set, falling back to the lowest of
+-- anything when the set holds no player.
+isPlayerRecipient :: Recipient.Recipient -> Bool
+isPlayerRecipient r = case r of
+  Recipient.ToPlayer _ -> True
+  Recipient.ToCreature _ -> False
+  Recipient.ToObject _ -> False
+
+pickPlayerRecipient :: Set.Set Recipient.Recipient -> Maybe Recipient.Recipient
+pickPlayerRecipient candidates =
+  case filter isPlayerRecipient (Set.toList candidates) of
+    r : _ -> Just r
+    [] -> Set.lookupMin candidates
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of
