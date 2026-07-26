@@ -24,7 +24,17 @@ The build must be **warning-clean**: pawl compiles with `-Weverything -Werror`
 minus a short, explicit allow-list in `pawl.cabal`. A warning is a failure, not
 a suggestion.
 
-There is no test suite yet. When there is, `cabal test` will run it.
+```sh
+cabal test    # the tasty suite
+cabal bench   # the tasty-bench benchmarks
+```
+
+Build `all` when you touch anything the suites use — they break separately from
+the library:
+
+```sh
+cabal build all --enable-tests --enable-benchmarks
+```
 
 ## Checks: formatting and linting
 
@@ -84,6 +94,30 @@ easy to read, debug, and modify. The load-bearing rules:
 - **Derive at least `Eq` and `Show`** on the types you define.
 - **Short exported names.** Uniqueness only has to hold within a module; lean on
   module qualification at the call site instead of prefixing every identifier.
+
+## Workflow
+
+`main` is protected: it takes changes only through a pull request, and only the
+repository owner merges them.
+
+1. **File or pick an issue.** It is the spec for the work.
+2. **Branch from current `main`**, named `<issue>-<slug>` — say,
+   `29-combat-damage-departed-blockers`.
+3. **Work, with tests.** Commit as often as you like; merges are squashed, so
+   a branch's internal history is working state, not a record.
+4. **Open a pull request.** `.github/pull_request_template.md` prompts for what
+   a reviewer needs: what and why, the rules citations behind it, how it was
+   verified, and what was deferred.
+5. **Wait for CI.** `Test` is the only check that blocks a merge. The others —
+   `Ormolu`, `HLint`, `Gild`, `Cabal` — are deliberately non-blocking: `hooky`
+   already runs them locally, and a contributor's PR won't be bounced over
+   formatting. It will be merged and tidied.
+
+**One pull request per logical chunk of work.** A large issue may span several,
+each independently mergeable and each leaving `main` green; only the last one
+closes the issue.
+
+`docs/workflow.md` has the longer version, including how work is picked.
 
 ## Commits and versioning
 
