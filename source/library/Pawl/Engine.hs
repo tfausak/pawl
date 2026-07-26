@@ -685,7 +685,25 @@ priorityLoop = do
                           Concession.Continues -> do
                             let decider = Decide.deciderFor p gs
                                 actions = Action.legalActions p gs
-                            chosen <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
+                            answered <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
+                            -- FILTERED, NOT TRUSTED. Everything Action.legalActions
+                            -- computed -- the controller check, CR 302.6's
+                            -- tap-sickness gate, CR 307.5 timing, cost payability,
+                            -- CR 305.1's one land per turn, CR 117.1a's casting
+                            -- timing and every prohibition -- is enforced here.
+                            -- Acting on an unoffered answer would make all of it
+                            -- advisory (#219). Cast.castSpell and
+                            -- Activate.activateAbility re-validate modes, targets
+                            -- and payment on their own; what only this guard can
+                            -- catch is an action that was never on the menu.
+                            --
+                            -- Rejecting to Pass rather than failing: it is always a
+                            -- legal action, it keeps this loop total, and it cannot
+                            -- wedge the game, because a full round of passes
+                            -- resolves the stack or ends the step. Same
+                            -- reject-not-repair posture Combat.declareAttackers and
+                            -- Cost.payComponents take toward their own answers.
+                            let chosen = if List.elem answered actions then answered else Action.Type.Pass
                             case chosen of
                               Action.Type.Pass -> do
                                 let passes = GameState.passes gs + 1
