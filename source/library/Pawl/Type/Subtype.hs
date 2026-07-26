@@ -42,4 +42,9 @@ data Subtype
     -- Ord-canonical subtype list is unchanged (card JSON stores subtypes in
     -- declaration order, and a whole-pool test compares against it).
     Aura
+  | -- CR 301.5: an artifact subtype. "An Equipment can be attached to a
+    -- creature. It can't legally be attached to anything that isn't a
+    -- creature." Appended LAST because Ord here is declaration order and the
+    -- corpus stores each card's subtypes in Ord-canonical order.
+    Equipment
   deriving (Eq, Ord, Show)

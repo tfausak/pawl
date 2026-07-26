@@ -6,6 +6,8 @@ module Pawl.AuraSpec where
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Engine as Engine
@@ -13,18 +15,185 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
+-- CR 301.5 / 702.6: Equipment. Shares the attachment substrate with Auras --
+-- Object.attachedTo, Affected.Attached -- so what is genuinely new is the CR
+-- 701.3 Attach keyword action that MOVES an already-on-the-battlefield permanent
+-- (#187), and CR 704.5n's detach-rather-than-bury state-based action (#193).
+equipmentTests :: Registry.Type.Registry -> Tasty.TestTree
+equipmentTests registry =
+  Tasty.testGroup
+    "Equipment"
+    [ -- CR 702.6a: "Equip [cost]" means "[Cost]: Attach this permanent to target
+      -- creature you control." The Equipment is the ability's SOURCE; the slot is
+      -- what it attaches to.
+      HU.testCase "CR 702.6a equipping attaches the Equipment to the target creature" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, withCreature) = S.addCreature piker S.alice base
+            (equip, gs) = S.addCreature bonesplitter S.alice withCreature
+            slot = SlotName.MkSlotName (Text.pack "target")
+            run =
+              Resolve.applyEffect
+                equip
+                S.alice
+                Map.empty
+                (Map.singleton slot True)
+                (Map.singleton slot (Recipient.ToCreature creature))
+                (Effect.Attach slot)
+            after = S.runPure S.identityAnswer gs run
+        HU.assertEqual "the Equipment is attached to the creature" (Just (Just creature)) (fmap Object.attachedTo (Game.lookupObject equip after))
+        HU.assertBool "and is still on the battlefield" (Set.member equip (GameState.battlefield after)),
+      -- CR 301.5a: "The creature an Equipment is attached to is called the
+      -- 'equipped creature'." Affected.Attached already means exactly that, so
+      -- Bonesplitter's +2/+0 rides the same path Unholy Strength does.
+      HU.testCase "CR 301.5a the equipped creature gets the Equipment's bonus" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, withCreature) = S.addCreature piker S.alice base
+            (equip, gs) = S.addCreature bonesplitter S.alice withCreature
+            attached = S.attach equip creature gs
+        HU.assertEqual "unequipped, the Piker is 2/1" (Just 2) (Projection.powerOf creature gs)
+        HU.assertEqual "equipped, it is 4/1" (Just 4) (Projection.powerOf creature attached)
+        HU.assertEqual "toughness is untouched by +2/+0" (Just 1) (Projection.toughnessOf creature attached),
+      -- CR 701.3a: attaching a permanent that is already attached MOVES it. This
+      -- is the whole point of the Attach opcode -- Aura attachment happens once,
+      -- as the Aura enters, and nothing could relocate it afterwards (#187).
+      HU.testCase "CR 701.3a equipping again moves the Equipment off the first creature" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        let base = Setup.emptyGame S.bothPlayers
+            (first, g1) = S.addCreature piker S.alice base
+            (second, g2) = S.addCreature warMammoth S.alice g1
+            (equip, g3) = S.addCreature bonesplitter S.alice g2
+            gs = S.attach equip first g3
+            slot = SlotName.MkSlotName (Text.pack "target")
+            run =
+              Resolve.applyEffect
+                equip
+                S.alice
+                Map.empty
+                (Map.singleton slot True)
+                (Map.singleton slot (Recipient.ToCreature second))
+                (Effect.Attach slot)
+            after = S.runPure S.identityAnswer gs run
+        HU.assertEqual "it moved to the second creature" (Just (Just second)) (fmap Object.attachedTo (Game.lookupObject equip after))
+        HU.assertEqual "the first creature is back to 2 power" (Just 2) (Projection.powerOf first after)
+        HU.assertEqual "the second is 3+2" (Just 5) (Projection.powerOf second after),
+      -- The gameplay-level proof design.md section 4 asks for: cast Bonesplitter,
+      -- activate its printed equip ability through the real activation path, let
+      -- it resolve, and see the creature actually hit harder. Everything above
+      -- drives Effect.Attach directly; this drives the CARD.
+      HU.testCase "CR 702.6 whole card: cast Bonesplitter, equip a Piker, and it swings for 4" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        let base0 = S.landsInPlay mountain 2 -- {1} to cast, {1} to equip
+            (creature, base1) = S.addCreature piker S.alice base0
+            (withSpell, spellId) = S.handOne bonesplitter base1
+            cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            equipId = case filter (\oid -> Game.cardOf oid resolved == Just (Printing.card bonesplitter)) (Set.toList (GameState.battlefield resolved)) of
+              oid : _ -> Just oid
+              [] -> Nothing
+        case equipId of
+          Nothing -> HU.assertFailure "Bonesplitter should have resolved onto the battlefield"
+          Just equip -> do
+            let ability = case Card.Type.activatedAbilities (Printing.card bonesplitter) of
+                  ab : _ -> Just ab
+                  [] -> Nothing
+            case ability of
+              Nothing -> HU.assertFailure "Bonesplitter should print an equip ability"
+              Just equipAbility -> do
+                let ready = resolved {GameState.priority = Just S.alice}
+                    activated = snd (Engine.runGamePure S.identityAnswer ready (Activate.activateAbility S.alice equip equipAbility))
+                    after = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+                HU.assertEqual "unequipped the Piker is 2/1" (Just 2) (Projection.powerOf creature resolved)
+                HU.assertEqual "the equip ability attached it" (Just (Just creature)) (fmap Object.attachedTo (Game.lookupObject equip after))
+                HU.assertEqual "and the Piker is now 4/1" (Just 4) (Projection.powerOf creature after)
+                HU.assertEqual "toughness unchanged" (Just 1) (Projection.toughnessOf creature after),
+      -- CR 701.3c: "Attaching an Aura, Equipment, or Fortification on the
+      -- battlefield to a different object or player causes [it] to receive a new
+      -- timestamp." That feeds CR 613.7's layer ordering, so it is not cosmetic.
+      -- CR 701.3b's second sentence is the other half: re-attaching to the object
+      -- it is ALREADY attached to "does nothing", so no new timestamp there.
+      HU.testCase "CR 701.3c attaching to a different creature restamps; re-attaching to the same one does not" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        let base = Setup.emptyGame S.bothPlayers
+            (first, g1) = S.addCreature piker S.alice base
+            (second, g2) = S.addCreature warMammoth S.alice g1
+            (equip, g3) = S.addCreature bonesplitter S.alice g2
+            gs = S.attach equip first g3
+            slot = SlotName.MkSlotName (Text.pack "target")
+            attachTo t g =
+              S.runPure S.identityAnswer g $
+                Resolve.applyEffect
+                  equip
+                  S.alice
+                  Map.empty
+                  (Map.singleton slot True)
+                  (Map.singleton slot (Recipient.ToCreature t))
+                  (Effect.Attach slot)
+            stampOf g = fmap Object.timestamp (Game.lookupObject equip g)
+            moved = attachTo second gs
+            again = attachTo second moved
+        HU.assertBool "moving it to a different creature restamps" (stampOf moved /= stampOf gs)
+        HU.assertEqual "re-attaching to the same creature does nothing" (stampOf moved) (stampOf again),
+      -- CR 704.5n: "If an Equipment or Fortification is attached to an illegal
+      -- permanent or to a player, it becomes unattached from that permanent or
+      -- player. It REMAINS ON THE BATTLEFIELD." The shape difference from an
+      -- Aura, which CR 704.5m buries instead (#193).
+      HU.testCase "CR 704.5n an Equipment whose creature dies detaches and stays on the battlefield" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, withCreature) = S.addCreature piker S.alice base
+            (equip, g2) = S.addCreature bonesplitter S.alice withCreature
+            attached = S.attach equip creature g2
+            gone = S.runPure S.identityAnswer attached (Event.changeZone creature Zone.Graveyard)
+            after = S.settleSba gone
+        HU.assertBool "the Equipment survives" (Set.member equip (GameState.battlefield after))
+        HU.assertEqual "and is unattached" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject equip after)),
+      -- CR 301.5: "It can't legally be attached to anything that isn't a
+      -- creature." An Equipment left on a noncreature permanent detaches too --
+      -- the same SBA, a different way of becoming illegal.
+      HU.testCase "CR 301.5 an Equipment attached to a noncreature permanent detaches" $ do
+        mountain <- Registry.printing registry "Mountain"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        let base = Setup.emptyGame S.bothPlayers
+            (land, withLand) = S.addCreature mountain S.alice base
+            (equip, g2) = S.addCreature bonesplitter S.alice withLand
+            attached = S.attach equip land g2
+            after = S.settleSba attached
+        HU.assertBool "the Equipment survives" (Set.member equip (GameState.battlefield after))
+        HU.assertEqual "and is unattached" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject equip after))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry =
+tests registry = Tasty.testGroup "Pawl.Aura" [auraTests registry, equipmentTests registry]
+
+auraTests :: Registry.Type.Registry -> Tasty.TestTree
+auraTests registry =
   Tasty.testGroup
     "Aura"
     [ HU.testCase "CR 303.4: a resolving Aura spell enters the battlefield attached to its target" $ do

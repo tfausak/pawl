@@ -33,6 +33,7 @@ import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
+import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
 
@@ -98,6 +99,46 @@ destroyedBySba gs pc oid =
                  )
                    || woundedByDeathtouch gs oid
                )
+
+-- CR 704.5n: "If an Equipment or Fortification is attached to an illegal
+-- permanent or to a player, it becomes unattached from that permanent or player.
+-- It remains on the battlefield."
+--
+-- The shape difference from CR 704.5m, which is why this is a separate
+-- classification rather than another clause of fallsOff: an Aura DIES, an
+-- Equipment merely DETACHES and stays. CR 301.5c says the same from the card
+-- type's side -- "An Equipment that equips an illegal or nonexistent permanent
+-- becomes unattached from that permanent but remains on the battlefield."
+--
+-- "Illegal" is CR 301.5: "An Equipment can be attached to a creature. It can't
+-- legally be attached to anything that isn't a creature." So a host that is gone,
+-- or that is not a creature, is illegal -- and `pcs` answers both at once, since
+-- an object no longer on the battlefield has no entry in it.
+--
+-- Reads the shared pre-pass projection for the same reason fallsOff does (see its
+-- haddock): a per-object project here would reintroduce the cubic sweep. An
+-- Equipment whose creature dies THIS pass therefore detaches on the NEXT one,
+-- exactly as an Aura falls off on the next one.
+--
+-- CR 704.5n's "or to a player" clause is unreachable: Object.attachedTo names an
+-- object, so an Equipment attached to a player cannot be represented (#190).
+--
+-- Guarded on the PROJECTED subtype, so a permanent that stops being an Equipment
+-- while attached stops matching here. CR 704.5p is the rule that should then
+-- detach it, and there is no branch for it (#214).
+becomesUnattached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
+becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
+  Nothing -> False
+  Just obj -> case Object.attachedTo obj of
+    Nothing -> False
+    Just host ->
+      let isEquipment = case Map.lookup oid pcs of
+            Nothing -> False
+            Just pc -> Set.member Subtype.Equipment (PC.subtypes pc)
+          hostIsCreature = case Map.lookup host pcs of
+            Nothing -> False
+            Just pc -> Set.member CardType.Creature (PC.cardTypes pc)
+       in isEquipment && not hostIsCreature
 
 -- CR 704.5m: "If an Aura is attached to an illegal object or player, or is not
 -- attached to an object or player, that Aura is put into its owner's graveyard."
@@ -185,11 +226,11 @@ stillLegalEnchant pcs gs source spec target = case spec of
 
 -- CR 704.3: repeat until no state-based action is performed. ONE pass here, with
 -- the repeat living in Engine's CR 117.5 settle loop (settleForPriority). A
--- single pass is NOT sufficient IN GENERAL -- CR 704.5m's Aura falls off only on
--- the pass AFTER its creature dies -- so settleForPriority is the entry point a
--- caller wanting a settled board should use. Engine.runStep's own two direct,
--- unlooped calls are the exception, each safe for reasons local to that call
--- site, not repeated here.
+-- single pass is NOT sufficient IN GENERAL -- CR 704.5m's Aura falls off, and CR
+-- 704.5n's Equipment detaches, only on the pass AFTER the creature dies -- so
+-- settleForPriority is the entry point a caller wanting a settled board should
+-- use. Engine.runStep's own two direct, unlooped calls are the exception, each
+-- safe for reasons local to that call site, not repeated here.
 checkStateBasedActions :: Game ()
 checkStateBasedActions = Monad.void performStateBasedActions
 
@@ -238,6 +279,8 @@ performStateBasedActions = do
       -- every other classification above -- see fallsOff's Haddock for why an
       -- Aura whose creature dies THIS pass survives it and falls off the next.
       unattachedAuras = filter (fallsOff pcs gs) onBattlefield
+      -- CR 704.5n: computed from the same pre-pass state, for the same reason.
+      detaching = filter (becomesUnattached pcs gs) onBattlefield
       -- CR 704.5h's window is "since the last SBA check", so the watermark is the
       -- log length AS THIS PASS BEGAN: every 704.5h victim was computed from that
       -- same pre-pass state, and the Moved events this pass itself appends carry
@@ -248,6 +291,10 @@ performStateBasedActions = do
   Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toGraveyard
   -- CR 704.5m: the Aura follows its creature. A plain put-into-graveyard.
   Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) unattachedAuras
+  -- CR 704.5n: the Equipment does NOT follow its creature -- it detaches and
+  -- stays. Not a zone change, so unlike the Aura above it does not funnel through
+  -- Pawl.Event: no Moved event, no replacement, no trigger.
+  State.modify' (\g -> g {GameState.objects = List.foldl' (\m oid -> Map.adjust (\o -> o {Object.attachedTo = Nothing}) oid m) (GameState.objects g) detaching})
   -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
   Monad.mapM_ Event.destroy toDestroy
   destroyed <- State.get
@@ -281,8 +328,9 @@ performStateBasedActions = do
       -- A state-based action was performed iff a creature was buried or destroyed
       -- (a regenerated creature still counts, which the CR 704.4 settle loop
       -- re-checks and -- because the regen healed the damage -- terminates), a
-      -- player left, a token ceased to exist, or an Aura fell off (CR 704.5m).
-      acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras)
+      -- player left, a token ceased to exist, an Aura fell off (CR 704.5m), or an
+      -- Equipment detached (CR 704.5n).
+      acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as

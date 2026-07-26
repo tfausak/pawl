@@ -318,6 +318,7 @@ effectCounts effect = case effect of
   Effect.CreateEmblem card -> cardCounts card
   Effect.BecomeMonarch _ -> []
   Effect.ExileUntilMonarch _ -> []
+  Effect.Attach _ -> []
   Effect.PlaySubgame _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
