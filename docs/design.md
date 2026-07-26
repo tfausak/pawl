@@ -173,7 +173,7 @@ This is load-bearing, not a party trick. **Designing for Little Girl gets you Ta
 
 Sequenced to retire *architectural* risk first, not to maximize card count. The ABI is the thing you can't cheaply change later; Lightning Bolt will still be there in six months and will take an afternoon.
 
-This section is the **forward plan**. For what has actually landed — one distilled entry per completed milestone, with its gate card, the decision it proved, the opcodes/types it added, and every elision and its named expiry — see the completion log in `progress.md`. Milestones **M0 through M4h are complete** — the whole of M4 (M4a–M4g, §3's split table below) plus its fast-follow M4h.
+This section **was** the forward plan, and is now largely the record of the path actually taken. Milestones **M0 through M5.6 are complete**, as is the card-driven Auras unit; for what each established — gate card, the decision it proved, the opcodes and types it added, every elision and its expiry — see the completion log in `progress.md`. Only M6 and M7 remain, and they are no longer milestones: they are ordinary GitHub issues, #9 and #10, picked up when they are picked up. Work is issue-driven now — see `workflow.md`.
 
 ### M0 — A complete game with zero cards
 
