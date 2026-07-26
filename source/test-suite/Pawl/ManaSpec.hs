@@ -283,13 +283,15 @@ manaTests registry =
             tappedElf g = fmap Object.tapped (Game.lookupObject elfId g)
         HU.assertEqual "asked to tap the Elf, it is tapped" (Just TapState.Tapped) (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay S.alice elfId cost)))
         HU.assertEqual "asked to spare the Elf, it is untapped" (Just TapState.Untapped) (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay S.alice elfId cost))),
-      -- The other half of the invariant, and the reason the elision is legal at
-      -- all: three untapped Forests are copies of ONE card, so there is nothing to
-      -- decide and pawl must NOT ask. Counting the prompts is the direct
-      -- assertion; the tap-count test above only pins the outcome.
-      HU.testCase "CR 601.2g identical sources are indistinguishable, so no choice is asked" $ do
+      -- The other half of the invariant: the elision is exactly "there is only one
+      -- candidate, so there is nothing to decide", and nothing broader. Counting
+      -- prompts is the direct assertion -- without it, an implementation that
+      -- never asks would still pass the test above's first half.
+      --
+      -- Three Forests DO ask. They are one card, but sameness of card is not
+      -- sameness of object (#217), so the engine does not presume to skip it.
+      HU.testCase "CR 601.2g one candidate asks nothing; more than one always asks" $ do
         forest <- Registry.printing registry "Forest"
-        llanowarElves <- Registry.printing registry "Llanowar Elves"
         let green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
             countingAnswer :: Prompt.Prompt r -> State.State Int r
             countingAnswer p = case p of
@@ -298,12 +300,22 @@ manaTests registry =
                 pure (NonEmpty.head candidates)
               _ -> pure (S.identityAnswer p)
             promptsFor g = State.execState (Engine.runGame countingAnswer g (Mana.payCost S.alice green)) 0
-            threeForests = S.landsInPlay forest 3
-            (elfBoard, mixed) = S.addCreature llanowarElves S.alice (S.landsInPlay forest 1)
-            settledMixed = S.runPure S.identityAnswer mixed (Engine.settleAll S.alice)
-        HU.assertBool "the mixed board really does hold the Elf as a source" (elem elfBoard (Mana.manaSources S.alice settledMixed))
-        HU.assertEqual "three identical Forests: nothing to ask" 0 (promptsFor threeForests)
-        HU.assertEqual "a Forest beside an Elf: one real decision" 1 (promptsFor settledMixed),
+        HU.assertEqual "a lone Forest: nothing to ask" 0 (promptsFor (S.landsInPlay forest 1))
+        HU.assertEqual "three Forests: one real decision" 1 (promptsFor (S.landsInPlay forest 3)),
+      -- FILTERED, NOT TRUSTED: an interpreter naming a source that was not offered
+      -- must not be honoured. Beyond hygiene, tapForMana is a no-op on an unknown
+      -- id, so obeying the answer would leave the state unchanged and loop forever.
+      HU.testCase "CR 601.2g an answer outside the offered set is rejected, not obeyed" $ do
+        forest <- Registry.printing registry "Forest"
+        let green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
+            bogus = ObjectId.MkObjectId 9999
+            liar p = case p of
+              Prompt.ChooseManaSource {} -> bogus
+              _ -> S.identityAnswer p
+            gs = S.landsInPlay forest 3
+            (paid, after) = S.runPureWith liar gs (Mana.payCost S.alice green)
+        HU.assertBool "the cost is still paid" paid
+        HU.assertEqual "from a real Forest, not the invented id" 1 (S.tappedCount S.alice after),
       HU.testCase "mana from a controlled permanent goes to its controller, not owner" $ do
         llanowarElves <- Registry.printing registry "Llanowar Elves"
         let (oid, base) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)

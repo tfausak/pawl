@@ -1340,7 +1340,6 @@ namedIs wanted mo = case mo of
 -- bob, this interpreter would pass, and bob's life would stay 20 -- the falsifier.
 slaveAnswer :: Prompt.Prompt r -> r
 slaveAnswer p = case p of
-  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAction (Decider.MkDecider d) player actions ->
     if player == S.bob && d == S.alice
       then case filter isCastAction actions of
@@ -1356,6 +1355,11 @@ slaveAnswer p = case p of
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
+  -- Head is enough here: this interpreter exists to prove the DECIDER is honoured
+  -- for ChooseAction under Mindslaver, and which land pays a cost is not part of
+  -- that. Placed with the other incidental arms rather than above ChooseAction,
+  -- so the one arm that reads the Decider stays first and legible.
+  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->

@@ -167,6 +167,27 @@ combatReplayTests =
             -- constructor. Both carry a PlayerId, so the types would not object.
             let p = Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol])
              in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.DeterminedFirstPlayer S.bob)),
+          -- CR 601.2g: the mana-source choice round-trips like every other prompt.
+          HU.testCase "ChooseManaSource round-trips through the transcript" $
+            let a = ObjectId.MkObjectId 7
+                b = ObjectId.MkObjectId 9
+                p = Prompt.ChooseManaSource decider S.alice (a NonEmpty.:| [b])
+             in do
+                  HU.assertEqual "the second source round trips" (Just b) (Replay.decode p (Replay.encode p b))
+                  -- Discriminating for the same reason ChooseDefender's pair is: a
+                  -- decode that ignored the response and returned the head would
+                  -- pass one leg by accident.
+                  HU.assertEqual "the first source round trips" (Just a) (Replay.decode p (Replay.encode p a)),
+          HU.testCase "a discard choice does not decode as a mana-source choice" $
+            -- Discriminating: this fails if ChooseManaSource reuses another
+            -- ObjectId-shaped response instead of getting its own constructor.
+            let p = Prompt.ChooseManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseDiscard [ObjectId.MkObjectId 7])),
+          HU.testCase "a short transcript taps the first offered source" $
+            HU.assertEqual
+              "the head"
+              (ObjectId.MkObjectId 7)
+              (Replay.defaultAnswer (Prompt.ChooseManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9]))),
           HU.testCase "a short transcript defends with the first candidate" $
             -- Discriminating against a defaultAnswer that returned the active
             -- player, or a candidate not on the offered list: the first candidate

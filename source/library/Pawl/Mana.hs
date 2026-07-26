@@ -237,10 +237,15 @@ spend cost (Mana.MkMana units) =
         afterGeneric <- Monad.foldM takeAny afterTyped [1 .. generic]
         pure (Mana.MkMana afterGeneric)
 
--- CR 601.2g / 602.1: pay a mana cost, asking the player WHICH sources to
--- activate. Returns whether it was paid; on failure nothing is spent, because a
--- half-paid cost is not a state the rules have (the reject-not-repair posture
--- Cast and Activate already take).
+-- CR 601.2g: "If the total cost includes a mana payment, the player then has a
+-- chance to activate mana abilities." Reached from an ability too, by CR 602.2b
+-- ("the remainder of the process ... is identical to ... 601.2b-i").
+--
+-- Returns whether it was paid; on failure nothing is spent, which is CR 601.2h's
+-- "Partial payments are not allowed" rather than mere tidiness. The prompts
+-- themselves are NOT rolled back -- they live in the Program, outside the state --
+-- so a failed payment still asked its questions. Unreachable in practice, because
+-- every caller pre-checks the pure canPay.
 --
 -- One prompt per source tapped, against a shrinking candidate list, rather than
 -- one prompt for a whole subset: a cost needing {G}{G} is two decisions, and the
@@ -265,24 +270,38 @@ payCost pid cost = do
             State.put (tapForMana oid gs)
             tapUntilPaid
 
--- Which source to tap next. Asked, unless every candidate is a copy of the SAME
--- card -- two untapped Forests are genuinely indistinguishable, and CLAUDE.md's
--- second invariant permits eliding a choice in exactly that case and no other.
+-- Which source to tap next.
 --
--- Card identity is the discriminator, and it is a PROXY rather than the whole
--- truth: two copies of one card could in principle differ in some state a player
--- cares about. Every difference the current pool can produce -- tapped, summoning
--- sick, damaged -- either removes the object from manaSources entirely or cannot
--- matter to a mana source, so the proxy is exact here. It errs in the safe
--- direction: an unnecessary prompt is a wasted question, a missing one is the
--- engine choosing for the player.
+-- Asked whenever there is more than one candidate, and elided ONLY when there is
+-- exactly one -- where no choice exists to make. That is a deliberately blunt
+-- reading of CLAUDE.md's "eliding a prompt is legitimate only for
+-- indistinguishable options": it never has to be right about what
+-- indistinguishable MEANS.
+--
+-- The obvious cheaper rule -- elide when every candidate is a copy of the same
+-- card -- is unsound in this pool, and the counterexamples are ordinary. Two
+-- Llanowar Elves are one card, but one may be equipped with Bonesplitter or
+-- enchanted, one may carry +1/+1 counters (Battlegrowth, Longtusk Cub), one may
+-- be borrowed until end of turn by Act of Treason, and one may be blocking (CR
+-- 506.4 does not remove a creature from combat for tapping). Each of those makes
+-- the choice real. `Game.cardOf` compares PRINTED identity and cannot see any of
+-- it, so that rule would suppress exactly the prompts the invariant exists to
+-- force. An extra question is cheap; a missing one is the engine deciding (#217).
+--
+-- FILTERED, NOT TRUSTED, the posture Combat.declareAttackers and
+-- Cost.payComponents already take: an answer outside the offered set is rejected
+-- and the head is used instead. That is not only hygiene -- tapForMana is a no-op
+-- on an unknown or mana-less id, so honouring a bogus answer would leave the
+-- state unchanged and loop forever.
 chooseSource :: PlayerId -> NonEmpty.NonEmpty ObjectId -> GameState -> Game ObjectId
-chooseSource pid candidates gs =
-  let cards = fmap (\oid -> Game.cardOf oid gs) (NonEmpty.toList candidates)
-      allAlike = all (== NonEmpty.head (NonEmpty.fromList cards)) cards
-   in if allAlike
-        then pure (NonEmpty.head candidates)
-        else Trans.lift (Program.prompt (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates))
+chooseSource pid candidates gs = case candidates of
+  only NonEmpty.:| [] -> pure only
+  _ -> do
+    answer <- Trans.lift (Program.prompt (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates))
+    pure $
+      if List.elem answer (NonEmpty.toList candidates)
+        then answer
+        else NonEmpty.head candidates
 
 -- CR 118.3: can this cost be paid at all? Pure, because Action.legalActions asks
 -- it while merely ENUMERATING actions, where prompting would be absurd. The
