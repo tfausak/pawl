@@ -2370,54 +2370,164 @@ its own gate card and spec, landed as it completes. Umbrella:
   `docs/superpowers/specs/2026-07-25-cr-103-6-opening-hand-actions-design.md` and
   `docs/superpowers/plans/2026-07-25-cr-103-6-opening-hand-actions.md`.
 
-- **Auras phase (a), the attachment substrate, is implemented** (a **card-driven
-  unit, not a numbered milestone** — Auras were the largest single hole in the
-  card pool, flagged at four separate code sites; no `docs/design.md` entry).
-  **Gate cards: Unholy Strength** (`{B}` Aura, "Enchanted creature gets +2/+1" —
-  the first static ability to reach through an attachment) **and Opalescence**
-  (closing #114: its "each other **non-Aura** enchantment" qualifier had been
-  unenforceable for want of the subtype, and enforcing it cost nothing once the
-  subtype existed). **What it establishes:** `Subtype.Aura` (CR 205.3h) is
-  appended, not inserted, so no existing card's `Ord`-canonical subtype list
-  moves. `Card.enchant :: Maybe TargetSpec` (CR 702.5a) is a `TargetSpec` rather
-  than a `Filter`, so CR 702.5d's enchant-player Auras will cost a field
-  widening later rather than a type change now. `Object.attachedTo :: Maybe
-  ObjectId` is **base state, not projected**, and is seeded as the object
-  *enters* rather than assigned after: CR 303.4 says an Aura "enters the
-  battlefield attached," and the CR 614.1c entry-replacement loop and the
-  `Moved` event both run before `changeZone` returns, so a post-hoc assignment
-  would race them. `Affected.Attached` is a third affected-set kind alongside
-  `TheseObjects` (fixed at resolution, CR 611.2c) and `Matching` (a per-candidate
-  predicate): it is re-derived each projection from the *source's own*
-  `attachedTo`, because "the enchanted permanent" is neither a fixed set nor a
-  predicate over candidates. **Two findings did the design work.** First, **the
-  target-spec seam is not single**: `Card.allTargetSpecs`/`modesTargetSpecs`
-  serve most consumers, but `Target.fillableModes` and the D4 lint reach past
-  them to `Mode.targetSpecs` directly. Merging the enchant slot in only
-  `Pawl.Card` would have left an Aura with no legal creature **castable**, then
-  countered on resolution for lacking one — when CR 601.2c means it could never
-  have been cast at all — so `fillableModes` grew an extra-slots parameter and
-  castability had to be taught the enchant slot separately from targeting.
-  Second, **an Aura spell is the first permanent spell in this pool that can
-  fizzle**: `Pawl.Stack` previously sent every permanent spell to the
-  battlefield with no target check at all, so `Resolve.targetsAllIllegal` was
-  extracted and consulted before an Aura enters (CR 608.2b), with
-  `Event.changeZoneAttaching` doing the entry-attached half of CR 303.4 when it
-  does not fizzle. CR 704.5m (an Aura attached to nothing, or to an illegal
-  object, falls off — `Sba.fallsOff`) falls off **one SBA pass later than its
-  creature**: CR 704.3 makes the passes simultaneous, so the pass that buries
-  the creature still judges the Aura against a state where that creature
-  existed; the tests pin both passes deliberately. **No new opcode**: an Aura's
-  entire behaviour is a static ability plus an entry rule. **Is-it-an-Aura
-  reads as a subtype classification, not an identity case** — the same closed-
-  half shape as the `Card.isPermanent` beside it — so the invariant holds.
-  Suite 1140 → 1153. **Deferred:** `Attach`/CR 303.4j, no opcode moves an Aura
-  already on the battlefield (#187); CR 303.4f/g/i, an Aura entering other than
-  by resolving as an Aura spell (#188); CR 702.5c, multiple `enchant` instances
-  (#189); CR 702.5d, enchant-player Auras — `Object.attachedTo` cannot name a
-  player, a modelling limit rather than a missing producer (#190); CR 303.4d,
-  the controller's choice when an effect would attach an Aura to more than one
-  legal thing (#191); CR 303.4k, an Aura turned face down (#192); CR
-  704.5n/704.5p, Equipment and Fortification (#193). Spec and plan:
-  `docs/superpowers/specs/2026-07-25-auras-design.md` and
-  `docs/superpowers/plans/2026-07-25-auras-a-attachment-substrate.md`.
+- **Auras (CR 303.4) is complete** (a **card-driven unit, not a numbered
+  milestone** — Auras were the largest single hole in the card pool, flagged at
+  four separate code sites; no `docs/design.md` entry). Two phases, each with
+  its own gate:
+  - **a — the attachment substrate.** Gate cards: **Unholy Strength** (`{B}`
+    Aura, "Enchanted creature gets +2/+1" — the first static ability to reach
+    through an attachment) **and Opalescence** (closing #114: its "each other
+    **non-Aura** enchantment" qualifier had been unenforceable for want of the
+    subtype, and enforcing it cost nothing once the subtype existed). Decision
+    proved: `Subtype.Aura` (CR 205.3h) is appended, not inserted, so no existing
+    card's `Ord`-canonical subtype list moves. `Card.enchant :: Maybe
+    TargetSpec` (CR 702.5a) is a `TargetSpec` rather than a `Filter`, so CR
+    702.5d's enchant-player Auras will cost a field widening later rather than
+    a type change now. `Object.attachedTo :: Maybe ObjectId` is **base state,
+    not projected**, and is seeded as the object *enters* rather than assigned
+    after: CR 303.4 says an Aura "enters the battlefield attached," and the CR
+    614.1c entry-replacement loop and the `Moved` event both run before
+    `changeZone` returns, so a post-hoc assignment would race them.
+    `Affected.Attached` is a third affected-set kind alongside `TheseObjects`
+    (fixed at resolution, CR 611.2c) and `Matching` (a per-candidate
+    predicate): it is re-derived each projection from the *source's own*
+    `attachedTo`, because "the enchanted permanent" is neither a fixed set nor
+    a predicate over candidates. Two findings did the design work. First, the
+    target-spec seam is not single: `Card.allTargetSpecs`/`modesTargetSpecs`
+    serve most consumers, but `Target.fillableModes` and the D4 lint reach past
+    them to `Mode.targetSpecs` directly — merging the enchant slot in only
+    `Pawl.Card` would have left an Aura with no legal creature **castable**,
+    then countered on resolution for lacking one, when CR 601.2c means it
+    could never have been cast at all — so `fillableModes` grew an extra-slots
+    parameter and castability had to be taught the enchant slot separately
+    from targeting. Second, an Aura spell is the first permanent spell in this
+    pool that can fizzle: `Pawl.Stack` previously sent every permanent spell to
+    the battlefield with no target check at all, so `Resolve.targetsAllIllegal`
+    was extracted and consulted before an Aura enters (CR 608.2b), with
+    `Event.changeZoneAttaching` doing the entry-attached half of CR 303.4 when
+    it does not fizzle. CR 704.5m (an Aura attached to nothing, or to an
+    illegal object, falls off — `Sba.fallsOff`) falls off **one SBA pass later
+    than its creature**: CR 704.3 makes the passes simultaneous, so the pass
+    that buries the creature still judges the Aura against a state where that
+    creature existed; the tests pin both passes deliberately. No new opcode.
+    Added: `Subtype.Aura`, `Card.enchant`, `Object.attachedTo`,
+    `Affected.Attached`, `Event.changeZoneAttaching`, `Pawl.Stack`'s Aura
+    branch, CR 704.5m in `Sba.fallsOff`. Suite 1140 → 1153. Deferred:
+    `Attach`/CR 303.4j, no opcode moves an Aura already on the battlefield
+    (#187); CR 303.4f/g/i, an Aura entering other than by resolving as an Aura
+    spell (#188); CR 702.5c, multiple `enchant` instances (#189); CR 702.5d,
+    enchant-player Auras — `Object.attachedTo` cannot name a player, a
+    modelling limit rather than a missing producer (#190); CR 303.4d, the
+    controller's choice when an effect would attach an Aura to more than one
+    legal thing (#191); CR 303.4k, an Aura turned face down (#192); CR
+    704.5n/704.5p, Equipment and Fortification (#193).
+  - **b — control from a static ability.** Gate card: **Control Magic**
+    (`{2}{U}{U}` Aura, "Enchant creature / You control enchanted creature"),
+    closing **#33** and **#62**. Decision proved: a static ability's control
+    grant is a payload-free, projection-time-derived layer-2 modification, not
+    the resolution-baked shape M4.5 P1's `SetController` used for Act of
+    Treason — card data cannot name a `PlayerId`, so
+    `Modification.SetControllerToSource` carries none, and its player is read
+    off the effect's own source's controller when `Projection.controllerOf`
+    folds it, never fixed in advance. `controllerOf` gains a second source of
+    control: `Projection.controlGrants` gathers every control-granting static
+    ability straight off battlefield permanents' `Card.staticAbilities`
+    (Control Magic's `Affected.Attached` resolves to the enchanted creature),
+    merged with stored `SetController` effects under CR 613.7a's rule that a
+    static ability's continuous effect takes the timestamp of the permanent
+    carrying it — both sides already `Timestamp`, so the merge is one
+    `maximumBy`. **The load-bearing constraint: `controllerOf` cannot call
+    `Projection.gather` or `project`.** `Projection.affects` calls
+    `controllerOf` to supply CR 109.5's "you" perspective when matching an
+    `Affected.Matching` filter, and `gather` is what feeds `affects` — a
+    `controllerOf` built on `gather` would be mutually recursive with it. So
+    `controlGrants` is a second, non-projecting gather, resolving only the
+    affected-set shapes that need no projection (`TheseObjects`, `Attached`);
+    a control-granting static ability carrying `Affected.Matching` is
+    therefore unsupported (#195), and layer 6 (Humility) cannot stop a
+    control-granting static ability for the same reason (#196) — both are real
+    gaps, filed rather than silently treated as "does not apply." A residual
+    hazard survives from this: `controlGrants`'s own liveness gate
+    (`liveGiven`, reused from CR 305.7) can re-enter `affects`'s `Matching` arm,
+    which is safe today only because no static `SetLandSubtype` in the pool
+    pairs a `Matching` filter with a `ControlledBy` conjunct that would force
+    the `controllerOf` thunk back into `controlGrants` — a laziness accident
+    rather than a structural guarantee, filed as #197 (a hang, not a wrong
+    answer, if such a card ever lands). `controllerOfGiven` carries a visited
+    `Set ObjectId`, the CR 613.8b loop-escape analog `Projection.liveGiven`
+    already uses (#37), returning the object's owner on re-entry — order-
+    independent, like `liveGiven`'s, and unreachable in this pool (no two Auras
+    can enchant each other) but present so a future cycle degrades rather than
+    loops. Hoisting matters because `controllerOf` is hotter than `project`:
+    `Projection.controls` calls it once per battlefield object inside the
+    state-based-action sweep, so `controls` and `Event.hs`'s two trigger scans
+    (`eventTriggers`, `stateTriggers`) each compute the grant list once and
+    thread it, the same move `setLandSubtypeEffects` already made for CR
+    305.7 — recomputing it per object would have reintroduced the
+    battlefield-cubed blowup `liveGiven`'s neighbours record from M3c. The
+    cross-turn indefinite-control settle (#62) needed no new production code:
+    `Engine.settleAll` already iterated `Projection.controls`, so the test
+    (a creature held under Control Magic surviving to its thief's own untap
+    step and attacking) was **green on first run** — #62 had recorded an
+    *unexercised* case, not a broken one, and `settleAll`'s comment was
+    rewritten to state that instead of forward-referencing this phase. The
+    synthetic steal fixture in `CombatSpec` — a hand-built `Effect.GainControl`
+    standing in for a card that could steal a creature without granting haste
+    — was retired for Control Magic itself, closing #33. `Pawl.Departure`'s two
+    CR 800.4a "empty by construction" proofs, which named `controllerOf`'s old
+    shape and `Modification`'s old single control-construction-site as their
+    premises, were **re-derived, not merely reworded**: both conclusions
+    survive, but the new argument is an induction over `controllerOfGiven`'s
+    visited-set recursion — a derived grant names no player (CR 109.5 makes it
+    the source's controller), so it is a recursive step rather than a third
+    base case, and every leaf the recursion terminates on is an owner, a baked
+    `SetController`, or an already-deleted source (reading `Nothing`) — all
+    three already ruled out for the departing player by CR 800.4a's first two
+    clauses. That covers the case clause 1 alone does not: a departing player
+    who *controls* a control-granting Aura they do not *own* — clause 2 ends
+    the stored effect that gave them the Aura, and CR 611.3a's "isn't locked
+    in" re-derives the grant to the Aura's actual owner. A pool-wide lint in
+    `CardSpec` now asserts no card's `Effect.ModifyTarget` carries a control
+    modification (`Projection.layer modification == Layer.Control`, asked as a
+    classification so the case on `Modification` stays inside
+    `Pawl.Projection`) — closing the gap between "no card does this" being
+    true by luck and true by enforcement — with one residual, unreachable
+    case left open: a *stored* `SetControllerToSource` that only card JSON
+    (not gameplay) could author is not ended by CR 800.4a's second clause
+    (#199). A benchmark gap closed alongside: no prior scenario contained an
+    Aura, so neither `Sba.fallsOff`'s per-Aura board re-derivation (found in
+    phase (a)'s review) nor `controllerOf`'s new battlefield walk was
+    measurable; `loadControlDeck` (Control Magic, Darksteel Myr, Island) gives
+    a "fighting 2p aura" case with six attached Auras on a populated board,
+    baseline ~513ms against ~21ms for "fighting 2p" — the 24x gap is
+    Darksteel Myr's indestructible 0/1 body never dying (a full attack/block/
+    damage cycle every turn) rather than board size, which accounts for only
+    about 2x of it. No new opcode. Added:
+    `Modification.SetControllerToSource`, `Projection.ControlGrant`/
+    `controlGrants`/`controllerOfGiven`, the hoisted grant lists in `controls`
+    and `Event`'s two trigger scans, `S.resick` (a state fixture forcing
+    summoning sickness, mirroring `S.attach`). Suite 1153 → 1162.
+    **The limitation this phase does not close, stated plainly rather than
+    softened: #198.** A *derived* control change does not re-Sick the
+    creature — `Object.sickness` is event-written state with exactly three
+    writers (a new object's zone-change entry, `settleAll`'s untap-step clear,
+    and `Effect.GainControl`'s explicit resolution-time re-Sick), and a static
+    ability's control grant is none of those: nothing ever observes the moment
+    it takes effect, so nothing re-Sicks. **Control Magic currently lets its
+    controller attack with the stolen creature the same turn it is cast —
+    CR 302.6-incorrect on the live path — until #198 lands as its own unit.**
+    Both `CombatSpec`'s CR 302.6 test and `AuraSpec`'s cross-turn settle test
+    use `S.resick` to *force* sickness rather than exercising a live control
+    change, and both now carry a comment saying so, citing #198, so neither
+    is mistaken for evidence the engine derives sickness from the control
+    change.
+
+  **Also deferred, filed by phase (b) and not yet exercised by any card:**
+  #200 (several per-priority-boundary paths are O(battlefield²) via a
+  per-object `project` call — pre-existing, not caused by this phase, but
+  noted while `controllerOf`'s own cost was under review).
+
+  Suite 1140 → 1162 across the two phases. Spec:
+  `docs/superpowers/specs/2026-07-25-auras-design.md`. Plans:
+  `docs/superpowers/plans/2026-07-25-auras-a-attachment-substrate.md` and
+  `docs/superpowers/plans/2026-07-25-auras-b-control-magic.md`.

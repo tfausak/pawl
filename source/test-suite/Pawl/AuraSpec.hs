@@ -131,6 +131,11 @@ tests registry =
       -- iterates Projection.controls, so it settles for the controller, and the
       -- creature can attack. Act of Treason could never test this -- its control ends
       -- at cleanup (CR 514.2), long before the thief's untap step.
+      --
+      -- S.resick FORCES sickness rather than exercising a live control change:
+      -- attaching Control Magic does not itself re-Sick the creature (#198), so
+      -- this test starts from the sick state a real steal SHOULD produce and
+      -- checks only the settle, not the attach.
       HU.testCase "CR 302.6 (#62): a creature held under indefinite control settles at the thief's untap step" $ do
         piker <- Registry.printing registry "Goblin Piker"
         controlMagic <- Registry.printing registry "Control Magic"

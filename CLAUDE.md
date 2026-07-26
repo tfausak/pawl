@@ -37,45 +37,65 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
 
 - **Status: M0–M5, the M5.5 count/compare interstitial, the M5.6 multiplayer
   interstitial, three mulligan-adjacent gap closures (CR 103.5b/#182, #176, CR
-  103.6a/#149), and Auras phase (a) are complete.** The closed-half milestones
-  M0–M3g, the M3.5 cards-as-data interstitial, all of M4 (M4a–M4h), all eleven
-  phases of M4.5 (the closed-half gap census), all of M5 (Controlling Another
-  Player CR 723, Restarting the Game CR 727, Subgames CR 729), the mulligan
-  gap-closure (CR 103.5), M5.5 (count/compare), M5.6 (Multiplayer: CR 800
-  general + CR 806 free-for-all, settling `docs/design.md` §2.4's bet), and the
-  three mulligan-adjacent closures (a declaration-window action gated on Serum
+  103.6a/#149), and Auras (CR 303.4, phases (a) and (b), both complete) are
+  done.** The closed-half milestones M0–M3g, the M3.5 cards-as-data
+  interstitial, all of M4 (M4a–M4h), all eleven phases of M4.5 (the
+  closed-half gap census), all of M5 (Controlling Another Player CR 723,
+  Restarting the Game CR 727, Subgames CR 729), the mulligan gap-closure (CR
+  103.5), M5.5 (count/compare), M5.6 (Multiplayer: CR 800 general + CR 806
+  free-for-all, settling `docs/design.md` §2.4's bet), and the three
+  mulligan-adjacent closures (a declaration-window action gated on Serum
   Powder, `Prompt.DeclareMulligan` carrying its cost, and an opening-hand-window
   action gated on Leyline of the Void) have each landed with their own
-  distilled entry in `docs/progress.md`. **Auras phase (a), the attachment
-  substrate (CR 303.4), is the newest — a card-driven unit, not a numbered
-  milestone, since Auras were the largest single hole in the card pool rather
-  than a scheduled phase.** Gate cards **Unholy Strength** (the first static
-  ability to reach through an attachment) and **Opalescence** (closing #114 for
-  free once `Subtype.Aura` existed): adds `Subtype.Aura`, `Card.enchant ::
-  Maybe TargetSpec`, `Object.attachedTo :: Maybe ObjectId` as base state seeded
-  as the object enters the battlefield, `Affected.Attached` (a third
+  distilled entry in `docs/progress.md`. **Auras is the newest — a card-driven
+  unit, not a numbered milestone, since Auras were the largest single hole in
+  the card pool rather than a scheduled phase.** Phase (a), the attachment
+  substrate, gate cards **Unholy Strength** (the first static ability to reach
+  through an attachment) and **Opalescence** (closing #114 for free once
+  `Subtype.Aura` existed): adds `Subtype.Aura`, `Card.enchant :: Maybe
+  TargetSpec`, `Object.attachedTo :: Maybe ObjectId` as base state seeded as
+  the object enters the battlefield, `Affected.Attached` (a third
   affected-set kind, re-derived from the source's own state), and CR 704.5m's
-  `Sba.fallsOff`. **No new opcode** — an Aura's whole behaviour is a static
-  ability plus an entry rule. Two findings: the target-spec seam is not single
-  (`Target.fillableModes` and the D4 lint reach past `Card.allTargetSpecs` to
-  `Mode.targetSpecs`, so castability needed teaching separately from
-  targeting, per CR 601.2c), and an Aura spell is the first permanent spell in
-  this pool that can fizzle (`Pawl.Stack` previously sent every permanent
-  straight to the battlefield with no target check). Deferred: #187–#193
-  (Attach/CR 303.4j, non-resolution entry, multiple `enchant`, enchant-player,
-  CR 303.4d's chooser, face-down, Equipment/Fortification). **Phase (b) is
-  next**: layer-2 control granted by a static ability, gated on **Control
-  Magic**, closing #33 and #62. M5.6's umbrella spec is
+  `Sba.fallsOff`. Phase (b), control granted by a static ability, gate card
+  **Control Magic**, closing **#33** and **#62**: adds the payload-free
+  `Modification.SetControllerToSource` (CR 613.1b) — payload-free because card
+  data cannot name a `PlayerId`, unlike `SetController`, which bakes its player
+  at resolution — and rebuilds `Projection.controllerOf` to merge stored
+  continuous effects with control-granting static abilities read straight off
+  battlefield permanents under CR 613.7's timestamp ordering, with a
+  `liveGiven`-shaped cycle escape (#37's shape) and hoisting so the
+  state-based-action sweep stays linear rather than quadratic in the
+  battlefield. Also re-derived, not merely reworded, two of
+  `Pawl.Departure`'s CR 800.4a proofs whose premises phase (b) invalidated.
+  **No new opcode across either phase**
+  — an Aura's whole behaviour is a static ability plus an entry rule. **The
+  limitation that stays open, stated plainly rather than softened: #198** — a
+  *derived* control change does not re-Sick the creature (`Object.sickness` is
+  event-written state with no hook for a static ability's control grant, unlike
+  `Effect.GainControl`'s explicit resolution-time re-Sick), so **Control Magic
+  currently lets its controller attack with the stolen creature the same
+  turn** — CR 302.6-incorrect on the live path until #198 lands as its own
+  unit. Deferred besides #198: #187–#193 from phase (a) (Attach/CR 303.4j,
+  non-resolution entry, multiple `enchant`, enchant-player, CR 303.4d's
+  chooser, face-down, Equipment/Fortification); #195 (a control grant with an
+  `Affected.Matching` set), #196 (layer 6/Humility does not stop a
+  control-granting static ability), #197 (`controllerOf` can loop through a
+  `Matching`/`ControlledBy` filter — held off today only by laziness), #199 (CR
+  800.4a clause 2 versus a stored `SetControllerToSource`, unreachable in this
+  pool and pool-wide linted against), and #200 (pre-existing
+  O(battlefield²) per-priority-boundary paths, not caused by this phase) from
+  phase (b). M5.6's umbrella spec is
   `docs/superpowers/specs/2026-07-24-m5.6-multiplayer-design.md`; its five
   phase plans are `docs/superpowers/plans/2026-07-24-m5.6a-turn-order-priority.md`,
   `docs/superpowers/plans/2026-07-25-m5.6b-setup-mulligans-restart-subgames.md`,
   `docs/superpowers/plans/2026-07-25-m5.6c-leaving-the-game-objects-monarch.md`,
   `docs/superpowers/plans/2026-07-25-m5.6d-combat-defending-player.md`, and
-  `docs/superpowers/plans/2026-07-25-m5.6e-close-out.md`. Auras phase (a)'s spec
-  and plan are `docs/superpowers/specs/2026-07-25-auras-design.md` and
-  `docs/superpowers/plans/2026-07-25-auras-a-attachment-substrate.md`; the
-  distilled per-milestone entries (gate cards, decisions, opcodes) are in
-  `docs/progress.md`.
+  `docs/superpowers/plans/2026-07-25-m5.6e-close-out.md`. Auras' spec is
+  `docs/superpowers/specs/2026-07-25-auras-design.md`; its two phase plans are
+  `docs/superpowers/plans/2026-07-25-auras-a-attachment-substrate.md` and
+  `docs/superpowers/plans/2026-07-25-auras-b-control-magic.md`. **M6 (the
+  transpiler, #9) is next.** The distilled per-milestone entries (gate cards,
+  decisions, opcodes) are in `docs/progress.md`.
 - The **milestone completion log** — one distilled entry per milestone with
   its gate card, the decision it proved, and the opcodes/types it added —
   lives in `docs/progress.md`. It records what each milestone *established*,
@@ -109,7 +129,13 @@ cards. M0 is a complete game with **zero** cards; the first real ABI test
   code site stating only what is *not* implemented, plus `(#N)`. Never write the
   expiry into the comment: an in-code expiry naming a milestone is a promise
   nothing checks, and it drifted at a 23% rate before the tracker existed. The
-  comment dies in the same commit that closes the issue.
+  comment dies in the same commit that closes the issue. **That rule is about a
+  deferral marker** — a comment stating what is *not yet* implemented. A
+  **closure citation** — a comment stating what a test now covers and pointing
+  at the proving test, e.g. `(#62)` beside `Pawl.Engine.settleAll`'s comment
+  about a creature settling under indefinite control — is a different genre,
+  the same as `docs/progress.md` citing a closed issue, and legitimately
+  survives the issue closing.
 
 ## Environment and commands
 

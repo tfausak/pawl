@@ -598,7 +598,11 @@ controlChangeSicknessTests :: Registry.Type.Registry -> Tasty.TestTree
 controlChangeSicknessTests registry =
   Tasty.testGroup
     "ControlChangeSickness"
-    [ HU.testCase "CR 302.6 a creature that just changed control is summoning sick (no haste)" $ do
+    [ -- S.resick FORCES sickness here rather than deriving it from the attach --
+      -- a live Control Magic control change does not itself re-Sick the
+      -- creature (#198), so this pins the intended CR 302.6 behavior, not the
+      -- engine's current one.
+      HU.testCase "CR 302.6 a creature that just changed control is summoning sick (no haste)" $ do
         piker <- Registry.printing registry "Goblin Piker"
         controlMagic <- Registry.printing registry "Control Magic"
         let base = Setup.emptyGame S.bothPlayers

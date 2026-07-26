@@ -87,7 +87,7 @@ The constructor and its classifications. No behaviour yet — nothing produces i
 **Interfaces:**
 - Produces: `Modification.SetControllerToSource`; `Projection.layer Modification.SetControllerToSource == Layer.Control`. Consumed by Tasks 2, 5.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/ProjectionSpec.hs`:
 
@@ -101,12 +101,12 @@ HU.testCase "CR 613.1b: SetControllerToSource is a layer-2 modification" $
 
 And in `source/test-suite/Pawl/CodecSpec.hs`, add `Modification.SetControllerToSource` to whichever round-trip list already covers `Modification` values. If none exists, add a single round-trip case matching the file's existing style.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal build all --enable-tests --enable-benchmarks`
 Expected: FAIL to compile — `Data constructor not in scope: Modification.SetControllerToSource`.
 
-- [ ] **Step 3: Add the constructor**
+- [x] **Step 3: Add the constructor**
 
 In `source/library/Pawl/Type/Modification.hs`, after `SetController`:
 
@@ -128,7 +128,7 @@ In `source/library/Pawl/Type/Modification.hs`, after `SetController`:
     SetControllerToSource
 ```
 
-- [ ] **Step 4: Fix every exhaustive match the compiler names**
+- [x] **Step 4: Fix every exhaustive match the compiler names**
 
 `Projection.layer` gets `Modification.SetControllerToSource -> Layer.Control`.
 
@@ -149,12 +149,12 @@ Then fix the remaining arms the compiler names in `Projection.hs` (`applyModific
 
 `Codec.modificationToJson` / `jsonToModification` get the nullary tag pair. **Never emitted in card JSON today is false for this constructor** — unlike `SetController`, this one *is* card data and will appear in `data/cards/control-magic.json` in Task 2, so the codec arms are load-bearing, not defensive.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add source/library/Pawl/ source/test-suite/Pawl/
@@ -181,7 +181,7 @@ The phase's centre. The card and the projection change land together, for the sa
 
 Scryfall-verified 2026-07-25: `Control Magic` — `{2}{U}{U}` — `Enchantment — Aura` — "Enchant creature / You control enchanted creature."
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `source/test-suite/Pawl/AuraSpec.hs`:
 
@@ -233,18 +233,18 @@ HU.testCase "CR 303.4: casting Control Magic takes the creature" $ do
 
 `S.landsInPlay island 4` must give alice enough blue mana for `{2}{U}{U}`; check how `landsInPlay` assigns lands and adjust the count if four Islands is not enough.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: FAIL — the registry cannot find `"Control Magic"`. After adding the card (Step 3) they should still fail, on control not moving.
 
-- [ ] **Step 3: Write the card**
+- [x] **Step 3: Write the card**
 
 `data/cards/control-magic.json`, alphabetical fields, matching the shape phase (a) established for `unholy-strength.json` — read that file first and mirror it. The `enchant` object carries pool `Creatures` and **omits** the `filter` key (the encoder omits it when `Nothing`). The one static ability is `affected: Attached`, `modification: SetControllerToSource` (a nullary tag — check `modificationToJson`'s emission for the exact shape). Mana cost is `{2}{U}{U}`: one `Generic` 2 followed by two `OfType`/`Colored`/`Blue` symbols.
 
 Run `cabal test` again: the card now loads, and the control tests fail on behaviour. That is the real red state.
 
-- [ ] **Step 4: Add the lean control gather**
+- [x] **Step 4: Add the lean control gather**
 
 In `source/library/Pawl/Projection.hs`, above `controllerOf`:
 
@@ -297,7 +297,7 @@ controlGrants gs =
    in concatMap grantsOf (Set.toList (GameState.battlefield gs))
 ```
 
-- [ ] **Step 5: Rebuild `controllerOf` on it**
+- [x] **Step 5: Rebuild `controllerOf` on it**
 
 Replace `controllerOf` with a hoisted, cycle-escaping pair, keeping the existing signature so no call site changes:
 
@@ -362,7 +362,7 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
 
 Two notes on that body. The stored path's `namesFrom` now also has an `Attached` arm it will never exercise — `Pawl.Resolve` builds only `Affected.TheseObjects` for stored effects — which is deliberate: one affected-set test shared by both paths beats two that can drift. And the `Ord.comparing fst` tie-break behaviour is unchanged from the existing `controllerOf`; do not "improve" it here.
 
-- [ ] **Step 6: Hoist in `controls`**
+- [x] **Step 6: Hoist in `controls`**
 
 ```haskell
 -- The battlefield permanents a player controls (CR 108.4). Computes the grant
@@ -375,12 +375,12 @@ controls pid gs =
    in filter (\oid -> controllerOfGiven grants Set.empty oid gs == Just pid) (Set.toList (GameState.battlefield gs))
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add data/cards/control-magic.json source/library/Pawl/Projection.hs source/test-suite/Pawl/
@@ -403,7 +403,7 @@ The deferral Control Magic exists to retire. Every control effect before this on
 **Interfaces:**
 - Consumes: the Control Magic printing and the new `controllerOf` (Task 2).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `source/test-suite/Pawl/AuraSpec.hs`. The point is that the stolen creature is still alice's at *her* untap step, settles there, and can then attack — which no until-end-of-turn effect could ever exercise:
 
@@ -428,21 +428,21 @@ HU.testCase "CR 302.6 (#62): a creature held under indefinite control settles at
 
 If `S.resick` does not exist, add it to `Pawl.Support` beside `S.attach` — a state fixture setting `Object.sickness = Sickness.Sick` on one object, mirroring `S.attach`'s shape and comment style. Do not reach for `Resolve.applyEffect` to induce sickness; that is the synthetic path Task 4 is deleting.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cabal test`
 Expected: FAIL on `canAttack` — or PASS. **If it passes on the first run, that is information, not a reason to skip the task.** It would mean `settleAll` already handled indefinite control and #62 was over-stated. Record that in your report, keep the test (it is now the regression guard #62 asked for), and proceed to Step 3.
 
-- [ ] **Step 3: Correct the comment**
+- [x] **Step 3: Correct the comment**
 
 `Engine.settleAll`'s comment currently ends: "Settling a permanent held under INDEFINITE control, across the thief's own untap step, is the Auras / Control Magic phase." That phase is now here. Rewrite the paragraph to state what is true: control from an Aura's static ability persists across turns, `settleAll` iterates `Projection.controls` so it settles for the current controller, and the case is covered by a test. Remove the forward reference.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 5: Commit and close the issue**
+- [x] **Step 5: Commit and close the issue**
 
 ```bash
 git add source/library/Pawl/Engine.hs source/test-suite/Pawl/
@@ -467,7 +467,7 @@ Also check `source/library/Pawl/Type/Sickness.hs:15` — issue #62 names it as t
 **Interfaces:**
 - Consumes: the Control Magic printing (Task 2).
 
-- [ ] **Step 1: Rewrite the test against the real card**
+- [x] **Step 1: Rewrite the test against the real card**
 
 In `source/test-suite/Pawl/CombatSpec.hs`, the `controlChangeSicknessTests` group holds a case labelled "SYNTHETIC (labeled crutch, spec §4)" that builds `Effect.GainControl` by hand via `Resolve.applyEffect`. Replace the fixture with Control Magic, keeping the assertion the test exists to make — that a creature which just changed control is summoning sick and cannot attack:
 
@@ -493,12 +493,12 @@ Delete the SYNTHETIC comment block and the `(#33)` citation with it. Remove any 
 
 **One thing to check rather than assume.** The old test got its sickness from `Effect.GainControl`'s resolution, which re-Sicks its target (CR 302.6). Attaching an Aura by fixture does not go through that path, so the test must establish sickness itself — that is what `S.resick` is for. If you find that attaching Control Magic *should* re-Sick the creature through some live path and does not, that is a real rules gap: **stop and report it** rather than papering over it with the fixture. CR 302.6 is about control held continuously since the turn began, so a creature that changes control mid-turn is genuinely sick.
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 3: Commit and close the issue**
+- [x] **Step 3: Commit and close the issue**
 
 ```bash
 git add source/test-suite/Pawl/CombatSpec.hs
@@ -522,7 +522,7 @@ gh issue close 33 --comment "Control Magic replaces the hand-built Effect.GainCo
 **Interfaces:**
 - Consumes: `Projection.controllerOf`, `Projection.givesControlTo` (Tasks 1–2).
 
-- [ ] **Step 1: Do the re-derivation, and write it down before touching code**
+- [x] **Step 1: Do the re-derivation, and write it down before touching code**
 
 The two proofs are around `Departure.hs:221` ("`Projection.controllerOf` is an object's OWNER overridden by a layer-2 `SetController` and nothing else") and around `Departure.hs:261` ("`Modification` is a flat sum with exactly one construction site for `SetController`"). Both now have a counterexample in principle: a third source of control, and a second construction site.
 
@@ -532,7 +532,7 @@ Work through CR 800.4a's clauses in order, with a control-granting Aura in the p
 2. Clause 2 ends effects giving that player control. `Projection.givesControlTo` sees only stored effects; a static ability is not stored. **Is there a reachable state where the departing player controls an Aura they do not own?** That requires something to have moved control of the Aura itself — which in this pool means a stored `SetController` on the Aura, which clause 2 removes. Verify that chain, and say whether it closes.
 3. Clauses 3 and 4 then ask whether any object is still controlled by the departed player. Re-derive `nonCardStackObjectsCease`'s "empty by construction" claim with `controllerOf`'s third case included.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 In `source/test-suite/Pawl/DepartureSpec.hs`, whatever your re-derivation concluded, pin it:
 
@@ -558,21 +558,21 @@ Use `S.threePlayerGame` deliberately: `Departure.objectsLeaveWith` runs only whe
 
 Match `Departure.depart`'s actual signature and argument order — read it rather than trusting the sketch.
 
-- [ ] **Step 3: Run test to verify it fails, or does not**
+- [x] **Step 3: Run test to verify it fails, or does not**
 
 Run: `cabal test`
 Expected: PASS is the likely outcome — clause 1 does the work. **A passing test here is the point, not a failure of TDD:** the test is a regression guard for a proof, and the proof predicts it passes. If it FAILS, you have found a real CR 800.4a bug; report it before fixing, because the fix belongs in `Projection.givesControlTo`'s classification (keeping the `Modification` case inside `Pawl.Projection`) and that is a design decision.
 
-- [ ] **Step 4: Rewrite the two proofs**
+- [x] **Step 4: Rewrite the two proofs**
 
 Replace both prose arguments with ones whose premises are true after this phase. They must name all three sources of control (owner, stored `SetController`, static `SetControllerToSource`) and carry the re-derivation from Step 1. Do not simply delete the arguments — they are what stops a future change silently skipping a clause of CR 800.4a, which is the value they were written for.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: PASS, warning-free.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add source/library/Pawl/ source/test-suite/Pawl/DepartureSpec.hs
@@ -595,22 +595,22 @@ Phase (a)'s final review found `Sba.fallsOff` re-deriving the whole board per Au
 **Interfaces:**
 - Consumes: the Control Magic and Unholy Strength printings.
 
-- [ ] **Step 1: Read how the benchmark builds its scenarios**
+- [x] **Step 1: Read how the benchmark builds its scenarios**
 
 `source/benchmark/Main.hs` is a single `tasty-bench` file. Find how it constructs the boards it measures — whether from the `Pawl.Cards` deck lists, from `Pawl.Support` fixtures, or inline. Note which scenario exercises the state-based-action sweep and the projection most heavily; that is the one an Aura belongs in.
 
-- [ ] **Step 2: Add an Aura-bearing scenario**
+- [x] **Step 2: Add an Aura-bearing scenario**
 
 Add a benchmark case with several attached Auras on a populated battlefield — enough permanents that a per-object re-derivation would show. Both real cards qualify: Unholy Strength (a layer-7c static ability through an attachment) and Control Magic (a layer-2 one that makes `controllerOf` do work). Prefer Control Magic, since `controllerOf` is the hot path this phase touches.
 
 Follow the file's existing style for naming and grouping. Do not restructure the benchmark.
 
-- [ ] **Step 3: Run the benchmark and record a baseline**
+- [x] **Step 3: Run the benchmark and record a baseline**
 
 Run: `cabal bench`
 Record the numbers for the new case in your report. This is a **baseline for future comparison**, not a pass/fail gate — there is no prior number to compare against. Say plainly in your report what the new scenario costs relative to its nearest Aura-free neighbour, so a future regression has something to be measured against.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add source/benchmark/Main.hs source/test-suite/Pawl/Cards.hs
@@ -627,12 +627,12 @@ git commit -m "bench: cover an Aura-bearing board, so projection regressions are
 **Files:**
 - Modify: `docs/progress.md`, `CLAUDE.md`
 
-- [ ] **Step 1: Verify no placeholder citation survived**
+- [x] **Step 1: Verify no placeholder citation survived**
 
 Run: `grep -rn '(#N' source/`
 Expected: no hits. Any hit is a comment that shipped without a real issue number.
 
-- [ ] **Step 2: Record the phase**
+- [x] **Step 2: Record the phase**
 
 Add the phase (b) material to `docs/progress.md`. Phase (a) already has an entry there — decide, and say in your report why, whether phase (b) extends that entry or gets its own. Both are defensible; the file's existing convention for multi-phase work should decide it.
 
@@ -640,14 +640,14 @@ Cover: the gate card (Control Magic), `Modification.SetControllerToSource` and w
 
 **Replace** `CLAUDE.md`'s status bullet — never append.
 
-- [ ] **Step 3: Final verification**
+- [x] **Step 3: Final verification**
 
 Run: `cabal clean && cabal build all --enable-tests --enable-benchmarks && cabal test`
 Expected: warning-free, all green.
 
 Confirm #33 and #62 are closed, and that the phase's new deferral issues are open.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/progress.md CLAUDE.md
@@ -657,7 +657,7 @@ hooky run
 git commit -m "docs(auras): record control from a static ability"
 ```
 
-- [ ] **Step 5: Confirm every step is ticked**
+- [x] **Step 5: Confirm every step is ticked**
 
 Run: `grep -c -- '- \[ \] \*\*Step' docs/superpowers/plans/2026-07-25-auras-b-control-magic.md`
 Expected: `0`. Use *that* grep, not `grep -c -- '- \[ \]'` — the header quotes the checkbox syntax in prose.
