@@ -44,10 +44,11 @@ data Subtype
     Aura
   | -- CR 301.5: an artifact subtype. "An Equipment can be attached to a
     -- creature. It can't legally be attached to anything that isn't a
-    -- creature." Appended LAST because Ord here is declaration order and the
-    -- corpus stores each card's subtypes in Ord-canonical order.
+    -- creature." Appended at the END, never inserted, because Ord here is
+    -- declaration order and the corpus stores each card's subtypes in
+    -- Ord-canonical order -- inserting reorders existing cards' lists and fails
+    -- the whole-pool test. Every constructor after this one obeys the same rule.
     Equipment
-  | -- CR 205.3m (a creature type; Branchblight Stalker's). Appended last, for
-    -- the reason Equipment's comment gives.
+  | -- CR 205.3m (a creature type; Branchblight Stalker's).
     Scout
   deriving (Eq, Ord, Show)

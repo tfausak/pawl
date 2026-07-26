@@ -93,10 +93,14 @@ blockerThreshold gs attacker blocker =
         else lethal
 
 -- One damage event, with its deal-time riders read off the projection HERE
--- rather than re-derived when they are consumed. CR 702.2e (deathtouch),
--- CR 702.90d (infect) and CR 702.164b (the total toxic value) are all facts
--- about the source AS THE DAMAGE IS DEALT -- last known information, since the
--- source may be gone by the time the CR 704.5h SBA or a later reader asks.
+-- rather than re-derived when they are consumed: each is a fact about the source
+-- AS THE DAMAGE IS DEALT, and the source may be gone by the time the CR 704.5h
+-- SBA or a later reader asks. CR 702.2e and CR 702.90d say so outright for
+-- deathtouch and infect ("its last known information is used to determine
+-- whether it had" the keyword). Rule 702.164 has NO such clause, so toxic's
+-- total value (CR 702.164b) is captured by analogy rather than by citation --
+-- observably the same today, since applyDamage runs in the same instant, and it
+-- keeps the CR 608.2i record self-contained.
 --
 -- Every damage the engine deals is built here -- the only other constructor call
 -- in the library is Pawl.Codec's decoder, which rebuilds an event rather than

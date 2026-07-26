@@ -299,7 +299,40 @@ toxicTests registry =
           [] -> HU.assertFailure "fixture should have a blocker"
           blocker : _ -> do
             HU.assertEqual "three damage marked on the blocker" (Just 3) (S.damageOf blocker fought)
-            HU.assertEqual "no -1/-1 counters" (Just 0) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject blocker fought))
+            HU.assertEqual "no -1/-1 counters" (Just 0) (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject blocker fought)),
+      -- CR 702.4b deals combat damage TWICE, and CR 120.3g fires per instance of
+      -- combat damage, not once per combat: two waves, two lots of poison. The
+      -- grant is a layer-6 GainKeyword rather than a card, since no printing in
+      -- the pool has both double strike and toxic.
+      HU.testCase "CR 702.4b/120.3g a double-striking Branchblight Stalker poisons twice" $ do
+        stalker <- Registry.printing registry "Branchblight Stalker"
+        let (gs0, attackers, _) = S.combatBoardOf [stalker] []
+        case attackers of
+          [] -> HU.assertFailure "fixture should have an attacker"
+          attacker : _ -> do
+            let gs = S.withEffectAt attacker (Timestamp.MkTimestamp 100) (Modification.GainKeyword Keyword.DoubleStrike) gs0
+                after = S.runCombat S.aggressiveAnswer gs
+            HU.assertEqual "toxic 2 twice is four poison" 4 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+            HU.assertEqual "and three damage twice" (Just 14) (S.lifeOf S.bob after),
+      -- CR 615.6: a prevented event never happens, so no combat damage was
+      -- "dealt to a player" for CR 120.3g to hang poison off. The falsifier is a
+      -- toxic implementation that reads the rider off the event batch instead of
+      -- off the survivors.
+      HU.testCase "CR 615.6 prevented combat damage gives no toxic poison" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            shield =
+              ActiveReplacement.MkActiveReplacement
+                { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat)) DamageRewrite.PreventAll,
+                  ActiveReplacement.source = oid,
+                  ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
+                  ActiveReplacement.expiry = Expiry.Type.AtCleanup,
+                  ActiveReplacement.uses = Uses.Unlimited
+                }
+            ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False 2 DamageKind.Combat
+            after = S.runPure S.identityAnswer (S.addReplacement shield gs0) (Damage.applyDamage [ev])
+        HU.assertEqual "no poison" 0 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+        HU.assertEqual "no life lost" (Just 20) (S.lifeOf S.bob after)
     ]
 
 sbaBase :: GameState.GameState
