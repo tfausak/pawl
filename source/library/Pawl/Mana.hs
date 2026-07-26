@@ -169,7 +169,8 @@ manaSources pid gs =
 --
 -- Takes the first mana type the object can produce. A Mountain produces exactly
 -- one, so there is no choice to make. A source that can produce more than one
--- type (any dual land) makes this a real decision that must become a Prompt (#12).
+-- TYPE (any dual land) makes that a real decision needing its own prompt (#124).
+-- Which SOURCE to tap is a separate question, and payCost asks it.
 tapForMana :: ObjectId -> GameState -> GameState
 tapForMana oid gs = case Game.lookupObject oid gs of
   Nothing -> gs
@@ -236,15 +237,6 @@ spend cost (Mana.MkMana units) =
         afterGeneric <- Monad.foldM takeAny afterTyped [1 .. generic]
         pure (Mana.MkMana afterGeneric)
 
--- Produce mana by tapping sources front-of-list until the cost is covered, then
--- spend it. Nothing when it cannot be covered.
---
--- This elides a choice, and that is legitimate ONLY because the sources are
--- INDISTINGUISHABLE: every Mountain produces exactly one red unit, so picking
--- among them is canonicalization, not a decision -- there is no policy to have.
--- The engine makes no player choices; strategy belongs to the interpreter. The
--- moment sources differ in any way a player could care about, this must become a
--- real Prompt (#12).
 -- CR 601.2g / 602.1: pay a mana cost, asking the player WHICH sources to
 -- activate. Returns whether it was paid; on failure nothing is spent, because a
 -- half-paid cost is not a state the rules have (the reject-not-repair posture

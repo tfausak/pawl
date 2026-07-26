@@ -136,7 +136,7 @@ activateAbility pid srcId ability = do
           -- ability reads the self slot, so this cannot disturb them.
           State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen Map.empty Nothing chosenModes)}) abilId (GameState.objects g)})
           -- CR 601.2g/h via Pawl.Cost.pay: the mana window, then the components.
-          -- activatable pre-checks payability, so within the source elision (#12)
+          -- activatable pre-checks payability (Cost.canPay, which is pure), so
           -- Unpaid is unreachable; reject-not-repair restores the whole
           -- activation -- including the ability object this function put on the
           -- stack -- if it ever is not.
