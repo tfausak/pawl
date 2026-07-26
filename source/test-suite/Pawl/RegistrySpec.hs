@@ -129,7 +129,7 @@ tests =
           expectExceptionWith
             "missing file"
             ( \err -> do
-                HU.assertEqual "names the slug" (Text.pack "goblin-piker") (Slug.slugToText (UnknownCard.slug err))
+                HU.assertEqual "names the slug" (Text.pack "goblin-piker") (Slug.toText (UnknownCard.slug err))
                 HU.assertEqual "names the path" (Registry.Type.root registry <> "/goblin-piker.json") (UnknownCard.path err)
             )
             (Registry.card registry "Goblin Piker"),
@@ -150,9 +150,9 @@ tests =
             "misfiled card"
             ( \err -> do
                 HU.assertEqual "names the path" (Registry.Type.root registry <> "/bird-maiden.json") (MisfiledCard.path err)
-                HU.assertEqual "names the file's slug" (Text.pack "bird-maiden") (Slug.slugToText (MisfiledCard.filedUnder err))
+                HU.assertEqual "names the file's slug" (Text.pack "bird-maiden") (Slug.toText (MisfiledCard.filedUnder err))
                 HU.assertEqual "names the card" (Text.pack "Goblin Piker") (MisfiledCard.name err)
-                HU.assertEqual "names the card's slug" (Just (Text.pack "goblin-piker")) (fmap Slug.slugToText (MisfiledCard.slugifiesTo err))
+                HU.assertEqual "names the card's slug" (Just (Text.pack "goblin-piker")) (fmap Slug.toText (MisfiledCard.slugifiesTo err))
             )
             (Registry.card registry "Bird Maiden"),
       HU.testCase "a name with no alphanumerics raises UnslugifiableName instead of reading .json"
@@ -209,7 +209,7 @@ tests =
           ]
           $ \registry -> do
             found <- Registry.slugs registry
-            HU.assertEqual "sorted, .json only" [Text.pack "bird-maiden", Text.pack "goblin-piker"] (fmap Slug.slugToText found),
+            HU.assertEqual "sorted, .json only" [Text.pack "bird-maiden", Text.pack "goblin-piker"] (fmap Slug.toText found),
       HU.testCase "cards loads every card the pool enumerates" $ do
         piker <- pikerJson
         withCorpus "load-all" [("goblin-piker.json", piker)] $ \registry -> do

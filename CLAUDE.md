@@ -2,7 +2,7 @@
 
 Guidance for Claude Code (and other agents) working in this repository.
 
-## What pawl is
+## What Pawl is
 
 A pure-Haskell rules engine for *Magic: The Gathering*, structured as a virtual
 machine:
@@ -20,193 +20,119 @@ machine:
 `case effect of DealDamage{} -> …`. Fusing the two halves is the single failure
 mode that sinks this project — audit for it.
 
-Design notes live in `docs/` (tracked in git):
+Keywords are the exception that proves the rule. Rule 702 is part of the
+rulebook, so `case keyword of Flying -> …` is the same kind of act as casing on
+`Phase` and is not a violation; the invariant forbids casing on an *effect's*
+identity.
 
-- `design.md` — architecture decisions and the M0–M7 implementation path.
-- `prior-art-lessons.md` — what to copy/avoid from Argentum (MIT), Forge
-  (GPLv3, reference only), XMage, the two Haskell engines (mtg-pure and
-  MedeaMelana's Magic, both BSD-3 — §10), and the wider field (Magarena,
-  ygopro, Arena/MTGO/Duels).
-- `rules.txt` — the comprehensive rules.
+**The second invariant: the engine never makes a player's choice.** Eliding a
+prompt is legitimate only for indistinguishable options, and every elision
+carries an issue. Where the rules leave nothing to ask, don't prompt.
 
-Follow the design doc's sequencing: retire architectural risk before adding
-cards. M0 is a complete game with **zero** cards; the first real ABI test
-(Magical Hack, Humility/Opalescence, Mindslaver) comes long before card #13.
+Design notes live in `docs/`:
 
-## Current work and tracking
+| Question | Where |
+|---|---|
+| What's next | `gh issue list` |
+| Architecture rationale | `design.md`, the relevant § only |
+| Rules ground truth | `rules.txt`, grepped by rule number — never memory |
+| Prior-art evidence | `prior-art-lessons.md`, cited § only |
+| What the milestone era established | `progress.md` (frozen), newest first |
+| A landed unit's authoritative detail | its spec, then its plan, under `docs/superpowers/` |
+Read these by section, on demand. Reading a whole doc "for context"
+front-loads tens of thousands of tokens before the first question.
 
-- **Status: the closed half is built.** M0–M5.6 have landed, together with the
-  M3.5 cards-as-data and M5.5 count/compare interstitials, M4.5's closed-half
-  gap census, the mulligan-adjacent closures, and the card-driven **Auras**
-  unit. `docs/progress.md` is the frozen record of what each established.
-  **Work is now issue-driven, not milestone-driven** — `gh issue list` says
-  what is next. M6 (the transpiler) and M7 (interpreters) are ordinary issues,
-  #9 and #10.
-- **The development workflow is `docs/workflow.md`** — pick an issue, branch,
-  TDD, `/code-review`, open a PR, stop. **One PR per logical chunk of work.
-  Never commit to `main`, never merge a PR, never push to `main`** — `main`'s
-  ruleset requires a pull request, and only the repository owner merges.
-- **Keywords are closed half, and casing on one is not a violation.** Rule 702 is
-  the rulebook; `case keyword of Flying -> …` is the same kind of act as casing on
-  `Phase`. The invariant forbids casing on an *effect's identity* — a keyword is
-  not an effect. See §1 of the M2a spec before "fixing" this.
-- **Outstanding work is tracked in GitHub Issues** (`tfausak/pawl`). List with
-  `gh issue list`; create with `gh issue create`; close with `gh issue close`.
-  **GitHub milestones are retired** — all closed as of 2026-07-24. `M6` and
-  `M7` are ordinary issues (#9, #10), picked up when they're picked up, and
-  a landed milestone's card-driven residue is de-milestoned rather than left
-  hanging off a finished phase. The useful
-  labels are `elision`, `gap`, `rules-correctness`, `bug`, and the two expiry
-  triggers `expires:milestone` and `expires:card-driven` — roughly half of
-  pawl's deferrals fire when a *card* demands them and have no scheduled date,
-  which is why that axis is a label and not a milestone. git-bug is retired; the
-  hash → issue mapping for citations in landed specs and plans is §10 of
-  `docs/superpowers/specs/2026-07-21-github-issue-migration-design.md`.
+## Workflow
+
+`CONTRIBUTING.md` has the loop — issue, branch, TDD, draft PR — and it applies
+to agents as written. What it doesn't say:
+
+- **Run `/code-review` on the branch before opening the PR.** That is the
+  invariant audit and the rules-correctness pass, and it reliably catches real
+  defects. Fix the findings on the branch.
+- **The PR body carries the case for merging**, since only the owner merges and
+  your work terminates at opening a PR likely to be merged. Give: what changed
+  and why, with `Closes #N`; the CR citations behind it, each checked against
+  `rules.txt`; the design calls made and the alternatives rejected; how it was
+  verified (build warning-clean, `hooky run` clean, suite count before → after,
+  and the proving test); whether the diff makes the rules core case on an
+  effect's *identity* — an explicit "no" is cheap; and what was deferred.
+- **Report the PR and stop.** Don't wait for CI. Don't start the next unit
+  either: one unit at a time in the single checkout, since two branches would
+  contend for `HEAD`.
+- **Most of what's left is card-driven** — it fires when a card demands it, so
+  the backlog is a menu rather than a queue. Never build one speculatively. Per
+  `design.md` §4, an effect is not done until a card exercises it in a
+  gameplay-level test: the card is the proof, not the deliverable. The useful
+  issue labels are `elision`, `gap`, `rules-correctness`, `bug`, and the expiry
+  triggers `expires:milestone` and `expires:card-driven`.
 - **File the issue, cite it inline.** When you elide something, open an issue
-  carrying the status, rationale and expiry trigger, and leave a comment at the
+  carrying the status, rationale and expiry trigger, then leave a comment at the
   code site stating only what is *not* implemented, plus `(#N)`. Never write the
-  expiry into the comment: an in-code expiry naming a milestone is a promise
-  nothing checks, and it drifted at a 23% rate before the tracker existed. The
-  comment dies in the same commit that closes the issue. **That rule is about a
-  deferral marker** — a comment stating what is *not yet* implemented. A
-  **closure citation** — a comment stating what a test now covers and pointing
-  at the proving test, e.g. `(#62)` beside `Pawl.Engine.settleAll`'s comment
-  about a creature settling under indefinite control — is a different genre,
-  the same as `docs/progress.md` citing a closed issue, and legitimately
-  survives the issue closing.
+  expiry into the comment — an in-code expiry is a promise nothing checks, and
+  it drifted at a 23% rate before the tracker existed. That comment dies in the
+  commit that closes the issue. A comment citing the test that *proves* a
+  behavior is a different genre and outlives the issue.
+- A spec or plan is **optional, not ceremony** — write one when the unit
+  warrants it and commit it in the same PR. If you are following a plan, work
+  its tasks strictly in order, and **never** edit the plan, weaken an assertion,
+  or delete a test to make a check pass. If the plan looks wrong, **stop and say
+  so** — it has been wrong before.
 
 ## Environment and commands
 
 The toolchain comes from the Nix flake — GHC 9.14.1, already on `PATH` in the
 dev shell (`nix develop` or direnv).
 
-- `cabal build` — compile. Must be **warning-clean** (`-Weverything` minus the
-  allow-list in `pawl.cabal`). The `pedantic` cabal flag adds `-Werror` and is
-  enabled in `cabal.project.local` (`flags: +pedantic`), so the build fails on
-  any warning; if the flag is somehow off, treat any warning as a failure
-  yourself. Incremental builds **hide** warnings from unchanged modules: when
-  you need a definitive check, `cabal clean` first — never poke at paths inside
-  `dist-newstyle`. Suites break separately from the library, so always build
-  `all` (`cabal build all --enable-tests --enable-benchmarks`).
-- `cabal test` — the `tasty` suite (`tasty-hunit` + `tasty-quickcheck`), split by
-  subsystem under `source/test-suite/Pawl/`. Each `Pawl.<Area>Spec` near-mirrors a
-  library module (`Pawl.Foo` ↔ `Pawl.FooSpec`), exposes `tests :: TestTree`, and
-  heads with a comment listing the modules it covers; `Main.hs` only aggregates
-  them. Shared fixtures live in `Pawl.Support`, imported `qualified ... as S` (the
-  one documented exception to alias-to-last-component); a group-local helper stays
-  with its group.
-- `cabal bench` — the `tasty-bench` benchmark, single file
-  `source/benchmark/Main.hs`.
-- `cabal repl` — GHCi.
-- `hooky fix` then `hooky run` — format and lint (ormolu, hlint, cabal-gild,
-  cabal check, file hygiene). Acts on **staged** files only: `git add -A` first,
-  or it reports "hooks skipped" and checks nothing. `hooky fix` reformats, so
-  `git add -A` again before `hooky run`.
+- `cabal build all` — compile. The suites break separately from the library, so
+  build `all`, not just the library. Incremental builds **hide** warnings from
+  unchanged modules; when you need a definitive check, `cabal clean` first —
+  never poke at paths inside `dist-newstyle`.
+- `cabal test` — the `tasty` suite. `cabal bench` and `cabal repl` as usual.
+- `hooky fix` then `hooky run` — format and lint. Acts on **staged** files only:
+  `git add` first, or it reports "hooks skipped" and checks nothing. `hooky fix`
+  reformats, so stage again before `hooky run`.
 
 ## Before you consider a change done
 
-1. `cabal build` is warning-free.
+1. `cabal build all` is warning-free.
 2. `hooky fix` applied, `hooky run` passes.
-3. HLint suggestions applied, or the exception justified.
-4. Every rules claim was checked against `docs/rules.txt`. **Never trust
-   recalled Magic rules** — they go stale. Two M1b spec bugs came from exactly
-   this: damage assignment order was *removed from the game* (the glossary lists
-   it "Obsolete"), and CR 733 is about human error at a table, not engine
+3. Every rules claim was checked against `docs/rules.txt`. **Never trust
+   recalled Magic rules** — they go stale. Two spec bugs came from exactly this:
+   damage assignment order was *removed from the game* (the glossary lists it
+   "Obsolete"), and CR 733 is about human error at a table, not engine
    validation. Cite the rule number in the code comment so the next reader can
    check your work.
 
-## Working a unit
-
-Work happens on a branch and lands as a pull request. `docs/workflow.md` is the
-full loop; the load-bearing rules:
-
-- **One PR per logical chunk of work**, usually one issue. A large issue may
-  span several PRs — each independently mergeable, each leaving `main` green;
-  only the last says `Closes #N`, the others `Part of #N`.
-- **Branch from current `main`**, named `<issue>-<slug>`, e.g.
-  `29-combat-damage-departed-blockers`.
-- **TDD is not optional:** write each failing test and actually run it to watch
-  it fail before implementing.
-- **Commit granularity inside a branch does not matter** — squash merge
-  collapses it. Commit as often as is convenient.
-- **Run `/code-review` on the branch before opening the PR** — the invariant
-  audit and the rules-correctness pass. Fix findings on the branch.
-- **The PR body carries the case for merging.** Only the repository owner
-  merges, so the work terminates at opening a PR that is likely to be merged,
-  and the body is what makes that case. Say: what changed and why, with
-  `Closes #N`; the CR citations behind it, each checked against `rules.txt`;
-  the design calls made and the alternatives rejected; how it was verified
-  (build warning-clean, `hooky run` clean, suite count before → after, and the
-  proving test); whether the diff makes the rules core case on an effect's
-  *identity* — an explicit "no" is cheap, and fusing the halves is the single
-  named failure mode; and what was deferred, with the issue filed and `(#N)`
-  cited at the code site.
-- **Run `hooky` before pushing; don't wait for CI afterward.** Only `Test`
-  blocks a merge, and that looseness is deliberate (`workflow.md` says why); a
-  red `Ormolu` means `hooky` was skipped, which is a bug in the work. Reading
-  the results is the reviewer's job — report the PR and stop.
-- A spec or plan is **optional, not ceremony** — write one when the unit
-  warrants it and commit it in the same PR. If you are following a plan: tasks
-  strictly in order, and **never** edit the plan, weaken an assertion, or
-  delete a test to make a check pass. If the plan looks wrong, **stop and say
-  so** — it has been wrong before.
-- The two invariants outrank everything: the engine never cases on a card's
-  identity (only classifications), and never makes a player's choice. Eliding a
-  prompt is legitimate only for indistinguishable options, and every elision
-  carries an issue. Where the rules leave nothing to ask, don't prompt.
-
 ## Code conventions
 
-These are the project's rules and several differ from common Haskell practice —
-follow them without being asked. Full rationale in the style section of
-`CONTRIBUTING.md`.
+`docs/style-guide.md` is the style guide; it is not repeated here. The
+project-specific rules it doesn't cover:
 
 - **No API stability obligations.** The project has no consumers. Rename
-  functions and modules, split or merge them, change signatures freely —
-  never add deprecation shims, compat re-exports, or keep an old name "just
-  in case."
-- **Haskell 2010, no language extensions** unless there's genuinely no
-  alternative. No `LambdaCase`, `OverloadedStrings`, etc. by default.
-- **No explicit export lists** (`module Pawl.Foo where`). The cabal file already
-  silences `-Wmissing-export-lists`.
-- **One type per module** under `Pawl.Type.<TypeName>` (type + instances only);
-  cross-type logic lives in other `Pawl.*` modules. A module never imports its
-  parents; a sibling `Pawl.Type.*` import is fine. Only `GADTs` and `RankNTypes`
-  are permitted (the suspension core); nothing else.
-- **Qualified imports**, aliased to the last component (`Data.List` → `List`);
-  import operators unqualified. One import group, no first/third-party split.
-  `A.B.C` must not import `A.B` or `A`.
-- **No partial functions**, written or used. `Maybe`/`Either`, not `head`,
-  `undefined`, `error`, or non-exhaustive matches.
-- **`newtype` liberally + smart constructors, non-punning.** Constructors take a
-  `Mk` prefix: `newtype Name = MkName Text`, `data Foo = MkFoo {…}` — never pun
-  the type and constructor names. Invariant-checking types instead use an
-  `UnsafeX` constructor with a validating `textToX`; unwrap with a descriptive
-  `xToText`, never `unwrapX`. Build records with `do` + record syntax, not
-  `<$>`/`<*>`.
-- **Prefer explicit:** `case` over point-free; a single equation with a `case`
-  over multiple pattern clauses; `do` notation over bare `>>=` (but never
-  `do` for pure code); `let` over `where`; `$` over parentheses and `.` over
-  chained `$`.
-- **`Text` not `String`.** Arbitrary-precision numbers (`Integer`, `Natural`,
-  `Rational`) unless a wire/DB boundary forces fixed width.
-- **No boolean blindness** — a custom sum type beats a bare `Bool`.
-- **Derive at least `Eq` and `Show`.**
-- **Short names**, disambiguated by module (`Pawl.Mana.Mana`, imported as
-  `Mana`), not by long prefixes. camelCase; no primes (a trailing `_` or number
-  is the fallback). Prefer functions to operators; no backtick-infixed functions
-  (except Hspec's `shouldBe`). No list comprehensions.
+  functions and modules, split or merge them, change signatures freely — never
+  add deprecation shims or compat re-exports.
+- **One type per module** under `Pawl.Type.<TypeName>`, holding the type and its
+  instances only; cross-type logic lives in other `Pawl.*` modules. Only `GADTs`
+  and `RankNTypes` are permitted, for the suspension core.
+- **Constructors take a `Mk` prefix and never pun the type name** —
+  `newtype Name = MkName Text`, `data Foo = MkFoo {…}`. Invariant-checking types
+  instead use an `UnsafeX` constructor with a validating `fromText`, unwrapped
+  by `toText`.
+- **Short names, disambiguated by module** — `Pawl.Mana.Mana`, imported as
+  `Mana`, rather than long prefixes.
 
 ## Adding a module
 
-Put it under `source/library/` namespaced beneath `Pawl` — one type per module as
-`Pawl.Type.<Name>`, logic in other `Pawl.*` modules. The `exposed-modules` field
-is generated by a `-- cabal-gild: discover` directive — add the file and run
-`cabal-gild` (via `hooky fix`); don't hand-edit the field.
+Put it under `source/library/` namespaced beneath `Pawl`. The `exposed-modules`
+field is generated by a `-- cabal-gild: discover` directive — add the file and
+run `cabal-gild` (via `hooky fix`); don't hand-edit the field.
 
 Tests go in the subsystem spec under `source/test-suite/Pawl/` that near-mirrors
-the library module under test (`Pawl.Foo` → `Pawl.FooSpec`); a new subsystem gets
-a new `Pawl.<Area>Spec` exposing `tests :: TestTree`, wired into `Main.hs`'s
-`testTree`. Shared fixtures go in `Pawl.Support` (aliased `S`); group-local
-helpers stay with their group. New `Pawl.*Spec` files must be added to the
-test-suite `other-modules` list.
+the library module under test (`Pawl.Foo` → `Pawl.FooSpec`). Each spec exposes
+`tests :: TestTree` and heads with a comment listing the modules it covers;
+`Main.hs` only aggregates them. A new subsystem gets a new `Pawl.<Area>Spec`
+wired into `Main.hs`'s `testTree` and added to the test-suite `other-modules`
+list. Shared fixtures live in `Pawl.Support`, imported `qualified ... as S` —
+the one documented exception to alias-to-last-component; a group-local helper
+stays with its group.

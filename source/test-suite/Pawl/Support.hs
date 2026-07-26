@@ -1315,7 +1315,7 @@ stubView table oid =
 -- is what the sweeps feed back to Registry.card; the enumeration itself is the
 -- library's since #167.
 corpusSlugs :: Registry.Type.Registry -> IO [String]
-corpusSlugs registry = fmap (fmap (Text.unpack . Slug.Type.slugToText)) (Registry.slugs registry)
+corpusSlugs registry = fmap (fmap (Text.unpack . Slug.Type.toText)) (Registry.slugs registry)
 
 allPrintings :: Registry.Type.Registry -> IO [Printing.Printing]
 allPrintings = Registry.printings

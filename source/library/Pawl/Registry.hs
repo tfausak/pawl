@@ -71,7 +71,7 @@ slugs :: Registry.Registry -> IO [Slug.Type.Slug]
 slugs registry =
   let json = ".json"
       stem name = take (length name - length json) name
-      toSlug name = case Slug.Type.textToSlug (Text.pack (stem name)) of
+      toSlug name = case Slug.Type.fromText (Text.pack (stem name)) of
         Nothing -> Exception.throwIO (UnslugifiableFile.MkUnslugifiableFile (pathIn registry name))
         Just slug -> pure slug
    in do
@@ -124,7 +124,7 @@ pathIn registry name = Registry.root registry <> "/" <> name
 -- under, or a lookup would quietly serve a different card than it was asked for.
 load :: Registry.Registry -> Slug.Type.Slug -> IO Card.Card
 load registry slug =
-  let path = pathIn registry (Text.unpack (Slug.Type.slugToText slug) <> ".json")
+  let path = pathIn registry (Text.unpack (Slug.Type.toText slug) <> ".json")
       corrupt reason = Exception.throwIO (CorruptCard.MkCorruptCard path reason)
    in do
         result <- IOError.tryIOError (ByteString.readFile path)

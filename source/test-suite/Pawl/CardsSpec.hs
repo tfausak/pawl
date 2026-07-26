@@ -68,7 +68,7 @@ checkFile registry p =
     -- already had to slugify it (via Pawl.Slug.slugify) to fetch this printing.
     Nothing -> HU.assertFailure (Text.unpack (CardT.name (Printing.card p)) <> ": does not slugify")
     Just slug -> do
-      let path = Registry.Type.root registry <> "/" <> Text.unpack (Slug.Type.slugToText slug) <> ".json"
+      let path = Registry.Type.root registry <> "/" <> Text.unpack (Slug.Type.toText slug) <> ".json"
       -- Read as bytes and decoded as UTF-8 explicitly, matching Pawl.Registry.load:
       -- Data.Text.IO.readFile decodes using the locale encoding, which is ASCII
       -- under LC_ALL=C, so this would otherwise die on khabal-ghoul.json's "á".

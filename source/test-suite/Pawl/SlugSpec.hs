@@ -12,7 +12,7 @@ import qualified Test.Tasty.QuickCheck as QC
 -- slugify's Text output, for assertions that only care about the text and not
 -- the Slug wrapper.
 slugifyText :: String -> Maybe Text.Text
-slugifyText = fmap Slug.Type.slugToText . Slug.slugify . Text.pack
+slugifyText = fmap Slug.Type.toText . Slug.slugify . Text.pack
 
 tests :: Tasty.TestTree
 tests =
@@ -52,49 +52,49 @@ tests =
           QC.testProperty "idempotent: a slug slugifies to itself" $
             \s -> case Slug.slugify (Text.pack s) of
               Nothing -> QC.property True
-              Just slug -> Slug.slugify (Slug.Type.slugToText slug) QC.=== Just slug,
+              Just slug -> Slug.slugify (Slug.Type.toText slug) QC.=== Just slug,
           QC.testProperty "the output is ASCII [a-z0-9-_] throughout" $
             \s ->
               let ok c = Char.isAsciiLower c || Char.isDigit c || c == '-' || c == '_'
                in case Slug.slugify (Text.pack s) of
                     Nothing -> QC.property True
-                    Just slug -> QC.property (Text.all ok (Slug.Type.slugToText slug)),
+                    Just slug -> QC.property (Text.all ok (Slug.Type.toText slug)),
           QC.testProperty "no leading, trailing, or doubled hyphen, and no doubled underscore" $
             \s -> case Slug.slugify (Text.pack s) of
               Nothing -> QC.property True
               Just slug ->
-                let t = Slug.Type.slugToText slug
+                let t = Slug.Type.toText slug
                  in QC.property
                       ( not (Text.isPrefixOf (Text.pack "-") t)
                           && not (Text.isSuffixOf (Text.pack "-") t)
                           && not (Text.isInfixOf (Text.pack "--") t)
                           && not (Text.isInfixOf (Text.pack "__") t)
                       ),
-          -- The payoff: textToSlug is slugify's own validation, applied to
+          -- The payoff: fromText is slugify's own validation, applied to
           -- slugify's own output, so drifting either one apart fails this.
-          QC.testProperty "everything slugify produces is accepted by textToSlug" $
+          QC.testProperty "everything slugify produces is accepted by fromText" $
             \s ->
               let slug = Slug.slugify (Text.pack s)
                in QC.property
-                    (maybe True (\sg -> Slug.Type.textToSlug (Slug.Type.slugToText sg) == Just sg) slug)
+                    (maybe True (\sg -> Slug.Type.fromText (Slug.Type.toText sg) == Just sg) slug)
         ],
       Tasty.testGroup
-        "textToSlug"
+        "fromText"
         [ HU.testCase "accepts what slugify produces" $
-            HU.assertEqual "goblin-piker" (Just (Text.pack "goblin-piker")) (fmap Slug.Type.slugToText (Slug.Type.textToSlug (Text.pack "goblin-piker"))),
+            HU.assertEqual "goblin-piker" (Just (Text.pack "goblin-piker")) (fmap Slug.Type.toText (Slug.Type.fromText (Text.pack "goblin-piker"))),
           HU.testCase "rejects a raw, unslugified name" $
-            HU.assertEqual "Goblin Piker" Nothing (Slug.Type.textToSlug (Text.pack "Goblin Piker")),
+            HU.assertEqual "Goblin Piker" Nothing (Slug.Type.fromText (Text.pack "Goblin Piker")),
           HU.testCase "rejects a leading hyphen" $
-            HU.assertEqual "-x" Nothing (Slug.Type.textToSlug (Text.pack "-x")),
+            HU.assertEqual "-x" Nothing (Slug.Type.fromText (Text.pack "-x")),
           HU.testCase "rejects a trailing hyphen" $
-            HU.assertEqual "x-" Nothing (Slug.Type.textToSlug (Text.pack "x-")),
+            HU.assertEqual "x-" Nothing (Slug.Type.fromText (Text.pack "x-")),
           HU.testCase "rejects a doubled hyphen" $
-            HU.assertEqual "a--b" Nothing (Slug.Type.textToSlug (Text.pack "a--b")),
+            HU.assertEqual "a--b" Nothing (Slug.Type.fromText (Text.pack "a--b")),
           HU.testCase "rejects a doubled underscore" $
-            HU.assertEqual "a__b" Nothing (Slug.Type.textToSlug (Text.pack "a__b")),
+            HU.assertEqual "a__b" Nothing (Slug.Type.fromText (Text.pack "a__b")),
           HU.testCase "rejects the empty text" $
-            HU.assertEqual "empty" Nothing (Slug.Type.textToSlug Text.empty),
+            HU.assertEqual "empty" Nothing (Slug.Type.fromText Text.empty),
           HU.testCase "accepts a lone underscore (Unhinged's _____)" $
-            HU.assertEqual "_" (Just (Text.pack "_")) (fmap Slug.Type.slugToText (Slug.Type.textToSlug (Text.pack "_")))
+            HU.assertEqual "_" (Just (Text.pack "_")) (fmap Slug.Type.toText (Slug.Type.fromText (Text.pack "_")))
         ]
     ]

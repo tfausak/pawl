@@ -16,9 +16,9 @@
 # Generally prefer named functions over operators.
 - ignore: {name: "Use <$>"}
 
-# HLint wants prefix `elem x xs` rewritten to infix ``x `elem` xs``. The project
-# style rule is the opposite: prefer functions to operators, and no
-# backtick-infixed functions. See the style section of CONTRIBUTING.md.
+# HLint wants prefix `elem x xs` rewritten to infix ``x `elem` xs``. The
+# project style rule is the opposite: prefer functions to operators, and no
+# backtick-infixed functions.
 - ignore: {name: "Use infix"}
 
 # Same rule, different hint name: this one rewrites `\x -> elem x xs` into a
@@ -26,16 +26,14 @@
 - ignore: {name: "Avoid lambda using `infix`"}
 
 # HLint wants `\gs -> f x (g gs)` eta-reduced to `f x . g`. The project style
-# rule is the opposite: prefer explicit over point-free. See the style section
-# of CONTRIBUTING.md.
+# rule is the opposite: prefer explicit over point-free.
 - ignore: {name: "Avoid lambda"}
 
 # HLint rewrites `if c then [] else [x]` into `[x | not c]`. The project style
-# rule bans list comprehensions outright, so this can never be applied. See the
-# style section of CONTRIBUTING.md.
+# rule bans list comprehensions outright, so this can never be applied.
 - ignore: {name: "Use list comprehension"}
 
 # HLint suggests `(, x)` for `\y -> (y, x)`. That needs TupleSections, and the
 # project is Haskell 2010 with only GADTs and RankNTypes permitted, so the
-# suggestion can never be applied. See the style section of CONTRIBUTING.md.
+# suggestion can never be applied.
 - ignore: {name: "Use tuple-section"}
