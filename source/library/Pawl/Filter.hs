@@ -11,8 +11,9 @@ import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 
 -- The characteristics a Filter atom consults. Supplied by the projection on the
--- battlefield/stack, and by the printed card off the battlefield (the two
--- builders live in Pawl.Projection). `power` and `controller` are Nothing off the
+-- battlefield/stack and by the printed card off the battlefield (both builders
+-- live in Pawl.Projection), or by `playerView` below when the candidate is a
+-- player rather than an object. `power` and `controller` are Nothing off the
 -- battlefield -- a card in a library has neither under the rules that matter here
 -- -- so PowerAtLeast / ControlledBy are vacuously False there, which no search
 -- filter uses.
