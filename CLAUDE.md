@@ -48,7 +48,7 @@ front-loads tens of thousands of tokens before the first question.
 to agents as written. What it doesn't say:
 
 - **Self-review the branch before opening the PR**, and fix the findings on the
-  branch. At minimum: re-check every CR citation against `rules.txt`, and
+  branch. At minimum: re-check every CR citation against `docs/rules.txt`, and
   re-read every comment the change touched for prose the rewrite made wrong —
   those two reliably catch real defects here. Scale the effort to the diff. A
   mechanical refactor does not need a fleet of subagents; a subtle rules change
