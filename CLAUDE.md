@@ -131,6 +131,16 @@ full loop; the load-bearing rules:
   collapses it. Commit as often as is convenient.
 - **Run `/code-review` on the branch before opening the PR** — the invariant
   audit and the rules-correctness pass. Fix findings on the branch.
+- **The PR body carries the case for merging.** Only the repository owner
+  merges, so the work terminates at opening a PR that is likely to be merged,
+  and the body is what makes that case. Say: what changed and why, with
+  `Closes #N`; the CR citations behind it, each checked against `rules.txt`;
+  the design calls made and the alternatives rejected; how it was verified
+  (build warning-clean, `hooky run` clean, suite count before → after, and the
+  proving test); whether the diff makes the rules core case on an effect's
+  *identity* — an explicit "no" is cheap, and fusing the halves is the single
+  named failure mode; and what was deferred, with the issue filed and `(#N)`
+  cited at the code site.
 - **Every CI check green at hand-off.** Only `Test` blocks a merge, and that
   looseness is deliberate (`workflow.md` says why); a red `Ormolu` means
   `hooky` was skipped, which is a bug in the work.

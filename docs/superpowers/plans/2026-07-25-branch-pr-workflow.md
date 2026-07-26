@@ -4,7 +4,18 @@
 
 **Goal:** Replace the retired milestone loop with a documented branch/PR workflow, so the process docs match the repository's actual protection rules and the issue-driven work ahead.
 
-**Architecture:** Documentation only — no Haskell changes, no test-suite changes. Six files: one new (`.github/pull_request_template.md`), one rewritten (`docs/workflow.md`), three edited (`CLAUDE.md`, `CONTRIBUTING.md`, `docs/design.md`), one frozen (`docs/progress.md`). Verification is `hooky run` plus greps that assert the retired vocabulary is gone.
+> **Amendment, 2026-07-25 (after review, before merge): Task 1 is reversed.**
+> `.github/pull_request_template.md` was created as specified, then removed on
+> the owner's call: guidance gets exactly two homes — `CLAUDE.md` for what an
+> agent needs, `CONTRIBUTING.md` for what a human needs — and a template is a
+> third copy that drifts from both. Task 1's steps below are left as the record
+> of what was executed; **do not re-run them.** The PR-body guidance now lives
+> in `CLAUDE.md`'s "Working a unit" and, in human-facing summary, in
+> `CONTRIBUTING.md`'s Workflow section. Task 2's and Task 4's quoted content
+> likewise still names the template; the files as shipped point at `CLAUDE.md`
+> instead.
+
+**Architecture:** Documentation only — no Haskell changes, no test-suite changes. Five files, all edited or rewritten: `docs/workflow.md` (rewritten), `CLAUDE.md`, `CONTRIBUTING.md` and `docs/design.md` (edited), `docs/progress.md` (frozen). Verification is `hooky run` plus greps that assert the retired vocabulary is gone.
 
 **Tech Stack:** Markdown, `hooky` (ormolu/hlint/cabal-gild/cabal-check/file-hygiene runner), `gh` CLI, GitHub rulesets.
 
@@ -27,7 +38,7 @@
 
 | File | Status | Responsibility after this plan |
 |---|---|---|
-| `.github/pull_request_template.md` | Create | Prompts a PR author for what the merger needs: what/why, rules basis, approach, verification, invariant check, deferrals |
+| ~~`.github/pull_request_template.md`~~ | **Reversed** | Created by Task 1, then removed — see the amendment above. Its content moved into `CLAUDE.md` and `CONTRIBUTING.md` |
 | `docs/workflow.md` | Rewrite whole | The development loop — how work is picked, built, audited, and landed. Absorbs the card-driven loop guidance currently stranded in untracked `_scratch/` |
 | `CLAUDE.md` | Edit two sections | Auto-loaded pointer file. "Current work and tracking" collapses from ~60 lines to a short status; "Executing a plan" becomes "Working a unit" |
 | `CONTRIBUTING.md` | Edit two sections | Human-facing contributor guide. Gains a Workflow section; the stale "no test suite yet" claim is corrected |

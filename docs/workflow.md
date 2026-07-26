@@ -31,8 +31,9 @@ PR that is likely to be merged* — not at a merge.
    This is the descendant of the whole-branch review that the milestone loop's
    close step carried — `progress.md` records that pass catching real defects,
    so it is not optional decoration.
-5. **Open the PR.** `.github/pull_request_template.md` prompts for what the
-   merger needs. Every CI check should be green at hand-off.
+5. **Open the PR.** The body carries the case for merging — `CLAUDE.md`'s
+   "Working a unit" says what it must contain. Every CI check should be green
+   at hand-off.
 6. **Hand off and stop.** Report the PR and its CI status. Do not start the
    next unit — one unit at a time, one checkout (see below).
 

@@ -105,9 +105,9 @@ repository owner merges them.
    `29-combat-damage-departed-blockers`.
 3. **Work, with tests.** Commit as often as you like; merges are squashed, so
    a branch's internal history is working state, not a record.
-4. **Open a pull request.** `.github/pull_request_template.md` prompts for what
-   a reviewer needs: what and why, the rules citations behind it, how it was
-   verified, and what was deferred.
+4. **Open a pull request.** Give the reviewer what they need: what changed and
+   why, a link to the issue, the rules citations behind it, how you verified
+   it, and anything you deliberately left out.
 5. **Wait for CI.** `Test` is the only check that blocks a merge. The others —
    `Ormolu`, `HLint`, `Gild`, `Cabal` — are deliberately non-blocking: `hooky`
    already runs them locally, and a contributor's PR won't be bounced over

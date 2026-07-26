@@ -95,7 +95,15 @@ contributes therefore terminates at *"open a PR that is likely to be merged"*,
 and the PR body is the artifact that makes that case. It absorbs what the
 retired spec, plan, and close-out documents used to carry.
 
-`.github/pull_request_template.md` prompts for:
+**There is deliberately no `.github/pull_request_template.md`.** Guidance has
+exactly two homes: `CLAUDE.md` for what an agent needs, `CONTRIBUTING.md` for
+what a human needs. A template is a third copy that drifts from both, and a
+GitHub-injected checklist is the wrong tool for prompting the party that
+already reads `CLAUDE.md` on every spawn. The operative list lives in
+`CLAUDE.md`'s "Working a unit"; `CONTRIBUTING.md` carries the human-facing
+summary.
+
+The body says:
 
 - **What and why** — the chunk of work, and `Closes #N` / `Part of #N`.
 - **Rules basis** — the CR citations, each verified against `rules.txt`.
