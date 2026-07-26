@@ -23,10 +23,12 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Comparison as Comparison
 -- Aliased Condition.Type, matching Pawl.Type.Count below and the project-wide
 -- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Condition may
 -- later be imported and must not collide.
@@ -1016,8 +1018,69 @@ auraCardTests registry =
         HU.assertEqual "no spell effects" [] (Card.allEffects card)
     ]
 
+-- Skilled Animator's "for as long as this creature remains on the battlefield",
+-- as an ordinary count. The sibling of S.youControlSource with the CR 109.5
+-- control conjunct dropped: this card asks only where its source IS, so a Master
+-- Thief stealing the Animator would not end its effect. Group-local -- only the
+-- pin below reads it.
+sourceOnBattlefield :: Condition.Type.Condition
+sourceOnBattlefield =
+  Condition.Type.MkCondition
+    ( Count.Type.MkCount
+        (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+        Filter.Type.IsSource
+        Aggregation.Objects
+    )
+    Comparison.Exactly
+    (Quantity.Type.Literal 1)
+
+-- The CR 704.5p gate card: the pool's first animator of an ARTIFACT, so an
+-- Equipment can become a creature while it is still equipping one.
+skilledAnimatorCardTests :: Registry.Type.Registry -> Tasty.TestTree
+skilledAnimatorCardTests registry =
+  Tasty.testGroup
+    "Skilled Animator"
+    [ HU.testCase "Skilled Animator is a {2}{U} 1/3 Human Artificer whose ETB animates an artifact you control" $ do
+        p <- Registry.printing registry "Skilled Animator"
+        let c = Printing.card p
+            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+            target = SlotName.MkSlotName (Text.pack "target")
+            duration = Duration.ForAsLongAs sourceOnBattlefield
+        HU.assertEqual "name" (Text.pack "Skilled Animator") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2, blue]) (Card.Type.manaCost c)
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power c)
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 3))) (Card.Type.toughness c)
+        HU.assertEqual "subtypes" (Set.fromList [Subtype.Human, Subtype.Artificer]) (TypeLine.subtypes (Card.Type.typeLine c))
+        case Card.Type.triggeredAbilities c of
+          [ab] -> do
+            HU.assertEqual "CR 603.6a: it triggers on entering" TriggerCondition.SelfEnters (TriggeredAbility.condition ab)
+            case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
+              [m] -> do
+                -- "becomes an artifact creature with base power and toughness
+                -- 5/5" is one printed effect that applies in two layers -- CR
+                -- 613.1d for the added card types, CR 613.4b for the base P/T --
+                -- so it decomposes into one Modification per layer. CR 613.6
+                -- ("it will continue to be applied to the same set of objects in
+                -- each other applicable layer") costs nothing across that split
+                -- here: each part locks the same CR 611.2c one-object set at
+                -- resolution, so there is no set left to disagree about.
+                HU.assertEqual
+                  "three parts, all on the target, all for the same duration"
+                  [ Effect.ModifyTarget duration (Modification.AddCardType CardType.Artifact) target,
+                    Effect.ModifyTarget duration (Modification.AddCardType CardType.Creature) target,
+                    Effect.ModifyTarget duration (Modification.SetBasePowerToughness (Quantity.Type.Literal 5) (Quantity.Type.Literal 5)) target
+                  ]
+                  (Foldable.toList (Mode.effects m))
+                HU.assertEqual
+                  "CR 115.1: one target slot, an artifact you control"
+                  (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasCardType CardType.Artifact, Filter.Type.ControlledBy PlayerRelation.You]))))
+                  (Mode.targetSpecs m)
+              _ -> HU.assertFailure "expected exactly one mode"
+          _ -> HU.assertFailure "expected exactly one triggered ability"
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, skilledAnimatorCardTests registry]

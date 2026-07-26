@@ -1,0 +1,259 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Skilled Animator",
+  "power": {
+    "type": "Literal",
+    "value": 1
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 3
+  },
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfEnters"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "ForAsLongAs",
+                    "value": {
+                      "type": "Condition",
+                      "value": [
+                        {
+                          "type": "Count",
+                          "value": [
+                            {
+                              "type": "InZone",
+                              "value": [
+                                {
+                                  "type": "Battlefield"
+                                },
+                                {
+                                  "type": "EachPlayer"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "IsSource"
+                            },
+                            {
+                              "type": "Objects"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Exactly"
+                        },
+                        {
+                          "type": "Literal",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "AddCardType",
+                    "value": {
+                      "type": "Artifact"
+                    }
+                  },
+                  "target"
+                ]
+              },
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "ForAsLongAs",
+                    "value": {
+                      "type": "Condition",
+                      "value": [
+                        {
+                          "type": "Count",
+                          "value": [
+                            {
+                              "type": "InZone",
+                              "value": [
+                                {
+                                  "type": "Battlefield"
+                                },
+                                {
+                                  "type": "EachPlayer"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "IsSource"
+                            },
+                            {
+                              "type": "Objects"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Exactly"
+                        },
+                        {
+                          "type": "Literal",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "AddCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  "target"
+                ]
+              },
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "ForAsLongAs",
+                    "value": {
+                      "type": "Condition",
+                      "value": [
+                        {
+                          "type": "Count",
+                          "value": [
+                            {
+                              "type": "InZone",
+                              "value": [
+                                {
+                                  "type": "Battlefield"
+                                },
+                                {
+                                  "type": "EachPlayer"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "IsSource"
+                            },
+                            {
+                              "type": "Objects"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Exactly"
+                        },
+                        {
+                          "type": "Literal",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "SetBasePowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 5
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 5
+                      }
+                    ]
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Artifact"
+                        }
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    ]
+                  },
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Human"
+      },
+      {
+        "type": "Artificer"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

@@ -1,6 +1,9 @@
--- Covers Pawl.Stack's Aura branch and Pawl.Resolve.targetsAllIllegal: a
+-- Covers Pawl.Stack's Aura branch and Pawl.Resolve.targetsAllIllegal -- a
 -- resolving Aura spell either fizzles (CR 608.2b) or enters the battlefield
--- already attached to its target (CR 303.4).
+-- already attached to its target (CR 303.4) -- together with the rest of the
+-- attachment substrate that shares Object.attachedTo: Pawl.Resolve's Attach
+-- opcode (CR 701.3) and Pawl.Sba's three attachment state-based actions
+-- (CR 704.5m, 704.5n, 704.5p).
 module Pawl.AuraSpec where
 
 import qualified Data.Map.Strict as Map
@@ -189,8 +192,77 @@ equipmentTests registry =
         HU.assertEqual "and is unattached" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject equip after))
     ]
 
+-- CR 704.5p, the sibling of CR 704.5n above: 704.5n asks whether the HOST is
+-- still legal, and this asks whether the attached permanent may be attached to
+-- anything at all. Both detach and leave the permanent on the battlefield.
+unattachableTests :: Registry.Type.Registry -> Tasty.TestTree
+unattachableTests registry =
+  Tasty.testGroup
+    "Unattachable"
+    [ -- CR 704.5p, first sentence: "If a battle or creature is attached to an
+      -- object or player, it becomes unattached and remains on the battlefield."
+      -- CR 301.5c says the same from the card type's side -- "An Equipment that's
+      -- also a creature can't equip a creature unless that Equipment has
+      -- reconfigure" -- and so does Skilled Animator's own ruling: "If an
+      -- Equipment becomes an artifact creature, it usually can't be attached to
+      -- another creature. If it was attached to a creature, it becomes
+      -- unattached." (Bonesplitter has no reconfigure; nothing in the pool does.)
+      --
+      -- Note which SBA does NOT fire here: CR 704.5n needs an ILLEGAL host, and
+      -- the Piker is a perfectly legal one. It is the Equipment itself that has
+      -- stopped being attachable.
+      --
+      -- Whole card, through the real pipeline: cast Skilled Animator, let its
+      -- CR 603.6a enters-the-battlefield trigger target the equipped
+      -- Bonesplitter, and watch the equipped creature lose the bonus.
+      HU.testCase "CR 704.5p whole card: animating an equipped Bonesplitter detaches it and the Piker loses the bonus" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        animator <- Registry.printing registry "Skilled Animator"
+        let base = S.landsInPlay island 3 -- {2}{U}
+            (creature, g1) = S.addCreature piker S.alice base
+            (equip, g2) = S.addCreature bonesplitter S.alice g1
+            attached = S.attach equip creature g2
+            (withSpell, spellId) = S.handOne animator attached
+            cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            -- The ETB trigger goes on the stack here, with its target chosen:
+            -- Bonesplitter is the only artifact alice controls, so CR 603.3d's
+            -- choice is forced.
+            triggered = snd (Engine.runGamePure S.identityAnswer resolved Engine.settleForPriority)
+            animated = snd (Engine.runGamePure S.identityAnswer triggered Stack.resolveTop)
+            after = snd (Engine.runGamePure S.identityAnswer animated Engine.settleForPriority)
+        HU.assertEqual "equipped, the Piker was 4/1" (Just 4) (Projection.powerOf creature attached)
+        HU.assertBool "the enters-the-battlefield trigger really was on the stack" (not (null (GameState.stack triggered)))
+        HU.assertEqual "the Equipment is now a 5/5 creature" (Just 5) (Projection.powerOf equip after)
+        HU.assertBool "it stays on the battlefield" (Set.member equip (GameState.battlefield after))
+        HU.assertEqual "and is unattached" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject equip after))
+        HU.assertEqual "so the Piker is back to 2 power" (Just 2) (Projection.powerOf creature after),
+      -- CR 704.5p, second sentence: "if any nonbattle, noncreature permanent
+      -- that's neither an Aura, an Equipment, nor a Fortification is attached to
+      -- an object or player, it becomes unattached and remains on the
+      -- battlefield." No card can produce this state -- nothing in the pool
+      -- strips the Equipment subtype, and nothing attaches a land -- so the
+      -- attachment is hand-built, the way the CR 301.5 case in the Equipment
+      -- group above hand-builds an Equipment on a land. What it pins is that the
+      -- branch reads the
+      -- permanent's own types and not its host's: the Piker here is a legal host
+      -- for anything that may be attached at all.
+      HU.testCase "CR 704.5p a land attached to a creature detaches and stays on the battlefield" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, withCreature) = S.addCreature piker S.alice base
+            (land, g2) = S.addCreature mountain S.alice withCreature
+            attached = S.attach land creature g2
+            after = S.settleSba attached
+        HU.assertBool "the land survives" (Set.member land (GameState.battlefield after))
+        HU.assertEqual "and is unattached" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject land after))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.Aura" [auraTests registry, equipmentTests registry]
+tests registry = Tasty.testGroup "Pawl.Aura" [auraTests registry, equipmentTests registry, unattachableTests registry]
 
 auraTests :: Registry.Type.Registry -> Tasty.TestTree
 auraTests registry =

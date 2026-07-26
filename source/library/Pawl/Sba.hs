@@ -124,8 +124,8 @@ destroyedBySba gs pc oid =
 -- object, so an Equipment attached to a player cannot be represented (#190).
 --
 -- Guarded on the PROJECTED subtype, so a permanent that stops being an Equipment
--- while attached stops matching here. CR 704.5p is the rule that should then
--- detach it, and there is no branch for it (#214).
+-- while attached stops matching here; cannotBeAttached below is the CR 704.5p
+-- branch that detaches it instead.
 becomesUnattached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
   Nothing -> False
@@ -139,6 +139,58 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
             Nothing -> False
             Just pc -> Set.member CardType.Creature (PC.cardTypes pc)
        in isEquipment && not hostIsCreature
+
+-- CR 704.5p: "If a battle or creature is attached to an object or player, it
+-- becomes unattached and remains on the battlefield. Similarly, if any
+-- nonbattle, noncreature permanent that's neither an Aura, an Equipment, nor a
+-- Fortification is attached to an object or player, it becomes unattached and
+-- remains on the battlefield."
+--
+-- The complement of becomesUnattached, and the reason the two are separate
+-- classifications rather than clauses of one: CR 704.5n asks whether the HOST is
+-- still legal, and this asks whether the attached permanent may be attached to
+-- anything at all. An Equipment animated while equipping a perfectly legal
+-- creature is the case only this one catches -- CR 301.5c, "An Equipment that's
+-- also a creature can't equip a creature unless that Equipment has reconfigure".
+-- That exception costs nothing here: CR 702.151b makes a reconfigure Equipment
+-- "stop being a creature until it becomes unattached", so it never reaches this
+-- branch in the first place (and no card in the pool has reconfigure). They share
+-- an ACTION (detach, stay on the battlefield), so performStateBasedActions ORs
+-- them into one list.
+--
+-- Read off the PROJECTED characteristics, which is the whole point: the card
+-- types this cases on are exactly what CR 613's layer 4 changes, and a permanent
+-- that was neither a creature nor an Aura when it became attached is what this
+-- rule exists for. "Aura" and "Equipment" are subtypes (CR 205.3h, CR 301.5), so
+-- they are read from PC.subtypes -- unlike CR 704.5m's fallsOff, which asks the
+-- printed card for an enchant ability because it needs that ability's spec.
+--
+-- Two clauses of the rule have no constructor to case on and are therefore
+-- unreachable rather than elided: there is no CardType.Battle (both "battle"
+-- halves) and no Subtype.Fortification. So is "or to a player", for the same
+-- reason it is unreachable in CR 704.5n -- Object.attachedTo names an object
+-- (#190).
+--
+-- An Aura that is also a creature detaches HERE (first sentence) and is then
+-- buried by CR 704.5m on the next pass, which is exactly the two-step CR 303.4d
+-- describes. #194 tracks that clause; it has no producer, since the pool's only
+-- animator (Opalescence) excludes Auras from its affected set.
+cannotBeAttached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
+cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
+  Nothing -> False
+  Just obj -> case Object.attachedTo obj of
+    Nothing -> False
+    Just _ -> case Map.lookup oid pcs of
+      Nothing -> False
+      Just pc ->
+        let isCreature = Set.member CardType.Creature (PC.cardTypes pc)
+            isAura = Set.member Subtype.Aura (PC.subtypes pc)
+            isEquipment = Set.member Subtype.Equipment (PC.subtypes pc)
+         in -- Written as the rule's two sentences rather than as the smaller
+            -- equivalent `isCreature || not (isAura || isEquipment)`, so each
+            -- half can be checked against the CR on its own. The `not isCreature`
+            -- conjunct is the second sentence's own "noncreature" qualifier.
+            isCreature || (not isCreature && not isAura && not isEquipment)
 
 -- CR 704.5m: "If an Aura is attached to an illegal object or player, or is not
 -- attached to an object or player, that Aura is put into its owner's graveyard."
@@ -279,8 +331,10 @@ performStateBasedActions = do
       -- every other classification above -- see fallsOff's Haddock for why an
       -- Aura whose creature dies THIS pass survives it and falls off the next.
       unattachedAuras = filter (fallsOff pcs gs) onBattlefield
-      -- CR 704.5n: computed from the same pre-pass state, for the same reason.
-      detaching = filter (becomesUnattached pcs gs) onBattlefield
+      -- CR 704.5n and CR 704.5p: computed from the same pre-pass state, for the
+      -- same reason. One list because they share an action -- detach, stay on
+      -- the battlefield -- and differ only in why the attachment is illegal.
+      detaching = filter (\oid -> becomesUnattached pcs gs oid || cannotBeAttached pcs gs oid) onBattlefield
       -- CR 704.5h's window is "since the last SBA check", so the watermark is the
       -- log length AS THIS PASS BEGAN: every 704.5h victim was computed from that
       -- same pre-pass state, and the Moved events this pass itself appends carry
@@ -291,9 +345,9 @@ performStateBasedActions = do
   Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toGraveyard
   -- CR 704.5m: the Aura follows its creature. A plain put-into-graveyard.
   Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) unattachedAuras
-  -- CR 704.5n: the Equipment does NOT follow its creature -- it detaches and
-  -- stays. Not a zone change, so unlike the Aura above it does not funnel through
-  -- Pawl.Event: no Moved event, no replacement, no trigger.
+  -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
+  -- and stays. Not a zone change, so unlike the Aura above it does not funnel
+  -- through Pawl.Event: no Moved event, no replacement, no trigger.
   State.modify' (\g -> g {GameState.objects = List.foldl' (\m oid -> Map.adjust (\o -> o {Object.attachedTo = Nothing}) oid m) (GameState.objects g) detaching})
   -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
   Monad.mapM_ Event.destroy toDestroy
@@ -328,8 +382,8 @@ performStateBasedActions = do
       -- A state-based action was performed iff a creature was buried or destroyed
       -- (a regenerated creature still counts, which the CR 704.4 settle loop
       -- re-checks and -- because the regen healed the damage -- terminates), a
-      -- player left, a token ceased to exist, an Aura fell off (CR 704.5m), or an
-      -- Equipment detached (CR 704.5n).
+      -- player left, a token ceased to exist, an Aura fell off (CR 704.5m), or a
+      -- permanent detached (CR 704.5n / 704.5p).
       acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
