@@ -37,6 +37,16 @@ data Filter
     -- number) are both written -- one relation, one spelling, rather than a
     -- parallel Exclusion field on each (#163).
     IsSource
+  | -- CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
+    -- "target opponent". Context-relative in exactly the way ControlledBy is: it
+    -- carries no player id, and the answer comes from the Context the caller
+    -- supplies.
+    --
+    -- Separate from ControlledBy rather than a reuse of it, because they ask
+    -- about different things: ControlledBy asks who controls an OBJECT candidate,
+    -- and this asks who the candidate IS. A player has no controller (CR 109.5
+    -- is about objects), so the two are never both answerable for one candidate.
+    IsPlayer PlayerRelation
   | And [Filter]
   | Or [Filter]
   | Not Filter

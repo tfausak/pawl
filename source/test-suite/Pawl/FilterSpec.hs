@@ -26,7 +26,8 @@ blackCreature =
       Filter.subtypes = Set.singleton Subtype.Zombie,
       Filter.power = Just 2,
       Filter.controller = Just (PlayerId.MkPlayerId 0),
-      Filter.identity = Just (ObjectId.MkObjectId 7)
+      Filter.identity = Just (ObjectId.MkObjectId 7),
+      Filter.playerIdentity = Nothing
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -39,7 +40,8 @@ devoidBigCreature =
       Filter.subtypes = Set.empty,
       Filter.power = Just 5,
       Filter.controller = Nothing,
-      Filter.identity = Nothing
+      Filter.identity = Nothing,
+      Filter.playerIdentity = Nothing
     }
 
 self :: Filter.Context

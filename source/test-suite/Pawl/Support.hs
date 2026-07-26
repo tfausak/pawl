@@ -1292,7 +1292,8 @@ stubView table oid =
                 Filter.subtypes = ss,
                 Filter.power = Nothing,
                 Filter.controller = ctrl,
-                Filter.identity = Just o
+                Filter.identity = Just o,
+                Filter.playerIdentity = Nothing
               }
         [] -> Nothing
 

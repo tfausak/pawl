@@ -123,7 +123,8 @@ snapshotView shape event = case event of
                 Filter.subtypes = PC.subtypes snapshot,
                 Filter.power = PC.power snapshot,
                 Filter.controller = Nothing,
-                Filter.identity = Nothing
+                Filter.identity = Nothing,
+                Filter.playerIdentity = Nothing
               }
         else Nothing
   GameEvent.DamageDealt _ -> Nothing
