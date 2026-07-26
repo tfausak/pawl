@@ -61,9 +61,12 @@ to agents as written. What it doesn't say:
   verified (build warning-clean, `hooky run` clean, suite count before → after,
   and the proving test); whether the diff makes the rules core case on an
   effect's *identity* — an explicit "no" is cheap; and what was deferred.
-- **Report the PR and stop.** Don't wait for CI. Don't start the next unit
-  either: one unit at a time in the single checkout, since two branches would
-  contend for `HEAD`.
+- **Mark the PR ready for review, then report it and stop.** Open it as a draft,
+  but flip it once the self-review's findings are pushed and the suite is green —
+  that is what "ready for review" means, and a finished PR left as a draft is
+  waiting on nobody. Don't wait for CI. Don't start the next unit either: one
+  unit at a time in the single checkout, since two branches would contend for
+  `HEAD`.
 - **Most of what's left is card-driven** — it fires when a card demands it, so
   the backlog is a menu rather than a queue. Never build one speculatively. Per
   `design.md` §4, an effect is not done until a card exercises it in a
