@@ -218,11 +218,15 @@ affects source oid a partial gs = case a of
         -- calls THIS function for any Matching set. So this call is safe only
         -- because `perspective` is an unforced thunk until a filter conjunct
         -- actually needs it (ControlledBy is the only one that does), and no
-        -- SetLandSubtype static ability in the pool pairs Matching with
-        -- ControlledBy. That is a laziness accident, not a structural guarantee
-        -- -- such a card would force `perspective`, which recurses back into
-        -- controllerOf -> controlGrants -> this same liveness gate, and hangs
-        -- rather than answering wrong (#197).
+        -- SetLandSubtype -- static OR stored, setLandSubtypeEffects gathers
+        -- both -- in the pool pairs Matching with ControlledBy. A stored one
+        -- is additionally safe today because Pawl.Resolve constructs every
+        -- stored ContinuousEffect with Affected.TheseObjects, never Matching;
+        -- that is a fact about Resolve's current call sites, not something
+        -- this fold enforces. That is a laziness accident, not a structural
+        -- guarantee -- such a card would force `perspective`, which recurses
+        -- back into controllerOf -> controlGrants -> this same liveness gate,
+        -- and hangs rather than answering wrong (#197).
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
           && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
@@ -907,9 +911,12 @@ data ControlGrant = MkControlGrant
 -- `controlGrants` -- so if that Matching filter's evaluation ever forces
 -- `affects`'s `perspective` thunk (a ControlledBy conjunct is the only thing
 -- that does), this loops rather than answering wrong. Nothing here prevents
--- that; it holds only because the pool's one static SetLandSubtype (Blood
--- Moon) carries a Matching filter with no ControlledBy in it. See #197 for the
--- card shape that would break this and the deferred structural fix.
+-- that; it holds only because no SetLandSubtype in the pool -- static OR
+-- stored, setLandSubtypeEffects gathers both -- carries a Matching filter with
+-- ControlledBy in it: the pool's one static example (Blood Moon) has none, and
+-- every stored ContinuousEffect Pawl.Resolve constructs carries
+-- Affected.TheseObjects rather than Matching at all. See #197 for the card
+-- shape that would break this and the deferred structural fix.
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
   let setEffs = setLandSubtypeEffects gs
@@ -952,12 +959,16 @@ controllerOf oid gs = controllerOfGiven (controlGrants gs) Set.empty oid gs
 -- (#37), not an implementation of it: deriving a grant's player asks for its
 -- SOURCE's controller, which can re-enter this function. Re-entering an object
 -- already under question returns its owner, so a cycle grants nothing and every
--- object in it keeps its own owner. Unreachable today ("enchant creature"
--- forbids two Auras attached to each other, the only way to form a control
--- cycle), and unobservable even if it existed: a direct controllerOf query on
--- any object in the cycle returns THAT object's owner either way, whether or
--- not it was first reached by recursing through another object in the cycle
--- -- which is the only kind of query `controls` (or anything else) ever makes.
+-- object in it keeps its own owner. Unreachable in practice today ("enchant
+-- creature" forbids two Auras attached to each other, which rules out the
+-- Attached route; a second route -- two static abilities each naming the
+-- other's fixed ObjectId via Affected.TheseObjects, which is codec-round-
+-- trippable and legal on a static ability -- is unauthorable by any real card
+-- but not excluded by the types), and unobservable even if it existed: a
+-- direct controllerOf query on any object in the cycle returns THAT object's
+-- owner either way, whether or not it was first reached by recursing through
+-- another object in the cycle -- which is the only kind of query `controls`
+-- (or anything else) ever makes.
 controllerOfGiven :: [ControlGrant] -> Set ObjectId -> ObjectId -> GameState -> Maybe PlayerId.PlayerId
 controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing

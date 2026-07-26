@@ -210,9 +210,15 @@ objectsLeaveWith pid gs =
 -- they OWN the source it left with the first clause, and if they merely
 -- CONTROLLED it, the effect that gave them the source is a stored carrier this
 -- clause just ended, and the grant re-derives to the source's new controller
--- on the next projection. One residual divergence, unreachable in this pool:
--- a stored SetControllerToSource, which card JSON could author through
--- Effect.ModifyTarget, is not ended here (#199).
+-- on the next projection. Card JSON could author a stored SetControllerToSource
+-- through Effect.ModifyTarget, and this function does not end one -- but that is
+-- not a gap: such a stored effect is inert. Projection.controllerOfGiven's
+-- storedSetter matches only Modification.SetController (its wildcard drops
+-- SetControllerToSource), Projection.controlGrants reads control-granting
+-- static abilities off Card.staticAbilities and never off stored effects, and
+-- Projection.applyModification's SetControllerToSource arm is the identity
+-- (`pc`). A card authoring one would resolve, store the effect, and grant
+-- control to no one; there is nothing here for CR 800.4a to end (#199).
 --
 -- CR 800.4a is immediate: "It happens as soon as the player leaves the game."
 -- Master Thief's ForAsLongAs condition would eventually drop its effect through

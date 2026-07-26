@@ -564,11 +564,14 @@ lintTests registry =
       -- Pawl.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
       -- mode declaring it would be silently shadowed.
       -- #199: no card authors a layer-2 control modification into an effect that
-      -- RESOLVES, because a stored control grant is the one shape CR 800.4a's
-      -- second clause cannot end. Projection.givesControlTo recognizes a stored
-      -- grant by its baked PlayerId; SetControllerToSource carries none (its
-      -- player is the source's controller, CR 109.5), so a stored one would
-      -- survive a departure the rule says ends it. See Pawl.Departure's proofs.
+      -- RESOLVES. SetControllerToSource is the payload-free constructor and is
+      -- INERT when stored: Projection.controllerOfGiven's storedSetter matches only
+      -- Modification.SetController, Projection.controlGrants reads control-granting
+      -- static abilities off Card.staticAbilities and never off stored effects, and
+      -- Projection.applyModification's SetControllerToSource arm is the identity.
+      -- A card authoring one would resolve, store the effect, and grant control to
+      -- no one -- there is nothing for CR 800.4a to end (see Pawl.Departure's
+      -- proofs).
       --
       -- BOTH control constructors, not just the payload-free one: baking a
       -- PlayerId into static card text is equally unreal, since a card cannot
