@@ -19,7 +19,7 @@ milestone's record is history, and history does not change.
 interstitials, and the card-driven Auras unit — which ended on 2026-07-25. Work
 after that is issue-driven and lands as pull requests; the merged PR and the
 issue it closes are the record, and no further entries are appended here. See
-`workflow.md`.
+`CONTRIBUTING.md`.
 
 - **M0 is complete** (a full game of 60 Mountains vs. 60 Mountains, replaying
   deterministically). Its spec and plan are kept as reference:

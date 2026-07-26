@@ -25,10 +25,14 @@ Ideally changes follow TDD by writing a failing test first, seeing it fail, and
 then writing code to make it pass.
 
 Keep PRs as drafts until they're ready for review. Please do not force push to
-a branch after opening a PR.
+a branch after opening a PR. Merges are squashed, so a branch's internal
+history is working state rather than a record. Commit as often as is
+convenient.
 
 Typically each PR will close one issue. However sometimes a single PR will
-close multiple issues. Other times one issue may require multiple PRs.
+close multiple issues. Other times one issue may require multiple PRs, in
+which case each PR should be independently mergeable and only the last one
+should close the issue.
 
 [1]: https://nixos.org
 [2]: https://direnv.net

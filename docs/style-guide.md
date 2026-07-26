@@ -16,11 +16,11 @@ understand, debug, and modify.
 - [Apply HLint suggestions](#apply-hlint-suggestions)
 - [Avoid backtick operators](#avoid-backtick-operators)
 - [Avoid big tuples](#avoid-big-tuples)
+- [Avoid boolean blindness](#avoid-boolean-blindness)
 - [Avoid compiler warnings](#avoid-compiler-warnings)
 - [Avoid duplicate guards](#avoid-duplicate-guards)
 - [Avoid excessive parentheses](#avoid-excessive-parentheses)
 - [Avoid explicit export lists](#avoid-explicit-export-lists)
-- [Avoid fields with `newtype`s](#avoid-fields-with-newtypes)
 - [Avoid importing parents](#avoid-importing-parents)
 - [Avoid language extensions](#avoid-language-extensions)
 - [Avoid `List`](#avoid-list)
@@ -34,14 +34,13 @@ understand, debug, and modify.
 - [Avoid pure `do`](#avoid-pure-do)
 - [Avoid separate `let`s](#avoid-separate-lets)
 - [Avoid `String`](#avoid-string)
-- [Avoid throwing exceptions](#avoid-throwing-exceptions)
 - [Avoid unnecessary eta reduction](#avoid-unnecessary-eta-reduction)
 - [Avoid using partial functions](#avoid-using-partial-functions)
 - [Avoid writing partial functions](#avoid-writing-partial-functions)
 - [Derive at least `Eq` and `Show`](#derive-at-least-eq-and-show)
 - [Expose record constructors and fields](#expose-record-constructors-and-fields)
 - [Format with Ormolu](#format-with-ormolu)
-- [Group imports together](#group-imports-together)
+- [Group all imports together](#group-all-imports-together)
 - [Prefer arbitrary precision numbers](#prefer-arbitrary-precision-numbers)
 - [Prefer ASCII](#prefer-ascii)
 - [Prefer `case` expressions](#prefer-case-expressions)
@@ -810,6 +809,20 @@ numbers :: Seq.Seq Int
 -- good
 import qualified Data.Set as Set
 numbers :: Set.Set Int
+```
+
+## Prefer line comments
+
+Prefer line comments over block comments. Block comments can nest, which makes
+them easy to unbalance, and commenting a region out with an editor keybinding
+produces line comments anyway.
+
+``` hs
+-- bad
+{- Convert a name into its slug. -}
+
+-- good
+-- Convert a name into its slug.
 ```
 
 ## Prefer ASCII

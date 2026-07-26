@@ -34,7 +34,7 @@ import qualified Pawl.Type.Slug as Slug
 -- into Nothing.
 --
 -- A name with nothing to keep (no letters, digits, or underscores) slugifies
--- to Nothing rather than the empty text: Pawl.Type.Slug.textToSlug rejects the
+-- to Nothing rather than the empty text: Pawl.Type.Slug.fromText rejects the
 -- empty text, and this function is exactly that validation applied to its own
 -- output.
 --
@@ -51,7 +51,7 @@ slugify t =
       collapseRun run = case Text.uncons run of
         Just ('_', _) -> Text.singleton '_'
         _ -> run
-   in Slug.textToSlug (Text.intercalate (Text.pack "-") (Text.words (collapseUnderscores (Text.map keep ascii))))
+   in Slug.fromText (Text.intercalate (Text.pack "-") (Text.words (collapseUnderscores (Text.map keep ascii))))
 
 -- ASCII stand-ins for the accented letters that occur in card names. Applied
 -- after case folding, so only the lower-case forms need entries. Everything
