@@ -192,13 +192,50 @@ loadRedDeck registry = do
   bolt <- Registry.printing registry "Lightning Bolt"
   pure (Deck.MkDeck (Map.fromList [(mountain, 36), (piker, 12), (maiden, 8), (bolt, 4)]))
 
+-- A deck that reliably attaches several Auras to a populated battlefield, so
+-- Sba.fallsOff (per-Aura board re-derivation) and Projection.controllerOf
+-- (walking the battlefield for control-granting statics, the hot path
+-- Projection.controls calls at every SBA sweep) both get exercised here -- no
+-- prior benchmark deck contained an Aura at all.
+--
+-- Setup.createDeck builds each player's library from 'Data.Map.Strict.toList',
+-- so it is grouped by Printing's derived Ord -- primarily 'name' (Text, so
+-- ordinary lexicographic order) -- NOT interleaved, and Prompt.Shuffle is the
+-- identity in every answer function above, so the library is never actually
+-- shuffled. "Control Magic" < "Darksteel Myr" < "Island" alphabetically, so the
+-- library is exactly [Control Magic x3][Darksteel Myr x4][Island x53] with no
+-- randomness at all. The opening hand is the library's first 7 cards -- all 3
+-- Control Magic and all 4 Darksteel Myr, i.e. the entire non-land half of the
+-- deck -- and every card kept in a hand at the maximum size stays there until
+-- something makes room, per discardNewest above (CR 514.1 discards the newest
+-- cards first, keeping this same original 7). Nothing else ever gets a turn at
+-- being kept: every OTHER card this deck draws arrives during a mana-less
+-- stretch with nothing to spend it on, so it is discarded again by the next
+-- cleanup step -- which is why this deck carries not one spare copy of either
+-- spell. Darksteel Myr (colourless, {3}) is castable off the Islands alone, so
+-- once enough of the 53 Islands have entered play as one-a-turn land drops
+-- (CR 305.2), all 4 Myr resolve as legal Cast targets for Control Magic
+-- ({2}{U}{U}, also Island-payable) to enchant, in turn making all 6 Control
+-- Magic across the mirror match legal casts before the match ends by decking
+-- out on turn 108 -- the same turn count 'loadRedDeck' reaches, so
+-- Bench.bench "fighting 2p aura" below measures the same shape of game as
+-- "fighting 2p", just with a populated, Aura-bearing battlefield.
+loadControlDeck :: Registry.Type.Registry -> IO Deck.Deck
+loadControlDeck registry = do
+  island <- Registry.printing registry "Island"
+  myr <- Registry.printing registry "Darksteel Myr"
+  control <- Registry.printing registry "Control Magic"
+  pure (Deck.MkDeck (Map.fromList [(island, 53), (myr, 4), (control, 3)]))
+
 main :: IO ()
 main = do
   root <- Registry.defaultRoot
   registry <- Registry.new root
   deck <- loadRedDeck registry
+  controlDeck <- loadControlDeck registry
   Bench.defaultMain
     [ Bench.bench "goldfish 2p" $ Bench.whnf (goldfish deck) 0,
       Bench.bench "casting 2p" $ Bench.whnf (casting deck) 0,
-      Bench.bench "fighting 2p" $ Bench.whnf (fighting deck) 0
+      Bench.bench "fighting 2p" $ Bench.whnf (fighting deck) 0,
+      Bench.bench "fighting 2p aura" $ Bench.whnf (fighting controlDeck) 0
     ]
