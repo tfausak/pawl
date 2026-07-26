@@ -147,7 +147,8 @@ manaSources pid gs =
       -- applies here exactly as it does to any other {T} ability, which is what
       -- makes Act of Treason's rider pay off.
       notSickCreature oid =
-        not (Set.member CardType.Creature (Projection.cardTypesOf oid gs) && not (Summoning.settledOrHasty pid oid gs))
+        not (Set.member CardType.Creature (Projection.cardTypesOf oid gs))
+          || Summoning.settledOrHasty pid oid gs
       isSource oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaTypesOf oid gs)) && notSickCreature oid

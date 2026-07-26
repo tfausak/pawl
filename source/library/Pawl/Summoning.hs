@@ -1,6 +1,7 @@
--- CR 302.6 (the "summoning sickness" rule) and the haste exemptions that relax it. One predicate, three readers:
--- Pawl.Combat asks it before attacking (CR 702.10b), Pawl.Activate before a
--- {T} activated ability and Pawl.Mana before a {T} mana ability (both CR 702.10c).
+-- CR 302.6 (the "summoning sickness" rule) and the haste exemptions that relax
+-- it. One predicate, three readers: Pawl.Combat asks it before attacking (CR
+-- 702.10b), Pawl.Activate before a {T} activated ability and Pawl.Mana before a
+-- {T} mana ability (both CR 702.10c).
 --
 -- Shared rather than repeated because the three had already drifted: combat read
 -- haste and the two ability paths did not, so a creature with haste could attack
