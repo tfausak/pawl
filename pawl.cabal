@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: pawl
-version: 0.2026.7.25
+version: 0.2026.7.26
 synopsis: Magic: the Gathering rules engine
 description:
   Pawl is a Magic: the Gathering rules engine.
@@ -9,12 +9,10 @@ category: Game
 license: 0BSD
 maintainer: Taylor Fausak
 license-file: LICENSE.txt
+data-files: data/cards/*.json
 extra-doc-files:
   CHANGELOG.md
   README.md
-
-data-files:
-  data/cards/*.json
 
 source-repository head
   location: https://github.com/tfausak/pawl
@@ -52,6 +50,7 @@ common executable
 
 library
   import: library
+  autogen-modules: Paths_pawl
   build-depends:
     bytestring ^>=0.12,
     containers ^>=0.8,
@@ -227,17 +226,8 @@ library
     Pawl.Type.ZoneChange
     Pawl.Type.ZoneChangePattern
 
-  -- Cabal-generated; exposes getDataDir / getDataFileName for the data-files
-  -- declared above. Lives in the library (not each consuming stanza) so that a
-  -- single Pawl.Registry.defaultRoot can use it and every caller just calls
-  -- that function.
-  other-modules:
-    Paths_pawl
-
-  autogen-modules:
-    Paths_pawl
-
   hs-source-dirs: source/library
+  other-modules: Paths_pawl
 
 executable pawl
   import: executable
@@ -307,7 +297,7 @@ test-suite pawl-test-suite
 benchmark pawl-benchmark
   import: executable
   build-depends:
-    containers,
+    containers ^>=0.8,
     tasty-bench ^>=0.5.1,
 
   hs-source-dirs: source/benchmark

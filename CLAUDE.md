@@ -2,7 +2,7 @@
 
 Guidance for Claude Code (and other agents) working in this repository.
 
-## What pawl is
+## What Pawl is
 
 A pure-Haskell rules engine for *Magic: The Gathering*, structured as a virtual
 machine:

@@ -42,6 +42,12 @@
               pkgs.ripgrep
               pkgs.xdg-utils
             ];
+
+            shellHook = ''
+              if test -d .git
+              then hooky install
+              fi
+            '';
           };
         }
       );
