@@ -82,6 +82,15 @@ data Effect card
     -- SOURCE into the reserved Pawl.Binding.triggerSource slot, and "this
     -- creature" recurs far too often to pay for a second opcode.
     Sacrifice SlotName
+  | -- CR 701.3 / 702.6a: attach THIS permanent (the effect's source) to the
+    -- slot's target. "Equip [cost]" means "[Cost]: Attach this permanent to
+    -- target creature you control", so the equipment is the source and the only
+    -- slot is what it attaches TO -- the opcode carries one slot, not two.
+    --
+    -- CR 701.3d: if the source is already attached to something else, attaching
+    -- it here moves it. CR 701.3c: if it cannot legally be attached to the
+    -- target, it does not move at all.
+    Attach SlotName
   | -- CR 400.7: move the slot's target object to a zone through the changeZone
     -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries
     -- Object.owner); targeted exile = MoveToZone slot Exile. The destination is

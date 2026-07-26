@@ -61,6 +61,7 @@ import qualified Pawl.Type.Sickness as Sickness
 import Pawl.Type.SlotName (SlotName)
 import qualified Pawl.Type.Source as Source
 import Pawl.Type.Subtype (Subtype)
+import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import Pawl.Type.TargetSpec (TargetSpec)
 import qualified Pawl.Type.Zone as Zone
@@ -100,6 +101,7 @@ slotsOf effect = case effect of
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
   Effect.ExileUntilMonarch slot -> Set.singleton slot
+  Effect.Attach slot -> Set.singleton slot
   -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
   -- bound once the subgame ends), not a read -- same shape as Create's slot.
   Effect.PlaySubgame _ -> Set.empty
@@ -140,6 +142,7 @@ readsX = any effectReadsX
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
       Effect.ExileUntilMonarch _ -> False
+      Effect.Attach _ -> False
       Effect.PlaySubgame _ -> False
 
 -- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
@@ -174,6 +177,7 @@ manaProduced effect = case effect of
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
+  Effect.Attach _ -> Nothing
   Effect.PlaySubgame _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
@@ -208,6 +212,7 @@ searchesLibrary effect = case effect of
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
   Effect.ExileUntilMonarch _ -> False
+  Effect.Attach _ -> False
   Effect.PlaySubgame _ -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
@@ -291,6 +296,7 @@ rewriteEffect pairs effect = case effect of
   Effect.BecomeMonarch {} -> effect
   -- No rewritable land-type word.
   Effect.ExileUntilMonarch _ -> effect
+  Effect.Attach _ -> effect
   -- No rewritable land-type word.
   Effect.PlaySubgame _ -> effect
 
@@ -467,6 +473,24 @@ cease abilId gs =
 -- The subgame-runner-aware executor. `runSubgame` is the injected Game Result
 -- that PLAYS a nested game (Engine.playSubgame); the bare applyEffect below
 -- passes noSubgame. Only the PlaySubgame arm consults it.
+-- CR 701.3c: may `src` legally be attached to `target` right now?
+--
+-- CR 301.5 is the only attachment legality this pool can express: "An Equipment
+-- can be attached to a creature. It can't legally be attached to anything that
+-- isn't a creature", plus CR 301.5c's "An Equipment can't equip itself".
+-- Subtype and creature-ness are read through the PROJECTION, so an Equipment
+-- that lost the subtype (CR 301.5c's second sentence) and a permanent animated
+-- into a creature both answer correctly.
+--
+-- False for a non-Equipment source. An Aura mover would consult that Aura's own
+-- enchant spec instead (CR 303.4j), and no card in the pool moves an Aura, so
+-- that branch has no producer to prove it (#187).
+attachLegal :: ObjectId -> ObjectId -> GameState -> Bool
+attachLegal src target gs =
+  Set.member Subtype.Equipment (Projection.subtypesOf src gs)
+    && src /= target
+    && Projection.isCreatureOf target gs
+
 applyEffectWith :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffectWith runSubgame source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity -> do
@@ -840,6 +864,25 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         -- overwritten (at most one at a time).
         State.modify' (\g -> g {GameState.monarch = Just p})
         State.modify' (Event.recordEvent (GameEvent.BecameMonarch p))
+  -- CR 701.3 / 702.6a: "Attach this permanent to target creature you control."
+  -- CR 702.6a's "Activate only as a sorcery" rider is NOT enforced -- there is no
+  -- activation-timing classification (#213).
+  -- The permanent that moves is the effect's SOURCE (the Equipment); the slot
+  -- names what it attaches TO. CR 701.3d makes this a MOVE when the source is
+  -- already attached elsewhere, which is the whole reason the opcode exists --
+  -- an Aura attaches once, as it enters, and nothing could relocate it (#187).
+  Effect.Attach slot ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case recipientObject recipient of
+        Nothing -> pure () -- a player recipient: CR 702.5d's enchant-player is unrepresentable (#190)
+        Just target -> do
+          gs <- State.get
+          -- CR 701.3c: an attach that cannot legally be performed does not move
+          -- the permanent at all -- it stays where it was, rather than becoming
+          -- unattached.
+          Monad.when (attachLegal source target gs) $
+            State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.attachedTo = Just target}) source (GameState.objects g)})
+      _ -> pure ()
   Effect.ExileUntilMonarch slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of

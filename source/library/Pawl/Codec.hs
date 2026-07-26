@@ -245,6 +245,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Nightmare -> "Nightmare"
   Subtype.Horse -> "Horse"
   Subtype.Aura -> "Aura"
+  Subtype.Equipment -> "Equipment"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -285,7 +286,8 @@ jsonToSubtype =
       (Text.pack "Elf", Subtype.Elf),
       (Text.pack "Nightmare", Subtype.Nightmare),
       (Text.pack "Horse", Subtype.Horse),
-      (Text.pack "Aura", Subtype.Aura)
+      (Text.pack "Aura", Subtype.Aura),
+      (Text.pack "Equipment", Subtype.Equipment)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -1230,6 +1232,7 @@ effectToJson e = case e of
   Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (cardToJson c))
   Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (monarchTargetToJson t))
   Effect.ExileUntilMonarch s -> Json.tagged (Text.pack "ExileUntilMonarch") (Just (slotNameToJson s))
+  Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (slotNameToJson s))
   Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (slotNameToJson s))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
@@ -1290,6 +1293,7 @@ jsonToEffect value = do
     "CreateEmblem" -> withValue mv (fmap Effect.CreateEmblem . jsonToCard)
     "BecomeMonarch" -> withValue mv (fmap Effect.BecomeMonarch . jsonToMonarchTarget)
     "ExileUntilMonarch" -> withValue mv (fmap Effect.ExileUntilMonarch . jsonToSlotName)
+    "Attach" -> withValue mv (fmap Effect.Attach . jsonToSlotName)
     "PlaySubgame" -> withValue mv (fmap Effect.PlaySubgame . jsonToSlotName)
     _ -> Left (Text.pack "unknown Effect: " <> t)
 
