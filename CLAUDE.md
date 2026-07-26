@@ -141,9 +141,10 @@ full loop; the load-bearing rules:
   *identity* — an explicit "no" is cheap, and fusing the halves is the single
   named failure mode; and what was deferred, with the issue filed and `(#N)`
   cited at the code site.
-- **Every CI check green at hand-off.** Only `Test` blocks a merge, and that
-  looseness is deliberate (`workflow.md` says why); a red `Ormolu` means
-  `hooky` was skipped, which is a bug in the work.
+- **Run `hooky` before pushing; don't wait for CI afterward.** Only `Test`
+  blocks a merge, and that looseness is deliberate (`workflow.md` says why); a
+  red `Ormolu` means `hooky` was skipped, which is a bug in the work. Reading
+  the results is the reviewer's job — report the PR and stop.
 - A spec or plan is **optional, not ceremony** — write one when the unit
   warrants it and commit it in the same PR. If you are following a plan: tasks
   strictly in order, and **never** edit the plan, weaken an assertion, or

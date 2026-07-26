@@ -32,10 +32,10 @@ PR that is likely to be merged* — not at a merge.
    close step carried — `progress.md` records that pass catching real defects,
    so it is not optional decoration.
 5. **Open the PR.** The body carries the case for merging — `CLAUDE.md`'s
-   "Working a unit" says what it must contain. Every CI check should be green
-   at hand-off.
-6. **Hand off and stop.** Report the PR and its CI status. Do not start the
-   next unit — one unit at a time, one checkout (see below).
+   "Working a unit" says what it must contain.
+6. **Hand off and stop.** Report the PR. **Do not wait for CI** — the results
+   are the reviewer's concern, and they will say so if something fails. Do not
+   start the next unit either: one unit at a time, one checkout (see below).
 
 ## The unit of work
 
@@ -95,11 +95,11 @@ hook, so they are enforced where the work happens; and keeping them
 non-blocking means an outside contributor's PR with
 bad formatting can be merged and tidied afterward rather than bounced. A red
 `Ormolu` on an agent-authored PR is not a policy hole — it means `hooky` was
-skipped, which is a bug in the work. **Every check should be green at
-hand-off.**
+skipped, which is a bug in the work.
 
-CI takes roughly six minutes per PR on a warm cache, across macOS, Linux and
-Windows.
+**Run `hooky` before pushing; don't sit and watch CI afterward.** The checks
+take roughly six minutes per PR on a warm cache, across macOS, Linux and
+Windows, and reading the results is the reviewer's job, not the author's.
 
 ## Specs and plans
 

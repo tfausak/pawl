@@ -85,8 +85,9 @@ This replaces `docs/workflow.md`'s five-step milestone loop.
    carried; `progress.md` records it catching real defects, so it is not
    optional decoration.
 5. **Open the PR**, with a body written to be merge-ready (§4).
-6. **Hand off and stop.** Report the PR link and CI status. Do not start the
-   next unit — see §6 on concurrency.
+6. **Hand off and stop.** Report the PR link. Do not wait for CI — the results
+   are the reviewer's concern. Do not start the next unit either; see §6 on
+   concurrency.
 
 ## 4. The PR body carries the case
 
@@ -135,10 +136,12 @@ a pre-commit hook, so they are enforced where the work happens; and keeping them
 non-blocking means an outside contributor's PR with bad formatting can be merged
 and tidied afterward rather than bounced. A red `Ormolu` on an agent-authored PR
 is not a policy hole — it means `hooky` was skipped, which is a bug in the work,
-not in the ruleset. **Every check should be green at hand-off.**
+not in the ruleset.
 
-CI takes roughly six minutes per PR on a warm cache, across macOS, Linux and
-Windows.
+**Run `hooky` before pushing; do not wait for CI afterward.** The checks take
+roughly six minutes per PR on a warm cache, across macOS, Linux and Windows,
+and reading the results is the reviewer's concern — the author reports the PR
+and stops.
 
 ## 6. Concurrency
 
