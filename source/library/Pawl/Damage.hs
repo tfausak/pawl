@@ -143,13 +143,19 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
             -- offering the choice.
             defenderIsPlaying = case target of
               AttackTarget.OfPlayer defender -> List.elem defender (Game.stillPlaying gs)
+        -- Whether it is BLOCKED and WHO is blocking it are two questions, and the
+        -- branch below asks each of the reader that answers it. CR 509.1h makes
+        -- blocked-ness a status the declaration confers (Combat.isBlocked, the
+        -- attacker's key in the map), which survives every blocker leaving; CR
+        -- 510.1c then gives damage only to the creatures CURRENTLY blocking. The
+        -- two answers come apart both ways a blocker can go: destroyed leaves it in
+        -- `recorded` (the liveness filter below is the only site that screens it
+        -- out, since Departure deliberately does not), regenerated takes it out of
+        -- `recorded` while the key stays (Game.removeFromCombat). Reading
+        -- emptiness as unblocked gets the second case wrong and lets the attacker
+        -- hit the defending player. onBattlefield is the same liveness predicate
+        -- dealCombatDamage uses to decide which creatures assign.
         let recorded = Combat.blockersOf attacker gs
-            -- CR 510.1c: damage goes only to the creatures CURRENTLY blocking.
-            -- The recorded set is deliberately NOT pruned when a blocker leaves --
-            -- CR 509.1h keeps the attacker blocked, and that map IS the record of
-            -- blocked-ness (#28) -- so the liveness filter belongs here, at
-            -- assignment, and nowhere else. Same predicate dealCombatDamage uses
-            -- to decide which creatures assign.
             toDefender :: [DamageEvent.DamageEvent]
             toDefender =
               if defenderIsPlaying
@@ -157,7 +163,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                   AttackTarget.OfPlayer defender ->
                     [damageEvent gs DamageKind.Combat attacker (Recipient.ToPlayer defender) power]
                 else []
-        if Set.null recorded
+        if not (Combat.isBlocked attacker gs)
           then -- CR 510.1b: never blocked, so it hits what it is attacking.
             pure toDefender
           else case filter (\oid -> onBattlefield oid gs) (Set.toList recorded) of
@@ -214,8 +220,8 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
 --
 -- The filter belongs HERE and not in Departure.objectsLeaveWith, for the same
 -- reason CR 510.1c's does: Combat.blockers is keyed by the attacker and its key
--- IS the record of blocked-ness that CR 509.1h's last sentence protects (#28),
--- so pruning it would be reading the rule backwards, and it would fix only the
+-- IS the record of blocked-ness that CR 509.1h's last sentence protects, so
+-- pruning it would be reading the rule backwards, and it would fix only the
 -- departure route and not the destroyed one. Without the filter a blocker emits
 -- a DamageEvent addressed to an object that is not on the battlefield: marking
 -- it is a no-op once the id is gone, but the event still enters the CR 608.2i

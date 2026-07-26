@@ -99,18 +99,21 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --
 -- Combat.blockers is DELIBERATELY left untouched -- neither a departing
 -- BLOCKER's id inside an attacker's blocker set, nor a departing ATTACKER's own
--- key. CR 509.1h's last sentence: "A creature remains blocked even if all the
--- creatures blocking it are removed from combat" -- and
--- Damage.attackerAssignment's own comment says why the engine must honor that:
--- the recorded blockers set IS the record of blocked-ness, and the liveness
--- filter (Damage.onBattlefield) belongs at damage ASSIGNMENT, not here.
--- Deleting a departing blocker's id out of that set would make a blocked
--- attacker with no living blockers read as UNBLOCKED and send its full damage
--- at the defending player, which CR 510.1c forbids. A departing attacker's KEY
--- stays for the same reason and is filtered at the same place, by
--- Damage.blockerAssignment's CR 510.1d check on the attacker -- and that really
--- is the only correct site, because an attacker DESTROYED mid-combat (CR 510.4's
--- two-step window) leaves an identical stale key this function never sees.
+-- key. Above all the KEY must stay: it is the record of blocked-ness
+-- (Combat.isBlocked), and CR 509.1h's last sentence -- "A creature remains
+-- blocked even if all the creatures blocking it are removed from combat" -- says
+-- the departure of every blocker cannot end it. Dropping the key would make a
+-- blocked attacker read as UNBLOCKED and send its full damage at the defending
+-- player, which CR 510.1c forbids.
+--
+-- The departing blocker's ID could be pruned from the set without changing an
+-- answer -- Game.removeFromCombat prunes exactly that way for CR 701.19a -- but
+-- it is left alone because it buys nothing: Damage's liveness filter
+-- (Damage.onBattlefield) has to run at damage ASSIGNMENT regardless, since a
+-- blocker DESTROYED mid-combat (CR 510.4's two-step window) leaves an identical
+-- stale id this function never sees. A departing attacker's key is left for the
+-- same reason and filtered at the same place, by Damage.blockerAssignment's
+-- CR 510.1d check on the attacker.
 --
 -- Combat.attackers loses only the departing player's OWN entry, because a
 -- deleted object cannot itself still be attacking. That much is cleanliness
