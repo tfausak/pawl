@@ -1,0 +1,142 @@
+name: CI
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    name: Build ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    needs: meta
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+          - runner: ubuntu-latest
+            bench: true
+            doc: true
+            test: true
+          - runner: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: haskell
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: 9.14.1
+      - id: info
+        run: |
+          echo "os=$(ghc -e 'putStrLn System.Info.os')" >> "$GITHUB_OUTPUT"
+          echo "arch=$(ghc -e 'putStrLn System.Info.arch')" >> "$GITHUB_OUTPUT"
+        shell: bash
+      - run: mkdir artifact
+      - run: ghc-pkg list
+      - run: cabal sdist --output-dir artifact
+      - run: cabal configure ${{ matrix.bench && '--enable-benchmarks' || '' }} ${{ matrix.doc && '--enable-documentation --haddock-for-hackage' || '' }} ${{ matrix.test && '--enable-tests' || '' }} --flags=pedantic --jobs
+      - run: cat cabal.project.local
+      - run: cp cabal.project.local artifact
+      - run: cabal freeze
+      - run: cat cabal.project.freeze
+      - run: cp cabal.project.freeze artifact
+      - run: cabal outdated --v2-freeze-file
+      - uses: actions/cache@v6
+        with:
+          key: ${{ steps.info.outputs.os }}-${{ steps.info.outputs.arch }}-${{ hashFiles('cabal.project.freeze') }}
+          path: ${{ steps.haskell.outputs.cabal-store }}
+          restore-keys: ${{ steps.info.outputs.os }}-${{ steps.info.outputs.arch }}-
+      - run: cabal build --only-download
+      - run: cabal build --only-dependencies
+      - run: cabal build
+      - if: matrix.doc
+        run: cp dist-newstyle/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}-docs.tar.gz artifact
+      - run: cp $( cabal list-bin ${{ needs.meta.outputs.name }} ) artifact
+      - if: matrix.test
+        run: cp $( cabal list-bin ${{ needs.meta.outputs.name }}-test-suite ) artifact
+      - if: matrix.bench
+        run: cp $( cabal list-bin ${{ needs.meta.outputs.name }}-benchmark ) artifact
+      - run: artifact/${{ needs.meta.outputs.name }}${{ runner.os == 'Windows' && '.exe' || '' }} --schema > artifact/schema.json
+        shell: bash
+      - run: tar --create --file artifact.tar --verbose artifact
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-${{ steps.info.outputs.os }}-${{ steps.info.outputs.arch }}
+          path: artifact.tar
+      - run: echo | artifact/${{ needs.meta.outputs.name }}${{ runner.os == 'Windows' && '.exe' || '' }}
+        shell: bash
+  cabal:
+    name: Cabal
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: cabal check
+  gild:
+    name: Gild
+    runs-on: ubuntu-latest
+    needs: meta
+    steps:
+      - uses: actions/checkout@v7
+      - uses: tfausak/cabal-gild-setup-action@v2
+      - run: cabal-gild --mode check ${{ needs.meta.outputs.name }}.cabal
+  hlint:
+    name: HLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: haskell-actions/hlint-setup@v2
+      - uses: haskell-actions/hlint-run@v2
+        with:
+          fail-on: status
+  meta:
+    name: Meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: name
+        run: "echo name=$( awk '/^name:/ {print $2}' *.cabal ) >> $GITHUB_OUTPUT"
+      - id: version
+        run: "echo version=$( awk '/^version:/ {print $2}' *.cabal ) >> $GITHUB_OUTPUT"
+    outputs:
+      name: ${{ steps.name.outputs.name }}
+      version: ${{ steps.version.outputs.version }}
+  ormolu:
+    name: Ormolu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: haskell-actions/run-ormolu@v19
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - meta
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-linux-x86_64
+      - run: tar --extract --file artifact.tar --verbose
+      - run: tar --extract --file artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}.tar.gz --directory artifact --verbose
+      - run: artifact/${{ needs.meta.outputs.name }}-test-suite
+        env:
+          pawl_datadir: ${{ github.workspace }}/artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}
+  bench:
+    name: Bench
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - meta
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-linux-x86_64
+      - run: tar --extract --file artifact.tar --verbose
+      - run: tar --extract --file artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}.tar.gz --directory artifact --verbose
+      - run: artifact/${{ needs.meta.outputs.name }}-benchmark --csv bench.csv +RTS -T
+        env:
+          pawl_datadir: ${{ github.workspace }}/artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-bench
+          path: bench.csv
