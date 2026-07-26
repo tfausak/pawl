@@ -13,7 +13,9 @@ import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Summoning as Summoning
 import qualified Pawl.Target as Target
+import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.Game (Game)
@@ -54,11 +56,32 @@ tapSicknessOk pid srcId ability gs =
 abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
 abilitiesFor = Projection.abilitiesOf
 
+-- CR 307.5: does this ability's timing rider permit activating it right now?
+--
+-- The window itself is Turn.sorcerySpeedWindow, shared with CR 307.1's casting
+-- gate: two rules, the same three conjuncts, one copy. Its haddock carries the
+-- rule text and the reason no prohibition may be consulted -- a player under
+-- Silence may still equip.
+--
+-- Priority is not re-checked here: the only caller is Action.legalActions, which
+-- the priority loop asks only of the player who has priority.
+--
+-- That also bounds what this gate GUARANTEES. Engine.priorityLoop acts on the
+-- interpreter's chosen action without checking it came from the offered list, so
+-- an interpreter can name a sorcery-speed activation at instant speed and be
+-- obeyed (#219). This makes the ability un-OFFERED, which is the half that lives
+-- here; enforcing it is that issue's job, and it bounds every other gate in
+-- activatable the same way.
+timingOk :: PlayerId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+timingOk pid ability gs = case ActivatedAbility.timing ability of
+  ActivationTiming.AnyTime -> True
+  ActivationTiming.SorcerySpeed -> Turn.sorcerySpeedWindow pid gs
+
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability (mana abilities are handled at
 -- payment, not the stack), the whole activation cost is payable (CR 118.3), the
--- {T} sickness gate holds, and enough modes are fillable to satisfy the
--- selection (CR 700.2a/602.2b).
+-- {T} sickness gate holds, the ability's timing rider permits it now (CR 307.5),
+-- and enough modes are fillable to satisfy the selection (CR 700.2a/602.2b).
 --
 -- The cost is the PRINTED one: an activated ability's cost is deliberately not
 -- routed through Cost.total (#90).
@@ -68,6 +91,7 @@ activatable pid srcId ability gs =
     && elem ability (abilitiesFor srcId gs)
     && not (Mana.isManaAbility ability)
     && tapSicknessOk pid srcId ability gs
+    && timingOk pid ability gs
     && Set.size (Target.fillableModes srcId Map.empty (ActivatedAbility.modal ability) gs)
       >= fromIntegral (Modal.selectionCount (ActivatedAbility.modal ability))
     && Cost.canPay pid srcId (ActivatedAbility.cost ability) gs

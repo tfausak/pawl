@@ -1,5 +1,6 @@
 module Pawl.Type.ActivatedAbility where
 
+import Pawl.Type.ActivationTiming (ActivationTiming)
 import Pawl.Type.Cost (Cost)
 import Pawl.Type.Modal (Modal)
 
@@ -14,6 +15,9 @@ import Pawl.Type.Modal (Modal)
 -- (CR 118.1).
 data ActivatedAbility card = MkActivatedAbility
   { cost :: Cost,
-    modal :: Modal card
+    modal :: Modal card,
+    -- CR 307.5: any timing rider the ability carries. AnyTime for every ability
+    -- without one, which is all of them but equip.
+    timing :: ActivationTiming
   }
   deriving (Eq, Ord, Show)

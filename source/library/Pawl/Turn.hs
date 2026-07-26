@@ -5,8 +5,11 @@ import qualified Data.Sequence as Seq
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.EndingStep as EndingStep
+import Pawl.Type.GameState (GameState)
+import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Phase (Phase)
 import qualified Pawl.Type.Phase as Phase
+import Pawl.Type.PlayerId (PlayerId)
 
 allPhases :: [Phase]
 allPhases =
@@ -39,6 +42,30 @@ grantsPriority phase = case phase of
   Phase.Beginning BeginningStep.Untap -> False
   Phase.Ending EndingStep.Cleanup -> False
   _ -> True
+
+-- CR 307.5: the "as a sorcery" window. "It means only that the player must have
+-- priority, it must be during the main phase of their turn, and the stack must
+-- be empty."
+--
+-- ONE predicate, because two rules need the same three conjuncts and a drifting
+-- second copy is exactly what the CR-citation discipline exists to prevent: CR
+-- 307.1 gates casting a sorcery (Cast.castableSpells) and CR 307.5 gates an
+-- ability that says "Activate only as a sorcery" (Activate.timingOk).
+--
+-- Priority is NOT among the conjuncts here. Both callers are reached only from
+-- Action.legalActions, which the priority loop asks solely of the player who
+-- holds it, so re-deriving it would be answering a question the caller has
+-- already answered.
+--
+-- Deliberately nothing else. CR 307.5's last sentence: "Effects that would
+-- preclude that player from casting a sorcery spell don't affect the player's
+-- capability to perform that action" -- so no prohibition (Rule of Law, Silence)
+-- may be consulted here.
+sorcerySpeedWindow :: PlayerId -> GameState -> Bool
+sorcerySpeedWindow pid gs =
+  isMainPhase (GameState.phase gs)
+    && GameState.activePlayer gs == pid
+    && null (GameState.stack gs)
 
 isMainPhase :: Phase -> Bool
 isMainPhase phase = case phase of

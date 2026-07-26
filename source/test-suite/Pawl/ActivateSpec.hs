@@ -21,9 +21,11 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
@@ -37,6 +39,7 @@ import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
@@ -63,7 +66,7 @@ findFirst p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty)
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
@@ -100,6 +103,59 @@ tests registry =
         HU.assertBool "bob could have activated it" (any isActivate (Action.legalActions S.bob settled {GameState.priority = Just S.bob}))
         HU.assertBool "alice controls it now" (Projection.controllerOf srcId stolen == Just S.alice)
         HU.assertBool "but no Activate is offered to her" (not (any isActivate (Action.legalActions S.alice stolen))),
+      -- CR 702.6a: "Activate only as a sorcery." CR 307.5 says what that means,
+      -- and says it narrowly: "the player must have priority, it must be during
+      -- the main phase of their turn, and the stack must be empty."
+      HU.testCase "CR 307.5 equip is offered in your own main phase with an empty stack" $ do
+        mountain <- Registry.printing registry "Mountain"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        piker <- Registry.printing registry "Goblin Piker"
+        -- Lands, so the {1} equip cost is payable and the ONLY thing under test
+        -- is the timing rider.
+        let (_, g0) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
+            (_, g1) = S.addCreature bonesplitter S.alice g0
+            gs = g1 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain}
+        HU.assertBool "equip offered" (any isActivate (Action.legalActions S.alice gs)),
+      HU.testCase "CR 307.5 equip is NOT offered outside a main phase" $ do
+        mountain <- Registry.printing registry "Mountain"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        piker <- Registry.printing registry "Goblin Piker"
+        -- Lands, so the {1} equip cost is payable and the ONLY thing under test
+        -- is the timing rider.
+        let (_, g0) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
+            (_, g1) = S.addCreature bonesplitter S.alice g0
+            gs = g1 {GameState.priority = Just S.alice, GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
+        HU.assertBool "no equip during combat" (not (any isActivate (Action.legalActions S.alice gs))),
+      HU.testCase "CR 307.5 equip is NOT offered on an opponent's turn" $ do
+        mountain <- Registry.printing registry "Mountain"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        piker <- Registry.printing registry "Goblin Piker"
+        -- Lands, so the {1} equip cost is payable and the ONLY thing under test
+        -- is the timing rider.
+        let (_, g0) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
+            (_, g1) = S.addCreature bonesplitter S.alice g0
+            gs = g1 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob}
+        HU.assertBool "not on bob's turn" (not (any isActivate (Action.legalActions S.alice gs))),
+      HU.testCase "CR 307.5 equip is NOT offered while the stack is not empty" $ do
+        mountain <- Registry.printing registry "Mountain"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        piker <- Registry.printing registry "Goblin Piker"
+        -- Lands, so the {1} equip cost is payable and the ONLY thing under test
+        -- is the timing rider.
+        let (_, g0) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
+            (_, g1) = S.addCreature bonesplitter S.alice g0
+            (spellId, g2) = S.spellOnStack piker S.alice g1
+            gs = g2 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain}
+        HU.assertBool "the stack really is occupied" (elem spellId (GameState.stack gs))
+        HU.assertBool "no equip with a spell on the stack" (not (any isActivate (Action.legalActions S.alice gs))),
+      -- The control: an UNRESTRICTED ability is unaffected by all three, so the
+      -- gate cannot pass by refusing everything outside a main phase.
+      HU.testCase "CR 602.2 an ability with no timing rider is still offered during combat" $ do
+        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+        let (_, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+            settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.alice)
+            gs = settled {GameState.priority = Just S.alice, GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
+        HU.assertBool "Prodigal Sorcerer still offered" (any isActivate (Action.legalActions S.alice gs)),
       HU.testCase "CR 602 a settled Prodigal Sorcerer's ability IS offered" $ do
         prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
         let (_, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
@@ -159,7 +215,8 @@ tests registry =
                       { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
                         Cost.Type.components = []
                       },
-                  ActivatedAbility.modal = singleModeAbility [] Map.empty
+                  ActivatedAbility.modal = singleModeAbility [] Map.empty,
+                  ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
         HU.assertBool "one Mountain cannot pay {2}" (not (Activate.activatable S.alice srcId costlyAbility gs1)),
       HU.testCase "CR 701.19a Drudge Skeletons regenerates: activate, survive Murder, die to the next" $ do
@@ -213,7 +270,8 @@ tests registry =
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) targetSlot]
-                      (Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))))
+                      (Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)))),
+                  ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
             activated = snd (Engine.runGamePure S.identityAnswer g2 (Activate.activateAbility S.alice srcId ability))
             -- Control of the SOURCE CREATURE (not the ability object) moves to bob
@@ -250,7 +308,8 @@ tests registry =
                   ActivatedAbility.modal =
                     singleModeAbility
                       [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) targetSlot]
-                      (Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))))
+                      (Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)))),
+                  ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
             -- Control of the SOURCE CREATURE moves to bob BEFORE activation.
             taken = S.giveControl srcId S.bob g1

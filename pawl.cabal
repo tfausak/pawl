@@ -103,6 +103,7 @@ library
     Pawl.Type.AbilityName
     Pawl.Type.Action
     Pawl.Type.ActivatedAbility
+    Pawl.Type.ActivationTiming
     Pawl.Type.ActivePlayerEffect
     Pawl.Type.ActiveReplacement
     Pawl.Type.Affected

@@ -38,13 +38,10 @@ import qualified Pawl.Type.Zone as Zone
 -- priority requirement is implicit: the engine only offers actions to the player
 -- who holds priority.)
 --
--- M1a has nothing castable at instant speed, so this gate is the whole timing
--- story. It grows a per-card timing classification when instants arrive.
+-- CR 307.1's window, shared with the CR 307.5 one an ability can carry
+-- (Activate.timingOk) -- see Turn.sorcerySpeedWindow for why there is one copy.
 sorcerySpeed :: PlayerId -> GameState -> Bool
-sorcerySpeed pid gs =
-  Turn.isMainPhase (GameState.phase gs)
-    && GameState.activePlayer gs == pid
-    && null (GameState.stack gs)
+sorcerySpeed = Turn.sorcerySpeedWindow
 
 -- CR 117.1a / 304.1: an instant is castable whenever its controller has
 -- priority; anything else needs sorcery speed (CR 302.1 / 307.1). Priority is

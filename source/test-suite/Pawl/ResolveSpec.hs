@@ -32,6 +32,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
@@ -593,7 +594,7 @@ resolveTests registry =
         let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
             ability = case Card.Type.activatedAbilities (Printing.card prodigalSorcerer) of
               ab : _ -> ab
-              [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
+              [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
             (abilId, g1) = Game.freshObjectId g0
             (ts, g2) = Game.freshTimestamp g1
             slot = SlotName.MkSlotName (Text.pack "target")
@@ -629,6 +630,7 @@ resolveTests registry =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
                 (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj =
@@ -642,7 +644,7 @@ resolveTests registry =
         mountain <- Registry.printing registry "Mountain"
         let base = Setup.emptyGame S.bothPlayers
             (_, g1) = S.addLibraryCard mountain S.alice base
-            ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
+            ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
@@ -666,6 +668,7 @@ resolveTests registry =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
                 (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj =
@@ -734,7 +737,8 @@ resolveTests registry =
                   ActivatedAbility.modal =
                     Modal.MkModal
                       (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing))))
-                      (ModeSelection.ChooseExactly 1)
+                      (ModeSelection.ChooseExactly 1),
+                  ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
@@ -796,7 +800,8 @@ resolveTests registry =
                   ActivatedAbility.modal =
                     Modal.MkModal
                       (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty))
-                      (ModeSelection.ChooseExactly 1)
+                      (ModeSelection.ChooseExactly 1),
+                  ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
             abilObj =
               Object.MkObject
@@ -1035,7 +1040,8 @@ installControlBy mindslaver controller target gs0 =
             ActivatedAbility.modal =
               Modal.MkModal
                 (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing))))
-                (ModeSelection.ChooseExactly 1)
+                (ModeSelection.ChooseExactly 1),
+            ActivatedAbility.timing = ActivationTiming.AnyTime
           }
       (abilId, gs2) = Game.freshObjectId gs1
       (ts, gs3) = Game.freshTimestamp gs2
