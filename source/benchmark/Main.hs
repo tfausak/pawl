@@ -216,10 +216,13 @@ loadRedDeck registry = do
 -- once enough of the 53 Islands have entered play as one-a-turn land drops
 -- (CR 305.2), all 4 Myr resolve as legal Cast targets for Control Magic
 -- ({2}{U}{U}, also Island-payable) to enchant, in turn making all 6 Control
--- Magic across the mirror match legal casts before the match ends by decking
--- out on turn 108 -- the same turn count 'loadRedDeck' reaches, so
--- Bench.bench "fighting 2p aura" below measures the same shape of game as
--- "fighting 2p", just with a populated, Aura-bearing battlefield.
+-- Magic across the mirror match legal casts. Observed (via 'cabal repl',
+-- reading 'GameState.turnNumber' after 'Engine.runMatchPure'): this deck
+-- decks out on turn 108. Darksteel Myr is 0/1 Indestructible, so once all 8
+-- are on the battlefield, "fighting 2p aura" runs a full 4v4 attack/block/
+-- damage cycle on essentially every one of those 108 turns -- nothing ever
+-- dies, so combat never tapers off the way it does against the red mirror's
+-- 1/2 Bird Maidens, which gang-block and kill the lead attacker.
 loadControlDeck :: Registry.Type.Registry -> IO Deck.Deck
 loadControlDeck registry = do
   island <- Registry.printing registry "Island"
