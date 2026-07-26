@@ -44,13 +44,16 @@ data Object = MkObject
     -- +1/+1 or -1/-1 count feeds P/T via the projection (CR 122.1a / 613.4c); both
     -- kinds present trigger the CR 704.5q annihilation SBA.
     counters :: Map CounterKind Natural,
-    -- CR 303.4b: the object this permanent is attached to -- what CR 303.4b calls
-    -- "enchanted". Nothing for every permanent that is not an attached Aura.
+    -- The object this permanent is attached to -- what CR 303.4b calls
+    -- "enchanted" for an Aura and CR 301.5a calls "equipped" for an Equipment.
+    -- One field for both, because attachment is one relation: CR 701.3's Attach
+    -- keyword action moves either, and Affected.Attached reads either. Nothing for
+    -- every permanent that is not attached to something.
     --
     -- BASE state, not projected: attachment is a fact about the object, and no CR
     -- 613 layer reads or writes it. Per-incarnation, like damage and counters:
     -- changeZone resets it, because CR 400.7 makes the moved object a new one with
-    -- no memory of what it enchanted.
+    -- no memory of what it was attached to.
     --
     -- One direction only. "What is attached to me" is derived by scanning the
     -- battlefield, the posture Projection.controls already takes toward control,

@@ -73,10 +73,10 @@ equipmentTests registry =
         HU.assertEqual "unequipped, the Piker is 2/1" (Just 2) (Projection.powerOf creature gs)
         HU.assertEqual "equipped, it is 4/1" (Just 4) (Projection.powerOf creature attached)
         HU.assertEqual "toughness is untouched by +2/+0" (Just 1) (Projection.toughnessOf creature attached),
-      -- CR 701.3d: attaching a permanent that is already attached MOVES it. This
+      -- CR 701.3a: attaching a permanent that is already attached MOVES it. This
       -- is the whole point of the Attach opcode -- Aura attachment happens once,
       -- as the Aura enters, and nothing could relocate it afterwards (#187).
-      HU.testCase "CR 701.3d equipping again moves the Equipment off the first creature" $ do
+      HU.testCase "CR 701.3a equipping again moves the Equipment off the first creature" $ do
         piker <- Registry.printing registry "Goblin Piker"
         warMammoth <- Registry.printing registry "War Mammoth"
         bonesplitter <- Registry.printing registry "Bonesplitter"
@@ -130,6 +130,35 @@ equipmentTests registry =
                 HU.assertEqual "the equip ability attached it" (Just (Just creature)) (fmap Object.attachedTo (Game.lookupObject equip after))
                 HU.assertEqual "and the Piker is now 4/1" (Just 4) (Projection.powerOf creature after)
                 HU.assertEqual "toughness unchanged" (Just 1) (Projection.toughnessOf creature after),
+      -- CR 701.3c: "Attaching an Aura, Equipment, or Fortification on the
+      -- battlefield to a different object or player causes [it] to receive a new
+      -- timestamp." That feeds CR 613.7's layer ordering, so it is not cosmetic.
+      -- CR 701.3b's second sentence is the other half: re-attaching to the object
+      -- it is ALREADY attached to "does nothing", so no new timestamp there.
+      HU.testCase "CR 701.3c attaching to a different creature restamps; re-attaching to the same one does not" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        let base = Setup.emptyGame S.bothPlayers
+            (first, g1) = S.addCreature piker S.alice base
+            (second, g2) = S.addCreature warMammoth S.alice g1
+            (equip, g3) = S.addCreature bonesplitter S.alice g2
+            gs = S.attach equip first g3
+            slot = SlotName.MkSlotName (Text.pack "target")
+            attachTo t g =
+              S.runPure S.identityAnswer g $
+                Resolve.applyEffect
+                  equip
+                  S.alice
+                  Map.empty
+                  (Map.singleton slot True)
+                  (Map.singleton slot (Recipient.ToCreature t))
+                  (Effect.Attach slot)
+            stampOf g = fmap Object.timestamp (Game.lookupObject equip g)
+            moved = attachTo second gs
+            again = attachTo second moved
+        HU.assertBool "moving it to a different creature restamps" (stampOf moved /= stampOf gs)
+        HU.assertEqual "re-attaching to the same creature does nothing" (stampOf moved) (stampOf again),
       -- CR 704.5n: "If an Equipment or Fortification is attached to an illegal
       -- permanent or to a player, it becomes unattached from that permanent or
       -- player. It REMAINS ON THE BATTLEFIELD." The shape difference from an

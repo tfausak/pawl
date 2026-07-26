@@ -473,7 +473,7 @@ cease abilId gs =
 -- The subgame-runner-aware executor. `runSubgame` is the injected Game Result
 -- that PLAYS a nested game (Engine.playSubgame); the bare applyEffect below
 -- passes noSubgame. Only the PlaySubgame arm consults it.
--- CR 701.3c: may `src` legally be attached to `target` right now?
+-- CR 701.3a/701.3b: may `src` legally be attached to `target` right now?
 --
 -- CR 301.5 is the only attachment legality this pool can express: "An Equipment
 -- can be attached to a creature. It can't legally be attached to anything that
@@ -864,24 +864,35 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         -- overwritten (at most one at a time).
         State.modify' (\g -> g {GameState.monarch = Just p})
         State.modify' (Event.recordEvent (GameEvent.BecameMonarch p))
-  -- CR 701.3 / 702.6a: "Attach this permanent to target creature you control."
+  -- CR 701.3a / 702.6a: "Attach this permanent to target creature you control."
+  -- CR 701.3a is the move itself -- "take it from where it currently is and put
+  -- it onto that object" -- so this relocates a source that is already attached
+  -- elsewhere, which is the whole reason the opcode exists: an Aura attaches once,
+  -- as it enters, and nothing could move it afterwards (#187).
+  --
   -- CR 702.6a's "Activate only as a sorcery" rider is NOT enforced -- there is no
   -- activation-timing classification (#213).
-  -- The permanent that moves is the effect's SOURCE (the Equipment); the slot
-  -- names what it attaches TO. CR 701.3d makes this a MOVE when the source is
-  -- already attached elsewhere, which is the whole reason the opcode exists --
-  -- an Aura attaches once, as it enters, and nothing could relocate it (#187).
   Effect.Attach slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of
         Nothing -> pure () -- a player recipient: CR 702.5d's enchant-player is unrepresentable (#190)
         Just target -> do
           gs <- State.get
-          -- CR 701.3c: an attach that cannot legally be performed does not move
-          -- the permanent at all -- it stays where it was, rather than becoming
-          -- unattached.
-          Monad.when (attachLegal source target gs) $
-            State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.attachedTo = Just target}) source (GameState.objects g)})
+          let alreadyThere = case Game.lookupObject source gs of
+                Nothing -> False
+                Just obj -> Object.attachedTo obj == Just target
+          -- CR 701.3b, both sentences: an attach that cannot legally be performed
+          -- does not move the permanent at all (it stays where it was rather than
+          -- becoming unattached), and attaching it to what it is ALREADY attached
+          -- to "does nothing" -- which matters because of the restamp below.
+          Monad.when (attachLegal source target gs && not alreadyThere) $ do
+            gs1 <- State.get
+            -- CR 701.3c: attaching to a DIFFERENT object gives it a new timestamp.
+            -- Not cosmetic -- CR 613.7 orders layer effects by it, so two things
+            -- modifying one creature apply in attach order.
+            let (ts, gs2) = Game.freshTimestamp gs1
+                move o = o {Object.attachedTo = Just target, Object.timestamp = ts}
+            State.put gs2 {GameState.objects = Map.adjust move source (GameState.objects gs2)}
       _ -> pure ()
   Effect.ExileUntilMonarch slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

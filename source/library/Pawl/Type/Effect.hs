@@ -87,9 +87,10 @@ data Effect card
     -- target creature you control", so the equipment is the source and the only
     -- slot is what it attaches TO -- the opcode carries one slot, not two.
     --
-    -- CR 701.3d: if the source is already attached to something else, attaching
-    -- it here moves it. CR 701.3c: if it cannot legally be attached to the
-    -- target, it does not move at all.
+    -- CR 701.3a: if the source is already attached to something else, attaching
+    -- it here moves it, and CR 701.3c restamps it. CR 701.3b: if it cannot legally
+    -- be attached to the target it does not move at all, and attaching it to what
+    -- it already holds does nothing.
     Attach SlotName
   | -- CR 400.7: move the slot's target object to a zone through the changeZone
     -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries
