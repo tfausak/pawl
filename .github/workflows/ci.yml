@@ -113,12 +113,14 @@ jobs:
       - build
       - meta
     steps:
-      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-linux-x86_64
       - run: tar --extract --file artifact.tar --verbose
+      - run: tar --extract --file artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}.tar.gz --directory artifact --verbose
       - run: artifact/${{ needs.meta.outputs.name }}-test-suite
+        env:
+          pawl_datadir: ${{ github.workspace }}/artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}
   bench:
     name: Bench
     runs-on: ubuntu-latest
@@ -130,8 +132,10 @@ jobs:
         with:
           name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-linux-x86_64
       - run: tar --extract --file artifact.tar --verbose
-      - run: chmod +x artifact/${{ needs.meta.outputs.name }}-benchmark
+      - run: tar --extract --file artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}.tar.gz --directory artifact --verbose
       - run: artifact/${{ needs.meta.outputs.name }}-benchmark --csv bench.csv +RTS -T
+        env:
+          pawl_datadir: ${{ github.workspace }}/artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-bench
