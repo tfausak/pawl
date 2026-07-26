@@ -10,6 +10,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
+import qualified Pawl.Summoning as Summoning
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
@@ -29,7 +30,6 @@ import qualified Pawl.Type.ManaUnit as ManaUnit
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Sickness as Sickness
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
@@ -140,16 +140,15 @@ emptyManaPools gs = gs {GameState.manaPool = Map.empty}
 -- i.e. the permanent's controller, CR 110.2 -- not the object's owner).
 manaSources :: PlayerId -> GameState -> [ObjectId]
 manaSources pid gs =
-  let notSickCreature oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj ->
-          -- CR 302.6: a sick creature can't use a {T} mana ability. A land is
-          -- never sick-gated. (M3e mana abilities all cost {T}.) Keyed to `pid`:
-          -- the creature must have settled under the player reaching for the
-          -- mana, not under whoever held it before (#198).
-          --
-          -- CR 702.10c's haste exemption is not applied here (#205).
-          not (Set.member CardType.Creature (Projection.cardTypesOf oid gs) && Object.sickness obj /= Sickness.Settled pid)
+  let -- CR 302.6: a sick creature can't use a {T} mana ability. A land is never
+      -- sick-gated. (M3e mana abilities all cost {T}.) Keyed to `pid`: the
+      -- creature must have settled under the player reaching for the mana, not
+      -- under whoever held it before (#198) -- and CR 702.10c's haste exemption
+      -- applies here exactly as it does to any other {T} ability, which is what
+      -- makes Act of Treason's rider pay off.
+      notSickCreature oid =
+        not (Set.member CardType.Creature (Projection.cardTypesOf oid gs))
+          || Summoning.settledOrHasty pid oid gs
       isSource oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaTypesOf oid gs)) && notSickCreature oid

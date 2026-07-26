@@ -939,8 +939,16 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                   -- chosen. CR 302.6: the new controller has not controlled the
                   -- permanent continuously, so it is re-Sicked.
                   --
-                  -- Not conditioned on control actually moving, so targeting a
-                  -- permanent you already control re-Sicks it too (#206).
+                  -- Unless control does not actually move. CR 302.6 asks whether
+                  -- control was CONTINUOUS, and gaining control of a permanent you
+                  -- already control interrupts nothing, so the clock must not
+                  -- reset (#206). Act of Treason may legally target your own
+                  -- creature -- untapping it is the reason to.
+                  --
+                  -- Compared against the PROJECTED controller, read before the new
+                  -- effect is stored, not against Object.owner: you may already
+                  -- control a permanent you do not own (Control Magic), and
+                  -- re-gaining that one interrupts nothing either.
                   let (ts, gs1) = Game.freshTimestamp gs
                       eff =
                         ContinuousEffect.MkContinuousEffect
@@ -950,7 +958,8 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                             ContinuousEffect.modification = Modification.SetController controller,
                             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
                           }
-                      sicken o = o {Object.sickness = Sickness.Sick}
+                      alreadyTheirs = Projection.controllerOf target gs == Just controller
+                      sicken o = if alreadyTheirs then o else o {Object.sickness = Sickness.Sick}
                    in gs1
                         { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
                           GameState.objects = Map.adjust sicken target (GameState.objects gs1)
