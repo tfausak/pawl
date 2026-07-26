@@ -552,9 +552,10 @@ tests registry =
             roundTrip "moved" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Moved zc snapshot),
           -- The snapshot's keywords are counted per keyword (CR 702.164b), so a
           -- COUNT has to survive the wire and not just a membership: the
-          -- array-with-repeats encoding is what carries it. Without this, a
-          -- Set-shaped encoder would round-trip green and halve the Stalker's
-          -- total toxic value on replay.
+          -- array-with-repeats encoding is what carries it. A Set-shaped encoder
+          -- would pass every OTHER round-trip test in this group and still halve
+          -- the Stalker's total toxic value on replay, which is why the count is
+          -- asserted here before the round-trip rather than left to Eq alone.
           HU.testCase "a doubled keyword survives the Moved snapshot round-trip" $ do
             stalker <- Registry.printing registry "Branchblight Stalker"
             let (oid, gs0) = S.addCreature stalker S.alice (Setup.emptyGame S.bothPlayers)

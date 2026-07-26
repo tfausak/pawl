@@ -758,6 +758,26 @@ m4bCardTests registry =
             blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
         HU.assertEqual "cost" (Just (ManaCost.MkManaCost [blue])) (Card.Type.manaCost c)
         HU.assertEqual "effect returns to hand" [Effect.MoveToZone (SlotName.MkSlotName (Text.pack "target")) Zone.Hand] (Card.allEffects c),
+      -- Three modifications on ONE target, in printed order. Spelled out rather
+      -- than spot-checked because the toxic 1 grant is what makes this card the
+      -- CR 702.164b proof in DamageSpec: a card that granted toxic 2 by mistake
+      -- would still add up to the poison that test expects.
+      HU.testCase "Aspirant's Ascent is a {U} Instant granting +1/+3, flying and toxic 1" $ do
+        ascent <- Registry.printing registry "Aspirant's Ascent"
+        let c = Printing.card ascent
+            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+            target = SlotName.MkSlotName (Text.pack "target")
+            untilEot = Effect.ModifyTarget Duration.UntilEndOfTurn
+        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [blue])) (Card.Type.manaCost c)
+        HU.assertBool "an instant" (Card.isInstant c)
+        HU.assertEqual
+          "effects, in printed order"
+          [ untilEot (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 3)) target,
+            untilEot (Modification.GainKeyword Keyword.Flying) target,
+            untilEot (Modification.GainKeyword (Keyword.Toxic 1)) target
+          ]
+          (Card.allEffects c)
+        HU.assertEqual "one creature slot, shared by all three" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
       HU.testCase "Angelic Edict is a {4}{W} Sorcery exiling a creature or enchantment" $ do
         angelicEdict <- Registry.printing registry "Angelic Edict"
         let c = Printing.card angelicEdict
