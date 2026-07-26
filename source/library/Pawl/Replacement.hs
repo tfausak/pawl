@@ -594,7 +594,10 @@ applyEntryOption oid option gs =
             -- nothing and keeps this function correct if that invariant ever
             -- changes.
             PC.characteristicPT = Nothing,
-            PC.keywords = Set.union (PC.keywords base) (EntryOption.keywords option)
+            -- The option's keywords are one card's printed text (CR 208.2b), so
+            -- each arrives once; unionWith (+) adds them to whatever the copy
+            -- snapshot already carries rather than absorbing a repeat.
+            PC.keywords = Map.unionWith (+) (PC.keywords base) (Map.fromSet (const 1) (EntryOption.keywords option))
           }
       write o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
    in gs {GameState.objects = Map.adjust write oid (GameState.objects gs)}

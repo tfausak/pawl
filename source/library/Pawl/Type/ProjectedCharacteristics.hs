@@ -1,6 +1,8 @@
 module Pawl.Type.ProjectedCharacteristics where
 
+import Data.Map.Strict (Map)
 import Data.Set (Set)
+import Numeric.Natural (Natural)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.Card (Card)
 import Pawl.Type.CardType (CardType)
@@ -17,7 +19,17 @@ import Pawl.Type.TriggeredAbility (TriggeredAbility)
 -- object's land subtype to a basic type, stripping its rules-text abilities.
 -- Ord derived so a copy snapshot can ride a Binding (CR 707.2, P2).
 data ProjectedCharacteristics = MkProjectedCharacteristics
-  { keywords :: Set Keyword,
+  { -- CR 702: this object's keyword abilities after the layer fold, COUNTED PER
+    -- KEYWORD. A multiset in Pawl.Type.Deck's shape, and for its reason: an
+    -- object can have the same keyword ability more than once, so counts are
+    -- the honest model. CR 702.164b reads the count directly -- "the sum of all
+    -- N values of toxic abilities that creature has" is 2 for a creature with
+    -- toxic 1 twice, which a Set could not say (it collapsed the second grant).
+    --
+    -- Redundancy (CR 702.3c defender, CR 702.9c flying) is a fact about the
+    -- QUESTION the reader asks and not about what is stored: Pawl.Projection's
+    -- hasKeyword asks membership, so a doubled flying is still just flying.
+    keywords :: Map Keyword Natural,
     -- CR 105.2 / 613.1e layer 5: the object's colours after the layer system.
     -- A Set, not a sum with a Colorless arm: CR 105.2c says a colourless object
     -- has NO colour, and CR 105.4 denies that colourless is a colour at all.

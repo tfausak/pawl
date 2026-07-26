@@ -17,7 +17,7 @@ import qualified Test.Tasty.HUnit as HU
 sampleSnapshot :: PC.ProjectedCharacteristics
 sampleSnapshot =
   PC.MkProjectedCharacteristics
-    { PC.keywords = Set.empty,
+    { PC.keywords = Map.empty,
       PC.colors = Set.empty,
       PC.power = Just 2,
       PC.toughness = Just 1,

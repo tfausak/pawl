@@ -134,7 +134,7 @@ tests registry =
         let (oid, gs) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
         HU.assertEqual "power" (Just 2) (Projection.powerOf oid gs)
         HU.assertEqual "toughness" (Just 1) (Projection.toughnessOf oid gs)
-        HU.assertBool "no keywords" (Set.null (Projection.keywordsOf oid gs)),
+        HU.assertBool "no keywords" (Map.null (Projection.keywordsOf oid gs)),
       HU.testCase "CR 613.3 layer 7c +3/+3 raises a Piker to 5/4" $ do
         piker <- Registry.printing registry "Goblin Piker"
         mountain <- Registry.printing registry "Mountain"
@@ -150,7 +150,7 @@ tests registry =
         HU.assertBool "has deathtouch" (Projection.hasKeyword Keyword.Deathtouch oid gs),
       -- CR 702.164b's own example: "If a creature with toxic 2 gains toxic 1 due
       -- to another effect, its total toxic value is 3." The two abilities are
-      -- distinct Set members, so they sum rather than shadow each other.
+      -- distinct, so they sum rather than shadow each other.
       HU.testCase "CR 702.164b total toxic value is the SUM of a creature's toxic abilities" $ do
         stalker <- Registry.printing registry "Branchblight Stalker"
         piker <- Registry.printing registry "Goblin Piker"
@@ -161,6 +161,31 @@ tests registry =
         HU.assertEqual "printed toxic 2 alone" 2 (Projection.totalToxic oid gs1)
         HU.assertEqual "toxic 2 plus a granted toxic 1" 3 (Projection.totalToxic oid gs)
         HU.assertEqual "a creature without toxic has a total toxic value of zero" 0 (Projection.totalToxic plain gs),
+      -- Rule 702.164 has no redundancy clause -- contrast CR 702.3c and 702.9c,
+      -- which say in so many words that multiple instances of defender and of
+      -- flying ARE redundant. So two toxic 1 abilities are two abilities, and
+      -- CR 702.164b sums both. The falsifier is a projection that keeps keywords
+      -- in a Set, where the second toxic 1 collapses into the first.
+      --
+      -- The flying half of the same test is the control: multiplicity is
+      -- tracked for every keyword, and CR 702.9c redundancy is a fact about what
+      -- READERS ask (hasKeyword), not about what the projection stores.
+      HU.testCase "CR 702.164b two toxic abilities with the SAME N both count" $ do
+        stalker <- Registry.printing registry "Branchblight Stalker"
+        mountain <- Registry.printing registry "Mountain"
+        let (oid, gs0) = S.addCreature stalker S.bob (S.landsInPlay mountain 1)
+            grant ts = S.withEffectAt oid (Timestamp.MkTimestamp ts)
+            gs =
+              grant 101 (Modification.GainKeyword (Keyword.Toxic 1))
+                . grant 100 (Modification.GainKeyword (Keyword.Toxic 1))
+                $ gs0
+        HU.assertEqual "toxic 2 plus TWO granted toxic 1s" 4 (Projection.totalToxic oid gs)
+        let flown =
+              grant 103 (Modification.GainKeyword Keyword.Flying)
+                . grant 102 (Modification.GainKeyword Keyword.Flying)
+                $ gs
+        HU.assertBool "CR 702.9c: two flying grants still just fly" (Projection.hasKeyword Keyword.Flying oid flown)
+        HU.assertEqual "and do not disturb the total toxic value" 4 (Projection.totalToxic oid flown),
       HU.testCase "CR 613 layer 7b SetBasePowerToughness makes a Piker 1/1" $ do
         piker <- Registry.printing registry "Goblin Piker"
         mountain <- Registry.printing registry "Mountain"
@@ -457,7 +482,7 @@ tests registry =
             (_, gs) = S.addCreature opalescence S.alice g2
         HU.assertEqual "power 1" (Just 1) (Projection.powerOf pikerId gs)
         HU.assertEqual "toughness 1" (Just 1) (Projection.toughnessOf pikerId gs)
-        HU.assertBool "no abilities" (Set.null (Projection.keywordsOf pikerId gs)),
+        HU.assertBool "no abilities" (Map.null (Projection.keywordsOf pikerId gs)),
       HU.testCase "CR 613.7 Humility + Opalescence: Humility is 4/4 when Opalescence is newer" $ do
         humility <- Registry.printing registry "Humility"
         opalescence <- Registry.printing registry "Opalescence"

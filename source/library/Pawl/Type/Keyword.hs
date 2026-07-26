@@ -21,6 +21,11 @@ import Numeric.Natural (Natural)
 -- Toxic (702.164) is the first PARAMETERIZED constructor, exactly the addition
 -- the `data`-not-an-enum choice was made for; Landwalk Subtype (702.14),
 -- Protection Quality (702.16) and Ward Cost (702.21) follow the same shape.
+--
+-- Multiplicity is NOT this type's problem: an object can have the same keyword
+-- ability twice, which Pawl.Type.ProjectedCharacteristics.keywords carries as a
+-- count. This type says only WHICH ability, so a card's printed keywords stay a
+-- Set (each printed once) -- see Pawl.Type.Card.keywords.
 data Keyword
   = Deathtouch -- 702.2
   | Defender -- 702.3
@@ -37,9 +42,9 @@ data Keyword
   | Devoid -- 702.114
   | -- 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
     -- a number." N rides the constructor, so `Toxic 1` and `Toxic 2` are
-    -- distinct members of a keyword Set and CR 702.164b's total toxic value is
-    -- their sum (Pawl.Projection.totalToxic). Two toxic abilities with the SAME
-    -- N collapse into one set member and are under-counted (#224).
+    -- distinct keywords, and CR 702.164b's total toxic value is the sum over
+    -- every toxic ability the creature has (Pawl.Projection.totalToxic) --
+    -- including two with the same N, which the projection counts separately.
     Toxic Natural
   deriving (Eq, Ord, Show)
 

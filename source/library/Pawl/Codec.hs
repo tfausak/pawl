@@ -124,6 +124,17 @@ setTo f = listTo f . Set.toAscList
 setFrom :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Set a)
 setFrom f value = Set.fromList <$> listFrom f value
 
+-- A count-per-key multiset, on the wire as a plain array WITH REPEATS rather
+-- than as key/count pairs: it is what the thing being encoded is a list of, and
+-- the encoding stays legible beside setTo's. Ascending by key, so it is
+-- canonical. multisetFrom recounts, so a hand-written file may repeat a key in
+-- any order and a zero count is simply unsayable.
+multisetTo :: (a -> Value) -> Map.Map a Natural -> Value
+multisetTo f = listTo f . concatMap (\(k, n) -> replicate (fromIntegral n) k) . Map.toAscList
+
+multisetFrom :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Map.Map a Natural)
+multisetFrom f value = Map.fromListWith (+) . fmap (\k -> (k, 1)) <$> listFrom f value
+
 maybeTo :: (a -> Value) -> Maybe a -> Value
 maybeTo = maybe Null
 
@@ -1122,7 +1133,7 @@ jsonToZoneChange value = do
 projectedCharacteristicsToJson :: PC.ProjectedCharacteristics -> Value
 projectedCharacteristicsToJson pc =
   Object
-    [ (Text.pack "keywords", setTo keywordToJson (PC.keywords pc)),
+    [ (Text.pack "keywords", multisetTo keywordToJson (PC.keywords pc)),
       (Text.pack "colors", setTo colorToJson (PC.colors pc)),
       (Text.pack "power", maybeTo Json.jInt (PC.power pc)),
       (Text.pack "toughness", maybeTo Json.jInt (PC.toughness pc)),
@@ -1138,7 +1149,7 @@ projectedCharacteristicsToJson pc =
 jsonToProjectedCharacteristics :: Value -> Either Text PC.ProjectedCharacteristics
 jsonToProjectedCharacteristics value = do
   ps <- Json.asObject value
-  kws <- Json.field (Text.pack "keywords") ps >>= setFrom jsonToKeyword
+  kws <- Json.field (Text.pack "keywords") ps >>= multisetFrom jsonToKeyword
   cols <- Json.field (Text.pack "colors") ps >>= setFrom jsonToColor
   -- power/toughness/characteristicPT are encoded as required keys (maybeTo
   -- writes JSON null for Nothing, never omits the key), so decoding them is

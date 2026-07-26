@@ -91,15 +91,19 @@ applyModification lyr src cands gs oid m pc =
   let context = Filter.MkContext (controllerOf src gs) (Just src)
       viewOf = viewUpTo lyr cands gs
    in case m of
+        -- CR 613.1f layer 6: a grant ADDS an ability. Two grants of the same
+        -- keyword are two abilities (rule 702.164 has no redundancy clause of
+        -- the CR 702.3c/702.9c kind), so the count goes up rather than the
+        -- second grant being absorbed.
         Modification.GainKeyword k ->
-          pc {PC.keywords = Set.insert k (PC.keywords pc)}
+          pc {PC.keywords = Map.insertWith (+) k 1 (PC.keywords pc)}
         -- CR 604.3: a characteristic-defining ability IS a static ability, so
         -- losing all abilities loses it too. Layer 6, which is BEFORE 7a -- the
         -- reason the CDA is folded in place from the partial rather than
         -- gathered up front.
         Modification.LoseAllAbilities ->
           pc
-            { PC.keywords = Set.empty,
+            { PC.keywords = Map.empty,
               PC.characteristicPT = Nothing,
               PC.activatedAbilities = [],
               PC.replacementEffects = [],
@@ -127,7 +131,7 @@ applyModification lyr src cands gs oid m pc =
         Modification.SetLandSubtype s ->
           pc
             { PC.subtypes = Set.singleton s,
-              PC.keywords = Set.empty,
+              PC.keywords = Map.empty,
               PC.rulesTextActive = False
             }
         -- CR 612.1/612.2: a text-changing effect replaces one basic land type
@@ -345,7 +349,7 @@ baseCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 baseCharacteristics oid gs = case Game.cardOf oid gs of
   Nothing ->
     PC.MkProjectedCharacteristics
-      { PC.keywords = Set.empty,
+      { PC.keywords = Map.empty,
         PC.colors = Set.empty,
         PC.power = Nothing,
         PC.toughness = Nothing,
@@ -372,7 +376,10 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
     let seedViewOf = const Nothing
         seedContext = Filter.MkContext (controllerOf oid gs) (Just oid)
      in PC.MkProjectedCharacteristics
-          { PC.keywords = Card.Type.keywords card,
+          { -- CR 702: a printed keyword appears once in the card's text, so the
+            -- seed's count is 1 apiece. Multiplicity is what layer-6 grants add
+            -- on top (CR 702.164b).
+            PC.keywords = Map.fromSet (const 1) (Card.Type.keywords card),
             PC.colors = baseColorsOf card,
             PC.power = case Card.Type.power card of
               Nothing -> Nothing
@@ -821,7 +828,10 @@ powerOf oid gs = PC.power (project oid gs)
 toughnessOf :: ObjectId -> GameState -> Maybe Integer
 toughnessOf oid gs = PC.toughness (project oid gs)
 
-keywordsOf :: ObjectId -> GameState -> Set Keyword
+-- CR 702: an object's keyword abilities after the layer fold, counted per
+-- keyword (see ProjectedCharacteristics.keywords for why the count is kept).
+-- Most readers want hasKeyword or totalToxic rather than the raw counts.
+keywordsOf :: ObjectId -> GameState -> Map Keyword Natural
 keywordsOf oid gs = PC.keywords (project oid gs)
 
 -- CR 105.2 / 613.1e: an object's colours after the layer fold. The SOLE read
@@ -877,23 +887,28 @@ cardTypesOf oid gs = PC.cardTypes (project oid gs)
 isCreatureOf :: ObjectId -> GameState -> Bool
 isCreatureOf oid gs = Set.member CardType.Creature (cardTypesOf oid gs)
 
+-- Membership, which DISCARDS the count -- and is exactly right for every
+-- keyword whose multiple instances the rules call redundant (CR 702.3c
+-- defender, CR 702.9c flying). A keyword that stacks is asked about with its
+-- own reader instead; totalToxic just below is the first.
 hasKeyword :: Keyword -> ObjectId -> GameState -> Bool
-hasKeyword keyword oid gs = Set.member keyword (keywordsOf oid gs)
+hasKeyword keyword oid gs = Map.member keyword (keywordsOf oid gs)
 
 -- CR 702.164b: "A creature's total toxic value is the sum of all N values of
 -- toxic abilities that creature has." Not hasKeyword's question -- toxic is
 -- parameterized, so there is no single member to ask about -- but the same
--- projection posture: the sum is taken over the POST-LAYER keyword set, so a
+-- projection posture: the sum is taken over the POST-LAYER keywords, so a
 -- Humility'd creature has none.
 --
--- Two toxic abilities with the same N collapse into one Set member and are
--- under-counted (#224).
+-- Each toxic ability contributes its own N, so a creature with the same N twice
+-- counts it twice -- rule 702.164 has no redundancy clause. That is why the
+-- projection counts keywords instead of setting them.
 totalToxic :: ObjectId -> GameState -> Natural
 totalToxic oid gs =
-  let value keyword = case keyword of
-        Keyword.Toxic n -> n
+  let value keyword count = case keyword of
+        Keyword.Toxic n -> n * count
         _ -> 0
-   in sum (fmap value (Set.toList (keywordsOf oid gs)))
+   in sum (Map.elems (Map.mapWithKey value (keywordsOf oid gs)))
 
 -- One control-granting static ability, flattened: the source that carries it and
 -- the timestamp its effect takes (CR 613.7a: a static ability's continuous effect

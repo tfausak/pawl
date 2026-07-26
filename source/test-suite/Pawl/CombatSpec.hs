@@ -942,7 +942,7 @@ keywordTests registry =
         HU.testCase (name <> " carries exactly " <> show keyword) $ do
           printing <- Registry.printing registry name
           let (oid, gs) = S.addCreature printing S.alice gs0
-          HU.assertEqual "keywords" (Set.singleton keyword) (Projection.keywordsOf oid gs)
+          HU.assertEqual "keywords" (Map.singleton keyword 1) (Projection.keywordsOf oid gs)
           HU.assertBool "hasKeyword" (Projection.hasKeyword keyword oid gs)
    in Tasty.testGroup
         "Keyword"
@@ -950,16 +950,16 @@ keywordTests registry =
             <> [ HU.testCase "a Piker has no keywords" $ do
                    piker <- Registry.printing registry "Goblin Piker"
                    let (oid, gs) = S.addCreature piker S.alice gs0
-                   HU.assertEqual "none" Set.empty (Projection.keywordsOf oid gs)
+                   HU.assertEqual "none" Map.empty (Projection.keywordsOf oid gs)
                    HU.assertBool "no flying" (not (Projection.hasKeyword Keyword.Flying oid gs)),
                  HU.testCase "a Mountain has no keywords" $ do
                    mountain <- Registry.printing registry "Mountain"
                    let gs = S.landsInPlay mountain 1
                    case Game.zoneMembers Zone.Battlefield S.alice gs of
                      [] -> HU.assertFailure "fixture should have one Mountain"
-                     oid : _ -> HU.assertEqual "none" Set.empty (Projection.keywordsOf oid gs),
+                     oid : _ -> HU.assertEqual "none" Map.empty (Projection.keywordsOf oid gs),
                  HU.testCase "an unknown id has no keywords" $
-                   HU.assertEqual "none" Set.empty (Projection.keywordsOf (ObjectId.MkObjectId 999) gs0),
+                   HU.assertEqual "none" Map.empty (Projection.keywordsOf (ObjectId.MkObjectId 999) gs0),
                  -- Flying is on Bird Maiden and NOT on Nimble Birdsticker. If this
                  -- passes while the reach case above also passes, the two keywords
                  -- are genuinely distinct rather than one flag.
