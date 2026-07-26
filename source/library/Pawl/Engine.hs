@@ -399,11 +399,17 @@ runTurnBasedActions phase = do
 -- has left the game would be created in any zone, it isn't created") and CR
 -- 800.4b's SECOND sentence ("If a token would be created under the control of a
 -- player who has left the game, no token is created") are both enforced by the
--- guard at the head of `Event.createTokens`: it takes one player and uses it for
--- both control and ownership, so for a token those two sentences coincide and
--- one guard satisfies both. A token is the only object in this pool that either
--- sentence has a producer for at all, and this function's own delayed-trigger
--- path is how a departed player still reaches that producer.
+-- guard at the head of `Event.createTokens`. By CR 111.2 a token's owner and
+-- controller are the same player, so for a token those two sentences coincide
+-- and one guard satisfies both; a token is the only object in this pool that
+-- either sentence has a producer for at all.
+--
+-- That guard is DEFENCE IN DEPTH, not a reachable path. The filter described
+-- above stops a departed player's ability one step earlier: it never reaches the
+-- stack, so it never resolves, so its Effect.Create never runs. The guard states
+-- the rule where the rule belongs -- at the single place a token is minted --
+-- rather than leaving CR 800.4b's second sentence resting on the CR 800.4d
+-- filter continuing to hold.
 --
 -- CR 800.4b's THIRD sentence (an object put onto the battlefield or the stack
 -- under a departed player's control) is producerless, so nothing tracks it:

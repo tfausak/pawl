@@ -76,11 +76,14 @@ aggregate aggregation views = case aggregation of
 -- that is masked rather than correct. It is unobservable: CR 800.4a takes every
 -- object a departing player owns out of the game, and no site can mint a new one
 -- owned by them afterwards, so Game.zoneMembers returns [] for every zone of
--- theirs and a departed player contributes nothing to any fold here. It is not
--- fixed, because a filter would need Game.stillPlaying and this module
--- cannot import Pawl.Departure -- Departure reaches Pawl.Monarch, Pawl.Event and
--- Pawl.Projection, and Pawl.Projection imports this module -- so the alternative
--- is duplicating that status predicate here.
+-- theirs and a departed player contributes nothing to any fold here.
+--
+-- It is not fixed because there is nothing to observe, so no test could prove a
+-- filter right. The obstacle this comment used to name -- that the status
+-- predicate lived in Pawl.Departure, which this module cannot import -- is gone:
+-- it is Game.stillPlaying now, and Pawl.Game is already imported here. Adding
+-- `filter (\pid -> List.elem pid (Game.stillPlaying gs)) everyone` is a one-line
+-- change whenever a card makes the difference visible.
 playersFor :: Filter.Context -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
 playersFor context gs ref =
   let everyone = Map.keys (GameState.players gs)
