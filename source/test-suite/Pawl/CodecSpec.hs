@@ -553,7 +553,9 @@ tests registry =
               "damage"
               Codec.gameEventToJson
               Codec.jsonToGameEvent
-              (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True False 0 DamageKind.Combat)),
+              -- A NONZERO toxic value, so the CR 702.164b rider is round-tripped
+              -- rather than defaulted past.
+              (GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 1) (Recipient.ToPlayer S.bob) 2 True False 3 DamageKind.Combat)),
           HU.testCase "GameEvent.StepBegan round-trips" $
             roundTrip "step" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice),
           HU.testCase "GameEvent.SpellCast round-trips" $
