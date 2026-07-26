@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
@@ -15,6 +16,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
@@ -96,6 +98,32 @@ tests registry =
         HU.assertEqual "alice's graveyard exiled by the ETB" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
         HU.assertEqual "Rest in Peace is on the battlefield" 1 (S.countOnBattlefieldByName (Text.pack "Rest in Peace") S.alice settled)
         HU.assertEqual "stack empty" [] (GameState.stack settled),
+      -- CR 800.4b, sentence 2: "If a token would be created under the control of
+      -- a player who has left the game, no token is created." NOT "is created and
+      -- then removed" -- so the assertion is that the object count never moved,
+      -- which a create-then-clean-up implementation would fail.
+      --
+      -- Three seats, because CR 800.1 gates the departure machinery on a game
+      -- that began with more than two players.
+      HU.testCase "CR 800.4b no token is created under the control of a player who has left the game" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let goblinCard = Printing.card piker
+            gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
+            before = Game.objectCount gone
+            after = S.runPure S.identityAnswer gone (Event.createTokens S.alice goblinCard 2)
+        HU.assertBool "alice really has left" (notElem S.alice (Game.stillPlaying gone))
+        HU.assertEqual "no object was ever minted" before (Game.objectCount after)
+        HU.assertEqual "and nothing reached the battlefield" 0 (Set.size (GameState.battlefield after)),
+      -- The other half of the guard: a player still in the game is unaffected, so
+      -- this cannot pass by refusing every token.
+      HU.testCase "CR 800.4b a player still in the game still gets their tokens" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let goblinCard = Printing.card piker
+            gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
+            before = Game.objectCount gone
+            after = S.runPure S.identityAnswer gone (Event.createTokens S.bob goblinCard 2)
+        HU.assertEqual "bob's two tokens exist" (before + 2) (Game.objectCount after)
+        HU.assertEqual "both on the battlefield" 2 (Set.size (GameState.battlefield after)),
       HU.testCase "CR 111.2 createTokens puts a token on the battlefield and emits an enters event" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let base = Setup.emptyGame S.bothPlayers

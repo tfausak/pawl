@@ -233,10 +233,13 @@ returnExiledForMonarch = do
 -- the game can become the monarch, the game continues with no monarch."
 --
 -- `playing` is the still-playing seats in SEATING order, injected by the caller
--- rather than computed here: Pawl.Departure calls this at the moment of
--- departure (CR 725.4's "at the same time as that player leaves the game"), so
--- this module may not import Pawl.Departure to ask. Same injected-value idiom
--- Pawl.Count uses for its ViewOf.
+-- rather than computed here. Pawl.Departure calls this at the moment of
+-- departure (CR 725.4's "at the same time as that player leaves the game") and
+-- passes the seats it has just recomputed from the post-flip state, which is the
+-- same state handed to this function -- so `Game.stillPlayingInOrder gs` would
+-- now give the identical answer. The injection is kept because it makes the
+-- caller's snapshot explicit at the one moment the answer is changing. Same
+-- injected-value idiom Pawl.Count uses for its ViewOf.
 --
 -- Engine.nextStillPlaying walks the same seating order, for CR 800.4a's
 -- priority successor -- a different rule, but the same shape of walk -- and
@@ -249,9 +252,8 @@ returnExiledForMonarch = do
 -- no monarch, where nextStillPlaying answers with a PlayerId always (both are
 -- total functions -- the difference is the result type, not partiality); and
 -- `playing` is injected here (see above), where nextStillPlaying
--- reads Departure.stillPlaying directly, because this module may not import
--- Pawl.Departure. Changing either walk without checking the other risks
--- reintroducing this duplication with a mismatch baked in.
+-- reads Game.stillPlaying directly. Changing either walk without checking the
+-- other risks reintroducing this duplication with a mismatch baked in.
 --
 -- Called with `leaving` ALREADY marked departed, so "is leaving the game" and
 -- "has left the game" are one test: the rule's first two sentences collapse to

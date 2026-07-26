@@ -450,8 +450,8 @@ defendingPlayerTests registry =
               HU.assertEqual "bob is dropped, carol and dave remain" [S.carol, S.dave] (Combat.attackableOpponents gone)
               HU.assertEqual "and before he left there were three" [S.bob, S.carol, S.dave] (Combat.attackableOpponents S.fourPlayerGame),
       HU.testCase "CR 506.2a the candidates come back in SEATING order, not player-id order" $
-        -- The discriminator between Departure.stillPlayingInOrder and
-        -- Departure.stillPlaying: seated carol-alice-bob with alice attacking,
+        -- The discriminator between Game.stillPlayingInOrder and
+        -- Game.stillPlaying: seated carol-alice-bob with alice attacking,
         -- seating order gives [carol, bob] and the players map gives [bob, carol].
         -- Every other fixture in the suite is seated ascending, so this is the
         -- only place the two readings disagree.

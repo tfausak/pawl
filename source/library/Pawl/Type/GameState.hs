@@ -79,7 +79,7 @@ data GameState = MkGameState
     -- the starting player and proceeds clockwise" -- so this field is that
     -- seating order, rotated so the starting player is first. It lists every
     -- player who BEGAN this game and is never shortened. Who is still IN the
-    -- game is Departure.stillPlaying, and every departure-aware read filters
+    -- game is Game.stillPlaying, and every departure-aware read filters
     -- through that on top of this.
     --
     -- Three rules depend on a departed player keeping their seat:

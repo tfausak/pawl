@@ -827,7 +827,7 @@ resolveTests registry =
         lightningBolt <- Registry.printing registry "Lightning Bolt"
         -- bob departed the MAIN game before this effect resolves, so bob was never
         -- seated for the subgame (Setup.subgameStateFrom seats only
-        -- Departure.stillPlayingInOrder) -- only alice and carol played it. The
+        -- Game.stillPlayingInOrder) -- only alice and carol played it. The
         -- stub reports alice won, so the derived loser must be carol; bob still
         -- appears in the raw seating roster (GameState.turnOrder) and is the
         -- non-participant a roster bug would wrongly name.

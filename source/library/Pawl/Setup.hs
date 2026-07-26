@@ -10,7 +10,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
-import qualified Pawl.Departure as Departure
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Turn as Turn
@@ -152,7 +151,7 @@ newGame perform matchup = do
 startGameFromCards :: HandActionPerformer -> Game ()
 startGameFromCards perform = do
   gs <- State.get
-  let owners = Departure.stillPlayingInOrder gs
+  let owners = Game.stillPlayingInOrder gs
       isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
@@ -232,7 +231,7 @@ restartGame perform starter = do
     -- CR 727.1: "All players in that game when it ended then start a new game
     -- ..." -- so the rebuilt seating order is the players who were still in the
     -- game, in their seats (fixed by #147), rotated to begin with `starter` (CR 727.1a).
-    let order = rotateTo starter (Departure.stillPlayingInOrder gs)
+    let order = rotateTo starter (Game.stillPlayingInOrder gs)
      in gs
           { GameState.players = resetPlayers (GameState.players gs),
             GameState.manaPool = Map.empty,
@@ -294,7 +293,7 @@ subgameStateFrom starter parent =
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
       libObjects = Map.restrictKeys (GameState.objects parent) libIds
       -- The pool is drawn from EVERY seat in the parent's FULL roster
-      -- (GameState.turnOrder), never narrowed to Departure.stillPlayingInOrder
+      -- (GameState.turnOrder), never narrowed to Game.stillPlayingInOrder
       -- -- `order` below DOES narrow to the seated players (CR 729.4, fixed by #147), but
       -- this pool must not, because funnelBack's oldLibIds is built the SAME way
       -- over the SAME full roster, and the two have to agree: funnelBack drops
@@ -337,7 +336,7 @@ subgameStateFrom starter parent =
       -- funnelBack's `recovered` pass, which is driven by the owner's absence
       -- from the FINISHED subgame's own objects, not by anything this pool
       -- captured for them at the start; see funnelBack's haddock.
-      order = rotateTo starter (Departure.stillPlayingInOrder parent)
+      order = rotateTo starter (Game.stillPlayingInOrder parent)
       firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe order)
    in parent
         { GameState.objects = libObjects,
@@ -416,7 +415,7 @@ subgameStateFrom starter parent =
 -- tried and rejected: that reads `finalSub`'s turnOrder at the END of the
 -- subgame, but objectsLeaveWith's own gate was decided at DEPARTURE time
 -- (Departure.hs), and the two can disagree. Setup.restartGame rewrites
--- turnOrder to `Departure.stillPlayingInOrder`, DROPPING departed seats, and a
+-- turnOrder to `Game.stillPlayingInOrder`, DROPPING departed seats, and a
 -- restart can resolve inside a subgame (Effect.RestartGame, Resolve.hs;
 -- playSubgame's playGame honours restartSignal) -- so a three-seat subgame
 -- where bob departs (wiping him) followed by an in-subgame restart leaves

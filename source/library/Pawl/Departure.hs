@@ -1,3 +1,16 @@
+-- CR 104.2a / 104.3: what happens when a player leaves the game.
+--
+-- Split out of Pawl.Sba because leaving is not always a state-based action. CR
+-- 104.3b (life <= 0) is one and arrives through the SBA pass; CR 104.3a (concede)
+-- is IMMEDIATE and Pawl.Engine reaches it directly. Having Engine call into
+-- Pawl.Sba for something the rules say is not a state-based action would misstate
+-- the rules in the module graph.
+--
+-- The QUERY half -- Game.stillPlaying / Game.stillPlayingInOrder, "who is still
+-- in the game" -- lives in Pawl.Game instead. This module imports Pawl.Monarch
+-- (CR 725.4 reassignment happens inside `depart`) and Monarch imports Pawl.Event,
+-- so anything in the event pipeline that needs to ask the question cannot reach
+-- it through here. Event.createTokens asks it for CR 800.4b.
 module Pawl.Departure where
 
 import Control.Applicative ((<|>))
@@ -23,33 +36,6 @@ import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Zone as Zone
-
--- CR 104.2a / 104.3: who is still in the game, and what happens when someone
--- leaves it.
---
--- Split out of Pawl.Sba because leaving is not always a state-based action. CR
--- 104.3b (life <= 0) is one and arrives through the SBA pass; CR 104.3a (concede)
--- is IMMEDIATE and Pawl.Engine reaches it directly. Having Engine call into
--- Pawl.Sba for something the rules say is not a state-based action would misstate
--- the rules in the module graph.
-stillPlaying :: GameState -> [PlayerId]
-stillPlaying gs =
-  let isPlaying entry = Player.status (snd entry) == Status.Playing
-   in fmap fst (filter isPlaying (Map.toList (GameState.players gs)))
-
--- Who is still in the game, in SEATING order.
---
--- stillPlaying reads the players map, so it comes back in PlayerId order.
--- GameState.turnOrder is the permanent seating roster (CR 800.5, CR 806.3; see
--- Pawl.Type.GameState), so anything that REBUILDS a turn order or walks seats
--- needs this instead. The order is load-bearing, not cosmetic: CR 103.5 has the
--- starting player declare their mulligan first, then each other player in turn
--- order, and CR 727.1a / CR 729.2 rotate the rebuilt order to begin with the
--- starting player.
-stillPlayingInOrder :: GameState -> [PlayerId]
-stillPlayingInOrder gs =
-  let playing = stillPlaying gs
-   in filter (\pid -> List.elem pid playing) (GameState.turnOrder gs)
 
 -- Mark a player as having left, with the reason they left, and perform
 -- everything the rules attach to that moment. Pure, because the CR 704.5 pass
@@ -77,7 +63,7 @@ depart reason pid gs =
           then remainingControlledExiled pid (nonCardStackObjectsCease pid (controlEffectsEnd pid (objectsLeaveWith pid gs)))
           else gs
       flipped = settled {GameState.players = Map.adjust lose pid (GameState.players settled)}
-   in Monarch.reassignOnDeparture pid (stillPlayingInOrder flipped) flipped
+   in Monarch.reassignOnDeparture pid (Game.stillPlayingInOrder flipped) flipped
 
 -- CR 800.4: "Unlike two-player games, multiplayer games can continue after one
 -- or more players have left the game." CR 800.1: "A multiplayer game is a game
@@ -360,11 +346,11 @@ remainingControlledExiled pid gs =
 -- have all left the game."
 --
 -- `gs` is the state AFTER the departures have been applied, so the survivors are
--- `stillPlaying gs`. `leaving` is who just left, and is needed only to tell
+-- `Game.stillPlaying gs`. `leaving` is who just left, and is needed only to tell
 -- "nobody is playing because they all left at once" (a draw) from "nobody was
 -- playing to begin with" (no result at all).
 outcomeAfterLeaving :: [PlayerId] -> GameState -> Maybe Result
-outcomeAfterLeaving leaving gs = case stillPlaying gs of
+outcomeAfterLeaving leaving gs = case Game.stillPlaying gs of
   [winner] -> Just (Result.Won winner)
   [] -> if null leaving then Nothing else Just Result.Drawn
   _ -> Nothing

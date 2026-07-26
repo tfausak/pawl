@@ -160,7 +160,7 @@ setupTests registry =
               HU.assertEqual "the starting player is active" S.alice (GameState.activePlayer gs)
               HU.assertEqual "three seats in the players map" 3 (Map.size (GameState.players gs)),
       HU.testCase "CR 800.1 a three-player game has three players still in it at the start" $
-        HU.assertEqual "all three playing" [S.alice, S.bob, S.carol] (Departure.stillPlaying S.threePlayerGame)
+        HU.assertEqual "all three playing" [S.alice, S.bob, S.carol] (Game.stillPlaying S.threePlayerGame)
     ]
 
 greenBlackSetup :: Registry.Type.Registry -> IO GameState.GameState
@@ -436,7 +436,7 @@ subgameTests registry =
       -- DEPARTURE time -- and a restart resolving INSIDE the subgame AFTER the
       -- departure (Setup.restartGame, reachable via Effect.RestartGame /
       -- Resolve.hs from a still-running subgame) rewrites turnOrder to
-      -- Departure.stillPlayingInOrder, which DROPS the departed seat. So by the
+      -- Game.stillPlayingInOrder, which DROPS the departed seat. So by the
       -- time funnelBack reads `finalSub`, its turnOrder is back down to two and
       -- continuesAfterDeparture would read False even though bob's objects were
       -- genuinely destroyed earlier. funnelBack's guard must not depend on

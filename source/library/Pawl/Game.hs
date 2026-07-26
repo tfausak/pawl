@@ -1,5 +1,6 @@
 module Pawl.Game where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -11,9 +12,11 @@ import Pawl.Type.Object (Object)
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Source as Source
+import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Timestamp as Timestamp
 import Pawl.Type.Zone (Zone)
 import qualified Pawl.Type.Zone as Zone
@@ -113,3 +116,29 @@ isSpell oid gs = case lookupObject oid gs of
       Source.OfTrigger _ _ -> False
       Source.OfEmblem _ -> False
       Source.OfInherentTrigger _ _ -> False
+
+-- CR 104.2a: who is still in the game. A pure query over the players map, so it
+-- lives here with the other GameState accessors rather than in Pawl.Departure
+-- with the machinery that acts on leaving. That is not only tidiness: Departure
+-- imports Pawl.Monarch (CR 725.4 reassignment happens inside `depart`), and
+-- Monarch imports Pawl.Event, so anything in the event pipeline that needs to
+-- ask "is this player still in the game" -- Event.createTokens does, for CR
+-- 800.4b -- cannot reach it through Departure without an import cycle.
+stillPlaying :: GameState -> [PlayerId]
+stillPlaying gs =
+  let isPlaying entry = Player.status (snd entry) == Status.Playing
+   in fmap fst (filter isPlaying (Map.toList (GameState.players gs)))
+
+-- Who is still in the game, in SEATING order.
+--
+-- stillPlaying reads the players map, so it comes back in PlayerId order.
+-- GameState.turnOrder is the permanent seating roster (CR 800.5, CR 806.3; see
+-- Pawl.Type.GameState), so anything that REBUILDS a turn order or walks seats
+-- needs this instead. The order is load-bearing, not cosmetic: CR 103.5 has the
+-- starting player declare their mulligan first, then each other player in turn
+-- order, and CR 727.1a / CR 729.2 rotate the rebuilt order to begin with the
+-- starting player.
+stillPlayingInOrder :: GameState -> [PlayerId]
+stillPlayingInOrder gs =
+  let playing = stillPlaying gs
+   in filter (\pid -> List.elem pid playing) (GameState.turnOrder gs)

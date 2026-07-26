@@ -10,6 +10,7 @@ module Pawl.Event where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -327,33 +328,60 @@ sacrifice oid = do
 -- scenario in the test pool would still pass. CR 616.1g's own worked example
 -- (a token copy of Voice of All) needs a token WITH an entry replacement to
 -- exercise, and no such card is in this pool (#73).
+-- CR 800.4b, sentence 2: "If a token would be created under the control of a
+-- player who has left the game, no token is created." Also CR 800.4d's first
+-- sentence ("If an object that would be owned by a player who has left the game
+-- would be created in any zone, it isn't created").
+--
+-- Those two sentences coincide for a token, and by CR 111.2 rather than by any
+-- accident of this signature: "The player who creates a token is its owner. The
+-- token enters the battlefield under that player's control." Owner and controller
+-- are the same player by rule, so one guard on that player satisfies both.
+--
+-- Before Replacement.resolveTokens, not after. The rule says no token is CREATED,
+-- not that one is created and then removed, so nothing may be minted and nothing
+-- may be spent getting there -- resolveTokens consumes replacement use counts (CR
+-- 614.3), and burning one on a token that the rules say never existed would be a
+-- second, quieter violation. Guarding the parameter rather than the resolved
+-- owner is exact today because no producer can move a token's controller as it is
+-- created (#69); if CR 616.1b's control-modifying entry replacements ever gain
+-- one, this check has to move after them and become a re-check.
+--
+-- Inline rather than a guard delegating to a `createTokensFor` body: the project
+-- writes no export lists, so a second top-level name would be a public door
+-- straight past the check, and the whole argument for putting the guard here is
+-- that this is the ONE door.
 createTokens :: PlayerId -> Card -> Natural -> Game [ObjectId]
 createTokens controller card n = do
-  resolved <- Replacement.resolveTokens controller card n
-  case resolved of
-    Nothing -> pure []
-    Just (owner, tokenCard, count) -> do
-      let mkObj ts =
-            Object.MkObject
-              { Object.owner = owner,
-                Object.source = Source.OfToken tokenCard,
-                Object.zone = Zone.Battlefield,
-                Object.tapped = TapState.Untapped,
-                Object.damage = 0,
-                Object.sickness = Sickness.Sick,
-                Object.bindings = Map.empty,
-                Object.counters = Map.empty,
-                Object.attachedTo = Nothing,
-                Object.timestamp = ts
-              }
-      ids <- Monad.replicateM (fromIntegral count) (placeObject owner mkObj Zone.Battlefield)
-      Monad.mapM_ (Replacement.runEntry (Set.fromList ids)) ids
-      -- A token is created from nothing, so there is no prior incarnation to
-      -- snapshot: its last known information IS what it is now (CR 111.3 makes the
-      -- creating effect's stated values functionally printed values). Recorded
-      -- AFTER every entry loop, so the events describe settled objects.
-      Monad.mapM_ recordTokenEntry ids
-      pure ids
+  gs <- State.get
+  if List.notElem controller (Game.stillPlaying gs)
+    then pure []
+    else do
+      resolved <- Replacement.resolveTokens controller card n
+      case resolved of
+        Nothing -> pure []
+        Just (owner, tokenCard, count) -> do
+          let mkObj ts =
+                Object.MkObject
+                  { Object.owner = owner,
+                    Object.source = Source.OfToken tokenCard,
+                    Object.zone = Zone.Battlefield,
+                    Object.tapped = TapState.Untapped,
+                    Object.damage = 0,
+                    Object.sickness = Sickness.Sick,
+                    Object.bindings = Map.empty,
+                    Object.counters = Map.empty,
+                    Object.attachedTo = Nothing,
+                    Object.timestamp = ts
+                  }
+          ids <- Monad.replicateM (fromIntegral count) (placeObject owner mkObj Zone.Battlefield)
+          Monad.mapM_ (Replacement.runEntry (Set.fromList ids)) ids
+          -- A token is created from nothing, so there is no prior incarnation to
+          -- snapshot: its last known information IS what it is now (CR 111.3 makes
+          -- the creating effect's stated values functionally printed values).
+          -- Recorded AFTER every entry loop, so the events describe settled objects.
+          Monad.mapM_ recordTokenEntry ids
+          pure ids
 
 recordTokenEntry :: ObjectId -> Game ()
 recordTokenEntry newId = do

@@ -115,7 +115,7 @@ handWindow field ask perform pid = do
 -- starting player first, which is exactly that order.
 --
 -- A player who has left the game is not here to act: the rebuild paths derive
--- `owners` from Departure.stillPlayingInOrder, so they get no window, exactly as
+-- `owners` from Game.stillPlayingInOrder, so they get no window, exactly as
 -- they get no opening hand.
 openingHandActions :: HandActionPerformer -> [PlayerId] -> Game ()
 openingHandActions perform owners =

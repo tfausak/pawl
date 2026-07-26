@@ -526,7 +526,7 @@ tests registry =
         -- CR 800.1: "A multiplayer game is a game that begins with more than two
         -- players." Begins with, not currently has. GameState.turnOrder is the
         -- permanent seating roster, so this stays 1 with two survivors; an
-        -- implementation that counted Departure.stillPlaying would answer 0.
+        -- implementation that counted Game.stillPlaying would answer 0.
         HU.assertEqual
           "still one free mulligan with two survivors"
           1

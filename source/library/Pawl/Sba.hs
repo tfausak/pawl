@@ -147,7 +147,7 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
 -- Pool.Creatures with no Filter is the ONLY shape any Card.enchant carries in
 -- this pool today (Unholy Strength's "enchant creature"). Target.creatureRecipients
 -- (Target.hs) tags every candidate it produces ToCreature, drawn from the
--- battlefield objects owned by a still-playing player (Departure.stillPlaying);
+-- battlefield objects owned by a still-playing player (Game.stillPlaying);
 -- with no Filter left to narrow that set, "still legal" reduces EXACTLY to
 -- "still a creature, on the battlefield, owned by a player still in the game" --
 -- which is what the Pool.Creatures arm below reads off `pcs` (a Map.lookup) plus
@@ -180,7 +180,7 @@ stillLegalEnchant pcs gs source spec target = case spec of
         Set.member CardType.Creature (PC.cardTypes pc)
           && case Game.lookupObject target gs of
             Nothing -> False
-            Just obj -> List.elem (Object.owner obj) (Departure.stillPlaying gs)
+            Just obj -> List.elem (Object.owner obj) (Game.stillPlaying gs)
   _ -> Target.stillLegal source (Recipient.ToCreature target) spec gs
 
 -- CR 704.3: repeat until no state-based action is performed. ONE pass here, with
@@ -251,7 +251,7 @@ performStateBasedActions = do
   -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
   Monad.mapM_ Event.destroy toDestroy
   destroyed <- State.get
-  let leaving = filter (losesNow destroyed) (Departure.stillPlaying destroyed)
+  let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
       departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving
       -- CR 704.5d: a token in any zone other than the battlefield ceases to exist.
       -- Computed from the post-bury state so a token that just died (now in the

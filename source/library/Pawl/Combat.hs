@@ -11,7 +11,6 @@ import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Decide as Decide
-import qualified Pawl.Departure as Departure
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Turn as Turn
@@ -77,13 +76,13 @@ skipEmptyCombat gs =
 -- phrased the same way on purpose. Filter.matches has an Opponent arm too, but it
 -- carries no such note and is deliberately not cited here as though it did.
 --
--- SEATING order (Departure.stillPlayingInOrder), not player-id order: the seating
+-- SEATING order (Game.stillPlayingInOrder), not player-id order: the seating
 -- roster is the game's own ordering for anything player-shaped (CR 800.5), and
--- Departure.stillPlaying's order is an artifact of reading the players map. It
+-- Game.stillPlaying's order is an artifact of reading the players map. It
 -- makes the first candidate the next seat rather than the lowest id, which is
 -- what an interpreter that takes the head should get.
 attackableOpponents :: GameState -> [PlayerId]
-attackableOpponents gs = filter (/= GameState.activePlayer gs) (Departure.stillPlayingInOrder gs)
+attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayingInOrder gs)
 
 isCreatureObject :: ObjectId -> GameState -> Bool
 isCreatureObject = Projection.isCreatureOf
@@ -244,7 +243,7 @@ chooseDefender = do
   -- guard -- and CombatSpec's direct-call case is the test that discriminates
   -- it. Do not delete it as redundant; Engine.runTurnBasedActions's comment
   -- states this same argument from the other end.
-  Monad.when (List.elem pid (Departure.stillPlaying gs)) $
+  Monad.when (List.elem pid (Game.stillPlaying gs)) $
     case NonEmpty.nonEmpty (attackableOpponents gs) of
       Nothing -> pure ()
       Just candidates -> do
