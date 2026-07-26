@@ -18,6 +18,7 @@ import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Mana as Mana.Type
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
@@ -215,6 +216,29 @@ manaTests registry =
         HU.assertBool "bob could tap it" (elem elfId (Mana.manaSources S.bob settled))
         HU.assertBool "alice controls it now" (elem elfId (Projection.controls S.alice stolen))
         HU.assertBool "but it is sick for her, so it is not her mana source" (notElem elfId (Mana.manaSources S.alice stolen)),
+      -- CR 702.10c is the exemption that makes the steal above pay off when the
+      -- thief also grants haste: "If a creature has haste, its controller can
+      -- activate its activated abilities whose cost includes the tap symbol or
+      -- the untap symbol even if that creature hasn't been controlled by that
+      -- player continuously since their most recent turn began."
+      --
+      -- Act of Treason grants haste for exactly this reason -- the whole point of
+      -- the card is that the stolen creature is usable the turn you take it. End
+      -- to end through cast and resolution, so the haste is really granted rather
+      -- than stipulated.
+      HU.testCase "CR 702.10c a hasted stolen Llanowar Elves IS a mana source for the thief" $ do
+        mountain <- Registry.printing registry "Mountain"
+        llanowarElves <- Registry.printing registry "Llanowar Elves"
+        actOfTreason <- Registry.printing registry "Act of Treason"
+        let base0 = S.landsInPlay mountain 3
+            (elfId, base1) = S.addCreature llanowarElves S.bob base0
+            base = S.runPure S.identityAnswer base1 (Engine.settleAll S.bob)
+            (withSpell, spellId) = S.handOne actOfTreason base
+            cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "alice controls the Elves" (Just S.alice) (Projection.controllerOf elfId resolved)
+        HU.assertBool "it has haste" (Projection.hasKeyword Keyword.Haste elfId resolved)
+        HU.assertBool "so she may tap it for mana this turn" (elem elfId (Mana.manaSources S.alice resolved)),
       HU.testCase "mana from a controlled permanent goes to its controller, not owner" $ do
         llanowarElves <- Registry.printing registry "Llanowar Elves"
         let (oid, base) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)

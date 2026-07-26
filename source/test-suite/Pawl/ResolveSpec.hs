@@ -1579,7 +1579,31 @@ gainControlTests registry =
             after = snd (Engine.runGamePure S.identityAnswer base run)
         HU.assertEqual "alice now controls it" (Just S.alice) (Projection.controllerOf oid after)
         HU.assertEqual "it is summoning sick for the new controller" (Just Sickness.Sick) (fmap Object.sickness (Game.lookupObject oid after))
-        HU.assertEqual "control reverts after cleanup" (Just S.bob) (Projection.controllerOf oid (Expiry.dropAtCleanup after))
+        HU.assertEqual "control reverts after cleanup" (Just S.bob) (Projection.controllerOf oid (Expiry.dropAtCleanup after)),
+      -- CR 302.6 asks whether control was CONTINUOUS. Gaining control of a
+      -- permanent you already control interrupts nothing, so the clock must not
+      -- reset. The sibling case above is the one where it must.
+      --
+      -- Isolated from haste on purpose: Act of Treason is the card that reaches
+      -- this, and it grants haste, which would mask the difference on the ability
+      -- path. Driving Effect.GainControl directly shows the sickness itself.
+      HU.testCase "CR 302.6 GainControl does NOT re-Sick a permanent its controller already controlled" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, base) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            settled = S.runPure S.identityAnswer base (Engine.settleAll S.alice)
+            slot = SlotName.MkSlotName (Text.pack "target")
+            run =
+              Resolve.applyEffect
+                oid
+                S.alice
+                Map.empty
+                (Map.singleton slot True)
+                (Map.singleton slot (Recipient.ToCreature oid))
+                (Effect.GainControl Duration.UntilEndOfTurn slot)
+            after = snd (Engine.runGamePure S.identityAnswer settled run)
+        HU.assertEqual "alice controlled it before" (Just S.alice) (Projection.controllerOf oid settled)
+        HU.assertEqual "and still does" (Just S.alice) (Projection.controllerOf oid after)
+        HU.assertEqual "its settle under alice is untouched" (Just (Sickness.Settled S.alice)) (fmap Object.sickness (Game.lookupObject oid after))
     ]
 
 gainPlayerCountersTests :: Registry.Type.Registry -> Tasty.TestTree
