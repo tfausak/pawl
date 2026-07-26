@@ -590,11 +590,11 @@ monarchTests registry =
             gone = Departure.depart Departure.Type.Conceded S.alice afterEtb
             settled = monarchSettle gone
         HU.assertEqual "alice is the monarch on ETB" (Just S.alice) (GameState.monarch afterEtb)
-        HU.assertEqual "bob's creature is exiled under the watch, keyed to alice" [S.alice] (fmap MonarchWatch.controller (Map.elems (GameState.exiledUntilMonarch afterEtb)))
+        HU.assertEqual "bob's creature is exiled under the watch, keyed to alice, baselined on her crown" [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.lastMonarch = Just S.alice}] (Map.elems (GameState.exiledUntilMonarch afterEtb))
         HU.assertEqual "the original is off the battlefield" 0 (length (filter (== victim) (Set.toList (GameState.battlefield afterEtb))))
         -- CR 800.4a: alice's own object leaves; bob's exiled card does not.
         HU.assertEqual "Palace Jailer left the game with alice" Nothing (Game.lookupObject jailer gone)
-        HU.assertEqual "but the watch survived her departure, still keyed to her" [S.alice] (fmap MonarchWatch.controller (Map.elems (GameState.exiledUntilMonarch gone)))
+        HU.assertEqual "but the watch survived her departure, still keyed to her and still baselined on her crown" [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.lastMonarch = Just S.alice}] (Map.elems (GameState.exiledUntilMonarch gone))
         -- CR 725.4, first sentence.
         HU.assertEqual "carol, the active player, is the monarch" (Just S.carol) (GameState.monarch gone)
         -- CR 800.4i: carol is in departed alice's frozen opponent set, so the

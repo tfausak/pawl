@@ -1266,15 +1266,16 @@ turnOrderTests registry =
         HU.assertEqual "bob took 2" (Just 18) (S.lifeOf S.bob hitBob)
         HU.assertEqual "alice is the monarch" (Just S.alice) (GameState.monarch hitBob)
         -- The next two assertions are ENTAILED by "alice is the monarch" just
-        -- above: Monarch.returnExiledForMonarch's `due` set is a pure function
-        -- of (monarch, exiledUntilMonarch) -- an entry is due iff its
-        -- controller is not the CURRENT monarch -- so once alice holds the
-        -- crown, carol's watch entry is due and nothing consistent with that
-        -- fact can leave it undischarged. They are not a second, independent
-        -- observation that the crown moved; what they add is real coverage of
-        -- the return machinery itself (Resolve's ExileUntilMonarch arm,
-        -- Event.changeZoneReturning, and this settle-loop return) running
-        -- inside a full Engine.runStep-driven combat.
+        -- above: an entry is due iff the crown has CHANGED HANDS since the watch
+        -- last looked and the new monarch is not the entry's controller (#171),
+        -- and this combat is exactly such a change -- carol held the crown when
+        -- the watch was armed, and alice has taken it from her. So carol's entry
+        -- is due and nothing consistent with that fact can leave it
+        -- undischarged. They are not a second, independent observation that the
+        -- crown moved; what they add is real coverage of the return machinery
+        -- itself (Resolve's ExileUntilMonarch arm, Event.changeZoneReturning,
+        -- and this settle-loop return) running inside a full
+        -- Engine.runStep-driven combat.
         HU.assertEqual "the watch is discharged" Map.empty (GameState.exiledUntilMonarch hitBob)
         -- CR 400.7: the return is itself a zone change, so the returned
         -- permanent has yet another new object id -- `prisoner`'s id (the one it

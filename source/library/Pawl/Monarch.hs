@@ -150,17 +150,19 @@ placeInherent controller ability provided = do
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
 
 -- CR 725 (Palace Jailer): return every object exiled "until an opponent becomes
--- the monarch" once an opponent of the entry's controller is the monarch. Runs in
--- the settle loop; CR 704.3 fixes "whenever a player would get priority" as the
--- coarsest moment anything can observe a condition, and Engine.settleForPriority
--- runs at exactly the points where the board can change.
+-- the monarch" once an opponent of the entry's controller HAS BECOME the monarch.
+-- Runs in the settle loop; CR 704.3 fixes "whenever a player would get priority"
+-- as the coarsest moment anything can observe a condition, and
+-- Engine.settleForPriority runs at exactly the points where the board can change.
 --
 -- "An opponent" is every player other than the controller. That is not a
 -- two-player shortcut: in a free-for-all the players compete as individuals and
--- every other player is an opponent by construction (CR 806.1), so an entry is
--- due iff its controller is not the current monarch. CR 102.3 makes a TEAMMATE
--- not an opponent, and teams are the only reading this arm would be wrong for;
--- pawl has none (#175).
+-- every other player is an opponent by construction (CR 806.1), so the opponent
+-- half of the test is simply "the monarch is not the controller". CR 102.3 makes
+-- a TEAMMATE not an opponent, and teams are the only reading this arm would be
+-- wrong for; pawl has none (#175). The ruling confirms the same breadth from the
+-- other side: "The opponent that controlled the exiled card doesn't have to be
+-- the same opponent that becomes the monarch."
 --
 -- When the controller has LEFT the game, the set is resolved by CR 800.4i: "If an
 -- effect requires information about a specific player, the effect uses the current
@@ -168,9 +170,9 @@ placeInherent controller ability provided = do
 -- effect uses the last known information about that player before they left the
 -- game." Who a departed player's opponents were is information about a specific
 -- player, so the set freezes at departure -- in a free-for-all, every other player
--- who was in the game. The same `/= m` filter computes it, because CR 725.4
--- guarantees the monarch is always a player still in the game and a departed
--- controller is therefore never the monarch. Nothing needs to be stored.
+-- who was in the game. The same controller comparison computes it, because CR
+-- 725.4 guarantees the monarch is always a player still in the game and a
+-- departed controller is therefore never the monarch. Nothing needs to be stored.
 --
 -- Departure.objectsLeaveWith drops an entry whose KEY -- the exiled object -- is
 -- owned by a departing player, and never one whose VALUE is: the effect survives
@@ -196,13 +198,23 @@ placeInherent controller ability provided = do
 --
 -- Nothing is a legitimate baseline, not a missing value: CR 725.1 starts the game
 -- with no monarch, and the first player ever crowned is a change like any other.
+--
+-- Two crownings with no settle between them, landing back on the starting holder,
+-- hide the middle reign from this comparison (#208).
 returnExiledForMonarch :: Game Bool
 returnExiledForMonarch = do
   gs <- State.get
   let m = GameState.monarch gs
       -- Unchanged crown: nothing to decide, and the baseline is already right.
       changed watch = MonarchWatch.lastMonarch watch /= m
-      opponentHolds watch = m /= Just (MonarchWatch.controller watch)
+      -- Someone must actually HOLD the crown: "an opponent becomes the monarch"
+      -- is never satisfied by there being no monarch. CR 725.1 says a game has
+      -- none until an effect creates one and exactly one thereafter, so the only
+      -- way back to Nothing is CR 725.4 exhausting the players -- which must
+      -- rebase the baseline without discharging anything.
+      opponentHolds watch = case m of
+        Nothing -> False
+        Just holder -> holder /= MonarchWatch.controller watch
       due = Map.keys (Map.filter (\w -> changed w && opponentHolds w) (GameState.exiledUntilMonarch gs))
       rebase watch = if changed watch then watch {MonarchWatch.lastMonarch = m} else watch
   State.modify' (\g -> g {GameState.exiledUntilMonarch = fmap rebase (GameState.exiledUntilMonarch g)})

@@ -1681,7 +1681,28 @@ exileUntilMonarchTests registry =
         HU.assertEqual "alice holding the crown does not discharge the watch" 1 (Map.size (GameState.exiledUntilMonarch alicesCrown))
         HU.assertEqual "nor return the creature" 0 (Set.size (GameState.battlefield alicesCrown))
         HU.assertEqual "bob retaking it does return the creature" 1 (Set.size (GameState.battlefield bobsCrown))
-        HU.assertEqual "and discharges the watch" 0 (Map.size (GameState.exiledUntilMonarch bobsCrown))
+        HU.assertEqual "and discharges the watch" 0 (Map.size (GameState.exiledUntilMonarch bobsCrown)),
+      -- The crown VANISHING is not an opponent becoming the monarch. CR 725.1's
+      -- ruling says the game keeps exactly one monarch once it has one, and the
+      -- single way back to none is CR 725.4's last player standing leaving -- but
+      -- the watch must not read "no monarch" as "not the controller" and fire.
+      HU.testCase "CR 725.1 the crown vanishing is not an opponent becoming the monarch" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, base0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+            base = base0 {GameState.monarch = Just S.bob}
+            slot = SlotName.MkSlotName (Text.pack "target")
+            exile =
+              Resolve.applyEffect
+                S.noSource
+                S.alice
+                Map.empty
+                (Map.singleton slot True)
+                (Map.singleton slot (Recipient.ToCreature oid))
+                (Effect.ExileUntilMonarch slot)
+            exiled = snd (Engine.runGamePure S.identityAnswer base exile)
+            noMonarch = snd (Engine.runGamePure S.identityAnswer exiled {GameState.monarch = Nothing} Monarch.returnExiledForMonarch)
+        HU.assertEqual "the watch is still armed" 1 (Map.size (GameState.exiledUntilMonarch noMonarch))
+        HU.assertEqual "and nothing returned" 0 (Set.size (GameState.battlefield noMonarch))
     ]
 
 -- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
