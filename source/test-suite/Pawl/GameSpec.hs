@@ -319,6 +319,7 @@ recordingAnswer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
 recordingAnswer p = case p of
   Prompt.Concede _ -> pure Concession.Continues
   Prompt.ChooseDefender _ _ candidates -> pure (NonEmpty.head candidates)
+  Prompt.ChooseManaSource _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.DeclareAttackers {} -> pure []
   Prompt.DeclareBlockers {} -> pure Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -1339,6 +1340,7 @@ namedIs wanted mo = case mo of
 -- bob, this interpreter would pass, and bob's life would stay 20 -- the falsifier.
 slaveAnswer :: Prompt.Prompt r -> r
 slaveAnswer p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAction (Decider.MkDecider d) player actions ->
     if player == S.bob && d == S.alice
       then case filter isCastAction actions of

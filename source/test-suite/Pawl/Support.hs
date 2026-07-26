@@ -195,6 +195,7 @@ isCreatureRecipient r = case r of
 identityAnswer :: Prompt.Prompt r -> r
 identityAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -231,6 +232,7 @@ castAnswer p = case p of
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -278,6 +280,7 @@ aggressiveAnswer p = case p of
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
@@ -325,6 +328,7 @@ playLandAnswer p = case p of
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -362,14 +366,22 @@ randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
 randomAnswer p = case p of
   Prompt.Concede _ -> pure Concession.Continues
   -- CR 507.1: the one interpreter with a real generator, so the defending-player
-  -- choice is a genuine draw rather than the head of the list. S.pickPlayer keeps
+  -- choice is a genuine draw rather than the head of the list. S.pickFrom keeps
   -- an out-of-range draw total.
   Prompt.ChooseDefender _ _ candidates -> do
     g <- State.get
     let players = NonEmpty.toList candidates
         (i, g') = Random.uniformR (0, length players - 1) g
     State.put g'
-    pure (pickPlayer candidates i)
+    pure (pickFrom candidates i)
+  -- Same shape for mana sources: a random legal source, so a random game that
+  -- mixes a creature mana source with lands really does explore both (#12).
+  Prompt.ChooseManaSource _ _ candidates -> do
+    g <- State.get
+    let sources = NonEmpty.toList candidates
+        (i, g') = Random.uniformR (0, length sources - 1) g
+    State.put g'
+    pure (pickFrom candidates i)
   Prompt.DeclareAttackers _ _ ids -> do
     g <- State.get
     let (keep, g') = Random.uniformR (0, length ids) g
@@ -402,7 +414,7 @@ randomAnswer p = case p of
     let players = NonEmpty.toList order
         (i, g') = Random.uniformR (0, length players - 1) g
     State.put g'
-    pure (pickPlayer order i)
+    pure (pickFrom order i)
   Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
   Prompt.ChooseAction _ _ actions -> do
     g <- State.get
@@ -411,7 +423,7 @@ randomAnswer p = case p of
     State.put g'
     pure (pick actions (min (n - 1) (max 0 i)))
   Prompt.ChooseTargets _ _ _ sets ->
-    let pickFrom s = do
+    let pickFromSet s = do
           g <- State.get
           let xs = Set.toList s
               (i, g') = Random.uniformR (0, max 0 (length xs - 1)) g
@@ -419,7 +431,7 @@ randomAnswer p = case p of
           pure $ case drop (min (max 0 i) (max 0 (length xs - 1))) xs of
             h : _ -> Just h
             [] -> Nothing
-     in fmap (Map.mapMaybe id) (traverse pickFrom sets)
+     in fmap (Map.mapMaybe id) (traverse pickFromSet sets)
   Prompt.ChooseBasicLandTypes {} -> pure (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> pure Nothing
   Prompt.CastWhileSearching {} -> pure Nothing
@@ -447,8 +459,8 @@ randomAnswer p = case p of
 
 -- Total index into a turn order: an out-of-range draw falls back to the head,
 -- which the NonEmpty guarantees exists (no partial functions).
-pickPlayer :: NonEmpty.NonEmpty PlayerId.PlayerId -> Int -> PlayerId.PlayerId
-pickPlayer order i = case drop i (NonEmpty.toList order) of
+pickFrom :: NonEmpty.NonEmpty a -> Int -> a
+pickFrom order i = case drop i (NonEmpty.toList order) of
   h : _ -> h
   [] -> NonEmpty.head order
 

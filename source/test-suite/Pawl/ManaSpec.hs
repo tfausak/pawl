@@ -1,10 +1,16 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 -- Covers Pawl.Mana: mana payment and castability.
 module Pawl.ManaSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
@@ -28,14 +34,17 @@ import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
@@ -54,6 +63,23 @@ resolvedCreature land creature nLands =
 singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Modal.Modal card
 singleModeAbility effects specs =
   Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs)) (ModeSelection.ChooseExactly 1)
+
+-- Answers Prompt.ChooseManaSource with `wanted` whenever it is on offer, and
+-- defers everything else to S.identityAnswer. Its sibling avoids that source
+-- instead: between them they prove the ANSWER is what decides, rather than the
+-- order Mana.manaSources happens to return (#12).
+prefersSource :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+prefersSource wanted p = case p of
+  Prompt.ChooseManaSource _ _ candidates ->
+    if elem wanted (NonEmpty.toList candidates) then wanted else NonEmpty.head candidates
+  _ -> S.identityAnswer p
+
+avoidsSource :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+avoidsSource unwanted p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> case filter (/= unwanted) (NonEmpty.toList candidates) of
+    h : _ -> h
+    [] -> NonEmpty.head candidates
+  _ -> S.identityAnswer p
 
 castabilityTests :: Registry.Type.Registry -> Tasty.TestTree
 castabilityTests registry =
@@ -135,13 +161,15 @@ manaTests registry =
       HU.testCase "no Mountains cannot pay {1}{R}" $ do
         mountain <- Registry.printing registry "Mountain"
         HU.assertBool "unaffordable" (not (Mana.canPay S.alice pikerCost (S.landsInPlay mountain 0))),
+      -- Three identical Mountains: every candidate is a copy of the same card, so
+      -- the choice is genuinely indistinguishable and payCost must NOT ask (#12).
+      -- S.identityAnswer would answer anyway; what this pins is the tap count.
       HU.testCase "paying {1}{R} taps exactly two of three Mountains and leaves no float" $ do
         mountain <- Registry.printing registry "Mountain"
-        case Mana.payCost S.alice pikerCost (S.landsInPlay mountain 3) of
-          Nothing -> HU.assertFailure "three Mountains should pay {1}{R}"
-          Just after -> do
-            HU.assertEqual "tapped" 2 (S.tappedCount S.alice after)
-            HU.assertEqual "no float" 0 (poolSize S.alice after),
+        let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 3) (Mana.payCost S.alice pikerCost)
+        HU.assertBool "three Mountains should pay {1}{R}" paid
+        HU.assertEqual "tapped" 2 (S.tappedCount S.alice after)
+        HU.assertEqual "no float" 0 (poolSize S.alice after),
       HU.testCase "CR 500.4 mana pools empty" $ do
         mountain <- Registry.printing registry "Mountain"
         let gs = S.landsInPlay mountain 1
@@ -239,6 +267,43 @@ manaTests registry =
         HU.assertEqual "alice controls the Elves" (Just S.alice) (Projection.controllerOf elfId resolved)
         HU.assertBool "it has haste" (Projection.hasKeyword Keyword.Haste elfId resolved)
         HU.assertBool "so she may tap it for mana this turn" (elem elfId (Mana.manaSources S.alice resolved)),
+      -- CR 601.2g / 602.1: WHICH sources to activate is the player's choice, and
+      -- pawl's second invariant is that the engine never makes one. A Forest and a
+      -- Llanowar Elves both pay {G}, but they are not interchangeable -- tapping
+      -- the Elf spends a creature that could otherwise block -- so the choice must
+      -- be asked, and the answer must be honoured (#12).
+      HU.testCase "CR 601.2g paying {G} with a Forest AND a Llanowar Elves asks which to tap" $ do
+        forest <- Registry.printing registry "Forest"
+        llanowarElves <- Registry.printing registry "Llanowar Elves"
+        let base0 = S.landsInPlay forest 1
+            (elfId, base1) = S.addCreature llanowarElves S.alice base0
+            gs = S.runPure S.identityAnswer base1 (Engine.settleAll S.alice)
+            green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
+            cost = Cost.Type.MkCost (Just green) []
+            tappedElf g = fmap Object.tapped (Game.lookupObject elfId g)
+        HU.assertEqual "asked to tap the Elf, it is tapped" (Just TapState.Tapped) (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay S.alice elfId cost)))
+        HU.assertEqual "asked to spare the Elf, it is untapped" (Just TapState.Untapped) (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay S.alice elfId cost))),
+      -- The other half of the invariant, and the reason the elision is legal at
+      -- all: three untapped Forests are copies of ONE card, so there is nothing to
+      -- decide and pawl must NOT ask. Counting the prompts is the direct
+      -- assertion; the tap-count test above only pins the outcome.
+      HU.testCase "CR 601.2g identical sources are indistinguishable, so no choice is asked" $ do
+        forest <- Registry.printing registry "Forest"
+        llanowarElves <- Registry.printing registry "Llanowar Elves"
+        let green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
+            countingAnswer :: Prompt.Prompt r -> State.State Int r
+            countingAnswer p = case p of
+              Prompt.ChooseManaSource _ _ candidates -> do
+                State.modify' (+ 1)
+                pure (NonEmpty.head candidates)
+              _ -> pure (S.identityAnswer p)
+            promptsFor g = State.execState (Engine.runGame countingAnswer g (Mana.payCost S.alice green)) 0
+            threeForests = S.landsInPlay forest 3
+            (elfBoard, mixed) = S.addCreature llanowarElves S.alice (S.landsInPlay forest 1)
+            settledMixed = S.runPure S.identityAnswer mixed (Engine.settleAll S.alice)
+        HU.assertBool "the mixed board really does hold the Elf as a source" (elem elfBoard (Mana.manaSources S.alice settledMixed))
+        HU.assertEqual "three identical Forests: nothing to ask" 0 (promptsFor threeForests)
+        HU.assertEqual "a Forest beside an Elf: one real decision" 1 (promptsFor settledMixed),
       HU.testCase "mana from a controlled permanent goes to its controller, not owner" $ do
         llanowarElves <- Registry.printing registry "Llanowar Elves"
         let (oid, base) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)

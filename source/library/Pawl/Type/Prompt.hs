@@ -73,6 +73,16 @@ data Prompt r where
   -- choice exist only in a multiplayer game; a two-player game gets its defending
   -- player from CR 506.2's second sentence with nothing to ask.
   ChooseDefender :: Decider -> PlayerId -> NonEmpty PlayerId -> Prompt PlayerId
+  -- CR 601.2g / 602.1: which mana source to activate next while paying a cost.
+  -- Asked once per source tapped, so a cost needing two mana asks twice against a
+  -- shrinking candidate list.
+  --
+  -- NOT asked when every candidate is a copy of the SAME card: two untapped
+  -- Forests are genuinely indistinguishable, and CLAUDE.md's second invariant
+  -- permits eliding a choice only in exactly that case. A Forest beside a Llanowar
+  -- Elves is a real decision -- tapping the Elf spends a creature that could
+  -- otherwise block -- and is asked (#12).
+  ChooseManaSource :: Decider -> PlayerId -> NonEmpty ObjectId -> Prompt ObjectId
   -- CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
   -- attack. WHOM they attack is not asked here: the defending player was already
   -- chosen at the beginning of combat step (Prompt.ChooseDefender), and CR 508.1b

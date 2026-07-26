@@ -1,11 +1,15 @@
 module Pawl.Mana where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.Class as Trans
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
@@ -15,6 +19,7 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Mana (Mana)
@@ -30,6 +35,8 @@ import qualified Pawl.Type.ManaUnit as ManaUnit
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.Prompt as Prompt
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
@@ -238,14 +245,65 @@ spend cost (Mana.MkMana units) =
 -- The engine makes no player choices; strategy belongs to the interpreter. The
 -- moment sources differ in any way a player could care about, this must become a
 -- real Prompt (#12).
-payCost :: PlayerId -> ManaCost -> GameState -> Maybe GameState
-payCost pid cost gs =
+-- CR 601.2g / 602.1: pay a mana cost, asking the player WHICH sources to
+-- activate. Returns whether it was paid; on failure nothing is spent, because a
+-- half-paid cost is not a state the rules have (the reject-not-repair posture
+-- Cast and Activate already take).
+--
+-- One prompt per source tapped, against a shrinking candidate list, rather than
+-- one prompt for a whole subset: a cost needing {G}{G} is two decisions, and the
+-- second is made knowing the first.
+payCost :: PlayerId -> ManaCost -> Game Bool
+payCost pid cost = do
+  before <- State.get
+  paid <- tapUntilPaid
+  Monad.unless paid (State.put before)
+  pure paid
+  where
+    tapUntilPaid = do
+      gs <- State.get
+      case spend cost (poolOf pid gs) of
+        Just left -> do
+          State.put (setPool pid left gs)
+          pure True
+        Nothing -> case manaSources pid gs of
+          [] -> pure False
+          candidate : rest -> do
+            oid <- chooseSource pid (candidate NonEmpty.:| rest) gs
+            State.put (tapForMana oid gs)
+            tapUntilPaid
+
+-- Which source to tap next. Asked, unless every candidate is a copy of the SAME
+-- card -- two untapped Forests are genuinely indistinguishable, and CLAUDE.md's
+-- second invariant permits eliding a choice in exactly that case and no other.
+--
+-- Card identity is the discriminator, and it is a PROXY rather than the whole
+-- truth: two copies of one card could in principle differ in some state a player
+-- cares about. Every difference the current pool can produce -- tapped, summoning
+-- sick, damaged -- either removes the object from manaSources entirely or cannot
+-- matter to a mana source, so the proxy is exact here. It errs in the safe
+-- direction: an unnecessary prompt is a wasted question, a missing one is the
+-- engine choosing for the player.
+chooseSource :: PlayerId -> NonEmpty.NonEmpty ObjectId -> GameState -> Game ObjectId
+chooseSource pid candidates gs =
+  let cards = fmap (\oid -> Game.cardOf oid gs) (NonEmpty.toList candidates)
+      allAlike = all (== NonEmpty.head (NonEmpty.fromList cards)) cards
+   in if allAlike
+        then pure (NonEmpty.head candidates)
+        else Trans.lift (Program.prompt (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates))
+
+-- CR 118.3: can this cost be paid at all? Pure, because Action.legalActions asks
+-- it while merely ENUMERATING actions, where prompting would be absurd. The
+-- greedy walk is sound for the question it answers: every mana source in this
+-- pool produces exactly one mana of one type (a source offering a colour CHOICE
+-- is #124), so the order they are tapped in cannot change WHETHER the cost is
+-- affordable -- only which permanents end up tapped, which is payCost's business
+-- and the player's choice.
+canPay :: PlayerId -> ManaCost -> GameState -> Bool
+canPay pid cost gs =
   let tapUntilPaid remaining state = case spend cost (poolOf pid state) of
-        Just left -> Just (setPool pid left state)
+        Just _ -> True
         Nothing -> case remaining of
-          [] -> Nothing
+          [] -> False
           oid : rest -> tapUntilPaid rest (tapForMana oid state)
    in tapUntilPaid (manaSources pid gs) gs
-
-canPay :: PlayerId -> ManaCost -> GameState -> Bool
-canPay pid cost gs = Maybe.isJust (payCost pid cost gs)
