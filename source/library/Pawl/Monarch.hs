@@ -28,6 +28,7 @@ import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
+import qualified Pawl.Type.MonarchWatch as MonarchWatch
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Phase as Phase
 import Pawl.Type.PlayerId (PlayerId)
@@ -176,25 +177,42 @@ placeInherent controller ability provided = do
 -- its controller's departure. Palace Jailer's own ruling agrees the watch is not
 -- tied to the source object.
 --
--- The due test is a STATE check where the card's ruling asks for an EVENT -- a new
--- monarch being crowned who is an opponent, not merely an opponent currently
--- holding the crown. Reachable at two players by ordering Palace Jailer's two
--- entry triggers (#171). The CR 725.4 departure path above is unaffected: a
--- reassignment IS a new monarch being crowned, so both readings agree there.
+-- The test is for an EVENT, not a state: a new monarch being CROWNED who is an
+-- opponent, not merely an opponent currently holding the crown. The card's ruling
+-- draws that line itself -- "If you're not the monarch as Palace Jailer's second
+-- ability resolves, the creature will be exiled until there's a new monarch and
+-- that player is one of your opponents. The creature won't immediately return
+-- just because an opponent is the monarch" -- and its companion ruling says the
+-- game "will continue to watch for the next time an opponent becomes the
+-- monarch". Ordering Palace Jailer's two entry triggers (CR 603.3b) reaches the
+-- difference at two seats.
+--
+-- No monarch-change event is hooked, for the same reason the CR 302.6 continuity
+-- check samples: GameState.events is cleared at turn handoff, and this watch
+-- outlives any number of turns. So each entry carries the monarch it last saw and
+-- the comparison is made here. A crown passing to the controller THEMSELVES
+-- discharges nothing but does move the baseline, so the same opponent retaking it
+-- later still reads as a new monarch being crowned.
+--
+-- Nothing is a legitimate baseline, not a missing value: CR 725.1 starts the game
+-- with no monarch, and the first player ever crowned is a change like any other.
 returnExiledForMonarch :: Game Bool
 returnExiledForMonarch = do
   gs <- State.get
-  case GameState.monarch gs of
-    Nothing -> pure False
-    Just m ->
-      let due = Map.keys (Map.filter (/= m) (GameState.exiledUntilMonarch gs))
-       in if null due
-            then pure False
-            else do
-              Monad.forM_ due $ \oid -> do
-                _ <- Event.changeZoneReturning oid Zone.Battlefield
-                State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g)})
-              pure True
+  let m = GameState.monarch gs
+      -- Unchanged crown: nothing to decide, and the baseline is already right.
+      changed watch = MonarchWatch.lastMonarch watch /= m
+      opponentHolds watch = m /= Just (MonarchWatch.controller watch)
+      due = Map.keys (Map.filter (\w -> changed w && opponentHolds w) (GameState.exiledUntilMonarch gs))
+      rebase watch = if changed watch then watch {MonarchWatch.lastMonarch = m} else watch
+  State.modify' (\g -> g {GameState.exiledUntilMonarch = fmap rebase (GameState.exiledUntilMonarch g)})
+  if null due
+    then pure False
+    else do
+      Monad.forM_ due $ \oid -> do
+        _ <- Event.changeZoneReturning oid Zone.Battlefield
+        State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g)})
+      pure True
 
 -- CR 725.4: "If the monarch leaves the game, the active player becomes the
 -- monarch at the same time as that player leaves the game. If the active player

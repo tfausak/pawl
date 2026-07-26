@@ -21,6 +21,7 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
+import qualified Pawl.Monarch as Monarch
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Resolve as Resolve
@@ -1619,6 +1620,70 @@ becomeMonarchTests registry =
         HU.assertBool "a BecameMonarch event was recorded" (elem (GameEvent.BecameMonarch S.alice) (GameState.events after))
     ]
 
+-- Palace Jailer's ruling (Scryfall, 2021-03-19): "If you're not the monarch as
+-- Palace Jailer's second ability resolves, the creature will be exiled until
+-- there's a new monarch and that player is one of your opponents. The creature
+-- won't immediately return just because an opponent is the monarch." A companion
+-- ruling fixes the same reading from the other side: "Palace Jailer leaving the
+-- battlefield won't cause the exiled creature to return. The game will continue
+-- to watch for the NEXT TIME an opponent becomes the monarch."
+--
+-- So the watch is for an EVENT -- a new monarch being crowned who is an opponent
+-- -- not for the STATE "an opponent currently holds the crown".
+exileUntilMonarchTests :: Registry.Type.Registry -> Tasty.TestTree
+exileUntilMonarchTests registry =
+  Tasty.testGroup
+    "ExileUntilMonarch"
+    [ -- Reachable at two seats: CR 603.3b lets alice order Palace Jailer's two
+      -- entry triggers, so the exile can resolve BEFORE she becomes the monarch,
+      -- while bob still holds the crown.
+      HU.testCase "CR 725 an exile that resolves while an opponent is already the monarch does not return at once" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, base0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+            base = base0 {GameState.monarch = Just S.bob}
+            slot = SlotName.MkSlotName (Text.pack "target")
+            exile =
+              Resolve.applyEffect
+                S.noSource
+                S.alice
+                Map.empty
+                (Map.singleton slot True)
+                (Map.singleton slot (Recipient.ToCreature oid))
+                (Effect.ExileUntilMonarch slot)
+            exiled = snd (Engine.runGamePure S.identityAnswer base exile)
+            settled = snd (Engine.runGamePure S.identityAnswer exiled Monarch.returnExiledForMonarch)
+        HU.assertEqual "the watch was registered" 1 (Map.size (GameState.exiledUntilMonarch exiled))
+        HU.assertEqual "bob is still the monarch, unchanged" (Just S.bob) (GameState.monarch settled)
+        HU.assertEqual "nothing came back to the battlefield" 0 (Set.size (GameState.battlefield settled))
+        HU.assertEqual "and the watch is still armed" 1 (Map.size (GameState.exiledUntilMonarch settled)),
+      -- The whole arc, still two seats. The crown must actually CHANGE HANDS to an
+      -- opponent before the creature comes back, and alice taking it herself in
+      -- between must not discharge the watch.
+      HU.testCase "CR 725 the exile returns when a NEW monarch is crowned who is an opponent" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (oid, base0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+            base = base0 {GameState.monarch = Just S.bob}
+            slot = SlotName.MkSlotName (Text.pack "target")
+            exile =
+              Resolve.applyEffect
+                S.noSource
+                S.alice
+                Map.empty
+                (Map.singleton slot True)
+                (Map.singleton slot (Recipient.ToCreature oid))
+                (Effect.ExileUntilMonarch slot)
+            exiled = snd (Engine.runGamePure S.identityAnswer base exile)
+            -- Palace Jailer's OTHER entry trigger: alice takes the crown. She is
+            -- not her own opponent, so this must not return the creature.
+            alicesCrown = snd (Engine.runGamePure S.identityAnswer exiled {GameState.monarch = Just S.alice} Monarch.returnExiledForMonarch)
+            -- bob deals combat damage to the monarch (CR 725.3) and takes it back.
+            bobsCrown = snd (Engine.runGamePure S.identityAnswer alicesCrown {GameState.monarch = Just S.bob} Monarch.returnExiledForMonarch)
+        HU.assertEqual "alice holding the crown does not discharge the watch" 1 (Map.size (GameState.exiledUntilMonarch alicesCrown))
+        HU.assertEqual "nor return the creature" 0 (Set.size (GameState.battlefield alicesCrown))
+        HU.assertEqual "bob retaking it does return the creature" 1 (Set.size (GameState.battlefield bobsCrown))
+        HU.assertEqual "and discharges the watch" 0 (Map.size (GameState.exiledUntilMonarch bobsCrown))
+    ]
+
 -- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
 -- (GainKeyword Haste) together end to end -- cast, resolve, attack, revert.
 actOfTreasonTests :: Registry.Type.Registry -> Tasty.TestTree
@@ -1644,4 +1709,4 @@ actOfTreasonTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, createEmblemTests registry, becomeMonarchTests registry, actOfTreasonTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]

@@ -12,6 +12,7 @@ import Pawl.Type.Decider (Decider)
 import Pawl.Type.DelayedTrigger (DelayedTrigger)
 import Pawl.Type.GameEvent (GameEvent)
 import Pawl.Type.Mana (Mana)
+import Pawl.Type.MonarchWatch (MonarchWatch)
 import Pawl.Type.Object (Object)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Phase (Phase)
@@ -130,9 +131,11 @@ data GameState = MkGameState
     -- not Player, because it is one designation, not a per-player counter.
     monarch :: Maybe PlayerId,
     -- CR 725 (Palace Jailer): objects exiled "until an opponent becomes the
-    -- monarch", keyed by the exiled incarnation id to the effect's controller
-    -- (whose opponent taking the crown ends the exile). Not an Expiry: the Expiry
-    -- sweeps are delete-and-recompute and cannot perform the return zone change.
-    exiledUntilMonarch :: Map ObjectId PlayerId
+    -- monarch", keyed by the exiled incarnation id to the watch that ends the
+    -- exile -- the effect's controller, plus the monarch as of the last look, so
+    -- that a CHANGE of crown can be told from an opponent merely holding it (see
+    -- MonarchWatch). Not an Expiry: the Expiry sweeps are delete-and-recompute
+    -- and cannot perform the return zone change.
+    exiledUntilMonarch :: Map ObjectId MonarchWatch
   }
   deriving (Eq, Show)
