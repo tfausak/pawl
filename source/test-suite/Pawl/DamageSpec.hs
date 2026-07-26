@@ -12,6 +12,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Departure as Departure
@@ -19,8 +20,10 @@ import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
+import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Affected as Affected
@@ -314,6 +317,35 @@ toxicTests registry =
                 after = S.runCombat S.aggressiveAnswer gs
             HU.assertEqual "toxic 2 twice is four poison" 4 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
             HU.assertEqual "and three damage twice" (Just 14) (S.lifeOf S.bob after),
+      -- Two Aspirant's Ascents on one Branchblight Stalker: toxic 2 printed plus
+      -- toxic 1 granted twice is a total toxic value of 4 (CR 702.164b sums N
+      -- over every toxic ability, and rule 702.164 has no redundancy clause of
+      -- the CR 702.3c/702.9c kind). The falsifier is a projection that keeps
+      -- keywords in a set, where the second toxic 1 collapses into the first and
+      -- bob takes 3 poison instead of 4.
+      --
+      -- The same two casts grant flying twice, which CR 702.9c DOES make
+      -- redundant: the Stalker simply flies, and bob (with no creatures) is not
+      -- blocking either way.
+      HU.testCase "CR 702.164b two Aspirant's Ascents make Branchblight Stalker toxic 4" $ do
+        stalker <- Registry.printing registry "Branchblight Stalker"
+        island <- Registry.printing registry "Island"
+        ascent <- Registry.printing registry "Aspirant's Ascent"
+        let (gs0, attackers, _) = S.combatBoardOf [stalker] []
+        case attackers of
+          [] -> HU.assertFailure "fixture should have an attacker"
+          attacker : _ -> do
+            let withIsland g = snd (S.addCreature island S.alice g)
+                castAscent g =
+                  let (oid, g1) = S.addHandCard ascent S.alice g
+                      g2 = g1 {GameState.priority = Just S.alice}
+                   in S.runPure S.identityAnswer g2 (Cast.castSpell S.alice oid Monad.>> Stack.resolveTop)
+                gs = castAscent (castAscent (withIsland (withIsland gs0)))
+                after = S.fightWith S.aggressiveAnswer gs
+            HU.assertEqual "toxic 2 plus toxic 1 twice" 4 (Projection.totalToxic attacker gs)
+            HU.assertBool "CR 702.9c: two flying grants still just fly" (Projection.hasKeyword Keyword.Flying attacker gs)
+            HU.assertEqual "bob has four poison" 4 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+            HU.assertEqual "and took the 3/1 Stalker's twice-pumped five damage" (Just 15) (S.lifeOf S.bob after),
       -- CR 615.6: a prevented event never happens, so no combat damage was
       -- "dealt to a player" for CR 120.3g to hang poison off. The falsifier is a
       -- toxic implementation that reads the rider off the event batch instead of

@@ -31,13 +31,12 @@ data Card = MkCard
     -- Only creatures have these.
     power :: Maybe Power,
     toughness :: Maybe Toughness,
-    -- CR 702. A Set because CR 702.9c and 702.3c say multiple instances are
-    -- redundant -- a per-keyword fact, true of everything through M2c, and NOT
-    -- true out in the tail (two Wards both trigger; Rampage stacks).
-    --
-    -- The tail has arrived, partly: CR 702.164b's toxic SUMS rather than being
-    -- redundant, which the Set handles for distinct values (toxic 2 and toxic 1
-    -- are distinct members) and gets wrong for equal ones (#224).
+    -- CR 702. A Set because this is PRINTED text: a card names each keyword
+    -- ability it has once, so there is no printed multiplicity to lose. Where
+    -- multiplicity does arise -- the same ability twice, once printed and once
+    -- granted, which CR 702.164b's toxic SUMS rather than treating as redundant
+    -- (contrast CR 702.3c/702.9c) -- it arises after the layer fold, and
+    -- Pawl.Type.ProjectedCharacteristics.keywords counts it there.
     --
     -- The closed half must read this through Pawl.Projection.keywordsOf, never
     -- directly: layer 6 grants and removes abilities at M3.

@@ -88,7 +88,7 @@ zeroToughness pc =
 destroyedBySba :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool
 destroyedBySba gs pc oid =
   let isCreature = Set.member CardType.Creature (PC.cardTypes pc)
-      indestructible = Set.member Keyword.Indestructible (PC.keywords pc)
+      indestructible = Map.member Keyword.Indestructible (PC.keywords pc)
    in isCreature && not indestructible && case PC.toughness pc of
         Nothing -> False
         Just toughness ->
