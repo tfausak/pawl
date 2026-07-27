@@ -36,10 +36,18 @@
         "effects": [
           {
             "type": "Draw",
-            "value": {
-              "type": "Literal",
-              "value": 2
-            }
+            "value": [
+              {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              },
+              {
+                "type": "Literal",
+                "value": 2
+              }
+            ]
           }
         ],
         "targetSpecs": []

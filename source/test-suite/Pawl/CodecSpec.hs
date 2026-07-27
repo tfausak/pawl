@@ -233,6 +233,11 @@ tests registry =
           HU.testCase "GainPlayerCounters" $ do
             roundTrip "gpc" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
             roundTrip "gpc slot" Codec.effectToJson Codec.jsonToEffect (Effect.GainPlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) PlayerCounterKind.Poison (Quantity.Literal 3)),
+          -- Both of Draw's proven PlayerRef shapes: Divination's controller draw
+          -- and Ancestral Recall's targeted one (#272).
+          HU.testCase "Draw" $ do
+            roundTrip "draw" Codec.effectToJson Codec.jsonToEffect (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
+            roundTrip "draw slot" Codec.effectToJson Codec.jsonToEffect (Effect.Draw (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3)),
           HU.testCase "CreateEmblem" $ do
             piker <- Registry.printing registry "Goblin Piker"
             roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card piker)),

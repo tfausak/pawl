@@ -496,7 +496,8 @@ placeOne pending = do
           then pure legal
           else Trans.lift (Program.prompt (Prompt.ChooseModes decider controller abilId legal count))
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability
-      -- is placed. A mode with no target slots (Create/Draw) asks nothing.
+      -- is placed. A mode with no target slots (Create, or a Draw that names its
+      -- drawer without targeting) asks nothing.
       let sets = Target.legalSets (Just controller) srcId (Modal.modesTargetSpecs chosenModes modal) gs
       chosen <-
         if Map.null sets

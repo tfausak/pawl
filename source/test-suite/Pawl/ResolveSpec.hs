@@ -1327,7 +1327,7 @@ fizzleTests registry =
             -- illegal (it's no longer a legal CreatureTarget), while the
             -- reserved slot -- never targeted -- stays vacuously legal.
             gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-            run = Resolve.resolveEffects abilId source [Effect.Destroy targetSlot Regenerability.Regenerable, Effect.Draw (Quantity.Literal 1)] specs
+            run = Resolve.resolveEffects abilId source [Effect.Destroy targetSlot Regenerability.Regenerable, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)] specs
             after = snd (Engine.runGamePure S.identityAnswer gone run)
         HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
       HU.testCase "CR 704.5a a Bolt can end the game mid-step" $ do
@@ -1501,7 +1501,7 @@ zoneChangeTests registry =
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         HU.assertEqual "the enchantment left the battlefield" Nothing (Game.lookupObject ripId after)
         HU.assertEqual "one card in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob after)),
-      HU.testCase "CR 120 Divination draws its controller two cards" $ do
+      HU.testCase "CR 121.1 Divination draws its controller two cards" $ do
         island <- Registry.printing registry "Island"
         piker <- Registry.printing registry "Goblin Piker"
         divination <- Registry.printing registry "Divination"
@@ -1513,7 +1513,7 @@ zoneChangeTests registry =
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         HU.assertEqual "two cards drawn to hand" 2 (S.handSize S.alice after)
         HU.assertEqual "library emptied" [] (Game.zoneMembers Zone.Library S.alice after),
-      HU.testCase "CR 121.3 a Draw that outruns the library records the loss" $ do
+      HU.testCase "CR 121.4 a Draw that outruns the library records the loss" $ do
         island <- Registry.printing registry "Island"
         piker <- Registry.printing registry "Goblin Piker"
         divination <- Registry.printing registry "Divination"
@@ -1523,6 +1523,23 @@ zoneChangeTests registry =
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after)),
+      -- The card that proves Effect.Draw's recipient (#272): CR 121.1 says who
+      -- draws, and here that is the player the spell TARGETS (CR 601.2c), not
+      -- the controller who paid for it. Divination above is the same opcode
+      -- pointed at `Relative You`; the two together are the falsifier for a
+      -- Draw that always drew for its controller.
+      HU.testCase "CR 121.1 Ancestral Recall draws three cards for the player it targets, not its controller" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        ancestralRecall <- Registry.printing registry "Ancestral Recall"
+        let base = S.landsInPlay island 1
+            withLib = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.bob g)) base [1 .. (4 :: Int)]
+            (gs, spellId) = S.handOne ancestralRecall withLib
+            cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+        HU.assertEqual "three cards drawn to bob's hand" 3 (S.handSize S.bob after)
+        HU.assertEqual "one card left in bob's library" 1 (length (Game.zoneMembers Zone.Library S.bob after))
+        HU.assertEqual "alice drew nothing" 0 (S.handSize S.alice after),
       HU.testCase "CR 701.17 Tome Scour mills five from a target player's library" $ do
         island <- Registry.printing registry "Island"
         piker <- Registry.printing registry "Goblin Piker"

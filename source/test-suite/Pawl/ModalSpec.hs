@@ -40,6 +40,8 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
+import qualified Pawl.Type.PlayerRef as PlayerRef
+import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
@@ -251,14 +253,14 @@ modalReaderTests =
         let m =
               ModalT.MkModal
                 ( Seq.fromList
-                    [ Mode.MkMode (Seq.singleton (Effect.Draw (Quantity.Literal 1))) Map.empty,
-                      Mode.MkMode (Seq.singleton (Effect.Draw (Quantity.Literal 2))) Map.empty
+                    [ Mode.MkMode (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))) Map.empty,
+                      Mode.MkMode (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))) Map.empty
                     ]
                 )
                 (ModeSelection.ChooseExactly 1) ::
                 ModalT.Modal Card.Type.Card
             chosen = Set.singleton (ModeIndex.MkModeIndex 1)
-        HU.assertEqual "only mode 1's effect" [Effect.Draw (Quantity.Literal 2)] (Modal.modesEffects chosen m)
+        HU.assertEqual "only mode 1's effect" [Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)] (Modal.modesEffects chosen m)
         HU.assertEqual "selectionCount is the ChooseExactly count" 1 (Modal.selectionCount m)
     ]
 
