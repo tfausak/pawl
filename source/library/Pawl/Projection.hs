@@ -535,18 +535,31 @@ baseColorsOf card =
 manaCostColors :: Maybe ManaCost.ManaCost -> Set Color.Color
 manaCostColors mc = case mc of
   Nothing -> Set.empty
-  Just (ManaCost.MkManaCost symbols) -> Set.fromList (Maybe.mapMaybe symbolColor symbols)
+  Just (ManaCost.MkManaCost symbols) -> Set.fromList (concatMap symbolColors symbols)
 
 -- CR 202.2b: only a coloured mana symbol carries a colour ("Objects with no
 -- colored mana symbols in their mana costs are colorless"). Generic ({2}), {X},
 -- and the colourless symbol ({C}) carry none -- {C} is colourless mana, and
 -- CR 105.2c says colourless is not a colour.
-symbolColor :: ManaSymbol.ManaSymbol -> Maybe Color.Color
-symbolColor symbol = case symbol of
-  ManaSymbol.OfType (ManaType.Colored c) -> Just c
-  ManaSymbol.OfType ManaType.Colorless -> Nothing
-  ManaSymbol.Generic _ -> Nothing
-  ManaSymbol.Variable -> Nothing
+--
+-- A LIST, not a Maybe, because of CR 107.4e's last sentence: "A hybrid mana
+-- symbol is all of its component colors." Burning-Tree Emissary's {R/G}{R/G}
+-- makes it both red and green, not one or the other and not multicoloured-as-a-
+-- third-thing (CR 105.3: an object with two or more colours IS each of them).
+symbolColors :: ManaSymbol.ManaSymbol -> [Color.Color]
+symbolColors symbol = case symbol of
+  ManaSymbol.OfType (ManaType.Colored c) -> [c]
+  ManaSymbol.OfType ManaType.Colorless -> []
+  ManaSymbol.Hybrid a b -> Maybe.mapMaybe colorOfManaType [a, b]
+  ManaSymbol.Generic _ -> []
+  ManaSymbol.Variable -> []
+
+-- CR 105.2c: colourless is not a colour, so a colourless half of a hybrid symbol
+-- (CR 107.4e allows one) contributes none.
+colorOfManaType :: ManaType.ManaType -> Maybe Color.Color
+colorOfManaType manaType = case manaType of
+  ManaType.Colored c -> Just c
+  ManaType.Colorless -> Nothing
 
 -- affects evaluated against an object's BASE characteristics (used by
 -- source-liveness, which must not recurse into the projection it feeds).

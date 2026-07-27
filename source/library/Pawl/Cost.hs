@@ -380,6 +380,10 @@ applyAdjustments adjustments cost =
       genericOf symbol = case symbol of
         ManaSymbol.Generic n -> n
         ManaSymbol.OfType _ -> 0
+        -- CR 107.4e: a colour/colour hybrid is paid with one mana of a stated
+        -- type, so it is no part of the generic component CR 118.7a reductions
+        -- come off.
+        ManaSymbol.Hybrid _ _ -> 0
         -- Unreachable: CR 601.2b precedes 601.2f, so Mana.substituteX has
         -- already replaced every Variable before a total cost is computed. The
         -- match must be total, so a bare {X} contributes 0 generic.
@@ -387,6 +391,10 @@ applyAdjustments adjustments cost =
       isTyped symbol = case symbol of
         ManaSymbol.Generic _ -> False
         ManaSymbol.OfType _ -> True
+        -- Typed for this function's purpose: it survives the filter and keeps
+        -- its printed position, which is what "the printed typed symbols in
+        -- their original order" above promises.
+        ManaSymbol.Hybrid _ _ -> True
         -- Unreachable for the same reason genericOf's Variable arm is: kept
         -- (retained, not stripped) so that if it ever were reachable, a bare
         -- {X} would still be treated as typed and survive the filter below.

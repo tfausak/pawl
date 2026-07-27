@@ -1,0 +1,124 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Hybrid",
+      "value": [
+        {
+          "type": "Colored",
+          "value": {
+            "type": "Red"
+          }
+        },
+        {
+          "type": "Colored",
+          "value": {
+            "type": "Green"
+          }
+        }
+      ]
+    },
+    {
+      "type": "Hybrid",
+      "value": [
+        {
+          "type": "Colored",
+          "value": {
+            "type": "Red"
+          }
+        },
+        {
+          "type": "Colored",
+          "value": {
+            "type": "Green"
+          }
+        }
+      ]
+    }
+  ],
+  "name": "Burning-Tree Emissary",
+  "power": {
+    "type": "Literal",
+    "value": 2
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 2
+  },
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfEnters"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "AddMana",
+                "value": {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Red"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "AddMana",
+                "value": {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Green"
+                    }
+                  }
+                }
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Human"
+      },
+      {
+        "type": "Shaman"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

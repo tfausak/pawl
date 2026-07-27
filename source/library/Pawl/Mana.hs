@@ -112,6 +112,7 @@ subtypeMana subtype = case subtype of
   Subtype.Artificer -> Nothing
   Subtype.Troll -> Nothing
   Subtype.Nomad -> Nothing
+  Subtype.Shaman -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an
@@ -251,9 +252,19 @@ chooseManaType pid oid candidates gs = case candidates of
         then answer
         else NonEmpty.head candidates
 
-typedOf :: ManaSymbol -> Maybe ManaType
-typedOf symbol = case symbol of
-  ManaSymbol.OfType t -> Just t
+-- What one non-generic symbol demands: the SET of mana types that can satisfy it,
+-- and Nothing for a symbol that demands no particular type.
+--
+-- A set rather than a single type, because CR 107.4e's hybrid symbol "can be paid
+-- in one of two ways". A plain `{R}` is the singleton case, so both payment paths
+-- below read one shape and never case on hybrid-ness.
+--
+-- The set survives all the way to payment rather than collapsing to one type as
+-- the spell is announced, which CR 118.13a is what asks for (#261).
+demandOf :: ManaSymbol -> Maybe (Set.Set ManaType)
+demandOf symbol = case symbol of
+  ManaSymbol.OfType t -> Just (Set.singleton t)
+  ManaSymbol.Hybrid a b -> Just (Set.fromList [a, b])
   ManaSymbol.Generic _ -> Nothing
   ManaSymbol.Variable -> Nothing
 
@@ -261,6 +272,10 @@ genericOf :: ManaSymbol -> Natural
 genericOf symbol = case symbol of
   ManaSymbol.Generic n -> n
   ManaSymbol.OfType _ -> 0
+  -- CR 107.4e: a colour/colour hybrid is paid with one mana of a stated type, so
+  -- it contributes nothing to the generic count. ({2/B}'s "two mana of any type"
+  -- half is the reason that symbol is not this constructor -- see ManaSymbol.)
+  ManaSymbol.Hybrid _ _ -> 0
   -- Unreachable in payment: substituteX removes every Variable before canPay
   -- (Task 4). The match must be total, so a bare {X} counts as 0 generic.
   ManaSymbol.Variable -> 0
@@ -277,10 +292,35 @@ substituteX x (ManaCost.MkManaCost symbols) =
       ManaSymbol.Variable -> ManaSymbol.Generic x
       other -> other
 
-takeTyped :: [ManaUnit] -> ManaType -> Maybe [ManaUnit]
-takeTyped units wanted = case List.break (\u -> ManaUnit.manaType u == wanted) units of
-  (before, _ : after) -> Just (before <> after)
-  (_, []) -> Nothing
+-- Every way to remove one unit that satisfies `wanted`, one result per candidate
+-- unit. The branching point of the search below.
+removals :: Set.Set ManaType -> [ManaUnit] -> [[ManaUnit]]
+removals wanted units = Maybe.mapMaybe without (zip [0 :: Int ..] units)
+  where
+    without (i, u) =
+      if Set.member (ManaUnit.manaType u) wanted
+        then Just (take i units <> drop (i + 1) units)
+        else Nothing
+
+-- Spend one unit per demand, or Nothing if no assignment covers them all.
+--
+-- EXACT, by search, and not the fold this replaced. A greedy left-to-right match
+-- is correct only while every demand has exactly one option, because then the
+-- order it consumes units in cannot matter. CR 107.4e's hybrid breaks that:
+--
+--   pool {R}{G}, cost {R/G}{R} -- greedy hands the {R} unit to the hybrid, then
+--   the {R} demand fails with a {G} still in the pool. The assignment that works
+--   gives the hybrid the {G}.
+--
+-- So this backtracks: try each unit that could serve the first demand, recurse,
+-- and keep the first assignment that covers the rest. A mana cost is a handful of
+-- symbols, so the search is trivially small, and being exact means canPay's Hall
+-- condition and this never disagree about whether a cost is payable.
+spendDemands :: [ManaUnit] -> [Set.Set ManaType] -> Maybe [ManaUnit]
+spendDemands units demands = case demands of
+  [] -> Just units
+  wanted : rest ->
+    Maybe.listToMaybe (Maybe.mapMaybe (\left -> spendDemands left rest) (removals wanted units))
 
 takeAny :: [ManaUnit] -> a -> Maybe [ManaUnit]
 takeAny units _ = case units of
@@ -295,10 +335,10 @@ takeAny units _ = case units of
 spend :: ManaCost -> Mana -> Maybe Mana
 spend cost (Mana.MkMana units) =
   let ManaCost.MkManaCost symbols = cost
-      typed = Maybe.mapMaybe typedOf symbols
+      demands = Maybe.mapMaybe demandOf symbols
       generic = sum (fmap genericOf symbols)
    in do
-        afterTyped <- Monad.foldM takeTyped units typed
+        afterTyped <- spendDemands units demands
         afterGeneric <- Monad.foldM takeAny afterTyped [1 .. generic]
         pure (Mana.MkMana afterGeneric)
 
@@ -411,14 +451,24 @@ chooseSource pid candidates gs = case candidates of
 canPay :: PlayerId -> ManaCost -> GameState -> Bool
 canPay pid cost gs =
   let ManaCost.MkManaCost symbols = cost
-      typed = Maybe.mapMaybe typedOf symbols
+      demands = Maybe.mapMaybe demandOf symbols
       generic = sum (fmap genericOf symbols)
       Mana.MkMana units = poolOf pid gs
       supplies =
         fmap (Set.singleton . ManaUnit.manaType) units
           <> fmap (\oid -> Set.fromList (manaTypesOf oid gs)) (manaSources pid gs)
-      demandedIn wanted = length (filter (`Set.member` wanted) typed)
+      -- A demand belongs to the set W exactly when every type that could satisfy
+      -- it is in W -- `isSubsetOf`, where a single-type demand only needed
+      -- `member`. That is the whole generalization CR 107.4e's hybrid asks of
+      -- Hall's condition: the demand side gained option-sets, and the condition
+      -- is still "no set of demands outruns the supplies that could serve it".
+      demandedIn wanted = length (filter (`Set.isSubsetOf` wanted) demands)
       couldServe wanted = length (filter (not . Set.disjoint wanted) supplies)
       hallHolds wanted = demandedIn wanted <= couldServe wanted
-   in length supplies >= length typed + fromIntegral generic
-        && all (hallHolds . Set.fromList) (List.subsequences (List.nub typed))
+      -- Enumerated over TYPES, not over demands: taking W = the union of a
+      -- demand set's options recovers the worst case for that set, so subsets of
+      -- the demanded types cover every subset of demands. At most 2^6 by
+      -- CR 106.1b, unchanged by hybrids.
+      demandedTypes = Set.toList (Set.unions demands)
+   in length supplies >= length demands + fromIntegral generic
+        && all (hallHolds . Set.fromList) (List.subsequences demandedTypes)
