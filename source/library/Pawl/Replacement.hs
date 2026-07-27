@@ -410,7 +410,7 @@ choose gs event candidates = case candidates of
 
 -- Total index into a list, with a fallback.
 at :: [a] -> Natural -> a -> a
-at xs i fallback = case drop (fromIntegral i) xs of
+at xs i fallback = case List.genericDrop i xs of
   h : _ -> h
   [] -> fallback
 

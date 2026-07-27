@@ -78,6 +78,9 @@ library
     Pawl.Engine
     Pawl.Event
     Pawl.Expiry
+    Pawl.Extra.Int
+    Pawl.Extra.Integer
+    Pawl.Extra.Natural
     Pawl.Filter
     Pawl.Game
     Pawl.Json
@@ -276,6 +279,7 @@ test-suite pawl-test-suite
     Pawl.DepartureSpec
     Pawl.EventSpec
     Pawl.ExpirySpec
+    Pawl.ExtraSpec
     Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.JsonSpec

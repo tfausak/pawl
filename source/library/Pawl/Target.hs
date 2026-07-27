@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
@@ -149,5 +150,5 @@ fillableModes perspective source extra modal gs =
         let sets = legalSets perspective source (Map.union extra (Mode.targetSpecs m)) gs
          in if any Set.null (Map.elems sets)
               then Nothing
-              else Just (ModeIndex.MkModeIndex (fromIntegral i))
-   in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Int ..] ms))
+              else Just (ModeIndex.MkModeIndex i)
+   in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Natural ..] ms))

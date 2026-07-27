@@ -10,6 +10,7 @@ import qualified Data.Sequence as Seq
 import qualified Numeric.Natural
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.Decider as Decider
@@ -222,12 +223,12 @@ takeMulligan counts pid = do
   let count = MulliganOffer.taken offer + 1
       counted = MulliganOffer.bottomCount offer
   newHand <- State.gets (Game.zoneMembers Zone.Hand pid)
-  let n = min (fromIntegral counted) (length newHand)
+  let n = min counted (Natural.length newHand)
   bottomChosen <-
     if n > 0 && length newHand >= 2
       then do
         decider <- State.gets (Decide.deciderFor pid)
-        answer <- Trans.lift (Program.prompt (Prompt.Bottom decider pid newHand (fromIntegral n)))
+        answer <- Trans.lift (Program.prompt (Prompt.Bottom decider pid newHand n))
         -- CR 103.5: the cards bottomed come from THIS hand, and there are exactly
         -- `n` of them. Filtered, not trusted (#222); a short answer is topped up
         -- from the front of the hand rather than bottoming too few.
@@ -235,12 +236,12 @@ takeMulligan counts pid = do
         -- bottom it twice, and the second changeZone is a no-op on an id that has
         -- already moved -- so the hand would end up one card too big rather than
         -- visibly wrong.
-        let kept = take n (List.nub (filter (\oid -> List.elem oid newHand) answer))
-            topUp = take (n - length kept) (filter (\oid -> List.notElem oid kept) newHand)
+        let kept = List.genericTake n (List.nub (filter (\oid -> List.elem oid newHand) answer))
+            topUp = List.genericTake (n - Natural.length kept) (filter (\oid -> List.notElem oid kept) newHand)
         pure (kept <> topUp)
       else -- CR 103.5: with nothing to bottom (a free mulligan, CR 103.5c) or a
       -- hand of 0 or 1, there is exactly one possible outcome; where the rules
       -- leave nothing to ask, don't prompt -- bottom whatever `n` names.
-        pure (take n newHand)
+        pure (List.genericTake n newHand)
   Monad.forM_ bottomChosen (\oid -> Event.changeZone oid Zone.Library)
   pure (Map.insert pid count counts)

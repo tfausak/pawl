@@ -23,6 +23,7 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
@@ -128,7 +129,7 @@ counterBoard forest battlegrowth mine theirs =
 -- depend on the engine's canonical candidate order.
 raceAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 raceAnswer preferred victim p = case p of
-  Prompt.ChooseReplacement _ _ sources -> maybe 0 fromIntegral (List.elemIndex preferred sources)
+  Prompt.ChooseReplacement _ _ sources -> maybe 0 Int.toNaturalSaturating (List.elemIndex preferred sources)
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
   _ -> S.identityAnswer p
 

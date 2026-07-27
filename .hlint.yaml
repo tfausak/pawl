@@ -37,3 +37,23 @@
 # project is Haskell 2010 with only GADTs and RankNTypes permitted, so the
 # suggestion can never be applied.
 - ignore: {name: "Use tuple-section"}
+
+# Every one of these silently produces a wrong answer rather than failing:
+# fromIntegral wraps a too-large Natural into a negative Int, fromInteger
+# crashes outright on a negative Integer bound for a Natural, and toEnum crashes
+# off the end of an enumeration. Pawl.Extra.Int, Pawl.Extra.Integer and
+# Pawl.Extra.Natural hold the total replacements, each named for the type it
+# converts out of and each saying in its own name what happens at the boundary.
+- functions:
+  - name: fromIntegral
+    within: []
+    message: "Use Pawl.Extra.Int, Pawl.Extra.Integer, or Pawl.Extra.Natural."
+  - name: fromInteger
+    within: []
+    message: "Use Pawl.Extra.Integer."
+  - name: realToFrac
+    within: []
+    message: "Use Pawl.Extra, adding the conversion there if it is missing."
+  - name: toEnum
+    within: []
+    message: "Use a named total conversion, such as Data.Char.chr."

@@ -820,7 +820,7 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               | d /= 0
               ]
             grantOf (kind, n) = case kind of
-              CounterKind.Keyword kw -> replicate (fromIntegral n) (at Layer.Ability (Modification.GainKeyword kw))
+              CounterKind.Keyword kw -> List.genericReplicate n (at Layer.Ability (Modification.GainKeyword kw))
               CounterKind.PlusOnePlusOne -> []
               CounterKind.MinusOneMinusOne -> []
          in pt <> concatMap grantOf (Map.toList cs)

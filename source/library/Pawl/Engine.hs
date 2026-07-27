@@ -22,6 +22,8 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
+import qualified Pawl.Extra.Int as Int
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
@@ -235,10 +237,10 @@ discardToHandSize pid = do
     Nothing -> pure ()
     Just limit -> do
       let held = Game.zoneMembers Zone.Hand pid gs
-          excess = length held - fromIntegral limit
+          excess = length held - Natural.toIntSaturating limit
       Monad.when (excess > 0) $ do
         let decider = Decide.deciderFor pid gs
-        chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (fromIntegral excess)))
+        chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (Int.toNaturalSaturating excess)))
         let inHand oid = List.elem oid held
             toDiscard = take excess (filter inHand chosen)
         Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toDiscard
@@ -434,7 +436,7 @@ placePendingTriggers = do
       inherent = Monarch.inherentMonarchPending evs gs
   State.put
     gs
-      { GameState.scannedThrough = fromIntegral (Seq.length (GameState.events gs)),
+      { GameState.scannedThrough = Natural.length (GameState.events gs),
         GameState.delayedTriggers = surviving
       }
   ordered <- orderPending pending
@@ -482,7 +484,7 @@ placeOne pending = do
             Object.timestamp = ts
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
-  if Set.size legal < fromIntegral count
+  if Natural.length legal < count
     then -- CR 603.3c: fewer legal modes than the selection demands -- for
     -- ChooseExactly 1, no legal mode at all -- removes the ability.
       State.modify' (Resolve.cease abilId)
@@ -490,7 +492,7 @@ placeOne pending = do
       -- CR 700.2b: forced when there is nothing to choose (as many legal modes
       -- as the selection demands), prompted otherwise.
       chosenModes <-
-        if Set.size legal <= fromIntegral count
+        if Natural.length legal <= count
           then pure legal
           else Trans.lift (Program.prompt (Prompt.ChooseModes decider controller abilId legal count))
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability
@@ -567,8 +569,8 @@ orderFor gs pending pid = do
 permute :: [a] -> [Natural] -> [a]
 permute xs order =
   let canonical :: [Natural]
-      canonical = fmap fromIntegral (take (length xs) [0 :: Int ..])
-      at i = case drop (fromIntegral i) xs of
+      canonical = zipWith const [0 ..] xs
+      at i = case List.genericDrop i xs of
         h : _ -> Just h
         [] -> Nothing
    in if List.sort order == canonical
@@ -708,8 +710,8 @@ priorityLoop = do
                             case chosen of
                               Action.Type.Pass -> do
                                 let passes = GameState.passes gs + 1
-                                    playing = length (Game.stillPlaying gs)
-                                if passes >= fromIntegral playing
+                                    playing = Natural.length (Game.stillPlaying gs)
+                                if passes >= playing
                                   then case GameState.stack gs of
                                     [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
                                     _ -> do

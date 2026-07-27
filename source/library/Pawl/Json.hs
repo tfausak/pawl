@@ -7,6 +7,7 @@ module Pawl.Json where
 import qualified Data.Bifunctor as Bifunctor
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as LazyByteString
+import qualified Data.Char as Char
 import qualified Data.Functor.Identity as Identity
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
@@ -112,7 +113,7 @@ showHexChar c =
         if n == 0
           then if null acc then "0" else acc
           else go (div n 16) (hexDigit (mod n 16) : acc)
-   in go (fromEnum c) ""
+   in go (Char.ord c) ""
 
 -- Extraction helpers ---------------------------------------------------------
 
@@ -228,7 +229,9 @@ pEscape =
 pUnicode :: P Char
 pUnicode = do
   ds <- Parsec.count 4 Parsec.hexDigit
-  pure (toEnum (foldl (\acc d -> acc * 16 + hexVal d) 0 ds))
+  -- Char.chr is total here: Parsec.count 4 bounds the value at 0xffff, and
+  -- every code point up to that is a Char (surrogates included).
+  pure (Char.chr (foldl (\acc d -> acc * 16 + hexVal d) 0 ds))
 
 hexVal :: Char -> Int
 hexVal c = Maybe.fromMaybe 0 (lookup c (zip "0123456789abcdefABCDEF" ([0 .. 15] <> [10 .. 15])))
@@ -260,4 +263,4 @@ pExp = do
   signF . digitsToInteger <$> Parsec.many1 Parsec.digit
 
 digitsToInteger :: String -> Integer
-digitsToInteger = foldl (\acc c -> acc * 10 + toInteger (fromEnum c - fromEnum '0')) 0
+digitsToInteger = foldl (\acc c -> acc * 10 + toInteger (Char.ord c - Char.ord '0')) 0

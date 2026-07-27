@@ -10,6 +10,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
@@ -470,5 +471,5 @@ canPay pid cost gs =
       -- the demanded types cover every subset of demands. At most 2^6 by
       -- CR 106.1b, unchanged by hybrids.
       demandedTypes = Set.toList (Set.unions demands)
-   in length supplies >= length demands + fromIntegral generic
+   in Natural.length supplies >= Natural.length demands + generic
         && all (hallHolds . Set.fromList) (List.subsequences demandedTypes)

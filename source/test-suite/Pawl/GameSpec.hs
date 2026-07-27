@@ -13,6 +13,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Action as Action
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
@@ -22,6 +23,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
@@ -246,9 +248,9 @@ landState registry = do
 
 -- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With one land play per
 -- turn (CR 305.2) a player can never have more lands out than turns taken.
-turnsTaken :: PlayerId.PlayerId -> GameState.GameState -> Int
+turnsTaken :: PlayerId.PlayerId -> GameState.GameState -> Natural
 turnsTaken pid gs =
-  let total = fromIntegral (GameState.turnNumber gs)
+  let total = GameState.turnNumber gs
    in if pid == S.alice then (total + 1) `div` 2 else total `div` 2
 
 engineTests :: Registry.Type.Registry -> Tasty.TestTree
@@ -271,8 +273,8 @@ engineTests registry =
         gs <- landState registry
         HU.assertBool
           "no double land plays"
-          ( length (Game.zoneMembers Zone.Battlefield S.alice gs) <= turnsTaken S.alice gs
-              && length (Game.zoneMembers Zone.Battlefield S.bob gs) <= turnsTaken S.bob gs
+          ( Natural.length (Game.zoneMembers Zone.Battlefield S.alice gs) <= turnsTaken S.alice gs
+              && Natural.length (Game.zoneMembers Zone.Battlefield S.bob gs) <= turnsTaken S.bob gs
           )
     ]
 
@@ -333,7 +335,7 @@ recordingAnswer p = case p of
   Prompt.Shuffle ids -> pure ids
   Prompt.RandomFirstPlayer order -> pure (NonEmpty.head order)
   Prompt.ChooseTargets _ _ _ sets -> pure (Map.mapMaybe Set.lookupMin sets)
-  Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
+  Prompt.ChooseDiscard _ _ ids n -> pure (List.genericTake n ids)
   Prompt.ChooseAction _ pid actions -> do
     State.modify' (\asked -> asked <> [pid])
     let isCast a = case a of
@@ -346,15 +348,15 @@ recordingAnswer p = case p of
   Prompt.SearchLibrary {} -> pure Nothing
   Prompt.CastWhileSearching {} -> pure Nothing
   Prompt.ChooseX {} -> pure 0
-  Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
+  Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (List.genericTake count (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
-  Prompt.OrderTriggers _ _ sources -> pure (fmap fromIntegral (take (length sources) [0 :: Int ..]))
+  Prompt.OrderTriggers _ _ sources -> pure (zipWith const [0 ..] sources)
   Prompt.ChooseReplacement {} -> pure 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
+  Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (List.genericTake count candidates))
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
   Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> pure (take (fromIntegral count) hand)
+  Prompt.Bottom _ _ hand count -> pure (List.genericTake count hand)
   Prompt.MulliganAction {} -> pure Nothing
   Prompt.OpeningHandAction {} -> pure Nothing
 
@@ -1393,7 +1395,7 @@ slaveAnswer p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   -- Head is enough here: this interpreter exists to prove the DECIDER is honoured
   -- for ChooseAction under Mindslaver, and which land pays a cost is not part of
@@ -1413,15 +1415,15 @@ slaveAnswer p = case p of
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 

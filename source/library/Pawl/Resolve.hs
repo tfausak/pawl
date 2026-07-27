@@ -15,6 +15,8 @@ import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
+import qualified Pawl.Extra.Integer as Integer
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
@@ -574,7 +576,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- The applied effect IS the event (the M3a spec, section 4):
             -- constructing this DamageEvent and funneling it is the whole
             -- application. CR 120.3e / 120.3a live in applyDamage.
-            Damage.applyDamage [Damage.damageEvent gs DamageKind.Noncombat source recipient (fromInteger n)]
+            Damage.applyDamage [Damage.damageEvent gs DamageKind.Noncombat source recipient (Integer.toNaturalSaturating n)]
       _ -> pure ()
   Effect.ModifyTarget duration modification slot ->
     State.modify' $ \gs ->
@@ -778,7 +780,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         | n > 0 ->
             -- CR 120: draw n, folding the shared primitive so each draw re-reads the
             -- library top and the CR 121.3 empty-library loss is preserved.
-            Monad.replicateM_ (fromInteger n) (Event.drawCard controller)
+            Monad.replicateM_ (Integer.toIntSaturating n) (Event.drawCard controller)
       _ -> pure ()
   Effect.Mill slot quantity -> do
     gs <- State.get
@@ -791,7 +793,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             | n > 0 ->
                 -- CR 701.17/701.17b: top min(n, library) of the target's library to
                 -- their graveyard, funnelled so each move mints a new incarnation.
-                let topN = take (fromInteger n) (Game.zoneMembers Zone.Library target gs)
+                let topN = List.genericTake n (Game.zoneMembers Zone.Library target gs)
                  in Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) topN
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
@@ -808,14 +810,17 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                 let held = Game.zoneMembers Zone.Hand target gs
                     bury :: [ObjectId] -> Game ()
                     bury = Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard)
-                if fromInteger n >= length held
+                    -- The quantity as the count it is. `n > 0` above, so the
+                    -- clamp never decides anything here.
+                    count = Integer.toNaturalSaturating n
+                if count >= Natural.length held
                   -- CR 609.3: discarding the whole hand is "as much as possible," so
                   -- it is forced -- no choice, so no prompt.
                   then bury held
                   else do
                     -- CR 701.9b: the discarding player chooses which cards.
                     let decider = Decide.deciderFor target gs
-                    choices <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider target held (fromInteger n)))
+                    choices <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider target held count))
                     -- FILTERED AND COMPLETED, the posture PlayerSacrifices takes
                     -- below and for the same reason. Dropping the invalid picks is
                     -- not enough: this branch is reached only when the hand is
@@ -837,7 +842,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                     -- permutation of it, so the take always yields exactly n.
                     let valid = List.nub (filter (\c -> elem c held) choices)
                         filler = filter (\c -> List.notElem c valid) held
-                    bury (take (fromInteger n) (valid <> filler))
+                    bury (List.genericTake count (valid <> filler))
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
@@ -868,10 +873,13 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                             (Projection.controls victim gs)
                         )
                     decider = Decide.deciderFor victim gs
+                    -- The quantity as the count it is. `n > 0` above, so the
+                    -- clamp never decides anything here.
+                    count = Integer.toNaturalSaturating n
                 picked <-
-                  if length candidates <= fromInteger n
+                  if Natural.length candidates <= count
                     then pure (Set.fromList candidates)
-                    else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider victim source candidates (fromInteger n)))
+                    else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider victim source candidates count))
                 -- FILTERED AND COMPLETED, not merely filtered. Dropping the
                 -- invalid picks is not enough: Diabolic Edict is not "may", so an
                 -- interpreter answering with too few -- or with nothing -- would
@@ -884,10 +892,10 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                 -- they were offered. That differs from the cost path's
                 -- reject-not-repair on purpose: a cost may simply go unpaid, and
                 -- an effect has no such out.
-                let wanted = min (fromInteger n) (length candidates)
+                let wanted = min count (Natural.length candidates)
                     valid = filter (\oid -> Set.member oid picked) candidates
                     filler = filter (\oid -> List.notElem oid valid) candidates
-                Monad.mapM_ (Event.sacrifice victim) (take wanted (valid <> filler))
+                Monad.mapM_ (Event.sacrifice victim) (List.genericTake wanted (valid <> filler))
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
@@ -901,7 +909,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- CR 111: create n tokens with these characteristics under the
             -- effect's controller (CR 111.2), through the single funnel -- so CR
             -- 614's token replacements (Doubling Season) get their opportunity.
-            minted <- Event.createTokens controller card (fromInteger n)
+            minted <- Event.createTokens controller card (Integer.toNaturalSaturating n)
             case (mSlot, minted) of
               (Nothing, _) -> pure ()
               -- Unreachable: createTokens places every token onto the battlefield
@@ -1084,7 +1092,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
           -- CR 122.6: through the single funnel, so CR 614's counter replacements
           -- (Hardened Scales, Doubling Season) get their opportunity.
-          Just n -> Monad.when (n > 0) (Event.putCounters target kind (fromInteger n))
+          Just n -> Monad.when (n > 0) (Event.putCounters target kind (Integer.toNaturalSaturating n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
       -- CR 701.34a: "choose any number of permanents and/or players that have a
       -- counter, then give each one additional counter of each kind that permanent or
@@ -1177,7 +1185,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                     g
                       { GameState.players =
                           Map.adjust
-                            (\p -> p {Player.counters = Map.insertWith (+) kind (fromInteger n) (Player.counters p)})
+                            (\p -> p {Player.counters = Map.insertWith (+) kind (Integer.toNaturalSaturating n) (Player.counters p)})
                             pid
                             (GameState.players g)
                       }

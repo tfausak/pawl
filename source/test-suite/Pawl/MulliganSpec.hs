@@ -71,10 +71,10 @@ keepAnswer p = case p of
   _ -> S.identityAnswer p
 
 -- Mulligan while fewer than `k` taken, then keep. Bottom the first `count`.
-mulliganUpTo :: Int -> Prompt.Prompt r -> r
+mulliganUpTo :: Natural -> Prompt.Prompt r -> r
 mulliganUpTo k p = case p of
   Prompt.DeclareMulligan _ _ offer ->
-    if fromIntegral (MulliganOffer.taken offer) < k then MulliganDecision.Mulligan else MulliganDecision.Keep
+    if MulliganOffer.taken offer < k then MulliganDecision.Mulligan else MulliganDecision.Keep
   _ -> S.identityAnswer p
 
 run :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
@@ -162,7 +162,7 @@ orderedLibraryGame mountain printings =
 bottomReversedAnswer :: Prompt.Prompt r -> r
 bottomReversedAnswer p = case p of
   Prompt.DeclareMulligan _ pid offer -> if pid == S.alice && MulliganOffer.taken offer < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> reverse (take (fromIntegral count) hand)
+  Prompt.Bottom _ _ hand count -> reverse (List.genericTake count hand)
   _ -> S.identityAnswer p
 
 -- alice's library: a Serum Powder on top, then `n` Mountains; bob's is uniform
@@ -253,7 +253,7 @@ recordWindowRound p = case p of
   -- which here is the Powder the mulligan just drew -- it would land at the
   -- library bottom and round 2 would have nothing to offer, so the test would
   -- pass or fail on the fixture's draw order rather than on CR 103.5b.
-  Prompt.Bottom _ _ hand count -> pure (reverse (take (fromIntegral count) (reverse hand)))
+  Prompt.Bottom _ _ hand count -> pure (reverse (List.genericTake count (reverse hand)))
   _ -> pure (S.identityAnswer p)
 
 -- alice keeps at once; bob mulligans twice then keeps. Every window is

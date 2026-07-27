@@ -20,6 +20,7 @@ import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
+import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
@@ -687,16 +688,19 @@ assignmentLegalityTests =
 -- lethal and every over/under split.
 genLegalityCase :: QC.Gen (Map.Map Recipient.Recipient Natural.Natural, Natural.Natural, Map.Map Recipient.Recipient Natural.Natural)
 genLegalityCase = do
-  lethal <- QC.choose (0, 4) :: QC.Gen Integer
-  power <- QC.choose (0, 6) :: QC.Gen Integer
-  toBlocker <- QC.choose (0, 6) :: QC.Gen Integer
-  toDefender <- QC.choose (0, 6) :: QC.Gen Integer
+  -- Counts, not Integers: the generator's own bounds are what makes every
+  -- conversion below exact.
+  let count hi = fmap Integer.toNaturalSaturating (QC.choose (0, hi))
+  lethal <- count 4
+  power <- count 6
+  toBlocker <- count 6
+  toDefender <- count 6
   let blocker = Recipient.ToCreature (ObjectId.MkObjectId 1)
       thresholds :: Map.Map Recipient.Recipient Natural.Natural
-      thresholds = Map.fromList [(blocker, fromInteger lethal), (Recipient.ToPlayer S.bob, 0)]
+      thresholds = Map.fromList [(blocker, lethal), (Recipient.ToPlayer S.bob, 0)]
       answer :: Map.Map Recipient.Recipient Natural.Natural
-      answer = Map.fromList [(blocker, fromInteger toBlocker), (Recipient.ToPlayer S.bob, fromInteger toDefender)]
-  pure (thresholds, fromInteger power, answer)
+      answer = Map.fromList [(blocker, toBlocker), (Recipient.ToPlayer S.bob, toDefender)]
+  pure (thresholds, power, answer)
 
 -- Assigns each blocker exactly its threshold, and every leftover point to the
 -- defender. A legal trample division for these boards.

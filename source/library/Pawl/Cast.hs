@@ -10,6 +10,7 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.PlayerEffect as PlayerEffect
@@ -68,7 +69,7 @@ targetable pid oid gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card ->
     let count = Modal.selectionCount (Card.Type.spell card)
-     in Set.size (Target.fillableModes (Just pid) oid (Card.enchantSpecs card) (Card.Type.spell card) gs) >= fromIntegral count
+     in Natural.length (Target.fillableModes (Just pid) oid (Card.enchantSpecs card) (Card.Type.spell card) gs) >= count
 
 -- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
 -- affordable when it is payable with X=0 (the caster may always choose 0)
@@ -168,12 +169,12 @@ castSpell pid oid = do
       -- or a modal card whose only-just-fillable modes leave no real
       -- choice), #50.
       chosenModes <-
-        if Set.size legal <= fromIntegral count
+        if Natural.length legal <= count
           then pure legal
           else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid oid legal count))
       -- Reject-not-repair: an answer that is not a size-`count` subset of the
       -- legal modes makes the whole cast a no-op, guarding every step below.
-      Monad.when (Set.isSubsetOf chosenModes legal && Set.size chosenModes == fromIntegral count) $ do
+      Monad.when (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count) $ do
         -- CR 601.2b: the cost to be paid is announced after the modes and
         -- before X and targets. Only PAYABLE candidates are offered (CR
         -- 118.9b makes an alternative optional, so a player who can afford both

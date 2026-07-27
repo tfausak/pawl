@@ -1,5 +1,6 @@
 module Pawl.Keyword where
 
+import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -56,7 +57,7 @@ triggeredAbilitiesOf counts = concatMap (uncurry abilitiesFor) (Map.toAscList co
 -- The abilities one keyword, held `count` times, contributes.
 abilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card]
 abilitiesFor keyword count = case keyword of
-  Keyword.Poisonous n -> replicate (fromIntegral count) (poisonous n)
+  Keyword.Poisonous n -> List.genericReplicate count (poisonous n)
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -100,4 +101,4 @@ poisonous n =
       Effect.GainPlayerCounters
         (PlayerRef.InSlot Binding.triggerPlayer)
         PlayerCounterKind.Poison
-        (Quantity.Literal (fromIntegral n))
+        (Quantity.Literal (toInteger n))

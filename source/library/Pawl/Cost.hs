@@ -17,6 +17,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
@@ -211,7 +212,7 @@ canPayComponent pid oid component gs = case component of
   -- CR 118.10's "each payment of a cost applies to only one spell, ability, or
   -- effect" is not enforced across two components of ONE cost (#104).
   CostComponent.Sacrifice n criterion ->
-    length (sacrificeCandidates pid criterion gs) >= fromIntegral n
+    Natural.length (sacrificeCandidates pid criterion gs) >= n
   -- CR 601.2f: payable only if the hand holds at least that many cards.
   --
   -- `oid` is excluded, and that is CR 601.2a, not a convenience: "the card …
@@ -223,7 +224,7 @@ canPayComponent pid oid component gs = case component of
   -- read as payable and the Reunion could discard itself. The exclusion is a
   -- no-op the moment #89 lands.
   CostComponent.DiscardCards n ->
-    length (discardCandidates pid oid gs) >= fromIntegral n
+    Natural.length (discardCandidates pid oid gs) >= n
   -- CR 107.14 / CR 118.6: payable only if the player has at least that many
   -- energy counters. The bidirectional proof: GainPlayerCounters (P10 #37)
   -- adds energy, this component spends it.
@@ -308,10 +309,10 @@ payComponent pid oid component = case component of
     let candidates = sacrificeCandidates pid criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
-      if length candidates <= fromIntegral n
+      if Natural.length candidates <= n
         then pure (Set.fromList candidates)
         else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider pid oid candidates n))
-    if Set.isSubsetOf chosen (Set.fromList candidates) && Set.size chosen == fromIntegral n
+    if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
         pure Payment.Paid
@@ -346,11 +347,11 @@ payComponent pid oid component = case component of
     let held = discardCandidates pid oid gs
         decider = Decide.deciderFor pid gs
     chosen <-
-      if length held <= fromIntegral n
+      if Natural.length held <= n
         then pure held
         else Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held n))
     let distinct = List.nub chosen
-    if all (\c -> List.elem c held) distinct && length distinct == fromIntegral n
+    if all (\c -> List.elem c held) distinct && Natural.length distinct == n
       then do
         Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) distinct
         pure Payment.Paid
