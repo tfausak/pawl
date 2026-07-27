@@ -538,6 +538,7 @@ filterToJson filter_ = case filter_ of
   Filter.ControlledBy r -> Json.tagged (Text.pack "ControlledBy") (Just (playerRelationToJson r))
   Filter.IsPlayer r -> Json.tagged (Text.pack "IsPlayer") (Just (playerRelationToJson r))
   Filter.IsSource -> nullary (Text.pack "IsSource")
+  Filter.IsAttacking -> nullary (Text.pack "IsAttacking")
   Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (fmap filterToJson fs)))
   Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (fmap filterToJson fs)))
   Filter.Not f -> Json.tagged (Text.pack "Not") (Just (filterToJson f))
@@ -554,6 +555,7 @@ jsonToFilter value = do
     ("ControlledBy", Just v) -> Filter.ControlledBy <$> jsonToPlayerRelation v
     ("IsPlayer", Just v) -> Filter.IsPlayer <$> jsonToPlayerRelation v
     ("IsSource", _) -> Right Filter.IsSource
+    ("IsAttacking", _) -> Right Filter.IsAttacking
     ("And", Just (Array vs)) -> Filter.And <$> traverse jsonToFilter vs
     ("Or", Just (Array vs)) -> Filter.Or <$> traverse jsonToFilter vs
     ("Not", Just v) -> Filter.Not <$> jsonToFilter v

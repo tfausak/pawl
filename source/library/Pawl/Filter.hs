@@ -34,7 +34,14 @@ data View = MkView
     -- is vacuously False on a player view. The two candidate kinds share one
     -- View type rather than splitting it, because Filter.matches folds And/Or/Not
     -- over whatever it is given and would otherwise need two trees.
-    playerIdentity :: Maybe PlayerId.PlayerId
+    playerIdentity :: Maybe PlayerId.PlayerId,
+    -- CR 508.1k: is this candidate an attacking creature right now? Not a
+    -- characteristic (CR 109.3 says so in as many words), so it is read from
+    -- GameState.combat rather than from a projection -- see
+    -- Pawl.Projection.viewOfCharacteristics. False for every candidate with no
+    -- combat status to read: a printed card off the battlefield, a player, and an
+    -- event snapshot -- the same vacuous posture power and controller take.
+    attacking :: Bool
   }
   deriving (Eq, Show)
 
@@ -51,7 +58,9 @@ playerView pid =
       power = Nothing,
       controller = Nothing,
       identity = Nothing,
-      playerIdentity = Just pid
+      playerIdentity = Just pid,
+      -- CR 506.3: only a creature can attack, and a player is not one.
+      attacking = False
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and
@@ -104,6 +113,10 @@ matches context view predicate = case predicate of
       PlayerRelation.You -> candidate == you
       PlayerRelation.Opponent -> candidate /= you
     _ -> False
+  -- CR 508.1k: "it remains an attacking creature until it's removed from combat
+  -- or the combat phase ends, whichever comes first" -- so this is a live read of
+  -- the combat record, never a stamp on the object.
+  Filter.IsAttacking -> attacking view
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)

@@ -127,7 +127,11 @@ snapshotView shape event = case event of
                 Filter.power = PC.power snapshot,
                 Filter.controller = Nothing,
                 Filter.identity = Nothing,
-                Filter.playerIdentity = Nothing
+                Filter.playerIdentity = Nothing,
+                -- The snapshot records characteristics only, and combat status is
+                -- not one (CR 109.3) -- so IsAttacking is vacuously False over a
+                -- past event, the posture controller already takes here.
+                Filter.attacking = False
               }
         else Nothing
   GameEvent.DamageDealt _ -> Nothing

@@ -1352,7 +1352,8 @@ stubView table oid =
                 Filter.power = Nothing,
                 Filter.controller = ctrl,
                 Filter.identity = Just o,
-                Filter.playerIdentity = Nothing
+                Filter.playerIdentity = Nothing,
+                Filter.attacking = False
               }
         [] -> Nothing
 

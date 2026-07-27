@@ -359,9 +359,10 @@ tests registry =
                 bySubtype = Filter.Type.HasSubtype Subtype.Wall
                 isSource = Filter.Type.IsSource
                 ravenousRats = Filter.Type.IsPlayer PlayerRelation.Opponent
+                killShot = Filter.Type.IsAttacking
              in mapM_
                   (roundTrip "filter" Codec.filterToJson Codec.jsonToFilter)
-                  [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats],
+                  [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot],
           HU.testCase "PlayerRelation round-trips" $
             mapM_
               (roundTrip "relation" Codec.playerRelationToJson Codec.jsonToPlayerRelation)

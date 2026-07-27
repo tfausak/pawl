@@ -6,7 +6,10 @@ import Pawl.Type.AttackTarget (AttackTarget)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 
--- The current combat (CR 508/509). Cleared at end of combat (CR 511).
+-- The current combat (CR 508/509). Cleared as the end of combat step ENDS
+-- (CR 511.3), not as it begins -- so every field here reads live for the whole of
+-- that step, which is what "target attacking creature" (Kill Shot) cast at
+-- CR 511.1's priority depends on.
 --
 -- A record rather than flat GameState fields because combat state has a
 -- LIFETIME the other fields do not -- one combat phase -- and something has to
@@ -48,10 +51,10 @@ data Combat = MkCombat
     -- choice per beginning-of-combat step, so a turn with a second combat phase
     -- (CR 500.8 is what adds one) chooses again rather than inheriting.
     --
-    -- pawl's lifetime is one step SHORTER than the rules': clearCombat runs from
-    -- Engine.runTurnBasedActions' end of combat step arm, i.e. as that step
-    -- BEGINS, so the field reads Nothing for the whole of a step that CR 511.3's
-    -- second sentence still places inside the combat phase (#180).
+    -- That lifetime is exact: Engine.runStep clears the record as the end of
+    -- combat step ENDS (CR 511.3), and CR 511.3's second sentence puts the phase
+    -- boundary immediately after that step -- so the field is Just for precisely
+    -- the combat phase and Nothing outside it.
     --
     -- Nothing also means NO ATTACK IS POSSIBLE, which is the right answer and not
     -- a fallback: a turn whose active player has left the game never performs the

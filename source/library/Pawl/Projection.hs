@@ -21,6 +21,7 @@ import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Combat as Combat
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Filter as Filter.Type
@@ -316,7 +317,10 @@ viewOfCard card =
           -- identity for IsSource to compare -- the same vacuous posture power
           -- and controller already take here.
           Filter.identity = Nothing,
-          Filter.playerIdentity = Nothing
+          Filter.playerIdentity = Nothing,
+          -- CR 506.3: only a creature can attack, and a card in a library or hand
+          -- is not one -- so it has no combat status either.
+          Filter.attacking = False
         }
 
 -- Shared assembly: fill a View from a projection's characteristics plus the
@@ -331,7 +335,11 @@ viewOfCharacteristics oid pc controller gs =
       Filter.power = PC.power pc,
       Filter.controller = controller,
       Filter.identity = Just oid,
-      Filter.playerIdentity = Nothing
+      Filter.playerIdentity = Nothing,
+      -- CR 508.1k: attacking is a combat STATUS, not a characteristic (CR 109.3),
+      -- so it comes straight off the combat record and not from the projection
+      -- this function is otherwise assembling.
+      Filter.attacking = Map.member oid (Combat.attackers (GameState.combat gs))
     }
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result -- the value the layer fold
@@ -773,6 +781,15 @@ data Aspect
 -- Two arms read nothing a modification can write. CR 205.4a supertypes come off
 -- the printed type line (printedSupertypes) and nothing projects them; IsSource
 -- and IsPlayer ask who the candidate IS, which no effect changes.
+--
+-- IsAttacking reads nothing either, but its emptiness is contingent where those
+-- are definitional. It reads GameState.combat, which is STORED, so no projected
+-- aspect feeds it and no modification writes it. Under the rules one could:
+-- CR 506.4 removes a permanent from combat if its controller changes or if it
+-- stops being a creature, so a faithful engine would have this arm read
+-- Controller and Types. pawl's Game.removeFromCombat implements only the
+-- leaves-the-battlefield and regeneration clauses, so there is nothing yet for
+-- this arm to depend on (#246).
 filterReads :: Filter.Type.Filter -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
@@ -783,6 +800,7 @@ filterReads f = case f of
   Filter.Type.ControlledBy _ -> Set.singleton Controller
   Filter.Type.IsSource -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
+  Filter.Type.IsAttacking -> Set.empty
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g
