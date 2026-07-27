@@ -534,9 +534,7 @@ placeOne pending = do
 -- roster, this filter is what enforces both.
 apnapPlayers :: GameState -> [PendingTrigger.PendingTrigger] -> [PlayerId]
 apnapPlayers gs pending =
-  let order = GameState.turnOrder gs
-      active = GameState.activePlayer gs
-      rotated = dropWhile (/= active) order <> takeWhile (/= active) order
+  let rotated = Game.apnapOrder gs
       -- turnOrder is the permanent SEATING roster, so the rotation still names
       -- departed seats. A player who has left the game is not in APNAP order and
       -- is never asked to order triggers (CR 800.4a leaves them nothing to

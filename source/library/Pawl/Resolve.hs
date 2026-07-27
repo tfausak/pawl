@@ -572,10 +572,11 @@ attachLegal src target gs =
 -- legalSlot already answered True for it.
 --
 -- `everyone` is not filtered to the players still in the game (CR 800.4a), and
--- it is not in turn order either -- it is `Map.keys` seat order. Both are
--- masked rather than correct, matching Count.playersFor's seat list; see that
--- function's comment for the one-line `Game.stillPlaying` filter, and #276 for
--- the ordering CR 121.2c wants once a Draw can name more than one player.
+-- it is `Map.keys` seat order rather than turn order. The first is masked rather
+-- than correct, matching Count.playersFor's seat list (#279). The second is
+-- deliberate: an unordered SET of players is what a PlayerRef names, and a
+-- caller with an ordering rule to obey imposes it on this answer -- the Draw
+-- arm does, for CR 121.2c.
 playerRefPlayers :: Map.Map SlotName Recipient -> Map.Map SlotName Bool -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
 playerRefPlayers chosen legality controller gs ref = case ref of
   PlayerRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -802,10 +803,34 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
         -- Whoever the PlayerRef names draws -- the controller for Divination's
-        -- `Relative You`, the targeted player for Ancestral Recall's `InSlot`.
-        -- CR 121.2c's ordering (the active player performs all of their draws
-        -- first, then each other player in turn order) is not implemented (#276).
-        drawers = playerRefPlayers chosen legality controller gs ref
+        -- `Relative You`, the targeted player for Ancestral Recall's `InSlot`,
+        -- each opponent for Master of the Feast's `Relative Opponent`, the whole
+        -- table for Vision Skeins' `EachPlayer`.
+        named = playerRefPlayers chosen legality controller gs ref
+        -- CR 121.2c: "If more than one player is instructed to draw cards, the
+        -- active player performs all of their draws first, then each other
+        -- player in turn order does the same." The reorder lives here rather
+        -- than in playerRefPlayers because CR 121.2c is a rule about DRAWING;
+        -- that helper's other caller, GainPlayerCounters, has no ordering rule
+        -- to obey. Observable, not cosmetic: each draw records the drawn card's
+        -- zone change in the one turn-scoped log that triggers scan (CR 603.2),
+        -- so the order the draws happen in is the order the log reports.
+        -- CR 121.2d (shared team turns) has no reader -- pawl has no teams
+        -- (#175).
+        --
+        -- A filter, so a drawer the roster does not name is dropped. The two
+        -- agree seat for seat in an ordinary game; where they don't -- CR 727.1
+        -- and Setup.subgameStateFrom rebuild turnOrder from the still-playing
+        -- seats while leaving a departed player in the players map -- dropping
+        -- is what CR 800.4a wants anyway.
+        --
+        -- NOT a general filter for departed players, who are still named
+        -- wherever turnOrder still seats them (#279). Drawing for one is not a
+        -- no-op: CR 800.4a took their library out of the game with them, so
+        -- Event.drawCard records them in GameState.drewFromEmpty. It is inert
+        -- rather than harmless-by-accident -- Sba.losesNow, that field's only
+        -- reader, gates every loss on Status.Playing.
+        drawers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
     case Quantity.evaluate viewOf context gs source quantity of
       Just n
         | n > 0 ->

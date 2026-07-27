@@ -8,6 +8,7 @@ module Pawl.ResolveSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -36,6 +37,7 @@ import qualified Pawl.Type.Action as A
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.Aggregation as Aggregation
+import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
@@ -96,6 +98,7 @@ import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -1421,6 +1424,31 @@ handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
               GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
             }
 
+-- Put k cards of a printing into pid's library, each on top of the last, for a
+-- draw to find.
+stockLibrary :: Printing.Printing -> PlayerId.PlayerId -> Int -> GameState.GameState -> GameState.GameState
+stockLibrary printing pid k gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. k]
+
+-- alice's upkeep begins, settled to the point where any trigger it woke is on
+-- the stack (CR 603.3b) waiting to resolve.
+settleAtAlicesUpkeep :: GameState.GameState -> GameState.GameState
+settleAtAlicesUpkeep gs =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      began = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+   in snd (Engine.runGamePure S.identityAnswer began Engine.settleForPriority)
+
+-- Who drew, in the order they drew, read off the turn-scoped event log. CR
+-- 121.1 makes a draw one library-to-hand move, and a library and a hand each
+-- belong to one player, so the moved card's owner is the drawer. Any OTHER route
+-- from library to hand would count here too; no fixture below has one.
+drawersOf :: GameState.GameState -> [PlayerId.PlayerId]
+drawersOf gs = Maybe.mapMaybe drawer (S.zoneChangesOf gs)
+  where
+    drawer zc =
+      if ZoneChange.from zc == Zone.Library && ZoneChange.to zc == Zone.Hand
+        then fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
+        else Nothing
+
 zoneChangeTests :: Registry.Type.Registry -> Tasty.TestTree
 zoneChangeTests registry =
   Tasty.testGroup
@@ -1540,6 +1568,84 @@ zoneChangeTests registry =
         HU.assertEqual "three cards drawn to bob's hand" 3 (S.handSize S.bob after)
         HU.assertEqual "one card left in bob's library" 1 (length (Game.zoneMembers Zone.Library S.bob after))
         HU.assertEqual "alice drew nothing" 0 (S.handSize S.alice after),
+      -- The card that proves Effect.Draw's `EachPlayer` arm (#276). Divination
+      -- above draws for the controller alone and Ancestral Recall for one named
+      -- player; Vision Skeins is the first Draw in the pool that reaches the
+      -- whole table at once.
+      HU.testCase "CR 121.1 Vision Skeins draws two cards for each player, its caster included" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        visionSkeins <- Registry.printing registry "Vision Skeins"
+        let base = S.landsInPlay island 2
+            withLibs = stockLibrary piker S.bob 2 (stockLibrary piker S.alice 2 base)
+            (gs, spellId) = S.handOne visionSkeins withLibs
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "alice drew two" 2 (S.handSize S.alice after)
+        HU.assertEqual "bob drew two as well" 2 (S.handSize S.bob after)
+        HU.assertEqual "no draw outran a library" Set.empty (GameState.drewFromEmpty after),
+      -- CR 121.2c: "If more than one player is instructed to draw cards, the
+      -- active player performs all of their draws first, then each other player
+      -- in turn order does the same." The seat order the players map answers in
+      -- is not that order, so this needs an active player who is not the first
+      -- seat: alice casts an INSTANT on BOB's turn, which makes seat order
+      -- [alice, bob, carol] and turn order [bob, carol, alice] disagree.
+      --
+      -- The draws are read back off the turn-scoped event log -- the same log a
+      -- trigger scans (CR 603.2) -- because that is where the order of the
+      -- individual draws is observable; the hand sizes alone are order-blind.
+      HU.testCase "CR 121.2c Vision Skeins draws for the active player first, then in turn order" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        visionSkeins <- Registry.printing registry "Vision Skeins"
+        let -- S.landsInPlay builds its own two-seat game, so the {1}{U} goes on
+            -- a three-seat board one Island at a time.
+            withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
+            withLibs = stockLibrary piker S.carol 2 (stockLibrary piker S.bob 2 (stockLibrary piker S.alice 2 withMana))
+            (gs0, spellId) = S.handOne visionSkeins withLibs
+            -- handOne hands alice the turn along with the card, so bob takes the
+            -- turn back. Cast.castSpell gates neither timing nor priority, but
+            -- the fixture is a legal board regardless: Vision Skeins is an
+            -- INSTANT, which alice may cast on bob's turn.
+            gs = gs0 {GameState.activePlayer = S.bob}
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual
+          "bob (active) draws both of his, then carol, then the caster"
+          [S.bob, S.bob, S.carol, S.carol, S.alice, S.alice]
+          (drawersOf after)
+        HU.assertEqual "and everyone holds two" [2, 2, 2] (fmap (\pid -> S.handSize pid after) [S.alice, S.bob, S.carol]),
+      -- The card that proves Effect.Draw's `Relative Opponent` arm (#276), and
+      -- the one shape no "you draw" card can stand in for: Master of the Feast's
+      -- trigger is a DRAWBACK, drawing for everyone except the player who
+      -- controls it (CR 109.5 makes "your upkeep" that controller's).
+      HU.testCase "CR 121.1 Master of the Feast's upkeep trigger draws for the opponent, not its controller" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        masterOfTheFeast <- Registry.printing registry "Master of the Feast"
+        let (_, board) = S.addCreature masterOfTheFeast S.alice (Setup.emptyGame S.bothPlayers)
+            withLibs = stockLibrary piker S.bob 1 (stockLibrary piker S.alice 1 board)
+            onStack = settleAtAlicesUpkeep withLibs
+            after = snd (Engine.runGamePure S.identityAnswer onStack Stack.resolveTop)
+        HU.assertBool "the upkeep trigger really reached the stack" (not (null (GameState.stack onStack)))
+        HU.assertEqual "bob drew" 1 (S.handSize S.bob after)
+        HU.assertEqual "alice, who controls it, did not" 0 (S.handSize S.alice after)
+        HU.assertEqual "and alice's library is untouched" 1 (length (Game.zoneMembers Zone.Library S.alice after)),
+      -- The discriminator, and it needs a THIRD seat: at two players an
+      -- `Opponent` arm that reached only ONE opponent is indistinguishable from
+      -- one that reaches them all. CR 806.1: in a Free-for-All the players
+      -- compete as individuals, so every other player is an opponent (CR 102.3's
+      -- teammates are the one exception, and pawl has no teams, #175) and both
+      -- of them draw.
+      HU.testCase "CR 806.1 at three seats each opponent draws off Master of the Feast, and only opponents" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        masterOfTheFeast <- Registry.printing registry "Master of the Feast"
+        let (_, board) = S.addCreature masterOfTheFeast S.alice S.threePlayerGame
+            withLibs = stockLibrary piker S.carol 1 (stockLibrary piker S.bob 1 (stockLibrary piker S.alice 1 board))
+            after = snd (Engine.runGamePure S.identityAnswer (settleAtAlicesUpkeep withLibs) Stack.resolveTop)
+        -- A drawer whose library was empty would draw no card and so record no
+        -- zone change; this is what keeps the list below honest about that.
+        HU.assertEqual "no draw outran a library" Set.empty (GameState.drewFromEmpty after)
+        HU.assertEqual "both opponents drew, and the controller did not" [S.bob, S.carol] (drawersOf after),
       HU.testCase "CR 701.17 Tome Scour mills five from a target player's library" $ do
         island <- Registry.printing registry "Island"
         piker <- Registry.printing registry "Goblin Piker"
@@ -1920,9 +2026,11 @@ proliferateTests registry =
       -- The discriminator, and it needs a THIRD seat: at two players `Relative
       -- Opponent` and `EachPlayer` differ only in whether the caster is included,
       -- which the case above catches -- but `Opponent` reaching only ONE of two
-      -- opponents would still pass there. CR 102.2: every other player is an
-      -- opponent, so both must be poisoned.
-      HU.testCase "CR 102.2 at three seats every opponent is poisoned, and only opponents" $ do
+      -- opponents would still pass there. CR 806.1: in a Free-for-All the
+      -- players compete as individuals, so every other player is an opponent and
+      -- both must be poisoned. (CR 102.2 is the TWO-player rule, which is
+      -- exactly what a third seat is here to get past.)
+      HU.testCase "CR 806.1 at three seats every opponent is poisoned, and only opponents" $ do
         island <- Registry.printing registry "Island"
         piker <- Registry.printing registry "Goblin Piker"
         prologueToPhyresis <- Registry.printing registry "Prologue to Phyresis"

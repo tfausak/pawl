@@ -159,6 +159,23 @@ stillPlayingInOrder gs =
   let playing = stillPlaying gs
    in filter (\pid -> List.elem pid playing) (GameState.turnOrder gs)
 
+-- CR 101.4: the seating roster rotated to APNAP order -- the active player
+-- first, then each other player in turn order, wrapping at the end of the
+-- roster. The shared anchor for every "the active player goes first, then each
+-- other player in turn order" rule: CR 603.3b, which Engine.apnapPlayers reads
+-- to stack triggers, and CR 121.2c, which Pawl.Resolve's Draw arm reads to
+-- order drawers.
+--
+-- SEATING, not survival: turnOrder is the permanent roster (CR 800.5), so a
+-- departed seat is still named here. A caller that must not name one filters
+-- with stillPlaying, the way apnapPlayers does. An active player somehow absent
+-- from the roster degrades to the roster itself rather than to nobody.
+apnapOrder :: GameState -> [PlayerId]
+apnapOrder gs =
+  let order = GameState.turnOrder gs
+      active = GameState.activePlayer gs
+   in dropWhile (/= active) order <> takeWhile (/= active) order
+
 -- CR 701.24a: "To shuffle a library or a face-down pile of cards, randomize the
 -- cards within it so that no player knows their order." Randomising an ORDER is a
 -- permutation -- the cards that were there are the cards that are there.

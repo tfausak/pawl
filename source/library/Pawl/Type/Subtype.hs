@@ -59,4 +59,6 @@ data Subtype
     Nomad
   | -- CR 205.3m (a creature type; Burning-Tree Emissary's).
     Shaman
+  | -- CR 205.3m (a creature type; Master of the Feast's).
+    Demon
   deriving (Eq, Ord, Show)
