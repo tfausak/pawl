@@ -1034,13 +1034,42 @@ sourceOnBattlefield =
     Comparison.Exactly
     (Quantity.Type.Literal 1)
 
--- The CR 704.5p gate card: the pool's first animator of an ARTIFACT, so an
--- Equipment can become a creature while it is still equipping one.
-skilledAnimatorCardTests :: Registry.Type.Registry -> Tasty.TestTree
-skilledAnimatorCardTests registry =
+-- The two type-changing gate cards. Skilled Animator animates an ARTIFACT, which
+-- is what lets an Equipment become a creature while it still equips one (CR
+-- 704.5p); Liquimetal Coating makes any permanent an artifact, which is the only
+-- way to feed an AURA to the Animator and so the only route to CR 303.4d's second
+-- clause -- every printed enchantment animator excludes Auras by name.
+animatorCardTests :: Registry.Type.Registry -> Tasty.TestTree
+animatorCardTests registry =
   Tasty.testGroup
-    "Skilled Animator"
-    [ HU.testCase "Skilled Animator is a {2}{U} 1/3 Human Artificer whose ETB animates an artifact you control" $ do
+    "Animators"
+    [ HU.testCase "Liquimetal Coating is a {2} artifact whose {T} ability makes any permanent an artifact" $ do
+        p <- Registry.printing registry "Liquimetal Coating"
+        let c = Printing.card p
+            target = SlotName.MkSlotName (Text.pack "target")
+        HU.assertEqual "name" (Text.pack "Liquimetal Coating") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2]) (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Artifact) (TypeLine.types (Card.Type.typeLine c))
+        case Card.Type.activatedAbilities c of
+          [ab] -> do
+            -- CR 107.5: the tap symbol is the entire activation cost.
+            HU.assertEqual "tap cost only" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost ab))
+            HU.assertEqual "and no mana" (Just (ManaCost.MkManaCost [])) (Cost.Type.mana (ActivatedAbility.cost ab))
+            case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
+              [m] -> do
+                HU.assertEqual
+                  "CR 613.1d: one layer-4 addition, until end of turn"
+                  [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.AddCardType CardType.Artifact) target]
+                  (Foldable.toList (Mode.effects m))
+                -- "Target permanent", unnarrowed -- the Aura the CR 303.4d case
+                -- needs is a legal target precisely because there is no filter.
+                HU.assertEqual
+                  "CR 115.1: one target slot, any permanent"
+                  (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents Nothing))
+                  (Mode.targetSpecs m)
+              _ -> HU.assertFailure "expected exactly one mode"
+          _ -> HU.assertFailure "expected exactly one activated ability",
+      HU.testCase "Skilled Animator is a {2}{U} 1/3 Human Artificer whose ETB animates an artifact you control" $ do
         p <- Registry.printing registry "Skilled Animator"
         let c = Printing.card p
             blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
@@ -1083,4 +1112,4 @@ tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, skilledAnimatorCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry]

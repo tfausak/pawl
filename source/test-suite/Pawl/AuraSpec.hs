@@ -1,3 +1,6 @@
+-- Pattern matching on Pawl.Type.Prompt, a GADT, in aimAt below.
+{-# LANGUAGE GADTs #-}
+
 -- Covers Pawl.Stack's Aura branch and Pawl.Resolve.targetsAllIllegal -- a
 -- resolving Aura spell either fizzles (CR 608.2b) or enters the battlefield
 -- already attached to its target (CR 303.4) -- together with the rest of the
@@ -23,10 +26,13 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.SlotName as SlotName
@@ -192,6 +198,16 @@ equipmentTests registry =
         HU.assertEqual "and is unattached" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject equip after))
     ]
 
+-- An answerer that aims every target slot at one object, deferring everything
+-- else to S.identityAnswer (ModalSpec.chooseModeAt's shape). The CR 303.4d case
+-- below needs it because both of its target choices are real ones -- alice
+-- controls other permanents that each spec admits -- so they cannot be forced by
+-- board construction the way the sibling cases above force theirs.
+aimAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  _ -> S.identityAnswer p
+
 -- CR 704.5p, the sibling of CR 704.5n above: 704.5n asks whether the HOST is
 -- still legal, and this asks whether the attached permanent may be attached to
 -- anything at all. Both detach and leave the permanent on the battlefield.
@@ -246,9 +262,8 @@ unattachableTests registry =
       -- strips the Equipment subtype, and nothing attaches a land -- so the
       -- attachment is hand-built, the way the CR 301.5 case in the Equipment
       -- group above hand-builds an Equipment on a land. What it pins is that the
-      -- branch reads the
-      -- permanent's own types and not its host's: the Piker here is a legal host
-      -- for anything that may be attached at all.
+      -- branch reads the permanent's own types and not its host's: the Piker here
+      -- is a legal host for anything that may be attached at all.
       HU.testCase "CR 704.5p a land attached to a creature detaches and stays on the battlefield" $ do
         mountain <- Registry.printing registry "Mountain"
         piker <- Registry.printing registry "Goblin Piker"
@@ -258,7 +273,66 @@ unattachableTests registry =
             attached = S.attach land creature g2
             after = S.settleSba attached
         HU.assertBool "the land survives" (Set.member land (GameState.battlefield after))
-        HU.assertEqual "and is unattached" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject land after))
+        HU.assertEqual "and is unattached" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject land after)),
+      -- CR 303.4d's second clause: "An Aura that's also a creature can't enchant
+      -- anything. If this occurs somehow, the Aura becomes unattached, then is
+      -- put into its owner's graveyard. (These are state-based actions.)"
+      --
+      -- Two state-based actions, in that order, and this drives them one pass at
+      -- a time to prove the order rather than only the end state: CR 704.5p
+      -- unattaches the Aura (it is a creature that is attached), and only then
+      -- does CR 704.5m see an Aura attached to nothing and bury it. Neither rule
+      -- names CR 303.4d; between them they are what enforces it.
+      --
+      -- Reaching the clause at all takes two cards, because every printed
+      -- enchantment animator carefully excludes Auras -- Opalescence and
+      -- Starfield of Nyx both say "non-Aura enchantment", and so does Zur,
+      -- Eternal Schemer. So the Aura is made
+      -- an ARTIFACT first (Liquimetal Coating), which nothing excludes it from,
+      -- and Skilled Animator then animates it as one.
+      HU.testCase "CR 303.4d whole cards: an Aura made a creature unattaches, then is buried" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        coating <- Registry.printing registry "Liquimetal Coating"
+        animator <- Registry.printing registry "Skilled Animator"
+        let base = S.landsInPlay island 3 -- {2}{U} for the Animator
+            (creature, g1) = S.addCreature piker S.alice base
+            (aura, g2) = S.addCreature unholyStrength S.alice g1
+            attached = S.attach aura creature g2
+            (coatingId, g3) = S.addCreature coating S.alice attached
+            ability = case Card.Type.activatedAbilities (Printing.card coating) of
+              ab : _ -> Just ab
+              [] -> Nothing
+        case ability of
+          Nothing -> HU.assertFailure "Liquimetal Coating should print one activated ability"
+          Just coat -> do
+            let ready = g3 {GameState.priority = Just S.alice}
+                activated = snd (Engine.runGamePure (aimAt aura) ready (Activate.activateAbility S.alice coatingId coat))
+                coated = snd (Engine.runGamePure (aimAt aura) activated Stack.resolveTop)
+                (withSpell, spellId) = S.handOne animator coated
+                cast = snd (Engine.runGamePure (aimAt aura) withSpell (Cast.castSpell S.alice spellId))
+                entered = snd (Engine.runGamePure (aimAt aura) cast Stack.resolveTop)
+                triggered = snd (Engine.runGamePure (aimAt aura) entered Engine.settleForPriority)
+                animated = snd (Engine.runGamePure (aimAt aura) triggered Stack.resolveTop)
+                -- S.settleSba is ONE pass (the CR 704.3 repeat lives in
+                -- Engine.settleForPriority), which is what makes the two steps
+                -- separately observable.
+                unattachedNow = S.settleSba animated
+                buried = S.settleSba unattachedNow
+            HU.assertBool "the Aura is an artifact now" (Set.member CardType.Artifact (Projection.cardTypesOf aura coated))
+            HU.assertEqual "and once animated it is a 5/5 creature" (Just 5) (Projection.powerOf aura animated)
+            HU.assertEqual "still enchanting the Piker at that moment" (Just (Just creature)) (fmap Object.attachedTo (Game.lookupObject aura animated))
+            HU.assertEqual "which is still 2/1 + 2/+1" (Just 4) (Projection.powerOf creature animated)
+            -- Step one: unattached, and still on the battlefield.
+            HU.assertEqual "one SBA pass unattaches it" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject aura unattachedNow))
+            HU.assertBool "and it has not been buried yet" (Set.member aura (GameState.battlefield unattachedNow))
+            -- Step two: CR 704.5m buries the now-unattached Aura.
+            HU.assertBool "the next pass buries it" (not (Set.member aura (GameState.battlefield buried)))
+            -- CR 400.7: it is a new object there, so this counts the zone rather
+            -- than looking the battlefield id up again.
+            HU.assertEqual "in its OWNER's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice buried))
+            HU.assertEqual "so the Piker loses the +2/+1" (Just 2) (Projection.powerOf creature buried)
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
