@@ -51,6 +51,7 @@ import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
@@ -472,7 +473,34 @@ legendRuleTests registry =
             (_, staged) = S.spellOnStack clone S.alice board
             settled = snd (Engine.runGamePure (copiesAndKeeps original original) staged (Stack.resolveTop >> Engine.settleForPriority))
         HU.assertBool "the original survives, because alice chose it" (inPlay original settled)
-        HU.assertEqual "and exactly one Thalia is left in play" 1 (S.creaturesInPlay S.alice settled)
+        HU.assertEqual "and exactly one Thalia is left in play" 1 (S.creaturesInPlay S.alice settled),
+      -- CR 704.3: every applicable state-based action is performed
+      -- "simultaneously as a single event". So a legend that CR 704.5f is already
+      -- burying stays on CR 704.5j's ballot, and keeping THAT one is a legal
+      -- choice which puts every other copy into the graveyard beside it.
+      --
+      -- Dropping such a member from the candidates would decide for the player
+      -- and strand a copy alive that they chose to lose -- which is what this
+      -- branch did before review caught it.
+      HU.testCase "CR 704.3/704.5j keeping a Thalia that is already dying buries both" $ do
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        let (healthy, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
+            (dying, g1) = S.addCreature thalia S.alice g0
+            -- Thalia is 2/1, so -2/-1 makes this copy a 0/0: CR 704.5f applies to
+            -- it and not to the other.
+            gs = S.withEffect dying (Modification.ModifyPowerToughness (Quantity.Literal (-2)) (Quantity.Literal (-1))) g1
+            keptDying = S.runPure (keepsLegend dying) gs Sba.checkStateBasedActions
+            keptHealthy = S.runPure (keepsLegend healthy) gs Sba.checkStateBasedActions
+        HU.assertEqual "the 0/0 really is a 0/0" (Just 0) (Projection.toughnessOf dying gs)
+        -- Keeping the dying copy: 704.5j buries the healthy one, 704.5f buries this
+        -- one, and alice is left with no Thalia at all.
+        HU.assertBool "the healthy Thalia went too" (not (inPlay healthy keptDying))
+        HU.assertBool "and so did the dying one" (not (inPlay dying keptDying))
+        HU.assertEqual "two cards in the graveyard, so neither was moved twice" 2 (length (Game.zoneMembers Zone.Graveyard S.alice keptDying))
+        -- The discriminating twin: keeping the healthy copy saves it, so the
+        -- outcome above really is alice's choice and not a forced sweep.
+        HU.assertBool "keeping the healthy one saves it" (inPlay healthy keptHealthy)
+        HU.assertEqual "and only the 0/0 was buried" 1 (length (Game.zoneMembers Zone.Graveyard S.alice keptHealthy))
     ]
 
 sbaTests :: Tasty.TestTree
