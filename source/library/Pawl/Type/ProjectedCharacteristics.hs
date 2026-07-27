@@ -2,6 +2,7 @@ module Pawl.Type.ProjectedCharacteristics where
 
 import Data.Map.Strict (Map)
 import Data.Set (Set)
+import Data.Text (Text)
 import Numeric.Natural (Natural)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
 import Pawl.Type.Card (Card)
@@ -11,6 +12,7 @@ import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.Subtype (Subtype)
+import Pawl.Type.Supertype (Supertype)
 import Pawl.Type.TriggeredAbility (TriggeredAbility)
 
 -- The characteristics of an object after the layer fold (design.md §2.5). Maybe
@@ -19,7 +21,27 @@ import Pawl.Type.TriggeredAbility (TriggeredAbility)
 -- object's land subtype to a basic type, stripping its rules-text abilities.
 -- Ord derived so a copy snapshot can ride a Binding (CR 707.2, P2).
 data ProjectedCharacteristics = MkProjectedCharacteristics
-  { -- CR 702: this object's keyword abilities after the layer fold, COUNTED PER
+  { -- CR 201.1: the object's name after the layer fold. Copiable -- CR 707.2 lists
+    -- name first among the copiable values -- and
+    -- that is what earns it a place here rather than a read of the printed card:
+    -- a Clone's name is the name it copied, which is precisely what makes CR
+    -- 704.5j's "two legendary permanents with the SAME NAME" reach a copy.
+    --
+    -- Carried, not folded: rule 613's layer 3 could change it (a text-changing
+    -- effect naming a name) but nothing in the pool does, so no layer touches it
+    -- after the seed.
+    name :: Text,
+    -- CR 205.4a: the object's supertypes after the layer fold -- the third part of
+    -- the layer-4 type line, alongside cardTypes and subtypes. Copiable for the
+    -- same reason as name: a Clone of a legend is itself legendary, without which
+    -- the legend rule would silently spare every copy.
+    --
+    -- Its own Set rather than more CardType constructors, because CR 205.4a makes
+    -- supertypes a separate part of the type line: a permanent can be Legendary
+    -- and a Creature at once, and "is it legendary" must not be answerable by the
+    -- same question as "is it a creature".
+    supertypes :: Set Supertype,
+    -- CR 702: this object's keyword abilities after the layer fold, COUNTED PER
     -- KEYWORD. A multiset in Pawl.Type.Deck's shape, and for its reason: an
     -- object can have the same keyword ability more than once, so counts are
     -- the honest model. CR 702.164b reads the count directly -- "the sum of all

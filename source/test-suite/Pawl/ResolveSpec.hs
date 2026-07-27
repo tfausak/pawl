@@ -1,9 +1,11 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Resolve and Pawl.Target: targeting legality, spell resolution, and
 -- the CR 608.2b fizzle.
 module Pawl.ResolveSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -105,12 +107,12 @@ targetTests registry =
         HU.assertEqual
           "creature and both players"
           (Set.fromList [Recipient.ToCreature oid, Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])
-          (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs),
+          (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs),
       HU.testCase "a departed player is not a legal target" $
         let gs = Departure.depart Departure.Type.Lost S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertBool
               "bob gone"
-              (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs))),
+              (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs))),
       HU.testCase "CR 800.4b an object does not change to the control of a player who has left the game" $ do
         -- CR 800.4b: "If an object would change to the control of a player who has
         -- left the game, it doesn't." Resolve.applyEffect takes the controller
@@ -146,44 +148,44 @@ targetTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
             gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
-        HU.assertBool "legal while fielded" (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs)
-        HU.assertBool "illegal once moved" (not (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gone)),
+        HU.assertBool "legal while fielded" (Target.stillLegal Nothing S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs)
+        HU.assertBool "illegal once moved" (not (Target.stillLegal Nothing S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gone)),
       HU.testCase "legalSets maps each slot to its legal recipients" $
         let specs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)
             gs = Setup.emptyGame S.bothPlayers
          in HU.assertEqual
               "one slot, two players"
               (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]))
-              (Target.legalSets S.noSource specs gs),
+              (Target.legalSets Nothing S.noSource specs gs),
       HU.testCase "CR 115.4 CreatureTarget offers creatures but no players" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         HU.assertEqual
           "just the creature"
           (Set.singleton (Recipient.ToCreature oid))
-          (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gs),
+          (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gs),
       HU.testCase "CR 601.2c CreatureTarget has an empty legal set with no creatures" $
         HU.assertBool
           "nothing to target"
-          (Set.null (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing) (Setup.emptyGame S.bothPlayers))),
+          (Set.null (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing) (Setup.emptyGame S.bothPlayers))),
       HU.testCase "CR 608.2b a creature that left is no longer a legal CreatureTarget" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
             gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
-        HU.assertBool "legal while fielded" (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gs)
-        HU.assertBool "illegal once moved" (not (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gone)),
+        HU.assertBool "legal while fielded" (Target.stillLegal Nothing S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gs)
+        HU.assertBool "illegal once moved" (not (Target.stillLegal Nothing S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gone)),
       HU.testCase "CR 115 SpellOrPermanentTarget offers battlefield permanents and stack spells" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (permId, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         HU.assertBool
           "the permanent is a legal object target"
-          (Set.member (Recipient.ToObject permId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.SpellsAndPermanents Nothing) gs)),
+          (Set.member (Recipient.ToObject permId) (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.SpellsAndPermanents Nothing) gs)),
       HU.testCase "CR 115 SpellTarget offers a stack spell but not a battlefield permanent" $ do
         piker <- Registry.printing registry "Goblin Piker"
         lightningBolt <- Registry.printing registry "Lightning Bolt"
         let (permId, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
             (spellId, gs) = S.spellOnStack lightningBolt S.alice base
-            legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Spells Nothing) gs
+            legal = Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Spells Nothing) gs
         HU.assertBool "the stack spell is a legal target" (Set.member (Recipient.ToObject spellId) legal)
         HU.assertBool "the battlefield permanent is not a legal target" (not (Set.member (Recipient.ToObject permId) legal)),
       HU.testCase "LandTarget offers a land as an object target, not a creature or player" $ do
@@ -192,12 +194,12 @@ targetTests registry =
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
-        HU.assertBool "the land is legal" (Set.member (Recipient.ToObject landId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land))) gs))
-        HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land))) gs))),
+        HU.assertBool "the land is legal" (Set.member (Recipient.ToObject landId) (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land))) gs))
+        HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land))) gs))),
       HU.testCase "CR 115: PlayerTarget is exactly the players still in the game" $
         let gs = Setup.emptyGame S.bothPlayers
             expected = Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]
-         in HU.assertEqual "both players, no creatures" expected (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Players Nothing) gs),
+         in HU.assertEqual "both players, no creatures" expected (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Players Nothing) gs),
       -- CR 115.1a / 700.2c: "target Wall" (Chaos Charm) restricts CreatureTarget to
       -- creatures whose PROJECTED subtypes include Wall. Wall of Stone (a real 0/8
       -- Creature - Wall, M4g) is the Wall; a Piker is the non-Wall control.
@@ -207,7 +209,7 @@ targetTests registry =
         let (wallId, base) = S.addCreature wallOfStone S.bob (Setup.emptyGame S.bothPlayers)
             (pikerId, gs) = S.addCreature piker S.alice base
             slot = SlotName.MkSlotName (Text.pack "target")
-            legal = Map.findWithDefault Set.empty slot (Target.legalSets S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
+            legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
         HU.assertBool "the Wall is legal" (Set.member (Recipient.ToCreature wallId) legal)
         HU.assertBool "the non-Wall creature is not legal" (not (Set.member (Recipient.ToCreature pikerId) legal)),
       HU.testCase "CR 115.1a ArtifactTarget is the battlefield's projected artifacts" $ do
@@ -217,7 +219,7 @@ targetTests registry =
         mindslaver <- Registry.printing registry "Mindslaver"
         mountain <- Registry.printing registry "Mountain"
         let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
-            legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))) gs
+            legal = Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))) gs
         HU.assertEqual "exactly the artifact" (Set.singleton (Recipient.ToObject (S.artifactId gs))) legal
         HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) legal)),
       HU.testCase "CR 115.1a / 109.5 OpponentCreatureTarget excludes the source's controller's creatures" $ do
@@ -226,7 +228,7 @@ targetTests registry =
         let gs0 = Setup.emptyGame S.bothPlayers
             (mine, gs1) = S.addCreature piker S.alice gs0
             (theirs, gs2) = S.addCreature warMammoth S.bob gs1
-            legal = Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs2
+            legal = Target.legalRecipients (Just S.alice) mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs2
         HU.assertEqual "only the opponent's creature" (Set.singleton (Recipient.ToCreature theirs)) legal
         HU.assertBool "not the source's controller's own" (not (Set.member (Recipient.ToCreature mine) legal)),
       -- CR 115.1 / 109.5: "target OPPONENT". Until Ravenous Rats there was no
@@ -237,7 +239,7 @@ targetTests registry =
         ravenousRats <- Registry.printing registry "Ravenous Rats"
         let (src, gs) = S.addCreature ravenousRats S.alice (Setup.emptyGame S.threePlayers)
             spec = TargetSpec.MkTargetSpec Pool.Players (Just (Filter.Type.IsPlayer PlayerRelation.Opponent))
-            legal = Target.legalRecipients src spec gs
+            legal = Target.legalRecipients (Just S.alice) src spec gs
         HU.assertEqual
           "exactly bob and carol, never alice"
           (Set.fromList [Recipient.ToPlayer S.bob, Recipient.ToPlayer S.carol])
@@ -256,7 +258,7 @@ targetTests registry =
             HU.assertEqual
               "bob is excluded from his own Rats' trigger"
               (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.carol])
-              (Target.legalRecipients src spec gs)
+              (Target.legalRecipients (Just S.bob) src spec gs)
           _ -> HU.assertFailure "Ravenous Rats should declare exactly one target slot",
       -- The gameplay-level proof design.md section 4 asks for: an opcode is not
       -- done until a card exercises it end to end. Ravenous Rats enters, its
@@ -290,7 +292,7 @@ targetTests registry =
             (mine, gs1) = S.addCreature piker S.alice gs0
             (bobs, gs2) = S.addCreature warMammoth S.bob gs1
             (carols, gs3) = S.addCreature piker S.carol gs2
-            legal = Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs3
+            legal = Target.legalRecipients (Just S.alice) mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs3
         HU.assertEqual
           "exactly bob's and carol's, and nothing of alice's"
           (Set.fromList [Recipient.ToCreature bobs, Recipient.ToCreature carols])
@@ -309,11 +311,11 @@ targetTests registry =
         HU.assertEqual
           "for alice's source, only the creature still under bob's control"
           (Set.singleton (Recipient.ToCreature alsoTheirs))
-          (Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) stolen)
+          (Target.legalRecipients (Projection.controllerOf mine stolen) mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) stolen)
         HU.assertEqual
           "for bob's source, the two alice now controls"
           (Set.fromList [Recipient.ToCreature mine, Recipient.ToCreature theirs])
-          (Target.legalRecipients alsoTheirs (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) stolen),
+          (Target.legalRecipients (Projection.controllerOf alsoTheirs stolen) alsoTheirs (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) stolen),
       -- P9 (#40): the reshaped TargetSpec = Pool + Maybe Filter reproduces the
       -- retired hand-carved specs as data. A black creature
       -- (Typhoid Rats, {B}) and a nonblack one (Goblin Piker, {1}{R}) exercise
@@ -325,7 +327,7 @@ targetTests registry =
             (blackOid, gs1) = S.addCreature typhoidRats S.bob gs0
             (plainOid, gs) = S.addCreature piker S.alice gs1
             spec = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
-            legal = Target.legalRecipients S.noSource spec gs
+            legal = Target.legalRecipients Nothing S.noSource spec gs
         HU.assertBool "black creature illegal" (not (Set.member (Recipient.ToCreature blackOid) legal))
         HU.assertBool "nonblack creature legal" (Set.member (Recipient.ToCreature plainOid) legal),
       HU.testCase "P9 Creatures + Nothing narrows nothing" $ do
@@ -336,7 +338,7 @@ targetTests registry =
             (plainOid, gs) = S.addCreature piker S.alice gs1
             spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing
             expectedAllCreatures = Set.fromList [Recipient.ToCreature blackOid, Recipient.ToCreature plainOid]
-        HU.assertEqual "all creatures legal" expectedAllCreatures (Target.legalRecipients S.noSource spec gs),
+        HU.assertEqual "all creatures legal" expectedAllCreatures (Target.legalRecipients Nothing S.noSource spec gs),
       -- CR 601.2c "another" over a Creatures pool (#163). The pool tags its
       -- candidates ToCreature (CR 115.1a); a Not IsSource conjunct drops the
       -- source whatever tag the pool gave it, which the retired Exclusion field
@@ -352,7 +354,7 @@ targetTests registry =
         HU.assertEqual
           "source excluded from its own set"
           (Map.singleton slot (Set.singleton (Recipient.ToCreature otherId)))
-          (Target.legalSets srcId specs gs),
+          (Target.legalSets Nothing srcId specs gs),
       -- The other half of the same claim: a slot carrying no Not IsSource does
       -- not exclude, so Prodigal Sorcerer may still ping itself (CR 115.4).
       HU.testCase "a slot without Not IsSource still admits the source (CR 115.4)" $ do
@@ -364,7 +366,7 @@ targetTests registry =
         HU.assertEqual
           "source is its own legal target"
           (Map.singleton slot (Set.singleton (Recipient.ToCreature srcId)))
-          (Target.legalSets srcId specs gs),
+          (Target.legalSets Nothing srcId specs gs),
       -- Gate cards for P9 Task 5: Terror and Reprisal. Both cards' printed text
       -- ends "It can't be regenerated."; regeneration is not modelled (no
       -- regeneration shield to suppress), so that clause is a no-op and is
@@ -382,7 +384,7 @@ targetTests registry =
                 (blackOid, gs1) = S.addCreature typhoidRats S.bob gs0
                 (artifactOid, gs2) = S.addCreature darksteelMyr S.bob gs1
                 (plainOid, gs) = S.addCreature piker S.alice gs2
-                legal = Target.legalRecipients S.noSource spec gs
+                legal = Target.legalRecipients Nothing S.noSource spec gs
             HU.assertBool "black creature illegal" (not (Set.member (Recipient.ToCreature blackOid) legal))
             HU.assertBool "artifact creature illegal" (not (Set.member (Recipient.ToCreature artifactOid) legal))
             HU.assertBool "nonblack, nonartifact creature legal" (Set.member (Recipient.ToCreature plainOid) legal),
@@ -394,9 +396,9 @@ targetTests registry =
           Just spec -> do
             let gs0 = Setup.emptyGame S.bothPlayers
                 (smallOid, gs) = S.addCreature piker S.bob gs0 -- power 2, {1}{R}
-                legalBefore = Target.legalRecipients S.noSource spec gs
+                legalBefore = Target.legalRecipients Nothing S.noSource spec gs
                 pumped = S.withEffect smallOid (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0)) gs
-                legalAfter = Target.legalRecipients S.noSource spec pumped
+                legalAfter = Target.legalRecipients Nothing S.noSource spec pumped
             HU.assertBool "power 2 is illegal (below the PowerAtLeast 4 floor)" (not (Set.member (Recipient.ToCreature smallOid) legalBefore))
             HU.assertBool "pumped to power 4 becomes legal" (Set.member (Recipient.ToCreature smallOid) legalAfter)
     ]
@@ -1707,6 +1709,137 @@ gainPlayerCountersTests registry =
         HU.assertEqual "alice has two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
     ]
 
+-- Answers Prompt.ChooseProliferate by taking everything on offer. Its sibling
+-- declines everything: between them the tests prove the ANSWER decides who gets
+-- counters, rather than the order the candidates happen to be enumerated in.
+proliferatesAll :: Prompt.Prompt r -> r
+proliferatesAll p = case p of
+  Prompt.ChooseProliferate _ _ oids pids -> (Set.fromList oids, Set.fromList pids)
+  _ -> S.identityAnswer p
+
+proliferatesNothing :: Prompt.Prompt r -> r
+proliferatesNothing p = case p of
+  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  _ -> S.identityAnswer p
+
+-- Resolve one Proliferate for alice against `gs`, answered by `answer`.
+proliferate :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+proliferate answer src gs =
+  S.runPure answer gs (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)
+
+proliferateTests :: Registry.Type.Registry -> Tasty.TestTree
+proliferateTests registry =
+  Tasty.testGroup
+    "Proliferate"
+    [ -- CR 701.34a: "give each one additional counter of each kind that permanent
+      -- or player already has." One more, never a doubling, and never a kind that
+      -- was not already there.
+      HU.testCase "CR 701.34a proliferate adds exactly one counter of a kind already there" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            gs = S.addCounter CounterKind.PlusOnePlusOne 2 src g0
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "two became three" 3 (S.counterOf CounterKind.PlusOnePlusOne src after),
+      -- "each kind" is the clause a naive implementation drops: a creature holding
+      -- both kinds gets one more of BOTH, not one of whichever was found first.
+      --
+      -- Holding both kinds at once is a state CR 704.5q would annihilate on the
+      -- next state-based-action pass, which is exactly why this drives the opcode
+      -- directly instead of resolving a spell: the question here is what
+      -- Proliferate does to the counters it finds, not what survives afterwards.
+      HU.testCase "CR 701.34a a permanent with two kinds gets one more of each" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            g1 = S.addCounter CounterKind.PlusOnePlusOne 1 src g0
+            gs = S.addCounter CounterKind.MinusOneMinusOne 3 src g1
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "+1/+1 went up" 2 (S.counterOf CounterKind.PlusOnePlusOne src after)
+        HU.assertEqual "-1/-1 went up too" 4 (S.counterOf CounterKind.MinusOneMinusOne src after),
+      -- CR 701.34a: only permanents "that have a counter" are choosable, so a bare
+      -- permanent is never offered and never gains a first counter this way.
+      HU.testCase "CR 701.34a a permanent with no counters is not a candidate" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (bare, g1) = S.addCreature piker S.alice g0
+            gs = S.addCounter CounterKind.PlusOnePlusOne 1 src g1
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "the bare Piker gained nothing" 0 (S.counterOf CounterKind.PlusOnePlusOne bare after)
+        HU.assertEqual "the countered one moved" 2 (S.counterOf CounterKind.PlusOnePlusOne src after),
+      -- CR 701.34a: players carry counters too, and proliferate reaches them.
+      HU.testCase "CR 701.34a proliferate adds to a player's poison and energy" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            g1 = S.addPlayerCounter PlayerCounterKind.Poison 3 S.bob g0
+            gs = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice g1
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "bob's poison" 4 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+        HU.assertEqual "alice's energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after),
+      -- A player with no counters is not a candidate, the same clause the bare
+      -- permanent above tests -- so proliferate never starts someone on poison.
+      HU.testCase "CR 701.34a a player with no counters is not a candidate" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            gs = S.addPlayerCounter PlayerCounterKind.Poison 2 S.bob g0
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "alice stays clean" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
+      -- CR 701.34a: "any number" includes none. The discriminating twin of the
+      -- first test -- same board, opposite answer -- so this fails if the engine
+      -- proliferates for the player instead of asking.
+      HU.testCase "CR 701.34a choosing nothing is legal and adds nothing" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            g1 = S.addCounter CounterKind.PlusOnePlusOne 2 src g0
+            gs = S.addPlayerCounter PlayerCounterKind.Poison 3 S.bob g1
+            after = proliferate proliferatesNothing src gs
+        HU.assertEqual "the creature is untouched" 2 (S.counterOf CounterKind.PlusOnePlusOne src after)
+        HU.assertEqual "bob is untouched" 3 (S.playerCounterOf PlayerCounterKind.Poison S.bob after),
+      -- The counter placement rides Event.putCounters, so CR 614's counter
+      -- replacements get their opportunity -- proliferate is not a side door that
+      -- bypasses Hardened Scales.
+      HU.testCase "CR 614 Hardened Scales applies to the counter proliferate adds" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        hardenedScales <- Registry.printing registry "Hardened Scales"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (_, g1) = S.addCreature hardenedScales S.alice g0
+            gs = S.addCounter CounterKind.PlusOnePlusOne 1 src g1
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "one proliferated counter became two" 3 (S.counterOf CounterKind.PlusOnePlusOne src after),
+      -- Where the rules leave nothing to ask, do not ask: no permanent and no
+      -- player holds a counter, so there is no choice to make.
+      HU.testCase "CR 701.34a an empty candidate set raises no prompt" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            countingAnswer :: Prompt.Prompt r -> State.State Int r
+            countingAnswer p = case p of
+              Prompt.ChooseProliferate {} -> do
+                State.modify (+ 1)
+                pure (S.identityAnswer p)
+              _ -> pure (S.identityAnswer p)
+            asks g = State.execState (Engine.runGame countingAnswer g (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)) 0
+        HU.assertEqual "nobody has a counter: nothing to ask" 0 (asks gs)
+        HU.assertEqual "someone does: one real decision" 1 (asks (S.addCounter CounterKind.PlusOnePlusOne 1 src gs)),
+      -- The gameplay-level proof (design.md section 4): a real card, cast and
+      -- resolved, doing both halves of its text.
+      HU.testCase "Steady Progress whole card: proliferate, then draw a card" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        steadyProgress <- Registry.printing registry "Steady Progress"
+        let base = S.landsInPlay island 3
+            (creature, g1) = S.addCreature piker S.alice base
+            g2 = S.addCounter CounterKind.PlusOnePlusOne 1 creature g1
+            -- Something to draw: an empty library would make the draw a no-op
+            -- (and a CR 104.3c loss), hiding whether the effect ran at all.
+            (_, g3) = S.addLibraryCard island S.alice g2
+            (withSpell, spell) = S.handOne steadyProgress g3
+            handBefore = length (Game.zoneMembers Zone.Hand S.alice withSpell)
+            afterCast = S.runPure proliferatesAll withSpell (Cast.castSpell S.alice spell)
+            resolved = S.runPure proliferatesAll afterCast Stack.resolveTop
+        HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
+        HU.assertEqual "the counter was proliferated" 2 (S.counterOf CounterKind.PlusOnePlusOne creature resolved)
+        -- The spell left the hand and one card was drawn, so the hand is level.
+        HU.assertEqual "drew a card" handBefore (length (Game.zoneMembers Zone.Hand S.alice resolved))
+    ]
+
 createEmblemTests :: Registry.Type.Registry -> Tasty.TestTree
 createEmblemTests registry =
   Tasty.testGroup
@@ -1843,4 +1976,4 @@ actOfTreasonTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]

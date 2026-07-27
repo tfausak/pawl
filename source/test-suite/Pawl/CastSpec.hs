@@ -407,6 +407,8 @@ discardLastAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -625,7 +627,7 @@ auraTargetTests registry =
         HU.assertEqual
           "its legal set is the one creature"
           (Map.singleton Card.enchantSlot (Set.singleton (Recipient.ToCreature creature)))
-          (Target.legalSets spellId specs gs),
+          (Target.legalSets Nothing spellId specs gs),
       -- CR 601.2c: a spell whose required target has no legal choice cannot be
       -- cast at all. Reading only Mode.targetSpecs would call this castable and
       -- let it be countered on resolution instead.
@@ -658,6 +660,8 @@ castFirstOption p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -705,6 +709,8 @@ castPanglacial p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->

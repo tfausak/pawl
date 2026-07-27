@@ -8,6 +8,7 @@ module Pawl.DamageSpec where
 
 import qualified Control.Monad as Monad
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -22,6 +23,7 @@ import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -49,6 +51,7 @@ import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
@@ -370,6 +373,136 @@ toxicTests registry =
 
 sbaBase :: GameState.GameState
 sbaBase = Setup.emptyGame S.bothPlayers
+
+-- Answers Prompt.ChooseLegend by keeping the candidate `wanted`, when it is on
+-- offer. A pair of tests differing only in this argument proves the ANSWER
+-- decides which legend survives, rather than the order Sba enumerates them.
+keepsLegend :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+keepsLegend wanted p = case p of
+  Prompt.ChooseLegend _ _ candidates ->
+    if elem wanted (NonEmpty.toList candidates) then wanted else NonEmpty.head candidates
+  _ -> S.identityAnswer p
+
+-- Copies `target` when asked what to copy, and keeps `keep` when the legend rule
+-- asks which same-named legend survives.
+copiesAndKeeps :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+copiesAndKeeps target keep p = case p of
+  Prompt.ChooseCopyTarget _ _ _ legal -> if elem target legal then Just target else Nothing
+  Prompt.ChooseLegend _ _ candidates ->
+    if elem keep (NonEmpty.toList candidates) then keep else NonEmpty.head candidates
+  _ -> S.identityAnswer p
+
+-- Is this object still on the battlefield?
+inPlay :: ObjectId.ObjectId -> GameState.GameState -> Bool
+inPlay oid gs = fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
+
+legendRuleTests :: Registry.Type.Registry -> Tasty.TestTree
+legendRuleTests registry =
+  Tasty.testGroup
+    "LegendRule"
+    [ -- CR 704.5j: "If two or more legendary permanents with the same name are
+      -- controlled by the same player, that player chooses one of them, and the
+      -- rest are put into their owners' graveyards."
+      HU.testCase "CR 704.5j a second Thalia sends one of them to the graveyard" $ do
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        let (first, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
+            (second, gs) = S.addCreature thalia S.alice g0
+            kept = S.runPure (keepsLegend first) gs Sba.checkStateBasedActions
+        HU.assertBool "the chosen one stays" (inPlay first kept)
+        HU.assertBool "the other is gone" (not (inPlay second kept))
+        -- CR 400.7: the move mints a NEW incarnation, so the buried Thalia is not
+        -- `second` any more. Count the graveyard rather than chase the dead id.
+        HU.assertEqual "exactly one Thalia was buried" 1 (length (Game.zoneMembers Zone.Graveyard S.alice kept)),
+      -- The discriminating twin: same board, opposite answer. This fails if the
+      -- engine picks the survivor itself.
+      HU.testCase "CR 704.5j which Thalia survives is the controller's choice" $ do
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        let (first, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
+            (second, gs) = S.addCreature thalia S.alice g0
+            keptSecond = S.runPure (keepsLegend second) gs Sba.checkStateBasedActions
+        HU.assertBool "the second one stays this time" (inPlay second keptSecond)
+        HU.assertBool "the first is gone" (not (inPlay first keptSecond)),
+      -- CR 704.5j is per CONTROLLER: one legend each is legal, and the rule has
+      -- nothing to say about the two of them.
+      HU.testCase "CR 704.5j two players may each control a Thalia" $ do
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        let (hers, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
+            (his, gs) = S.addCreature thalia S.bob g0
+            after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+        HU.assertBool "alice keeps hers" (inPlay hers after)
+        HU.assertBool "bob keeps his" (inPlay his after),
+      -- "Legendary" is half the condition; a duplicated ordinary creature is not
+      -- the legend rule's business.
+      HU.testCase "CR 704.5j two copies of a NON-legendary creature both survive" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (a, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (b, gs) = S.addCreature piker S.alice g0
+            after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+        HU.assertBool "both stay" (inPlay a after && inPlay b after),
+      -- "With the same name" is the other half: two DIFFERENT legends coexist.
+      HU.testCase "CR 704.5j a Thalia and an Urborg coexist under one controller" $ do
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+        let (t, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
+            (u, gs) = S.addCreature urborg S.alice g0
+            after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+        HU.assertBool "both stay" (inPlay t after && inPlay u after),
+      -- "Put into their OWNERS' graveyards" -- not the controller's. Alice
+      -- controls both, but bob owns the one she stole, so that is where it goes.
+      HU.testCase "CR 704.5j the loser goes to its OWNER's graveyard, not the controller's" $ do
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        let (hers, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
+            (his, g1) = S.addCreature thalia S.bob g0
+            stolen = S.giveControl his S.alice g1
+            after = S.runPure (keepsLegend hers) stolen Sba.checkStateBasedActions
+        HU.assertBool "alice keeps her own" (inPlay hers after)
+        HU.assertBool "the stolen one left the battlefield" (not (inPlay his after))
+        -- The whole point: alice controlled it, but bob owns it, so bob's
+        -- graveyard is where it lands. (CR 400.7 gives it a fresh id on the way,
+        -- so this counts the zone rather than naming the old one.)
+        HU.assertEqual "one card in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertEqual "and none in alice's" 0 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      -- The P2-reachable path the issue names, and the gameplay-level proof: a
+      -- Clone is neither legendary nor named Thalia on its own, but CR 707.2 lists both
+      -- name and supertype among the copiable values, so the copy copies
+      -- name and supertype alike, so the copy IS a second Thalia and the rule
+      -- fires on it.
+      HU.testCase "CR 707.2/704.5j a Clone copying Thalia is a second Thalia and the rule fires" $ do
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        clone <- Registry.printing registry "Clone"
+        let (original, board) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
+            (_, staged) = S.spellOnStack clone S.alice board
+            settled = snd (Engine.runGamePure (copiesAndKeeps original original) staged (Stack.resolveTop >> Engine.settleForPriority))
+        HU.assertBool "the original survives, because alice chose it" (inPlay original settled)
+        HU.assertEqual "and exactly one Thalia is left in play" 1 (S.creaturesInPlay S.alice settled),
+      -- CR 704.3: every applicable state-based action is performed
+      -- "simultaneously as a single event". So a legend that CR 704.5f is already
+      -- burying stays on CR 704.5j's ballot, and keeping THAT one is a legal
+      -- choice which puts every other copy into the graveyard beside it.
+      --
+      -- Dropping such a member from the candidates would decide for the player
+      -- and strand a copy alive that they chose to lose -- which is what this
+      -- branch did before review caught it.
+      HU.testCase "CR 704.3/704.5j keeping a Thalia that is already dying buries both" $ do
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        let (healthy, g0) = S.addCreature thalia S.alice (Setup.emptyGame S.bothPlayers)
+            (dying, g1) = S.addCreature thalia S.alice g0
+            -- Thalia is 2/1, so -2/-1 makes this copy a 0/0: CR 704.5f applies to
+            -- it and not to the other.
+            gs = S.withEffect dying (Modification.ModifyPowerToughness (Quantity.Literal (-2)) (Quantity.Literal (-1))) g1
+            keptDying = S.runPure (keepsLegend dying) gs Sba.checkStateBasedActions
+            keptHealthy = S.runPure (keepsLegend healthy) gs Sba.checkStateBasedActions
+        HU.assertEqual "the 0/0 really is a 0/0" (Just 0) (Projection.toughnessOf dying gs)
+        -- Keeping the dying copy: 704.5j buries the healthy one, 704.5f buries this
+        -- one, and alice is left with no Thalia at all.
+        HU.assertBool "the healthy Thalia went too" (not (inPlay healthy keptDying))
+        HU.assertBool "and so did the dying one" (not (inPlay dying keptDying))
+        HU.assertEqual "two cards in the graveyard, so neither was moved twice" 2 (length (Game.zoneMembers Zone.Graveyard S.alice keptDying))
+        -- The discriminating twin: keeping the healthy copy saves it, so the
+        -- outcome above really is alice's choice and not a forced sweep.
+        HU.assertBool "keeping the healthy one saves it" (inPlay healthy keptHealthy)
+        HU.assertEqual "and only the 0/0 was buried" 1 (length (Game.zoneMembers Zone.Graveyard S.alice keptHealthy))
+    ]
 
 sbaTests :: Tasty.TestTree
 sbaTests =
@@ -1064,6 +1197,7 @@ tests registry =
   Tasty.testGroup
     "Damage"
     [ damageTests registry,
+      legendRuleTests registry,
       damageEventTests registry,
       deathtouchTests registry,
       assignmentLegalityTests,

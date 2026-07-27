@@ -138,7 +138,7 @@ falsifierTests registry =
         HU.assertEqual
           "the Wall mode (0) is absent from the fillable set"
           (Set.fromList [ModeIndex.MkModeIndex 1, ModeIndex.MkModeIndex 2])
-          (Target.fillableModes oid (Card.enchantSpecs (Printing.card chaosCharm)) (Card.Type.spell (Printing.card chaosCharm)) gs1)
+          (Target.fillableModes Nothing oid (Card.enchantSpecs (Printing.card chaosCharm)) (Card.Type.spell (Printing.card chaosCharm)) gs1)
     ]
 
 -- CR 601.2c/700.2c: only the CHOSEN mode's slots are ever prompted or stamped
@@ -220,7 +220,7 @@ nonlandPermanentTargetTests registry =
         mindslaver <- Registry.printing registry "Mindslaver"
         mountain <- Registry.printing registry "Mountain"
         let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
-            got = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land)))) gs
+            got = Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land)))) gs
         HU.assertEqual
           "two nonland permanents, no land"
           (Set.fromList [Recipient.ToObject (S.creatureId gs), Recipient.ToObject (S.artifactId gs)])
@@ -232,7 +232,7 @@ nonlandPermanentTargetTests registry =
         let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
             nonlandOther = Filter.Type.And [Filter.Type.Not (Filter.Type.HasCardType CardType.Land), Filter.Type.Not Filter.Type.IsSource]
             specs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.Permanents (Just nonlandOther))
-            got = Target.legalSets (S.creatureId gs) specs gs
+            got = Target.legalSets Nothing (S.creatureId gs) specs gs
         HU.assertEqual
           "source excluded from its own set"
           (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (Set.singleton (Recipient.ToObject (S.artifactId gs))))
@@ -406,7 +406,7 @@ triggerModalTests registry =
             HU.assertEqual
               "with Aether Channeler the only nonland permanent, only modes 0 and 2 are fillable"
               (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2])
-              (Target.fillableModes acId Map.empty modal gs),
+              (Target.fillableModes Nothing acId Map.empty modal gs),
       -- CR 603.3c/700.2b: "If no mode is chosen, the ability is removed from
       -- the stack." This is the trigger-only rule -- a SPELL that can't choose
       -- is simply never offered (CR 601.2c elides the cast entirely, M4g), but

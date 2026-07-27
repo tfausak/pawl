@@ -206,6 +206,39 @@ combatReplayTests =
             -- rather than getting its own constructor.
             let p = Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (ManaType.Colored Color.Black NonEmpty.:| [ManaType.Colored Color.Red])
              in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))),
+          -- CR 701.34a: who was proliferated onto is a decision, so it has to
+          -- survive a transcript like any other.
+          HU.testCase "ChooseProliferate round-trips through the transcript" $
+            let a = ObjectId.MkObjectId 7
+                p = Prompt.ChooseProliferate decider S.alice [a] [S.bob]
+                both = (Set.singleton a, Set.singleton S.bob)
+                neither = (Set.empty, Set.empty)
+             in do
+                  HU.assertEqual "taking both round trips" (Just both) (Replay.decode p (Replay.encode p both))
+                  -- Discriminating: CR 701.34a's "any number" includes none, and a
+                  -- decode that defaulted to the offered set would pass one leg.
+                  HU.assertEqual "declining round trips" (Just neither) (Replay.decode p (Replay.encode p neither)),
+          HU.testCase "a short transcript proliferates onto nothing" $
+            HU.assertEqual
+              "declines"
+              (Set.empty, Set.empty)
+              (Replay.defaultAnswer (Prompt.ChooseProliferate decider S.alice [ObjectId.MkObjectId 7] [S.bob])),
+          -- CR 704.5j: which legend its controller kept is a decision, so it has to
+          -- survive a transcript like any other.
+          HU.testCase "ChooseLegend round-trips through the transcript" $
+            let a = ObjectId.MkObjectId 7
+                b = ObjectId.MkObjectId 9
+                p = Prompt.ChooseLegend decider S.alice (a NonEmpty.:| [b])
+             in do
+                  HU.assertEqual "keeping the second round trips" (Just b) (Replay.decode p (Replay.encode p b))
+                  -- Discriminating: a decode that ignored the response and returned
+                  -- the head would pass one leg by accident.
+                  HU.assertEqual "keeping the first round trips" (Just a) (Replay.decode p (Replay.encode p a)),
+          HU.testCase "a legend choice does not decode as a mana-source choice" $
+            -- Discriminating: fails if ChooseLegend reuses ChoseManaSource rather
+            -- than getting its own ObjectId-shaped constructor.
+            let p = Prompt.ChooseLegend decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))),
           HU.testCase "a short transcript produces the first offered mana type" $
             HU.assertEqual
               "the head"
@@ -271,7 +304,7 @@ replayTests registry =
             decider = Decide.deciderFor S.alice gs
         case Card.Type.triggeredAbilities (Printing.card acPrinting) of
           [ability] -> do
-            let legal = Target.fillableModes acId Map.empty (TriggeredAbility.modal ability) gs
+            let legal = Target.fillableModes Nothing acId Map.empty (TriggeredAbility.modal ability) gs
                 p = Prompt.ChooseModes decider S.alice acId legal 1
                 answer = Set.singleton (ModeIndex.MkModeIndex 2)
             HU.assertEqual "legal modes are 0 and 2 (bounce self-excluded)" (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]) legal

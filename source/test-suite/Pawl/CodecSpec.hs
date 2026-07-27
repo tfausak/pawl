@@ -201,6 +201,8 @@ tests registry =
             roundTrip "e3b" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana ManaProduction.AnyColor),
           HU.testCase "ExileAllGraveyards" $
             roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards,
+          HU.testCase "Proliferate" $
+            roundTrip "e4b" Codec.effectToJson Codec.jsonToEffect Effect.Proliferate,
           HU.testCase "Destroy carries its CR 701.19c rider both ways" $ do
             roundTrip "e5a" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (SlotName.MkSlotName (Text.pack "t")) Regenerability.Regenerable)
             roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (SlotName.MkSlotName (Text.pack "t")) Regenerability.CantBeRegenerated),

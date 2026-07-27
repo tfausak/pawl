@@ -329,6 +329,7 @@ effectCounts effect = case effect of
   Effect.AddMana _ -> []
   Effect.Search _ -> []
   Effect.ExileAllGraveyards -> []
+  Effect.Proliferate -> []
   Effect.ExileHandThenDraw -> []
   Effect.RestartGame -> []
   Effect.ControlPlayerNextTurn _ -> []

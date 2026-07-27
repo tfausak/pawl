@@ -1181,7 +1181,9 @@ jsonToZoneChange value = do
 projectedCharacteristicsToJson :: PC.ProjectedCharacteristics -> Value
 projectedCharacteristicsToJson pc =
   Object
-    [ (Text.pack "keywords", multisetTo keywordToJson (PC.keywords pc)),
+    [ (Text.pack "name", Json.jText (PC.name pc)),
+      (Text.pack "supertypes", setTo supertypeToJson (PC.supertypes pc)),
+      (Text.pack "keywords", multisetTo keywordToJson (PC.keywords pc)),
       (Text.pack "colors", setTo colorToJson (PC.colors pc)),
       (Text.pack "power", maybeTo Json.jInt (PC.power pc)),
       (Text.pack "toughness", maybeTo Json.jInt (PC.toughness pc)),
@@ -1197,6 +1199,8 @@ projectedCharacteristicsToJson pc =
 jsonToProjectedCharacteristics :: Value -> Either Text PC.ProjectedCharacteristics
 jsonToProjectedCharacteristics value = do
   ps <- Json.asObject value
+  nm <- Json.field (Text.pack "name") ps >>= Json.asText
+  sups <- Json.field (Text.pack "supertypes") ps >>= setFrom jsonToSupertype
   kws <- Json.field (Text.pack "keywords") ps >>= multisetFrom jsonToKeyword
   cols <- Json.field (Text.pack "colors") ps >>= setFrom jsonToColor
   -- power/toughness/characteristicPT are encoded as required keys (maybeTo
@@ -1214,7 +1218,9 @@ jsonToProjectedCharacteristics value = do
   trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
   pure
     PC.MkProjectedCharacteristics
-      { PC.keywords = kws,
+      { PC.name = nm,
+        PC.supertypes = sups,
+        PC.keywords = kws,
         PC.colors = cols,
         PC.power = pow,
         PC.toughness = tou,
@@ -1279,6 +1285,7 @@ effectToJson e = case e of
   Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (manaProductionToJson production))
   Effect.Search f -> Json.tagged (Text.pack "Search") (Just (filterToJson f))
   Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
+  Effect.Proliferate -> nullary (Text.pack "Proliferate")
   Effect.ExileHandThenDraw -> nullary (Text.pack "ExileHandThenDraw")
   Effect.RestartGame -> nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
@@ -1318,6 +1325,7 @@ jsonToEffect value = do
     "AddMana" -> withValue mv (fmap Effect.AddMana . jsonToManaProduction)
     "Search" -> withValue mv (fmap Effect.Search . jsonToFilter)
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
+    "Proliferate" -> Right Effect.Proliferate
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
