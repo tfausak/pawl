@@ -626,7 +626,7 @@ auraTargetTests registry =
         HU.assertEqual
           "its legal set is the one creature"
           (Map.singleton Card.enchantSlot (Set.singleton (Recipient.ToCreature creature)))
-          (Target.legalSets spellId specs gs),
+          (Target.legalSets Nothing spellId specs gs),
       -- CR 601.2c: a spell whose required target has no legal choice cannot be
       -- cast at all. Reading only Mode.targetSpecs would call this castable and
       -- let it be countered on resolution instead.

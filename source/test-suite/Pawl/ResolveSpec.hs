@@ -106,12 +106,12 @@ targetTests registry =
         HU.assertEqual
           "creature and both players"
           (Set.fromList [Recipient.ToCreature oid, Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])
-          (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs),
+          (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs),
       HU.testCase "a departed player is not a legal target" $
         let gs = Departure.depart Departure.Type.Lost S.bob (Setup.emptyGame S.bothPlayers)
          in HU.assertBool
               "bob gone"
-              (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs))),
+              (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs))),
       HU.testCase "CR 800.4b an object does not change to the control of a player who has left the game" $ do
         -- CR 800.4b: "If an object would change to the control of a player who has
         -- left the game, it doesn't." Resolve.applyEffect takes the controller
@@ -147,44 +147,44 @@ targetTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
             gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
-        HU.assertBool "legal while fielded" (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs)
-        HU.assertBool "illegal once moved" (not (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gone)),
+        HU.assertBool "legal while fielded" (Target.stillLegal Nothing S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gs)
+        HU.assertBool "illegal once moved" (not (Target.stillLegal Nothing S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing) gone)),
       HU.testCase "legalSets maps each slot to its legal recipients" $
         let specs = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)
             gs = Setup.emptyGame S.bothPlayers
          in HU.assertEqual
               "one slot, two players"
               (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]))
-              (Target.legalSets S.noSource specs gs),
+              (Target.legalSets Nothing S.noSource specs gs),
       HU.testCase "CR 115.4 CreatureTarget offers creatures but no players" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         HU.assertEqual
           "just the creature"
           (Set.singleton (Recipient.ToCreature oid))
-          (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gs),
+          (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gs),
       HU.testCase "CR 601.2c CreatureTarget has an empty legal set with no creatures" $
         HU.assertBool
           "nothing to target"
-          (Set.null (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing) (Setup.emptyGame S.bothPlayers))),
+          (Set.null (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Creatures Nothing) (Setup.emptyGame S.bothPlayers))),
       HU.testCase "CR 608.2b a creature that left is no longer a legal CreatureTarget" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
             gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
-        HU.assertBool "legal while fielded" (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gs)
-        HU.assertBool "illegal once moved" (not (Target.stillLegal S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gone)),
+        HU.assertBool "legal while fielded" (Target.stillLegal Nothing S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gs)
+        HU.assertBool "illegal once moved" (not (Target.stillLegal Nothing S.noSource (Recipient.ToCreature oid) (TargetSpec.MkTargetSpec Pool.Creatures Nothing) gone)),
       HU.testCase "CR 115 SpellOrPermanentTarget offers battlefield permanents and stack spells" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (permId, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         HU.assertBool
           "the permanent is a legal object target"
-          (Set.member (Recipient.ToObject permId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.SpellsAndPermanents Nothing) gs)),
+          (Set.member (Recipient.ToObject permId) (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.SpellsAndPermanents Nothing) gs)),
       HU.testCase "CR 115 SpellTarget offers a stack spell but not a battlefield permanent" $ do
         piker <- Registry.printing registry "Goblin Piker"
         lightningBolt <- Registry.printing registry "Lightning Bolt"
         let (permId, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
             (spellId, gs) = S.spellOnStack lightningBolt S.alice base
-            legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Spells Nothing) gs
+            legal = Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Spells Nothing) gs
         HU.assertBool "the stack spell is a legal target" (Set.member (Recipient.ToObject spellId) legal)
         HU.assertBool "the battlefield permanent is not a legal target" (not (Set.member (Recipient.ToObject permId) legal)),
       HU.testCase "LandTarget offers a land as an object target, not a creature or player" $ do
@@ -193,12 +193,12 @@ targetTests registry =
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
-        HU.assertBool "the land is legal" (Set.member (Recipient.ToObject landId) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land))) gs))
-        HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land))) gs))),
+        HU.assertBool "the land is legal" (Set.member (Recipient.ToObject landId) (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land))) gs))
+        HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Land))) gs))),
       HU.testCase "CR 115: PlayerTarget is exactly the players still in the game" $
         let gs = Setup.emptyGame S.bothPlayers
             expected = Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]
-         in HU.assertEqual "both players, no creatures" expected (Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Players Nothing) gs),
+         in HU.assertEqual "both players, no creatures" expected (Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Players Nothing) gs),
       -- CR 115.1a / 700.2c: "target Wall" (Chaos Charm) restricts CreatureTarget to
       -- creatures whose PROJECTED subtypes include Wall. Wall of Stone (a real 0/8
       -- Creature - Wall, M4g) is the Wall; a Piker is the non-Wall control.
@@ -208,7 +208,7 @@ targetTests registry =
         let (wallId, base) = S.addCreature wallOfStone S.bob (Setup.emptyGame S.bothPlayers)
             (pikerId, gs) = S.addCreature piker S.alice base
             slot = SlotName.MkSlotName (Text.pack "target")
-            legal = Map.findWithDefault Set.empty slot (Target.legalSets S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
+            legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
         HU.assertBool "the Wall is legal" (Set.member (Recipient.ToCreature wallId) legal)
         HU.assertBool "the non-Wall creature is not legal" (not (Set.member (Recipient.ToCreature pikerId) legal)),
       HU.testCase "CR 115.1a ArtifactTarget is the battlefield's projected artifacts" $ do
@@ -218,7 +218,7 @@ targetTests registry =
         mindslaver <- Registry.printing registry "Mindslaver"
         mountain <- Registry.printing registry "Mountain"
         let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
-            legal = Target.legalRecipients S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))) gs
+            legal = Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact))) gs
         HU.assertEqual "exactly the artifact" (Set.singleton (Recipient.ToObject (S.artifactId gs))) legal
         HU.assertBool "no players" (not (Set.member (Recipient.ToPlayer S.alice) legal)),
       HU.testCase "CR 115.1a / 109.5 OpponentCreatureTarget excludes the source's controller's creatures" $ do
@@ -227,7 +227,7 @@ targetTests registry =
         let gs0 = Setup.emptyGame S.bothPlayers
             (mine, gs1) = S.addCreature piker S.alice gs0
             (theirs, gs2) = S.addCreature warMammoth S.bob gs1
-            legal = Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs2
+            legal = Target.legalRecipients (Just S.alice) mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs2
         HU.assertEqual "only the opponent's creature" (Set.singleton (Recipient.ToCreature theirs)) legal
         HU.assertBool "not the source's controller's own" (not (Set.member (Recipient.ToCreature mine) legal)),
       -- CR 115.1 / 109.5: "target OPPONENT". Until Ravenous Rats there was no
@@ -238,7 +238,7 @@ targetTests registry =
         ravenousRats <- Registry.printing registry "Ravenous Rats"
         let (src, gs) = S.addCreature ravenousRats S.alice (Setup.emptyGame S.threePlayers)
             spec = TargetSpec.MkTargetSpec Pool.Players (Just (Filter.Type.IsPlayer PlayerRelation.Opponent))
-            legal = Target.legalRecipients src spec gs
+            legal = Target.legalRecipients (Just S.alice) src spec gs
         HU.assertEqual
           "exactly bob and carol, never alice"
           (Set.fromList [Recipient.ToPlayer S.bob, Recipient.ToPlayer S.carol])
@@ -257,7 +257,7 @@ targetTests registry =
             HU.assertEqual
               "bob is excluded from his own Rats' trigger"
               (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.carol])
-              (Target.legalRecipients src spec gs)
+              (Target.legalRecipients (Just S.bob) src spec gs)
           _ -> HU.assertFailure "Ravenous Rats should declare exactly one target slot",
       -- The gameplay-level proof design.md section 4 asks for: an opcode is not
       -- done until a card exercises it end to end. Ravenous Rats enters, its
@@ -291,7 +291,7 @@ targetTests registry =
             (mine, gs1) = S.addCreature piker S.alice gs0
             (bobs, gs2) = S.addCreature warMammoth S.bob gs1
             (carols, gs3) = S.addCreature piker S.carol gs2
-            legal = Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs3
+            legal = Target.legalRecipients (Just S.alice) mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs3
         HU.assertEqual
           "exactly bob's and carol's, and nothing of alice's"
           (Set.fromList [Recipient.ToCreature bobs, Recipient.ToCreature carols])
@@ -310,11 +310,11 @@ targetTests registry =
         HU.assertEqual
           "for alice's source, only the creature still under bob's control"
           (Set.singleton (Recipient.ToCreature alsoTheirs))
-          (Target.legalRecipients mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) stolen)
+          (Target.legalRecipients (Projection.controllerOf mine stolen) mine (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) stolen)
         HU.assertEqual
           "for bob's source, the two alice now controls"
           (Set.fromList [Recipient.ToCreature mine, Recipient.ToCreature theirs])
-          (Target.legalRecipients alsoTheirs (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) stolen),
+          (Target.legalRecipients (Projection.controllerOf alsoTheirs stolen) alsoTheirs (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) stolen),
       -- P9 (#40): the reshaped TargetSpec = Pool + Maybe Filter reproduces the
       -- retired hand-carved specs as data. A black creature
       -- (Typhoid Rats, {B}) and a nonblack one (Goblin Piker, {1}{R}) exercise
@@ -326,7 +326,7 @@ targetTests registry =
             (blackOid, gs1) = S.addCreature typhoidRats S.bob gs0
             (plainOid, gs) = S.addCreature piker S.alice gs1
             spec = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
-            legal = Target.legalRecipients S.noSource spec gs
+            legal = Target.legalRecipients Nothing S.noSource spec gs
         HU.assertBool "black creature illegal" (not (Set.member (Recipient.ToCreature blackOid) legal))
         HU.assertBool "nonblack creature legal" (Set.member (Recipient.ToCreature plainOid) legal),
       HU.testCase "P9 Creatures + Nothing narrows nothing" $ do
@@ -337,7 +337,7 @@ targetTests registry =
             (plainOid, gs) = S.addCreature piker S.alice gs1
             spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing
             expectedAllCreatures = Set.fromList [Recipient.ToCreature blackOid, Recipient.ToCreature plainOid]
-        HU.assertEqual "all creatures legal" expectedAllCreatures (Target.legalRecipients S.noSource spec gs),
+        HU.assertEqual "all creatures legal" expectedAllCreatures (Target.legalRecipients Nothing S.noSource spec gs),
       -- CR 601.2c "another" over a Creatures pool (#163). The pool tags its
       -- candidates ToCreature (CR 115.1a); a Not IsSource conjunct drops the
       -- source whatever tag the pool gave it, which the retired Exclusion field
@@ -353,7 +353,7 @@ targetTests registry =
         HU.assertEqual
           "source excluded from its own set"
           (Map.singleton slot (Set.singleton (Recipient.ToCreature otherId)))
-          (Target.legalSets srcId specs gs),
+          (Target.legalSets Nothing srcId specs gs),
       -- The other half of the same claim: a slot carrying no Not IsSource does
       -- not exclude, so Prodigal Sorcerer may still ping itself (CR 115.4).
       HU.testCase "a slot without Not IsSource still admits the source (CR 115.4)" $ do
@@ -365,7 +365,7 @@ targetTests registry =
         HU.assertEqual
           "source is its own legal target"
           (Map.singleton slot (Set.singleton (Recipient.ToCreature srcId)))
-          (Target.legalSets srcId specs gs),
+          (Target.legalSets Nothing srcId specs gs),
       -- Gate cards for P9 Task 5: Terror and Reprisal. Both cards' printed text
       -- ends "It can't be regenerated."; regeneration is not modelled (no
       -- regeneration shield to suppress), so that clause is a no-op and is
@@ -383,7 +383,7 @@ targetTests registry =
                 (blackOid, gs1) = S.addCreature typhoidRats S.bob gs0
                 (artifactOid, gs2) = S.addCreature darksteelMyr S.bob gs1
                 (plainOid, gs) = S.addCreature piker S.alice gs2
-                legal = Target.legalRecipients S.noSource spec gs
+                legal = Target.legalRecipients Nothing S.noSource spec gs
             HU.assertBool "black creature illegal" (not (Set.member (Recipient.ToCreature blackOid) legal))
             HU.assertBool "artifact creature illegal" (not (Set.member (Recipient.ToCreature artifactOid) legal))
             HU.assertBool "nonblack, nonartifact creature legal" (Set.member (Recipient.ToCreature plainOid) legal),
@@ -395,9 +395,9 @@ targetTests registry =
           Just spec -> do
             let gs0 = Setup.emptyGame S.bothPlayers
                 (smallOid, gs) = S.addCreature piker S.bob gs0 -- power 2, {1}{R}
-                legalBefore = Target.legalRecipients S.noSource spec gs
+                legalBefore = Target.legalRecipients Nothing S.noSource spec gs
                 pumped = S.withEffect smallOid (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0)) gs
-                legalAfter = Target.legalRecipients S.noSource spec pumped
+                legalAfter = Target.legalRecipients Nothing S.noSource spec pumped
             HU.assertBool "power 2 is illegal (below the PowerAtLeast 4 floor)" (not (Set.member (Recipient.ToCreature smallOid) legalBefore))
             HU.assertBool "pumped to power 4 becomes legal" (Set.member (Recipient.ToCreature smallOid) legalAfter)
     ]

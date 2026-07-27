@@ -288,7 +288,7 @@ replayTests registry =
             decider = Decide.deciderFor S.alice gs
         case Card.Type.triggeredAbilities (Printing.card acPrinting) of
           [ability] -> do
-            let legal = Target.fillableModes acId Map.empty (TriggeredAbility.modal ability) gs
+            let legal = Target.fillableModes Nothing acId Map.empty (TriggeredAbility.modal ability) gs
                 p = Prompt.ChooseModes decider S.alice acId legal 1
                 answer = Set.singleton (ModeIndex.MkModeIndex 2)
             HU.assertEqual "legal modes are 0 and 2 (bounce self-excluded)" (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]) legal
