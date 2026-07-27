@@ -22,7 +22,12 @@
         "effects": [
           {
             "type": "Destroy",
-            "value": "wall"
+            "value": [
+              "wall",
+              {
+                "type": "Regenerable"
+              }
+            ]
           }
         ],
         "targetSpecs": [

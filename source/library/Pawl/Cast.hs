@@ -59,12 +59,16 @@ timingOk pid oid gs = case Game.cardOf oid gs of
 -- in play). For a non-modal card (one mode, count 1) this is identical to
 -- "every slot fillable": the single mode fillable = all its slots fillable =
 -- the whole card's slots.
-targetable :: ObjectId -> GameState -> Bool
-targetable oid gs = case Game.cardOf oid gs of
+-- CR 109.5 / 601.2a: the perspective a "target creature an opponent controls"
+-- slot is measured against is the player CASTING the spell, who becomes its
+-- controller the moment it is put on the stack. Taken as a parameter rather than
+-- read off the card, which is in a hand and has no controller at all.
+targetable :: PlayerId -> ObjectId -> GameState -> Bool
+targetable pid oid gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card ->
     let count = Modal.selectionCount (Card.Type.spell card)
-     in Set.size (Target.fillableModes oid (Card.enchantSpecs card) (Card.Type.spell card) gs) >= fromIntegral count
+     in Set.size (Target.fillableModes (Just pid) oid (Card.enchantSpecs card) (Card.Type.spell card) gs) >= fromIntegral count
 
 -- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
 -- affordable when it is payable with X=0 (the caster may always choose 0)
@@ -87,7 +91,7 @@ castable pid oid gs =
     -- because the engine never offers an illegal action and then rejects it.
     && not (PlayerEffect.prohibitsCasting pid gs)
     && any (payableCost pid oid gs) (Cost.costsFor oid gs)
-    && targetable oid gs
+    && targetable pid oid gs
 
 castableSpells :: PlayerId -> GameState -> [ObjectId]
 castableSpells pid gs = filter (\oid -> castable pid oid gs) (Game.zoneMembers Zone.Hand pid gs)
@@ -113,7 +117,7 @@ castableWhileSearching :: PlayerId -> GameState -> [ObjectId]
 castableWhileSearching pid gs =
   let permitted oid = maybe False permitsCastWhileSearching (Game.cardOf oid gs)
       affordable oid = any (payableCost pid oid gs) (Cost.costsFor oid gs)
-      allowed oid = permitted oid && affordable oid && targetable oid gs
+      allowed oid = permitted oid && affordable oid && targetable pid oid gs
    in if PlayerEffect.prohibitsCasting pid gs
         then []
         else filter allowed (Game.zoneMembers Zone.Library pid gs)
@@ -156,7 +160,7 @@ castSpell pid oid = do
     Nothing -> pure ()
     Just card -> do
       let decider = Decide.deciderFor pid gs
-          legal = Target.fillableModes oid (Card.enchantSpecs card) (Card.Type.spell card) gs
+          legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs card) (Card.Type.spell card) gs
           count = Modal.selectionCount (Card.Type.spell card)
       -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
       -- unprompted) exactly when there is nothing to choose -- as many legal
@@ -182,7 +186,7 @@ castSpell pid oid = do
             [only] -> pure only
             _ -> Trans.lift (Program.prompt (Prompt.ChooseCost decider pid oid payable))
           Monad.when (elem chosenCost payable) $ do
-            let sets = Target.legalSets oid (Card.modesTargetSpecs chosenModes card) gs
+            let sets = Target.legalSets (Just pid) oid (Card.modesTargetSpecs chosenModes card) gs
             mAmount <-
               if Cost.hasVariable chosenCost
                 then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid)))

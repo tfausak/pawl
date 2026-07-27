@@ -62,6 +62,7 @@ import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity.Type
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.SlotName as SlotName
@@ -328,11 +329,12 @@ effectCounts effect = case effect of
   Effect.AddMana _ -> []
   Effect.Search _ -> []
   Effect.ExileAllGraveyards -> []
+  Effect.Proliferate -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices _ _ quantity -> quantityCounts quantity
   Effect.RestartGame -> []
   Effect.ControlPlayerNextTurn _ -> []
-  Effect.Destroy _ -> []
+  Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   Effect.MoveToZone _ _ -> []
   Effect.Draw quantity -> quantityCounts quantity
@@ -764,13 +766,22 @@ m4bCardTests registry =
         HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 0))) (Card.Type.power c)
         HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
         HU.assertEqual "keyword" (Set.singleton Keyword.Indestructible) (Card.Type.keywords c),
+      -- #113: both P9 gate cards end "It can't be regenerated", and the clause was
+      -- omitted from their data while nothing could honour it. It is data now.
+      HU.testCase "CR 701.19c Terror and Reprisal both carry the can't-be-regenerated rider" $ do
+        terror <- Registry.printing registry "Terror"
+        reprisal <- Registry.printing registry "Reprisal"
+        let riders c = [r | Effect.Destroy _ r <- Card.allEffects (Printing.card c)]
+        HU.assertEqual "Terror" [Regenerability.CantBeRegenerated] (riders terror)
+        HU.assertEqual "Reprisal" [Regenerability.CantBeRegenerated] (riders reprisal),
       HU.testCase "Murder is a {1}{B}{B} Instant that destroys a target creature" $ do
         murder <- Registry.printing registry "Murder"
         let c = Printing.card murder
             black = ManaSymbol.OfType (ManaType.Colored Color.Black)
         HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black, black])) (Card.Type.manaCost c)
         HU.assertBool "an instant" (Card.isInstant c)
-        HU.assertEqual "effect destroys the target slot" [Effect.Destroy (SlotName.MkSlotName (Text.pack "target"))] (Card.allEffects c)
+        -- Murder carries no CR 701.19c rider, unlike Terror and Reprisal.
+        HU.assertEqual "effect destroys the target slot" [Effect.Destroy (SlotName.MkSlotName (Text.pack "target")) Regenerability.Regenerable] (Card.allEffects c)
         HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
       HU.testCase "Unsummon is a {U} Instant that bounces a target creature to hand" $ do
         unsummon <- Registry.printing registry "Unsummon"

@@ -44,6 +44,7 @@ import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
@@ -224,8 +225,8 @@ changeZoneAttaching oid requestedDest seed = do
 -- graveyard via changeZone (so Rest in Peace's redirect and a token's CR
 -- 704.5d cease-to-exist still compose). Ungated for CR 701.19c "can't be
 -- regenerated" (#42).
-destroy :: ObjectId -> Game ()
-destroy oid = do
+destroy :: Regenerability.Regenerability -> ObjectId -> Game ()
+destroy regenerability oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure ()
@@ -233,7 +234,7 @@ destroy oid = do
       if Projection.hasKeyword Keyword.Type.Indestructible oid gs
         then pure ()
         else do
-          settled <- Replacement.resolveDestruction oid
+          settled <- Replacement.resolveDestruction regenerability oid
           case settled of
             Nothing -> pure ()
             -- The graveyard move follows the SETTLED object, not the one asked

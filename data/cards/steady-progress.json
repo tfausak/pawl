@@ -5,19 +5,19 @@
   "manaCost": [
     {
       "type": "Generic",
-      "value": 1
+      "value": 2
     },
     {
       "type": "OfType",
       "value": {
         "type": "Colored",
         "value": {
-          "type": "White"
+          "type": "Blue"
         }
       }
     }
   ],
-  "name": "Reprisal",
+  "name": "Steady Progress",
   "power": null,
   "replacementEffects": [],
   "spell": {
@@ -25,29 +25,17 @@
       {
         "effects": [
           {
-            "type": "Destroy",
-            "value": [
-              "target",
-              {
-                "type": "CantBeRegenerated"
-              }
-            ]
-          }
-        ],
-        "targetSpecs": [
+            "type": "Proliferate"
+          },
           {
-            "slot": "target",
-            "spec": {
-              "filter": {
-                "type": "PowerAtLeast",
-                "value": 4
-              },
-              "pool": {
-                "type": "Creatures"
-              }
+            "type": "Draw",
+            "value": {
+              "type": "Literal",
+              "value": 1
             }
           }
-        ]
+        ],
+        "targetSpecs": []
       }
     ],
     "selection": {

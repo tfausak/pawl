@@ -1,0 +1,104 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [],
+        "mana": [
+          {
+            "type": "OfType",
+            "value": {
+              "type": "Colored",
+              "value": {
+                "type": "Red"
+              }
+            }
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Replace",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "Once"
+                  },
+                  {
+                    "type": "DestructionR",
+                    "value": {
+                      "type": "Regenerate"
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Uthden Troll",
+  "power": {
+    "type": "Literal",
+    "value": 2
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 2
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Troll"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

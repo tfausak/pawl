@@ -2,13 +2,16 @@ module Pawl.Sba where
 
 import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Decide as Decide
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
@@ -29,11 +32,15 @@ import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Pool as Pool
+import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.ProjectedCharacteristics as PC
+import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
 
@@ -285,7 +292,61 @@ stillLegalEnchant pcs gs source spec target = case spec of
           && case Game.lookupObject target gs of
             Nothing -> False
             Just obj -> List.elem (Object.owner obj) (Game.stillPlaying gs)
-  _ -> Target.stillLegal source (Recipient.ToCreature target) spec gs
+  -- The Aura is on the battlefield when this SBA asks, so its controller is
+  -- live -- the CR 608.2b case this perspective exists for cannot arise here.
+  _ -> Target.stillLegal (Projection.controllerOf source gs) source (Recipient.ToCreature target) spec gs
+
+-- CR 704.5j: the same-named legendary groups one player controls, as a list of
+-- groups, each with two or more members. Both halves are read from the
+-- PROJECTION, not the printed card, which is the whole reason a Clone is caught:
+-- CR 707.2 copies name and supertype alike, so a Clone of Thalia is legendary and
+-- named Thalia even though its own card is neither.
+--
+-- Grouped by name per controller. Two players each with a Thalia is not the
+-- legend rule's business (it says "controlled by the same player"), and one
+-- player's Thalia and Urborg are two different names.
+legendGroups :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> [(PlayerId, NonEmpty.NonEmpty ObjectId)]
+legendGroups pcs gs =
+  let legendary oid = case Map.lookup oid pcs of
+        Nothing -> Nothing
+        Just pc
+          | Set.member Supertype.Legendary (PC.supertypes pc) ->
+              fmap (\controller -> ((controller, PC.name pc), [oid])) (Projection.controllerOf oid gs)
+          | otherwise -> Nothing
+      keyed = Maybe.mapMaybe legendary (Set.toList (GameState.battlefield gs))
+      byKey = Map.fromListWith (<>) keyed
+      -- Only a group of two or more is the legend rule's business, and the
+      -- candidate list is sorted so the prompt's order is stable rather than an
+      -- accident of how Map.fromListWith accumulated it.
+      toGroup ((controller, _), oids) = case List.sort oids of
+        first : rest@(_ : _) -> Just (controller, first NonEmpty.:| rest)
+        _ -> Nothing
+   in Maybe.mapMaybe toGroup (Map.toList byKey)
+
+-- CR 704.5j: ask one same-named group's controller which to keep, and return the
+-- rest -- the permanents this pass must put into their OWNERS' graveyards
+-- (Event.changeZone is owner-relative, so that falls out).
+--
+-- Asks but does not move, and that separation is the rule rather than tidiness.
+-- CR 704.3 performs every applicable state-based action "simultaneously as a
+-- single event", so the choice has to be made against the state as the pass
+-- began -- including a group member that another action is ALSO about to bury.
+-- Keeping that one is a legal choice, and it puts every other same-named legend
+-- into the graveyard beside it; dropping it from the candidates would decide for
+-- the player and could leave a copy alive that they chose to lose.
+--
+-- A plain put-into-graveyard, not a destruction: CR 704.5j says "put into", so
+-- the caller consults neither indestructible (CR 702.12b) nor a regeneration
+-- shield, exactly as CR 704.5f's zero-toughness bury does.
+--
+-- FILTERED, NOT TRUSTED: an answer naming a permanent outside the group would
+-- otherwise bury the whole group, so it falls back to the head.
+chooseLegendVictims :: (PlayerId, NonEmpty.NonEmpty ObjectId) -> Game [ObjectId]
+chooseLegendVictims (controller, candidates) = do
+  gs <- State.get
+  answer <- Trans.lift (Program.prompt (Prompt.ChooseLegend (Decide.deciderFor controller gs) controller candidates))
+  let kept = if List.elem answer (NonEmpty.toList candidates) then answer else NonEmpty.head candidates
+  pure (filter (/= kept) (NonEmpty.toList candidates))
 
 -- CR 704.3: repeat until no state-based action is performed. ONE pass here, with
 -- the repeat living in Engine's CR 117.5 settle loop (settleForPriority). A
@@ -352,16 +413,40 @@ performStateBasedActions = do
       -- no damage. The record is never removed.
       watermark :: Natural
       watermark = fromIntegral (Seq.length (GameState.events gs))
-  -- CR 704.5f: a plain put-into-graveyard (regeneration cannot save it).
-  Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) toGraveyard
-  -- CR 704.5m: the Aura follows its creature. A plain put-into-graveyard.
-  Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) unattachedAuras
+      -- CR 704.5j, computed from the SAME pre-pass state as every classification
+      -- above, because CR 704.3 performs all applicable state-based actions
+      -- simultaneously. Deliberately NOT filtered against the buries below: see
+      -- chooseLegendVictims for why a member that is dying anyway must stay on
+      -- the ballot.
+      legendsToResolve = legendGroups pcs gs
+  -- CR 704.5j: the legend rule is the one state-based action that ASKS, and it
+  -- asks BEFORE anything below moves -- so every choice is made against the state
+  -- this pass began in, which is what CR 704.3's "simultaneously as a single
+  -- event" requires.
+  legendVictims <- fmap concat (Monad.mapM chooseLegendVictims legendsToResolve)
+  -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
+  -- CR 704.5f (toughness <= 0), CR 704.5j (the legend rule's losers) and CR
+  -- 704.5m (an Aura attached to nothing). None of the three is a destruction, so
+  -- none consults indestructible or a regeneration shield.
+  --
+  -- Deduplicated because the three sets overlap: a legend at 0 toughness whose
+  -- controller kept a DIFFERENT copy is named by 704.5f and 704.5j alike, and
+  -- moving it twice would emit a second zone-change event and fire its
+  -- dies-triggers again.
+  Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> unattachedAuras))
   -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Event: no Moved event, no replacement, no trigger.
   State.modify' (\g -> g {GameState.objects = List.foldl' (\m oid -> Map.adjust (\o -> o {Object.attachedTo = Nothing}) oid m) (GameState.objects g) detaching})
-  -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
-  Monad.mapM_ Event.destroy toDestroy
+  -- CR 704.5g/h: destruction through the funnel, Regenerable -- and that is not a
+  -- default so much as the point, since CR 701.19a's shield exists to replace
+  -- exactly this destruction.
+  --
+  -- A permanent the legend rule already buried is excluded rather than left to
+  -- no-op on a dead id, and the two halves of this line say the same thing from
+  -- opposite ends: CR 704.5j is a put-into-graveyard, not a destruction, so it
+  -- neither offers the shield an opportunity nor may consume one here.
+  Monad.mapM_ (Event.destroy Regenerability.Regenerable) (filter (\oid -> List.notElem oid legendVictims) toDestroy)
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
       departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving
@@ -394,8 +479,9 @@ performStateBasedActions = do
       -- (a regenerated creature still counts, which the CR 704.4 settle loop
       -- re-checks and -- because the regen healed the damage -- terminates), a
       -- player left, a token ceased to exist, an Aura fell off (CR 704.5m), or a
-      -- permanent detached (CR 704.5n / 704.5p).
-      acted = not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching)
+      -- permanent detached (CR 704.5n / 704.5p), or the legend rule buried a
+      -- duplicate legend (CR 704.5j).
+      acted = not (null legendVictims) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as

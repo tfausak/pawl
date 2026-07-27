@@ -88,11 +88,12 @@ slotsOf effect = case effect of
   Effect.AddMana _ -> Set.empty
   Effect.Search _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
+  Effect.Proliferate -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
   Effect.PlayerSacrifices slot _ _ -> Set.singleton slot
   Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
-  Effect.Destroy slot -> Set.singleton slot
+  Effect.Destroy slot _ -> Set.singleton slot
   Effect.Sacrifice slot -> Set.singleton slot
   Effect.MoveToZone slot _ -> Set.singleton slot
   Effect.Draw _ -> Set.empty
@@ -132,11 +133,12 @@ readsX = any effectReadsX
       Effect.AddMana _ -> False
       Effect.Search _ -> False
       Effect.ExileAllGraveyards -> False
+      Effect.Proliferate -> False
       Effect.ExileHandThenDraw -> False
       Effect.PlayerSacrifices _ _ quantity -> quantity == Quantity.Type.X
       Effect.RestartGame -> False
       Effect.ControlPlayerNextTurn _ -> False
-      Effect.Destroy _ -> False
+      Effect.Destroy {} -> False
       Effect.Sacrifice _ -> False
       Effect.MoveToZone {} -> False
       Effect.Draw quantity -> quantity == Quantity.Type.X
@@ -173,11 +175,12 @@ manaProduced effect = case effect of
   Effect.ChangeText _ -> Nothing
   Effect.Search _ -> Nothing
   Effect.ExileAllGraveyards -> Nothing
+  Effect.Proliferate -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
   Effect.RestartGame -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
-  Effect.Destroy _ -> Nothing
+  Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
   Effect.MoveToZone {} -> Nothing
   Effect.Draw _ -> Nothing
@@ -204,6 +207,7 @@ manaProduced effect = case effect of
 searchesLibrary :: Effect Card.Type.Card -> Bool
 searchesLibrary effect = case effect of
   Effect.Search _ -> True
+  Effect.Proliferate -> False
   Effect.PlayerSacrifices {} -> False
   Effect.DealDamage _ _ -> False
   Effect.ModifyTarget {} -> False
@@ -213,7 +217,7 @@ searchesLibrary effect = case effect of
   Effect.ExileHandThenDraw -> False
   Effect.RestartGame -> False
   Effect.ControlPlayerNextTurn _ -> False
-  Effect.Destroy _ -> False
+  Effect.Destroy {} -> False
   Effect.Sacrifice _ -> False
   Effect.MoveToZone {} -> False
   Effect.Draw _ -> False
@@ -286,11 +290,12 @@ rewriteEffect pairs effect = case effect of
   Effect.AddMana _ -> effect
   Effect.Search _ -> effect
   Effect.ExileAllGraveyards -> effect
+  Effect.Proliferate -> effect
   Effect.ExileHandThenDraw -> effect
   Effect.PlayerSacrifices {} -> effect
   Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
-  Effect.Destroy _ -> effect
+  Effect.Destroy {} -> effect
   Effect.Sacrifice _ -> effect
   Effect.MoveToZone {} -> effect
   Effect.Draw _ -> effect
@@ -344,6 +349,25 @@ effectsOf oid gs = case Game.lookupObject oid gs of
 -- (Pawl.Stack), which is the whole point of it being a function: an Aura spell is
 -- the first PERMANENT spell that can be countered on resolution, and a second
 -- copy of this logic would drift.
+-- CR 405.4: who controls a SPELL on the stack -- "a spell's controller is the
+-- player who cast it", fixed at cast time -- for both CR 608.2b's legality
+-- perspective and the effects' own execution.
+--
+-- One function because those two must name the same player, not because they
+-- currently disagree: they do not. controllerOfGiven answers Nothing only for an
+-- object that does not exist, and both callers have already matched `Just obj`
+-- from a lookup, so the fallback below is unreachable at either. What was wrong
+-- was having the same question spelled two ways -- a bare Projection.controllerOf
+-- for legality and this expression for execution -- which is a divergence waiting
+-- to be introduced rather than one already there.
+--
+-- The projection read is itself a no-op in this pool: nothing installs a
+-- SetController naming a stack object, so it always folds back to the owner. #83
+-- argues it should trust Object.owner outright; whichever way that lands, it now
+-- lands in one place instead of three.
+spellController :: Object.Object -> ObjectId -> GameState -> PlayerId
+spellController obj oid gs = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+
 targetsAllIllegal :: ObjectId -> GameState -> Bool
 targetsAllIllegal oid gs = case Game.lookupObject oid gs of
   Nothing -> False
@@ -354,7 +378,10 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipient = case Map.lookup slot specs of
             Nothing -> True
-            Just spec -> Target.stillLegal oid recipient spec gs
+            -- CR 608.2b's perspective is the SPELL's controller (CR 405.4), read
+            -- through the same function resolveSpellWith uses for effect
+            -- execution so the two cannot drift apart.
+            Just spec -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           targeted = Map.restrictKeys legality (Map.keysSet specs)
        in not (Map.null specs) && not (or (Map.elems targeted))
@@ -390,7 +417,7 @@ resolveSpellWith runSubgame oid = do
               -- a token this resolution minted -- and was never targeted, so it can
               -- never have become an illegal target.
               Nothing -> True
-              Just spec -> Target.stillLegal oid recipient spec gs
+              Just spec -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs
          in if targetsAllIllegal oid gs
               then Event.changeZone oid Zone.Graveyard
               else do
@@ -404,7 +431,7 @@ resolveSpellWith runSubgame oid = do
                 -- Object.owner -- but it re-reads live projected control
                 -- rather than trusting the frozen owner outright, the same
                 -- shape an ability's controller recompute used to take (#83).
-                let effectController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+                let effectController = spellController obj oid gs
                 Monad.forM_ (effectsOf oid gs) $ \eff -> do
                   -- Re-read the live bindings for THIS effect: a prior PlaySubgame
                   -- may have bound its loser slot. Target legality is recomputed
@@ -438,7 +465,17 @@ resolveEffects stackId srcId effects specs = do
             -- a token this resolution minted -- and was never targeted, so it can
             -- never have become an illegal target.
             Nothing -> True
-            Just spec -> Target.stillLegal srcId recipient spec gs
+            -- CR 608.2b: the perspective is the ABILITY's controller -- literally
+            -- the `effectController` bound below, whose own comment explains why
+            -- that is Object.owner and not a live projection (CR 113.8: fixed at
+            -- the ability's creation, and a stolen permanent's later controller
+            -- must not override it). Reading the projection here instead would
+            -- have contradicted that rule three lines away.
+            --
+            -- `srcId` stays the source (CR 113.7) and may well be gone: that is
+            -- exactly the case this rule is about, and why the perspective is not
+            -- read from it.
+            Just spec -> Target.stillLegal (Just effectController) srcId recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
           -- reserved slots above cannot rescue a spell whose every target is gone.
@@ -691,13 +728,15 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
-  Effect.Destroy slot ->
+  Effect.Destroy slot regenerability ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of
         Nothing -> pure ()
         -- CR 701.8: destroy through the single funnel -- indestructible (CR
         -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide.
-        Just target -> Event.destroy target
+        -- The card's own CR 701.19c rider rides along, because whether a shield
+        -- may apply is a fact about THIS destruction (Terror's), not the victim.
+        Just target -> Event.destroy regenerability target
       -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
       _ -> pure ()
   Effect.Sacrifice slot ->
@@ -1006,6 +1045,63 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           -- (Hardened Scales, Doubling Season) get their opportunity.
           Just n -> Monad.when (n > 0) (Event.putCounters target kind (fromInteger n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
+      -- CR 701.34a: "choose any number of permanents and/or players that have a
+      -- counter, then give each one additional counter of each kind that permanent or
+      -- player already has."
+      --
+      -- Every clause of that sentence is load-bearing. "That have a counter" is the
+      -- candidate filter, so proliferate never starts anything on its first counter.
+      -- "Any number" means the chosen set may be empty, which is why a lone candidate
+      -- is still asked about. "Each kind ... already has" means one more of every kind
+      -- present, not a doubling and not a kind of the chooser's choosing.
+      --
+      -- Both the candidates and their kinds are read from the state BEFORE the prompt
+      -- and before any counter lands. That keeps the answer to "which kinds does this
+      -- have" fixed for the whole action (CR 608.2h's posture), so a CR 614
+      -- replacement that scales one placement cannot feed back and widen the set of
+      -- kinds still being walked.
+      --
+      -- Targetless: nothing was targeted, so unlike every slot-reading opcode here
+      -- there is no CR 608.2b legality to re-check.
+  Effect.Proliferate -> do
+    gs <- State.get
+    let everyone = Map.keys (GameState.players gs)
+        kindsOn oid = foldMap (Map.keys . Map.filter (> 0) . Object.counters) (Game.lookupObject oid gs)
+        kindsFor pid = foldMap (Map.keys . Map.filter (> 0) . Player.counters) (Map.lookup pid (GameState.players gs))
+        -- The battlefield is shared, and zoneMembers slices it by OWNER, so the
+        -- union over every seat is every permanent in play -- not just this
+        -- player's. CR 701.34a lets a proliferating player choose anyone's.
+        onBattlefield = concatMap (\pid -> Game.zoneMembers Zone.Battlefield pid gs) everyone
+        permanents = filter (not . null . kindsOn) onBattlefield
+        players = filter (not . null . kindsFor) everyone
+    Monad.unless (null permanents && null players) $ do
+      (pickedPermanents, pickedPlayers) <-
+        Trans.lift (Program.prompt (Prompt.ChooseProliferate (Decide.deciderFor controller gs) controller permanents players))
+      -- FILTERED, NOT TRUSTED, the posture every other prompt reader takes: an
+      -- answer naming something that was not offered is dropped rather than
+      -- honoured, so a bogus id cannot mint a counter on a permanent that had
+      -- none -- which is precisely what the candidate filter exists to prevent.
+      let keptPermanents = filter (\oid -> Set.member oid pickedPermanents) permanents
+          keptPlayers = filter (\pid -> Set.member pid pickedPlayers) players
+      -- CR 122.6: object counters go through the single funnel, so CR 614's
+      -- counter replacements (Hardened Scales, Doubling Season) apply to a
+      -- proliferated counter exactly as they do to a placed one.
+      Monad.forM_ keptPermanents $ \oid ->
+        Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters oid kind 1
+      -- Player counters are added directly, with no CR 614 opportunity, matching
+      -- GainPlayerCounters below and gapped for the same reason (#122).
+      Monad.forM_ keptPlayers $ \pid ->
+        Monad.forM_ (kindsFor pid) $ \kind ->
+          State.modify'
+            ( \g ->
+                g
+                  { GameState.players =
+                      Map.adjust
+                        (\pl -> pl {Player.counters = Map.insertWith (+) kind 1 (Player.counters pl)})
+                        pid
+                        (GameState.players g)
+                  }
+            )
   Effect.GainPlayerCounters ref kind quantity -> do
     gs <- State.get
     let viewOf = Projection.fullView gs

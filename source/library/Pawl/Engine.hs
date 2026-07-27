@@ -465,7 +465,7 @@ placeOne pending = do
       (ts, gs2) = Game.freshTimestamp gs1
       decider = Decide.deciderFor controller gs
       modal = TriggeredAbility.modal ability
-      legal = Target.fillableModes srcId Map.empty modal gs
+      legal = Target.fillableModes (Just controller) srcId Map.empty modal gs
       count = Modal.selectionCount modal
       obj =
         Object.MkObject
@@ -494,7 +494,7 @@ placeOne pending = do
           else Trans.lift (Program.prompt (Prompt.ChooseModes decider controller abilId legal count))
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability
       -- is placed. A mode with no target slots (Create/Draw) asks nothing.
-      let sets = Target.legalSets srcId (Modal.modesTargetSpecs chosenModes modal) gs
+      let sets = Target.legalSets (Just controller) srcId (Modal.modesTargetSpecs chosenModes modal) gs
       chosen <-
         if Map.null sets
           then pure Map.empty

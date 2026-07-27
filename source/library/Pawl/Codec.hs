@@ -77,6 +77,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.Scope as Scope
@@ -274,6 +275,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Equipment -> "Equipment"
   Subtype.Scout -> "Scout"
   Subtype.Artificer -> "Artificer"
+  Subtype.Troll -> "Troll"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -317,7 +319,8 @@ jsonToSubtype =
       (Text.pack "Aura", Subtype.Aura),
       (Text.pack "Equipment", Subtype.Equipment),
       (Text.pack "Scout", Subtype.Scout),
-      (Text.pack "Artificer", Subtype.Artificer)
+      (Text.pack "Artificer", Subtype.Artificer),
+      (Text.pack "Troll", Subtype.Troll)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -951,6 +954,19 @@ jsonToManaType value = do
     ("Colorless", _) -> Right ManaType.Colorless
     _ -> Left (Text.pack "unknown ManaType: " <> t)
 
+regenerabilityToJson :: Regenerability.Regenerability -> Value
+regenerabilityToJson r = nullary . Text.pack $ case r of
+  Regenerability.Regenerable -> "Regenerable"
+  Regenerability.CantBeRegenerated -> "CantBeRegenerated"
+
+jsonToRegenerability :: Value -> Either Text Regenerability.Regenerability
+jsonToRegenerability =
+  decodeNullary
+    (Text.pack "Regenerability")
+    [ (Text.pack "Regenerable", Regenerability.Regenerable),
+      (Text.pack "CantBeRegenerated", Regenerability.CantBeRegenerated)
+    ]
+
 manaProductionToJson :: ManaProduction.ManaProduction -> Value
 manaProductionToJson mp = case mp of
   ManaProduction.OfType mt -> Json.tagged (Text.pack "OfType") (Just (manaTypeToJson mt))
@@ -1165,7 +1181,9 @@ jsonToZoneChange value = do
 projectedCharacteristicsToJson :: PC.ProjectedCharacteristics -> Value
 projectedCharacteristicsToJson pc =
   Object
-    [ (Text.pack "keywords", multisetTo keywordToJson (PC.keywords pc)),
+    [ (Text.pack "name", Json.jText (PC.name pc)),
+      (Text.pack "supertypes", setTo supertypeToJson (PC.supertypes pc)),
+      (Text.pack "keywords", multisetTo keywordToJson (PC.keywords pc)),
       (Text.pack "colors", setTo colorToJson (PC.colors pc)),
       (Text.pack "power", maybeTo Json.jInt (PC.power pc)),
       (Text.pack "toughness", maybeTo Json.jInt (PC.toughness pc)),
@@ -1181,6 +1199,8 @@ projectedCharacteristicsToJson pc =
 jsonToProjectedCharacteristics :: Value -> Either Text PC.ProjectedCharacteristics
 jsonToProjectedCharacteristics value = do
   ps <- Json.asObject value
+  nm <- Json.field (Text.pack "name") ps >>= Json.asText
+  sups <- Json.field (Text.pack "supertypes") ps >>= setFrom jsonToSupertype
   kws <- Json.field (Text.pack "keywords") ps >>= multisetFrom jsonToKeyword
   cols <- Json.field (Text.pack "colors") ps >>= setFrom jsonToColor
   -- power/toughness/characteristicPT are encoded as required keys (maybeTo
@@ -1198,7 +1218,9 @@ jsonToProjectedCharacteristics value = do
   trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
   pure
     PC.MkProjectedCharacteristics
-      { PC.keywords = kws,
+      { PC.name = nm,
+        PC.supertypes = sups,
+        PC.keywords = kws,
         PC.colors = cols,
         PC.power = pow,
         PC.toughness = tou,
@@ -1263,11 +1285,12 @@ effectToJson e = case e of
   Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (manaProductionToJson production))
   Effect.Search f -> Json.tagged (Text.pack "Search") (Just (filterToJson f))
   Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
+  Effect.Proliferate -> nullary (Text.pack "Proliferate")
   Effect.ExileHandThenDraw -> nullary (Text.pack "ExileHandThenDraw")
   Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array [slotNameToJson slot, filterToJson f, quantityToJson q]))
   Effect.RestartGame -> nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
-  Effect.Destroy s -> Json.tagged (Text.pack "Destroy") (Just (slotNameToJson s))
+  Effect.Destroy s r -> Json.tagged (Text.pack "Destroy") (Just (Array [slotNameToJson s, regenerabilityToJson r]))
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
   Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (slotNameToJson s))
   Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array [slotNameToJson s, zoneToJson z]))
@@ -1303,13 +1326,16 @@ jsonToEffect value = do
     "AddMana" -> withValue mv (fmap Effect.AddMana . jsonToManaProduction)
     "Search" -> withValue mv (fmap Effect.Search . jsonToFilter)
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
+    "Proliferate" -> Right Effect.Proliferate
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "PlayerSacrifices" -> case mv of
       Just (Array [sv, fv, qv]) -> Effect.PlayerSacrifices <$> jsonToSlotName sv <*> jsonToFilter fv <*> jsonToQuantity qv
       _ -> Left (Text.pack "PlayerSacrifices expects [slot, filter, quantity]")
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
-    "Destroy" -> withValue mv (fmap Effect.Destroy . jsonToSlotName)
+    "Destroy" -> case mv of
+      Just (Array [sv, rv]) -> Effect.Destroy <$> jsonToSlotName sv <*> jsonToRegenerability rv
+      _ -> Left (Text.pack "Destroy expects [slot, regenerability]")
     "Sacrifice" -> withValue mv (fmap Effect.Sacrifice . jsonToSlotName)
     "Counter" -> withValue mv (fmap Effect.Counter . jsonToSlotName)
     "MoveToZone" -> case mv of
