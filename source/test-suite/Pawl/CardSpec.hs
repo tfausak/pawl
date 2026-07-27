@@ -3,6 +3,7 @@
 module Pawl.CardSpec where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -156,7 +157,7 @@ m2aCardTests registry =
             HU.assertEqual "no printed keywords of its own" Set.empty (Card.Type.keywords c)
             HU.assertEqual
               "one static ability: the enchanted creature gains poisonous 3"
-              [StaticAbility.MkStaticAbility Affected.Attached [Modification.GainKeyword (Keyword.Poisonous 3)]]
+              [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.GainKeyword (Keyword.Poisonous 3)))]
               (Card.Type.staticAbilities c),
           HU.testCase "every M2a printing carries exactly its keyword" $
             mapM_
@@ -1012,7 +1013,7 @@ auraCardTests registry =
         -- attached to.
         HU.assertEqual
           "one +2/+1 static ability on the enchanted permanent"
-          [StaticAbility.MkStaticAbility Affected.Attached [Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 1)]]
+          [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 1)))]
           (Card.Type.staticAbilities card)
         -- CR 303.4: an Aura spell has no spell effects; it enters attached.
         HU.assertEqual "no spell effects" [] (Card.allEffects card)
@@ -1067,10 +1068,11 @@ animatorCardTests registry =
           "\"is an artifact creature with power and toughness each equal to its mana value\""
           [ StaticAbility.MkStaticAbility
               noncreatureArtifact
-              [ Modification.AddCardType CardType.Artifact,
-                Modification.AddCardType CardType.Creature,
-                Modification.SetBasePowerToughness Quantity.Type.ManaValue Quantity.Type.ManaValue
-              ]
+              ( Modification.AddCardType CardType.Artifact
+                  NonEmpty.:| [ Modification.AddCardType CardType.Creature,
+                                Modification.SetBasePowerToughness Quantity.Type.ManaValue Quantity.Type.ManaValue
+                              ]
+              )
           ]
           (Card.Type.staticAbilities c),
       -- The same shape, arrived at from the other direction: Humility and
@@ -1081,7 +1083,7 @@ animatorCardTests registry =
       HU.testCase "Humility and Opalescence are each one two-part ability, not two abilities" $ do
         humility <- Registry.printing registry "Humility"
         opalescence <- Registry.printing registry "Opalescence"
-        let partsOf p = fmap StaticAbility.modifications (Card.Type.staticAbilities (Printing.card p))
+        let partsOf p = fmap (NonEmpty.toList . StaticAbility.modifications) (Card.Type.staticAbilities (Printing.card p))
         HU.assertEqual
           "CR 613.1f + CR 613.4b: lose all abilities, base 1/1"
           [[Modification.LoseAllAbilities, Modification.SetBasePowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)]]

@@ -1169,7 +1169,7 @@ anthemEmblemCard piker =
                 Affected.Matching
                   (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
               StaticAbility.modifications =
-                [Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1)]
+                NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
             }
         ]
     }

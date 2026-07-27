@@ -1,5 +1,6 @@
 module Pawl.Type.StaticAbility where
 
+import Data.List.NonEmpty (NonEmpty)
 import Pawl.Type.Affected (Affected)
 import Pawl.Type.Modification (Modification)
 
@@ -20,12 +21,18 @@ import Pawl.Type.Modification (Modification)
 -- let the projection ask the filter once per layer and get two different answers
 -- (#233).
 --
--- A list, like the neighbouring Card.activatedAbilities and
--- Card.staticAbilities: it is built once by the codec and only ever walked in
--- order. Its order is the card's PRINTED order, not the application order --
+-- NonEmpty, and not merely a list validated at the boundary: an ability with no
+-- parts is an ability that does nothing, which the one-modification field this
+-- replaced could not express and which no card means. Making it unrepresentable
+-- keeps the codec honest (a malformed `"modifications": []` fails to decode
+-- rather than quietly producing a permanent that under-performs its own text) and
+-- costs the rest of the module nothing, since every consumer only folds over it.
+-- Same reasoning as Setup.emptyGame's NonEmpty player order.
+--
+-- Its order is the card's PRINTED order, not the application order --
 -- Projection.layer decides that, per CR 613.1.
 data StaticAbility = MkStaticAbility
   { affected :: Affected,
-    modifications :: [Modification]
+    modifications :: NonEmpty Modification
   }
   deriving (Eq, Ord, Show)

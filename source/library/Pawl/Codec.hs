@@ -6,6 +6,7 @@
 module Pawl.Codec where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -111,6 +112,18 @@ listTo f = Array . fmap f
 
 listFrom :: (Value -> Either Text a) -> Value -> Either Text [a]
 listFrom f value = Json.asArray value >>= mapM f
+
+-- CR 613.6's card-data invariant: a static ability has at least one part. An
+-- empty array is a decode failure, not an ability that does nothing.
+nonEmptyTo :: (a -> Value) -> NonEmpty.NonEmpty a -> Value
+nonEmptyTo f = listTo f . NonEmpty.toList
+
+nonEmptyFrom :: (Value -> Either Text a) -> Value -> Either Text (NonEmpty.NonEmpty a)
+nonEmptyFrom f value = do
+  xs <- listFrom f value
+  case NonEmpty.nonEmpty xs of
+    Nothing -> Left (Text.pack "expected a non-empty array")
+    Just ne -> pure ne
 
 seqTo :: (a -> Value) -> Seq.Seq a -> Value
 seqTo f = Array . fmap f . Foldable.toList
@@ -1360,14 +1373,14 @@ staticAbilityToJson :: StaticAbility.StaticAbility -> Value
 staticAbilityToJson sa =
   Object
     [ (Text.pack "affected", affectedToJson (StaticAbility.affected sa)),
-      (Text.pack "modifications", listTo modificationToJson (StaticAbility.modifications sa))
+      (Text.pack "modifications", nonEmptyTo modificationToJson (StaticAbility.modifications sa))
     ]
 
 jsonToStaticAbility :: Value -> Either Text StaticAbility.StaticAbility
 jsonToStaticAbility value = do
   ps <- Json.asObject value
   a <- Json.field (Text.pack "affected") ps >>= jsonToAffected
-  ms <- Json.field (Text.pack "modifications") ps >>= listFrom jsonToModification
+  ms <- Json.field (Text.pack "modifications") ps >>= nonEmptyFrom jsonToModification
   pure (StaticAbility.MkStaticAbility a ms)
 
 playerStaticAbilityToJson :: PlayerStaticAbility.PlayerStaticAbility -> Value

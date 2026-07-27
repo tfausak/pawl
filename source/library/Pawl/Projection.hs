@@ -1,6 +1,7 @@
 module Pawl.Projection where
 
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -699,7 +700,7 @@ gatherStatic :: ObjectId -> Timestamp -> [(Subtype.Subtype, Subtype.Subtype)] ->
 gatherStatic src ts changes n sa =
   let ms = StaticAbility.modifications sa
       key = case ms of
-        _ : _ : _ -> Just (src, n)
+        _ NonEmpty.:| (_ : _) -> Just (src, n)
         _ -> Nothing
       one m =
         let m' = rewriteModification changes m
@@ -711,7 +712,7 @@ gatherStatic src ts changes n sa =
                 gTimestamp = ts,
                 gModification = m'
               }
-   in fmap one ms
+   in fmap one (NonEmpty.toList ms)
 
 -- CR 122.1a / 613.4c: a +1/+1 counter adds +1/+1 and a -1/-1 counter adds -1/-1,
 -- in layer 7c. Emit each battlefield object's counters as ONE synthetic 7c
