@@ -1,9 +1,11 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Resolve and Pawl.Target: targeting legality, spell resolution, and
 -- the CR 608.2b fizzle.
 module Pawl.ResolveSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -1706,6 +1708,137 @@ gainPlayerCountersTests registry =
         HU.assertEqual "alice has two energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after)
     ]
 
+-- Answers Prompt.ChooseProliferate by taking everything on offer. Its sibling
+-- declines everything: between them the tests prove the ANSWER decides who gets
+-- counters, rather than the order the candidates happen to be enumerated in.
+proliferatesAll :: Prompt.Prompt r -> r
+proliferatesAll p = case p of
+  Prompt.ChooseProliferate _ _ oids pids -> (Set.fromList oids, Set.fromList pids)
+  _ -> S.identityAnswer p
+
+proliferatesNothing :: Prompt.Prompt r -> r
+proliferatesNothing p = case p of
+  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  _ -> S.identityAnswer p
+
+-- Resolve one Proliferate for alice against `gs`, answered by `answer`.
+proliferate :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+proliferate answer src gs =
+  S.runPure answer gs (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)
+
+proliferateTests :: Registry.Type.Registry -> Tasty.TestTree
+proliferateTests registry =
+  Tasty.testGroup
+    "Proliferate"
+    [ -- CR 701.34a: "give each one additional counter of each kind that permanent
+      -- or player already has." One more, never a doubling, and never a kind that
+      -- was not already there.
+      HU.testCase "CR 701.34a proliferate adds exactly one counter of a kind already there" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            gs = S.addCounter CounterKind.PlusOnePlusOne 2 src g0
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "two became three" 3 (S.counterOf CounterKind.PlusOnePlusOne src after),
+      -- "each kind" is the clause a naive implementation drops: a creature holding
+      -- both kinds gets one more of BOTH, not one of whichever was found first.
+      --
+      -- Holding both kinds at once is a state CR 704.5q would annihilate on the
+      -- next state-based-action pass, which is exactly why this drives the opcode
+      -- directly instead of resolving a spell: the question here is what
+      -- Proliferate does to the counters it finds, not what survives afterwards.
+      HU.testCase "CR 701.34a a permanent with two kinds gets one more of each" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            g1 = S.addCounter CounterKind.PlusOnePlusOne 1 src g0
+            gs = S.addCounter CounterKind.MinusOneMinusOne 3 src g1
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "+1/+1 went up" 2 (S.counterOf CounterKind.PlusOnePlusOne src after)
+        HU.assertEqual "-1/-1 went up too" 4 (S.counterOf CounterKind.MinusOneMinusOne src after),
+      -- CR 701.34a: only permanents "that have a counter" are choosable, so a bare
+      -- permanent is never offered and never gains a first counter this way.
+      HU.testCase "CR 701.34a a permanent with no counters is not a candidate" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (bare, g1) = S.addCreature piker S.alice g0
+            gs = S.addCounter CounterKind.PlusOnePlusOne 1 src g1
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "the bare Piker gained nothing" 0 (S.counterOf CounterKind.PlusOnePlusOne bare after)
+        HU.assertEqual "the countered one moved" 2 (S.counterOf CounterKind.PlusOnePlusOne src after),
+      -- CR 701.34a: players carry counters too, and proliferate reaches them.
+      HU.testCase "CR 701.34a proliferate adds to a player's poison and energy" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            g1 = S.addPlayerCounter PlayerCounterKind.Poison 3 S.bob g0
+            gs = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice g1
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "bob's poison" 4 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+        HU.assertEqual "alice's energy" 2 (S.playerCounterOf PlayerCounterKind.Energy S.alice after),
+      -- A player with no counters is not a candidate, the same clause the bare
+      -- permanent above tests -- so proliferate never starts someone on poison.
+      HU.testCase "CR 701.34a a player with no counters is not a candidate" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            gs = S.addPlayerCounter PlayerCounterKind.Poison 2 S.bob g0
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "alice stays clean" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
+      -- CR 701.34a: "any number" includes none. The discriminating twin of the
+      -- first test -- same board, opposite answer -- so this fails if the engine
+      -- proliferates for the player instead of asking.
+      HU.testCase "CR 701.34a choosing nothing is legal and adds nothing" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            g1 = S.addCounter CounterKind.PlusOnePlusOne 2 src g0
+            gs = S.addPlayerCounter PlayerCounterKind.Poison 3 S.bob g1
+            after = proliferate proliferatesNothing src gs
+        HU.assertEqual "the creature is untouched" 2 (S.counterOf CounterKind.PlusOnePlusOne src after)
+        HU.assertEqual "bob is untouched" 3 (S.playerCounterOf PlayerCounterKind.Poison S.bob after),
+      -- The counter placement rides Event.putCounters, so CR 614's counter
+      -- replacements get their opportunity -- proliferate is not a side door that
+      -- bypasses Hardened Scales.
+      HU.testCase "CR 614 Hardened Scales applies to the counter proliferate adds" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        hardenedScales <- Registry.printing registry "Hardened Scales"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (_, g1) = S.addCreature hardenedScales S.alice g0
+            gs = S.addCounter CounterKind.PlusOnePlusOne 1 src g1
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "one proliferated counter became two" 3 (S.counterOf CounterKind.PlusOnePlusOne src after),
+      -- Where the rules leave nothing to ask, do not ask: no permanent and no
+      -- player holds a counter, so there is no choice to make.
+      HU.testCase "CR 701.34a an empty candidate set raises no prompt" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            countingAnswer :: Prompt.Prompt r -> State.State Int r
+            countingAnswer p = case p of
+              Prompt.ChooseProliferate {} -> do
+                State.modify (+ 1)
+                pure (S.identityAnswer p)
+              _ -> pure (S.identityAnswer p)
+            asks g = State.execState (Engine.runGame countingAnswer g (Resolve.applyEffect src S.alice Map.empty Map.empty Map.empty Effect.Proliferate)) 0
+        HU.assertEqual "nobody has a counter: nothing to ask" 0 (asks gs)
+        HU.assertEqual "someone does: one real decision" 1 (asks (S.addCounter CounterKind.PlusOnePlusOne 1 src gs)),
+      -- The gameplay-level proof (design.md section 4): a real card, cast and
+      -- resolved, doing both halves of its text.
+      HU.testCase "Steady Progress whole card: proliferate, then draw a card" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        steadyProgress <- Registry.printing registry "Steady Progress"
+        let base = S.landsInPlay island 3
+            (creature, g1) = S.addCreature piker S.alice base
+            g2 = S.addCounter CounterKind.PlusOnePlusOne 1 creature g1
+            -- Something to draw: an empty library would make the draw a no-op
+            -- (and a CR 104.3c loss), hiding whether the effect ran at all.
+            (_, g3) = S.addLibraryCard island S.alice g2
+            (withSpell, spell) = S.handOne steadyProgress g3
+            handBefore = length (Game.zoneMembers Zone.Hand S.alice withSpell)
+            afterCast = S.runPure proliferatesAll withSpell (Cast.castSpell S.alice spell)
+            resolved = S.runPure proliferatesAll afterCast Stack.resolveTop
+        HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
+        HU.assertEqual "the counter was proliferated" 2 (S.counterOf CounterKind.PlusOnePlusOne creature resolved)
+        -- The spell left the hand and one card was drawn, so the hand is level.
+        HU.assertEqual "drew a card" handBefore (length (Game.zoneMembers Zone.Hand S.alice resolved))
+    ]
+
 createEmblemTests :: Registry.Type.Registry -> Tasty.TestTree
 createEmblemTests registry =
   Tasty.testGroup
@@ -1842,4 +1975,4 @@ actOfTreasonTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]

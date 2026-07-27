@@ -39,6 +39,10 @@ data Response
     -- ChoseManaSource: decode must return Nothing for a response that does not
     -- match the prompt being asked, and two prompts sharing a constructor cannot.
     ChoseManaType ManaType
+  | -- CR 701.34a: the permanents and players a proliferating player chose,
+    -- serialized so a DecisionLog replays a proliferate deterministically. A pair
+    -- rather than two constructors, because one prompt asks one question.
+    ChoseProliferation (Set ObjectId, Set PlayerId)
   | DeclaredAttackers [ObjectId]
   | DeclaredBlockers (Map ObjectId ObjectId)
   | AssignedCombatDamage (Map Recipient Natural)
