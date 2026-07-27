@@ -132,6 +132,13 @@ project-specific rules it doesn't cover:
   by `toText`.
 - **Short names, disambiguated by module** — `Pawl.Mana.Mana`, imported as
   `Mana`, rather than long prefixes.
+- **No unchecked numeric conversions.** `fromIntegral`, `fromInteger`,
+  `realToFrac` and `toEnum` are banned outright by `.hlint.yaml`, because each
+  silently produces a wrong answer instead of failing. Convert through
+  `Pawl.Extra.Int`, `Pawl.Extra.Integer` or `Pawl.Extra.Natural` — one module
+  per source type, each function named for its target and for what it does at
+  the boundary (`Maybe` in the type, or `Saturating` in the name). Add the
+  missing conversion there rather than reaching around the ban.
 
 ## Adding a module
 

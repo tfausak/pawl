@@ -1,7 +1,8 @@
 -- Mode-scoped structural reads over a Modal payload (CR 700.2), shared by the
 -- spell (Card.spell) and both ability types. Card-free/parametric in `card` (M4c):
--- imports only Type modules and Pawl.Extra (which imports no Pawl module at
--- all), so no cycle -- Pawl.Card imports THIS.
+-- imports only Type modules and Pawl.Extra (a leaf of the module graph: it
+-- imports nothing from Pawl outside itself), so no cycle -- Pawl.Card imports
+-- THIS.
 module Pawl.Modal where
 
 import qualified Data.Foldable as Foldable
