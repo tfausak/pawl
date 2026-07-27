@@ -18,6 +18,7 @@ import qualified Pawl.Card as Card
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
@@ -832,7 +833,13 @@ m4bCardTests registry =
         mindRot <- Registry.printing registry "Mind Rot"
         let c = Printing.card mindRot
         HU.assertEqual "effect discards two" [Effect.Discard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 2)] (Card.allEffects c)
-        HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.allTargetSpecs c)
+        HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.allTargetSpecs c),
+      -- CR 202.3: "each colored or colorless mana symbol contributes 1", and
+      -- CR 107.4e makes a hybrid symbol a coloured mana symbol -- so {R/G}{R/G}
+      -- is mana value 2, not 4 (both halves) and not 0 (neither).
+      HU.testCase "Burning-Tree Emissary's two hybrid symbols make mana value 2" $ do
+        burningTreeEmissary <- Registry.printing registry "Burning-Tree Emissary"
+        HU.assertEqual "two" 2 (Quantity.manaValueOf (Printing.card burningTreeEmissary))
     ]
 
 m45p6CardTests :: Registry.Type.Registry -> Tasty.TestTree

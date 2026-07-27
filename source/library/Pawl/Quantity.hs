@@ -78,5 +78,9 @@ symbolValue :: ManaSymbol.ManaSymbol -> Integer
 symbolValue symbol = case symbol of
   ManaSymbol.Generic n -> toInteger n
   ManaSymbol.OfType _ -> 1
+  -- CR 202.3: "each colored or colorless mana symbol contributes 1", and
+  -- CR 107.4e makes a hybrid symbol a coloured mana symbol -- one symbol, one
+  -- toward the mana value, whichever half is eventually paid.
+  ManaSymbol.Hybrid _ _ -> 1
   -- CR 202.3b: off the stack a variable's contribution to mana value is 0.
   ManaSymbol.Variable -> 0

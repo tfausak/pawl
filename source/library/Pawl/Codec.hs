@@ -278,6 +278,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Artificer -> "Artificer"
   Subtype.Troll -> "Troll"
   Subtype.Nomad -> "Nomad"
+  Subtype.Shaman -> "Shaman"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -323,7 +324,8 @@ jsonToSubtype =
       (Text.pack "Scout", Subtype.Scout),
       (Text.pack "Artificer", Subtype.Artificer),
       (Text.pack "Troll", Subtype.Troll),
-      (Text.pack "Nomad", Subtype.Nomad)
+      (Text.pack "Nomad", Subtype.Nomad),
+      (Text.pack "Shaman", Subtype.Shaman)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -1011,6 +1013,7 @@ manaSymbolToJson :: ManaSymbol.ManaSymbol -> Value
 manaSymbolToJson ms = case ms of
   ManaSymbol.Generic n -> Json.tagged (Text.pack "Generic") (Just (natTo n))
   ManaSymbol.OfType mt -> Json.tagged (Text.pack "OfType") (Just (manaTypeToJson mt))
+  ManaSymbol.Hybrid a b -> Json.tagged (Text.pack "Hybrid") (Just (Array [manaTypeToJson a, manaTypeToJson b]))
   ManaSymbol.Variable -> nullary (Text.pack "Variable")
 
 jsonToManaSymbol :: Value -> Either Text ManaSymbol.ManaSymbol
@@ -1019,6 +1022,7 @@ jsonToManaSymbol value = do
   case (Text.unpack t, mv) of
     ("Generic", Just v) -> ManaSymbol.Generic <$> natFrom v
     ("OfType", Just v) -> ManaSymbol.OfType <$> jsonToManaType v
+    ("Hybrid", Just (Array [av, bv])) -> ManaSymbol.Hybrid <$> jsonToManaType av <*> jsonToManaType bv
     ("Variable", _) -> Right ManaSymbol.Variable
     _ -> Left (Text.pack "unknown ManaSymbol: " <> t)
 

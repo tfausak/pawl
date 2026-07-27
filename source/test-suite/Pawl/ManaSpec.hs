@@ -5,9 +5,11 @@
 module Pawl.ManaSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
@@ -458,4 +460,77 @@ anyColorTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Mana" [manaTests registry, castabilityTests registry, anyColorTests registry]
+tests registry = Tasty.testGroup "Mana" [manaTests registry, castabilityTests registry, anyColorTests registry, hybridTests registry]
+
+-- alice controls `reds` Mountains and `greens` Forests and nothing else.
+mixedLands :: Printing.Printing -> Printing.Printing -> Int -> Int -> GameState.GameState
+mixedLands mountain forest reds greens =
+  let base = S.landsInPlay mountain reds
+   in List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) base [1 .. greens]
+
+redGreen :: ManaSymbol.ManaSymbol
+redGreen = ManaSymbol.Hybrid (ManaType.Colored Color.Red) (ManaType.Colored Color.Green)
+
+redSymbol :: ManaSymbol.ManaSymbol
+redSymbol = ManaSymbol.OfType (ManaType.Colored Color.Red)
+
+-- CR 107.4e: "A hybrid symbol such as {W/U} can be paid with either white or blue
+-- mana." Its example is exactly this shape: "{G/W}{G/W} can be paid by spending
+-- {G}{G}, {G}{W}, or {W}{W}."
+hybridTests :: Registry.Type.Registry -> Tasty.TestTree
+hybridTests registry =
+  Tasty.testGroup
+    "Hybrid"
+    [ HU.testCase "CR 107.4e one {R/G} is payable from either half, and from neither otherwise" $ do
+        mountain <- Registry.printing registry "Mountain"
+        forest <- Registry.printing registry "Forest"
+        island <- Registry.printing registry "Island"
+        let cost = ManaCost.MkManaCost [redGreen]
+        HU.assertBool "a Mountain pays it" (Mana.canPay S.alice cost (S.landsInPlay mountain 1))
+        HU.assertBool "a Forest pays it" (Mana.canPay S.alice cost (mixedLands mountain forest 0 1))
+        HU.assertBool "an Island does not" (not (Mana.canPay S.alice cost (S.landsInPlay island 1)))
+        HU.assertBool "and nothing does not" (not (Mana.canPay S.alice cost (S.landsInPlay mountain 0))),
+      -- THE case a greedy left-to-right match gets wrong, and the reason
+      -- Mana.spendDemands searches instead of folding. One Mountain and one
+      -- Forest pay {R/G}{R} only if the hybrid takes the GREEN; handing it the
+      -- red first strands the {R} with a Forest still untapped.
+      HU.testCase "CR 107.4e {R/G}{R} off one Mountain and one Forest: the hybrid must take the GREEN" $ do
+        mountain <- Registry.printing registry "Mountain"
+        forest <- Registry.printing registry "Forest"
+        let cost = ManaCost.MkManaCost [redGreen, redSymbol]
+            gs = mixedLands mountain forest 1 1
+        HU.assertBool "canPay says yes" (Mana.canPay S.alice cost gs)
+        let (paid, after) = S.runPureWith S.identityAnswer gs (Mana.payCost S.alice cost)
+        HU.assertBool "and it really is paid" paid
+        HU.assertEqual "both lands tapped" 2 (S.tappedCount S.alice after)
+        HU.assertEqual "nothing left floating" 0 (poolSize S.alice after),
+      -- The twin: the same cost with no red anywhere is unpayable, so the case
+      -- above is not "hybrids always succeed".
+      HU.testCase "CR 107.4e {R/G}{R} off two Forests is unpayable -- the {R} has no source" $ do
+        mountain <- Registry.printing registry "Mountain"
+        forest <- Registry.printing registry "Forest"
+        let cost = ManaCost.MkManaCost [redGreen, redSymbol]
+            gs = mixedLands mountain forest 0 2
+        HU.assertBool "canPay says no" (not (Mana.canPay S.alice cost gs))
+        HU.assertBool "and paying fails" (not (fst (S.runPureWith S.identityAnswer gs (Mana.payCost S.alice cost))))
+        HU.assertEqual "two {R/G} alone WOULD be payable from them" True (Mana.canPay S.alice (ManaCost.MkManaCost [redGreen, redGreen]) gs),
+      HU.testCase "CR 107.4e whole card: Burning-Tree Emissary casts off RR, GG, or RG" $ do
+        mountain <- Registry.printing registry "Mountain"
+        forest <- Registry.printing registry "Forest"
+        burningTreeEmissary <- Registry.printing registry "Burning-Tree Emissary"
+        let castOff reds greens =
+              let (gs, spellId) = S.handOne burningTreeEmissary (mixedLands mountain forest reds greens)
+                  cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+               in length (GameState.stack cast)
+        HU.assertEqual "two Mountains" 1 (castOff 2 0)
+        HU.assertEqual "two Forests" 1 (castOff 0 2)
+        HU.assertEqual "one of each" 1 (castOff 1 1)
+        HU.assertEqual "one land is not enough" 0 (castOff 1 0),
+      HU.testCase "CR 107.4e a hybrid symbol is ALL of its component colours" $ do
+        burningTreeEmissary <- Registry.printing registry "Burning-Tree Emissary"
+        let (oid, gs) = S.addCreature burningTreeEmissary S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual
+          "red AND green, not one or the other"
+          (Set.fromList [Color.Red, Color.Green])
+          (Projection.colorsOf oid gs)
+    ]

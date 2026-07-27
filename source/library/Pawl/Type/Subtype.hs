@@ -57,4 +57,6 @@ data Subtype
     Troll
   | -- CR 205.3m (a creature type; Ghitu Fire-Eater's).
     Nomad
+  | -- CR 205.3m (a creature type; Burning-Tree Emissary's).
+    Shaman
   deriving (Eq, Ord, Show)
