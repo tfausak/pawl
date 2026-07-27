@@ -5,7 +5,7 @@
 --
 -- The SOLE casing home for Pawl.Type.CostComponent. Pawl.Cast and Pawl.Activate
 -- learn nothing about which components exist: they ask "can this be paid" and
--- "pay it", and read one classification (requiresTapSymbol) for CR 302.6.
+-- "pay it", and read one classification (requiresSicknessCheck) for CR 302.6.
 module Pawl.Cost where
 
 import qualified Control.Monad as Monad
@@ -121,11 +121,22 @@ hasVariable cost = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
 
--- CR 302.6 / 107.5: does paying this cost require tapping the object it is on?
--- The CLASSIFICATION Pawl.Activate reads for the summoning-sickness gate, so
--- that this module stays the only one matching a CostComponent constructor.
-requiresTapSymbol :: Cost -> Bool
-requiresTapSymbol cost = elem CostComponent.TapThis (Cost.components cost)
+-- CR 302.6: does paying this cost put the object's ability behind the
+-- summoning-sickness gate? The CLASSIFICATION Pawl.Activate reads, so that this
+-- module stays the only one matching a CostComponent constructor.
+--
+-- BOTH symbols, because CR 302.6 names both: "A creature's activated ability with
+-- the tap symbol or the untap symbol in its activation cost can't be activated
+-- unless the creature has been under its controller's control continuously since
+-- their most recent turn began." CR 107.5 is the tap symbol and CR 107.6 the
+-- untap symbol, and CR 702.10c grants haste the same exemption from each.
+--
+-- Named for the RULE it answers rather than for one of the two symbols: the
+-- previous name, requiresTapSymbol, made the untap half read like an oversight
+-- at the call site instead of a question the function had never been asked.
+requiresSicknessCheck :: Cost -> Bool
+requiresSicknessCheck cost =
+  any (\c -> elem c (Cost.components cost)) [CostComponent.TapThis, CostComponent.UntapThis]
 
 -- Which permanents a Filter admits, matched through the PROJECTION and never
 -- against printed characteristics: a card type is CR 613.1d layer 4 and a
@@ -181,6 +192,12 @@ canPayComponent pid oid component gs = case component of
   CostComponent.TapThis -> case Game.lookupObject oid gs of
     Nothing -> False
     Just obj -> Object.zone obj == Zone.Battlefield && Object.tapped obj == TapState.Untapped
+  -- CR 107.6: "A permanent that's already untapped can't be untapped again to pay
+  -- the cost" -- the exact mirror of TapThis above, and the reason a {Q} ability
+  -- is one a player uses on a creature they left tapped.
+  CostComponent.UntapThis -> case Game.lookupObject oid gs of
+    Nothing -> False
+    Just obj -> Object.zone obj == Zone.Battlefield && Object.tapped obj == TapState.Tapped
   -- CR 701.21a: only a permanent, and only one this player controls.
   CostComponent.SacrificeThis ->
     Set.member oid (GameState.battlefield gs) && Projection.controllerOf oid gs == Just pid
@@ -255,6 +272,12 @@ payComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent -> Game Paym
 payComponent pid oid component = case component of
   CostComponent.TapThis -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)})
+    pure Payment.Paid
+  -- CR 107.6: "Untap this permanent." A direct edit like TapThis above, and not
+  -- through any funnel: untapping to pay a cost is not CR 701.20's untap EVENT
+  -- (Effect.Untap), which is what a spell or ability does TO a permanent.
+  CostComponent.UntapThis -> do
+    State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)})
     pure Payment.Paid
   -- Through Event.sacrifice, the CR 701.21 funnel, and never a direct zone poke:
   -- a cost payment is a game event, so dies-triggers, replacement effects and the

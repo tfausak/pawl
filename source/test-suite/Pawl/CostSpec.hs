@@ -23,6 +23,7 @@ import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
@@ -59,8 +60,10 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Response as Response
+import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -122,13 +125,13 @@ doorTests registry =
           Nothing
           (Cost.Type.mana (Cost.total S.alice bolt (Cost.Type.MkCost Nothing []) withBolt)),
       -- The classification Pawl.Activate reads instead of matching a constructor.
-      HU.testCase "CR 302.6 requiresTapSymbol classifies a cost, and Greed's counterpart proves it" $ do
+      HU.testCase "CR 302.6 requiresSicknessCheck classifies a cost, and Greed's counterpart proves it" $ do
         llanowarElves <- Registry.printing registry "Llanowar Elves"
         drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
         let elves = ActivatedAbility.cost (theAbility llanowarElves)
             skeletons = ActivatedAbility.cost (theAbility drudgeSkeletons)
-        HU.assertBool "Llanowar Elves' {T} cost requires the tap symbol" (Cost.requiresTapSymbol elves)
-        HU.assertBool "Drudge Skeletons' {B} regenerate cost does not" (not (Cost.requiresTapSymbol skeletons)),
+        HU.assertBool "Llanowar Elves' {T} cost requires the tap symbol" (Cost.requiresSicknessCheck elves)
+        HU.assertBool "Drudge Skeletons' {B} regenerate cost does not" (not (Cost.requiresSicknessCheck skeletons)),
       -- Departure 1: Pawl.Activate does NOT route an ability cost through
       -- Cost.total. PlayerEffect.matchesSpell classifies an OBJECT, not a spell,
       -- so a noncreature PERMANENT matches Thalia's Not (HasCardType Creature)
@@ -266,7 +269,7 @@ greedTests registry =
             greed <- Registry.printing registry "Greed"
             HU.assertBool
               "no {T}"
-              (not (Cost.requiresTapSymbol (ActivatedAbility.cost (theAbility greed))))
+              (not (Cost.requiresSicknessCheck (ActivatedAbility.cost (theAbility greed))))
         ]
 
 -- Every answer the engine asked for, in order -- so a test can assert that a
@@ -598,7 +601,65 @@ longtuskCubTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.Cost" [doorTests registry, greedTests registry, villageRitesTests registry, catharticReunionTests registry, fireblastTests registry, crossCheckTests registry, longtuskCubTests registry]
+tests registry = Tasty.testGroup "Pawl.Cost" [doorTests registry, greedTests registry, villageRitesTests registry, catharticReunionTests registry, safeholdSentryTests registry, fireblastTests registry, crossCheckTests registry, longtuskCubTests registry]
+
+-- alice controls a Safehold Sentry and three Plains, all settled. `tapped` says
+-- whether the Sentry itself starts tapped -- which for a {Q} cost is the payable
+-- state, the exact inverse of every {T} fixture in this file.
+sentryBoard :: Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState)
+sentryBoard plains safeholdSentry tapped =
+  let base = S.landsInPlay plains 3
+      (sentry, gs1) = S.addCreature safeholdSentry S.alice base
+      turnTapped o = if tapped then o {Object.tapped = TapState.Tapped} else o
+   in ( sentry,
+        gs1
+          { GameState.objects = Map.adjust turnTapped sentry (GameState.objects gs1),
+            GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Safehold Sentry {1}{W} Creature -- Elf Warrior 2/2: "{2}{W}, {Q}: This creature
+-- gets +0/+2 until end of turn." The card CR 107.6's untap symbol was waiting for.
+safeholdSentryTests :: Registry.Type.Registry -> Tasty.TestTree
+safeholdSentryTests registry =
+  Tasty.testGroup
+    "Safehold Sentry"
+    [ HU.testCase "CR 107.6 whole card: a TAPPED Sentry untaps to pay {Q} and gets +0/+2" $ do
+        plains <- Registry.printing registry "Plains"
+        safeholdSentry <- Registry.printing registry "Safehold Sentry"
+        let (sentry, gs) = sentryBoard plains safeholdSentry True
+            activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice sentry (theAbility safeholdSentry))
+            resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+        HU.assertEqual "paying the cost UNTAPPED it" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject sentry activated))
+        HU.assertEqual "the three Plains paid the mana" 3 (S.tappedCount S.alice activated)
+        HU.assertEqual "toughness 2 + 2" (Just 4) (Projection.toughnessOf sentry resolved)
+        HU.assertEqual "power unchanged" (Just 2) (Projection.powerOf sentry resolved),
+      -- CR 107.6's second sentence, and the exact inverse of TapThis: "A permanent
+      -- that's already untapped can't be untapped again to pay the cost."
+      HU.testCase "CR 107.6 an UNTAPPED Sentry cannot pay {Q}, so the ability is not offered" $ do
+        plains <- Registry.printing registry "Plains"
+        safeholdSentry <- Registry.printing registry "Safehold Sentry"
+        let (sentry, gs) = sentryBoard plains safeholdSentry False
+        HU.assertBool "canPay says no" (not (Cost.canPay S.alice sentry (ActivatedAbility.cost (theAbility safeholdSentry)) gs))
+        HU.assertBool "and no Activate is offered" (not (any isActivateAction (Action.legalActions S.alice gs))),
+      -- The issue itself (#204): CR 302.6 names the tap symbol AND the untap
+      -- symbol, and only the first half had a producer. A summoning-sick Sentry
+      -- must not be able to activate a {Q} ability.
+      HU.testCase "CR 302.6 a summoning-sick Sentry's {Q} ability is not offered" $ do
+        plains <- Registry.printing registry "Plains"
+        safeholdSentry <- Registry.printing registry "Safehold Sentry"
+        let (sentry, gs) = sentryBoard plains safeholdSentry True
+            sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) sentry (GameState.objects gs)}
+        HU.assertBool "the cost itself is still payable -- it is tapped" (Cost.canPay S.alice sentry (ActivatedAbility.cost (theAbility safeholdSentry)) sick)
+        HU.assertBool "but CR 302.6 withholds the ability" (not (any isActivateAction (Action.legalActions S.alice sick)))
+    ]
+
+isActivateAction :: Action.Type.Action -> Bool
+isActivateAction a = case a of
+  Action.Type.Activate _ _ -> True
+  _ -> False
 
 -- alice has two untapped Mountains, holds one Cathartic Reunion plus `n` other
 -- cards, and has four cards in her library so the draw of three is never a
