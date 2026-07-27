@@ -102,7 +102,7 @@ data Effect card
     -- Destroy (unconditional move, no indestructible check).
     MoveToZone SlotName Zone
   | -- CR 120: the controller draws this many cards. Targetless (a spell's
-    -- controller draws, CR 120.2). Empty-library draw is a loss (CR 121.3),
+    -- controller draws, CR 120.2). Empty-library draw is a loss (CR 104.3c),
     -- unlike Mill -- the semantic asymmetry that keeps Draw and Mill separate.
     Draw Quantity
   | -- CR 701.17: the slot's target player mills this many (top N of their library
@@ -242,4 +242,18 @@ data Effect card
     -- The card granting the action is itself in the hand and is exiled with the
     -- rest: CR 103.5b's action is not a cost, and nothing sets it aside.
     ExileHandThenDraw
+  | -- CR 701.34a: choose any number of permanents and/or players that have a
+    -- counter, then give each one additional counter of each kind it already has.
+    --
+    -- CHOOSE, not target (CR 701.34a says "choose"): there is no target spec, the
+    -- set is picked on RESOLUTION via Prompt.ChooseProliferate, and nothing here
+    -- is subject to CR 608.2b's illegal-target check. That is why this carries no
+    -- SlotName.
+    --
+    -- Nullary: rule 701.34a fixes the count at one per kind, with no quantity,
+    -- kind or scope left to vary. Object counters ride Event.putCounters, so CR
+    -- 614's counter replacements (Hardened Scales, Doubling Season) get their
+    -- opportunity; player counters are added directly, matching
+    -- GainPlayerCounters and gapped for the same reason (#122).
+    Proliferate
   deriving (Eq, Ord, Show)

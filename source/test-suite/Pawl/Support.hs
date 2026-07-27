@@ -197,6 +197,7 @@ identityAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -235,6 +236,7 @@ castAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -284,6 +286,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
@@ -333,6 +336,7 @@ playLandAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -394,6 +398,14 @@ randomAnswer p = case p of
         (i, g') = Random.uniformR (0, length types - 1) g
     State.put g'
     pure (pickFrom candidates i)
+  -- CR 701.34a: a random subset of each offered list, so a random game explores
+  -- proliferating and declining alike -- "any number" includes none and all.
+  Prompt.ChooseProliferate _ _ oids pids -> do
+    g <- State.get
+    let (howManyObjects, g') = Random.uniformR (0, length oids) g
+        (howManyPlayers, g'') = Random.uniformR (0, length pids) g'
+    State.put g''
+    pure (Set.fromList (take howManyObjects oids), Set.fromList (take howManyPlayers pids))
   Prompt.DeclareAttackers _ _ ids -> do
     g <- State.get
     let (keep, g') = Random.uniformR (0, length ids) g
@@ -1151,6 +1163,12 @@ addPlayerCounter :: PlayerCounterKind.PlayerCounterKind -> Natural.Natural -> Pl
 addPlayerCounter kind n pid gs =
   let bump player = player {Player.counters = Map.insertWith (+) kind n (Player.counters player)}
    in gs {GameState.players = Map.adjust bump pid (GameState.players gs)}
+
+-- How many counters of a kind an object has (absent kind = zero). The object
+-- mirror of playerCounterOf below.
+counterOf :: CounterKind.CounterKind -> ObjectId.ObjectId -> GameState.GameState -> Natural.Natural
+counterOf kind oid gs =
+  maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
 
 -- How many counters of a kind a player has (absent kind = zero).
 playerCounterOf :: PlayerCounterKind.PlayerCounterKind -> PlayerId.PlayerId -> GameState.GameState -> Natural.Natural

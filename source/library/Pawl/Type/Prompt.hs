@@ -105,6 +105,23 @@ data Prompt r where
   -- The candidates are deduplicated, which is the one elision needing no
   -- judgement: two ways to produce black mana yield the same unit either way.
   ChooseManaType :: Decider -> PlayerId -> ObjectId -> NonEmpty ManaType -> Prompt ManaType
+  -- CR 701.34a: which permanents and players a proliferating player gives another
+  -- counter to. The [ObjectId] is every permanent holding at least one counter and
+  -- the [PlayerId] every player holding at least one; the answer is the subset of
+  -- each that gets one more of every kind it already has.
+  --
+  -- CHOOSE, not target. Proliferate declares no target spec, so a candidate is
+  -- offered no matter whose it is -- an opponent's -1/-1'd creature sits on the
+  -- same list as your own +1/+1'd one, and picking between them is the whole
+  -- decision. Nothing here is re-checked for legality at resolution (CR 608.2b),
+  -- because nothing was ever targeted.
+  --
+  -- Asked whenever EITHER list is non-empty, and elided only when both are empty.
+  -- Deliberately NOT elided for a single candidate, unlike ChooseManaSource: "any
+  -- number" (CR 701.34a) includes none, so even one candidate is a real yes or no
+  -- -- proliferating a -1/-1 counter onto your own creature is a choice a player
+  -- may well decline.
+  ChooseProliferate :: Decider -> PlayerId -> [ObjectId] -> [PlayerId] -> Prompt (Set ObjectId, Set PlayerId)
   -- CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
   -- attack. WHOM they attack is not asked here: the defending player was already
   -- chosen at the beginning of combat step (Prompt.ChooseDefender), and CR 508.1b

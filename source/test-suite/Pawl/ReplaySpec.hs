@@ -206,6 +206,23 @@ combatReplayTests =
             -- rather than getting its own constructor.
             let p = Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (ManaType.Colored Color.Black NonEmpty.:| [ManaType.Colored Color.Red])
              in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))),
+          -- CR 701.34a: who was proliferated onto is a decision, so it has to
+          -- survive a transcript like any other.
+          HU.testCase "ChooseProliferate round-trips through the transcript" $
+            let a = ObjectId.MkObjectId 7
+                p = Prompt.ChooseProliferate decider S.alice [a] [S.bob]
+                both = (Set.singleton a, Set.singleton S.bob)
+                neither = (Set.empty, Set.empty)
+             in do
+                  HU.assertEqual "taking both round trips" (Just both) (Replay.decode p (Replay.encode p both))
+                  -- Discriminating: CR 701.34a's "any number" includes none, and a
+                  -- decode that defaulted to the offered set would pass one leg.
+                  HU.assertEqual "declining round trips" (Just neither) (Replay.decode p (Replay.encode p neither)),
+          HU.testCase "a short transcript proliferates onto nothing" $
+            HU.assertEqual
+              "declines"
+              (Set.empty, Set.empty)
+              (Replay.defaultAnswer (Prompt.ChooseProliferate decider S.alice [ObjectId.MkObjectId 7] [S.bob])),
           HU.testCase "a short transcript produces the first offered mana type" $
             HU.assertEqual
               "the head"
