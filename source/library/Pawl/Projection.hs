@@ -802,6 +802,17 @@ modificationWrites m = case m of
   Modification.SetController _ -> Set.singleton Controller
   Modification.SetControllerToSource -> Set.singleton Controller
 
+-- Could another effect move this one's affected set at all? The structural half
+-- of projectWith's movableReads: only a Matching set is a predicate over
+-- characteristics that something else can change. A TheseObjects set names ids
+-- (CR 611.2c) and an Attached one reads its source's attachment off the game
+-- state (CR 303.4m).
+staticallyMovable :: Gathered -> Bool
+staticallyMovable c = case gAffected c of
+  Affected.Matching _ -> True
+  Affected.TheseObjects _ -> False
+  Affected.Attached -> False
+
 -- CR 613: apply continuous effects layer by layer (only the layers with effects,
 -- ascending). Within a layer, CR 613.8's dependency ordering, falling back to CR
 -- 613.7 timestamp order where no dependency exists. An effect's affected set is
@@ -870,151 +881,160 @@ applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
 -- own layer or later (#157). It is unrelated to the CR 613.8 dependency ordering
 -- below, which is about effects rather than counts and is implemented.
 projectWith :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
-projectWith admits cands oid gs =
-  let layers = filter admits (Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))
-      applyLayer (partial, decided) lyr =
-        let seeded =
-              if lyr == Layer.CharacteristicPT
-                then applyCharacteristicPT lyr cands gs oid partial
-                else partial
-            -- CR 613.6: "If an effect starts to apply in one layer and/or
-            -- sublayer, it will continue to be applied to the same set of objects
-            -- in each other applicable layer." The affected set is therefore asked
-            -- ONCE per effect, at the lowest layer that effect reaches, and the
-            -- answer is remembered in `decided` for its other layers. It remembers
-            -- "no" as faithfully as "yes": an artifact that was ALREADY a creature
-            -- is outside March of the Machines' set when March starts to apply, so
-            -- it stays outside at 7b and keeps its printed P/T (#233).
-            --
-            -- Only an effect with parts in more than one layer carries a key
-            -- (gEffect); everything else -- every counter, every stored effect,
-            -- every single-line static ability -- is Nothing and never touches the
-            -- Map.
-            appliesTo ds pc c = case gEffect c of
-              Just k | Just answer <- Map.lookup k ds -> answer
-              _ -> affects (gSource c) oid (gAffected c) pc gs
-            -- Apply one candidate, recording its decision the first time.
-            -- Re-inserting an existing key writes the value it just read, so this
-            -- is idempotent rather than a second determination.
-            applyOne (pc, ds) c =
-              let answer = appliesTo ds pc c
-                  ds' = case gEffect c of
-                    Nothing -> ds
-                    Just k -> Map.insert k answer ds
-               in (if answer then applyModification lyr (gSource c) cands gs oid (gModification c) pc else pc, ds')
-            -- What could move `c`'s affected set, as the aspects its filter reads
-            -- -- or Nothing when nothing can move it at all. Three ways to be
-            -- immovable, none of them an optimization of CR 613.8a so much as its
-            -- own precondition made cheap to test: a TheseObjects set names ids
-            -- (CR 611.2c) and an Attached one reads the source's own attachment off
-            -- the game state (CR 303.4m), neither of which any modification writes;
-            -- an effect CR 613.6 already decided answers from the memo; and a
-            -- filter that reads no projected aspect at all (`And []`, IsSource, a
-            -- supertype) has nothing in it to change.
-            movableReads ds c = case gEffect c of
-              Just k | Map.member k ds -> Nothing
-              _ -> case gAffected c of
-                Affected.TheseObjects _ -> Nothing
-                Affected.Attached -> Nothing
-                Affected.Matching f ->
-                  let aspects = filterReads f
-                   in if Set.null aspects then Nothing else Just aspects
-            -- CR 613.8b: an effect that depends on another waits for it, and among
-            -- the effects waiting on nothing, CR 613.7 timestamp order picks the
-            -- next. Re-deriving `ready` each time round IS CR 613.8c ("the order of
-            -- remaining effects is reevaluated"), and removing one candidate per
-            -- pass is what makes it terminate.
-            --
-            -- Applicability is judged HERE, as each effect is applied, rather than
-            -- from `seeded`. That is CR 613.8's premise: "applying the other would
-            -- change ... what it applies to" describes a state that only exists if
-            -- an effect is asked after its predecessor has applied.
-            --
-            -- When `ready` is empty every remaining candidate is waiting on
-            -- another, so they form a dependency loop and CR 613.8b's last sentence
-            -- says to ignore the rule and use timestamp order. Taking the earliest
-            -- of ALL of them does that for a two-effect loop, which is the only
-            -- shape a real pair makes; a larger tangle where some effects are not
-            -- themselves on the cycle would need the strongly-connected components,
-            -- and has no producer.
-            resolve (pc, ds) pending = case pending of
-              [] -> (pc, ds)
-              _ ->
-                let -- One applicability answer per candidate per round, shared by
-                    -- the dependency scan rather than recomputed per pair. A
-                    -- candidate that does not apply changes nothing, so it cannot
-                    -- be the `b` of a dependency either.
-                    answered = fmap (\(i, c) -> (i, c, appliesTo ds pc c)) pending
-                    -- CR 613.8a clause (b), the "what it applies to" half: `a`
-                    -- depends on `b` when applying `b` would change whether `a`
-                    -- applies. The tentative application is thrown away and only
-                    -- the answer kept -- and it is only reached for a pair that
-                    -- could interact at all, `b` writing an aspect `a` reads.
-                    --
-                    -- Clause (c)'s characteristic-defining exclusion needs no test:
-                    -- a CDA is never a candidate (applyCharacteristicPT folds it at
-                    -- 7a, outside this list), so no pair here is CDA-vs-non-CDA.
-                    -- Clause (b)'s "text" and "what it does to" halves are not
-                    -- implemented and have no producer; "existence" is handled by
-                    -- staticAbilitiesLive. The CR decides all of this over an
-                    -- effect's whole affected set and this decides it per projected
-                    -- object, which agrees for everything the Filter vocabulary can
-                    -- express (#236).
-                    waiting (i, a, answer) = case movableReads ds a of
-                      Nothing -> False
-                      Just aspects ->
-                        any
-                          ( \(j, b, bApplies) ->
-                              j /= i
-                                && bApplies
-                                && not (Set.disjoint aspects (modificationWrites (gModification b)))
-                                && appliesTo ds (applyModification lyr (gSource b) cands gs oid (gModification b) pc) a /= answer
-                          )
-                          answered
-                    ready = filter (not . waiting) answered
-                    batch = if null ready then answered else ready
-                    (chosen, next, _) = List.minimumBy (Ord.comparing (\(_, c, _) -> gTimestamp c)) batch
-                 in resolve (applyOne (pc, ds) next) (filter ((/= chosen) . fst) pending)
-            -- Is there anything at this layer CR 613.8 could reorder? Asked with
-            -- the structural half of movableReads only -- the constructor, not the
-            -- filter's aspects -- so the common answer costs a pattern match per
-            -- candidate and allocates nothing. `waiting` does the precise version
-            -- later, on the branch where it can matter.
-            couldMove ds c = case gEffect c of
-              Just k | Map.member k ds -> False
-              _ -> case gAffected c of
-                Affected.Matching _ -> True
-                Affected.TheseObjects _ -> False
-                Affected.Attached -> False
-            movableHere = any (\c -> gLayer c == lyr && couldMove decided c) cands
-            -- CR 613.6's memo, populated against `seeded` -- sound only on the
-            -- branch below where nothing is movable, which is exactly where an
-            -- effect's answer cannot change as the layer is applied.
-            remember ds c = case gEffect c of
-              Nothing -> ds
-              Just k
-                | gLayer c /= lyr || Map.member k ds -> ds
-                | otherwise -> Map.insert k (affects (gSource c) oid (gAffected c) seeded gs) ds
-         in if movableHere
-              then resolve (seeded, decided) (zip [0 :: Int ..] (filter (\c -> gLayer c == lyr) cands))
-              else
-                -- Nothing here can be moved, so no candidate depends on any other
-                -- (CR 613.8a needs one to change what another applies to) and no
-                -- candidate's answer can change as the layer is applied. CR 613.8
-                -- therefore says nothing, CR 613.7 timestamp order stands, and
-                -- judging applicability against `seeded` gives the same answers as
-                -- judging it one at a time -- so this branch is not a shortcut past
-                -- the rule, it is the rule where the rule is silent. It is also
-                -- almost every layer of almost every projection, which is why it
-                -- keeps the older, tighter fold rather than sharing `resolve`'s.
-                let decided' = List.foldl' remember decided cands
-                    applies c = case gEffect c of
-                      Nothing -> affects (gSource c) oid (gAffected c) seeded gs
-                      Just k -> Map.findWithDefault False k decided'
-                    ordered = List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands)
-                    step pc c = applyModification lyr (gSource c) cands gs oid (gModification c) pc
-                 in (List.foldl' step seeded ordered, decided')
-   in fst (List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers)
+-- Written as candidates-in, then a worker taking the object: everything derived
+-- from the CANDIDATE LIST alone -- the layer list, and the CR 613.8 movable-layer
+-- set -- is bound before `oid`, so projectAll shares it across the whole board
+-- instead of rebuilding it per object.
+projectWith admits cands = forObject
+  where
+    layers = filter admits (Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))
+    -- The layers CR 613.8 could reorder anything in: those holding an effect with
+    -- a Matching set, the only kind another effect can move. Bound HERE, before
+    -- the object, so a whole-board sweep pays for it once for the board rather
+    -- than once per object per layer -- and for most boards it is empty, so the
+    -- per-layer question becomes a lookup in an empty Set.
+    --
+    -- Deliberately coarser than the movableReads inside the fold: this skips the
+    -- CR 613.6 memo test (per object, and it changes as the fold runs) and the
+    -- filter's own aspects. Both only ever turn a True into a False, so this
+    -- over-admits -- which costs the general path where the tight one would have
+    -- done, and never a different answer.
+    movableLayers = Set.fromList (fmap gLayer (filter staticallyMovable cands))
+    forObject oid gs =
+      let applyLayer (partial, decided) lyr =
+            let seeded =
+                  if lyr == Layer.CharacteristicPT
+                    then applyCharacteristicPT lyr cands gs oid partial
+                    else partial
+                -- CR 613.6: "If an effect starts to apply in one layer and/or
+                -- sublayer, it will continue to be applied to the same set of objects
+                -- in each other applicable layer." The affected set is therefore asked
+                -- ONCE per effect, at the lowest layer that effect reaches, and the
+                -- answer is remembered in `decided` for its other layers. It remembers
+                -- "no" as faithfully as "yes": an artifact that was ALREADY a creature
+                -- is outside March of the Machines' set when March starts to apply, so
+                -- it stays outside at 7b and keeps its printed P/T (#233).
+                --
+                -- Only an effect with parts in more than one layer carries a key
+                -- (gEffect); everything else -- every counter, every stored effect,
+                -- every single-line static ability -- is Nothing and never touches the
+                -- Map.
+                appliesTo ds pc c = case gEffect c of
+                  Just k | Just answer <- Map.lookup k ds -> answer
+                  _ -> affects (gSource c) oid (gAffected c) pc gs
+                -- Apply one candidate, recording its decision the first time.
+                -- Re-inserting an existing key writes the value it just read, so this
+                -- is idempotent rather than a second determination.
+                applyOne (pc, ds) c =
+                  let answer = appliesTo ds pc c
+                      ds' = case gEffect c of
+                        Nothing -> ds
+                        Just k -> Map.insert k answer ds
+                   in (if answer then applyModification lyr (gSource c) cands gs oid (gModification c) pc else pc, ds')
+                -- What could move `c`'s affected set, as the aspects its filter reads
+                -- -- or Nothing when nothing can move it at all. Three ways to be
+                -- immovable, none of them an optimization of CR 613.8a so much as its
+                -- own precondition made cheap to test: a TheseObjects set names ids
+                -- (CR 611.2c) and an Attached one reads the source's own attachment off
+                -- the game state (CR 303.4m), neither of which any modification writes;
+                -- an effect CR 613.6 already decided answers from the memo; and a
+                -- filter that reads no projected aspect at all (`And []`, IsSource, a
+                -- supertype) has nothing in it to change.
+                movableReads ds c = case gEffect c of
+                  Just k | Map.member k ds -> Nothing
+                  _ -> case gAffected c of
+                    Affected.TheseObjects _ -> Nothing
+                    Affected.Attached -> Nothing
+                    Affected.Matching f ->
+                      let aspects = filterReads f
+                       in if Set.null aspects then Nothing else Just aspects
+                -- CR 613.8b: an effect that depends on another waits for it, and among
+                -- the effects waiting on nothing, CR 613.7 timestamp order picks the
+                -- next. Re-deriving `ready` each time round IS CR 613.8c ("the order of
+                -- remaining effects is reevaluated"), and removing one candidate per
+                -- pass is what makes it terminate.
+                --
+                -- Applicability is judged HERE, as each effect is applied, rather than
+                -- from `seeded`. That is CR 613.8's premise: "applying the other would
+                -- change ... what it applies to" describes a state that only exists if
+                -- an effect is asked after its predecessor has applied.
+                --
+                -- When `ready` is empty every remaining candidate is waiting on
+                -- another, so they form a dependency loop and CR 613.8b's last sentence
+                -- says to ignore the rule and use timestamp order. Taking the earliest
+                -- of ALL of them does that for a two-effect loop, which is the only
+                -- shape a real pair makes; a larger tangle where some effects are not
+                -- themselves on the cycle would need the strongly-connected components,
+                -- and has no producer.
+                resolve (pc, ds) pending = case pending of
+                  [] -> (pc, ds)
+                  _ ->
+                    let -- One applicability answer per candidate per round, shared by
+                        -- the dependency scan rather than recomputed per pair. A
+                        -- candidate that does not apply changes nothing, so it cannot
+                        -- be the `b` of a dependency either.
+                        answered = fmap (\(i, c) -> (i, c, appliesTo ds pc c)) pending
+                        -- CR 613.8a clause (b), the "what it applies to" half: `a`
+                        -- depends on `b` when applying `b` would change whether `a`
+                        -- applies. The tentative application is thrown away and only
+                        -- the answer kept -- and it is only reached for a pair that
+                        -- could interact at all, `b` writing an aspect `a` reads.
+                        --
+                        -- Clause (c)'s characteristic-defining exclusion needs no test:
+                        -- a CDA is never a candidate (applyCharacteristicPT folds it at
+                        -- 7a, outside this list), so no pair here is CDA-vs-non-CDA.
+                        -- Clause (b)'s "text" and "what it does to" halves are not
+                        -- implemented and have no producer; "existence" is handled by
+                        -- staticAbilitiesLive. The CR decides all of this over an
+                        -- effect's whole affected set and this decides it per projected
+                        -- object, which agrees for everything the Filter vocabulary can
+                        -- express (#236).
+                        waiting (i, a, answer) = case movableReads ds a of
+                          Nothing -> False
+                          Just aspects ->
+                            any
+                              ( \(j, b, bApplies) ->
+                                  j /= i
+                                    && bApplies
+                                    && not (Set.disjoint aspects (modificationWrites (gModification b)))
+                                    && appliesTo ds (applyModification lyr (gSource b) cands gs oid (gModification b) pc) a /= answer
+                              )
+                              answered
+                        ready = filter (not . waiting) answered
+                        batch = if null ready then answered else ready
+                        (chosen, next, _) = List.minimumBy (Ord.comparing (\(_, c, _) -> gTimestamp c)) batch
+                     in resolve (applyOne (pc, ds) next) (filter ((/= chosen) . fst) pending)
+                -- Is there anything at this layer CR 613.8 could reorder? See
+                -- movableLayers above: one Set lookup, almost always in an empty Set.
+                movableHere = Set.member lyr movableLayers
+                -- CR 613.6's memo, populated against `seeded` -- sound only on the
+                -- branch below where nothing is movable, which is exactly where an
+                -- effect's answer cannot change as the layer is applied.
+                remember ds c = case gEffect c of
+                  Nothing -> ds
+                  Just k
+                    | gLayer c /= lyr || Map.member k ds -> ds
+                    | otherwise -> Map.insert k (affects (gSource c) oid (gAffected c) seeded gs) ds
+             in if movableHere
+                  then resolve (seeded, decided) (zip [0 :: Int ..] (filter (\c -> gLayer c == lyr) cands))
+                  else
+                    -- Nothing here can be moved, so no candidate depends on any other
+                    -- (CR 613.8a needs one to change what another applies to) and no
+                    -- candidate's answer can change as the layer is applied. CR 613.8
+                    -- therefore says nothing, CR 613.7 timestamp order stands, and
+                    -- judging applicability against `seeded` gives the same answers as
+                    -- judging it one at a time -- so this branch is not a shortcut past
+                    -- the rule, it is the rule where the rule is silent. It is also
+                    -- almost every layer of almost every projection, which is why it
+                    -- keeps the older, tighter fold rather than sharing `resolve`'s.
+                    let decided' = List.foldl' remember decided cands
+                        applies c = case gEffect c of
+                          Nothing -> affects (gSource c) oid (gAffected c) seeded gs
+                          Just k -> Map.findWithDefault False k decided'
+                        ordered = List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands)
+                        step pc c = applyModification lyr (gSource c) cands gs oid (gModification c) pc
+                     in (List.foldl' step seeded ordered, decided')
+       in fst (List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers)
 
 -- Project one object against a PRECOMPUTED candidate list. gather is
 -- oid-independent, so a whole-board sweep gathers once and folds each object
@@ -1039,7 +1059,12 @@ projectUpTo bound = projectWith (< bound)
 projectAll :: GameState -> Map ObjectId ProjectedCharacteristics
 projectAll gs =
   let cands = gather gs
-   in Map.fromSet (\oid -> projectFrom cands oid gs) (GameState.battlefield gs)
+      -- Bound separately, and NOT inlined: projectWith does its candidate-only
+      -- work (the layer list, the CR 613.8 movable-layer set) when it is applied
+      -- to `cands`, so sharing this partial application shares that work across
+      -- every object on the board.
+      forObject = projectFrom cands
+   in Map.fromSet (\oid -> forObject oid gs) (GameState.battlefield gs)
 
 powerOf :: ObjectId -> GameState -> Maybe Integer
 powerOf oid gs = PC.power (project oid gs)

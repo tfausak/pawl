@@ -204,21 +204,31 @@ Measured, `cabal bench`, median of three, before → after:
 
 | benchmark | before | after |
 |---|---|---|
-| goldfish 2p | 13.2 ms | 13.4 ms |
-| casting 2p | 129 ms | 143 ms |
-| fighting 2p | 23.5 ms | 24.7 ms |
-| fighting 2p aura | 597 ms | 676 ms |
+| goldfish 2p | 13.2 ms | 13.3 ms |
+| casting 2p | 129 ms | 130 ms |
+| fighting 2p | 23.5 ms | 23.6 ms |
+| fighting 2p aura | 597 ms | 563 ms |
 
-The first cut, with no immovability guard, ran the pairwise dependency scan on
-every layer of every projection and took **2.2 s** on the aura benchmark — 3.7x,
-an algorithmic change rather than a constant one, since the scan is quadratic in
-the candidates at a layer and each comparison costs a filter evaluation and a
-tentative application. §3's guard is what retires that: the aura deck (Islands,
-Darksteel Myr, Control Magic) has no `Matching` effect anywhere, so it never
-reaches the scan at all.
+The aura benchmark ends up **faster than before the feature**, which took three
+passes to reach and is worth recording because two of them were wrong turns.
 
-What is left is a constant factor: one extra pass per layer to ask whether
-anything is movable. Correctness is worth that, and it is the kind of thing a
-later optimization pass can take back — the guard could be computed once per
-`gather` instead of once per layer per object, which needs the candidate list to
-carry it rather than be re-scanned.
+1. **No guard: 2.2 s, 3.7x.** The pairwise dependency scan ran on every layer of
+   every projection. It is quadratic in a layer's candidates and each comparison
+   costs a filter evaluation plus a tentative application, so this is an
+   algorithmic regression rather than a constant one.
+2. **Guard per layer per object: 676 ms.** §3's immovability test retires the
+   scan — the aura deck (Islands, Darksteel Myr, Control Magic) has no `Matching`
+   effect anywhere, so it never reaches it. What was left was asking the guard's
+   question once per layer per object.
+3. **Guard per board: 563 ms.** The question depends only on the candidate list,
+   so `projectWith` now binds it — together with the layer list, which was always
+   candidates-only and was always being recomputed per object — *before* taking
+   the object, and `projectAll` shares that partial application across the board.
+   The layer list moving with it is why the total comes out below the starting
+   point.
+
+The guard is deliberately coarser than the fold's own `movableReads`: it skips the
+CR 613.6 memo test (per object, and it changes as the fold runs) and the filter's
+aspects. Both only ever turn a True into a False, so the coarse version
+over-admits — which costs the general path where the tight one would have done,
+and never a different answer.
