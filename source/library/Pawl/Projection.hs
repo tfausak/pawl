@@ -960,12 +960,13 @@ projectWith admits cands = forObject
                 -- an effect is asked after its predecessor has applied.
                 --
                 -- When `ready` is empty every remaining candidate is waiting on
-                -- another, so they form a dependency loop and CR 613.8b's last sentence
-                -- says to ignore the rule and use timestamp order. Taking the earliest
-                -- of ALL of them does that for a two-effect loop, which is the only
-                -- shape a real pair makes; a larger tangle where some effects are not
-                -- themselves on the cycle would need the strongly-connected components,
-                -- and has no producer.
+                -- another, so somewhere in there is a dependency loop, and CR
+                -- 613.8b's last sentence says to ignore the rule for it: "the
+                -- effects in the dependency loop are applied in timestamp order".
+                -- Only the loop's OWN members escape -- an effect that merely
+                -- waits on the loop keeps waiting, and gets its turn once the loop
+                -- has unwound -- so the fallback is restricted to the candidates
+                -- that sit on a cycle rather than to everything left.
                 resolve (pc, ds) pending = case pending of
                   [] -> (pc, ds)
                   _ ->
@@ -989,19 +990,37 @@ projectWith admits cands = forObject
                         -- effect's whole affected set and this decides it per projected
                         -- object, which agrees for everything the Filter vocabulary can
                         -- express (#236).
-                        waiting (i, a, answer) = case movableReads ds a of
+                        dependsOnOne (i, a, answer) (j, b, bApplies) = case movableReads ds a of
                           Nothing -> False
                           Just aspects ->
-                            any
-                              ( \(j, b, bApplies) ->
-                                  j /= i
-                                    && bApplies
-                                    && not (Set.disjoint aspects (modificationWrites (gModification b)))
-                                    && appliesTo ds (applyModification lyr (gSource b) cands gs oid (gModification b) pc) a /= answer
-                              )
-                              answered
-                        ready = filter (not . waiting) answered
-                        batch = if null ready then answered else ready
+                            j /= i
+                              && bApplies
+                              && not (Set.disjoint aspects (modificationWrites (gModification b)))
+                              && appliesTo ds (applyModification lyr (gSource b) cands gs oid (gModification b) pc) a /= answer
+                        ready = filter (\a -> not (any (dependsOnOne a) answered)) answered
+                        -- The dependency edges, built only when the whole round is
+                        -- blocked -- which is the one case that needs to know the
+                        -- SHAPE of the tangle rather than merely that there is one.
+                        edges = Map.fromList (fmap (\a@(i, _, _) -> (i, fmap (\(j, _, _) -> j) (filter (dependsOnOne a) answered))) answered)
+                        -- Everything reachable from `start` by following edges.
+                        reach seen queue = case queue of
+                          [] -> seen
+                          x : xs ->
+                            if Set.member x seen
+                              then reach seen xs
+                              else reach (Set.insert x seen) (Map.findWithDefault [] x edges <> xs)
+                        -- On a cycle iff it can reach itself in one step or more.
+                        onCycle (i, _, _) = Set.member i (reach Set.empty (Map.findWithDefault [] i edges))
+                        batch = case ready of
+                          _ : _ -> ready
+                          -- `ready` empty means every remaining candidate has an
+                          -- outgoing edge, and a finite graph where every node has
+                          -- one contains a cycle -- so `cyclic` is never empty and
+                          -- the fallback to `answered` is unreachable. Written out
+                          -- because `minimumBy` is partial and this keeps it total.
+                          [] -> case filter onCycle answered of
+                            [] -> answered
+                            cyclic -> cyclic
                         (chosen, next, _) = List.minimumBy (Ord.comparing (\(_, c, _) -> gTimestamp c)) batch
                      in resolve (applyOne (pc, ds) next) (filter ((/= chosen) . fst) pending)
                 -- Is there anything at this layer CR 613.8 could reorder? See

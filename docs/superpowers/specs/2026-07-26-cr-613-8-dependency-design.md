@@ -74,10 +74,25 @@ Per object, per layer:
 pending := the candidates in this layer
 while pending is non-empty:
     ready := { e in pending | e depends on no other member of pending }
-    batch := if ready is empty then pending else ready      -- CR 613.8b, loops
-    next  := the earliest-timestamp member of batch          -- CR 613.7
+    batch := if ready is non-empty then ready
+             else  { e in pending | e is on a dependency cycle }   -- CR 613.8b
+    next  := the earliest-timestamp member of batch                -- CR 613.7
     apply next (if it applies), then remove it from pending
 ```
+
+The loop clause is the fiddly one. CR 613.8b's last sentence — "If several
+dependent effects form a dependency loop, then this rule is ignored and the
+effects **in the dependency loop** are applied in timestamp order" — excuses the
+loop's own members and nobody else. An effect that merely waits on the loop keeps
+waiting, and takes its turn once the loop has unwound. So when `ready` empties,
+the fallback is the candidates that sit on a cycle, not everything left: with A
+and B in a two-effect loop and C depending on A from outside it, a fallback over
+all of `pending` would spend C first if C had the earliest timestamp, at a moment
+when A has not applied and C may not even be applicable yet.
+
+`ready` being empty means every remaining candidate has an outgoing edge, and a
+finite graph in which every node has one contains a cycle — so the cycle set is
+never empty, and the loop always makes progress.
 
 Three properties fall out of the shape:
 

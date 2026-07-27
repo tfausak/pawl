@@ -612,6 +612,37 @@ tests registry =
             gsA = S.withEffectAt pikerId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Swamp) gs0
             gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.SetLandSubtype Subtype.Forest) gsA
         HU.assertEqual "the later SetLandSubtype wins" (Set.singleton Subtype.Forest) (Projection.subtypesOf pikerId gs),
+      -- CR 613.8b's last sentence: "If several dependent effects form a dependency
+      -- loop, then this rule is ignored and the effects IN THE DEPENDENCY LOOP are
+      -- applied in timestamp order." Only the loop's own members escape the
+      -- dependency rule; an effect that merely waits on the loop keeps waiting.
+      --
+      -- Three effects on a Forest, all layer 4:
+      --
+      --   A (t=20) "each noncreature ... gains Swamp"     applies; reads types
+      --   B (t=30) "each non-Swamp ... becomes a creature" applies; reads subtypes
+      --   C (t=10) "each Swamp ... gains Mountain"         does NOT apply yet
+      --
+      -- A and B each stop the other from applying, so they are a two-effect loop.
+      -- C depends on A -- A's Swamp is what would let C apply -- but nothing
+      -- depends on C, so C is NOT in the loop. C also has the earliest timestamp,
+      -- which is the whole point: a fallback that took the earliest of everything
+      -- pending would spend C first, while it still does not apply, and the
+      -- Mountain would never land. Restricted to the cycle, A goes first, and C
+      -- gets its turn afterwards with the Swamp in place.
+      HU.testCase "CR 613.8b a dependency loop lets only its own members ignore the rule" $ do
+        forest <- Registry.printing registry "Forest"
+        let gs0 = S.landsInPlay forest 1
+            landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+            withC = withDynamicEffect (Affected.Matching (Filter.Type.HasSubtype Subtype.Swamp)) (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Mountain) gs0
+            withA = withDynamicEffect (Affected.Matching (Filter.Type.Not (Filter.Type.HasCardType CardType.Creature))) (Timestamp.MkTimestamp 20) (Modification.AddLandSubtype Subtype.Swamp) withC
+            gs = withDynamicEffect (Affected.Matching (Filter.Type.Not (Filter.Type.HasSubtype Subtype.Swamp))) (Timestamp.MkTimestamp 30) (Modification.AddCardType CardType.Creature) withA
+            subtypes = Projection.subtypesOf landId gs
+        HU.assertBool "A applied: the Forest is a Swamp" (Set.member Subtype.Swamp subtypes)
+        HU.assertBool "and C, which was only waiting on the loop, still got its turn" (Set.member Subtype.Mountain subtypes)
+        HU.assertBool "B lost its window once A applied, so this is no creature" (not (Projection.isCreatureOf landId gs)),
       -- CR 613.8b with real cards, and the pair that retired #11's expiry trigger:
       -- Liquimetal Coating ("{T}: Target permanent becomes an artifact in addition
       -- to its other types until end of turn") and March of the Machines ("Each
