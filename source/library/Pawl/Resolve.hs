@@ -572,9 +572,8 @@ attachLegal src target gs =
 -- legalSlot already answered True for it.
 --
 -- `everyone` is not filtered to the players still in the game (CR 800.4a), and
--- it is `Map.keys` seat order rather than turn order. The first is masked
--- rather than correct, matching Count.playersFor's seat list; see that
--- function's comment for the one-line `Game.stillPlaying` filter. The second is
+-- it is `Map.keys` seat order rather than turn order. The first is masked rather
+-- than correct, matching Count.playersFor's seat list (#279). The second is
 -- deliberate: an unordered SET of players is what a PlayerRef names, and a
 -- caller with an ordering rule to obey imposes it on this answer -- the Draw
 -- arm does, for CR 121.2c.
@@ -820,12 +819,17 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         -- (#175).
         --
         -- A filter, so a drawer the roster does not name is dropped. The two
-        -- agree seat for seat in an ordinary game, and where they don't -- CR
-        -- 727.1 and Setup.subgameStateFrom rebuild turnOrder from the
-        -- still-playing seats while leaving a departed player in the players map
-        -- -- dropping is the right answer and an unobservable one: CR 800.4a
-        -- took that player's library out of the game with them, so folding over
-        -- them drew nothing either way.
+        -- agree seat for seat in an ordinary game; where they don't -- CR 727.1
+        -- and Setup.subgameStateFrom rebuild turnOrder from the still-playing
+        -- seats while leaving a departed player in the players map -- dropping
+        -- is what CR 800.4a wants anyway.
+        --
+        -- NOT a general filter for departed players, who are still named
+        -- wherever turnOrder still seats them (#279). Drawing for one is not a
+        -- no-op: CR 800.4a took their library out of the game with them, so
+        -- Event.drawCard records them in GameState.drewFromEmpty. It is inert
+        -- rather than harmless-by-accident -- Sba.losesNow, that field's only
+        -- reader, gates every loss on Status.Playing.
         drawers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
     case Quantity.evaluate viewOf context gs source quantity of
       Just n

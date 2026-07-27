@@ -83,7 +83,8 @@ aggregate aggregation views = case aggregation of
 -- predicate lived in Pawl.Departure, which this module cannot import -- is gone:
 -- it is Game.stillPlaying now, and Pawl.Game is already imported here. Adding
 -- `filter (\pid -> List.elem pid (Game.stillPlaying gs)) everyone` is a one-line
--- change whenever a card makes the difference visible.
+-- change whenever a card makes the difference visible (#279, which tracks the
+-- same mask at Resolve.playerRefPlayers).
 playersFor :: Filter.Context -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
 playersFor context gs ref =
   let everyone = Map.keys (GameState.players gs)
