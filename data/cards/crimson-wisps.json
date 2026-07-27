@@ -54,10 +54,18 @@
           },
           {
             "type": "Draw",
-            "value": {
-              "type": "Literal",
-              "value": 1
-            }
+            "value": [
+              {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              },
+              {
+                "type": "Literal",
+                "value": 1
+              }
+            ]
           }
         ],
         "targetSpecs": [

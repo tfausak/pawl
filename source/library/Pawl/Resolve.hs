@@ -98,7 +98,7 @@ slotsOf effect = case effect of
   Effect.Destroy slot _ -> Set.singleton slot
   Effect.Sacrifice slot -> Set.singleton slot
   Effect.MoveToZone slot _ -> Set.singleton slot
-  Effect.Draw _ -> Set.empty
+  Effect.Draw ref _ -> playerRefSlots ref
   Effect.Mill slot _ -> Set.singleton slot
   Effect.Discard slot _ -> Set.singleton slot
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
@@ -143,7 +143,7 @@ readsX = any effectReadsX
       Effect.Destroy {} -> False
       Effect.Sacrifice _ -> False
       Effect.MoveToZone {} -> False
-      Effect.Draw quantity -> quantity == Quantity.Type.X
+      Effect.Draw _ quantity -> quantity == Quantity.Type.X
       Effect.Mill _ quantity -> quantity == Quantity.Type.X
       Effect.Discard _ quantity -> quantity == Quantity.Type.X
       Effect.Create quantity _ _ -> quantity == Quantity.Type.X
@@ -185,7 +185,7 @@ manaProduced effect = case effect of
   Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
   Effect.MoveToZone {} -> Nothing
-  Effect.Draw _ -> Nothing
+  Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
   Effect.Discard {} -> Nothing
   Effect.Create {} -> Nothing
@@ -222,7 +222,7 @@ searchesLibrary effect = case effect of
   Effect.Destroy {} -> False
   Effect.Sacrifice _ -> False
   Effect.MoveToZone {} -> False
-  Effect.Draw _ -> False
+  Effect.Draw {} -> False
   Effect.Mill {} -> False
   Effect.Discard {} -> False
   Effect.Create {} -> False
@@ -300,7 +300,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Destroy {} -> effect
   Effect.Sacrifice _ -> effect
   Effect.MoveToZone {} -> effect
-  Effect.Draw _ -> effect
+  Effect.Draw {} -> effect
   Effect.Mill {} -> effect
   Effect.Discard {} -> effect
   -- A text-changer does not reach a token's embedded card here (spec section 8).
@@ -561,6 +561,32 @@ attachLegal src target gs =
     && src /= target
     && Projection.isCreatureOf target gs
 
+-- The players a PlayerRef names DURING a resolution, read from the slots this
+-- resolution filled rather than from the source's bindings (which is what
+-- Count.playersFor reads, for a static count). Shared by applyEffectWith's
+-- GainPlayerCounters and Draw arms.
+--
+-- A slot's legality is asked the way every other slot read asks it (CR 608.2b):
+-- a slot filled by targeting that has since become illegal names nobody, and a
+-- RESERVED slot -- the trigger's "that player" -- has no target spec, so
+-- legalSlot already answered True for it.
+--
+-- `everyone` is not filtered to the players still in the game (CR 800.4a), and
+-- it is not in turn order either -- it is `Map.keys` seat order. Both are
+-- masked rather than correct, matching Count.playersFor's seat list; see that
+-- function's comment for the one-line `Game.stillPlaying` filter, and #276 for
+-- the ordering CR 121.2c wants once a Draw can name more than one player.
+playerRefPlayers :: Map.Map SlotName Recipient -> Map.Map SlotName Bool -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
+playerRefPlayers chosen legality controller gs ref = case ref of
+  PlayerRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+    (Just (Recipient.ToPlayer pid), True) -> [pid]
+    _ -> [] -- an unfilled, illegal, or non-player slot: no-op
+  PlayerRef.Relative PlayerRelation.You -> [controller]
+  PlayerRef.Relative PlayerRelation.Opponent -> filter (/= controller) everyone
+  PlayerRef.EachPlayer -> everyone
+  where
+    everyone = Map.keys (GameState.players gs)
+
 applyEffectWith :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffectWith runSubgame source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity -> do
@@ -771,16 +797,23 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative.
         Just target -> Event.changeZone target zone
       _ -> pure ()
-  Effect.Draw quantity -> do
+  Effect.Draw ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
+        -- Whoever the PlayerRef names draws -- the controller for Divination's
+        -- `Relative You`, the targeted player for Ancestral Recall's `InSlot`.
+        -- CR 121.2c's ordering (the active player performs all of their draws
+        -- first, then each other player in turn order) is not implemented (#276).
+        drawers = playerRefPlayers chosen legality controller gs ref
     case Quantity.evaluate viewOf context gs source quantity of
       Just n
         | n > 0 ->
-            -- CR 120: draw n, folding the shared primitive so each draw re-reads the
-            -- library top and the CR 121.3 empty-library loss is preserved.
-            Monad.replicateM_ (Integer.toIntSaturating n) (Event.drawCard controller)
+            -- CR 121.2: draw n one at a time, folding the shared primitive so each
+            -- draw re-reads the library top and the CR 104.3c empty-library loss is
+            -- preserved.
+            Monad.forM_ drawers $ \pid ->
+              Monad.replicateM_ (Integer.toIntSaturating n) (Event.drawCard pid)
       _ -> pure ()
   Effect.Mill slot quantity -> do
     gs <- State.get
@@ -1155,23 +1188,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
-        -- The recipients. A slot's legality is asked the way every other slot
-        -- read asks it (CR 608.2b): a slot filled by targeting that has since
-        -- become illegal names nobody, and a RESERVED slot -- the trigger's
-        -- "that player" -- has no target spec, so legalSlot already answered
-        -- True for it.
-        recipients = case ref of
-          PlayerRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-            (Just (Recipient.ToPlayer pid), True) -> [pid]
-            _ -> [] -- an unfilled, illegal, or non-player slot: no-op
-          PlayerRef.Relative PlayerRelation.You -> [controller]
-          PlayerRef.Relative PlayerRelation.Opponent -> filter (/= controller) everyone
-          PlayerRef.EachPlayer -> everyone
-        -- Not filtered to the players still in the game, matching
-        -- Count.playersFor's seat list and unobservable for the same reason: no
-        -- card in the pool reaches the two arms that use it. See that function's
-        -- comment for the one-line change whenever one does.
-        everyone = Map.keys (GameState.players gs)
+        recipients = playerRefPlayers chosen legality controller gs ref
     case Quantity.evaluate viewOf context gs source quantity of
       Just n
         | n > 0 ->

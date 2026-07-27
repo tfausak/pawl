@@ -1338,7 +1338,7 @@ effectToJson e = case e of
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
   Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (slotNameToJson s))
   Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array [slotNameToJson s, zoneToJson z]))
-  Effect.Draw q -> Json.tagged (Text.pack "Draw") (Just (quantityToJson q))
+  Effect.Draw r q -> Json.tagged (Text.pack "Draw") (Just (Array [playerRefToJson r, quantityToJson q]))
   Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.Create q c Nothing -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
@@ -1385,7 +1385,9 @@ jsonToEffect value = do
     "MoveToZone" -> case mv of
       Just (Array [s, z]) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z
       _ -> Left (Text.pack "MoveToZone expects [slot, zone]")
-    "Draw" -> withValue mv (fmap Effect.Draw . jsonToQuantity)
+    "Draw" -> case mv of
+      Just (Array [r, q]) -> Effect.Draw <$> jsonToPlayerRef r <*> jsonToQuantity q
+      _ -> Left (Text.pack "Draw expects [playerRef, quantity]")
     "Mill" -> case mv of
       Just (Array [s, q]) -> Effect.Mill <$> jsonToSlotName s <*> jsonToQuantity q
       _ -> Left (Text.pack "Mill expects [slot, quantity]")

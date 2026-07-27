@@ -341,7 +341,7 @@ effectCounts effect = case effect of
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   Effect.MoveToZone _ _ -> []
-  Effect.Draw quantity -> quantityCounts quantity
+  Effect.Draw _ quantity -> quantityCounts quantity
   Effect.Mill _ quantity -> quantityCounts quantity
   Effect.Discard _ quantity -> quantityCounts quantity
   Effect.Create quantity card _ -> quantityCounts quantity <> cardCounts card
@@ -822,7 +822,7 @@ m4bCardTests registry =
       HU.testCase "Divination is a {2}{U} Sorcery that draws two cards with no target" $ do
         divination <- Registry.printing registry "Divination"
         let c = Printing.card divination
-        HU.assertEqual "effect draws two" [Effect.Draw (Quantity.Type.Literal 2)] (Card.allEffects c)
+        HU.assertEqual "effect draws two" [Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 2)] (Card.allEffects c)
         HU.assertBool "no target slots" (Map.null (Card.allTargetSpecs c)),
       HU.testCase "Tome Scour is a {U} Sorcery milling five from a target player" $ do
         tomeScour <- Registry.printing registry "Tome Scour"

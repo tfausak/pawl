@@ -4,10 +4,6 @@
   "keywords": [],
   "manaCost": [
     {
-      "type": "Generic",
-      "value": 2
-    },
-    {
       "type": "OfType",
       "value": {
         "type": "Colored",
@@ -17,7 +13,7 @@
       }
     }
   ],
-  "name": "Steady Progress",
+  "name": "Ancestral Recall",
   "power": null,
   "replacementEffects": [],
   "spell": {
@@ -25,25 +21,29 @@
       {
         "effects": [
           {
-            "type": "Proliferate"
-          },
-          {
             "type": "Draw",
             "value": [
               {
-                "type": "Relative",
-                "value": {
-                  "type": "You"
-                }
+                "type": "InSlot",
+                "value": "target"
               },
               {
                 "type": "Literal",
-                "value": 1
+                "value": 3
               }
             ]
           }
         ],
-        "targetSpecs": []
+        "targetSpecs": [
+          {
+            "slot": "target",
+            "spec": {
+              "pool": {
+                "type": "Players"
+              }
+            }
+          }
+        ]
       }
     ],
     "selection": {

@@ -105,10 +105,17 @@ data Effect card
     -- data; one opcode for every targeted single-object move. Distinct from
     -- Destroy (unconditional move, no indestructible check).
     MoveToZone SlotName Zone
-  | -- CR 120: the controller draws this many cards. Targetless (a spell's
-    -- controller draws, CR 120.2). Empty-library draw is a loss (CR 104.3c),
+  | -- CR 121.1: the players the PlayerRef names each draw this many cards, one
+    -- at a time (CR 121.2). Divination is `Relative You`; Ancestral Recall's
+    -- "target player draws three cards" is `InSlot`, reading a slot that
+    -- TARGETING filled (CR 601.2c). Empty-library draw is a loss (CR 104.3c),
     -- unlike Mill -- the semantic asymmetry that keeps Draw and Mill separate.
-    Draw Quantity
+    --
+    -- PlayerRef rather than a `Draw SlotName Quantity` sibling: the sibling
+    -- keeps this opcode's arm count at one but leaves two draw opcodes to keep
+    -- in step, which the effect DSL otherwise avoids (cf. MoveToZone's one
+    -- opcode for every targeted single-object move).
+    Draw PlayerRef Quantity
   | -- CR 701.17: the slot's target player mills this many (top N of their library
     -- to their graveyard). Milling a short/empty library mills fewer, no penalty
     -- (CR 701.17b) -- unlike Draw, which loses on empty.
@@ -236,7 +243,7 @@ data Effect card
     PlaySubgame SlotName
   | -- CR 103.5b (Serum Powder): exile every card in the resolving controller's
     -- hand, then draw that many cards. Targetless and controller-scoped, the
-    -- ExileAllGraveyards / Draw shape.
+    -- ExileAllGraveyards shape -- unlike Draw, which names its recipient.
     --
     -- ONE opcode rather than an exile composed with a Draw: "that many" is the
     -- hand size BEFORE the exile, so a following Draw would read a hand that is

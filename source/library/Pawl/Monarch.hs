@@ -32,6 +32,8 @@ import qualified Pawl.Type.MonarchWatch as MonarchWatch
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Phase as Phase
 import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Type.PlayerRef as PlayerRef
+import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Sickness as Sickness
@@ -68,7 +70,7 @@ endStepDraw :: TriggeredAbility Card
 endStepDraw =
   oneEffect
     (TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
-    (Effect.Draw (Quantity.Literal 1))
+    (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
 
 -- CR 725.2: "Whenever a creature deals combat damage to the monarch, its
 -- controller becomes the monarch." Controlled by the current monarch; makes a
