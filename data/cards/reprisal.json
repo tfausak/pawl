@@ -26,7 +26,12 @@
         "effects": [
           {
             "type": "Destroy",
-            "value": "target"
+            "value": [
+              "target",
+              {
+                "type": "CantBeRegenerated"
+              }
+            ]
           }
         ],
         "targetSpecs": [

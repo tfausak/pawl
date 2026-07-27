@@ -77,6 +77,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Scope as Scope
@@ -1284,7 +1285,7 @@ fizzleTests registry =
             -- illegal (it's no longer a legal CreatureTarget), while the
             -- reserved slot -- never targeted -- stays vacuously legal.
             gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-            run = Resolve.resolveEffects abilId source [Effect.Destroy targetSlot, Effect.Draw (Quantity.Literal 1)] specs
+            run = Resolve.resolveEffects abilId source [Effect.Destroy targetSlot Regenerability.Regenerable, Effect.Draw (Quantity.Literal 1)] specs
             after = snd (Engine.runGamePure S.identityAnswer gone run)
         HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
       HU.testCase "CR 704.5a a Bolt can end the game mid-step" $ do

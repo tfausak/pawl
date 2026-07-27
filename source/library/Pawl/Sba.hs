@@ -31,6 +31,7 @@ import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Subtype as Subtype
@@ -360,8 +361,10 @@ performStateBasedActions = do
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Event: no Moved event, no replacement, no trigger.
   State.modify' (\g -> g {GameState.objects = List.foldl' (\m oid -> Map.adjust (\o -> o {Object.attachedTo = Nothing}) oid m) (GameState.objects g) detaching})
-  -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
-  Monad.mapM_ Event.destroy toDestroy
+  -- CR 704.5g/h: destruction through the funnel. Regenerable, and that is not a
+  -- default so much as the point -- CR 701.19a's shield exists to replace exactly
+  -- this destruction.
+  Monad.mapM_ (Event.destroy Regenerability.Regenerable) toDestroy
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
       departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving

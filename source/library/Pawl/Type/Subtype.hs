@@ -53,4 +53,6 @@ data Subtype
     Scout
   | -- CR 205.3m (a creature type; Skilled Animator's).
     Artificer
+  | -- CR 205.3m (a creature type; Uthden Troll's).
+    Troll
   deriving (Eq, Ord, Show)

@@ -194,6 +194,7 @@ library
     Pawl.Type.ProposedEvent
     Pawl.Type.Quantity
     Pawl.Type.Recipient
+    Pawl.Type.Regenerability
     Pawl.Type.Registry
     Pawl.Type.ReplacementBucket
     Pawl.Type.ReplacementCandidate

@@ -23,6 +23,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.TapState as TapState
@@ -170,7 +171,7 @@ tests registry =
             (oid, gs0) = S.addCreature piker S.alice base
             damaged = S.markDamage oid 1 gs0
             shielded = S.addRegenShield oid damaged
-            after = S.runPure S.identityAnswer shielded (Event.destroy oid)
+            after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable oid)
         HU.assertEqual "still on the battlefield (regenerated, not destroyed)" True (Set.member oid (GameState.battlefield after))
         HU.assertEqual "shield spent" [] (GameState.replacements after)
         case Game.lookupObject oid after of
@@ -182,14 +183,14 @@ tests registry =
         piker <- Registry.printing registry "Goblin Piker"
         let base = Setup.emptyGame S.bothPlayers
             (oid, gs0) = S.addCreature piker S.alice base
-            once = S.runPure S.identityAnswer (S.addRegenShield oid gs0) (Event.destroy oid) -- regenerated
-            twice = S.runPure S.identityAnswer once (Event.destroy oid) -- no shield -> dies
+            once = S.runPure S.identityAnswer (S.addRegenShield oid gs0) (Event.destroy Regenerability.Regenerable oid) -- regenerated
+            twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable oid) -- no shield -> dies
         HU.assertEqual "gone from the battlefield" False (Set.member oid (GameState.battlefield twice)),
       HU.testCase "CR 700.4 Event.destroy no-ops on an indestructible permanent" $ do
         darksteelMyr <- Registry.printing registry "Darksteel Myr"
         let base = Setup.emptyGame S.bothPlayers
             (oid, gs0) = S.addCreature darksteelMyr S.alice base
-            after = S.runPure S.identityAnswer gs0 (Event.destroy oid)
+            after = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable oid)
         HU.assertEqual "indestructible survives" True (Set.member oid (GameState.battlefield after)),
       HU.testCase "CR 122.2 counters cease to exist when an object changes zones" $ do
         swamp <- Registry.printing registry "Swamp"

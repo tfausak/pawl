@@ -58,6 +58,7 @@ import qualified Pawl.Type.Prompt as Prompt
 import Pawl.Type.ProposedEvent (ProposedEvent)
 import qualified Pawl.Type.ProposedEvent as ProposedEvent
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import Pawl.Type.ReplacementBucket (ReplacementBucket)
 import qualified Pawl.Type.ReplacementBucket as ReplacementBucket
 import Pawl.Type.ReplacementCandidate (ReplacementCandidate)
@@ -84,7 +85,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldChangeZone zc -> Just zc
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
-  ProposedEvent.WouldBeDestroyed _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
 
@@ -205,6 +206,20 @@ applicable gs event = filter (applies gs event) (collect gs)
 -- CR 614.1: does this instance apply to this proposed event? The arms must agree
 -- on the EVENT CLASS -- which the type already rules out for the impossible pairs
 -- -- and the pattern must admit the event's subject.
+-- CR 701.19c: may this destruction rewrite be applied to this destruction?
+--
+-- "Effects that say that a permanent can't be regenerated ... cause regeneration
+-- shields to not be applied." Asked here, where a candidate is offered the event,
+-- so a shield that is refused is also never CONSUMED -- refusing it at
+-- application time would spend a shield that the rules say never fired.
+--
+-- Gates regeneration and nothing else. A destruction replacement that is not a
+-- regeneration is untouched by CR 701.19c, which is why this reads the rewrite
+-- rather than rejecting the whole DestructionR class.
+admits :: Regenerability.Regenerability -> DestructionRewrite.DestructionRewrite -> Bool
+admits regenerability rewrite = case rewrite of
+  DestructionRewrite.Regenerate -> regenerability == Regenerability.Regenerable
+
 applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
 applies gs event candidate =
   let src = ReplacementCandidate.source candidate
@@ -221,7 +236,8 @@ applies gs event candidate =
         -- ability's own source, so a destruction replacement is self-only.
         -- DestructionR carries no pattern because the only producer in the
         -- card pool is self-regeneration (CR 701.19a).
-        (ReplacementEffect.DestructionR _, ProposedEvent.WouldBeDestroyed oid) -> src == oid
+        (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid regenerability) ->
+          src == oid && admits regenerability rewrite
         (ReplacementEffect.CounterR pat _, ProposedEvent.WouldPutCounters oid kind _) ->
           -- Our own encoding convention, not a rule: `whichKind = Nothing` means
           -- any kind, never no kind.
@@ -413,7 +429,7 @@ chooserOf gs event = case event of
     Recipient.ToPlayer pid -> Just pid
     Recipient.ToCreature oid -> Projection.controllerOf oid gs
     Recipient.ToObject oid -> Projection.controllerOf oid gs
-  ProposedEvent.WouldBeDestroyed oid -> Projection.controllerOf oid gs
+  ProposedEvent.WouldBeDestroyed oid _ -> Projection.controllerOf oid gs
   ProposedEvent.WouldPutCounters oid _ _ -> Projection.controllerOf oid gs
   ProposedEvent.WouldCreateTokens pid _ _ -> Just pid
 
@@ -547,7 +563,7 @@ apply batch candidate event =
     -- put-into-graveyard, and therefore Rest in Peace's redirect) ever runs.
     -- That nesting was hardcoded in Event.destroy before P5; it is structural
     -- now.
-    (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid) -> case rewrite of
+    (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid _) -> case rewrite of
       DestructionRewrite.Regenerate -> do
         consume (ReplacementCandidate.identity candidate)
         State.modify' $ \gs ->
@@ -659,7 +675,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldDealDamage de -> Just de
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
-  ProposedEvent.WouldBeDestroyed _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
 
@@ -667,14 +683,14 @@ asDamageEvent event = case event of
 -- destroyed -- which need not be the one asked about, since a rewrite may
 -- redirect it; `Nothing` means a replacement took the event (regeneration), and
 -- that rewrite has already done its own work.
-resolveDestruction :: ObjectId -> Game (Maybe ObjectId)
-resolveDestruction oid = do
-  outcome <- applyReplacements (ProposedEvent.WouldBeDestroyed oid)
+resolveDestruction :: Regenerability.Regenerability -> ObjectId -> Game (Maybe ObjectId)
+resolveDestruction regenerability oid = do
+  outcome <- applyReplacements (ProposedEvent.WouldBeDestroyed oid regenerability)
   pure (outcome >>= asDestruction)
 
 asDestruction :: ProposedEvent -> Maybe ObjectId
 asDestruction event = case event of
-  ProposedEvent.WouldBeDestroyed target -> Just target
+  ProposedEvent.WouldBeDestroyed target _ -> Just target
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
@@ -693,7 +709,7 @@ asCounters event = case event of
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
-  ProposedEvent.WouldBeDestroyed _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
 
 -- CR 111.1: settle a proposed token creation. Nothing means none are created.
@@ -708,5 +724,5 @@ asTokens event = case event of
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
-  ProposedEvent.WouldBeDestroyed _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing

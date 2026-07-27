@@ -65,6 +65,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Response as Response
@@ -292,13 +293,69 @@ tests registry =
               -- GameState.combat's attacker map directly -- the same shortcut
               -- Support.addRegenShield takes for the shield itself.
               attacking = armed {GameState.combat = (GameState.combat armed) {Combat.attackers = Map.singleton skel (AttackTarget.OfPlayer S.bob)}}
-              once = S.runPure S.identityAnswer attacking (Event.destroy skel)
-              twice = S.runPure S.identityAnswer once (Event.destroy skel)
+              once = S.runPure S.identityAnswer attacking (Event.destroy Regenerability.Regenerable skel)
+              twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable skel)
           HU.assertBool "combat started with no attackers" (Map.null (Combat.attackers (GameState.combat armed)))
           HU.assertBool "survived the first destruction" (Set.member skel (GameState.battlefield once))
           HU.assertEqual "the shield was spent" [] (GameState.replacements once)
           HU.assertBool "removed from combat by the regeneration (CR 701.19a)" (not (Map.member skel (Combat.attackers (GameState.combat once))))
           HU.assertBool "the second destruction kills it" (not (Set.member skel (GameState.battlefield twice))),
+        -- CR 701.19c: "Effects that say that a permanent can't be regenerated
+        -- don't preclude such abilities from being activated or such spells from
+        -- being cast; rather, they cause regeneration shields to not be applied."
+        -- So the shield still exists -- it simply does not fire.
+        HU.testCase "CR 701.19c a shield does not save a creature from a destruction that forbids regeneration" $ do
+          swamp <- Registry.printing registry "Swamp"
+          drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+          let (skel, g1) = S.addCreature drudgeSkeletons S.alice (S.landsInPlay swamp 1)
+              shielded = S.addRegenShield skel g1
+              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.CantBeRegenerated skel)
+          HU.assertBool "it died anyway" (not (Set.member skel (GameState.battlefield after)))
+          -- CR 701.19c again, and the sharp half: an unapplied shield is not a
+          -- spent one. Nothing consumed it, because it was never chosen.
+          HU.assertEqual "and the shield was not consumed" (length (GameState.replacements shielded)) (length (GameState.replacements after)),
+        -- The discriminating twin: identical creature, identical shield, and the
+        -- only difference is whether the destruction forbids regeneration. This
+        -- fails if the gate is ignored, and equally if it is applied to every
+        -- destruction.
+        HU.testCase "CR 701.19a the same shield DOES save it from an ordinary destruction" $ do
+          swamp <- Registry.printing registry "Swamp"
+          drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
+          let (skel, g1) = S.addCreature drudgeSkeletons S.alice (S.landsInPlay swamp 1)
+              shielded = S.addRegenShield skel g1
+              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable skel)
+          HU.assertBool "it survived" (Set.member skel (GameState.battlefield after))
+          HU.assertEqual "and this time the shield was spent" [] (GameState.replacements after),
+        -- The gameplay-level proof (design.md section 4): real cards, cast and
+        -- resolved. Uthden Troll rather than Drudge Skeletons because Terror
+        -- cannot target a black creature -- the Troll is red.
+        HU.testCase "CR 701.19c whole cards: Terror kills an Uthden Troll that just regenerated" $ do
+          mountain <- Registry.printing registry "Mountain"
+          swamp <- Registry.printing registry "Swamp"
+          uthdenTroll <- Registry.printing registry "Uthden Troll"
+          terror <- Registry.printing registry "Terror"
+          let base = foldl (\gs p -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) [mountain, swamp, swamp]
+              (troll, g1) = S.addCreature uthdenTroll S.alice base
+              -- {R}: Regenerate this creature -- the shield is really activated.
+              armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)
+              (withTerror, spell) = S.handOne terror armed
+              afterCast = S.runPure S.identityAnswer withTerror (Cast.castSpell S.alice spell)
+              resolved = S.runPure S.identityAnswer afterCast Stack.resolveTop
+          HU.assertBool "the shield really was created" (not (null (GameState.replacements armed)))
+          HU.assertBool "and Terror killed the Troll through it" (not (Set.member troll (GameState.battlefield resolved))),
+        -- The twin of the whole-card test: the SAME creature and the SAME shield,
+        -- destroyed by the CR 704.5g state-based action instead, which carries no
+        -- such clause. Regeneration is exactly what it is for.
+        HU.testCase "CR 701.19a an Uthden Troll's shield still saves it from lethal damage" $ do
+          mountain <- Registry.printing registry "Mountain"
+          uthdenTroll <- Registry.printing registry "Uthden Troll"
+          let base = S.landsInPlay mountain 1
+              (troll, g1) = S.addCreature uthdenTroll S.alice base
+              armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)
+              -- 2 damage is lethal to a 2/2.
+              hurt = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent troll (Recipient.ToCreature troll) 2 False False 0 DamageKind.Combat])
+              settled = S.settleSba hurt
+          HU.assertBool "the shield saved it" (Set.member troll (GameState.battlefield settled)),
         HU.testCase "CR 614.8 regeneration replaces the destruction, so Rest in Peace never sees it" $ do
           swamp <- Registry.printing registry "Swamp"
           restInPeace <- Registry.printing registry "Rest in Peace"
@@ -307,7 +364,7 @@ tests registry =
               (_, g1) = S.addCreature restInPeace S.bob base
               (skel, g2) = S.addCreature drudgeSkeletons S.alice g1
               shielded = S.addRegenShield skel g2
-              after = S.runPure S.identityAnswer shielded (Event.destroy skel)
+              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable skel)
           HU.assertBool "still on the battlefield" (Set.member skel (GameState.battlefield after))
           HU.assertEqual "nothing was exiled -- the put-into-graveyard never happened" 0 (Set.size (GameState.exile after))
           HU.assertEqual "and nothing reached a graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
@@ -316,7 +373,7 @@ tests registry =
           let base = Setup.emptyGame S.bothPlayers
               (myr, g1) = S.addCreature darksteelMyr S.alice base
               shielded = S.addRegenShield myr g1
-              after = S.runPure S.identityAnswer shielded (Event.destroy myr)
+              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable myr)
           HU.assertBool "the indestructible creature survives" (Set.member myr (GameState.battlefield after))
           HU.assertEqual "the shield is intact" 1 (length (GameState.replacements after)),
         HU.testCase "CR 616.1 Scales first, then Corpsejack: 1 -> 2 -> 4" $ do
@@ -610,13 +667,13 @@ tests registry =
           pikerPrinting <- Registry.printing registry "Goblin Piker"
           let base = S.landsInPlay swamp 1
               (piker, g1) = S.addCreature pikerPrinting S.alice base
-              (settled, _) = S.runPureWith S.identityAnswer g1 (Replacement.resolveDestruction piker)
+              (settled, _) = S.runPureWith S.identityAnswer g1 (Replacement.resolveDestruction Regenerability.Regenerable piker)
           HU.assertEqual "the object it was asked about" (Just piker) settled,
         HU.testCase "CR 701.19a a regenerated destruction settles on nothing" $ do
           swamp <- Registry.printing registry "Swamp"
           pikerPrinting <- Registry.printing registry "Goblin Piker"
           let base = S.landsInPlay swamp 1
               (piker, g1) = S.addCreature pikerPrinting S.alice base
-              (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Replacement.resolveDestruction piker)
+              (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Replacement.resolveDestruction Regenerability.Regenerable piker)
           HU.assertEqual "consumed by the shield" Nothing settled
       ]

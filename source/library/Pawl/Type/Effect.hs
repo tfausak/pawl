@@ -12,6 +12,7 @@ import Pawl.Type.PlayerEffect (PlayerEffect)
 import Pawl.Type.PlayerRef (PlayerRef)
 import Pawl.Type.PlayerScope (PlayerScope)
 import Pawl.Type.Quantity (Quantity)
+import Pawl.Type.Regenerability (Regenerability)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Uses (Uses)
@@ -74,7 +75,10 @@ data Effect card
     -- is itself interceptable: Pawl.Event.destroy offers a WouldBeDestroyed event
     -- to the CR 616.1 replacement loop before the graveyard move, which is how a
     -- regeneration shield (CR 701.19a) intercepts it.
-    Destroy SlotName
+    -- The Regenerability is CR 701.19c's "It can't be regenerated" rider, carried
+    -- by the destruction rather than looked up on the victim -- Terror has it and
+    -- the state-based action of CR 704.5g does not, for the same creature.
+    Destroy SlotName Regenerability
   | -- CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction: CR 701.21a
     -- says so explicitly, so this consults neither indestructible (CR 702.12b) nor

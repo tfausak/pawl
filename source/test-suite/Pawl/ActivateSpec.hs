@@ -43,6 +43,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
@@ -228,9 +229,9 @@ tests registry =
             activated = snd (Engine.runGamePure S.identityAnswer gs0 (Activate.activateAbility S.alice skel ability))
             resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
             -- First Murder: replaced by the shield.
-            firstKill = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy skel))
+            firstKill = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable skel))
             -- Second Murder: no shield -> dies.
-            secondKill = S.settleSba (S.runPure S.identityAnswer firstKill (Event.destroy skel))
+            secondKill = S.settleSba (S.runPure S.identityAnswer firstKill (Event.destroy Regenerability.Regenerable skel))
         HU.assertEqual
           "the shield's source is the skeleton itself"
           [skel]

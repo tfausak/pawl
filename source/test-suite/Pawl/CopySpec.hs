@@ -26,6 +26,7 @@ import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -158,7 +159,7 @@ tests registry =
             (pikerId, board) = S.addCreature piker S.alice gs0
             (_, staged) = S.spellOnStack clone S.alice board
             resolved = resolveAndSettle copyNewest staged
-            afterKill = S.runPure S.identityAnswer resolved (Event.destroy pikerId)
+            afterKill = S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable pikerId)
         case cloneOnBattlefield afterKill of
           Nothing -> HU.assertFailure "Clone should survive the source's death"
           Just cloneId -> do

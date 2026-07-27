@@ -50,6 +50,7 @@ import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Result as Result
@@ -646,7 +647,7 @@ killBlockerMidCombat victim answer gs =
   S.runPure answer gs $ do
     Combat.declareAttackers S.alice
     Combat.declareBlockers
-    Event.destroy victim
+    Event.destroy Regenerability.Regenerable victim
     Monad.void Damage.dealCombatDamage
 
 -- Every DamageDealt event in the history addressed to `oid`, however much.
@@ -828,7 +829,7 @@ killAttackerMidCombat victim gs =
   S.runPure S.aggressiveAnswer gs $ do
     Combat.declareAttackers S.alice
     Combat.declareBlockers
-    Event.destroy victim
+    Event.destroy Regenerability.Regenerable victim
     Monad.void Damage.dealCombatDamage
 
 departedAttackerTests :: Registry.Type.Registry -> Tasty.TestTree
