@@ -173,7 +173,10 @@ addMana pid units gs =
   let Mana.MkMana existing = poolOf pid gs
    in setPool pid (Mana.MkMana (existing <> units)) gs
 
--- CR 500.4: each player's mana pool empties at the end of every step and phase.
+-- CR 500.5: as a step or phase ends, any unspent mana left in a player's mana
+-- pool empties -- a turn-based action that does not use the stack (CR 703.4q).
+-- CR 106.4 supplies the wording for what that does to the player: they are said
+-- to LOSE this mana, which is how every card that stops it is templated.
 emptyManaPools :: GameState -> GameState
 emptyManaPools gs = gs {GameState.manaPool = Map.empty}
 

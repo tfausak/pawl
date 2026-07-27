@@ -172,7 +172,7 @@ manaTests registry =
         HU.assertBool "three Mountains should pay {1}{R}" paid
         HU.assertEqual "tapped" 2 (S.tappedCount S.alice after)
         HU.assertEqual "no float" 0 (poolSize S.alice after),
-      HU.testCase "CR 500.4 mana pools empty" $ do
+      HU.testCase "CR 500.5 mana pools empty" $ do
         mountain <- Registry.printing registry "Mountain"
         let gs = S.landsInPlay mountain 1
         case Game.zoneMembers Zone.Battlefield S.alice gs of

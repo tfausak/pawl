@@ -23,7 +23,7 @@ import qualified Test.Tasty.QuickCheck as QC
 -- Playing one game out is this suite's entire cost (~66 ms; the other 948 tests
 -- together take ~1 s), so the iteration count is the only real dial. 16 is the
 -- cheap end of the curve: these are coarse whole-game invariants, so a bug that
--- breaks one breaks nearly every seed -- a mutation that drops CR 500.4's mana
+-- breaks one breaks nearly every seed -- a mutation that drops CR 500.5's mana
 -- emptying is caught by the third seed. To crank it for a milestone gate, edit
 -- this number: both a localOption and an in-property withNumTests take
 -- precedence over --quickcheck-tests, so there is no command-line override.

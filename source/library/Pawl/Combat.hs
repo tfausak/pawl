@@ -47,9 +47,10 @@ emptyCombat =
 -- CR 506.2, not CR 511.3: the designation is scoped to the combat phase, so it
 -- cannot survive the phase ending.
 --
--- Engine.runStep calls this as the end of combat step ENDS, alongside CR 500.4's
+-- Engine.runStep calls this as the end of combat step ENDS, alongside CR 500.5's
 -- mana emptying -- not from runTurnBasedActions, which is a step's opening and
--- which CR 511.1 says this step has none of.
+-- which CR 511.1 says this step has none of. Neighbours in time only: CR 703.4q
+-- makes that emptying a turn-based action, and this is not one.
 clearCombat :: GameState -> GameState
 clearCombat gs = gs {GameState.combat = emptyCombat}
 
