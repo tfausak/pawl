@@ -1910,12 +1910,14 @@ proliferateTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         prologueToPhyresis <- Registry.printing registry "Prologue to Phyresis"
         let (_, withLibrary) = S.addLibraryCard piker S.alice S.threePlayerGame
-            (mana, gs0) = S.addCreature island S.alice withLibrary
-            gs1 = snd (S.addCreature island S.alice gs0)
-            (gs, spellId) = S.handOne prologueToPhyresis gs1
+            -- Two Islands for the {1}{U}. S.landsInPlay builds its own two-seat
+            -- game, so a three-seat board adds them one at a time instead.
+            withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withLibrary [1 .. (2 :: Int)]
+            (gs, spellId) = S.handOne prologueToPhyresis withMana
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        HU.assertBool "the fixture really gave alice mana" (mana /= S.noSource)
+        -- No separate "the fixture is payable" assertion: an unpayable cast is a
+        -- no-op, so the poison counts below are what prove it resolved.
         HU.assertEqual "bob poisoned" 1 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
         HU.assertEqual "carol poisoned too" 1 (S.playerCounterOf PlayerCounterKind.Poison S.carol after)
         HU.assertEqual "alice untouched" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
