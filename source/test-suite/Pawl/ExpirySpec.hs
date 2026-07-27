@@ -674,7 +674,67 @@ hagTests registry =
         hag <- Registry.printing registry "Hag of Inner Weakness"
         piker <- Registry.printing registry "Goblin Piker"
         let (_, afterPiker) = hagBoardWith hag piker
-        HU.assertEqual "bob's Piker is gone" 0 (S.creaturesInPlay S.bob afterPiker)
+        HU.assertEqual "bob's Piker is gone" 0 (S.creaturesInPlay S.bob afterPiker),
+      -- CR 608.2b: "If the source of an ability has left the zone it was in, its
+      -- last known information is used during this process."
+      --
+      -- The Hag's slot says "target creature an OPPONENT controls" -- a filter
+      -- that reads a perspective. Take the perspective from the SOURCE PERMANENT
+      -- and killing the Hag in response empties the legal set, so CR 608.2b's
+      -- re-check finds the target illegal and the trigger wrongly fizzles. The
+      -- ability's own controller is still known, and that is the perspective the
+      -- rule means.
+      HU.testCase "CR 608.2b killing the Hag in response does not fizzle its trigger" $ do
+        hag <- Registry.printing registry "Hag of Inner Weakness"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (hagId, gs1) = S.addCreature hag S.alice gs0
+            (mammoth, gs2) = S.addCreature warMammoth S.bob gs1
+            -- The trigger is on the stack with its target already chosen.
+            staged = hagSettle (hagBeginUpkeep gs2)
+            -- Bob answers it by killing the Hag before it resolves.
+            hagGone = S.runPure S.identityAnswer staged (Event.destroy hagId)
+            resolved = hagResolveAll hagGone
+        HU.assertBool "the Hag really did leave" (S.creaturesInPlay S.alice hagGone == 0)
+        HU.assertEqual "the trigger still resolved: power" (Just 1) (Projection.powerOf mammoth resolved)
+        HU.assertEqual "and toughness" (Just 2) (Projection.toughnessOf mammoth resolved),
+      -- The discriminating twin: CR 608.2b still FIZZLES when the thing that
+      -- actually became illegal is the target. This fails if the fix were "stop
+      -- re-checking targets" rather than "read the right perspective".
+      HU.testCase "CR 608.2b killing the TARGET in response does fizzle the trigger" $ do
+        hag <- Registry.printing registry "Hag of Inner Weakness"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (_, gs1) = S.addCreature hag S.alice gs0
+            (mammoth, gs2) = S.addCreature warMammoth S.bob gs1
+            staged = hagSettle (hagBeginUpkeep gs2)
+            targetGone = S.runPure S.identityAnswer staged (Event.destroy mammoth)
+            resolved = hagResolveAll targetGone
+        HU.assertEqual "nothing was stored, because the trigger fizzled" [] (GameState.continuousEffects resolved),
+      -- CR 603.3a: a triggered ability's controller is whoever controlled its
+      -- source WHEN IT TRIGGERED. CR 608.2b then re-checks against that player.
+      --
+      -- DISCRIMINATING against the tempting simplification -- reading the
+      -- perspective off the source's LIVE controller. Stealing the Hag after its
+      -- trigger is on the stack would flip "an opponent controls" to bob's point
+      -- of view, making bob's own Mammoth illegal and the trigger fizzle. Alice
+      -- keeps a creature of her own precisely so that flip would be visible.
+      HU.testCase "CR 603.3a stealing the Hag mid-trigger does not flip its perspective" $ do
+        hag <- Registry.printing registry "Hag of Inner Weakness"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        piker <- Registry.printing registry "Goblin Piker"
+        let gs0 = Setup.emptyGame S.bothPlayers
+            (hagId, gs1) = S.addCreature hag S.alice gs0
+            (_, gs2) = S.addCreature piker S.alice gs1
+            (mammoth, gs3) = S.addCreature warMammoth S.bob gs2
+            -- Only bob's Mammoth is "a creature an opponent controls" for alice,
+            -- so the CR 603.3d target choice is forced.
+            staged = hagSettle (hagBeginUpkeep gs3)
+            stolen = S.giveControl hagId S.bob staged
+            resolved = hagResolveAll stolen
+        HU.assertEqual "the Hag is bob's now" (Just S.bob) (Projection.controllerOf hagId stolen)
+        HU.assertEqual "but the trigger still resolved against bob's Mammoth" (Just 1) (Projection.powerOf mammoth resolved)
+        HU.assertEqual "and its toughness" (Just 2) (Projection.toughnessOf mammoth resolved)
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree

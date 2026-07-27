@@ -291,7 +291,9 @@ stillLegalEnchant pcs gs source spec target = case spec of
           && case Game.lookupObject target gs of
             Nothing -> False
             Just obj -> List.elem (Object.owner obj) (Game.stillPlaying gs)
-  _ -> Target.stillLegal source (Recipient.ToCreature target) spec gs
+  -- The Aura is on the battlefield when this SBA asks, so its controller is
+  -- live -- the CR 608.2b case this perspective exists for cannot arise here.
+  _ -> Target.stillLegal (Projection.controllerOf source gs) source (Recipient.ToCreature target) spec gs
 
 -- CR 704.5j: the same-named legendary groups one player controls, as a list of
 -- groups, each with two or more members. Both halves are read from the

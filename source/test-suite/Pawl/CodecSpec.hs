@@ -200,6 +200,8 @@ tests registry =
             roundTrip "e3b" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana ManaProduction.AnyColor),
           HU.testCase "ExileAllGraveyards" $
             roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards,
+          HU.testCase "Proliferate" $
+            roundTrip "e4b" Codec.effectToJson Codec.jsonToEffect Effect.Proliferate,
           HU.testCase "ExileHandThenDraw" $
             roundTrip "e-powder" Codec.effectToJson Codec.jsonToEffect Effect.ExileHandThenDraw,
           HU.testCase "Sacrifice round-trips" $
