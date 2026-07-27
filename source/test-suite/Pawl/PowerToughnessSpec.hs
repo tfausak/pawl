@@ -390,7 +390,7 @@ tests registry =
             (_, g3) = S.addCreature urborg S.alice g2
             (_, gs) = S.addCreature bloodMoon S.alice g3
         HU.assertEqual "Urborg is a bare Mountain now; only the basic Swamp remains" (Just 1) (Projection.powerOf nightId gs),
-      HU.testCase "CR 305.7 the outcome does not depend on entry order (#11)" $ do
+      HU.testCase "CR 305.7 the outcome does not depend on entry order" $ do
         -- THE FALSIFIER for a naive per-layer TIMESTAMP-ONLY implementation: the
         -- previous test's order reversed -- Blood Moon enters FIRST, Urborg
         -- SECOND. A plain CR 613.7 timestamp fold would apply Urborg's LATER
@@ -417,10 +417,11 @@ tests registry =
         -- effect waits to apply until just after the effect(s) it depends on
         -- have applied -- so Blood Moon applies first regardless of timestamps,
         -- and Urborg's ability is already dead by the time it would otherwise
-        -- run. General same-layer applies-to dependency reordering (CR 613.8b)
-        -- is otherwise unimplemented (#11); this specific pair does not
-        -- exercise that gap -- it is carried by the dedicated CR 305.7 liveness
-        -- mechanism instead.
+        -- run. Note which mechanism carries this pair: the EXISTENCE half of CR
+        -- 613.8a clause (b), which lives in the dedicated CR 305.7 liveness gate,
+        -- not the applies-to reorder in projectWith. The reorder would not save
+        -- it -- by the time it ran, Urborg's ability would have to still exist to
+        -- be ordered at all.
         --
         -- THE POSITIVE CONTROL, as in the previous test: a basic Swamp sits
         -- alongside the other two permanents. It is immune to Blood Moon (which

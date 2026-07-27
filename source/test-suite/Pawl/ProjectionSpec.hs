@@ -1,12 +1,16 @@
--- Covers Pawl.Projection: the single-effect layer fold -- CR 613 layer order and
--- CR 613.7 within-layer timestamp order, with no CR 613.8 dependency (M3c). Uses
--- directly-constructed continuous effects so the engine is proven before any card
--- wiring; real-card behavior lands in later tasks and DamageSpec.
+-- Pattern matching on Pawl.Type.Prompt, a GADT, in aimAtObject below.
+{-# LANGUAGE GADTs #-}
+
+-- Covers Pawl.Projection: the layer fold -- CR 613 layer order, CR 613.7
+-- within-layer timestamp order, and the CR 613.8 dependency reorder that
+-- overrides it. Mostly directly-constructed continuous effects, so the engine is
+-- proven independently of any card wiring; the card-level proofs live alongside.
 module Pawl.ProjectionSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
@@ -20,6 +24,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
+import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
@@ -39,7 +44,9 @@ import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
+import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Source as Source
@@ -75,6 +82,15 @@ withDynamicEffect aff ts m gs =
             ContinuousEffect.affected = aff
           }
    in gs {GameState.continuousEffects = eff : GameState.continuousEffects gs}
+
+-- Aims every target slot at one object, deferring the rest to S.identityAnswer
+-- (ModalSpec.chooseModeAt's shape). Liquimetal Coating's "target permanent" admits
+-- every permanent on the board, so the choice has to be answered rather than
+-- forced by construction.
+aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  _ -> S.identityAnswer p
 
 -- The object timestamp of the (single) Humility on the battlefield.
 humilityTimestamp :: Printing.Printing -> GameState.GameState -> Timestamp.Timestamp
@@ -566,19 +582,76 @@ tests registry =
             (ripId, gs) = S.addCreature restInPeace S.alice withAura
         HU.assertBool "the Aura stays a non-creature" (not (Projection.isCreatureOf auraId gs))
         HU.assertBool "a non-Aura enchantment IS animated" (Projection.isCreatureOf ripId gs),
-      HU.testCase "CR 613.7 within layer 4, timestamp order (EXPIRES at CR 613.8b, #11)" $ do
-        -- A Piker made a Land by B (layer 4, TheseObjects), and A = AddLandSubtype
-        -- Swamp over Matching (HasCardType Land) (layer 4). With A OLDER than B, timestamp order applies
-        -- A before B, so A does not yet see the Piker as a land and adds no Swamp.
-        -- The CR 613.8b-correct answer is that A depends on B (B changes what A
-        -- applies to), so B applies first and the Piker WOULD gain Swamp. When the
-        -- topological resolver lands, flip this assertion to assert the Swamp.
+      -- CR 613.8b: "An effect dependent on one or more other effects waits to
+      -- apply until just after all of those effects have been applied." A Piker
+      -- made a Land by B (layer 4, TheseObjects), and A = AddLandSubtype Swamp
+      -- over Matching (HasCardType Land), also layer 4, with A OLDER than B.
+      --
+      -- A depends on B by CR 613.8a clause (b): applying B changes what A applies
+      -- to. So B goes first despite its later timestamp, and the Piker gains the
+      -- Swamp. Timestamp order alone would apply A to a Piker that is not a land
+      -- yet and add nothing -- which is what this test asserted, and documented as
+      -- known-incomplete, until #11 closed.
+      HU.testCase "CR 613.8b within layer 4, a dependency overrides timestamp order" $ do
         piker <- Registry.printing registry "Goblin Piker"
         mountain <- Registry.printing registry "Mountain"
         let (pikerId, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
             gsA = withDynamicEffect (Affected.Matching (Filter.Type.HasCardType CardType.Land)) (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Swamp) gs0
             gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.AddCardType CardType.Land) gsA
-        HU.assertBool "timestamp-only: no Swamp yet (known-incomplete, tracked)" (not (Set.member Subtype.Swamp (Projection.subtypesOf pikerId gs))),
+        HU.assertBool "the newer land-maker applied first, so the Swamp lands" (Set.member Subtype.Swamp (Projection.subtypesOf pikerId gs)),
+      -- The other direction, which is CR 613.7 surviving underneath CR 613.8: with
+      -- no dependency between them, two same-layer effects are still applied in
+      -- timestamp order. Here B makes the Piker a land at timestamp 20 and A adds
+      -- a Swamp to a FIXED set (the Piker) at timestamp 10 -- A's set names an
+      -- object id, so applying B cannot change it, so A does not depend on B and
+      -- nothing is reordered.
+      HU.testCase "CR 613.7 within layer 4, no dependency leaves timestamp order alone" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mountain <- Registry.printing registry "Mountain"
+        let (pikerId, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+            gsA = S.withEffectAt pikerId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Swamp) gs0
+            gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.SetLandSubtype Subtype.Forest) gsA
+        HU.assertEqual "the later SetLandSubtype wins" (Set.singleton Subtype.Forest) (Projection.subtypesOf pikerId gs),
+      -- CR 613.8b with real cards, and the pair that retired #11's expiry trigger:
+      -- Liquimetal Coating ("{T}: Target permanent becomes an artifact in addition
+      -- to its other types until end of turn") and March of the Machines ("Each
+      -- noncreature artifact is an artifact creature with power and toughness each
+      -- equal to its mana value"). Both apply in layer 4.
+      --
+      -- March depends on the Coating: applying the Coating's effect makes its
+      -- target an artifact, which changes whether March applies to it. The Coating
+      -- does not depend on March -- its CR 611.2c set names an object id, and no
+      -- type change moves an id in or out of that. So the Coating goes first even
+      -- though March, already on the battlefield, is older.
+      --
+      -- The end state is the whole rule in one board: the Forest is an artifact
+      -- (Coating), therefore a noncreature artifact when March is asked, therefore
+      -- an artifact creature with base P/T equal to its mana value -- and a land
+      -- has no mana cost, so that is 0/0 and CR 704.5f buries it.
+      HU.testCase "CR 613.8b whole cards: Liquimetal Coating + March of the Machines kills the land it points at" $ do
+        forest <- Registry.printing registry "Forest"
+        march <- Registry.printing registry "March of the Machines"
+        coating <- Registry.printing registry "Liquimetal Coating"
+        let gs0 = S.landsInPlay forest 1
+            landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+              i : _ -> i
+              [] -> ObjectId.MkObjectId 999
+            (_, g1) = S.addCreature march S.alice gs0
+            (coatingId, g2) = S.addCreature coating S.alice g1
+            ability = case Card.Type.activatedAbilities (Printing.card coating) of
+              ab : _ -> Just ab
+              [] -> Nothing
+        case ability of
+          Nothing -> HU.assertFailure "Liquimetal Coating should print one activated ability"
+          Just coat -> do
+            let ready = g2 {GameState.priority = Just S.alice}
+                activated = snd (Engine.runGamePure (aimAtObject landId) ready (Activate.activateAbility S.alice coatingId coat))
+                coated = snd (Engine.runGamePure (aimAtObject landId) activated Stack.resolveTop)
+            HU.assertBool "the Forest is an artifact now" (Set.member CardType.Artifact (Projection.cardTypesOf landId coated))
+            HU.assertBool "and March therefore animates it" (Projection.isCreatureOf landId coated)
+            HU.assertEqual "at its mana value, which for a land is 0" (Just 0) (Projection.powerOf landId coated)
+            let settled = snd (Engine.runGamePure (aimAtObject landId) coated Engine.settleForPriority)
+            HU.assertBool "so CR 704.5f buries it" (not (Set.member landId (GameState.battlefield settled))),
       HU.testCase "CR 614: Rest in Peace projects its graveyard->exile replacement" $ do
         restInPeace <- Registry.printing registry "Rest in Peace"
         let (rip, gs) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
