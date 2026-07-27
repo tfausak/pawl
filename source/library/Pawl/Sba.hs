@@ -171,10 +171,19 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 -- reason it is unreachable in CR 704.5n -- Object.attachedTo names an object
 -- (#190).
 --
--- An Aura that is also a creature detaches HERE (first sentence) and is then
--- buried by CR 704.5m on the next pass, which is exactly the two-step CR 303.4d
--- describes. #194 tracks that clause; it has no producer, since the pool's only
--- animator (Opalescence) excludes Auras from its affected set.
+-- This is also where CR 303.4d's second clause -- "An Aura that's also a creature
+-- can't enchant anything. If this occurs somehow, the Aura becomes unattached,
+-- then is put into its owner's graveyard" -- is enforced, without naming it: such
+-- an Aura is a creature that is attached, so it detaches HERE (first sentence)
+-- and CR 704.5m's fallsOff buries it on the next pass. The rule's "then" IS that
+-- pass boundary. Proven by Liquimetal Coating plus Skilled Animator in
+-- Pawl.AuraSpec, which is the only route to it: every printed enchantment
+-- animator excludes Auras, so the Aura has to be made an ARTIFACT first.
+--
+-- CR 303.4d's clause is a RESTRICTION as well as a state-based action ("can't
+-- enchant anything"), and only the state-based half lives here. The restriction
+-- half has nowhere to be checked: an Aura is attached as it enters (Pawl.Stack),
+-- and no opcode moves one afterwards (#187).
 cannotBeAttached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
   Nothing -> False
@@ -213,8 +222,10 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- CR 303.4d's first clause -- an Aura can't enchant itself -- is the `oid == self`
 -- arm. Unreachable in this pool (a Creatures enchant spec cannot name the Aura
 -- spell on the stack), written anyway because it costs one comparison. CR
--- 303.4d's SECOND clause -- an Aura that's also a creature can't enchant
--- anything -- is not implemented (#194).
+-- 303.4d's SECOND clause -- an Aura that's also a creature can't enchant anything
+-- -- is the "unattached" arm here plus cannotBeAttached above: that rule detaches
+-- the animated Aura on one pass, and this buries it on the next, which is the
+-- order CR 303.4d states. See cannotBeAttached's haddock.
 --
 -- A put-into-graveyard, NOT a destruction: CR 704.5m says "put into its owner's
 -- graveyard", so this goes through Event.changeZone and consults neither

@@ -787,6 +787,12 @@ projectWith admits cands oid gs =
               if lyr == Layer.CharacteristicPT
                 then applyCharacteristicPT lyr cands gs oid partial
                 else partial
+            -- The affected set is re-derived at every layer, against the layers
+            -- below it -- which is right ACROSS effects (a layer-6 grant should
+            -- see a layer-4 type change) and wrong WITHIN one, where CR 613.6
+            -- says an effect keeps the same set in each layer it applies in. A
+            -- filter that reads a characteristic its own effect changes therefore
+            -- stops matching partway down (#233).
             here = filter (\c -> gLayer c == lyr && affects (gSource c) oid (gAffected c) seeded gs) cands
             -- CR 613.7 timestamp order within a layer; the CR 613.8b dependency
             -- reorder (a same-layer effect that changes which objects another
