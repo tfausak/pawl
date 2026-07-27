@@ -276,6 +276,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Scout -> "Scout"
   Subtype.Artificer -> "Artificer"
   Subtype.Troll -> "Troll"
+  Subtype.Nomad -> "Nomad"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -320,7 +321,8 @@ jsonToSubtype =
       (Text.pack "Equipment", Subtype.Equipment),
       (Text.pack "Scout", Subtype.Scout),
       (Text.pack "Artificer", Subtype.Artificer),
-      (Text.pack "Troll", Subtype.Troll)
+      (Text.pack "Troll", Subtype.Troll),
+      (Text.pack "Nomad", Subtype.Nomad)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -1013,6 +1015,7 @@ quantityToJson :: Quantity.Quantity -> Value
 quantityToJson q = case q of
   Quantity.Literal n -> Json.tagged (Text.pack "Literal") (Just (Json.jInt n))
   Quantity.ManaValue -> nullary (Text.pack "ManaValue")
+  Quantity.Power -> nullary (Text.pack "Power")
   Quantity.X -> nullary (Text.pack "X")
   Quantity.Star -> nullary (Text.pack "Star")
   Quantity.Plus a b -> Json.tagged (Text.pack "Plus") (Just (Array [quantityToJson a, quantityToJson b]))
@@ -1024,6 +1027,7 @@ jsonToQuantity value = do
   case (Text.unpack t, mv) of
     ("Literal", Just v) -> Quantity.Literal <$> Json.asInteger v
     ("ManaValue", _) -> Right Quantity.ManaValue
+    ("Power", _) -> Right Quantity.Power
     ("X", _) -> Right Quantity.X
     ("Star", _) -> Right Quantity.Star
     ("Plus", Just (Array [x, y])) -> Quantity.Plus <$> jsonToQuantity x <*> jsonToQuantity y

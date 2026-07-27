@@ -285,6 +285,37 @@ viewOfObject oid gs = viewOfCharacteristics oid (project oid gs) (controllerOf o
 fullView :: GameState -> Count.ViewOf
 fullView gs oid = Just (viewOfObject oid gs)
 
+-- CR 113.7a / 608.2h: `fullView`, except that the one object named by `src` is
+-- read from last known information once it no longer exists. The view a resolving
+-- spell or ability wants for anything it reads ABOUT ITS OWN SOURCE -- "this
+-- creature deals damage equal to its power" when the cost already sacrificed it
+-- (Ghitu Fire-Eater).
+--
+-- Scoped to `src` alone, not applied to every id, and that is the whole point:
+-- CR 608.2h's fallback is about "a specific object" an effect asks after, while
+-- an off-battlefield candidate a COUNT sweeps is matched on printed
+-- characteristics instead (#160, viewUpTo's haddock). Widening this to all ids
+-- would silently overturn that rule.
+--
+-- The trigger is that the id names no object. It is not a proxy for "left the
+-- battlefield": CR 400.7 mints a fresh id on every zone change and deletes the
+-- old one, so an id that still resolves is an object that has not moved, and one
+-- that does not is precisely CR 608.2h's "no longer in the zone it was expected
+-- to be in". A source that is still on the battlefield therefore reads LIVE, as
+-- CR 608.2h's first clause requires -- last known information is the fallback,
+-- never the default.
+--
+-- Nothing when the source is gone AND nothing was recorded for it -- an object
+-- that ceased without a zone change ever running over it, which is what
+-- Resolve.cease does to an ability and what Departure.objectsLeaveWith does to a
+-- departing player's objects. Honest Nothing rather than a zero, and it lands on
+-- the no-op every caller already gives an unevaluable quantity.
+viewWithLastKnown :: ObjectId -> GameState -> Count.ViewOf
+viewWithLastKnown src gs oid =
+  if oid == src && not (Map.member oid (GameState.objects gs))
+    then fmap (\pc -> viewOfCharacteristics oid pc Nothing gs) (Map.lookup oid (GameState.lastKnown gs))
+    else fullView gs oid
+
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
 -- candidates projected through the layers BEFORE that one. Off-battlefield
 -- candidates have no projection at all (gather walks the battlefield only), so

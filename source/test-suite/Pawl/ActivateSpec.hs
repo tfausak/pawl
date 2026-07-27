@@ -5,6 +5,7 @@
 module Pawl.ActivateSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -12,6 +13,7 @@ import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
@@ -38,11 +40,16 @@ import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
+import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity.Type
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Sickness as Sickness
@@ -325,7 +332,83 @@ tests registry =
           "control of the artifact changed to bob, the new controller who activated it"
           (Just S.bob)
           (Projection.controllerOf myrId resolved)
-        HU.assertEqual "exactly one stored effect names the artifact" 1 (length stored)
+        HU.assertEqual "exactly one stored effect names the artifact" 1 (length stored),
+      lastKnownTests registry
+    ]
+
+-- Answers every target slot with `who`, so a damage test reads a player's life
+-- total rather than whichever recipient happens to sort lowest. The Fire-Eater
+-- fixtures need it: their source is itself a legal AnyTarget candidate, and a
+-- self-targeting answer would put the damage on an object that the cost has
+-- already sacrificed -- observable nowhere.
+aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimAt who p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+  _ -> S.identityAnswer p
+
+-- CR 113.7a / 608.2h: an ability resolves using its source's LAST KNOWN
+-- information once the source is gone. Ghitu Fire-Eater is the card that reaches
+-- it -- "{T}, Sacrifice this creature: It deals damage equal to its power to any
+-- target" pays a cost that removes the very object the effect then reads.
+--
+-- CR 113.7a says which moment is read: an ability that "references information
+-- about the source for use while announcing" checks it as the ability is put on
+-- the stack, "otherwise, it will check that information when it resolves. In both
+-- instances, if the source is no longer in the zone it's expected to be in, its
+-- last known information is used."
+lastKnownTests :: Registry.Type.Registry -> Tasty.TestTree
+lastKnownTests registry =
+  Tasty.testGroup
+    "LastKnownInformation"
+    [ HU.testCase "CR 113.7a whole card: a sacrificed Ghitu Fire-Eater still deals damage equal to its power" $ do
+        ghituFireEater <- Registry.printing registry "Ghitu Fire-Eater"
+        let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
+            g1 = g0 {GameState.priority = Just S.alice}
+            activated = snd (Engine.runGamePure (aimAt S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility ghituFireEater)))
+            resolved = snd (Engine.runGamePure (aimAt S.bob) activated Stack.resolveTop)
+        HU.assertBool "the cost really sacrificed it" (not (Set.member srcId (GameState.battlefield activated)))
+        HU.assertBool "and the id it left behind names nothing" (Maybe.isNothing (Game.lookupObject srcId activated))
+        HU.assertEqual "bob took the Fire-Eater's 2" (Just 18) (S.lifeOf S.bob resolved),
+      HU.testCase "CR 608.2h the value is LAST KNOWN, not printed: a pumped Fire-Eater deals 5" $ do
+        -- The discriminator between reading last known information and reading
+        -- the printed card. Both answer 2 for a vanilla Fire-Eater; only last
+        -- known information answers 5 for one that was pumped before it left.
+        ghituFireEater <- Registry.printing registry "Ghitu Fire-Eater"
+        let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
+            pumped = S.withEffect srcId (Modification.ModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3)) g0
+            g1 = pumped {GameState.priority = Just S.alice}
+            activated = snd (Engine.runGamePure (aimAt S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility ghituFireEater)))
+            resolved = snd (Engine.runGamePure (aimAt S.bob) activated Stack.resolveTop)
+        HU.assertEqual "it was a 5/5 while it was on the battlefield" (Just 5) (Projection.powerOf srcId g1)
+        HU.assertEqual "bob took 5, not the printed 2" (Just 15) (S.lifeOf S.bob resolved),
+      HU.testCase "CR 608.2h leaving a zone files last known information under the OLD id" $ do
+        -- The substrate, on its own. CR 400.7 mints a fresh id for the graveyard
+        -- incarnation, so the id an ability on the stack still holds is the one
+        -- this map has to be keyed by.
+        ghituFireEater <- Registry.printing registry "Ghitu Fire-Eater"
+        let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
+            pumped = S.withEffect srcId (Modification.ModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3)) g0
+        HU.assertEqual "nothing filed before it moves" Nothing (Map.lookup srcId (GameState.lastKnown pumped))
+        let moved = S.runPure S.identityAnswer pumped (Event.changeZone srcId Zone.Graveyard)
+        HU.assertEqual
+          "the snapshot is the projected power it had, not the printed one"
+          (Just (Just 5))
+          (fmap PC.power (Map.lookup srcId (GameState.lastKnown moved))),
+      HU.testCase "CR 608.2h the fallback is only a fallback: a source still there reads LIVE" $ do
+        -- Discriminating against a viewWithLastKnown that always consults the
+        -- map: a Fire-Eater that has not moved must read its current projection,
+        -- and the map has nothing filed for it at all.
+        ghituFireEater <- Registry.printing registry "Ghitu Fire-Eater"
+        let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
+            pumped = S.withEffect srcId (Modification.ModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3)) g0
+        HU.assertEqual
+          "the live projection is what the source-aware view returns"
+          (Just 5)
+          (Projection.viewWithLastKnown srcId pumped srcId >>= Filter.power)
+        HU.assertEqual
+          "and every other id is untouched by the substitution"
+          (Projection.fullView pumped S.noSource >>= Filter.power)
+          (Projection.viewWithLastKnown srcId pumped S.noSource >>= Filter.power)
     ]
 
 isActivate :: A.Action -> Bool

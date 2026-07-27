@@ -32,6 +32,12 @@ evaluate :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Quantity 
 evaluate viewOf context gs oid quantity = case quantity of
   Quantity.Literal n -> Just n
   Quantity.ManaValue -> fmap manaValueOf (Game.cardOf oid gs)
+  -- CR 208.1 read through the injected view, so this arm never learns whether it
+  -- is looking at a live projection or a CR 608.2h snapshot -- the caller decides
+  -- that by which ViewOf it supplies (Projection.fullView vs.
+  -- Projection.viewWithLastKnown). Nothing when the object has no power: it is
+  -- not a creature, or it is gone and no last known information was kept.
+  Quantity.Power -> viewOf oid >>= Filter.power
   -- CR 601.2b: read the chosen X from the source object's binding environment.
   Quantity.X -> case Game.lookupObject oid gs of
     Nothing -> Nothing
@@ -56,6 +62,7 @@ substituteStar star quantity = case quantity of
   Quantity.Plus a b -> Quantity.Plus (substituteStar star a) (substituteStar star b)
   Quantity.Literal _ -> quantity
   Quantity.ManaValue -> quantity
+  Quantity.Power -> quantity
   Quantity.X -> quantity
   Quantity.Count _ -> quantity
 

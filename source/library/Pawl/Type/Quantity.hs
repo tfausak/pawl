@@ -24,6 +24,21 @@ data Quantity
     -- computed quantity (Opalescence's "base P/T equal to its mana value"),
     -- evaluated against the affected object.
     ManaValue
+  | -- CR 208.1: the power of the object this quantity is evaluated against --
+    -- for an effect, its SOURCE (Ghitu Fire-Eater's "damage equal to its
+    -- power"). The projected value, not the printed one, so a pumped source
+    -- deals what it currently has.
+    --
+    -- Sibling of ManaValue, and read the same way: against the `oid` the caller
+    -- supplies, never against a target. What makes it different is that power is
+    -- PROJECTED (CR 613 layer 7) where mana value is computed from the printed
+    -- cost, so this arm goes through the injected ViewOf rather than
+    -- Game.cardOf -- which is also what lets a caller substitute CR 608.2h last
+    -- known information for a source that is gone.
+    --
+    -- No Toughness sibling: nothing in the pool reads one, and an unused arm is
+    -- the speculative construction the project forbids.
+    Power
   | -- CR 601.2b: X -- a value the caster chose while casting, read from the
     -- object's binding environment (Pawl.Binding.variableX). One-shot only: a
     -- continuous effect must FREEZE this to a Literal when stored (Projection.hs

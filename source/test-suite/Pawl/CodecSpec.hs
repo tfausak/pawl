@@ -156,6 +156,11 @@ tests registry =
               (Codec.quantityToJson (Quantity.Literal 3)),
           HU.testCase "Quantity.ManaValue is nullary tagged" $
             roundTrip "mv" Codec.quantityToJson Codec.jsonToQuantity Quantity.ManaValue,
+          -- CR 208.1, Ghitu Fire-Eater's "damage equal to its power". Nullary like
+          -- ManaValue, and NOT to be confused with the Power newtype round-tripped
+          -- further down, which wraps a printed power/toughness box.
+          HU.testCase "Quantity.Power is nullary tagged" $
+            roundTrip "pwr" Codec.quantityToJson Codec.jsonToQuantity Quantity.Power,
           HU.testCase "Quantity.Literal round-trips" $
             roundTrip "lit" Codec.quantityToJson Codec.jsonToQuantity (Quantity.Literal 5),
           HU.testCase "ManaCost round-trips" $
