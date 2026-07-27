@@ -35,7 +35,12 @@
         "effects": [
           {
             "type": "Destroy",
-            "value": "target"
+            "value": [
+              "target",
+              {
+                "type": "Regenerable"
+              }
+            ]
           }
         ],
         "targetSpecs": [

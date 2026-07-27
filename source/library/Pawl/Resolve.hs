@@ -92,7 +92,7 @@ slotsOf effect = case effect of
   Effect.ExileHandThenDraw -> Set.empty
   Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
-  Effect.Destroy slot -> Set.singleton slot
+  Effect.Destroy slot _ -> Set.singleton slot
   Effect.Sacrifice slot -> Set.singleton slot
   Effect.MoveToZone slot _ -> Set.singleton slot
   Effect.Draw _ -> Set.empty
@@ -136,7 +136,7 @@ readsX = any effectReadsX
       Effect.ExileHandThenDraw -> False
       Effect.RestartGame -> False
       Effect.ControlPlayerNextTurn _ -> False
-      Effect.Destroy _ -> False
+      Effect.Destroy {} -> False
       Effect.Sacrifice _ -> False
       Effect.MoveToZone {} -> False
       Effect.Draw quantity -> quantity == Quantity.Type.X
@@ -177,7 +177,7 @@ manaProduced effect = case effect of
   Effect.ExileHandThenDraw -> Nothing
   Effect.RestartGame -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
-  Effect.Destroy _ -> Nothing
+  Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
   Effect.MoveToZone {} -> Nothing
   Effect.Draw _ -> Nothing
@@ -213,7 +213,7 @@ searchesLibrary effect = case effect of
   Effect.ExileHandThenDraw -> False
   Effect.RestartGame -> False
   Effect.ControlPlayerNextTurn _ -> False
-  Effect.Destroy _ -> False
+  Effect.Destroy {} -> False
   Effect.Sacrifice _ -> False
   Effect.MoveToZone {} -> False
   Effect.Draw _ -> False
@@ -290,7 +290,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ExileHandThenDraw -> effect
   Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
-  Effect.Destroy _ -> effect
+  Effect.Destroy {} -> effect
   Effect.Sacrifice _ -> effect
   Effect.MoveToZone {} -> effect
   Effect.Draw _ -> effect
@@ -723,13 +723,15 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
-  Effect.Destroy slot ->
+  Effect.Destroy slot regenerability ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of
         Nothing -> pure ()
         -- CR 701.8: destroy through the single funnel -- indestructible (CR
         -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide.
-        Just target -> Event.destroy target
+        -- The card's own CR 701.19c rider rides along, because whether a shield
+        -- may apply is a fact about THIS destruction (Terror's), not the victim.
+        Just target -> Event.destroy regenerability target
       -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
       _ -> pure ()
   Effect.Sacrifice slot ->

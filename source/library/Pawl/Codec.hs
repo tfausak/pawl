@@ -77,6 +77,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.Scope as Scope
@@ -274,6 +275,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Equipment -> "Equipment"
   Subtype.Scout -> "Scout"
   Subtype.Artificer -> "Artificer"
+  Subtype.Troll -> "Troll"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -317,7 +319,8 @@ jsonToSubtype =
       (Text.pack "Aura", Subtype.Aura),
       (Text.pack "Equipment", Subtype.Equipment),
       (Text.pack "Scout", Subtype.Scout),
-      (Text.pack "Artificer", Subtype.Artificer)
+      (Text.pack "Artificer", Subtype.Artificer),
+      (Text.pack "Troll", Subtype.Troll)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -951,6 +954,19 @@ jsonToManaType value = do
     ("Colorless", _) -> Right ManaType.Colorless
     _ -> Left (Text.pack "unknown ManaType: " <> t)
 
+regenerabilityToJson :: Regenerability.Regenerability -> Value
+regenerabilityToJson r = nullary . Text.pack $ case r of
+  Regenerability.Regenerable -> "Regenerable"
+  Regenerability.CantBeRegenerated -> "CantBeRegenerated"
+
+jsonToRegenerability :: Value -> Either Text Regenerability.Regenerability
+jsonToRegenerability =
+  decodeNullary
+    (Text.pack "Regenerability")
+    [ (Text.pack "Regenerable", Regenerability.Regenerable),
+      (Text.pack "CantBeRegenerated", Regenerability.CantBeRegenerated)
+    ]
+
 manaProductionToJson :: ManaProduction.ManaProduction -> Value
 manaProductionToJson mp = case mp of
   ManaProduction.OfType mt -> Json.tagged (Text.pack "OfType") (Just (manaTypeToJson mt))
@@ -1273,7 +1289,7 @@ effectToJson e = case e of
   Effect.ExileHandThenDraw -> nullary (Text.pack "ExileHandThenDraw")
   Effect.RestartGame -> nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
-  Effect.Destroy s -> Json.tagged (Text.pack "Destroy") (Just (slotNameToJson s))
+  Effect.Destroy s r -> Json.tagged (Text.pack "Destroy") (Just (Array [slotNameToJson s, regenerabilityToJson r]))
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
   Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (slotNameToJson s))
   Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array [slotNameToJson s, zoneToJson z]))
@@ -1313,7 +1329,9 @@ jsonToEffect value = do
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
-    "Destroy" -> withValue mv (fmap Effect.Destroy . jsonToSlotName)
+    "Destroy" -> case mv of
+      Just (Array [sv, rv]) -> Effect.Destroy <$> jsonToSlotName sv <*> jsonToRegenerability rv
+      _ -> Left (Text.pack "Destroy expects [slot, regenerability]")
     "Sacrifice" -> withValue mv (fmap Effect.Sacrifice . jsonToSlotName)
     "Counter" -> withValue mv (fmap Effect.Counter . jsonToSlotName)
     "MoveToZone" -> case mv of

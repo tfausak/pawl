@@ -77,6 +77,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
@@ -202,6 +203,9 @@ tests registry =
             roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards,
           HU.testCase "Proliferate" $
             roundTrip "e4b" Codec.effectToJson Codec.jsonToEffect Effect.Proliferate,
+          HU.testCase "Destroy carries its CR 701.19c rider both ways" $ do
+            roundTrip "e5a" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (SlotName.MkSlotName (Text.pack "t")) Regenerability.Regenerable)
+            roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (SlotName.MkSlotName (Text.pack "t")) Regenerability.CantBeRegenerated),
           HU.testCase "ExileHandThenDraw" $
             roundTrip "e-powder" Codec.effectToJson Codec.jsonToEffect Effect.ExileHandThenDraw,
           HU.testCase "Sacrifice round-trips" $

@@ -6,6 +6,7 @@ import Pawl.Type.CounterKind (CounterKind)
 import Pawl.Type.DamageEvent (DamageEvent)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
+import Pawl.Type.Regenerability (Regenerability)
 import Pawl.Type.ZoneChange (ZoneChange)
 
 -- CR 614.6: an event as it WOULD happen -- the thing a replacement effect
@@ -26,7 +27,11 @@ data ProposedEvent
   = WouldChangeZone ZoneChange
   | WouldEnter ObjectId
   | WouldDealDamage DamageEvent
-  | WouldBeDestroyed ObjectId
+  | -- CR 701.8 / 701.19c: a permanent would be destroyed. The Regenerability is
+    -- the destruction's own, not the permanent's: it says whether a CR 701.19a
+    -- regeneration shield may be applied to THIS destruction, which is where
+    -- Terror's "It can't be regenerated" lives.
+    WouldBeDestroyed ObjectId Regenerability
   | WouldPutCounters ObjectId CounterKind Natural
   | WouldCreateTokens PlayerId Card Natural
   deriving (Eq, Show)

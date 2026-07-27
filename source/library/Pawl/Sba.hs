@@ -36,6 +36,7 @@ import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Status as Status
 import qualified Pawl.Type.Subtype as Subtype
@@ -437,11 +438,15 @@ performStateBasedActions = do
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Event: no Moved event, no replacement, no trigger.
   State.modify' (\g -> g {GameState.objects = List.foldl' (\m oid -> Map.adjust (\o -> o {Object.attachedTo = Nothing}) oid m) (GameState.objects g) detaching})
-  -- CR 704.5g/h: destruction through the funnel (regeneration may replace it).
+  -- CR 704.5g/h: destruction through the funnel, Regenerable -- and that is not a
+  -- default so much as the point, since CR 701.19a's shield exists to replace
+  -- exactly this destruction.
+  --
   -- A permanent the legend rule already buried is excluded rather than left to
-  -- no-op on a dead id: CR 704.5j put it into the graveyard, which is not a
-  -- destruction, so nothing here may consume its regeneration shield.
-  Monad.mapM_ Event.destroy (filter (\oid -> List.notElem oid legendVictims) toDestroy)
+  -- no-op on a dead id, and the two halves of this line say the same thing from
+  -- opposite ends: CR 704.5j is a put-into-graveyard, not a destruction, so it
+  -- neither offers the shield an opportunity nor may consume one here.
+  Monad.mapM_ (Event.destroy Regenerability.Regenerable) (filter (\oid -> List.notElem oid legendVictims) toDestroy)
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
       departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving

@@ -39,6 +39,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Sickness as Sickness
@@ -267,13 +268,13 @@ conditionalTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         warMammoth <- Registry.printing registry "War Mammoth"
         let (srcId, _, gs) = board piker warMammoth
-            gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
+            gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable srcId)
         HU.assertBool "no longer holds" (not (holdsYouControlSource S.alice srcId gone)),
       HU.testCase "CR 611.2b arm returns Nothing when the condition is already false" $ do
         piker <- Registry.printing registry "Goblin Piker"
         warMammoth <- Registry.printing registry "War Mammoth"
         let (srcId, _, gs) = board piker warMammoth
-            gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
+            gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable srcId)
         HU.assertEqual
           "never starts"
           Nothing
@@ -290,7 +291,7 @@ conditionalTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         warMammoth <- Registry.printing registry "War Mammoth"
         let (srcId, targetId, gs) = board piker warMammoth
-            gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
+            gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable srcId)
             (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
         HU.assertEqual "alice held it while the source stood" (Just S.alice) (Projection.controllerOf targetId gs)
         HU.assertBool "the sweep reports a change" changed
@@ -306,7 +307,7 @@ conditionalTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         warMammoth <- Registry.printing registry "War Mammoth"
         let (srcId, targetId, gs) = board piker warMammoth
-            gone = S.runPure S.identityAnswer gs (Event.destroy srcId)
+            gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable srcId)
             settled = S.runPure S.identityAnswer gone Engine.settleForPriority
         HU.assertEqual "control reverted at the settle" (Just S.bob) (Projection.controllerOf targetId settled),
       HU.testCase "CR 611.2b the sweep's replacements half survives while the source stands, then deletes once it doesn't" $ do
@@ -385,7 +386,7 @@ masterThiefTests registry =
         masterThief <- Registry.printing registry "Master Thief"
         let (thief, myr, entering) = masterThiefBoard darksteelMyr masterThief
             stolen = masterThiefResolveAll (masterThiefSettle entering)
-            dead = S.runPure S.identityAnswer stolen (Event.destroy thief)
+            dead = S.runPure S.identityAnswer stolen (Event.destroy Regenerability.Regenerable thief)
             swept = masterThiefSettle dead
         HU.assertEqual "control reverts at the next settle" (Just S.bob) (Projection.controllerOf myr swept)
         HU.assertEqual "and stays reverted" (Just S.bob) (Projection.controllerOf myr (masterThiefSettle swept)),
@@ -693,7 +694,7 @@ hagTests registry =
             -- The trigger is on the stack with its target already chosen.
             staged = hagSettle (hagBeginUpkeep gs2)
             -- Bob answers it by killing the Hag before it resolves.
-            hagGone = S.runPure S.identityAnswer staged (Event.destroy hagId)
+            hagGone = S.runPure S.identityAnswer staged (Event.destroy Regenerability.Regenerable hagId)
             resolved = hagResolveAll hagGone
         HU.assertBool "the Hag really did leave" (S.creaturesInPlay S.alice hagGone == 0)
         HU.assertEqual "the trigger still resolved: power" (Just 1) (Projection.powerOf mammoth resolved)
@@ -708,7 +709,7 @@ hagTests registry =
             (_, gs1) = S.addCreature hag S.alice gs0
             (mammoth, gs2) = S.addCreature warMammoth S.bob gs1
             staged = hagSettle (hagBeginUpkeep gs2)
-            targetGone = S.runPure S.identityAnswer staged (Event.destroy mammoth)
+            targetGone = S.runPure S.identityAnswer staged (Event.destroy Regenerability.Regenerable mammoth)
             resolved = hagResolveAll targetGone
         HU.assertEqual "nothing was stored, because the trigger fizzled" [] (GameState.continuousEffects resolved),
       -- CR 603.3a: a triggered ability's controller is whoever controlled its
