@@ -253,8 +253,7 @@ tests registry =
       -- artifact for as long as you control this creature" is the same
       -- GainControl/ForAsLongAs shape Master Thief's ETB uses in
       -- Pawl.ExpirySpec's masterThiefTests, but on the ACTIVATED path -- which
-      -- is what retired the synthetic ability these two tests used to carry
-      -- (#82).
+      -- is what retired the synthetic ability these two tests used to carry.
       HU.testCase "CR 113.8 an activated ability resolves under whoever activated it, not a later controller" $ do
         darksteelMyr <- Registry.printing registry "Darksteel Myr"
         mountain <- Registry.printing registry "Mountain"
@@ -283,12 +282,17 @@ tests registry =
           []
           (filter (S.continuousEffectAffects myrId) (GameState.continuousEffects resolved)),
       -- The stolen-creature case the OLD (deleted) Resolve.hs comment named --
-      -- rebuilt as the POSITIVE mirror of the test above, with the same
-      -- SYNTHETIC ability (#82): control of the source moves to bob FIRST, bob
-      -- then activates, and the effect must arm and store under bob, the
-      -- ability's frozen (and only) controller (CR 113.8). Object.owner is
-      -- stamped with bob at activation time, so there is no later re-read to
-      -- get wrong.
+      -- the POSITIVE mirror of the test above, on the same Aladdin: control of
+      -- the source moves to bob FIRST, bob then activates, and the effect must
+      -- arm and store under bob, the ability's frozen (and only) controller
+      -- (CR 113.8). Object.owner is stamped with bob at activation time, so there
+      -- is no later re-read to get wrong.
+      --
+      -- ASYMMETRIC on purpose, and this half is the weaker one: bob is both the
+      -- activator and the later controller, so a regression to a live re-read of
+      -- the source's controller passes HERE and fails only the test above. The
+      -- pair is what covers CR 113.8, not either case alone -- do not "fix" this
+      -- one into a second copy of the first.
       HU.testCase "CR 113.8 a stolen creature's ability, activated by the new controller, resolves under them" $ do
         darksteelMyr <- Registry.printing registry "Darksteel Myr"
         mountain <- Registry.printing registry "Mountain"
@@ -308,7 +312,7 @@ tests registry =
             activated = snd (Engine.runGamePure S.identityAnswer g2 (Activate.activateAbility S.bob srcId ability))
             resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
             stored = filter (S.continuousEffectAffects myrId) (GameState.continuousEffects resolved)
-        HU.assertEqual "bob controls the stolen sorcerer" (Just S.bob) (Projection.controllerOf srcId activated)
+        HU.assertEqual "bob controls the stolen Aladdin" (Just S.bob) (Projection.controllerOf srcId activated)
         HU.assertEqual "one thing on the stack" 1 (length (GameState.stack activated))
         HU.assertEqual "stack empty after resolution" [] (GameState.stack resolved)
         HU.assertEqual
