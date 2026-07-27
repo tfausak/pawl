@@ -494,7 +494,7 @@ hybridTests registry =
       -- Mana.spendDemands searches instead of folding. One Mountain and one
       -- Forest pay {R/G}{R} only if the hybrid takes the GREEN; handing it the
       -- red first strands the {R} with a Forest still untapped.
-      HU.testCase "CR 107.4e {R/G}{R} off one Mountain and one Forest: the hybrid must yield the red" $ do
+      HU.testCase "CR 107.4e {R/G}{R} off one Mountain and one Forest: the hybrid must take the GREEN" $ do
         mountain <- Registry.printing registry "Mountain"
         forest <- Registry.printing registry "Forest"
         let cost = ManaCost.MkManaCost [redGreen, redSymbol]

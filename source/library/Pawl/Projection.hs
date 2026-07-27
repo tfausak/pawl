@@ -546,6 +546,14 @@ manaCostColors mc = case mc of
 -- symbol is all of its component colors." Burning-Tree Emissary's {R/G}{R/G}
 -- makes it both red and green, not one or the other and not multicoloured-as-a-
 -- third-thing (CR 105.3: an object with two or more colours IS each of them).
+--
+-- CONTRIBUTIONS, not a set: this may repeat a colour, and deduplicating is the
+-- caller's job because the caller is the one building a set. Colour is a set
+-- property under CR 105.2 ("an object can be one or more of the five colors"), so
+-- manaCostColors above unions the whole cost with Set.fromList and a repeat
+-- inside one symbol is absorbed there along with the repeat ACROSS symbols that
+-- {R/G}{R/G} already produces. Deduplicating here would only cover the second
+-- case -- and only for a degenerate `Hybrid t t` that no card prints.
 symbolColors :: ManaSymbol.ManaSymbol -> [Color.Color]
 symbolColors symbol = case symbol of
   ManaSymbol.OfType (ManaType.Colored c) -> [c]
