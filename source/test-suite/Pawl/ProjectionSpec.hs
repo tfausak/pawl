@@ -813,5 +813,46 @@ tests registry =
         HU.assertEqual
           "bounded at 7c does not"
           (Just 2)
-          (PC.power (Projection.projectUpTo Layer.ModifyPT cands pikerId gs))
+          (PC.power (Projection.projectUpTo Layer.ModifyPT cands pikerId gs)),
+      keywordCounterTests registry
+    ]
+
+-- CR 122.1b: "A keyword counter on a permanent ... causes that object to gain
+-- that keyword", and CR 613.1f puts that grant in LAYER 6 -- not the layer 7c
+-- where CR 122.1a's +1/+1 counters land.
+keywordCounterTests :: Registry.Type.Registry -> Tasty.TestTree
+keywordCounterTests registry =
+  Tasty.testGroup
+    "KeywordCounter"
+    [ HU.testCase "CR 122.1b a flying counter grants flying; without one there is none" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (pikerId, board) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            flying = S.addCounter (CounterKind.Keyword Keyword.Flying) 1 pikerId board
+        HU.assertBool "a bare Piker does not fly" (not (Projection.hasKeyword Keyword.Flying pikerId board))
+        HU.assertBool "with the counter it does" (Projection.hasKeyword Keyword.Flying pikerId flying),
+      -- The grant is layer 6, so it must NOT disturb layer 7c. A keyword counter
+      -- adds no power or toughness, which is what tells it apart from the +1/+1
+      -- counter the same Map holds.
+      HU.testCase "CR 613.1f the grant is layer 6, so it changes no power or toughness" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (pikerId, board) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            flying = S.addCounter (CounterKind.Keyword Keyword.Flying) 1 pikerId board
+        HU.assertEqual "power unchanged" (Projection.powerOf pikerId board) (Projection.powerOf pikerId flying)
+        HU.assertEqual "toughness unchanged" (Projection.toughnessOf pikerId board) (Projection.toughnessOf pikerId flying),
+      -- CR 702.164b's counting, reached through counters: the layer-6 arm counts
+      -- INSTANCES (two grants are two abilities, not one absorbed into the other),
+      -- so two counters must arrive as two grants.
+      HU.testCase "CR 122.1b two counters grant two instances, not one" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (pikerId, board) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            one = S.addCounter (CounterKind.Keyword Keyword.Flying) 1 pikerId board
+            two = S.addCounter (CounterKind.Keyword Keyword.Flying) 2 pikerId board
+        HU.assertEqual "one counter, one instance" (Just 1) (Map.lookup Keyword.Flying (Projection.keywordsOf pikerId one))
+        HU.assertEqual "two counters, two instances" (Just 2) (Map.lookup Keyword.Flying (Projection.keywordsOf pikerId two)),
+      HU.testCase "CR 122.1b a counter of a DIFFERENT keyword grants that one, not flying" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (pikerId, board) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            hasted = S.addCounter (CounterKind.Keyword Keyword.Haste) 1 pikerId board
+        HU.assertBool "haste granted" (Projection.hasKeyword Keyword.Haste pikerId hasted)
+        HU.assertBool "flying is not" (not (Projection.hasKeyword Keyword.Flying pikerId hasted))
     ]

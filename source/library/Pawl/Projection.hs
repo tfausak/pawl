@@ -790,28 +790,40 @@ gatherStatic src ts changes n sa =
 -- is the sole home that may name a Modification constructor). Layer 7c is purely
 -- additive, so pre-combining the counters and the object's own timestamp are both
 -- unobservable (spec section 4). d == 0 emits nothing.
+--
+-- CR 122.1b / 613.1f: a keyword counter grants its keyword instead, which is
+-- LAYER 6 and not 7c. Emitted alongside, one grant per counter rather than one
+-- per kind: the layer-6 arm counts instances (see applyModification's GainKeyword
+-- comment on CR 702.164's lack of a redundancy clause), so two flying counters
+-- must arrive as two grants, exactly as two separate GainKeyword effects would.
 counterGathered :: GameState -> [Gathered]
-counterGathered gs = Maybe.mapMaybe fromObject (Set.toList (GameState.battlefield gs))
+counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs))
   where
     fromObject oid = case Game.lookupObject oid gs of
-      Nothing -> Nothing
+      Nothing -> []
       Just obj ->
         let cs = Object.counters obj
+            at lyr m =
+              MkGathered
+                { gEffect = Nothing,
+                  gSource = oid,
+                  gAffected = Affected.TheseObjects (Set.singleton oid),
+                  gLayer = lyr,
+                  gTimestamp = Object.timestamp obj,
+                  gModification = m
+                }
             plus = toInteger (Map.findWithDefault 0 CounterKind.PlusOnePlusOne cs)
             minus = toInteger (Map.findWithDefault 0 CounterKind.MinusOneMinusOne cs)
             d = plus - minus
-         in if d == 0
-              then Nothing
-              else
-                Just
-                  MkGathered
-                    { gEffect = Nothing,
-                      gSource = oid,
-                      gAffected = Affected.TheseObjects (Set.singleton oid),
-                      gLayer = Layer.ModifyPT,
-                      gTimestamp = Object.timestamp obj,
-                      gModification = Modification.ModifyPowerToughness (Quantity.Type.Literal d) (Quantity.Type.Literal d)
-                    }
+            pt =
+              [ at Layer.ModifyPT (Modification.ModifyPowerToughness (Quantity.Type.Literal d) (Quantity.Type.Literal d))
+              | d /= 0
+              ]
+            grantOf (kind, n) = case kind of
+              CounterKind.Keyword kw -> replicate (fromIntegral n) (at Layer.Ability (Modification.GainKeyword kw))
+              CounterKind.PlusOnePlusOne -> []
+              CounterKind.MinusOneMinusOne -> []
+         in pt <> concatMap grantOf (Map.toList cs)
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
 -- question needs: applying one effect can only change what another applies to if

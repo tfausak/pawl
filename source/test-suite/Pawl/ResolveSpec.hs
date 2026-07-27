@@ -1681,6 +1681,27 @@ countersTests registry =
             afterCleanup = Expiry.dropAtCleanup resolved
         HU.assertEqual "still 3/2 after cleanup" (Just 3) (Projection.powerOf victim afterCleanup)
         HU.assertEqual "still 3/2 after cleanup" (Just 2) (Projection.toughnessOf victim afterCleanup),
+      -- CR 122.1b: Spontaneous Flight is the one card where the two halves have
+      -- DIFFERENT durations, which is what proves the flying is a counter rather
+      -- than a second until-end-of-turn effect. The +2/+2 wears off at cleanup
+      -- (CR 514.2); the flying counter does not.
+      HU.testCase "CR 122.1b whole card: Spontaneous Flight pumps until EOT and grants flying for good" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        spontaneousFlight <- Registry.printing registry "Spontaneous Flight"
+        let base = S.landsInPlay plains 3
+            (target, withCreature) = S.addCreature piker S.alice base
+            (gs, spellId) = S.handOne spontaneousFlight withCreature
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            afterCleanup = Expiry.dropAtCleanup resolved
+        HU.assertBool "the Piker did not fly to begin with" (not (Projection.hasKeyword Keyword.Flying target withCreature))
+        HU.assertEqual "pumped to 4/3" (Just 4) (Projection.powerOf target resolved)
+        HU.assertEqual "pumped to 4/3" (Just 3) (Projection.toughnessOf target resolved)
+        HU.assertBool "and it flies" (Projection.hasKeyword Keyword.Flying target resolved)
+        -- The discriminator between a counter and another until-EOT effect.
+        HU.assertEqual "the pump wore off" (Just 2) (Projection.powerOf target afterCleanup)
+        HU.assertBool "the flying did not" (Projection.hasKeyword Keyword.Flying target afterCleanup),
       HU.testCase "CR 122.6 Instill Infection puts a -1/-1 counter and draws" $ do
         -- alice casts Instill Infection on bob's Piker; Piker becomes 1/0 and dies
         -- (704.5f); alice draws a card.
