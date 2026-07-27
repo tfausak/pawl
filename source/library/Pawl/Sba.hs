@@ -8,12 +8,12 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Event as Event
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Target as Target
@@ -412,7 +412,7 @@ performStateBasedActions = do
       -- same pre-pass state, and the Moved events this pass itself appends carry
       -- no damage. The record is never removed.
       watermark :: Natural
-      watermark = fromIntegral (Seq.length (GameState.events gs))
+      watermark = Natural.length (GameState.events gs)
       -- CR 704.5j, computed from the SAME pre-pass state as every classification
       -- above, because CR 704.3 performs all applicable state-based actions
       -- simultaneously. Deliberately NOT filtered against the buries below: see

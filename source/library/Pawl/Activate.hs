@@ -7,6 +7,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
@@ -90,8 +91,8 @@ activatable pid srcId ability gs =
     && not (Mana.isManaAbility ability)
     && sicknessOk pid srcId ability gs
     && timingOk pid ability gs
-    && Set.size (Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
-      >= fromIntegral (Modal.selectionCount (ActivatedAbility.modal ability))
+    && Natural.length (Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
+      >= Modal.selectionCount (ActivatedAbility.modal ability)
     && Cost.canPay pid srcId (ActivatedAbility.cost ability) gs
 
 -- CR 602.2: put the ability on the stack (a fresh OfAbility object), choose
@@ -131,12 +132,12 @@ activateAbility pid srcId ability = do
       count = Modal.selectionCount (ActivatedAbility.modal ability)
   State.put onStack
   chosenModes <-
-    if Set.size legal <= fromIntegral count
+    if Natural.length legal <= count
       then pure legal
       else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid abilId legal count))
   -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
   -- modes makes the whole activation a no-op, guarding every step below.
-  if not (Set.isSubsetOf chosenModes legal && Set.size chosenModes == fromIntegral count)
+  if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
     then State.put gs
     else do
       let sets = Target.legalSets (Just pid) srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs

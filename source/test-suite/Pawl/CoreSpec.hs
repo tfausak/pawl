@@ -7,6 +7,7 @@ module Pawl.CoreSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Projection as Projection
@@ -78,10 +79,10 @@ programTests =
 
 -- A GameState holding one object whose binding environment carries the given
 -- chosen X (Nothing = no amount bound), for exercising Quantity.evaluate's X arm.
-withBoundAmount :: Printing.Printing -> Maybe Integer -> (ObjectId.ObjectId, GameState.GameState)
+withBoundAmount :: Printing.Printing -> Maybe Natural.Natural -> (ObjectId.ObjectId, GameState.GameState)
 withBoundAmount mountain mAmount =
   let (oid, gs0) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
-      bindings = Binding.fromChoices Map.empty Map.empty (fmap fromInteger mAmount) Set.empty
+      bindings = Binding.fromChoices Map.empty Map.empty mAmount Set.empty
       gs = gs0 {GameState.objects = Map.adjust (\o -> o {Object.bindings = bindings}) oid (GameState.objects gs0)}
    in (oid, gs)
 

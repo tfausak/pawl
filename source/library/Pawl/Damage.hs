@@ -11,6 +11,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
+import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
@@ -87,7 +88,7 @@ blockerThreshold gs attacker blocker =
       lethal :: Natural
       lethal = case Projection.toughnessOf blocker gs of
         Nothing -> 0
-        Just t -> fromInteger (max 0 (t - toInteger marked))
+        Just t -> Integer.toNaturalSaturating (t - toInteger marked)
    in if lethal > 0 && Projection.hasKeyword Keyword.Deathtouch attacker gs
         then 1
         else lethal
@@ -129,7 +130,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
       then pure []
       else do
         let power :: Natural
-            power = fromInteger p
+            power = Integer.toNaturalSaturating p
             trample = Projection.hasKeyword Keyword.Trample attacker gs
             -- CR 800.4e: "If combat damage would be assigned to a player who has
             -- left the game, that damage isn't assigned." Reachable in a
@@ -233,7 +234,7 @@ blockerAssignment gs (attacker, blockers) =
         Just p ->
           if p <= 0
             then []
-            else [damageEvent gs DamageKind.Combat blocker (Recipient.ToCreature attacker) (fromInteger p)]
+            else [damageEvent gs DamageKind.Combat blocker (Recipient.ToCreature attacker) (Integer.toNaturalSaturating p)]
         Nothing -> []
    in if onBattlefield attacker gs
         then concatMap assign (Set.toList blockers)

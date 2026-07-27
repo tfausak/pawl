@@ -17,6 +17,7 @@ import qualified Pawl.DecideSpec as DecideSpec
 import qualified Pawl.DepartureSpec as DepartureSpec
 import qualified Pawl.EventSpec as EventSpec
 import qualified Pawl.ExpirySpec as ExpirySpec
+import qualified Pawl.ExtraSpec as ExtraSpec
 import qualified Pawl.FilterSpec as FilterSpec
 import qualified Pawl.GameSpec as GameSpec
 import qualified Pawl.JsonSpec as JsonSpec
@@ -85,5 +86,6 @@ testTree registry =
       FilterSpec.tests,
       RegistrySpec.tests,
       SlugSpec.tests,
+      ExtraSpec.tests,
       AuraSpec.tests registry
     ]

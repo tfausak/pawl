@@ -10,6 +10,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Combat as Combat
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Turn as Turn
@@ -123,7 +124,7 @@ createCard pid printing = do
 createDeck :: PlayerId -> Deck.Deck -> Game ()
 createDeck pid (Deck.MkDeck m) =
   Monad.forM_ (Map.toList m) $ \(printing, n) ->
-    Monad.replicateM_ (fromIntegral n) (createCard pid printing)
+    Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printing)
 
 newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do

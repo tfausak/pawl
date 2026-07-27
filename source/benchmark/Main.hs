@@ -6,6 +6,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Type.Action as Action
@@ -56,7 +57,7 @@ castElsePlay actions =
 -- match, front-discard yields 4 land plays and no combat, back-discard yields 72
 -- land plays and 66 declare-attackers prompts.
 discardNewest :: [a] -> Natural -> [a]
-discardNewest ids n = take (fromIntegral n) (reverse ids)
+discardNewest ids n = take (Natural.toIntSaturating n) (reverse ids)
 
 alwaysPass :: Prompt.Prompt r -> r
 alwaysPass p = case p of
@@ -81,15 +82,15 @@ alwaysPass p = case p of
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 
@@ -118,15 +119,15 @@ castAnswer p = case p of
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 
@@ -156,15 +157,15 @@ fightAnswer p = case p of
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 

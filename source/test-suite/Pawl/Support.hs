@@ -27,6 +27,8 @@ import qualified Pawl.Count as Count
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Extra.Int as Int
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
@@ -210,20 +212,20 @@ identityAnswer p = case p of
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDiscard _ _ ids n -> take (Natural.toIntSaturating n) ids
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 
@@ -245,7 +247,7 @@ castAnswer p = case p of
     case filter isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
-  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDiscard _ _ ids n -> take (Natural.toIntSaturating n) ids
   Prompt.ChooseAction _ _ actions ->
     let isCast a = case a of
           A.Cast _ -> True
@@ -262,15 +264,15 @@ castAnswer p = case p of
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 
@@ -284,7 +286,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDiscard _ _ ids n -> take (Natural.toIntSaturating n) ids
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
@@ -302,15 +304,15 @@ aggressiveAnswer p = case p of
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 
@@ -347,7 +349,7 @@ playLandAnswer p = case p of
     case filter isCreatureRecipient (Map.keys thresholds) of
       r : _ -> Map.singleton r n
       [] -> Map.empty
-  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDiscard _ _ ids n -> take (Natural.toIntSaturating n) ids
   Prompt.ChooseAction _ _ actions ->
     let isPlay a = case a of
           A.Play _ -> True
@@ -361,15 +363,15 @@ playLandAnswer p = case p of
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 
@@ -451,7 +453,7 @@ randomAnswer p = case p of
         (i, g') = Random.uniformR (0, length players - 1) g
     State.put g'
     pure (pickFrom order i)
-  Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
+  Prompt.ChooseDiscard _ _ ids n -> pure (take (Natural.toIntSaturating n) ids)
   Prompt.ChooseAction _ _ actions -> do
     g <- State.get
     let n = length actions
@@ -477,19 +479,19 @@ randomAnswer p = case p of
     g <- State.get
     let (i, g') = Random.uniformR (0 :: Int, 3) g
     State.put g'
-    pure (fromIntegral i)
+    pure (Int.toNaturalSaturating i)
   -- A deterministic prefix of the legal modes, keeping replay simple (the
   -- brief permits this in place of a genuinely random size-`count` subset).
   Prompt.ChooseModes _ _ _ legal count ->
-    pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
+    pure (Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
-  Prompt.OrderTriggers _ _ sources -> pure (fmap fromIntegral (take (length sources) [0 :: Int ..]))
+  Prompt.OrderTriggers _ _ sources -> pure (take (length sources) [0 ..])
   Prompt.ChooseReplacement {} -> pure 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
+  Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (Natural.toIntSaturating count) candidates))
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
   Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> pure (take (fromIntegral count) hand)
+  Prompt.Bottom _ _ hand count -> pure (take (Natural.toIntSaturating count) hand)
   Prompt.MulliganAction {} -> pure Nothing
   Prompt.OpeningHandAction {} -> pure Nothing
 

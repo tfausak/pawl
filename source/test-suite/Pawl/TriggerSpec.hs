@@ -733,8 +733,8 @@ orderingTests registry =
       orderLast :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       orderLast wanted p = case p of
         Prompt.OrderTriggers _ _ sources ->
-          let indexed = zip [0 :: Int ..] sources
-              pick keep = fmap (fromIntegral . fst) (filter (\entry -> (snd entry == wanted) == keep) indexed)
+          let indexed = zip [0 ..] sources
+              pick keep = fmap fst (filter (\entry -> (snd entry == wanted) == keep) indexed)
            in pick False <> pick True
         _ -> S.identityAnswer p
       -- Counts how many times the ordering prompt was asked, answering canonically.
@@ -742,7 +742,7 @@ orderingTests registry =
       countingAnswer p = case p of
         Prompt.OrderTriggers _ _ sources -> do
           State.modify' (+ 1)
-          pure (fmap fromIntegral (take (length sources) [0 :: Int ..]))
+          pure (take (length sources) [0 ..])
         _ -> pure (S.identityAnswer p)
    in Tasty.testGroup
         "TriggerOrdering"

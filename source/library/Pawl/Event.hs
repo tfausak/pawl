@@ -18,6 +18,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Condition as Condition
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Keyword as Keyword
@@ -98,12 +99,12 @@ castOf event = case event of
 -- CR 117.5: the events the trigger scan has not yet consumed.
 unscannedEvents :: GameState -> [GameEvent]
 unscannedEvents gs =
-  Foldable.toList (Seq.drop (fromIntegral (GameState.scannedThrough gs)) (GameState.events gs))
+  Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.scannedThrough gs)) (GameState.events gs))
 
 -- CR 704.5h: the damage the state-based-action check has not yet consumed.
 unscannedDamage :: GameState -> [DamageEvent]
 unscannedDamage gs =
-  Maybe.mapMaybe damageOf (Foldable.toList (Seq.drop (fromIntegral (GameState.damageScannedThrough gs)) (GameState.events gs)))
+  Maybe.mapMaybe damageOf (Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.damageScannedThrough gs)) (GameState.events gs)))
 
 -- Insert a freshly-built object into `dest` under a new id and timestamp, and
 -- return that id. The common tail of changeZone (a moved incarnation) and
@@ -413,7 +414,7 @@ createTokens controller card n = do
                     Object.attachedTo = Nothing,
                     Object.timestamp = ts
                   }
-          ids <- Monad.replicateM (fromIntegral count) (placeObject owner mkObj Zone.Battlefield)
+          ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
           Monad.mapM_ (Replacement.runEntry (Set.fromList ids)) ids
           -- A token is created from nothing, so there is no prior incarnation to
           -- snapshot: its last known information IS what it is now (CR 111.3 makes

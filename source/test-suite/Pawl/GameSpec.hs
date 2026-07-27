@@ -22,6 +22,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
@@ -248,7 +249,7 @@ landState registry = do
 -- turn (CR 305.2) a player can never have more lands out than turns taken.
 turnsTaken :: PlayerId.PlayerId -> GameState.GameState -> Int
 turnsTaken pid gs =
-  let total = fromIntegral (GameState.turnNumber gs)
+  let total = Natural.toIntSaturating (GameState.turnNumber gs)
    in if pid == S.alice then (total + 1) `div` 2 else total `div` 2
 
 engineTests :: Registry.Type.Registry -> Tasty.TestTree
@@ -333,7 +334,7 @@ recordingAnswer p = case p of
   Prompt.Shuffle ids -> pure ids
   Prompt.RandomFirstPlayer order -> pure (NonEmpty.head order)
   Prompt.ChooseTargets _ _ _ sets -> pure (Map.mapMaybe Set.lookupMin sets)
-  Prompt.ChooseDiscard _ _ ids n -> pure (take (fromIntegral n) ids)
+  Prompt.ChooseDiscard _ _ ids n -> pure (take (Natural.toIntSaturating n) ids)
   Prompt.ChooseAction _ pid actions -> do
     State.modify' (\asked -> asked <> [pid])
     let isCast a = case a of
@@ -346,15 +347,15 @@ recordingAnswer p = case p of
   Prompt.SearchLibrary {} -> pure Nothing
   Prompt.CastWhileSearching {} -> pure Nothing
   Prompt.ChooseX {} -> pure 0
-  Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (take (fromIntegral count) (Set.toAscList legal)))
+  Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
-  Prompt.OrderTriggers _ _ sources -> pure (fmap fromIntegral (take (length sources) [0 :: Int ..]))
+  Prompt.OrderTriggers _ _ sources -> pure (take (length sources) [0 ..])
   Prompt.ChooseReplacement {} -> pure 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (fromIntegral count) candidates))
+  Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (take (Natural.toIntSaturating count) candidates))
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
   Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> pure (take (fromIntegral count) hand)
+  Prompt.Bottom _ _ hand count -> pure (take (Natural.toIntSaturating count) hand)
   Prompt.MulliganAction {} -> pure Nothing
   Prompt.OpeningHandAction {} -> pure Nothing
 
@@ -1393,7 +1394,7 @@ slaveAnswer p = case p of
   Prompt.Shuffle ids -> ids
   Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseDiscard _ _ ids n -> take (fromIntegral n) ids
+  Prompt.ChooseDiscard _ _ ids n -> take (Natural.toIntSaturating n) ids
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   -- Head is enough here: this interpreter exists to prove the DECIDER is honoured
   -- for ChooseAction under Mindslaver, and which land pays a cost is not part of
@@ -1413,15 +1414,15 @@ slaveAnswer p = case p of
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (fromIntegral count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> fmap fromIntegral (take (length sources) [0 :: Int ..])
+  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (fromIntegral count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (fromIntegral count) hand
+  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 

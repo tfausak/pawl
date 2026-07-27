@@ -13,6 +13,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Count as Count
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Quantity as Quantity
@@ -820,7 +821,7 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               | d /= 0
               ]
             grantOf (kind, n) = case kind of
-              CounterKind.Keyword kw -> replicate (fromIntegral n) (at Layer.Ability (Modification.GainKeyword kw))
+              CounterKind.Keyword kw -> replicate (Natural.toIntSaturating n) (at Layer.Ability (Modification.GainKeyword kw))
               CounterKind.PlusOnePlusOne -> []
               CounterKind.MinusOneMinusOne -> []
          in pt <> concatMap grantOf (Map.toList cs)

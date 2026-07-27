@@ -15,6 +15,8 @@ import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Extra.Integer as Integer
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Json as Json
 import qualified Pawl.Type.AbilityName as AbilityName
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
@@ -146,7 +148,7 @@ setFrom f value = Set.fromList <$> listFrom f value
 -- canonical. multisetFrom recounts, so a hand-written file may repeat a key in
 -- any order and a zero count is simply unsayable.
 multisetTo :: (a -> Value) -> Map.Map a Natural -> Value
-multisetTo f = listTo f . concatMap (\(k, n) -> replicate (fromIntegral n) k) . Map.toAscList
+multisetTo f = listTo f . concatMap (\(k, n) -> replicate (Natural.toIntSaturating n) k) . Map.toAscList
 
 multisetFrom :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Map.Map a Natural)
 multisetFrom f value = Map.fromListWith (+) . fmap (\k -> (k, 1)) <$> listFrom f value
@@ -165,7 +167,9 @@ natTo = Json.jInt . toInteger
 natFrom :: Value -> Either Text Natural
 natFrom value = do
   n <- Json.asInteger value
-  if n >= 0 then Right (fromInteger n) else Left (Text.pack "expected natural")
+  case Integer.toNatural n of
+    Just x -> Right x
+    Nothing -> Left (Text.pack "expected natural")
 
 -- Leaf enums -----------------------------------------------------------------
 
