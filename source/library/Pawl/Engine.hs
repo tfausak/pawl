@@ -340,7 +340,7 @@ runTurnBasedActions phase = do
         State.modify' (\gs -> gs {GameState.remaining = Turn.spliceSecondDamage (GameState.remaining gs)})
     -- CR 511.1: "the end of combat step has no turn-based actions", so it has no
     -- arm here, deliberately. CR 511.3's removal from combat is an end-of-STEP
-    -- action and runStep performs it there, beside CR 500.4's mana emptying.
+    -- action and runStep performs it there, beside CR 500.5's mana emptying.
     Phase.Ending EndingStep.Cleanup -> do
       Monad.when hasActive (discardToHandSize active)
       -- CR 514.2: damage wears off AND until-end-of-turn effects end,
@@ -899,15 +899,19 @@ runStep = do
       -- signal and plays the new game from its first step.
       RestartSignal.Restarted -> pure ()
       RestartSignal.Playing -> do
-        -- CR 500.4: each player's mana pool empties at the end of every step and
-        -- phase. Nothing floats mana in M1a, so this is unobservable today; it is
-        -- the rule, and it is a one-liner.
+        -- CR 500.5: as a step or phase ends, any unspent mana left in a player's
+        -- mana pool empties -- a turn-based action that does not use the stack
+        -- (CR 703.4q). Nothing floats mana in M1a, so this is unobservable today;
+        -- it is the rule, and it is a one-liner.
         State.modify' Mana.emptyManaPools
         -- CR 511.3: "as soon as the end of combat step ends, all creatures,
-        -- battles, and planeswalkers are removed from combat" -- so this is an
-        -- end-of-STEP action like the mana emptying above it, and not a
-        -- turn-based action (CR 511.1 says the step has none). The distinction is
-        -- observable: creatures stay attacking for the whole of the step,
+        -- battles, and planeswalkers are removed from combat" -- so it belongs
+        -- here, at the step's END, and not in runTurnBasedActions at its start.
+        -- The two lines share that timing for opposite reasons: CR 703.4q makes
+        -- the mana emptying above a turn-based action whose own moment is "as
+        -- each step or phase ends", while this is not a turn-based action at all,
+        -- because CR 511.1 says this step has none. Start versus end is the
+        -- observable part: creatures stay attacking for the whole of the step,
         -- including the priority round CR 511.1 grants, where an instant may
         -- still read them (Kill Shot).
         --

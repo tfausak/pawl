@@ -124,7 +124,7 @@ castEngineTests registry =
       HU.testCase "a casting game conserves objects" $ do
         gs <- castGameState registry
         HU.assertEqual "objects" 120 (Game.objectCount gs),
-      HU.testCase "CR 500.4 no mana floats at the end of a game" $ do
+      HU.testCase "CR 500.5 no mana floats at the end of a game" $ do
         gs <- castGameState registry
         HU.assertEqual "pools empty" Map.empty (GameState.manaPool gs)
     ]

@@ -195,7 +195,7 @@ Lettered rather than renumbered: M2–M7 are referenced by number throughout, an
 
 Goblin Piker (`{1}{R}` 2/1 vanilla) rather than Grizzly Bears (`{1}{G}`), to reuse M0's Mountain mana base and fixtures; `{1}{R}` still exercises generic *and* colored payment. Deck is 36 Mountain / 24 Piker. Creatures resolve onto the battlefield and sit there. Still zero opcodes.
 
-Exercises: the mana pool (106.4) and its emptying (500.4), intrinsic mana abilities from a subtype (305.6), casting (601), the stack carrying an object, priority under a non-empty stack (117.4), resolution of a permanent spell (608.3), cleanup discard as a real decision (514.2).
+Exercises: the mana pool (106.4) and its emptying (500.5), intrinsic mana abilities from a subtype (305.6), casting (601), the stack carrying an object, priority under a non-empty stack (117.4), resolution of a permanent spell (608.3), cleanup discard as a real decision (514.2).
 
 Two things get decided here because this is where they first appear:
 - **The numeric model** (§2.12) — `Quantity`, shape landed with only `Literal` implemented. Named `Quantity`, not `Characteristic`: 109.3 already owns that word for the whole characteristic set.
