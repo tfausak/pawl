@@ -8,6 +8,8 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Text (Text)
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Count as Count
@@ -363,7 +365,11 @@ baseCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 baseCharacteristics oid gs = case Game.cardOf oid gs of
   Nothing ->
     PC.MkProjectedCharacteristics
-      { PC.keywords = Map.empty,
+      { -- No card behind this object (an ability or trigger on the stack): it has
+        -- no printed name and no type line to seed from.
+        PC.name = Text.empty,
+        PC.supertypes = Set.empty,
+        PC.keywords = Map.empty,
         PC.colors = Set.empty,
         PC.power = Nothing,
         PC.toughness = Nothing,
@@ -390,7 +396,9 @@ baseCharacteristics oid gs = case Game.cardOf oid gs of
     let seedViewOf = const Nothing
         seedContext = Filter.MkContext (controllerOf oid gs) (Just oid)
      in PC.MkProjectedCharacteristics
-          { -- CR 702: a printed keyword appears once in the card's text, so the
+          { PC.name = Card.Type.name card,
+            PC.supertypes = TypeLine.supertypes (Card.Type.typeLine card),
+            -- CR 702: a printed keyword appears once in the card's text, so the
             -- seed's count is 1 apiece. Multiplicity is what layer-6 grants add
             -- on top (CR 702.164b).
             PC.keywords = Map.fromSet (const 1) (Card.Type.keywords card),
@@ -1152,6 +1160,15 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 
 subtypesOf :: ObjectId -> GameState -> Set Subtype.Subtype
 subtypesOf oid gs = PC.subtypes (project oid gs)
+
+-- CR 201.1 / 707.2: the object's projected name -- a Clone's is the name it
+-- copied, not "Clone".
+nameOf :: ObjectId -> GameState -> Text
+nameOf oid gs = PC.name (project oid gs)
+
+-- CR 205.4: the object's projected supertypes, the sibling of subtypesOf.
+supertypesOf :: ObjectId -> GameState -> Set Supertype.Supertype
+supertypesOf oid gs = PC.supertypes (project oid gs)
 
 cardTypesOf :: ObjectId -> GameState -> Set CardType.CardType
 cardTypesOf oid gs = PC.cardTypes (project oid gs)

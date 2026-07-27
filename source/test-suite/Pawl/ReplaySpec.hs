@@ -223,6 +223,22 @@ combatReplayTests =
               "declines"
               (Set.empty, Set.empty)
               (Replay.defaultAnswer (Prompt.ChooseProliferate decider S.alice [ObjectId.MkObjectId 7] [S.bob])),
+          -- CR 704.5j: which legend its controller kept is a decision, so it has to
+          -- survive a transcript like any other.
+          HU.testCase "ChooseLegend round-trips through the transcript" $
+            let a = ObjectId.MkObjectId 7
+                b = ObjectId.MkObjectId 9
+                p = Prompt.ChooseLegend decider S.alice (a NonEmpty.:| [b])
+             in do
+                  HU.assertEqual "keeping the second round trips" (Just b) (Replay.decode p (Replay.encode p b))
+                  -- Discriminating: a decode that ignored the response and returned
+                  -- the head would pass one leg by accident.
+                  HU.assertEqual "keeping the first round trips" (Just a) (Replay.decode p (Replay.encode p a)),
+          HU.testCase "a legend choice does not decode as a mana-source choice" $
+            -- Discriminating: fails if ChooseLegend reuses ChoseManaSource rather
+            -- than getting its own ObjectId-shaped constructor.
+            let p = Prompt.ChooseLegend decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))),
           HU.testCase "a short transcript produces the first offered mana type" $
             HU.assertEqual
               "the head"

@@ -122,6 +122,24 @@ data Prompt r where
   -- -- proliferating a -1/-1 counter onto your own creature is a choice a player
   -- may well decline.
   ChooseProliferate :: Decider -> PlayerId -> [ObjectId] -> [PlayerId] -> Prompt (Set ObjectId, Set PlayerId)
+  -- CR 704.5j: which of two or more same-named legendary permanents its
+  -- controller keeps. The NonEmpty is the whole same-named group; the answer is
+  -- the ONE that survives, and every other member is put into its owner's
+  -- graveyard.
+  --
+  -- One prompt per name, not one per player: a player controlling two Thalias and
+  -- two Urborgs faces two separate applications of the legend rule, and each is
+  -- its own decision.
+  --
+  -- The answer is what is KEPT rather than what is buried, because CR 704.5j is
+  -- worded that way ("that player chooses one of them, and the rest are put
+  -- into..."), and because it stays a single choice however large the group gets.
+  --
+  -- Never elided: the prompt is only raised for a group of two or more, which is
+  -- always a real choice. The permanents may differ in counters, Auras, damage or
+  -- summoning sickness, none of which the shared name can see -- the same reason
+  -- ChooseManaSource refuses to treat same-card candidates as interchangeable.
+  ChooseLegend :: Decider -> PlayerId -> NonEmpty ObjectId -> Prompt ObjectId
   -- CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
   -- attack. WHOM they attack is not asked here: the defending player was already
   -- chosen at the beginning of combat step (Prompt.ChooseDefender), and CR 508.1b

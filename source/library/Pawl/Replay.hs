@@ -34,6 +34,7 @@ encode p answer = case p of
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
   Prompt.ChooseManaType {} -> Response.ChoseManaType answer
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
+  Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
   Prompt.DeclareBlockers {} -> Response.DeclaredBlockers answer
   Prompt.AssignCombatDamage {} -> Response.AssignedCombatDamage answer
@@ -90,6 +91,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseProliferate {} -> case response of
     Response.ChoseProliferation chosen -> Just chosen
+    _ -> Nothing
+  Prompt.ChooseLegend {} -> case response of
+    Response.ChoseLegend oid -> Just oid
     _ -> Nothing
   Prompt.DeclareAttackers {} -> case response of
     Response.DeclaredAttackers ids -> Just ids
@@ -179,6 +183,9 @@ defaultAnswer p = case p of
   -- least eventful thing a fallback can do, the same posture as declining to
   -- attack or block.
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  -- CR 704.5j: every candidate is a legal thing to keep, so the head is a legal
+  -- answer and the least eventful fallback.
+  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   -- Declining to attack or block is always legal, and is the least eventful
   -- thing a fallback can do.
   Prompt.DeclareAttackers {} -> []

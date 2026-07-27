@@ -43,6 +43,12 @@ data Response
     -- serialized so a DecisionLog replays a proliferate deterministically. A pair
     -- rather than two constructors, because one prompt asks one question.
     ChoseProliferation (Set ObjectId, Set PlayerId)
+  | -- CR 704.5j: the legendary permanent its controller kept, serialized so a
+    -- DecisionLog replays the legend rule deterministically. Its own constructor
+    -- rather than a reuse of ChoseManaSource: decode must return Nothing for a
+    -- response that does not match the prompt asked, and two ObjectId-shaped
+    -- prompts sharing a constructor cannot do that.
+    ChoseLegend ObjectId
   | DeclaredAttackers [ObjectId]
   | DeclaredBlockers (Map ObjectId ObjectId)
   | AssignedCombatDamage (Map Recipient Natural)
