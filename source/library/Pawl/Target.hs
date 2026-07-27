@@ -33,32 +33,34 @@ import qualified Pawl.Type.Zone as Zone
 -- (protection, hexproof, shroud) exists in the pool -- this function is where
 -- they will all land.
 --
--- `source` is the object the targeting is relative to: the spell object at cast,
--- the source permanent for an ability. It frames the Filter's perspective (CR
--- 109.5): "a creature an opponent controls" is a ControlledBy Opponent filter,
--- and a source that has left the battlefield has no projected controller, which
--- yields Nothing and matches nothing -- the EMPTY set, not last known information
--- (#85). A player candidate is narrowed by the same fold, through the IsPlayer
--- atom (#168), and inherits that posture: "target opponent" from a source with no
--- projected controller has no legal targets either. CR 601.2c's "another" is applied here too, as the
--- Filter's own Not IsSource (#163) -- so it drops whichever tag the Pool
--- produced, and re-validation sees the same rule selection did.
--- The PERSPECTIVE (CR 109.5's "you") is passed in rather than derived from the
--- source, and CR 608.2b is why: "If the source of an ability has left the zone it
--- was in, its last known information is used during this process." Deriving it
--- here as `Projection.controllerOf source` returns Nothing once the source has
--- left the battlefield, which makes a ControlledBy filter vacuously False and
--- empties the legal set -- so the CR 608.2b re-check would find every target
--- illegal and fizzle an ability whose source was merely killed in response.
+-- The two frames are SEPARATE, and keeping them apart is the whole point:
 --
--- The ability's controller is knowable when its source is not, because the
--- ABILITY is its own object on the stack: callers on the resolution path read the
--- perspective from that object, and callers on the cast/activate path already
--- have the acting player in hand.
+--   * `source` is the object the targeting is relative to -- the spell object at
+--     cast, the source permanent for an ability. It frames only CR 601.2c's
+--     "another", carried as the Filter's own Not IsSource (#163), so that drops
+--     whichever tag the Pool produced and re-validation sees the same rule
+--     selection did.
+--   * `perspective` is CR 109.5's "you", supplied by the caller. "A creature an
+--     opponent controls" is a ControlledBy Opponent filter, and a player
+--     candidate is narrowed by the same fold through the IsPlayer atom (#168).
 --
--- Maybe, not PlayerId, and it matches Filter.MkContext's own field: Nothing is a
+-- They were one frame once, and splitting them is the fix. Deriving the
+-- perspective here as `Projection.controllerOf source` returns Nothing after the
+-- source leaves the battlefield, which makes ControlledBy vacuously False and
+-- yields the EMPTY set
+-- -- so CR 608.2b's re-check found every target illegal and fizzled an ability
+-- whose source was merely killed in response. CR 608.2b says the opposite: "If
+-- the source of an ability has left the zone it was in, its last known
+-- information is used during this process."
+--
+-- The controller is knowable when the source is not, because an ability is its
+-- own object on the stack. Callers on the resolution path read it from that
+-- object's stamped owner (CR 113.8: fixed at the ability's creation, never
+-- re-derived); callers on the cast/activate path already hold the acting player.
+--
+-- Maybe, not PlayerId, matching Filter.MkContext's own field: Nothing is a
 -- genuinely absent perspective, which leaves a player-referencing filter
--- vacuously False exactly as before.
+-- vacuously False.
 legalRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
 legalRecipients perspective source spec gs =
   let TargetSpec.MkTargetSpec pool restriction = spec

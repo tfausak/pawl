@@ -339,6 +339,25 @@ effectsOf oid gs = case Game.lookupObject oid gs of
 -- (Pawl.Stack), which is the whole point of it being a function: an Aura spell is
 -- the first PERMANENT spell that can be countered on resolution, and a second
 -- copy of this logic would drift.
+-- CR 405.4: who controls a SPELL on the stack -- "a spell's controller is the
+-- player who cast it", fixed at cast time -- for both CR 608.2b's legality
+-- perspective and the effects' own execution.
+--
+-- One function because those two must name the same player, not because they
+-- currently disagree: they do not. controllerOfGiven answers Nothing only for an
+-- object that does not exist, and both callers have already matched `Just obj`
+-- from a lookup, so the fallback below is unreachable at either. What was wrong
+-- was having the same question spelled two ways -- a bare Projection.controllerOf
+-- for legality and this expression for execution -- which is a divergence waiting
+-- to be introduced rather than one already there.
+--
+-- The projection read is itself a no-op in this pool: nothing installs a
+-- SetController naming a stack object, so it always folds back to the owner. #83
+-- argues it should trust Object.owner outright; whichever way that lands, it now
+-- lands in one place instead of three.
+spellController :: Object.Object -> ObjectId -> GameState -> PlayerId
+spellController obj oid gs = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+
 targetsAllIllegal :: ObjectId -> GameState -> Bool
 targetsAllIllegal oid gs = case Game.lookupObject oid gs of
   Nothing -> False
@@ -349,10 +368,10 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipient = case Map.lookup slot specs of
             Nothing -> True
-            -- CR 608.2b's perspective comes from the SPELL, which is the object
-            -- on the stack and therefore still present; for a spell the source and
-            -- the ability are the same object, so this is a rename, not a change.
-            Just spec -> Target.stillLegal (Projection.controllerOf oid gs) oid recipient spec gs
+            -- CR 608.2b's perspective is the SPELL's controller (CR 405.4), read
+            -- through the same function resolveSpellWith uses for effect
+            -- execution so the two cannot drift apart.
+            Just spec -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           targeted = Map.restrictKeys legality (Map.keysSet specs)
        in not (Map.null specs) && not (or (Map.elems targeted))
@@ -388,7 +407,7 @@ resolveSpellWith runSubgame oid = do
               -- a token this resolution minted -- and was never targeted, so it can
               -- never have become an illegal target.
               Nothing -> True
-              Just spec -> Target.stillLegal (Projection.controllerOf oid gs) oid recipient spec gs
+              Just spec -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs
          in if targetsAllIllegal oid gs
               then Event.changeZone oid Zone.Graveyard
               else do
@@ -402,7 +421,7 @@ resolveSpellWith runSubgame oid = do
                 -- Object.owner -- but it re-reads live projected control
                 -- rather than trusting the frozen owner outright, the same
                 -- shape an ability's controller recompute used to take (#83).
-                let effectController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+                let effectController = spellController obj oid gs
                 Monad.forM_ (effectsOf oid gs) $ \eff -> do
                   -- Re-read the live bindings for THIS effect: a prior PlaySubgame
                   -- may have bound its loser slot. Target legality is recomputed
@@ -436,11 +455,17 @@ resolveEffects stackId srcId effects specs = do
             -- a token this resolution minted -- and was never targeted, so it can
             -- never have become an illegal target.
             Nothing -> True
-            -- CR 608.2b: the perspective is the ABILITY's controller, read from
-            -- `stackId` -- the ability's own object, which is on the stack and so
-            -- still exists. `srcId` stays the source (CR 113.7), and may well be
-            -- gone: that is exactly the case this rule is about.
-            Just spec -> Target.stillLegal (Projection.controllerOf stackId gs) srcId recipient spec gs
+            -- CR 608.2b: the perspective is the ABILITY's controller -- literally
+            -- the `effectController` bound below, whose own comment explains why
+            -- that is Object.owner and not a live projection (CR 113.8: fixed at
+            -- the ability's creation, and a stolen permanent's later controller
+            -- must not override it). Reading the projection here instead would
+            -- have contradicted that rule three lines away.
+            --
+            -- `srcId` stays the source (CR 113.7) and may well be gone: that is
+            -- exactly the case this rule is about, and why the perspective is not
+            -- read from it.
+            Just spec -> Target.stillLegal (Just effectController) srcId recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
           -- reserved slots above cannot rescue a spell whose every target is gone.
