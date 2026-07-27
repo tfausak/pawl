@@ -817,6 +817,7 @@ jsonToDamagePattern value = do
 costComponentToJson :: CostComponent.CostComponent -> Value
 costComponentToJson c = case c of
   CostComponent.TapThis -> nullary (Text.pack "TapThis")
+  CostComponent.UntapThis -> nullary (Text.pack "UntapThis")
   CostComponent.SacrificeThis -> nullary (Text.pack "SacrificeThis")
   CostComponent.PayLife n -> Json.tagged (Text.pack "PayLife") (Just (natTo n))
   CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array [natTo n, filterToJson c_]))
@@ -828,6 +829,7 @@ jsonToCostComponent value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
     ("TapThis", _) -> Right CostComponent.TapThis
+    ("UntapThis", _) -> Right CostComponent.UntapThis
     ("SacrificeThis", _) -> Right CostComponent.SacrificeThis
     ("PayLife", Just v) -> fmap CostComponent.PayLife (natFrom v)
     ("Sacrifice", Just (Array [n, c_])) -> do

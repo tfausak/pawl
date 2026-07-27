@@ -42,13 +42,14 @@ import qualified Pawl.Type.Zone as Zone
 -- settle recorded for anyone else does not answer it (#198). CR 702.10c's haste
 -- exemption comes with it, from the shared predicate.
 --
--- The untap symbol has no cost component to classify, so CR 302.6's {Q} half is
--- unreachable here (#204).
-tapSicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
-tapSicknessOk pid srcId ability gs =
-  let needsTap = Cost.requiresTapSymbol (ActivatedAbility.cost ability)
+-- BOTH of CR 302.6's symbols reach here: requiresSicknessCheck answers for the
+-- tap symbol (CR 107.5) and the untap symbol (CR 107.6) alike, so this function
+-- never learns which one a cost carries.
+sicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+sicknessOk pid srcId ability gs =
+  let needsCheck = Cost.requiresSicknessCheck (ActivatedAbility.cost ability)
       isCreature = Set.member CardType.Creature (Projection.cardTypesOf srcId gs)
-   in not (needsTap && isCreature && not (Summoning.settledOrHasty pid srcId gs))
+   in not (needsCheck && isCreature && not (Summoning.settledOrHasty pid srcId gs))
 
 -- The abilities to consider activating. Task 5: the card's PRINTED abilities.
 -- Task 9 switches the body to `Projection.abilitiesOf srcId gs` so Humility
@@ -87,7 +88,7 @@ activatable pid srcId ability gs =
   Projection.controllerOf srcId gs == Just pid
     && elem ability (abilitiesFor srcId gs)
     && not (Mana.isManaAbility ability)
-    && tapSicknessOk pid srcId ability gs
+    && sicknessOk pid srcId ability gs
     && timingOk pid ability gs
     && Set.size (Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
       >= fromIntegral (Modal.selectionCount (ActivatedAbility.modal ability))

@@ -20,6 +20,16 @@ data CostComponent
     -- permanent.' A permanent that's already tapped can't be tapped again to pay
     -- the cost." CR 302.6 gates it on summoning sickness.
     TapThis
+  | -- CR 107.6: "The untap symbol is {Q}. The untap symbol in an activation cost
+    -- means 'Untap this permanent.' A permanent that's already untapped can't be
+    -- untapped again to pay the cost."
+    --
+    -- The mirror of TapThis, and CR 302.6 names the two together: "A creature's
+    -- activated ability with the tap symbol OR THE UNTAP SYMBOL in its activation
+    -- cost can't be activated unless the creature has been under its controller's
+    -- control continuously since their most recent turn began." So this joins
+    -- TapThis in Pawl.Cost.requiresSicknessCheck, not just in the payment.
+    UntapThis
   | -- CR 701.21a: sacrifice the object the cost is on -- its controller moves it
     -- from the battlefield directly to its owner's graveyard (Mindslaver).
     --
