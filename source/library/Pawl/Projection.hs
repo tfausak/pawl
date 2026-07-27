@@ -21,6 +21,7 @@ import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.Filter as Filter.Type
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Keyword (Keyword)
@@ -744,12 +745,80 @@ counterGathered gs = Maybe.mapMaybe fromObject (Set.toList (GameState.battlefiel
                       gModification = Modification.ModifyPowerToughness (Quantity.Type.Literal d) (Quantity.Type.Literal d)
                     }
 
+-- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
+-- question needs: applying one effect can only change what another applies to if
+-- it WRITES something that one READS. Projection-internal; not a domain type, and
+-- deliberately coarser than ProjectedCharacteristics -- "the subtypes changed" is
+-- enough to make two effects worth comparing exactly.
+data Aspect
+  = Types
+  | Subtypes
+  | Colors
+  | PowerA
+  | Controller
+  deriving (Eq, Ord)
+
+-- Which aspects a Filter reads. Exhaustive on purpose: a new Filter arm that
+-- reads a projected characteristic must be classified here, or CR 613.8a would
+-- silently stop seeing dependencies through it.
+--
+-- Two arms read nothing a modification can write. CR 205.4a supertypes come off
+-- the printed type line (printedSupertypes) and nothing projects them; IsSource
+-- and IsPlayer ask who the candidate IS, which no effect changes.
+filterReads :: Filter.Type.Filter -> Set Aspect
+filterReads f = case f of
+  Filter.Type.HasCardType _ -> Set.singleton Types
+  Filter.Type.HasSupertype _ -> Set.empty
+  Filter.Type.HasColor _ -> Set.singleton Colors
+  Filter.Type.HasSubtype _ -> Set.singleton Subtypes
+  Filter.Type.PowerAtLeast _ -> Set.singleton PowerA
+  Filter.Type.ControlledBy _ -> Set.singleton Controller
+  Filter.Type.IsSource -> Set.empty
+  Filter.Type.IsPlayer _ -> Set.empty
+  Filter.Type.And fs -> foldMap filterReads fs
+  Filter.Type.Or fs -> foldMap filterReads fs
+  Filter.Type.Not g -> filterReads g
+
+-- Which aspects a Modification writes -- the other half of the pair above, and
+-- another legitimate case-on-Modification that Projection is the sole home of.
+--
+-- The two layer-6 arms write nothing here: no Filter reads abilities, so losing
+-- or gaining one cannot change what any affected set matches. That is not the
+-- same as saying an ability change cannot matter to CR 613.8 at all -- it can
+-- change an effect's EXISTENCE, which is a different clause of CR 613.8a and
+-- lives in staticAbilitiesLive (CR 305.7).
+modificationWrites :: Modification -> Set Aspect
+modificationWrites m = case m of
+  Modification.GainKeyword _ -> Set.empty
+  Modification.LoseAllAbilities -> Set.empty
+  Modification.SetBasePowerToughness _ _ -> Set.singleton PowerA
+  Modification.ModifyPowerToughness _ _ -> Set.singleton PowerA
+  Modification.SwitchPowerToughness -> Set.singleton PowerA
+  Modification.SetLandSubtype _ -> Set.singleton Subtypes
+  Modification.AddLandSubtype _ -> Set.singleton Subtypes
+  Modification.ChangeSubtypeWord _ _ -> Set.singleton Subtypes
+  Modification.AddCardType _ -> Set.singleton Types
+  Modification.SetColor _ -> Set.singleton Colors
+  Modification.SetController _ -> Set.singleton Controller
+  Modification.SetControllerToSource -> Set.singleton Controller
+
+-- Could another effect move this one's affected set at all? The structural half
+-- of projectWith's movableReads: only a Matching set is a predicate over
+-- characteristics that something else can change. A TheseObjects set names ids
+-- (CR 611.2c) and an Attached one reads its source's attachment off the game
+-- state (CR 303.4m).
+staticallyMovable :: Gathered -> Bool
+staticallyMovable c = case gAffected c of
+  Affected.Matching _ -> True
+  Affected.TheseObjects _ -> False
+  Affected.Attached -> False
+
 -- CR 613: apply continuous effects layer by layer (only the layers with effects,
--- ascending). Within a layer, CR 613.7 timestamp order. An effect's affected set
--- is evaluated against the partial projection through the previous layers.
--- CR 613.8 EXISTENCE dependency is handled by source-liveness, not a within-layer
--- reorder; the topological CR 613.8b applies-to reorder is not implemented (#11).
--- design.md §2.5.
+-- ascending). Within a layer, CR 613.8's dependency ordering, falling back to CR
+-- 613.7 timestamp order where no dependency exists. An effect's affected set is
+-- evaluated against the partial projection as it stands when that effect applies.
+-- CR 613.8's EXISTENCE dependency is the exception: it is handled by
+-- source-liveness rather than by the reorder. design.md section 2.5.
 project :: ObjectId -> GameState -> ProjectedCharacteristics
 project oid gs = projectFrom (gather gs) oid gs
 
@@ -807,61 +876,184 @@ applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
 -- THAT fold is applied at some K < L and sees `< K`. The bound strictly
 -- decreases and Layer is finite, so the nesting terminates.
 --
--- This is a terminating APPROXIMATION of CR 613.8's dependency system, not an
--- implementation of it: exact whenever a count reads layers strictly earlier
--- than its consumer's, and it under-reads a count over its own layer or later
--- (#157; #11 is the missing CR 613.8b reorder).
+-- That BOUND is a terminating approximation: a count is exact whenever it reads
+-- layers strictly earlier than its consumer's, and under-reads a count over its
+-- own layer or later (#157). It is unrelated to the CR 613.8 dependency ordering
+-- below, which is about effects rather than counts and is implemented.
 projectWith :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
-projectWith admits cands oid gs =
-  let layers = filter admits (Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))
-      applyLayer (partial, decided) lyr =
-        let seeded =
-              if lyr == Layer.CharacteristicPT
-                then applyCharacteristicPT lyr cands gs oid partial
-                else partial
-            -- CR 613.6: "If an effect starts to apply in one layer and/or
-            -- sublayer, it will continue to be applied to the same set of objects
-            -- in each other applicable layer." So the affected set is asked ONCE
-            -- per effect, at the lowest layer that effect reaches -- which is this
-            -- one the first time its key is seen, since `layers` is ascending --
-            -- and the answer is remembered in `decided` for its other layers.
-            --
-            -- Across DIFFERENT effects the partial projection is still the right
-            -- thing to read, which is why this memo is keyed by the effect rather
-            -- than hoisted out of the loop: a layer-6 grant must see a layer-4
-            -- type change. Re-asking WITHIN one effect is what made March of the
-            -- Machines' "each noncreature artifact" stop matching its own layer-4
-            -- output by layer 7b, leaving an animated artifact with no P/T at all
-            -- (#233).
-            --
-            -- The memo remembers "no" as faithfully as "yes", which is the rule's
-            -- other half: an artifact that was ALREADY a creature is outside the
-            -- set when March starts to apply, so it stays outside at 7b too and
-            -- keeps its printed P/T.
-            --
-            -- Only an effect with parts in more than one layer carries a key
-            -- (gEffect); everything else -- every counter, every stored effect,
-            -- every single-line static ability -- is Nothing, asks once by
-            -- construction, and never touches the Map. So on a board with no
-            -- Humility, Opalescence or March on it, `decided` stays empty and this
-            -- costs one Maybe test per candidate per layer.
-            remember ds c = case gEffect c of
-              Nothing -> ds
-              Just k
-                | gLayer c /= lyr || Map.member k ds -> ds
-                | otherwise -> Map.insert k (affects (gSource c) oid (gAffected c) seeded gs) ds
-            decided' = List.foldl' remember decided cands
-            applies c = case gEffect c of
-              Nothing -> affects (gSource c) oid (gAffected c) seeded gs
-              Just k -> Map.findWithDefault False k decided'
-            -- CR 613.7 timestamp order within a layer; the CR 613.8b dependency
-            -- reorder (a same-layer effect that changes which objects another
-            -- applies to) is not implemented (#11). Existence dependencies are
-            -- handled separately by staticAbilitiesLive.
-            ordered = List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands)
-            step pc c = applyModification lyr (gSource c) cands gs oid (gModification c) pc
-         in (List.foldl' step seeded ordered, decided')
-   in fst (List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers)
+-- Written as candidates-in, then a worker taking the object: everything derived
+-- from the CANDIDATE LIST alone -- the layer list, and the CR 613.8 movable-layer
+-- set -- is bound before `oid`, so projectAll shares it across the whole board
+-- instead of rebuilding it per object.
+projectWith admits cands = forObject
+  where
+    layers = filter admits (Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))
+    -- The layers CR 613.8 could reorder anything in: those holding an effect with
+    -- a Matching set, the only kind another effect can move. Bound HERE, before
+    -- the object, so a whole-board sweep pays for it once for the board rather
+    -- than once per object per layer -- and for most boards it is empty, so the
+    -- per-layer question becomes a lookup in an empty Set.
+    --
+    -- Deliberately coarser than the movableReads inside the fold: this skips the
+    -- CR 613.6 memo test (per object, and it changes as the fold runs) and the
+    -- filter's own aspects. Both only ever turn a True into a False, so this
+    -- over-admits -- which costs the general path where the tight one would have
+    -- done, and never a different answer.
+    movableLayers = Set.fromList (fmap gLayer (filter staticallyMovable cands))
+    forObject oid gs =
+      let applyLayer (partial, decided) lyr =
+            let seeded =
+                  if lyr == Layer.CharacteristicPT
+                    then applyCharacteristicPT lyr cands gs oid partial
+                    else partial
+                -- CR 613.6: "If an effect starts to apply in one layer and/or
+                -- sublayer, it will continue to be applied to the same set of objects
+                -- in each other applicable layer." The affected set is therefore asked
+                -- ONCE per effect, at the lowest layer that effect reaches, and the
+                -- answer is remembered in `decided` for its other layers. It remembers
+                -- "no" as faithfully as "yes": an artifact that was ALREADY a creature
+                -- is outside March of the Machines' set when March starts to apply, so
+                -- it stays outside at 7b and keeps its printed P/T (#233).
+                --
+                -- Only an effect with parts in more than one layer carries a key
+                -- (gEffect); everything else -- every counter, every stored effect,
+                -- every single-line static ability -- is Nothing and never touches the
+                -- Map.
+                appliesTo ds pc c = case gEffect c of
+                  Just k | Just answer <- Map.lookup k ds -> answer
+                  _ -> affects (gSource c) oid (gAffected c) pc gs
+                -- Apply one candidate, recording its decision the first time.
+                -- Re-inserting an existing key writes the value it just read, so this
+                -- is idempotent rather than a second determination.
+                applyOne (pc, ds) c =
+                  let answer = appliesTo ds pc c
+                      ds' = case gEffect c of
+                        Nothing -> ds
+                        Just k -> Map.insert k answer ds
+                   in (if answer then applyModification lyr (gSource c) cands gs oid (gModification c) pc else pc, ds')
+                -- What could move `c`'s affected set, as the aspects its filter reads
+                -- -- or Nothing when nothing can move it at all. Three ways to be
+                -- immovable, none of them an optimization of CR 613.8a so much as its
+                -- own precondition made cheap to test: a TheseObjects set names ids
+                -- (CR 611.2c) and an Attached one reads the source's own attachment off
+                -- the game state (CR 303.4m), neither of which any modification writes;
+                -- an effect CR 613.6 already decided answers from the memo; and a
+                -- filter that reads no projected aspect at all (`And []`, IsSource, a
+                -- supertype) has nothing in it to change.
+                movableReads ds c = case gEffect c of
+                  Just k | Map.member k ds -> Nothing
+                  _ -> case gAffected c of
+                    Affected.TheseObjects _ -> Nothing
+                    Affected.Attached -> Nothing
+                    Affected.Matching f ->
+                      let aspects = filterReads f
+                       in if Set.null aspects then Nothing else Just aspects
+                -- CR 613.8b: an effect that depends on another waits for it, and among
+                -- the effects waiting on nothing, CR 613.7 timestamp order picks the
+                -- next. Re-deriving `ready` each time round IS CR 613.8c ("the order of
+                -- remaining effects is reevaluated"), and removing one candidate per
+                -- pass is what makes it terminate.
+                --
+                -- Applicability is judged HERE, as each effect is applied, rather than
+                -- from `seeded`. That is CR 613.8's premise: "applying the other would
+                -- change ... what it applies to" describes a state that only exists if
+                -- an effect is asked after its predecessor has applied.
+                --
+                -- When `ready` is empty every remaining candidate is waiting on
+                -- another, so somewhere in there is a dependency loop, and CR
+                -- 613.8b's last sentence says to ignore the rule for it: "the
+                -- effects in the dependency loop are applied in timestamp order".
+                -- Only the loop's OWN members escape -- an effect that merely
+                -- waits on the loop keeps waiting, and gets its turn once the loop
+                -- has unwound -- so the fallback is restricted to the candidates
+                -- that sit on a cycle rather than to everything left.
+                resolve (pc, ds) pending = case pending of
+                  [] -> (pc, ds)
+                  _ ->
+                    let -- One applicability answer per candidate per round, shared by
+                        -- the dependency scan rather than recomputed per pair. A
+                        -- candidate that does not apply changes nothing, so it cannot
+                        -- be the `b` of a dependency either.
+                        answered = fmap (\(i, c) -> (i, c, appliesTo ds pc c)) pending
+                        -- CR 613.8a clause (b), the "what it applies to" half: `a`
+                        -- depends on `b` when applying `b` would change whether `a`
+                        -- applies. The tentative application is thrown away and only
+                        -- the answer kept -- and it is only reached for a pair that
+                        -- could interact at all, `b` writing an aspect `a` reads.
+                        --
+                        -- Clause (c)'s characteristic-defining exclusion needs no test:
+                        -- a CDA is never a candidate (applyCharacteristicPT folds it at
+                        -- 7a, outside this list), so no pair here is CDA-vs-non-CDA.
+                        -- Clause (b)'s "text" and "what it does to" halves are not
+                        -- implemented and have no producer; "existence" is handled by
+                        -- staticAbilitiesLive. The CR decides all of this over an
+                        -- effect's whole affected set and this decides it per projected
+                        -- object, which agrees for everything the Filter vocabulary can
+                        -- express (#236).
+                        dependsOnOne (i, a, answer) (j, b, bApplies) = case movableReads ds a of
+                          Nothing -> False
+                          Just aspects ->
+                            j /= i
+                              && bApplies
+                              && not (Set.disjoint aspects (modificationWrites (gModification b)))
+                              && appliesTo ds (applyModification lyr (gSource b) cands gs oid (gModification b) pc) a /= answer
+                        ready = filter (\a -> not (any (dependsOnOne a) answered)) answered
+                        -- The dependency edges, built only when the whole round is
+                        -- blocked -- which is the one case that needs to know the
+                        -- SHAPE of the tangle rather than merely that there is one.
+                        edges = Map.fromList (fmap (\a@(i, _, _) -> (i, fmap (\(j, _, _) -> j) (filter (dependsOnOne a) answered))) answered)
+                        -- Everything reachable from `start` by following edges.
+                        reach seen queue = case queue of
+                          [] -> seen
+                          x : xs ->
+                            if Set.member x seen
+                              then reach seen xs
+                              else reach (Set.insert x seen) (Map.findWithDefault [] x edges <> xs)
+                        -- On a cycle iff it can reach itself in one step or more.
+                        onCycle (i, _, _) = Set.member i (reach Set.empty (Map.findWithDefault [] i edges))
+                        batch = case ready of
+                          _ : _ -> ready
+                          -- `ready` empty means every remaining candidate has an
+                          -- outgoing edge, and a finite graph where every node has
+                          -- one contains a cycle -- so `cyclic` is never empty and
+                          -- the fallback to `answered` is unreachable. Written out
+                          -- because `minimumBy` is partial and this keeps it total.
+                          [] -> case filter onCycle answered of
+                            [] -> answered
+                            cyclic -> cyclic
+                        (chosen, next, _) = List.minimumBy (Ord.comparing (\(_, c, _) -> gTimestamp c)) batch
+                     in resolve (applyOne (pc, ds) next) (filter ((/= chosen) . fst) pending)
+                -- Is there anything at this layer CR 613.8 could reorder? See
+                -- movableLayers above: one Set lookup, almost always in an empty Set.
+                movableHere = Set.member lyr movableLayers
+                -- CR 613.6's memo, populated against `seeded` -- sound only on the
+                -- branch below where nothing is movable, which is exactly where an
+                -- effect's answer cannot change as the layer is applied.
+                remember ds c = case gEffect c of
+                  Nothing -> ds
+                  Just k
+                    | gLayer c /= lyr || Map.member k ds -> ds
+                    | otherwise -> Map.insert k (affects (gSource c) oid (gAffected c) seeded gs) ds
+             in if movableHere
+                  then resolve (seeded, decided) (zip [0 :: Int ..] (filter (\c -> gLayer c == lyr) cands))
+                  else
+                    -- Nothing here can be moved, so no candidate depends on any other
+                    -- (CR 613.8a needs one to change what another applies to) and no
+                    -- candidate's answer can change as the layer is applied. CR 613.8
+                    -- therefore says nothing, CR 613.7 timestamp order stands, and
+                    -- judging applicability against `seeded` gives the same answers as
+                    -- judging it one at a time -- so this branch is not a shortcut past
+                    -- the rule, it is the rule where the rule is silent. It is also
+                    -- almost every layer of almost every projection, which is why it
+                    -- keeps the older, tighter fold rather than sharing `resolve`'s.
+                    let decided' = List.foldl' remember decided cands
+                        applies c = case gEffect c of
+                          Nothing -> affects (gSource c) oid (gAffected c) seeded gs
+                          Just k -> Map.findWithDefault False k decided'
+                        ordered = List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands)
+                        step pc c = applyModification lyr (gSource c) cands gs oid (gModification c) pc
+                     in (List.foldl' step seeded ordered, decided')
+       in fst (List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers)
 
 -- Project one object against a PRECOMPUTED candidate list. gather is
 -- oid-independent, so a whole-board sweep gathers once and folds each object
@@ -886,7 +1078,12 @@ projectUpTo bound = projectWith (< bound)
 projectAll :: GameState -> Map ObjectId ProjectedCharacteristics
 projectAll gs =
   let cands = gather gs
-   in Map.fromSet (\oid -> projectFrom cands oid gs) (GameState.battlefield gs)
+      -- Bound separately, and NOT inlined: projectWith does its candidate-only
+      -- work (the layer list, the CR 613.8 movable-layer set) when it is applied
+      -- to `cands`, so sharing this partial application shares that work across
+      -- every object on the board.
+      forObject = projectFrom cands
+   in Map.fromSet (\oid -> forObject oid gs) (GameState.battlefield gs)
 
 powerOf :: ObjectId -> GameState -> Maybe Integer
 powerOf oid gs = PC.power (project oid gs)
