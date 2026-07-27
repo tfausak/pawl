@@ -32,6 +32,7 @@ encode p answer = case p of
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
   Prompt.ChooseDefender {} -> Response.ChoseDefender answer
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
+  Prompt.ChooseManaType {} -> Response.ChoseManaType answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
   Prompt.DeclareBlockers {} -> Response.DeclaredBlockers answer
   Prompt.AssignCombatDamage {} -> Response.AssignedCombatDamage answer
@@ -82,6 +83,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseManaSource {} -> case response of
     Response.ChoseManaSource oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseManaType {} -> case response of
+    Response.ChoseManaType mt -> Just mt
     _ -> Nothing
   Prompt.DeclareAttackers {} -> case response of
     Response.DeclaredAttackers ids -> Just ids
@@ -164,6 +168,9 @@ defaultAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   -- Any candidate pays; the head is the least eventful fallback. NonEmpty.head is total.
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
+  -- Every offered type is producible (tapForMana only offers what the source can
+  -- make), so the head is a legal answer and the least eventful fallback.
+  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
   -- Declining to attack or block is always legal, and is the least eventful
   -- thing a fallback can do.
   Prompt.DeclareAttackers {} -> []

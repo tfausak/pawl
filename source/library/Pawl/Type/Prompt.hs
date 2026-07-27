@@ -11,6 +11,7 @@ import Pawl.Type.Concession (Concession)
 import Pawl.Type.Cost (Cost)
 import Pawl.Type.Decider (Decider)
 import Pawl.Type.EntryOption (EntryOption)
+import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.MulliganDecision (MulliganDecision)
 import Pawl.Type.MulliganOffer (MulliganOffer)
@@ -83,6 +84,27 @@ data Prompt r where
   -- can differ by an Equipment, an Aura, counters or borrowed control, and none of
   -- that is visible in the printed card (#12, #217).
   ChooseManaSource :: Decider -> PlayerId -> NonEmpty ObjectId -> Prompt ObjectId
+  -- CR 605.3b: which mana type the source (the ObjectId) produces, asked as the
+  -- mana ability resolves -- immediately, since a mana ability never uses the
+  -- stack. Two separate things reach this one prompt, because they are
+  -- observationally the same question:
+  --
+  --   * one ability offering a choice -- Birds of Paradise's "add one mana of
+  --     any color", whose five options are CR 105.4's five colours; and
+  --   * a permanent with SEVERAL single-type mana abilities -- an Urborg'd
+  --     Mountain (CR 305.6/305.7) is both a Mountain and a Swamp, so its
+  --     controller picks which of its two intrinsic abilities to activate.
+  --
+  -- Collapsing them is sound because a source produces exactly one mana and taps
+  -- doing it, so "which ability" and "which type" have the same answer set and
+  -- the same consequences. It would stop being sound if two abilities of one
+  -- permanent differed in cost or in a rider (City of Brass' damage) -- but
+  -- Mana.tapForMana reads neither today, so nothing observable is being lost
+  -- here that is not already gone (#238).
+  --
+  -- The candidates are deduplicated, which is the one elision needing no
+  -- judgement: two ways to produce black mana yield the same unit either way.
+  ChooseManaType :: Decider -> PlayerId -> ObjectId -> NonEmpty ManaType -> Prompt ManaType
   -- CR 508.1. The [ObjectId] is the legal attackers; the answer is which of them
   -- attack. WHOM they attack is not asked here: the defending player was already
   -- chosen at the beginning of combat step (Prompt.ChooseDefender), and CR 508.1b

@@ -26,6 +26,8 @@ import Pawl.Type.Mana (Mana)
 import qualified Pawl.Type.Mana as Mana
 import Pawl.Type.ManaCost (ManaCost)
 import qualified Pawl.Type.ManaCost as ManaCost
+import Pawl.Type.ManaProduction (ManaProduction)
+import qualified Pawl.Type.ManaProduction as ManaProduction
 import Pawl.Type.ManaSymbol (ManaSymbol)
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import Pawl.Type.ManaType (ManaType)
@@ -109,18 +111,45 @@ subtypeMana subtype = case subtype of
   Subtype.Scout -> Nothing
   Subtype.Artificer -> Nothing
 
+-- CR 105.4: "If a player is asked to choose a color, they must choose one of the
+-- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an
+-- any-colour producer offers exactly five options and never {C} -- which is also
+-- why AnyColor cannot be spelled as "every ManaType".
+--
+-- Written out rather than derived from a Bounded Color: the five are CR 105.1's
+-- closed enumeration, and spelling them here keeps the rule citation next to the
+-- list a reader has to check.
+producedTypes :: ManaProduction -> [ManaType]
+producedTypes production = case production of
+  ManaProduction.OfType manaType -> [manaType]
+  ManaProduction.AnyColor ->
+    fmap
+      ManaType.Colored
+      [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
+
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
 -- PLUS every projected activated ability that is a mana ability (CR 605.1a),
 -- resolved inline at payment and never on the stack. Read through the projection
 -- (abilitiesOf), so Humility (layer 6) strips a creature's mana ability too.
+--
+-- These are OPTIONS, not a yield: the object produces ONE of them when tapped
+-- (tapForMana), so a five-entry list is Birds of Paradise offering five colours,
+-- not a source adding five mana. An ability whose one mode adds mana TWICE is
+-- therefore misread here, and under-produces (#238) -- no card in the pool does
+-- it.
+--
+-- Deduplicated. Two routes to the same type (an Urborg'd Swamp is a Swamp twice
+-- over) are indistinguishable options producing an identical unit, so collapsing
+-- them elides a prompt that has no content -- the one such elision that needs no
+-- judgement about what "indistinguishable" means.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
 manaTypesOf oid gs =
   let fromSubtypes = Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesOf oid gs))
       fromAbilities =
         concatMap
-          (Maybe.mapMaybe Resolve.manaProduced . Modal.allEffects . ActivatedAbility.modal)
+          (concatMap producedTypes . Maybe.mapMaybe Resolve.manaProduced . Modal.allEffects . ActivatedAbility.modal)
           (filter isManaAbility (Projection.abilitiesOf oid gs))
-   in fromSubtypes <> fromAbilities
+   in List.nub (fromSubtypes <> fromAbilities)
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
 -- doesn't target (the loyalty clause is vacuous -- no planeswalkers). The ABI
@@ -166,27 +195,52 @@ manaSources pid gs =
         Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaTypesOf oid gs)) && notSickCreature oid
    in filter isSource (Projection.controls pid gs)
 
--- Activate an object's intrinsic mana ability: tap it, add its mana. CR 605.3:
--- a mana ability does not use the stack, so this is immediate.
+-- Activate an object's intrinsic mana ability: tap it, add its mana. CR 605.3b:
+-- a mana ability does not use the stack, so this is immediate -- which is also
+-- why the colour choice is made HERE and not by Resolve.
 --
--- Takes the first mana type the object can produce. A Mountain produces exactly
--- one, so there is no choice to make. A source that can produce more than one
--- TYPE (any dual land) makes that a real decision needing its own prompt (#124).
+-- Monadic because of that choice. A Mountain produces exactly one type and is
+-- never asked; a Birds of Paradise (CR 105.4) and an Urborg'd Mountain (CR
+-- 305.6/305.7) both offer several, and the engine never picks for the player.
 -- Which SOURCE to tap is a separate question, and payCost asks it.
-tapForMana :: ObjectId -> GameState -> GameState
-tapForMana oid gs = case Game.lookupObject oid gs of
-  Nothing -> gs
-  Just obj -> case manaTypesOf oid gs of
-    [] -> gs
-    produced : _ ->
-      let tapped = obj {Object.tapped = TapState.Tapped}
-          gs1 = gs {GameState.objects = Map.insert oid tapped (GameState.objects gs)}
-       in -- CR 109.4a/110.2: mana goes to the mana ability's controller, which is
-          -- the permanent's controller (CR 106.4 only says it lands in "a
-          -- player's mana pool", not whose). Falls back to owner in the
-          -- impossible case lookupObject just proved oid exists but
-          -- controllerOf returns Nothing.
-          addMana (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)) [ManaUnit.MkManaUnit {ManaUnit.manaType = produced}] gs1
+tapForMana :: ObjectId -> Game ()
+tapForMana oid = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Nothing -> pure ()
+    Just obj -> case manaTypesOf oid gs of
+      [] -> pure ()
+      first : rest -> do
+        -- CR 109.4a/110.2: mana goes to the mana ability's controller, which is
+        -- the permanent's controller (CR 106.4 only says it lands in "a player's
+        -- mana pool", not whose) -- and that same player makes the colour
+        -- choice. Falls back to owner in the impossible case lookupObject just
+        -- proved oid exists but controllerOf returns Nothing.
+        let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+        produced <- chooseManaType controller oid (first NonEmpty.:| rest) gs
+        let tapped = obj {Object.tapped = TapState.Tapped}
+            gs1 = gs {GameState.objects = Map.insert oid tapped (GameState.objects gs)}
+        State.put (addMana controller [ManaUnit.MkManaUnit {ManaUnit.manaType = produced}] gs1)
+
+-- Which type this source produces.
+--
+-- Elided exactly when the source offers ONE type, where no choice exists --
+-- manaTypesOf has already collapsed duplicate routes to the same type, so a
+-- remaining list of two is two genuinely different mana.
+--
+-- FILTERED, NOT TRUSTED, the posture chooseSource and Cost.payComponents take:
+-- an answer outside the offered set is rejected and the head used instead. Here
+-- that is not merely hygiene -- honouring a type the source cannot make would
+-- mint mana out of nothing.
+chooseManaType :: PlayerId -> ObjectId -> NonEmpty.NonEmpty ManaType -> GameState -> Game ManaType
+chooseManaType pid oid candidates gs = case candidates of
+  only NonEmpty.:| [] -> pure only
+  _ -> do
+    answer <- Trans.lift (Program.prompt (Prompt.ChooseManaType (Decide.deciderFor pid gs) pid oid candidates))
+    pure $
+      if List.elem answer (NonEmpty.toList candidates)
+        then answer
+        else NonEmpty.head candidates
 
 typedOf :: ManaSymbol -> Maybe ManaType
 typedOf symbol = case symbol of
@@ -246,8 +300,16 @@ spend cost (Mana.MkMana units) =
 -- Returns whether it was paid; on failure nothing is spent, which is CR 601.2h's
 -- "Partial payments are not allowed" rather than mere tidiness. The prompts
 -- themselves are NOT rolled back -- they live in the Program, outside the state --
--- so a failed payment still asked its questions. Unreachable in practice, because
--- every caller pre-checks the pure canPay.
+-- so a failed payment still asked its questions.
+--
+-- Failure is REACHABLE, and a source offering a colour choice is what makes it
+-- so. canPay asks whether SOME sequence of choices pays the cost; this asks the
+-- player to make them. A player who taps their only Birds of Paradise for green
+-- cannot then pay {B}, and the engine must let them: choosing badly is a choice,
+-- and second-guessing it here would be the engine playing the game. While every
+-- source produced one fixed type the two questions coincided, and this comment
+-- claimed the failure was unreachable. Proved reachable by ManaSpec's "a Birds
+-- tapped for green does not pay {B}".
 --
 -- One prompt per source tapped, against a shrinking candidate list, rather than
 -- one prompt for a whole subset: a cost needing {G}{G} is two decisions, and the
@@ -269,7 +331,7 @@ payCost pid cost = do
           [] -> pure False
           candidate : rest -> do
             oid <- chooseSource pid (candidate NonEmpty.:| rest) gs
-            State.put (tapForMana oid gs)
+            tapForMana oid
             tapUntilPaid
 
 -- Which source to tap next.
@@ -306,17 +368,48 @@ chooseSource pid candidates gs = case candidates of
         else NonEmpty.head candidates
 
 -- CR 118.3: can this cost be paid at all? Pure, because Action.legalActions asks
--- it while merely ENUMERATING actions, where prompting would be absurd. The
--- greedy walk is sound for the question it answers: every mana source in this
--- pool produces exactly one mana of one type (a source offering a colour CHOICE
--- is #124), so the order they are tapped in cannot change WHETHER the cost is
--- affordable -- only which permanents end up tapped, which is payCost's business
--- and the player's choice.
+-- it while merely ENUMERATING actions, where prompting would be absurd -- so it
+-- cannot simply walk tapForMana, which now asks a question.
+--
+-- It must not simulate one greedily either. Once a source can produce more than
+-- one type, WHICH type each source makes decides whether the cost is affordable:
+-- a Forest and a Birds of Paradise pay {G}{B}, but only if the Birds makes
+-- black, and a greedy walk that tapped the Forest for green and took the Birds'
+-- first colour would call it unaffordable.
+--
+-- So this is an assignment question, and it is answered exactly. Model each
+-- available mana as a SUPPLY carrying the set of types it could be -- a pool
+-- unit is its own type; an untapped source is everything manaTypesOf offers,
+-- because tapping it yields exactly one mana of one of them. Each typed symbol
+-- of the cost is a DEMAND for a specific type; generic symbols demand a count
+-- and nothing more.
+--
+-- The cost is payable exactly when both hold:
+--
+--   1. every typed demand can be met at once -- a matching of demands into
+--      supplies that saturates the demand side; and
+--   2. enough supplies are left over for the generic part. Every full typed
+--      matching consumes exactly one supply per typed symbol, so the leftover
+--      count does not depend on WHICH matching, and this is a plain comparison.
+--
+-- Clause 1 is Hall's condition: a saturating matching exists iff no set of
+-- demands outruns the supplies that could serve it. Demands of the same type
+-- have identical options, so it is enough to check one demand set per SUBSET of
+-- the types actually demanded -- at most 2^6 subsets by CR 106.1b, and in
+-- practice a handful. Checked directly rather than by running a matching
+-- algorithm: the condition IS the specification, so there is no gap between what
+-- this says and what it does.
 canPay :: PlayerId -> ManaCost -> GameState -> Bool
 canPay pid cost gs =
-  let tapUntilPaid remaining state = case spend cost (poolOf pid state) of
-        Just _ -> True
-        Nothing -> case remaining of
-          [] -> False
-          oid : rest -> tapUntilPaid rest (tapForMana oid state)
-   in tapUntilPaid (manaSources pid gs) gs
+  let ManaCost.MkManaCost symbols = cost
+      typed = Maybe.mapMaybe typedOf symbols
+      generic = sum (fmap genericOf symbols)
+      Mana.MkMana units = poolOf pid gs
+      supplies =
+        fmap (Set.singleton . ManaUnit.manaType) units
+          <> fmap (\oid -> Set.fromList (manaTypesOf oid gs)) (manaSources pid gs)
+      demandedIn wanted = length (filter (`Set.member` wanted) typed)
+      couldServe wanted = length (filter (not . Set.disjoint wanted) supplies)
+      hallHolds wanted = demandedIn wanted <= couldServe wanted
+   in length supplies >= length typed + fromIntegral generic
+        && all (hallHolds . Set.fromList) (List.subsequences (List.nub typed))

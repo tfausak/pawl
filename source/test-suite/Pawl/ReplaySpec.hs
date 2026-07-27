@@ -14,6 +14,7 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
@@ -23,6 +24,7 @@ import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.MulliganOffer as MulliganOffer
@@ -188,6 +190,27 @@ combatReplayTests =
               "the head"
               (ObjectId.MkObjectId 7)
               (Replay.defaultAnswer (Prompt.ChooseManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9]))),
+          -- CR 605.3b / 105.4: the colour an any-colour source was tapped for is a
+          -- decision, so it has to survive a transcript like any other.
+          HU.testCase "ChooseManaType round-trips through the transcript" $
+            let black = ManaType.Colored Color.Black
+                red = ManaType.Colored Color.Red
+                p = Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (black NonEmpty.:| [red])
+             in do
+                  HU.assertEqual "black round trips" (Just black) (Replay.decode p (Replay.encode p black))
+                  -- Discriminating for the same reason the pair above is: a decode
+                  -- that returned the head would pass one leg by accident.
+                  HU.assertEqual "red round trips" (Just red) (Replay.decode p (Replay.encode p red)),
+          HU.testCase "a mana-source choice does not decode as a mana-type choice" $
+            -- Discriminating: this fails if ChooseManaType reuses ChoseManaSource
+            -- rather than getting its own constructor.
+            let p = Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (ManaType.Colored Color.Black NonEmpty.:| [ManaType.Colored Color.Red])
+             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))),
+          HU.testCase "a short transcript produces the first offered mana type" $
+            HU.assertEqual
+              "the head"
+              (ManaType.Colored Color.Black)
+              (Replay.defaultAnswer (Prompt.ChooseManaType decider S.alice (ObjectId.MkObjectId 7) (ManaType.Colored Color.Black NonEmpty.:| [ManaType.Colored Color.Red]))),
           HU.testCase "a short transcript defends with the first candidate" $
             -- Discriminating against a defaultAnswer that returned the active
             -- player, or a candidate not on the offered list: the first candidate

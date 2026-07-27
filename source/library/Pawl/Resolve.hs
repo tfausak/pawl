@@ -40,7 +40,7 @@ import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.HandActionPerformer as HandActionPerformer
-import Pawl.Type.ManaType (ManaType)
+import Pawl.Type.ManaProduction (ManaProduction)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.MonarchWatch as MonarchWatch
@@ -155,12 +155,17 @@ readsX = any effectReadsX
       Effect.Attach _ -> False
       Effect.PlaySubgame _ -> False
 
--- CR 605: does this effect add mana, and which type? The "produces mana?" ABI
--- classification (design.md risk register). Read by Mana.isManaAbility to keep
--- mana abilities off the stack. Casing on Effect is Resolve's charter.
-manaProduced :: Effect Card.Type.Card -> Maybe ManaType
+-- CR 605: does this effect add mana, and how is its type decided? The "produces
+-- mana?" ABI classification (design.md risk register). Read by Mana.isManaAbility
+-- to keep mana abilities off the stack, and by Mana.manaTypesOf to enumerate what
+-- a source could produce. Casing on Effect is Resolve's charter.
+--
+-- Returns the ManaProduction rather than a settled ManaType because CR 605.1a
+-- asks whether the ability "could add mana", which an unresolved colour choice
+-- answers yes to; WHICH colour is Mana.tapForMana's prompt, not a static fact.
+manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
 manaProduced effect = case effect of
-  Effect.AddMana mt -> Just mt
+  Effect.AddMana production -> Just production
   Effect.DealDamage _ _ -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText _ -> Nothing

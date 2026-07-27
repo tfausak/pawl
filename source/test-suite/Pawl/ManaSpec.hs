@@ -28,6 +28,7 @@ import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Mana as Mana.Type
 import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaProduction as ManaProduction
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ManaUnit as ManaUnit
@@ -147,7 +148,7 @@ manaTests registry =
         case Game.zoneMembers Zone.Battlefield S.alice gs of
           [] -> HU.assertFailure "fixture should have one Mountain"
           oid : _ -> do
-            let after = Mana.tapForMana oid gs
+            let after = S.runPure S.identityAnswer gs (Mana.tapForMana oid)
             HU.assertEqual "tapped" 1 (S.tappedCount S.alice after)
             HU.assertEqual
               "pool"
@@ -177,7 +178,7 @@ manaTests registry =
         case Game.zoneMembers Zone.Battlefield S.alice gs of
           [] -> HU.assertFailure "fixture should have one Mountain"
           oid : _ ->
-            HU.assertEqual "emptied" 0 (poolSize S.alice (Mana.emptyManaPools (Mana.tapForMana oid gs))),
+            HU.assertEqual "emptied" 0 (poolSize S.alice (Mana.emptyManaPools (S.runPure S.identityAnswer gs (Mana.tapForMana oid)))),
       HU.testCase "CR 305.6/305.7 an Urborg'd Mountain taps for black too" $ do
         mountain <- Registry.printing registry "Mountain"
         urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
@@ -199,7 +200,7 @@ manaTests registry =
         let ab =
               ActivatedAbility.MkActivatedAbility
                 { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
-                  ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaType.Colored Color.Green)] Map.empty,
+                  ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))] Map.empty,
                   ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
          in HU.assertBool "mana ability" (Mana.isManaAbility ab),
@@ -209,7 +210,7 @@ manaTests registry =
                 { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
                   ActivatedAbility.modal =
                     singleModeAbility
-                      [Effect.AddMana (ManaType.Colored Color.Green)]
+                      [Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))]
                       (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)),
                   ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
@@ -324,12 +325,137 @@ manaTests registry =
         llanowarElves <- Registry.printing registry "Llanowar Elves"
         let (oid, base) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
             gs0 = S.giveControl oid S.alice base
-            after = Mana.tapForMana oid gs0
+            after = S.runPure S.identityAnswer gs0 (Mana.tapForMana oid)
             manaUnitsOf pool = case pool of
               Mana.Type.MkMana units -> units
         HU.assertBool "alice received a mana unit" (not (null (manaUnitsOf (Mana.poolOf S.alice after))))
         HU.assertBool "bob received none" (null (manaUnitsOf (Mana.poolOf S.bob after)))
     ]
 
+-- Answers Prompt.ChooseManaType with `wanted` whenever it is on offer, and
+-- defers everything else to S.identityAnswer. The ChooseManaType sibling of
+-- prefersSource: a pair of tests differing only in this colour proves the
+-- ANSWER decides what is produced, rather than the order Mana.manaTypesOf
+-- happens to return.
+prefersColor :: Color.Color -> Prompt.Prompt r -> r
+prefersColor wanted p = case p of
+  Prompt.ChooseManaType _ _ _ candidates ->
+    if elem (ManaType.Colored wanted) (NonEmpty.toList candidates)
+      then ManaType.Colored wanted
+      else NonEmpty.head candidates
+  _ -> S.identityAnswer p
+
+-- Alice controls `permanents` and holds `spell`; she casts it and resolves it,
+-- with every prompt answered by `answer`.
+castOffBoard :: (forall r. Prompt.Prompt r -> r) -> [Printing.Printing] -> Printing.Printing -> GameState.GameState
+castOffBoard answer permanents spell =
+  let board = foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) permanents
+      (withSpell, oid) = S.handOne spell board
+      afterCast = S.runPure answer withSpell (Cast.castSpell S.alice oid)
+   in S.runPure answer afterCast Stack.resolveTop
+
+-- The mana Alice's pool holds after tapping `oid` with every prompt answered by
+-- `answer` -- the observable that says which type a multi-type source produced.
+tappedFor :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> [ManaType.ManaType]
+tappedFor answer oid gs = case Mana.poolOf S.alice (S.runPure answer gs (Mana.tapForMana oid)) of
+  Mana.Type.MkMana units -> fmap ManaUnit.manaType units
+
+anyColorTests :: Registry.Type.Registry -> Tasty.TestTree
+anyColorTests registry =
+  Tasty.testGroup
+    "Mana of any color"
+    [ -- CR 105.4: "If a player is asked to choose a color, they must choose one of
+      -- the five colors. 'Multicolored' is not a color. Neither is 'colorless.'"
+      -- So AnyColor offers exactly five options, and {C} is not among them.
+      HU.testCase "CR 105.4 Birds of Paradise offers the five colors and not colorless" $ do
+        birds <- Registry.printing registry "Birds of Paradise"
+        let (birdsId, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual
+          "exactly the five colors"
+          (fmap ManaType.Colored [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green])
+          (Mana.manaTypesOf birdsId gs)
+        HU.assertBool "it is a mana source" (elem birdsId (Mana.manaSources S.alice gs)),
+      -- The gameplay-level proof (design.md section 4): a real card, cast end to
+      -- end off a source that produces no black mana until its controller says so.
+      HU.testCase "CR 605.3b Typhoid Rats is cast off a lone Birds of Paradise that taps for black" $ do
+        birds <- Registry.printing registry "Birds of Paradise"
+        typhoidRats <- Registry.printing registry "Typhoid Rats"
+        let resolved = castOffBoard (prefersColor Color.Black) [birds] typhoidRats
+        HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
+        HU.assertEqual "the Birds and the Rats" 2 (S.creaturesInPlay S.alice resolved)
+        HU.assertEqual "the Birds is tapped" 1 (S.tappedCount S.alice resolved),
+      -- The discriminating half: identical board, identical spell, one different
+      -- answer. If the engine picked the colour itself this would pass too.
+      HU.testCase "the color is the player's: a Birds tapped for green does not pay {B}" $ do
+        birds <- Registry.printing registry "Birds of Paradise"
+        typhoidRats <- Registry.printing registry "Typhoid Rats"
+        let resolved = castOffBoard (prefersColor Color.Green) [birds] typhoidRats
+        HU.assertEqual "the Rats never resolved" 1 (S.creaturesInPlay S.alice resolved)
+        -- CR 601.2h: partial payments are not allowed, so the failed payment is
+        -- rolled back whole and the Birds is left untapped.
+        HU.assertEqual "payment rolled back" 0 (S.tappedCount S.alice resolved),
+      -- CR 118.3 exactness. A greedy walk fails this one: it taps the Forest for
+      -- {G}, then takes the Birds' FIRST colour (white) and reports {G}{B}
+      -- unaffordable. Only a matching over what each source COULD produce gets it
+      -- right.
+      HU.testCase "CR 118.3 a Forest and a Birds of Paradise can pay {G}{B}" $ do
+        forest <- Registry.printing registry "Forest"
+        birds <- Registry.printing registry "Birds of Paradise"
+        let (_, g1) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
+            (_, gs) = S.addCreature birds S.alice g1
+            cost = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green), ManaSymbol.OfType (ManaType.Colored Color.Black)]
+        HU.assertBool "affordable" (Mana.canPay S.alice cost gs),
+      HU.testCase "CR 118.3 two Birds of Paradise can pay {B}{B}, one cannot" $ do
+        birds <- Registry.printing registry "Birds of Paradise"
+        let (_, one) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
+            (_, two) = S.addCreature birds S.alice one
+            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+            cost = ManaCost.MkManaCost [black, black]
+        HU.assertBool "two suffice" (Mana.canPay S.alice cost two)
+        HU.assertBool "one does not" (not (Mana.canPay S.alice cost one)),
+      -- The OTHER way to get this wrong, which Hall's condition also rules out:
+      -- checking each symbol independently ("is there a source that could make
+      -- white?") passes both {W} symbols, because the same Birds answers each
+      -- one. Only weighing the whole demand set against the supplies that could
+      -- serve it catches that one source cannot make two mana. Two demands, three
+      -- sources, plenty of mana, still unpayable.
+      HU.testCase "CR 118.3 a Birds and two Forests cannot pay {W}{W}" $ do
+        birds <- Registry.printing registry "Birds of Paradise"
+        forest <- Registry.printing registry "Forest"
+        let (_, g1) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
+            (_, g2) = S.addCreature forest S.alice g1
+            (_, gs) = S.addCreature forest S.alice g2
+            white = ManaSymbol.OfType (ManaType.Colored Color.White)
+        HU.assertBool "only one white source" (not (Mana.canPay S.alice (ManaCost.MkManaCost [white, white]) gs))
+        HU.assertBool "but one {W} plus {2} is fine" (Mana.canPay S.alice (ManaCost.MkManaCost [white, ManaSymbol.Generic 2]) gs),
+      -- Not only "any color": a source with two BASIC LAND TYPES has been a real
+      -- choice in this pool since Urborg landed, and tapForMana was silently
+      -- taking the first. Both directions, so the answer is proven to decide.
+      HU.testCase "CR 305.6/305.7 an Urborg'd Mountain's controller chooses red or black" $ do
+        mountain <- Registry.printing registry "Mountain"
+        urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
+        let base = Setup.emptyGame S.bothPlayers
+            (mountainId, g1) = S.addCreature mountain S.alice base
+            (_, gs) = S.addCreature urborg S.alice g1
+        HU.assertEqual "choosing black" [ManaType.Colored Color.Black] (tappedFor (prefersColor Color.Black) mountainId gs)
+        HU.assertEqual "choosing red" [ManaType.Colored Color.Red] (tappedFor (prefersColor Color.Red) mountainId gs),
+      -- The elision side of the invariant: where the rules leave nothing to ask,
+      -- do not ask. A Forest produces one type, so no ChooseManaType is raised.
+      HU.testCase "CR 605 a single-type source is not asked which type to produce" $ do
+        forest <- Registry.printing registry "Forest"
+        birds <- Registry.printing registry "Birds of Paradise"
+        let countingAnswer :: Prompt.Prompt r -> State.State Int r
+            countingAnswer p = case p of
+              Prompt.ChooseManaType {} -> do
+                State.modify (+ 1)
+                pure (S.identityAnswer p)
+              _ -> pure (S.identityAnswer p)
+            asks printing =
+              let (oid, gs) = S.addCreature printing S.alice (Setup.emptyGame S.bothPlayers)
+               in State.execState (Engine.runGame countingAnswer gs (Mana.tapForMana oid)) 0
+        HU.assertEqual "a Forest: nothing to ask" 0 (asks forest)
+        HU.assertEqual "a Birds of Paradise: one real decision" 1 (asks birds)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Mana" [manaTests registry, castabilityTests registry]
+tests registry = Tasty.testGroup "Mana" [manaTests registry, castabilityTests registry, anyColorTests registry]

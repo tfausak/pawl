@@ -53,6 +53,7 @@ import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.Json (Value (Array, Boolean, Null, Object))
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaProduction as ManaProduction
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modal as Modal
@@ -950,6 +951,19 @@ jsonToManaType value = do
     ("Colorless", _) -> Right ManaType.Colorless
     _ -> Left (Text.pack "unknown ManaType: " <> t)
 
+manaProductionToJson :: ManaProduction.ManaProduction -> Value
+manaProductionToJson mp = case mp of
+  ManaProduction.OfType mt -> Json.tagged (Text.pack "OfType") (Just (manaTypeToJson mt))
+  ManaProduction.AnyColor -> nullary (Text.pack "AnyColor")
+
+jsonToManaProduction :: Value -> Either Text ManaProduction.ManaProduction
+jsonToManaProduction value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("OfType", Just v) -> ManaProduction.OfType <$> jsonToManaType v
+    ("AnyColor", _) -> Right ManaProduction.AnyColor
+    _ -> Left (Text.pack "unknown ManaProduction: " <> t)
+
 manaSymbolToJson :: ManaSymbol.ManaSymbol -> Value
 manaSymbolToJson ms = case ms of
   ManaSymbol.Generic n -> Json.tagged (Text.pack "Generic") (Just (natTo n))
@@ -1246,7 +1260,7 @@ effectToJson e = case e of
   Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.ModifyTarget d m s -> Json.tagged (Text.pack "ModifyTarget") (Just (Array [durationToJson d, modificationToJson m, slotNameToJson s]))
   Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (slotNameToJson s))
-  Effect.AddMana mt -> Json.tagged (Text.pack "AddMana") (Just (manaTypeToJson mt))
+  Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (manaProductionToJson production))
   Effect.Search f -> Json.tagged (Text.pack "Search") (Just (filterToJson f))
   Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
   Effect.ExileHandThenDraw -> nullary (Text.pack "ExileHandThenDraw")
@@ -1285,7 +1299,7 @@ jsonToEffect value = do
       Just (Array [d, m, s]) -> Effect.ModifyTarget <$> jsonToDuration d <*> jsonToModification m <*> jsonToSlotName s
       _ -> Left (Text.pack "ModifyTarget expects [duration, modification, slot]")
     "ChangeText" -> withValue mv (fmap Effect.ChangeText . jsonToSlotName)
-    "AddMana" -> withValue mv (fmap Effect.AddMana . jsonToManaType)
+    "AddMana" -> withValue mv (fmap Effect.AddMana . jsonToManaProduction)
     "Search" -> withValue mv (fmap Effect.Search . jsonToFilter)
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
