@@ -302,6 +302,19 @@ payComponent pid oid component = case component of
   -- simply go unpaid, and `pay` restores the entry state so Unpaid is a complete
   -- no-op. An effect has no such out, which is why the two paths differ.
   --
+  -- What "reject" means precisely, because the answer's SHAPE differs from
+  -- Sacrifice's and the difference is easy to misread: the answer is read as a
+  -- SET of card ids, and is rejected unless that set is exactly `n` cards drawn
+  -- from `held`. So [a,a] for n=2 names one card and is rejected, while [a,a,b]
+  -- names two and is accepted.
+  --
+  -- That is not the repair it can look like. Prompt.ChooseSacrifices is answered
+  -- with a Set, so an interpreter meaning [a,a,b] builds Set.fromList [a,a,b] --
+  -- which IS {a,b} -- and the Sacrifice arm above accepts it. `List.nub` is what
+  -- makes this list-shaped answer behave identically rather than more strictly.
+  -- Repair would mean COMPLETING a short answer from cards the interpreter never
+  -- named, which is exactly what this does not do.
+  --
   -- CR 701.9a's move is made through Event.changeZone, the CR 400.7 funnel, so a
   -- discarded card gets a new incarnation and Rest in Peace's redirect composes --
   -- the same call the Discard effect makes.

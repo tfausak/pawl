@@ -675,5 +675,33 @@ catharticReunionTests registry =
         HU.assertEqual "nothing was discarded" 0 (length (Game.zoneMembers Zone.Graveyard S.alice cast))
         HU.assertEqual "the hand is untouched, Reunion included" 4 (S.handSize S.alice cast)
         HU.assertEqual "nothing reached the stack" 0 (length (GameState.stack cast))
-        HU.assertEqual "and the Mountains are untapped again" 0 (S.tappedCount S.alice cast)
+        HU.assertEqual "and the Mountains are untapped again" 0 (S.tappedCount S.alice cast),
+      -- Where the reject boundary actually falls, stated rather than inferred.
+      -- The answer is read as a SET, so a duplicate is normalised, not repaired:
+      -- naming two distinct cards across three entries pays, and naming one card
+      -- twice does not. Prompt.ChooseSacrifices is answered with a Set, so an
+      -- interpreter meaning [a,a,b] there builds {a,b} and the Sacrifice arm
+      -- accepts it -- this keeps the two components answering alike.
+      HU.testCase "CR 601.2h the answer is read as a set: [a,a,b] pays for two, [a,a] does not" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        catharticReunion <- Registry.printing registry "Cathartic Reunion"
+        let (reunion, gs) = catharticBoard mountain piker catharticReunion 3
+            -- Repeat the first offered card, then add a second distinct one.
+            duplicateThenDistinct q = case q of
+              Prompt.ChooseDiscard _ _ ids _ -> case ids of
+                a : b : _ -> [a, a, b]
+                _ -> []
+              _ -> S.identityAnswer q
+            -- The same card twice and nothing else: one distinct card for a
+            -- count of two.
+            sameCardTwice q = case q of
+              Prompt.ChooseDiscard _ _ ids _ -> concat (replicate 2 (take 1 ids))
+              _ -> S.identityAnswer q
+            paid = S.runPure duplicateThenDistinct gs (Cast.castSpell S.alice reunion)
+            unpaid = S.runPure sameCardTwice gs (Cast.castSpell S.alice reunion)
+        HU.assertEqual "[a,a,b] names two distinct cards, so the cost is paid" 2 (length (Game.zoneMembers Zone.Graveyard S.alice paid))
+        HU.assertEqual "and the spell is on the stack" 1 (length (GameState.stack paid))
+        HU.assertEqual "[a,a] names one, so nothing is discarded" 0 (length (Game.zoneMembers Zone.Graveyard S.alice unpaid))
+        HU.assertEqual "and nothing reached the stack" 0 (length (GameState.stack unpaid))
     ]
