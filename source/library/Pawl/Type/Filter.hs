@@ -11,7 +11,9 @@ import Pawl.Type.Supertype (Supertype)
 -- target may be either -- expressed as data and evaluated by one generic
 -- matcher (Pawl.Filter.matches) that never learns which effect produced it. Its
 -- atoms case on CHARACTERISTICS (card type, supertype, colour, subtype, power,
--- controller, and for a player candidate its identity) exactly as the rules
+-- controller, and for a player candidate its identity) -- and, in IsAttacking's
+-- case, on a combat status that is not one (CR 109.3) but that the closed half
+-- owns just as squarely -- exactly as the rules
 -- already case on a CardType -- casing on a
 -- characteristic classification is legitimate; the invariant forbids only casing
 -- on an EFFECT's identity, which this type never does.
@@ -51,6 +53,20 @@ data Filter
     -- representing a permanent or spell -- so the two are never both answerable
     -- for one candidate.
     IsPlayer PlayerRelation
+  | -- CR 508.1k: the candidate is an ATTACKING creature -- a creature declared
+    -- as an attacker this combat phase and not since removed from combat
+    -- (CR 506.4). "Target attacking creature" (Kill Shot) is the card text this
+    -- exists for.
+    --
+    -- The one atom that reads something CR 109.3 explicitly says is NOT a
+    -- characteristic ("any other information about an object isn't a
+    -- characteristic"), alongside its examples of tapped-ness and what an Aura
+    -- enchants. That is not a breach of the invariant this type's haddock states:
+    -- combat status is a RULES concept the closed half already owns (CR 506-511,
+    -- Pawl.Type.Combat), so reading it is the same kind of act as reading a card
+    -- type. What the invariant forbids is casing on an EFFECT's identity, which
+    -- this arm still does not do.
+    IsAttacking
   | And [Filter]
   | Or [Filter]
   | Not Filter

@@ -338,8 +338,9 @@ runTurnBasedActions phase = do
       needSecond <- Damage.dealCombatDamage
       Monad.when needSecond $
         State.modify' (\gs -> gs {GameState.remaining = Turn.spliceSecondDamage (GameState.remaining gs)})
-    -- CR 511.3: creatures stop being attacking and blocking.
-    Phase.Combat CombatStep.EndOfCombat -> State.modify' Combat.clearCombat
+    -- CR 511.1: "the end of combat step has no turn-based actions", so it has no
+    -- arm here, deliberately. CR 511.3's removal from combat is an end-of-STEP
+    -- action and runStep performs it there, beside CR 500.4's mana emptying.
     Phase.Ending EndingStep.Cleanup -> do
       Monad.when hasActive (discardToHandSize active)
       -- CR 514.2: damage wears off AND until-end-of-turn effects end,
@@ -893,6 +894,18 @@ runStep = do
         -- phase. Nothing floats mana in M1a, so this is unobservable today; it is
         -- the rule, and it is a one-liner.
         State.modify' Mana.emptyManaPools
+        -- CR 511.3: "as soon as the end of combat step ends, all creatures,
+        -- battles, and planeswalkers are removed from combat" -- so this is an
+        -- end-of-STEP action like the mana emptying above it, and not a
+        -- turn-based action (CR 511.1 says the step has none). The distinction is
+        -- observable: creatures stay attacking for the whole of the step,
+        -- including the priority round CR 511.1 grants, where an instant may
+        -- still read them (Kill Shot).
+        --
+        -- The two orderings of these two lines are indistinguishable -- nothing
+        -- reads a mana pool through the combat record or the reverse -- and
+        -- neither raises a state-based action, so checkSba below is unaffected.
+        Monad.when (phase == Phase.Combat CombatStep.EndOfCombat) (State.modify' Combat.clearCombat)
         checkSba
         stillFinished <- State.gets (Maybe.isJust . GameState.result)
         Monad.unless stillFinished advance

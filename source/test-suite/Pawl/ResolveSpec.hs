@@ -39,6 +39,7 @@ import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Count as Count.Type
@@ -400,7 +401,25 @@ targetTests registry =
                 pumped = S.withEffect smallOid (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0)) gs
                 legalAfter = Target.legalRecipients Nothing S.noSource spec pumped
             HU.assertBool "power 2 is illegal (below the PowerAtLeast 4 floor)" (not (Set.member (Recipient.ToCreature smallOid) legalBefore))
-            HU.assertBool "pumped to power 4 becomes legal" (Set.member (Recipient.ToCreature smallOid) legalAfter)
+            HU.assertBool "pumped to power 4 becomes legal" (Set.member (Recipient.ToCreature smallOid) legalAfter),
+      -- CR 508.1k: Kill Shot's IsAttacking narrowing, read off the committed card
+      -- data. The defender is a creature in every other respect, so only combat
+      -- status can be what separates the two.
+      HU.testCase "Kill Shot: IsAttacking admits the attacker and rejects the untapped defender" $ do
+        killShot <- Registry.printing registry "Kill Shot"
+        piker <- Registry.printing registry "Goblin Piker"
+        case S.spellTargetSpec killShot of
+          Nothing -> HU.assertFailure "Kill Shot's printing carries no 'target' slot"
+          Just spec -> do
+            let (board, mine, theirs) = S.combatBoardOf [piker] [piker]
+                declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+                legal = Target.legalRecipients Nothing S.noSource spec declared
+            case (mine, theirs) of
+              (attacker : _, defender : _) -> do
+                HU.assertBool "the fixture really did attack" (Map.member attacker (Combat.Type.attackers (GameState.combat declared)))
+                HU.assertBool "the attacker is legal" (Set.member (Recipient.ToCreature attacker) legal)
+                HU.assertBool "the creature that stayed home is not" (not (Set.member (Recipient.ToCreature defender) legal))
+              _ -> HU.assertFailure "fixture should have one creature a side"
     ]
 
 resolveTests :: Registry.Type.Registry -> Tasty.TestTree

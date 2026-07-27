@@ -1059,6 +1059,87 @@ firstStrikeTests registry =
         HU.assertEqual "after both steps, bob took 8" (Just 12) (S.lifeOf S.bob after)
     ]
 
+-- Attacks and blocks with everything, and casts whenever a cast is legal --
+-- aggressiveAnswer's combat decisions with castAnswer's priority decision. The
+-- end-of-combat group needs both: the attack has to happen for there to be an
+-- attacking creature, and the spell has to be cast for the attacking-ness to be
+-- observable.
+attackAndCast :: Prompt.Prompt r -> r
+attackAndCast p = case p of
+  Prompt.ChooseAction {} -> S.castAnswer p
+  _ -> S.aggressiveAnswer p
+
+-- alice attacks with one Piker while holding a Kill Shot and exactly the three
+-- Plains that pay for it; bob has nothing, so the attack is unblocked. Sits at
+-- the declare attackers step like every combatBoardOf board, so the ENGINE
+-- declares the attack and carries it forward -- the combat record this group
+-- observes is never hand-written. S.addCreature is what puts the Plains out: it
+-- is the "any printing, on the battlefield, untapped and Settled" helper its
+-- haddock says it is, and lands need exactly that.
+killShotBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
+killShotBoard plains piker killShot =
+  let (gs0, _, _) = S.combatBoardOf [piker] []
+      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addCreature plains S.alice g))
+      (withCard, _) = S.handOne killShot (addLands 3 gs0)
+   in -- handOne parks its state in a precombat main phase; this board is mid-combat.
+      withCard {GameState.phase = GameState.phase gs0, GameState.priority = GameState.priority gs0}
+
+-- Run whole steps until the end of combat step is the current phase, WITHOUT
+-- running it, so a test can play that one step itself under a different
+-- answerer. Bounded so a bug cannot loop forever.
+runToEndOfCombat :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runToEndOfCombat answer gs0 =
+  let go n g =
+        if n <= (0 :: Int)
+          || GameState.phase g == Phase.Combat CombatStep.EndOfCombat
+          || not (S.inCombatPhase (GameState.phase g))
+          then g
+          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+   in go 8 gs0
+
+-- CR 511.3: creatures are removed from combat as the end of combat step ENDS, so
+-- they are still attacking for the whole of that step -- including its priority
+-- round (CR 511.1), where the active player may cast an instant. Kill Shot
+-- ("Destroy target attacking creature") is what makes the window observable: it
+-- has a legal target during the end of combat step and none after it.
+endOfCombatTests :: Registry.Type.Registry -> Tasty.TestTree
+endOfCombatTests registry =
+  Tasty.testGroup
+    "EndOfCombat"
+    [ HU.testCase "CR 511.3 whole card: Kill Shot destroys an attacker during the end of combat step" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        killShot <- Registry.printing registry "Kill Shot"
+        let atEnd = runToEndOfCombat S.aggressiveAnswer (killShotBoard plains piker killShot)
+            after = snd (Engine.runGamePure attackAndCast atEnd Engine.runStep)
+        HU.assertEqual "the step under test is the end of combat step" (Phase.Combat CombatStep.EndOfCombat) (GameState.phase atEnd)
+        HU.assertBool "the Piker is still attacking as the step begins" (not (Map.null (Combat.Type.attackers (GameState.combat atEnd))))
+        HU.assertEqual "the attacker was destroyed" 0 (S.creaturesInPlay S.alice after),
+      HU.testCase "CR 511.3 the removal still happens, one step later: combat is empty once the step ends" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        killShot <- Registry.printing registry "Kill Shot"
+        let atEnd = runToEndOfCombat S.aggressiveAnswer (killShotBoard plains piker killShot)
+            after = snd (Engine.runGamePure S.aggressiveAnswer atEnd Engine.runStep)
+        HU.assertEqual "the combat phase is over" Phase.PostcombatMain (GameState.phase after)
+        HU.assertEqual "no attackers" Map.empty (Combat.Type.attackers (GameState.combat after))
+        -- CR 506.2's designation is scoped to the combat phase, and clearCombat
+        -- resets it alongside the attackers.
+        HU.assertEqual "no defending player" Nothing (Combat.Type.defender (GameState.combat after)),
+      HU.testCase "CR 511.3 the twin: the same Kill Shot has no target in the postcombat main phase" $ do
+        -- The discriminator for the case above. If IsAttacking simply read True
+        -- for every creature, or if combat were never cleared at all, this would
+        -- kill the Piker too.
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        killShot <- Registry.printing registry "Kill Shot"
+        let atEnd = runToEndOfCombat S.aggressiveAnswer (killShotBoard plains piker killShot)
+            postcombat = snd (Engine.runGamePure S.aggressiveAnswer atEnd Engine.runStep)
+            after = snd (Engine.runGamePure attackAndCast postcombat Engine.runStep)
+        HU.assertEqual "the step under test is the postcombat main phase" Phase.PostcombatMain (GameState.phase postcombat)
+        HU.assertEqual "the Piker survives" 1 (S.creaturesInPlay S.alice after)
+    ]
+
 -- The state out of a combatBoardOf triple.
 frst :: (a, b, c) -> a
 frst (a, _, _) = a
@@ -1089,6 +1170,7 @@ tests registry =
       combatDamageTests registry,
       keywordTests registry,
       firstStrikeTests registry,
+      endOfCombatTests registry,
       m2bExitTests registry,
       defenderTests registry,
       defendingPlayerTests registry,

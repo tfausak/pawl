@@ -27,7 +27,8 @@ blackCreature =
       Filter.power = Just 2,
       Filter.controller = Just (PlayerId.MkPlayerId 0),
       Filter.identity = Just (ObjectId.MkObjectId 7),
-      Filter.playerIdentity = Nothing
+      Filter.playerIdentity = Nothing,
+      Filter.attacking = False
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -41,7 +42,8 @@ devoidBigCreature =
       Filter.power = Just 5,
       Filter.controller = Nothing,
       Filter.identity = Nothing,
-      Filter.playerIdentity = Nothing
+      Filter.playerIdentity = Nothing,
+      Filter.attacking = False
     }
 
 self :: Filter.Context
@@ -119,5 +121,27 @@ tests =
               (Filter.MkContext (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7)))
               devoidBigCreature
               Filter.Type.IsSource
+        ],
+      Tasty.testGroup
+        "IsAttacking"
+        [ HU.testCase "matches a view whose combat status says so"
+            . HU.assertBool "attacking"
+            $ Filter.matches self (blackCreature {Filter.attacking = True}) Filter.Type.IsAttacking,
+          HU.testCase "does not match a creature that is not attacking"
+            . HU.assertBool "not attacking"
+            . not
+            $ Filter.matches self blackCreature Filter.Type.IsAttacking,
+          -- CR 109.3: combat status is not a characteristic, so no other axis of
+          -- the view can stand in for it. A 5-power creature is no more attacking
+          -- than a 2-power one.
+          HU.testCase "is independent of every characteristic axis"
+            . HU.assertBool "power does not imply attacking"
+            . not
+            $ Filter.matches self devoidBigCreature Filter.Type.IsAttacking,
+          -- CR 506.3: only a creature can attack, and a player is not one.
+          HU.testCase "a player candidate is vacuously false"
+            . HU.assertBool "player"
+            . not
+            $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsAttacking
         ]
     ]
