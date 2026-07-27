@@ -57,12 +57,14 @@
           ]
         }
       },
-      "modification": {
-        "type": "SetLandSubtype",
-        "value": {
-          "type": "Mountain"
+      "modifications": [
+        {
+          "type": "SetLandSubtype",
+          "value": {
+            "type": "Mountain"
+          }
         }
-      }
+      ]
     }
   ],
   "toughness": null,

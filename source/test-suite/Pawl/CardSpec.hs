@@ -3,6 +3,7 @@
 module Pawl.CardSpec where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -156,7 +157,7 @@ m2aCardTests registry =
             HU.assertEqual "no printed keywords of its own" Set.empty (Card.Type.keywords c)
             HU.assertEqual
               "one static ability: the enchanted creature gains poisonous 3"
-              [StaticAbility.MkStaticAbility Affected.Attached (Modification.GainKeyword (Keyword.Poisonous 3))]
+              [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.GainKeyword (Keyword.Poisonous 3)))]
               (Card.Type.staticAbilities c),
           HU.testCase "every M2a printing carries exactly its keyword" $
             mapM_
@@ -392,7 +393,7 @@ cardCounts card =
   concatMap quantityCounts (Maybe.maybeToList (Card.Type.characteristicPT card))
     <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Card.Type.power card))
     <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Card.Type.toughness card))
-    <> concatMap (modificationCounts . StaticAbility.modification) (Card.Type.staticAbilities card)
+    <> concatMap (concatMap modificationCounts . StaticAbility.modifications) (Card.Type.staticAbilities card)
     <> concatMap effectCounts (Card.allEffects card)
     <> concatMap (concatMap effectCounts . Modal.allEffects . ActivatedAbility.modal) (Card.Type.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Card.Type.triggeredAbilities card)
@@ -1012,7 +1013,7 @@ auraCardTests registry =
         -- attached to.
         HU.assertEqual
           "one +2/+1 static ability on the enchanted permanent"
-          [StaticAbility.MkStaticAbility Affected.Attached (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 1))]
+          [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 1)))]
           (Card.Type.staticAbilities card)
         -- CR 303.4: an Aura spell has no spell effects; it enters attached.
         HU.assertEqual "no spell effects" [] (Card.allEffects card)
@@ -1034,16 +1035,64 @@ sourceOnBattlefield =
     Comparison.Exactly
     (Quantity.Type.Literal 1)
 
--- The two type-changing gate cards. Skilled Animator animates an ARTIFACT, which
--- is what lets an Equipment become a creature while it still equips one (CR
--- 704.5p); Liquimetal Coating makes any permanent an artifact, which is the only
--- way to feed an AURA to the Animator and so the only route to CR 303.4d's second
--- clause -- every printed enchantment animator excludes Auras by name.
+-- The type-changing gate cards. Skilled Animator animates an ARTIFACT, which is
+-- what lets an Equipment become a creature while it still equips one (CR 704.5p);
+-- Liquimetal Coating makes any permanent an artifact, which is the only way to
+-- feed an AURA to the Animator and so the only route to CR 303.4d's second clause
+-- -- every printed enchantment animator excludes Auras by name; and March of the
+-- Machines animates every noncreature artifact at once, which is the card CR
+-- 613.6 exists for (#233).
 animatorCardTests :: Registry.Type.Registry -> Tasty.TestTree
 animatorCardTests registry =
   Tasty.testGroup
     "Animators"
-    [ HU.testCase "Liquimetal Coating is a {2} artifact whose {T} ability makes any permanent an artifact" $ do
+    [ -- The CR 613.6 gate card (#233), and the pin that matters is the SHAPE: one
+      -- static ability with three parts, not three abilities. Its affected set
+      -- reads a card type its own layer-4 part changes, so the parts have to stay
+      -- one effect or the layer-7b part loses the set.
+      HU.testCase "March of the Machines is a {3}{U} enchantment: ONE ability, three parts, one affected set" $ do
+        p <- Registry.printing registry "March of the Machines"
+        let c = Printing.card p
+            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+            noncreatureArtifact =
+              Affected.Matching
+                ( Filter.Type.And
+                    [ Filter.Type.HasCardType CardType.Artifact,
+                      Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
+                    ]
+                )
+        HU.assertEqual "name" (Text.pack "March of the Machines") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, blue]) (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine c))
+        HU.assertEqual
+          "\"is an artifact creature with power and toughness each equal to its mana value\""
+          [ StaticAbility.MkStaticAbility
+              noncreatureArtifact
+              ( Modification.AddCardType CardType.Artifact
+                  NonEmpty.:| [ Modification.AddCardType CardType.Creature,
+                                Modification.SetBasePowerToughness Quantity.Type.ManaValue Quantity.Type.ManaValue
+                              ]
+              )
+          ]
+          (Card.Type.staticAbilities c),
+      -- The same shape, arrived at from the other direction: Humility and
+      -- Opalescence were each TWO abilities before #233 and are now one with two
+      -- parts. Nothing observable changed for them -- their filters read card types
+      -- they do not themselves change -- but the model has to be uniform, and this
+      -- is the pin that keeps a future card from re-splitting them.
+      HU.testCase "Humility and Opalescence are each one two-part ability, not two abilities" $ do
+        humility <- Registry.printing registry "Humility"
+        opalescence <- Registry.printing registry "Opalescence"
+        let partsOf p = fmap (NonEmpty.toList . StaticAbility.modifications) (Card.Type.staticAbilities (Printing.card p))
+        HU.assertEqual
+          "CR 613.1f + CR 613.4b: lose all abilities, base 1/1"
+          [[Modification.LoseAllAbilities, Modification.SetBasePowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)]]
+          (partsOf humility)
+        HU.assertEqual
+          "CR 613.1d + CR 613.4b: becomes a creature, base P/T its mana value"
+          [[Modification.AddCardType CardType.Creature, Modification.SetBasePowerToughness Quantity.Type.ManaValue Quantity.Type.ManaValue]]
+          (partsOf opalescence),
+      HU.testCase "Liquimetal Coating is a {2} artifact whose {T} ability makes any permanent an artifact" $ do
         p <- Registry.printing registry "Liquimetal Coating"
         let c = Printing.card p
             target = SlotName.MkSlotName (Text.pack "target")

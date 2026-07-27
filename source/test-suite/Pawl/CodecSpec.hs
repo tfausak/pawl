@@ -1,6 +1,7 @@
 -- Covers Pawl.Codec.
 module Pawl.CodecSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -80,6 +81,7 @@ import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.TargetSpec as TargetSpec
@@ -256,6 +258,35 @@ tests registry =
                 PlayerEffect.ReduceSpellCost (Filter.Type.HasColor Color.Blue) 1,
                 PlayerEffect.NoMaximumHandSize
               ],
+          -- CR 613.6 made a static ability "one affected set, one or more parts",
+          -- so the wire format has an array where it used to have a single
+          -- modification -- and an array can be empty where a single value could
+          -- not. An ability with no parts is one that does nothing, which no card
+          -- means, so it is a decode FAILURE rather than a permanent that quietly
+          -- under-performs its own text. NonEmpty is what makes that structural;
+          -- this pins that the boundary really says no.
+          HU.testCase "a static ability with an empty modifications array is rejected" $ do
+            let value =
+                  Json.Object
+                    [ (Text.pack "affected", Codec.affectedToJson Affected.Attached),
+                      (Text.pack "modifications", Json.Array [])
+                    ]
+            HU.assertBool
+              "an empty array does not decode"
+              (either (const True) (const False) (Codec.jsonToStaticAbility value))
+            roundTrip
+              "one part still round-trips"
+              Codec.staticAbilityToJson
+              Codec.jsonToStaticAbility
+              (StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
+            roundTrip
+              "and so do several"
+              Codec.staticAbilityToJson
+              Codec.jsonToStaticAbility
+              ( StaticAbility.MkStaticAbility
+                  Affected.Attached
+                  (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)])
+              ),
           HU.testCase "PlayerStaticAbility round-trips" $
             roundTrip
               "ability"

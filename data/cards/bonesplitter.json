@@ -75,19 +75,21 @@
       "affected": {
         "type": "Attached"
       },
-      "modification": {
-        "type": "ModifyPowerToughness",
-        "value": [
-          {
-            "type": "Literal",
-            "value": 2
-          },
-          {
-            "type": "Literal",
-            "value": 0
-          }
-        ]
-      }
+      "modifications": [
+        {
+          "type": "ModifyPowerToughness",
+          "value": [
+            {
+              "type": "Literal",
+              "value": 2
+            },
+            {
+              "type": "Literal",
+              "value": 0
+            }
+          ]
+        }
+      ]
     }
   ],
   "toughness": null,

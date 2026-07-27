@@ -29,12 +29,14 @@
           }
         }
       },
-      "modification": {
-        "type": "AddLandSubtype",
-        "value": {
-          "type": "Swamp"
+      "modifications": [
+        {
+          "type": "AddLandSubtype",
+          "value": {
+            "type": "Swamp"
+          }
         }
-      }
+      ]
     }
   ],
   "toughness": null,
