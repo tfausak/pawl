@@ -14,6 +14,9 @@ data Registry = MkRegistry
     -- than an IORef because the test suite is built -threaded and tasty runs
     -- cases concurrently: holding it across the read-and-parse is what makes
     -- "each file is parsed at most once" exact rather than merely likely.
+    -- Not a TVar either, for that same reason: the lock has to span a
+    -- readFile, which no transaction can, so the STM equivalent is a TMVar --
+    -- this, plus a hand-written copy of base's modifyMVar (#265).
     cache :: MVar.MVar (Map.Map Slug.Slug Card.Card)
   }
   -- No Show: MVar has no Show instance. Eq is MVar identity, so two registries

@@ -127,12 +127,15 @@ Card }` and wrapping is the caller's business.
 
 Three deliberate choices:
 
-- **`MVar`, not `IORef`.** The suite is built `-threaded` and tasty runs test
+- **`MVar`, not `IORef` or `TVar`.** The suite is built `-threaded` and tasty runs test
   cases concurrently, so an `IORef` cache lets two threads miss and both parse
   the same file. The result is still correct (parsing is pure and
   deterministic), but it breaks the at-most-once property this design promises.
   Holding the `MVar` across the read-and-parse makes once-only exact. The cost —
-  loads serialize — is irrelevant for files of this size.
+  loads serialize — is irrelevant for files of this size. A `TVar` fails the same
+  test the `IORef` does: the lock has to span a `readFile`, which no transaction
+  can, so the STM equivalent is a `TMVar` — this, plus a hand-written copy of
+  base's `modifyMVar` (#265).
 - **The argument is `String`, not `Text`.** This is the one place where the house
   `Text` rule loses on its own terms: the argument's destiny is a `FilePath`, and
   the alternative is `Text.pack` at ~1,600 call sites with `OverloadedStrings`
