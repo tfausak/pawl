@@ -816,8 +816,28 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                     -- CR 701.9b: the discarding player chooses which cards.
                     let decider = Decide.deciderFor target gs
                     choices <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider target held (fromInteger n)))
-                    let toDiscard = take (fromInteger n) (filter (\c -> elem c held) choices)
-                    bury toDiscard
+                    -- FILTERED AND COMPLETED, the posture PlayerSacrifices takes
+                    -- below and for the same reason. Dropping the invalid picks is
+                    -- not enough: this branch is reached only when the hand is
+                    -- LARGER than the count, so CR 609.3's "as much as possible"
+                    -- is not doing any work here and every card the answer omits
+                    -- is one the player could have discarded. An interpreter
+                    -- answering with too few -- or with nothing -- would otherwise
+                    -- discard fewer cards than the effect demands and cheat a Mind
+                    -- Rot. Reject-not-repair is the COST path's option, available
+                    -- there only because a cost may go unpaid; an effect has no
+                    -- such out.
+                    --
+                    -- Deduplicated as well as filtered, which PlayerSacrifices
+                    -- gets for free from its Set-shaped answer: ChooseDiscard is
+                    -- answered with a LIST, so a card named twice would otherwise
+                    -- fill two of the n slots and discard one card too few.
+                    --
+                    -- `held` is longer than n and `valid <> filler` is a
+                    -- permutation of it, so the take always yields exactly n.
+                    let valid = List.nub (filter (\c -> elem c held) choices)
+                        filler = filter (\c -> List.notElem c valid) held
+                    bury (take (fromInteger n) (valid <> filler))
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()

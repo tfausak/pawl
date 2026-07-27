@@ -1574,7 +1574,65 @@ zoneChangeTests registry =
             after = snd (Engine.runGamePure noDiscard cast Stack.resolveTop)
         -- Elision (hand == count): the whole hand is discarded without asking (#63).
         HU.assertEqual "bob's hand emptied" 0 (S.handSize S.bob after)
-        HU.assertEqual "both cards discarded" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertEqual "both cards discarded" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
+      -- The three below are about the PROMPTED branch -- hand of three, discard
+      -- two -- where the elision above does not apply and the answer is a real
+      -- choice. Mind Rot is not "may", and CR 609.3's "as much as possible" caps
+      -- nothing here (the hand is larger than the count), so every card an answer
+      -- omits is one the player could have discarded.
+      HU.testCase "CR 701.9b an empty ChooseDiscard answer still discards the full count" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        mindRot <- Registry.printing registry "Mind Rot"
+        let base = S.landsInPlay swamp 3
+            withHand = handCards piker S.bob 3 base
+            (gs, spellId) = S.handOne mindRot withHand
+            noDiscard q = case q of
+              Prompt.ChooseDiscard {} -> []
+              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+              _ -> S.identityAnswer q
+            cast = snd (Engine.runGamePure noDiscard gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure noDiscard cast Stack.resolveTop)
+        HU.assertEqual "two discarded despite the answer naming none" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertEqual "one card left in bob's hand" 1 (S.handSize S.bob after),
+      HU.testCase "CR 701.9b a valid pick is honoured and only the shortfall is completed" $ do
+        -- Discriminating against "ignore the answer and take the first n": the
+        -- answer names the LAST card in hand, which a first-n completion would
+        -- leave behind.
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        mindRot <- Registry.printing registry "Mind Rot"
+        let base = S.landsInPlay swamp 3
+            withHand = handCards piker S.bob 3 base
+            (gs, spellId) = S.handOne mindRot withHand
+            onlyLast q = case q of
+              Prompt.ChooseDiscard _ _ ids _ -> take 1 (reverse ids)
+              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+              _ -> S.identityAnswer q
+            cast = snd (Engine.runGamePure onlyLast gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure onlyLast cast Stack.resolveTop)
+        case reverse (Game.zoneMembers Zone.Hand S.bob cast) of
+          [] -> HU.assertFailure "fixture should leave bob a hand to discard from"
+          lastCard : _ -> do
+            HU.assertEqual "two discarded" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+            HU.assertBool "and the card the answer named is one of them" (List.notElem lastCard (Game.zoneMembers Zone.Hand S.bob after)),
+      HU.testCase "CR 701.9b naming the same card twice fills one slot, not two" $ do
+        -- ChooseDiscard is answered with a LIST, so unlike ChooseSacrifices'
+        -- Set the duplicate has to be removed here or it discards one card short.
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        mindRot <- Registry.printing registry "Mind Rot"
+        let base = S.landsInPlay swamp 3
+            withHand = handCards piker S.bob 3 base
+            (gs, spellId) = S.handOne mindRot withHand
+            sameTwice q = case q of
+              Prompt.ChooseDiscard _ _ ids _ -> concat (replicate 2 (take 1 ids))
+              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+              _ -> S.identityAnswer q
+            cast = snd (Engine.runGamePure sameTwice gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure sameTwice cast Stack.resolveTop)
+        HU.assertEqual "two distinct cards discarded" 2 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertEqual "one card left in bob's hand" 1 (S.handSize S.bob after)
     ]
 
 drawCardTests :: Registry.Type.Registry -> Tasty.TestTree
