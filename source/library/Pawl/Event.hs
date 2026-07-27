@@ -289,13 +289,21 @@ counter oid = do
 -- the only caller (Resolve's Sacrifice arm) reads a slot the engine itself
 -- stamped (Binding.triggerSource, a triggered ability's own source, CR 113.7),
 -- which is always controlled by whoever triggered it.
-sacrifice :: ObjectId -> Game ()
-sacrifice oid = do
+sacrifice :: PlayerId -> ObjectId -> Game ()
+sacrifice pid oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure ()
     Just obj -> case Object.zone obj of
-      Zone.Battlefield -> changeZone oid Zone.Graveyard
+      -- CR 701.21a: "A player can't sacrifice something that isn't a permanent, or
+      -- something that's a permanent they don't control." The zone case below is
+      -- the first clause; this is the second. Enforced HERE, at the one funnel,
+      -- rather than trusted from each caller -- the callers are a cost payment, a
+      -- trigger's own source, and an edict whose victim a player NAMED, and only
+      -- the last of those could ever be wrong.
+      Zone.Battlefield
+        | Projection.controllerOf oid gs /= Just pid -> pure ()
+        | otherwise -> changeZone oid Zone.Graveyard
       Zone.Library -> pure ()
       Zone.Hand -> pure ()
       Zone.Graveyard -> pure ()

@@ -272,7 +272,7 @@ sacrificeTests registry =
     [ HU.testCase "CR 701.21a a sacrificed permanent goes to its owner's graveyard" $ do
         pikerPrinting <- Registry.printing registry "Goblin Piker"
         let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
-            after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
+            after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob piker)
         HU.assertEqual "off the battlefield" 0 (S.creaturesInPlay S.bob after)
         HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
       -- The test above sacrifices a permanent the same player owns and
@@ -284,7 +284,10 @@ sacrificeTests registry =
         pikerPrinting <- Registry.printing registry "Goblin Piker"
         let (piker, gs0) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
             gs = S.giveControl piker S.alice gs0
-            after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
+            -- ALICE is the sacrificing player, because she controls it (CR
+            -- 701.21a); bob merely owns it, which is what the assertions below
+            -- separate.
+            after = S.runPure S.identityAnswer gs (Event.sacrifice S.alice piker)
         HU.assertEqual "off bob's battlefield" 0 (S.creaturesInPlay S.bob after)
         HU.assertEqual "in bob's (owner's) graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
         HU.assertEqual "not in alice's graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
@@ -293,13 +296,13 @@ sacrificeTests registry =
       HU.testCase "CR 701.21a an indestructible permanent can still be sacrificed" $ do
         darksteelMyr <- Registry.printing registry "Darksteel Myr"
         let (myr, gs) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
-            after = S.runPure S.identityAnswer gs (Event.sacrifice myr)
+            after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob myr)
         HU.assertEqual "gone from the battlefield" 0 (S.creaturesInPlay S.bob after),
       HU.testCase "CR 701.21a sacrificing neither consults nor consumes a regeneration shield" $ do
         pikerPrinting <- Registry.printing registry "Goblin Piker"
         let (piker, gs0) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
             gs = S.addRegenShield piker gs0
-            after = S.runPure S.identityAnswer gs (Event.sacrifice piker)
+            after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob piker)
         HU.assertEqual "still sacrificed" 0 (S.creaturesInPlay S.bob after)
         HU.assertEqual
           "the shield's source is untouched"
@@ -308,8 +311,20 @@ sacrificeTests registry =
       HU.testCase "only a battlefield permanent can be sacrificed (CR 701.21a)" $ do
         piker <- Registry.printing registry "Goblin Piker"
         let (card, gs) = S.addLibraryCard piker S.bob (Setup.emptyGame S.bothPlayers)
-            after = S.runPure S.identityAnswer gs (Event.sacrifice card)
+            after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob card)
         HU.assertEqual "the library card is untouched" gs after,
+      -- CR 701.21a's second clause, which had no enforcement before #44: "A player
+      -- can't sacrifice ... a permanent they don't control." Bob controls it;
+      -- alice asking is refused outright rather than quietly honoured.
+      HU.testCase "CR 701.21a a player cannot sacrifice a permanent they do not control" $ do
+        pikerPrinting <- Registry.printing registry "Goblin Piker"
+        let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
+            byAlice = S.runPure S.identityAnswer gs (Event.sacrifice S.alice piker)
+            byBob = S.runPure S.identityAnswer gs (Event.sacrifice S.bob piker)
+        HU.assertEqual "alice's attempt changes nothing at all" gs byAlice
+        -- The discriminating half: the same call from the controller works, so the
+        -- refusal above is the guard and not an unrelated no-op.
+        HU.assertEqual "bob's own sacrifice goes through" 0 (S.creaturesInPlay S.bob byBob),
       -- CR 113.7: "this creature" is a slot read, filled at placement.
       HU.testCase "CR 113.7 a placed trigger binds its source into the reserved self slot" $ do
         restInPeace <- Registry.printing registry "Rest in Peace"

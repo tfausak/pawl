@@ -242,4 +242,21 @@ data Effect card
     -- The card granting the action is itself in the hand and is exiled with the
     -- rest: CR 103.5b's action is not a cost, and nothing sets it aside.
     ExileHandThenDraw
+  | -- CR 701.21a: the slot's target PLAYER sacrifices this many permanents
+    -- matching the Filter, chosen by that player. Diabolic Edict's exact shape.
+    --
+    -- Distinct from Sacrifice, which names a PERMANENT and is "this creature".
+    -- The difference is who decides: there the effect picks the victim, here the
+    -- sacrificing player does, which is why this one prompts and that one does
+    -- not. The sibling of Mill and Discard, which likewise name a player and a
+    -- count.
+    --
+    -- The Filter carries "a creature of their choice" rather than baking creatures
+    -- in: edicts differ only in what they name (a creature, a permanent, a land),
+    -- and Filter already says all three.
+    --
+    -- CR 609.3: a player with fewer matching permanents than the count sacrifices
+    -- all of them, and one with none sacrifices nothing -- "as much as possible",
+    -- and forced, so neither case is prompted.
+    PlayerSacrifices SlotName Filter Quantity
   deriving (Eq, Ord, Show)

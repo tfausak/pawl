@@ -89,6 +89,7 @@ slotsOf effect = case effect of
   Effect.Search _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
+  Effect.PlayerSacrifices slot _ _ -> Set.singleton slot
   Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
   Effect.Destroy slot -> Set.singleton slot
@@ -132,6 +133,7 @@ readsX = any effectReadsX
       Effect.Search _ -> False
       Effect.ExileAllGraveyards -> False
       Effect.ExileHandThenDraw -> False
+      Effect.PlayerSacrifices _ _ quantity -> quantity == Quantity.Type.X
       Effect.RestartGame -> False
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy _ -> False
@@ -172,6 +174,7 @@ manaProduced effect = case effect of
   Effect.Search _ -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.ExileHandThenDraw -> Nothing
+  Effect.PlayerSacrifices {} -> Nothing
   Effect.RestartGame -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.Destroy _ -> Nothing
@@ -201,6 +204,7 @@ manaProduced effect = case effect of
 searchesLibrary :: Effect Card.Type.Card -> Bool
 searchesLibrary effect = case effect of
   Effect.Search _ -> True
+  Effect.PlayerSacrifices {} -> False
   Effect.DealDamage _ _ -> False
   Effect.ModifyTarget {} -> False
   Effect.ChangeText _ -> False
@@ -283,6 +287,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Search _ -> effect
   Effect.ExileAllGraveyards -> effect
   Effect.ExileHandThenDraw -> effect
+  Effect.PlayerSacrifices {} -> effect
   Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy _ -> effect
@@ -700,8 +705,11 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       (Just recipient, True) -> case recipientObject recipient of
         Nothing -> pure () -- a player recipient cannot be sacrificed
         -- CR 701.21: through the single funnel, which is NOT Event.destroy --
-        -- CR 701.21a: sacrificing is not destroying.
-        Just target -> Event.sacrifice target
+        -- CR 701.21a: sacrificing is not destroying. The sacrificing player is
+        -- this effect's controller, which for the "this creature" shape this
+        -- opcode serves is the permanent's own controller; the funnel's CR 701.21a
+        -- guard turns any other case into a no-op rather than a wrong sacrifice.
+        Just target -> Event.sacrifice controller target
       -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
       _ -> pure ()
   Effect.MoveToZone slot zone ->
@@ -760,6 +768,46 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                     choices <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider target held (fromInteger n)))
                     let toDiscard = take (fromInteger n) (filter (\c -> elem c held) choices)
                     bury toDiscard
+          _ -> pure ()
+      -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
+      _ -> pure ()
+  -- CR 701.21a: the slot's target player sacrifices `quantity` permanents
+  -- matching the filter, and THAT PLAYER chooses which -- the whole difference
+  -- between this and Sacrifice above.
+  --
+  -- CR 609.3: with no more candidates than the count, every one of them goes and
+  -- there is nothing to ask; with none, nothing happens. Only a genuine surplus
+  -- raises the prompt, which is the same shape Cost's Sacrifice component takes.
+  Effect.PlayerSacrifices slot filter_ quantity -> do
+    gs <- State.get
+    let viewOf = Projection.fullView gs
+        context = Filter.MkContext (Just controller) (Just source)
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just (Recipient.ToPlayer victim), True) ->
+        case Quantity.evaluate viewOf context gs source quantity of
+          Just n
+            | n > 0 -> do
+                -- Candidates are what the VICTIM controls, ascending, so both the
+                -- elision and a short transcript are deterministic. No perspective
+                -- on the filter context: an edict's filter names a quality, never
+                -- a player.
+                let candidates =
+                      List.sort
+                        ( filter
+                            (\oid -> Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_)
+                            (Projection.controls victim gs)
+                        )
+                    decider = Decide.deciderFor victim gs
+                picked <-
+                  if length candidates <= fromInteger n
+                    then pure (Set.fromList candidates)
+                    else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider victim source candidates (fromInteger n)))
+                -- FILTERED, NOT TRUSTED: an answer outside the offered set is
+                -- dropped. Event.sacrifice's CR 701.21a guard would refuse it
+                -- anyway, and the two agreeing is the point -- neither is load
+                -- bearing alone.
+                let kept = filter (\oid -> Set.member oid picked) candidates
+                Monad.mapM_ (Event.sacrifice victim) (take (fromInteger n) kept)
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
