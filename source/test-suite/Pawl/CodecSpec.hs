@@ -208,6 +208,8 @@ tests registry =
             roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (SlotName.MkSlotName (Text.pack "t")) Regenerability.CantBeRegenerated),
           HU.testCase "ExileHandThenDraw" $
             roundTrip "e-powder" Codec.effectToJson Codec.jsonToEffect Effect.ExileHandThenDraw,
+          HU.testCase "PlayerSacrifices" $
+            roundTrip "e6" Codec.effectToJson Codec.jsonToEffect (Effect.PlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.Type.HasCardType CardType.Creature) (Quantity.Literal 1)),
           HU.testCase "Sacrifice round-trips" $
             roundTrip "e5" Codec.effectToJson Codec.jsonToEffect (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "self"))),
           HU.testCase "PutCounters effect round-trips through the codec" $

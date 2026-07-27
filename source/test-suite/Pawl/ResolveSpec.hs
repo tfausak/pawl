@@ -1840,6 +1840,122 @@ proliferateTests registry =
         HU.assertEqual "drew a card" handBefore (length (Game.zoneMembers Zone.Hand S.alice resolved))
     ]
 
+slotTarget :: SlotName.SlotName
+slotTarget = SlotName.MkSlotName (Text.pack "target")
+
+-- Diabolic Edict's "a creature of their choice".
+creatureFilter :: Filter.Type.Filter
+creatureFilter = Filter.Type.HasCardType CardType.Creature
+
+-- Targets `victim` with every slot that offers them, deferring the rest to
+-- S.identityAnswer -- which picks the lowest ObjectId/PlayerId and so would aim
+-- an edict at its own caster.
+targetsPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+targetsPlayer victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    Map.mapMaybe
+      (\legal -> if Set.member (Recipient.ToPlayer victim) legal then Just (Recipient.ToPlayer victim) else Set.lookupMin legal)
+      sets
+  _ -> S.identityAnswer p
+
+-- A lying interpreter: names `wanted` for a sacrifice regardless of whether it
+-- was offered. The only way to reach CR 701.21a's guard from a test, since the
+-- candidate list is built from what the sacrificing player controls.
+namesInstead :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+namesInstead wanted p = case p of
+  Prompt.ChooseSacrifices {} -> Set.singleton wanted
+  _ -> S.identityAnswer p
+
+-- Answers Prompt.ChooseSacrifices with `wanted`, when it is on offer. A pair of
+-- tests differing only in this argument proves the ANSWER decides which permanent
+-- is sacrificed, rather than the order the candidates are enumerated in.
+sacrifices :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+sacrifices wanted p = case p of
+  Prompt.ChooseSacrifices _ _ _ candidates _ ->
+    if elem wanted candidates then Set.singleton wanted else Set.fromList (take 1 candidates)
+  _ -> S.identityAnswer p
+
+playerSacrificesTests :: Registry.Type.Registry -> Tasty.TestTree
+playerSacrificesTests registry =
+  Tasty.testGroup
+    "PlayerSacrifices"
+    [ -- CR 701.21a: "its controller moves it from the battlefield directly to its
+      -- owner's graveyard." Diabolic Edict names a PLAYER, and that player picks.
+      HU.testCase "Diabolic Edict: the targeted player chooses which of their creatures dies" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        rats <- Registry.printing registry "Typhoid Rats"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (hisPiker, g1) = S.addCreature piker S.bob g0
+            (hisRats, gs) = S.addCreature rats S.bob g1
+            edict = Resolve.applyEffect src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
+            keptRats = S.runPure (sacrifices hisPiker) gs edict
+            keptPiker = S.runPure (sacrifices hisRats) gs edict
+        HU.assertBool "choosing the Piker leaves the Rats" (S.onBattlefield hisRats keptRats)
+        HU.assertBool "and the Piker is gone" (not (S.onBattlefield hisPiker keptRats))
+        -- The discriminating twin: same board, same effect, opposite answer.
+        HU.assertBool "choosing the Rats leaves the Piker" (S.onBattlefield hisPiker keptPiker)
+        HU.assertBool "and the Rats are gone" (not (S.onBattlefield hisRats keptPiker))
+        HU.assertBool "alice's own creature is never touched" (S.onBattlefield src keptRats),
+      -- CR 701.21a: "A player can't sacrifice ... a permanent they don't control."
+      -- The guard the whole issue is about, reached the only way it can be: an
+      -- interpreter naming a permanent outside the offered set.
+      --
+      -- Bob controls TWO creatures on purpose. With one, candidates <= count and
+      -- the prompt is elided, so the lying answerer is never consulted and the
+      -- test passes without exercising anything -- which is what it did before
+      -- review caught it.
+      HU.testCase "CR 701.21a an answer naming a permanent the player does not control is refused" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        rats <- Registry.printing registry "Typhoid Rats"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (hers, g1) = S.addCreature piker S.alice g0
+            (hisPiker, g2) = S.addCreature piker S.bob g1
+            (hisRats, gs) = S.addCreature rats S.bob g2
+            after = S.runPure (namesInstead hers) gs (Resolve.applyEffect src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+            bobsLeft = length (filter (`S.onBattlefield` after) [hisPiker, hisRats])
+        HU.assertBool "alice's creature is untouched" (S.onBattlefield hers after)
+        -- The edict still takes exactly one: an answer the engine refuses does not
+        -- become an answer of "none". CR 609.3 caps it at what bob controls, and
+        -- he controls two.
+        HU.assertEqual "bob still lost exactly one of his own" 1 bobsLeft,
+      -- Where the rules leave nothing to ask, don't prompt: one candidate is
+      -- forced (CR 609.3 does as much as possible, which here is all of it).
+      HU.testCase "CR 609.3 a lone creature is sacrificed without a prompt" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (his, gs) = S.addCreature piker S.bob g0
+            countingAnswer :: Prompt.Prompt r -> State.State Int r
+            countingAnswer p = case p of
+              Prompt.ChooseSacrifices {} -> do
+                State.modify (+ 1)
+                pure (S.identityAnswer p)
+              _ -> pure (S.identityAnswer p)
+            act = Resolve.applyEffect src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
+            asked = State.execState (Engine.runGame countingAnswer gs act) 0
+            after = S.runPure S.identityAnswer gs act
+        HU.assertEqual "nothing to choose" 0 asked
+        HU.assertBool "but it still died" (not (S.onBattlefield his after)),
+      -- CR 609.3 again: a player with no creatures sacrifices nothing, and the
+      -- edict simply does as much as it can -- which is nothing.
+      HU.testCase "CR 609.3 an edict against an empty board does nothing" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            after = S.runPure S.identityAnswer gs (Resolve.applyEffect src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+        HU.assertBool "alice keeps hers" (S.onBattlefield src after),
+      -- The gameplay-level proof: the real card, cast and resolved.
+      HU.testCase "Diabolic Edict whole card: cast off two Swamps, bob sacrifices" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        diabolicEdict <- Registry.printing registry "Diabolic Edict"
+        let base = S.landsInPlay swamp 2
+            (his, g1) = S.addCreature piker S.bob base
+            (withSpell, spell) = S.handOne diabolicEdict g1
+            afterCast = S.runPure (targetsPlayer S.bob) withSpell (Cast.castSpell S.alice spell)
+            resolved = S.runPure (targetsPlayer S.bob) afterCast Stack.resolveTop
+        HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
+        HU.assertBool "bob's creature was sacrificed" (not (S.onBattlefield his resolved))
+    ]
+
 createEmblemTests :: Registry.Type.Registry -> Tasty.TestTree
 createEmblemTests registry =
   Tasty.testGroup
@@ -1976,4 +2092,4 @@ actOfTreasonTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]

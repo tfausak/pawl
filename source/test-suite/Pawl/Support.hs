@@ -1182,6 +1182,11 @@ counterOf :: CounterKind.CounterKind -> ObjectId.ObjectId -> GameState.GameState
 counterOf kind oid gs =
   maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
 
+-- Is this object still on the battlefield? A zone read, not a set-membership
+-- one, so it stays correct for an object whose incarnation changed (CR 400.7).
+onBattlefield :: ObjectId.ObjectId -> GameState.GameState -> Bool
+onBattlefield oid gs = fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
+
 -- How many counters of a kind a player has (absent kind = zero).
 playerCounterOf :: PlayerCounterKind.PlayerCounterKind -> PlayerId.PlayerId -> GameState.GameState -> Natural.Natural
 playerCounterOf kind pid gs =

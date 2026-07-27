@@ -239,7 +239,10 @@ payComponent pid oid component = case component of
   -- a cost payment is a game event, so dies-triggers, replacement effects and the
   -- turn history all see it.
   CostComponent.SacrificeThis -> do
-    Event.sacrifice oid
+    -- CR 701.21a's "a permanent they don't control" guard lives in the funnel, and
+    -- `pid` is the player paying this cost -- who, for "sacrifice this permanent",
+    -- is its controller.
+    Event.sacrifice pid oid
     pure Payment.Paid
   -- CR 119.4: "the payment is subtracted from their life total; in other words,
   -- the player loses that much life." A direct subtraction, and the CR 704.5a
@@ -266,7 +269,7 @@ payComponent pid oid component = case component of
         else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider pid oid candidates n))
     if Set.isSubsetOf chosen (Set.fromList candidates) && Set.size chosen == fromIntegral n
       then do
-        Monad.mapM_ Event.sacrifice (Set.toAscList chosen)
+        Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
         pure Payment.Paid
       else pure Payment.Unpaid
   -- CR 107.14: paying energy removes that many energy counters from the

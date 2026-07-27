@@ -331,6 +331,7 @@ effectCounts effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ExileHandThenDraw -> []
+  Effect.PlayerSacrifices _ _ quantity -> quantityCounts quantity
   Effect.RestartGame -> []
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy {} -> []

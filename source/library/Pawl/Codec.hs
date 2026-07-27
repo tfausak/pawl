@@ -1287,6 +1287,7 @@ effectToJson e = case e of
   Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
   Effect.Proliferate -> nullary (Text.pack "Proliferate")
   Effect.ExileHandThenDraw -> nullary (Text.pack "ExileHandThenDraw")
+  Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array [slotNameToJson slot, filterToJson f, quantityToJson q]))
   Effect.RestartGame -> nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
   Effect.Destroy s r -> Json.tagged (Text.pack "Destroy") (Just (Array [slotNameToJson s, regenerabilityToJson r]))
@@ -1327,6 +1328,9 @@ jsonToEffect value = do
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
+    "PlayerSacrifices" -> case mv of
+      Just (Array [sv, fv, qv]) -> Effect.PlayerSacrifices <$> jsonToSlotName sv <*> jsonToFilter fv <*> jsonToQuantity qv
+      _ -> Left (Text.pack "PlayerSacrifices expects [slot, filter, quantity]")
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
     "Destroy" -> case mv of
