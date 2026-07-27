@@ -472,6 +472,63 @@ tests registry =
             (humilityId, gs) = S.addCreature humility S.alice g1
         HU.assertBool "the other enchantment IS animated" (Projection.isCreatureOf humilityId gs)
         HU.assertBool "Opalescence is not" (not (Projection.isCreatureOf opalescenceId gs)),
+      -- CR 613.6: "If an effect starts to apply in one layer and/or sublayer, it
+      -- will continue to be applied to the same set of objects in each other
+      -- applicable layer and/or sublayer, even if the ability generating the
+      -- effect is removed during this process."
+      --
+      -- March of the Machines is the card that needs it, and the reason nothing
+      -- before it did. Its affected set is "each NONCREATURE artifact" and its own
+      -- layer-4 part makes every object in that set a creature, so a set
+      -- re-derived at layer 7b would be empty: the animated artifact would have no
+      -- power or toughness at all (not 0/0 -- Nothing), which CR 704.5f would not
+      -- even fire on. Opalescence never noticed because its filter reads card
+      -- types it does not change.
+      HU.testCase "CR 613.6: March of the Machines animates an artifact AND still sets its P/T" $ do
+        march <- Registry.printing registry "March of the Machines"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        let base = Setup.emptyGame S.bothPlayers
+            (equip, g1) = S.addCreature bonesplitter S.alice base
+            (_, gs) = S.addCreature march S.alice g1
+        HU.assertBool "Bonesplitter is a creature (layer 4)" (Projection.isCreatureOf equip gs)
+        HU.assertEqual "power equal to its mana value, {1} (layer 7b)" (Just 1) (Projection.powerOf equip gs)
+        HU.assertEqual "and toughness the same" (Just 1) (Projection.toughnessOf equip gs),
+      -- The other half of the same rule, and the half a per-layer re-derivation
+      -- gets right by accident: an artifact that was ALREADY a creature is not in
+      -- the set when March starts to apply, so it is in the set at NEITHER layer.
+      -- Its P/T must stay printed rather than becoming its mana value.
+      HU.testCase "CR 613.6: an artifact that was already a creature is in no part of March's set" $ do
+        march <- Registry.printing registry "March of the Machines"
+        myr <- Registry.printing registry "Darksteel Myr"
+        let base = Setup.emptyGame S.bothPlayers
+            (myrId, g1) = S.addCreature myr S.alice base
+            (_, gs) = S.addCreature march S.alice g1
+        HU.assertEqual "still its printed 0 power, not its {3} mana value" (Just 0) (Projection.powerOf myrId gs)
+        HU.assertEqual "and its printed 1 toughness" (Just 1) (Projection.toughnessOf myrId gs),
+      -- The whole card, cast: March of the Machines' own reminder text is
+      -- "(Equipment that's a creature can't equip a creature.)" -- CR 301.5c, whose
+      -- state-based action is CR 704.5p. So the two halves meet here: the layer-7b
+      -- part that CR 613.6 rescues gives the Equipment its P/T, and the layer-4
+      -- part that gave it the creature type also knocks it off the creature it was
+      -- equipping.
+      HU.testCase "CR 613.6 + CR 704.5p whole card: casting March animates an equipped Bonesplitter, which falls off" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        march <- Registry.printing registry "March of the Machines"
+        let base = S.landsInPlay island 4 -- {3}{U}
+            (creature, g1) = S.addCreature piker S.alice base
+            (equip, g2) = S.addCreature bonesplitter S.alice g1
+            attached = S.attach equip creature g2
+            (withSpell, spellId) = S.handOne march attached
+            cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            after = snd (Engine.runGamePure S.identityAnswer resolved Engine.settleForPriority)
+        HU.assertEqual "equipped, the Piker was 4/1" (Just 4) (Projection.powerOf creature attached)
+        HU.assertEqual "the Equipment is a 1/1 creature" (Just 1) (Projection.powerOf equip after)
+        HU.assertBool "it is still on the battlefield" (Set.member equip (GameState.battlefield after))
+        HU.assertEqual "but unattached" (Just Nothing) (fmap Object.attachedTo (Game.lookupObject equip after))
+        HU.assertEqual "so the Piker is back to 2 power" (Just 2) (Projection.powerOf creature after),
       HU.testCase "CR 613 Humility + Opalescence: a real creature is 1/1 with no abilities" $ do
         piker <- Registry.printing registry "Goblin Piker"
         humility <- Registry.printing registry "Humility"

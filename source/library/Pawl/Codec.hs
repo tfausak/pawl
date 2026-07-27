@@ -1354,19 +1354,21 @@ jsonToTypeLine value = do
   sub <- Json.field (Text.pack "subtypes") ps >>= setFrom jsonToSubtype
   pure (TypeLine.MkTypeLine sup tys sub)
 
+-- CR 613.6: the parts of one ability's effect travel together, so the wire format
+-- is one affected set and an ARRAY of modifications -- never one entry per layer.
 staticAbilityToJson :: StaticAbility.StaticAbility -> Value
 staticAbilityToJson sa =
   Object
     [ (Text.pack "affected", affectedToJson (StaticAbility.affected sa)),
-      (Text.pack "modification", modificationToJson (StaticAbility.modification sa))
+      (Text.pack "modifications", listTo modificationToJson (StaticAbility.modifications sa))
     ]
 
 jsonToStaticAbility :: Value -> Either Text StaticAbility.StaticAbility
 jsonToStaticAbility value = do
   ps <- Json.asObject value
   a <- Json.field (Text.pack "affected") ps >>= jsonToAffected
-  m <- Json.field (Text.pack "modification") ps >>= jsonToModification
-  pure (StaticAbility.MkStaticAbility a m)
+  ms <- Json.field (Text.pack "modifications") ps >>= listFrom jsonToModification
+  pure (StaticAbility.MkStaticAbility a ms)
 
 playerStaticAbilityToJson :: PlayerStaticAbility.PlayerStaticAbility -> Value
 playerStaticAbilityToJson pa =

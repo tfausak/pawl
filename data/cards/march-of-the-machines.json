@@ -5,28 +5,19 @@
   "manaCost": [
     {
       "type": "Generic",
-      "value": 2
+      "value": 3
     },
     {
       "type": "OfType",
       "value": {
         "type": "Colored",
         "value": {
-          "type": "White"
-        }
-      }
-    },
-    {
-      "type": "OfType",
-      "value": {
-        "type": "Colored",
-        "value": {
-          "type": "White"
+          "type": "Blue"
         }
       }
     }
   ],
-  "name": "Opalescence",
+  "name": "March of the Machines",
   "power": null,
   "replacementEffects": [],
   "spell": {
@@ -51,21 +42,15 @@
             {
               "type": "HasCardType",
               "value": {
-                "type": "Enchantment"
+                "type": "Artifact"
               }
             },
             {
               "type": "Not",
               "value": {
-                "type": "IsSource"
-              }
-            },
-            {
-              "type": "Not",
-              "value": {
-                "type": "HasSubtype",
+                "type": "HasCardType",
                 "value": {
-                  "type": "Aura"
+                  "type": "Creature"
                 }
               }
             }
@@ -73,6 +58,12 @@
         }
       },
       "modifications": [
+        {
+          "type": "AddCardType",
+          "value": {
+            "type": "Artifact"
+          }
+        },
         {
           "type": "AddCardType",
           "value": {

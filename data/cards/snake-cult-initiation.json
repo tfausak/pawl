@@ -42,13 +42,15 @@
       "affected": {
         "type": "Attached"
       },
-      "modification": {
-        "type": "GainKeyword",
-        "value": {
-          "type": "Poisonous",
-          "value": 3
+      "modifications": [
+        {
+          "type": "GainKeyword",
+          "value": {
+            "type": "Poisonous",
+            "value": 3
+          }
         }
-      }
+      ]
     }
   ],
   "toughness": null,

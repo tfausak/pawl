@@ -182,11 +182,23 @@ addPT base delta = case (base, delta) of
   (Just b, Nothing) -> Just b
   (Nothing, _) -> Nothing
 
--- A continuous effect ready to fold: its source (for the Matching ExcludesSource
--- self-exclusion), the set it affects, its layer, its timestamp, and the
--- modification. Projection-internal; not a domain type.
+-- One layer's worth of a continuous effect: its source (for the Matching
+-- ExcludesSource self-exclusion), the set it affects, its timestamp, and the one
+-- modification that applies in `gLayer`. Projection-internal; not a domain type.
 data Gathered = MkGathered
-  { gSource :: ObjectId,
+  { -- WHICH effect this part belongs to, named only when that matters: Just
+    -- (source, the ability's index on that source) for a static ability with
+    -- parts in more than one layer, Nothing for everything else. CR 613.6's "the
+    -- same set of objects in each other applicable layer" is a decision keyed by
+    -- exactly this pair, made once and reused (projectWith). Two parts of one
+    -- ability share it; two abilities never do, even on the same permanent with
+    -- the same filter.
+    --
+    -- A one-part effect is asked once by construction, so it needs no identity at
+    -- all: every counter, every stored effect and every single-line static
+    -- ability is Nothing, which is the whole pool bar three cards.
+    gEffect :: !(Maybe (ObjectId, Natural)),
+    gSource :: ObjectId,
     gAffected :: Affected.Affected,
     gLayer :: Layer,
     gTimestamp :: Timestamp,
@@ -561,7 +573,7 @@ setLandSubtypeEffects gs =
         Nothing -> []
         Just card ->
           fmap (\sa -> (permId, StaticAbility.affected sa)) $
-            filter (isSet . StaticAbility.modification) (Card.Type.staticAbilities card)
+            filter (any isSet . StaticAbility.modifications) (Card.Type.staticAbilities card)
    in concatMap fromStored (GameState.continuousEffects gs)
         <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 
@@ -624,12 +636,22 @@ rewriteModification pairs m =
 -- permanent's own timestamp), dropping a permanent whose static abilities are
 -- not live (CR 305.7 stripped). NOT filtered by object here -- project filters
 -- per layer against the partial.
+--
+-- CR 613.6: the affected set belongs to the EFFECT, not to each of its parts, so
+-- the parts of one static ability all carry that ability's key -- which is what
+-- lets projectWith decide their set once. A stored effect and a counter are each
+-- a single part and carry none.
 gather :: GameState -> [Gathered]
 gather gs =
   let setEffs = setLandSubtypeEffects gs
+      -- A stored effect carries exactly one modification (Pawl.Resolve stores one
+      -- per opcode), so CR 613.6 has nothing to hold together here -- and nothing
+      -- to get wrong either, since every stored effect's set is the CR 611.2c
+      -- TheseObjects one, locked at resolution.
       fromStored eff =
         MkGathered
-          { gSource = ContinuousEffect.source eff,
+          { gEffect = Nothing,
+            gSource = ContinuousEffect.source eff,
             gAffected = ContinuousEffect.affected eff,
             gLayer = layer (ContinuousEffect.modification eff),
             gTimestamp = ContinuousEffect.timestamp eff,
@@ -648,16 +670,7 @@ gather gs =
                 -- effect is folded onto any other object. Hack Blood Moon's
                 -- SetLandSubtype Mountain -> SetLandSubtype Island.
                 let changes = textChangesAffecting permId gs
-                    gatherOne sa =
-                      let m = rewriteModification changes (StaticAbility.modification sa)
-                       in MkGathered
-                            { gSource = permId,
-                              gAffected = StaticAbility.affected sa,
-                              gLayer = layer m,
-                              gTimestamp = Object.timestamp permObj,
-                              gModification = m
-                            }
-                 in fmap gatherOne (Card.Type.staticAbilities card)
+                 in concat (zipWith (gatherStatic permId (Object.timestamp permObj) changes) [0 ..] (Card.Type.staticAbilities card))
               else []
       static_ = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
@@ -669,19 +682,36 @@ gather gs =
             -- zone. Its static ability's continuous effect shares the emblem's
             -- entry timestamp (CR 613.7a). No liveness/text-change pass: nothing
             -- in scope strips an emblem's abilities or rewrites land types.
-            fmap
-              ( \sa ->
-                  MkGathered
-                    { gSource = emblemId,
-                      gAffected = StaticAbility.affected sa,
-                      gLayer = layer (StaticAbility.modification sa),
-                      gTimestamp = Object.timestamp emblemObj,
-                      gModification = StaticAbility.modification sa
-                    }
-              )
-              (Card.Type.staticAbilities card)
+            concat (zipWith (gatherStatic emblemId (Object.timestamp emblemObj) []) [0 ..] (Card.Type.staticAbilities card))
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
    in stored <> static_ <> emblems <> counterGathered gs
+
+-- One static ability's parts, ready to fold: CR 613.6's unit. `n` is the
+-- ability's index on its source, and (src, n) is what every part of a MULTI-part
+-- ability carries as its key, so projectWith can tell that a layer-4 part and a
+-- layer-7b part are the same effect and must share one affected set. A one-part
+-- ability is asked once by construction and carries no key at all.
+--
+-- Read-point 2 (CR 612): the text-changes affecting the SOURCE rewrite each
+-- part's basic-land-type words before the part is folded onto any other object.
+-- Hack Blood Moon's SetLandSubtype Mountain -> SetLandSubtype Island.
+gatherStatic :: ObjectId -> Timestamp -> [(Subtype.Subtype, Subtype.Subtype)] -> Natural -> StaticAbility.StaticAbility -> [Gathered]
+gatherStatic src ts changes n sa =
+  let ms = StaticAbility.modifications sa
+      key = case ms of
+        _ : _ : _ -> Just (src, n)
+        _ -> Nothing
+      one m =
+        let m' = rewriteModification changes m
+         in MkGathered
+              { gEffect = key,
+                gSource = src,
+                gAffected = StaticAbility.affected sa,
+                gLayer = layer m',
+                gTimestamp = ts,
+                gModification = m'
+              }
+   in fmap one ms
 
 -- CR 122.1a / 613.4c: a +1/+1 counter adds +1/+1 and a -1/-1 counter adds -1/-1,
 -- in layer 7c. Emit each battlefield object's counters as ONE synthetic 7c
@@ -705,7 +735,8 @@ counterGathered gs = Maybe.mapMaybe fromObject (Set.toList (GameState.battlefiel
               else
                 Just
                   MkGathered
-                    { gSource = oid,
+                    { gEffect = Nothing,
+                      gSource = oid,
                       gAffected = Affected.TheseObjects (Set.singleton oid),
                       gLayer = Layer.ModifyPT,
                       gTimestamp = Object.timestamp obj,
@@ -782,26 +813,54 @@ applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
 projectWith :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectWith admits cands oid gs =
   let layers = filter admits (Set.toAscList (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))
-      applyLayer partial lyr =
+      applyLayer (partial, decided) lyr =
         let seeded =
               if lyr == Layer.CharacteristicPT
                 then applyCharacteristicPT lyr cands gs oid partial
                 else partial
-            -- The affected set is re-derived at every layer, against the layers
-            -- below it -- which is right ACROSS effects (a layer-6 grant should
-            -- see a layer-4 type change) and wrong WITHIN one, where CR 613.6
-            -- says an effect keeps the same set in each layer it applies in. A
-            -- filter that reads a characteristic its own effect changes therefore
-            -- stops matching partway down (#233).
-            here = filter (\c -> gLayer c == lyr && affects (gSource c) oid (gAffected c) seeded gs) cands
+            -- CR 613.6: "If an effect starts to apply in one layer and/or
+            -- sublayer, it will continue to be applied to the same set of objects
+            -- in each other applicable layer." So the affected set is asked ONCE
+            -- per effect, at the lowest layer that effect reaches -- which is this
+            -- one the first time its key is seen, since `layers` is ascending --
+            -- and the answer is remembered in `decided` for its other layers.
+            --
+            -- Across DIFFERENT effects the partial projection is still the right
+            -- thing to read, which is why this memo is keyed by the effect rather
+            -- than hoisted out of the loop: a layer-6 grant must see a layer-4
+            -- type change. Re-asking WITHIN one effect is what made March of the
+            -- Machines' "each noncreature artifact" stop matching its own layer-4
+            -- output by layer 7b, leaving an animated artifact with no P/T at all
+            -- (#233).
+            --
+            -- The memo remembers "no" as faithfully as "yes", which is the rule's
+            -- other half: an artifact that was ALREADY a creature is outside the
+            -- set when March starts to apply, so it stays outside at 7b too and
+            -- keeps its printed P/T.
+            --
+            -- Only an effect with parts in more than one layer carries a key
+            -- (gEffect); everything else -- every counter, every stored effect,
+            -- every single-line static ability -- is Nothing, asks once by
+            -- construction, and never touches the Map. So on a board with no
+            -- Humility, Opalescence or March on it, `decided` stays empty and this
+            -- costs one Maybe test per candidate per layer.
+            remember ds c = case gEffect c of
+              Nothing -> ds
+              Just k
+                | gLayer c /= lyr || Map.member k ds -> ds
+                | otherwise -> Map.insert k (affects (gSource c) oid (gAffected c) seeded gs) ds
+            decided' = List.foldl' remember decided cands
+            applies c = case gEffect c of
+              Nothing -> affects (gSource c) oid (gAffected c) seeded gs
+              Just k -> Map.findWithDefault False k decided'
             -- CR 613.7 timestamp order within a layer; the CR 613.8b dependency
             -- reorder (a same-layer effect that changes which objects another
             -- applies to) is not implemented (#11). Existence dependencies are
             -- handled separately by staticAbilitiesLive.
-            ordered = List.sortOn gTimestamp here
+            ordered = List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands)
             step pc c = applyModification lyr (gSource c) cands gs oid (gModification c) pc
-         in List.foldl' step seeded ordered
-   in List.foldl' applyLayer (copiableCharacteristics oid gs) layers
+         in (List.foldl' step seeded ordered, decided')
+   in fst (List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers)
 
 -- Project one object against a PRECOMPUTED candidate list. gather is
 -- oid-independent, so a whole-board sweep gathers once and folds each object
@@ -980,7 +1039,8 @@ controlGrants gs =
             if not (null setEffs) && not (liveGiven setEffs Set.empty permId gs)
               then []
               else
-                let isControl sa = case StaticAbility.modification sa of
+                let isControl sa = any isControlOp (StaticAbility.modifications sa)
+                    isControlOp m = case m of
                       Modification.SetControllerToSource -> True
                       _ -> False
                     toGrant sa =

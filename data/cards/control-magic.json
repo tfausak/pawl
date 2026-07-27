@@ -51,9 +51,11 @@
       "affected": {
         "type": "Attached"
       },
-      "modification": {
-        "type": "SetControllerToSource"
-      }
+      "modifications": [
+        {
+          "type": "SetControllerToSource"
+        }
+      ]
     }
   ],
   "toughness": null,

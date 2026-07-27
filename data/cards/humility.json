@@ -52,33 +52,24 @@
           }
         }
       },
-      "modification": {
-        "type": "LoseAllAbilities"
-      }
-    },
-    {
-      "affected": {
-        "type": "Matching",
-        "value": {
-          "type": "HasCardType",
-          "value": {
-            "type": "Creature"
-          }
+      "modifications": [
+        {
+          "type": "LoseAllAbilities"
+        },
+        {
+          "type": "SetBasePowerToughness",
+          "value": [
+            {
+              "type": "Literal",
+              "value": 1
+            },
+            {
+              "type": "Literal",
+              "value": 1
+            }
+          ]
         }
-      },
-      "modification": {
-        "type": "SetBasePowerToughness",
-        "value": [
-          {
-            "type": "Literal",
-            "value": 1
-          },
-          {
-            "type": "Literal",
-            "value": 1
-          }
-        ]
-      }
+      ]
     }
   ],
   "toughness": null,
