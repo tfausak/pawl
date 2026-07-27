@@ -349,7 +349,10 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipient = case Map.lookup slot specs of
             Nothing -> True
-            Just spec -> Target.stillLegal oid recipient spec gs
+            -- CR 608.2b's perspective comes from the SPELL, which is the object
+            -- on the stack and therefore still present; for a spell the source and
+            -- the ability are the same object, so this is a rename, not a change.
+            Just spec -> Target.stillLegal (Projection.controllerOf oid gs) oid recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           targeted = Map.restrictKeys legality (Map.keysSet specs)
        in not (Map.null specs) && not (or (Map.elems targeted))
@@ -385,7 +388,7 @@ resolveSpellWith runSubgame oid = do
               -- a token this resolution minted -- and was never targeted, so it can
               -- never have become an illegal target.
               Nothing -> True
-              Just spec -> Target.stillLegal oid recipient spec gs
+              Just spec -> Target.stillLegal (Projection.controllerOf oid gs) oid recipient spec gs
          in if targetsAllIllegal oid gs
               then Event.changeZone oid Zone.Graveyard
               else do
@@ -433,7 +436,11 @@ resolveEffects stackId srcId effects specs = do
             -- a token this resolution minted -- and was never targeted, so it can
             -- never have become an illegal target.
             Nothing -> True
-            Just spec -> Target.stillLegal srcId recipient spec gs
+            -- CR 608.2b: the perspective is the ABILITY's controller, read from
+            -- `stackId` -- the ability's own object, which is on the stack and so
+            -- still exists. `srcId` stays the source (CR 113.7), and may well be
+            -- gone: that is exactly the case this rule is about.
+            Just spec -> Target.stillLegal (Projection.controllerOf stackId gs) srcId recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
           -- reserved slots above cannot rescue a spell whose every target is gone.

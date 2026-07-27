@@ -17,6 +17,7 @@ import qualified Pawl.Type.Mode as Mode
 import Pawl.Type.ModeIndex (ModeIndex)
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Pool as Pool
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
@@ -42,10 +43,26 @@ import qualified Pawl.Type.Zone as Zone
 -- projected controller has no legal targets either. CR 601.2c's "another" is applied here too, as the
 -- Filter's own Not IsSource (#163) -- so it drops whichever tag the Pool
 -- produced, and re-validation sees the same rule selection did.
-legalRecipients :: ObjectId -> TargetSpec -> GameState -> Set Recipient
-legalRecipients source spec gs =
+-- The PERSPECTIVE (CR 109.5's "you") is passed in rather than derived from the
+-- source, and CR 608.2b is why: "If the source of an ability has left the zone it
+-- was in, its last known information is used during this process." Deriving it
+-- here as `Projection.controllerOf source` returns Nothing once the source has
+-- left the battlefield, which makes a ControlledBy filter vacuously False and
+-- empties the legal set -- so the CR 608.2b re-check would find every target
+-- illegal and fizzle an ability whose source was merely killed in response.
+--
+-- The ability's controller is knowable when its source is not, because the
+-- ABILITY is its own object on the stack: callers on the resolution path read the
+-- perspective from that object, and callers on the cast/activate path already
+-- have the acting player in hand.
+--
+-- Maybe, not PlayerId, and it matches Filter.MkContext's own field: Nothing is a
+-- genuinely absent perspective, which leaves a player-referencing filter
+-- vacuously False exactly as before.
+legalRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
+legalRecipients perspective source spec gs =
   let TargetSpec.MkTargetSpec pool restriction = spec
-      context = Filter.MkContext (Projection.controllerOf source gs) (Just source)
+      context = Filter.MkContext perspective (Just source)
       keep recipient = case recipient of
         -- CR 115.1: a player candidate is narrowed too ("target opponent"), by a
         -- Filter that asks about the player rather than about an object -- the
@@ -100,8 +117,8 @@ spellRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is
 -- otherwise re-judged against the spec in the current state.
-stillLegal :: ObjectId -> Recipient -> TargetSpec -> GameState -> Bool
-stillLegal source recipient spec gs = Set.member recipient (legalRecipients source spec gs)
+stillLegal :: Maybe PlayerId -> ObjectId -> Recipient -> TargetSpec -> GameState -> Bool
+stillLegal perspective source recipient spec gs = Set.member recipient (legalRecipients perspective source spec gs)
 
 -- One legal set per named slot; casting prompts with exactly this map. `source`
 -- is the object the targeting is relative to -- the spell object at cast, the
@@ -109,8 +126,8 @@ stillLegal source recipient spec gs = Set.member recipient (legalRecipients sour
 -- a slot that excludes its source says so with Not IsSource, and a slot that
 -- does not is untouched, so Prodigal Sorcerer may still target itself with
 -- AnyTarget (CR 115.4).
-legalSets :: ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
-legalSets source specs gs = fmap (\spec -> legalRecipients source spec gs) specs
+legalSets :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
+legalSets perspective source specs gs = fmap (\spec -> legalRecipients perspective source spec gs) specs
 
 -- CR 700.2a: the mode indices all of whose target slots have a legal recipient
 -- (a mode with no slots is trivially fillable). Self-exclusion ("another") is
@@ -123,11 +140,11 @@ legalSets source specs gs = fmap (\spec -> legalRecipients source spec gs) specs
 -- resolution (CR 601.2c says it could never have been cast). An ability has no
 -- enchant spec and passes Map.empty, which makes that a fact of the call
 -- rather than a special case here.
-fillableModes :: ObjectId -> Map SlotName TargetSpec -> Modal.Modal Card -> GameState -> Set ModeIndex
-fillableModes source extra modal gs =
+fillableModes :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> Modal.Modal Card -> GameState -> Set ModeIndex
+fillableModes perspective source extra modal gs =
   let ms = Foldable.toList (Modal.modes modal)
       fillable i m =
-        let sets = legalSets source (Map.union extra (Mode.targetSpecs m)) gs
+        let sets = legalSets perspective source (Map.union extra (Mode.targetSpecs m)) gs
          in if any Set.null (Map.elems sets)
               then Nothing
               else Just (ModeIndex.MkModeIndex (fromIntegral i))
