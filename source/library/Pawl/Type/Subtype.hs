@@ -55,4 +55,6 @@ data Subtype
     Artificer
   | -- CR 205.3m (a creature type; Uthden Troll's).
     Troll
+  | -- CR 205.3m (a creature type; Ghitu Fire-Eater's).
+    Nomad
   deriving (Eq, Ord, Show)

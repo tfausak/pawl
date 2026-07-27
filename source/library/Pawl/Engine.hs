@@ -824,6 +824,15 @@ beginTurnOf pid gs =
           GameState.events = Seq.empty,
           GameState.scannedThrough = 0,
           GameState.damageScannedThrough = 0,
+          -- GameState.lastKnown is deliberately NOT cleared alongside them. The
+          -- log's one-turn scope is a choice about what "look back in time"
+          -- (CR 608.2i) has to reach; CR 608.2h's last known information is not
+          -- history a card asks after, it is the substitute identity of an object
+          -- that no longer exists, and it stays needed for as long as anything can
+          -- still name that object -- a delayed triggered ability's source
+          -- (CR 603.7d) outlives the turn it was armed in. Pawl.Setup clears it at
+          -- the three points a NEW game begins, which is the only place it means
+          -- nothing.
           GameState.phase = Turn.firstPhase,
           GameState.remaining = Turn.laterPhases,
           -- CR 723.1/723.1b: the new active player's pending control (if any)

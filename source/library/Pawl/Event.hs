@@ -198,7 +198,16 @@ changeZoneAttaching oid requestedDest seed = do
               mkObj ts = obj {Object.zone = dest, Object.tapped = TapState.Untapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.timestamp = ts}
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
-             in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
+             in g1
+                  { GameState.objects = Map.delete oid (GameState.objects g1),
+                    -- CR 608.2h: the object ceases here, so this is the last
+                    -- moment its information is known. Filed under the id it had
+                    -- while it existed -- the id an ability on the stack still
+                    -- carries as its source (CR 113.7) -- and from the same
+                    -- `snapshot` the Moved event below records, so the two
+                    -- readings of "what was it" cannot drift apart.
+                    GameState.lastKnown = Map.insert oid snapshot (GameState.lastKnown g1)
+                  }
           newId <- placeObject pid mkObj dest
           -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
           -- nowhere else. CR 616.1g: this loop is NESTED inside the zone change,

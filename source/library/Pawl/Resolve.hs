@@ -527,6 +527,17 @@ cease abilId gs =
 -- `controller` is the controller of the resolving spell/ability -- who searches
 -- their own library (CR 701.23), never the effect `source` (for an ability, the
 -- source permanent may already be sacrificed as a cost).
+--
+-- That last parenthesis is why every arm below that evaluates a Quantity binds
+-- its view as `Projection.viewWithLastKnown source gs` and not
+-- `Projection.fullView gs`. CR 608.2h: "if the effect requires information from a
+-- specific object, INCLUDING THE SOURCE OF THE ABILITY ITSELF, the effect uses
+-- the current information of that object if it's in the public zone it was
+-- expected to be in; if it's no longer in that zone … the effect uses the
+-- object's last known information." Uniform across the arms rather than
+-- special-cased on the one opcode a card exercises today: the rule is about the
+-- source, not about which effect is asking, and for a source that still exists
+-- the two views are equal by construction.
 -- The subgame-runner-aware executor. `runSubgame` is the injected Game Result
 -- that PLAYS a nested game (Engine.playSubgame); the bare applyEffect below
 -- passes noSubgame. Only the PlaySubgame arm consults it.
@@ -552,7 +563,7 @@ applyEffectWith :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Subt
 applyEffectWith runSubgame source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity -> do
     gs <- State.get
-    let viewOf = Projection.fullView gs
+    let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Quantity.evaluate viewOf context gs source quantity of
@@ -760,7 +771,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Draw quantity -> do
     gs <- State.get
-    let viewOf = Projection.fullView gs
+    let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
     case Quantity.evaluate viewOf context gs source quantity of
       Just n
@@ -771,7 +782,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Mill slot quantity -> do
     gs <- State.get
-    let viewOf = Projection.fullView gs
+    let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
@@ -787,7 +798,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Discard slot quantity -> do
     gs <- State.get
-    let viewOf = Projection.fullView gs
+    let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
@@ -819,7 +830,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- raises the prompt, which is the same shape Cost's Sacrifice component takes.
   Effect.PlayerSacrifices slot filter_ quantity -> do
     gs <- State.get
-    let viewOf = Projection.fullView gs
+    let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer victim), True) ->
@@ -862,7 +873,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.Create quantity card mSlot -> do
     gs <- State.get
-    let viewOf = Projection.fullView gs
+    let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
     case Quantity.evaluate viewOf context gs source quantity of
       Just n
@@ -1044,7 +1055,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       _ -> pure ()
   Effect.PutCounters kind quantity slot -> do
     gs <- State.get
-    let viewOf = Projection.fullView gs
+    let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of
@@ -1114,7 +1125,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             )
   Effect.GainPlayerCounters ref kind quantity -> do
     gs <- State.get
-    let viewOf = Projection.fullView gs
+    let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
         -- The recipients. A slot's legality is asked the way every other slot
         -- read asks it (CR 608.2b): a slot filled by targeting that has since

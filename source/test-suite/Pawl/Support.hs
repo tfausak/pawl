@@ -1262,6 +1262,7 @@ oneMountainState mountain ph =
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.events = Seq.empty,
+          GameState.lastKnown = Map.empty,
           GameState.scannedThrough = 0,
           GameState.damageScannedThrough = 0,
           GameState.delayedTriggers = Seq.empty,

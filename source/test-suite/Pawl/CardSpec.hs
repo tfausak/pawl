@@ -271,6 +271,7 @@ quantityCounts :: Quantity.Type.Quantity -> [Count.Type.Count]
 quantityCounts quantity = case quantity of
   Quantity.Type.Literal _ -> []
   Quantity.Type.ManaValue -> []
+  Quantity.Type.Power -> []
   Quantity.Type.X -> []
   Quantity.Type.Star -> []
   Quantity.Type.Plus a b -> quantityCounts a <> quantityCounts b

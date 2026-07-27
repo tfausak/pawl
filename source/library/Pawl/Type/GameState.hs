@@ -18,6 +18,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Phase (Phase)
 import Pawl.Type.Player (Player)
 import Pawl.Type.PlayerId (PlayerId)
+import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
 import Pawl.Type.RestartSignal (RestartSignal)
 import Pawl.Type.Result (Result)
 import Pawl.Type.Timestamp (Timestamp)
@@ -45,6 +46,31 @@ data GameState = MkGameState
     -- cleared by a reader. Cleared with both watermarks at turn handoff
     -- (Engine.handoffTurn) -- not at cleanup, which is still part of this turn.
     events :: Seq GameEvent,
+    -- CR 608.2h / 113.7a: last known information, keyed by the id an object had
+    -- BEFORE it left a zone. "If the effect requires information from a specific
+    -- object, including the source of the ability itself, the effect uses the
+    -- current information of that object if it's in the public zone it was
+    -- expected to be in; if it's no longer in that zone … the effect uses the
+    -- object's last known information."
+    --
+    -- Every zone change mints a fresh id (CR 400.7, Event.changeZoneAttaching),
+    -- so a departed object's OLD id names nothing in `objects`. That is exactly
+    -- the condition under which this map is the answer, and it is why the key is
+    -- the pre-move id rather than the incarnation's: the id an ability on the
+    -- stack still carries as its source is the old one.
+    --
+    -- Written by the same funnel that records the Moved event, from the same
+    -- snapshot value, so the two cannot disagree. Both are kept because they
+    -- answer different questions: the log answers "what happened, in order"
+    -- (CR 608.2i) and needs the NEW id for an enters trigger to scan, while this
+    -- answers "what was that object" by the OLD id, in one lookup rather than a
+    -- backwards scan.
+    --
+    -- Grows for the whole game, deliberately: an entry can be needed arbitrarily
+    -- later (a delayed trigger's source, CR 603.7d), so there is no point at
+    -- which pruning is provably safe. Correctness over footprint, per the
+    -- project's standing guidance.
+    lastKnown :: Map ObjectId ProjectedCharacteristics,
     -- CR 117.5: how far the trigger scan has consumed. Everything at or after
     -- this index is unscanned. Consumption is an index bump; the record stays.
     scannedThrough :: Natural,
