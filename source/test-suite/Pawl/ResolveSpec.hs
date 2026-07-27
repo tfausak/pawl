@@ -1899,14 +1899,25 @@ playerSacrificesTests registry =
       -- CR 701.21a: "A player can't sacrifice ... a permanent they don't control."
       -- The guard the whole issue is about, reached the only way it can be: an
       -- interpreter naming a permanent outside the offered set.
+      --
+      -- Bob controls TWO creatures on purpose. With one, candidates <= count and
+      -- the prompt is elided, so the lying answerer is never consulted and the
+      -- test passes without exercising anything -- which is what it did before
+      -- review caught it.
       HU.testCase "CR 701.21a an answer naming a permanent the player does not control is refused" $ do
         piker <- Registry.printing registry "Goblin Piker"
+        rats <- Registry.printing registry "Typhoid Rats"
         let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
             (hers, g1) = S.addCreature piker S.alice g0
-            (his, gs) = S.addCreature piker S.bob g1
+            (hisPiker, g2) = S.addCreature piker S.bob g1
+            (hisRats, gs) = S.addCreature rats S.bob g2
             after = S.runPure (namesInstead hers) gs (Resolve.applyEffect src S.alice Map.empty (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+            bobsLeft = length (filter (`S.onBattlefield` after) [hisPiker, hisRats])
         HU.assertBool "alice's creature is untouched" (S.onBattlefield hers after)
-        HU.assertBool "and bob's own creature went instead" (not (S.onBattlefield his after)),
+        -- The edict still takes exactly one: an answer the engine refuses does not
+        -- become an answer of "none". CR 609.3 caps it at what bob controls, and
+        -- he controls two.
+        HU.assertEqual "bob still lost exactly one of his own" 1 bobsLeft,
       -- Where the rules leave nothing to ask, don't prompt: one candidate is
       -- forced (CR 609.3 does as much as possible, which here is all of it).
       HU.testCase "CR 609.3 a lone creature is sacrificed without a prompt" $ do

@@ -286,10 +286,12 @@ counter oid = do
 -- restricts it to permanents on the battlefield, so anything else is a no-op.
 --
 -- CR 701.21a's other clause -- "A player can't sacrifice something that... [is] a
--- permanent they don't control" -- is not enforced here (#44). Not wrong today:
--- the only caller (Resolve's Sacrifice arm) reads a slot the engine itself
--- stamped (Binding.triggerSource, a triggered ability's own source, CR 113.7),
--- which is always controlled by whoever triggered it.
+-- permanent they don't control" -- is why this takes the sacrificing player and
+-- not just the permanent. Enforced HERE, at the one funnel, rather than trusted
+-- from each caller: a cost payment and a triggered ability's own source (CR
+-- 113.7's Binding.triggerSource) are controlled by the paying player by
+-- construction, but an edict's victim is a permanent a PLAYER named, and only
+-- that one could ever be wrong.
 sacrifice :: PlayerId -> ObjectId -> Game ()
 sacrifice pid oid = do
   gs <- State.get

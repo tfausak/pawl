@@ -841,12 +841,22 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                   if length candidates <= fromInteger n
                     then pure (Set.fromList candidates)
                     else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider victim source candidates (fromInteger n)))
-                -- FILTERED, NOT TRUSTED: an answer outside the offered set is
-                -- dropped. Event.sacrifice's CR 701.21a guard would refuse it
-                -- anyway, and the two agreeing is the point -- neither is load
-                -- bearing alone.
-                let kept = filter (\oid -> Set.member oid picked) candidates
-                Monad.mapM_ (Event.sacrifice victim) (take (fromInteger n) kept)
+                -- FILTERED AND COMPLETED, not merely filtered. Dropping the
+                -- invalid picks is not enough: Diabolic Edict is not "may", so an
+                -- interpreter answering with too few -- or with nothing -- would
+                -- otherwise sacrifice fewer permanents than the effect demands and
+                -- cheat the edict. CR 609.3 caps this at "as much as possible",
+                -- which is every candidate, not however many the answer named.
+                --
+                -- So the valid picks are honoured first and the rest is made up
+                -- deterministically from the remaining candidates, in the order
+                -- they were offered. That differs from the cost path's
+                -- reject-not-repair on purpose: a cost may simply go unpaid, and
+                -- an effect has no such out.
+                let wanted = min (fromInteger n) (length candidates)
+                    valid = filter (\oid -> Set.member oid picked) candidates
+                    filler = filter (\oid -> List.notElem oid valid) candidates
+                Monad.mapM_ (Event.sacrifice victim) (take wanted (valid <> filler))
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
