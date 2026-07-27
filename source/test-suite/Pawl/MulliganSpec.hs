@@ -15,7 +15,6 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.Registry as Registry
@@ -163,7 +162,7 @@ orderedLibraryGame mountain printings =
 bottomReversedAnswer :: Prompt.Prompt r -> r
 bottomReversedAnswer p = case p of
   Prompt.DeclareMulligan _ pid offer -> if pid == S.alice && MulliganOffer.taken offer < 2 then MulliganDecision.Mulligan else MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> reverse (take (Natural.toIntSaturating count) hand)
+  Prompt.Bottom _ _ hand count -> reverse (List.genericTake count hand)
   _ -> S.identityAnswer p
 
 -- alice's library: a Serum Powder on top, then `n` Mountains; bob's is uniform
@@ -254,7 +253,7 @@ recordWindowRound p = case p of
   -- which here is the Powder the mulligan just drew -- it would land at the
   -- library bottom and round 2 would have nothing to offer, so the test would
   -- pass or fail on the fixture's draw order rather than on CR 103.5b.
-  Prompt.Bottom _ _ hand count -> pure (reverse (take (Natural.toIntSaturating count) (reverse hand)))
+  Prompt.Bottom _ _ hand count -> pure (reverse (List.genericTake count (reverse hand)))
   _ -> pure (S.identityAnswer p)
 
 -- alice keeps at once; bob mulligans twice then keeps. Every window is

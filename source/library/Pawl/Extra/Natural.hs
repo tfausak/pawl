@@ -24,7 +24,14 @@ toIntSaturating :: Natural -> Int
 toIntSaturating = Maybe.fromMaybe maxBound . toInt
 
 -- How many elements a container holds, as the Natural it always is -- so a
--- count can be compared against a length without either side converting. Total:
--- a length is never negative, and never overflows an Int in the first place.
+-- count can be compared against a length without either side converting.
+--
+-- The floor is free: a length is never negative, so the saturation never fires.
+-- The CEILING is inherited and is NOT free: Foldable.length answers in Int, so a
+-- container of more than maxBound elements is already miscounted before this
+-- sees it, and no wrapper can recover the true count. That is 2^63 elements,
+-- which nothing that fits in memory reaches. Counting in Natural with a fold
+-- would be honest at every size, but it would give up the O(1) length that Set,
+-- Seq and Map define -- the property that lets the Set.size call sites use this.
 length :: (Foldable.Foldable t) => t a -> Natural
 length = Int.toNaturalSaturating . Foldable.length

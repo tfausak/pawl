@@ -742,7 +742,7 @@ orderingTests registry =
       countingAnswer p = case p of
         Prompt.OrderTriggers _ _ sources -> do
           State.modify' (+ 1)
-          pure (take (length sources) [0 ..])
+          pure (zipWith const [0 ..] sources)
         _ -> pure (S.identityAnswer p)
    in Tasty.testGroup
         "TriggerOrdering"

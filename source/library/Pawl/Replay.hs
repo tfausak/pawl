@@ -4,11 +4,11 @@
 module Pawl.Replay where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Cost as Cost
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Type.Action as Action
 import qualified Pawl.Type.Concession as Concession
 import Pawl.Type.Game (Game)
@@ -170,7 +170,7 @@ defaultAnswer p = case p of
   -- CR 104.3a: not conceding is always legal and is the least eventful fallback
   -- when a transcript runs short.
   Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseDiscard _ _ ids n -> take (Natural.toIntSaturating n) ids
+  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   -- CR 507.1: the first candidate is always a legal answer (the prompt is only
   -- asked with candidates) and is the least eventful fallback when a transcript
   -- runs short. NonEmpty.head is total.
@@ -219,7 +219,7 @@ defaultAnswer p = case p of
   Prompt.ChooseX {} -> 0
   -- The first `count` legal modes, deterministically -- the least eventful
   -- fallback when a transcript runs short on a modal cast.
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   -- CR 707.5: declining to copy is always legal, and is the least eventful
   -- fallback -- Clone is a deterministic fixture, never in a random deck, so
   -- this is never exercised in play.
@@ -229,14 +229,14 @@ defaultAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   -- CR 603.3b: the canonical order is always a legal answer, and is the least
   -- eventful fallback when a transcript runs short.
-  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
+  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   -- CR 616.1: index 0 is always a legal answer (the bucket is non-empty when this
   -- is asked), and is the least eventful fallback when a transcript runs short.
   Prompt.ChooseReplacement {} -> 0
   -- The first `count` candidates, which the engine offers in ascending order --
   -- a legal answer whenever the prompt was legal to ask, and the least eventful
   -- fallback when a transcript runs short.
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   -- The first offered candidate is the PRINTED cost (Pawl.Cost.costsFor puts it
   -- first) -- the least eventful fallback when a transcript runs short, since it
   -- sacrifices nothing. Cost.firstOffered keeps this total for the empty list the
@@ -247,7 +247,7 @@ defaultAnswer p = case p of
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   -- A legal ordered subset of the redrawn hand, deterministically the first
   -- `count` -- the least-eventful fallback when a transcript runs short.
-  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
+  Prompt.Bottom _ _ hand count -> List.genericTake count hand
   -- CR 103.5b: declining is always legal and the least-eventful fallback when a
   -- transcript runs short (mirrors DeclareMulligan -> Keep).
   Prompt.MulliganAction {} -> Nothing

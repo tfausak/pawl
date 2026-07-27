@@ -569,8 +569,8 @@ orderFor gs pending pid = do
 permute :: [a] -> [Natural] -> [a]
 permute xs order =
   let canonical :: [Natural]
-      canonical = take (length xs) [0 ..]
-      at i = case drop (Natural.toIntSaturating i) xs of
+      canonical = zipWith const [0 ..] xs
+      at i = case List.genericDrop i xs of
         h : _ -> Just h
         [] -> Nothing
    in if List.sort order == canonical

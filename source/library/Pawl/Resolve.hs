@@ -793,7 +793,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             | n > 0 ->
                 -- CR 701.17/701.17b: top min(n, library) of the target's library to
                 -- their graveyard, funnelled so each move mints a new incarnation.
-                let topN = take (Integer.toIntSaturating n) (Game.zoneMembers Zone.Library target gs)
+                let topN = List.genericTake n (Game.zoneMembers Zone.Library target gs)
                  in Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) topN
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
@@ -842,7 +842,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                     -- permutation of it, so the take always yields exactly n.
                     let valid = List.nub (filter (\c -> elem c held) choices)
                         filler = filter (\c -> List.notElem c valid) held
-                    bury (take (Natural.toIntSaturating count) (valid <> filler))
+                    bury (List.genericTake count (valid <> filler))
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
@@ -892,10 +892,10 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                 -- they were offered. That differs from the cost path's
                 -- reject-not-repair on purpose: a cost may simply go unpaid, and
                 -- an effect has no such out.
-                let wanted = Natural.toIntSaturating (min count (Natural.length candidates))
+                let wanted = min count (Natural.length candidates)
                     valid = filter (\oid -> Set.member oid picked) candidates
                     filler = filter (\oid -> List.notElem oid valid) candidates
-                Monad.mapM_ (Event.sacrifice victim) (take wanted (valid <> filler))
+                Monad.mapM_ (Event.sacrifice victim) (List.genericTake wanted (valid <> filler))
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()

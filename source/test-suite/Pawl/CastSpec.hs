@@ -13,6 +13,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Binding as Binding
@@ -21,7 +22,6 @@ import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
@@ -421,25 +421,25 @@ discardLastAnswer p = case p of
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseDiscard _ _ ids n -> lastN (Natural.toIntSaturating n) ids
+  Prompt.ChooseDiscard _ _ ids n -> lastN n ids
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.CastWhileSearching {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
+  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
+  Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 
-lastN :: Int -> [a] -> [a]
-lastN n xs = drop (length xs - n) xs
+lastN :: Natural -> [a] -> [a]
+lastN n xs = reverse (List.genericTake n (reverse xs))
 
 -- Bob draws to eight, then discards at cleanup under discardLastAnswer.
 bobDiscardChoice :: Registry.Type.Registry -> IO (GameState.GameState, [ObjectId.ObjectId])
@@ -657,7 +657,7 @@ castFirstOption p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseDiscard _ _ ids n -> take (Natural.toIntSaturating n) ids
+  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
@@ -672,15 +672,15 @@ castFirstOption p = case p of
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.SearchLibrary {} -> Nothing
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
+  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
+  Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
 
@@ -706,7 +706,7 @@ castPanglacial p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
   Prompt.ChooseAction {} -> A.Pass
   Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseDiscard _ _ ids n -> take (Natural.toIntSaturating n) ids
+  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
@@ -720,14 +720,14 @@ castPanglacial p = case p of
       [] -> Map.empty
   Prompt.ChooseBasicLandTypes {} -> (Subtype.Mountain, Subtype.Mountain)
   Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (take (Natural.toIntSaturating count) (Set.toAscList legal))
+  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
-  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
+  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (take (Natural.toIntSaturating count) candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> take (Natural.toIntSaturating count) hand
+  Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing

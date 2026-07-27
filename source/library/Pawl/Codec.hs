@@ -6,6 +6,7 @@
 module Pawl.Codec where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -16,7 +17,6 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Extra.Integer as Integer
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Json as Json
 import qualified Pawl.Type.AbilityName as AbilityName
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
@@ -148,7 +148,7 @@ setFrom f value = Set.fromList <$> listFrom f value
 -- canonical. multisetFrom recounts, so a hand-written file may repeat a key in
 -- any order and a zero count is simply unsayable.
 multisetTo :: (a -> Value) -> Map.Map a Natural -> Value
-multisetTo f = listTo f . concatMap (\(k, n) -> replicate (Natural.toIntSaturating n) k) . Map.toAscList
+multisetTo f = listTo f . concatMap (\(k, n) -> List.genericReplicate n k) . Map.toAscList
 
 multisetFrom :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Map.Map a Natural)
 multisetFrom f value = Map.fromListWith (+) . fmap (\k -> (k, 1)) <$> listFrom f value

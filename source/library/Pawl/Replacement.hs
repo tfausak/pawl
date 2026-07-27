@@ -28,7 +28,6 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Decide as Decide
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
@@ -411,7 +410,7 @@ choose gs event candidates = case candidates of
 
 -- Total index into a list, with a fallback.
 at :: [a] -> Natural -> a -> a
-at xs i fallback = case drop (Natural.toIntSaturating i) xs of
+at xs i fallback = case List.genericDrop i xs of
   h : _ -> h
   [] -> fallback
 

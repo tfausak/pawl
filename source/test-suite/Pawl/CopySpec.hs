@@ -55,13 +55,13 @@ newest = Maybe.listToMaybe . List.sortOn Ord.Down
 copyForbidden :: ObjectId -> Prompt.Prompt r -> r
 copyForbidden wanted p = case p of
   Prompt.ChooseCopyTarget {} -> Just wanted
-  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
+  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   _ -> S.identityAnswer p
 
 copyNewest :: Prompt.Prompt r -> r
 copyNewest p = case p of
   Prompt.ChooseCopyTarget _ _ _ legal -> newest legal
-  Prompt.OrderTriggers _ _ sources -> take (length sources) [0 ..]
+  Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   _ -> S.identityAnswer p
 
 -- Resolve the stack top (a permanent enters -- the copy choice is now made INSIDE
