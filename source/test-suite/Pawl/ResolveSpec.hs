@@ -1884,6 +1884,43 @@ proliferateTests registry =
             after = proliferate proliferatesAll src gs
         HU.assertEqual "the bare Piker gained nothing" 0 (S.counterOf CounterKind.PlusOnePlusOne bare after)
         HU.assertEqual "the countered one moved" 2 (S.counterOf CounterKind.PlusOnePlusOne src after),
+      -- CR 102.2 / 109.5: `Relative Opponent` on GainPlayerCounters had no card
+      -- producer until Prologue to Phyresis (#267). The arm was implemented and
+      -- unproven, which design.md section 4 says is not done.
+      HU.testCase "CR 122.1 whole card: Prologue to Phyresis poisons the opponent, not the caster" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        prologueToPhyresis <- Registry.printing registry "Prologue to Phyresis"
+        let base = S.landsInPlay island 2
+            (_, withLibrary) = S.addLibraryCard piker S.alice base
+            handBefore = S.handSize S.alice withLibrary
+            (gs, spellId) = S.handOne prologueToPhyresis withLibrary
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "bob is poisoned" 1 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+        HU.assertEqual "alice is not" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after)
+        HU.assertEqual "and alice drew" (handBefore + 1) (S.handSize S.alice after),
+      -- The discriminator, and it needs a THIRD seat: at two players `Relative
+      -- Opponent` and `EachPlayer` differ only in whether the caster is included,
+      -- which the case above catches -- but `Opponent` reaching only ONE of two
+      -- opponents would still pass there. CR 102.2: every other player is an
+      -- opponent, so both must be poisoned.
+      HU.testCase "CR 102.2 at three seats every opponent is poisoned, and only opponents" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        prologueToPhyresis <- Registry.printing registry "Prologue to Phyresis"
+        let (_, withLibrary) = S.addLibraryCard piker S.alice S.threePlayerGame
+            -- Two Islands for the {1}{U}. S.landsInPlay builds its own two-seat
+            -- game, so a three-seat board adds them one at a time instead.
+            withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withLibrary [1 .. (2 :: Int)]
+            (gs, spellId) = S.handOne prologueToPhyresis withMana
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        -- No separate "the fixture is payable" assertion: an unpayable cast is a
+        -- no-op, so the poison counts below are what prove it resolved.
+        HU.assertEqual "bob poisoned" 1 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+        HU.assertEqual "carol poisoned too" 1 (S.playerCounterOf PlayerCounterKind.Poison S.carol after)
+        HU.assertEqual "alice untouched" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
       -- CR 701.34a: players carry counters too, and proliferate reaches them.
       HU.testCase "CR 701.34a proliferate adds to a player's poison and energy" $ do
         piker <- Registry.printing registry "Goblin Piker"
