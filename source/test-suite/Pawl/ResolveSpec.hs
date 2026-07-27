@@ -44,6 +44,7 @@ import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Count as Count.Type
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.Counterability as Counterability
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Decider as Decider
@@ -535,7 +536,8 @@ resolveTests registry =
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
                   Card.Type.alternativeCosts = [],
-                  Card.Type.enchant = Nothing
+                  Card.Type.enchant = Nothing,
+                  Card.Type.counterability = Counterability.Counterable
                 }
         HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))
         HU.assertEqual "textChangeSlots" [slot] (Resolve.textChangeSlots card),
@@ -907,7 +909,8 @@ resolveTests registry =
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
                   Card.Type.alternativeCosts = [],
-                  Card.Type.enchant = Nothing
+                  Card.Type.enchant = Nothing,
+                  Card.Type.counterability = Counterability.Counterable
                 }
             spellObj =
               Object.MkObject
@@ -964,7 +967,8 @@ resolveTests registry =
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
                   Card.Type.alternativeCosts = [],
-                  Card.Type.enchant = Nothing
+                  Card.Type.enchant = Nothing,
+                  Card.Type.counterability = Counterability.Counterable
                 }
             spellObj =
               Object.MkObject
@@ -1236,6 +1240,23 @@ counterTests registry =
         HU.assertEqual "victim never resolved onto the battlefield" 0 (S.creaturesInPlay S.bob resolved)
         HU.assertEqual "Cancel in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice resolved))
         HU.assertEqual "stack empty" 0 (length (GameState.stack resolved)),
+      -- CR 113.6g: "an object's ability that states it can't be countered …
+      -- functions on the stack", and CR 101.2 makes the "can't" win. The twin is
+      -- the case directly above: the same Cancel, cast the same way at a spell
+      -- that does not say it, DOES counter -- so this is the card's clause and
+      -- not a broken Cancel.
+      HU.testCase "CR 113.6g whole card: Cancel resolves but cannot counter Rending Volley" $ do
+        island <- Registry.printing registry "Island"
+        cancel <- Registry.printing registry "Cancel"
+        rendingVolley <- Registry.printing registry "Rending Volley"
+        let (victimId, resolved) = cancelVictim island cancel rendingVolley
+        HU.assertBool "Rending Volley is still on the stack" (elem victimId (GameState.stack resolved))
+        HU.assertEqual "and not in bob's graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
+        -- CR 101.2 again, from the other side: the countering spell is not itself
+        -- stopped. Cancel targeted legally (CR 113.6g grants no shroud), resolved,
+        -- did nothing, and CR 608.2n put it into its owner's graveyard as the
+        -- final part of that resolution.
+        HU.assertEqual "Cancel resolved into alice's graveyard regardless" 1 (length (Game.zoneMembers Zone.Graveyard S.alice resolved)),
       HU.testCase "CR 608.2b a Cancel whose target already left the stack fizzles" $ do
         island <- Registry.printing registry "Island"
         piker <- Registry.printing registry "Goblin Piker"

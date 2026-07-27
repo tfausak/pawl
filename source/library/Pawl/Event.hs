@@ -25,7 +25,9 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
 import Pawl.Type.Binding (Binding)
 import Pawl.Type.Card (Card)
+import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CounterKind as CounterKind
+import qualified Pawl.Type.Counterability as Counterability
 import Pawl.Type.DamageEvent (DamageEvent)
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -277,15 +279,28 @@ putCounters oid kind n = do
 -- spell is removed from the stack and put into its owner's graveyard (CR
 -- 701.6a) via changeZone -- so Rest in Peace's redirect (graveyard->exile) and
 -- CR 400.7's new incarnation still compose, exactly as they do for destroy.
--- Ungated for "can't be countered" (CR 701.6), and emits no distinct "was
--- countered" event (#43) -- the same posture as Event.destroy being ungated
--- for CR 701.19c.
+-- Gated on CR 113.6g's "can't be countered", which functions on the stack and so
+-- is read off the spell's own card (Card.counterability) rather than through the
+-- projection -- there is no battlefield projection of a spell. CR 101.2 is what
+-- makes the gate the whole story: the "can't" takes precedence, so the countering
+-- effect resolves and simply does nothing. It is NOT targeting immunity -- Cancel
+-- still legally targeted the spell (CR 113.6g grants no shroud), which is why
+-- this gate lives here at the funnel and not in Pawl.Target.
+--
+-- The gate comes before the zone change, the shape Event.destroy's CR 702.12b
+-- indestructible gate already has, and for the same CR 614.7 reason: an event
+-- that never happens offers nothing for a replacement to intercept.
+--
+-- Still emits no distinct "was countered" event for a trigger to read (#43) --
+-- no card in the pool has one.
 counter :: ObjectId -> Game ()
 counter oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure ()
-    Just _ -> changeZone oid Zone.Graveyard
+    Just _ -> case fmap Card.counterability (Game.cardOf oid gs) of
+      Just Counterability.CantBeCountered -> pure ()
+      _ -> changeZone oid Zone.Graveyard
 
 -- CR 701.21/701.21a: the single sacrifice funnel. The permanent is put into its
 -- OWNER's graveyard through changeZone (so Rest in Peace's redirect and a token's

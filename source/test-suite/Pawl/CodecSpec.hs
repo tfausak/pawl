@@ -33,6 +33,7 @@ import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Count as Count.Type
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.CounterPattern as CounterPattern
+import qualified Pawl.Type.Counterability as Counterability
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.DamagePattern as DamagePattern
@@ -585,7 +586,22 @@ tests registry =
             HU.assertEqual
               "target spec"
               (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.MkTargetSpec Pool.Spells Nothing))
-              (Card.allTargetSpecs card)
+              (Card.allTargetSpecs card),
+          -- The key is omitted when Counterable, so this pins BOTH directions of
+          -- that default: the one card that prints the clause decodes as
+          -- CantBeCountered, and a card that says nothing decodes as Counterable
+          -- rather than as whatever a missing key might otherwise become.
+          HU.testCase "CR 113.6g counterability decodes from the card, and defaults when the key is absent" $ do
+            rendingVolley <- Registry.printing registry "Rending Volley"
+            cancel <- Registry.printing registry "Cancel"
+            HU.assertEqual
+              "Rending Volley says it"
+              Counterability.CantBeCountered
+              (CardT.counterability (Printing.card rendingVolley))
+            HU.assertEqual
+              "Cancel does not, and its file has no counterability key"
+              Counterability.Counterable
+              (CardT.counterability (Printing.card cancel))
         ],
       Tasty.testGroup
         "P4 runtime types"

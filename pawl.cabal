@@ -127,6 +127,7 @@ library
     Pawl.Type.Cost
     Pawl.Type.CostComponent
     Pawl.Type.Count
+    Pawl.Type.Counterability
     Pawl.Type.CounterKind
     Pawl.Type.CounterPattern
     Pawl.Type.DamageEvent
