@@ -177,6 +177,10 @@ addMana pid units gs =
 -- pool empties -- a turn-based action that does not use the stack (CR 703.4q).
 -- CR 106.4 supplies the wording for what that does to the player: they are said
 -- to LOSE this mana, which is how every card that stops it is templated.
+--
+-- Being a turn-based action does not put it in Engine.runTurnBasedActions, which
+-- handles a step's OPENING: CR 703.4q's own moment is the step's end, so
+-- Engine.runStep calls this there instead.
 emptyManaPools :: GameState -> GameState
 emptyManaPools gs = gs {GameState.manaPool = Map.empty}
 
