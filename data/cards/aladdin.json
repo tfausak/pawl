@@ -1,0 +1,185 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [
+          {
+            "type": "TapThis"
+          }
+        ],
+        "mana": [
+          {
+            "type": "Generic",
+            "value": 1
+          },
+          {
+            "type": "OfType",
+            "value": {
+              "type": "Colored",
+              "value": {
+                "type": "Red"
+              }
+            }
+          },
+          {
+            "type": "OfType",
+            "value": {
+              "type": "Colored",
+              "value": {
+                "type": "Red"
+              }
+            }
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "GainControl",
+                "value": [
+                  {
+                    "type": "ForAsLongAs",
+                    "value": {
+                      "type": "Condition",
+                      "value": [
+                        {
+                          "type": "Count",
+                          "value": [
+                            {
+                              "type": "InZone",
+                              "value": [
+                                {
+                                  "type": "Battlefield"
+                                },
+                                {
+                                  "type": "EachPlayer"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "IsSource"
+                                },
+                                {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "type": "Objects"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Exactly"
+                        },
+                        {
+                          "type": "Literal",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "filter": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Artifact"
+                    }
+                  },
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Aladdin",
+  "power": {
+    "type": "Literal",
+    "value": 1
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 1
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Human"
+      },
+      {
+        "type": "Rogue"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

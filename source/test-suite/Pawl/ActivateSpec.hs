@@ -4,11 +4,11 @@
 -- gating, and the CR 605 mana-ability exclusion from stack activations.
 module Pawl.ActivateSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Engine as Engine
@@ -26,14 +26,9 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.Cost as Cost.Type
-import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Filter may later be imported and must not collide.
-import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
@@ -44,7 +39,6 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
@@ -254,33 +248,24 @@ tests registry =
       --
       -- Prodigal Sorcerer's own ability (a flat DealDamage 1; CR 115.4's "any
       -- target" has no controller-sensitive restriction) has no
-      -- controller-sensitive OUTPUT, so it cannot make "whose control"
-      -- observable here. A GainControl/ForAsLongAs effect does -- the same
-      -- shape Master Thief's ETB uses in Pawl.ExpirySpec's masterThiefTests --
-      -- attached to a SYNTHETIC ability (labeled crutch) on the same creature,
-      -- standing in for the pool's lack of a controller-sensitive printed
-      -- activated ability (#82), so this exercises the ACTIVATED path rather
-      -- than the TRIGGERED one that card already covers.
+      -- controller-sensitive OUTPUT, so it could not make "whose control"
+      -- observable. Aladdin's can: "{1}{R}{R}, {T}: Gain control of target
+      -- artifact for as long as you control this creature" is the same
+      -- GainControl/ForAsLongAs shape Master Thief's ETB uses in
+      -- Pawl.ExpirySpec's masterThiefTests, but on the ACTIVATED path -- which
+      -- is what retired the synthetic ability these two tests used to carry.
       HU.testCase "CR 113.8 an activated ability resolves under whoever activated it, not a later controller" $ do
         darksteelMyr <- Registry.printing registry "Darksteel Myr"
-        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-        let base = Setup.emptyGame S.bothPlayers
+        mountain <- Registry.printing registry "Mountain"
+        aladdin <- Registry.printing registry "Aladdin"
+        let base = S.landsInPlay mountain 3
             -- The Myr is ALICE's own artifact (not bob's): if control ever
             -- moved to bob it would be a genuine change, not a fixture
             -- coincidence, so this assertion actually discriminates the bug.
             (myrId, g0) = S.addCreature darksteelMyr S.alice base
-            (srcId, g1) = S.addCreature prodigalSorcerer S.alice g0
+            (srcId, g1) = S.addCreature aladdin S.alice g0
             g2 = g1 {GameState.priority = Just S.alice}
-            targetSlot = SlotName.MkSlotName (Text.pack "target")
-            ability =
-              ActivatedAbility.MkActivatedAbility
-                { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
-                  ActivatedAbility.modal =
-                    singleModeAbility
-                      [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) targetSlot]
-                      (Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)))),
-                  ActivatedAbility.timing = ActivationTiming.AnyTime
-                }
+            ability = theAbility aladdin
             activated = snd (Engine.runGamePure S.identityAnswer g2 (Activate.activateAbility S.alice srcId ability))
             -- Control of the SOURCE CREATURE (not the ability object) moves to bob
             -- while the ability sits on the stack.
@@ -297,35 +282,37 @@ tests registry =
           []
           (filter (S.continuousEffectAffects myrId) (GameState.continuousEffects resolved)),
       -- The stolen-creature case the OLD (deleted) Resolve.hs comment named --
-      -- rebuilt as the POSITIVE mirror of the test above, with the same
-      -- SYNTHETIC ability (#82): control of the source moves to bob FIRST, bob
-      -- then activates, and the effect must arm and store under bob, the
-      -- ability's frozen (and only) controller (CR 113.8). Object.owner is
-      -- stamped with bob at activation time, so there is no later re-read to
-      -- get wrong.
+      -- the POSITIVE mirror of the test above, on the same Aladdin: control of
+      -- the source moves to bob FIRST, bob then activates, and the effect must
+      -- arm and store under bob, the ability's frozen (and only) controller
+      -- (CR 113.8). Object.owner is stamped with bob at activation time, so there
+      -- is no later re-read to get wrong.
+      --
+      -- ASYMMETRIC on purpose, and this half is the weaker one: bob is both the
+      -- activator and the later controller, so a regression to a live re-read of
+      -- the source's controller passes HERE and fails only the test above. The
+      -- pair is what covers CR 113.8, not either case alone -- do not "fix" this
+      -- one into a second copy of the first.
       HU.testCase "CR 113.8 a stolen creature's ability, activated by the new controller, resolves under them" $ do
         darksteelMyr <- Registry.printing registry "Darksteel Myr"
-        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
-        let base = Setup.emptyGame S.bothPlayers
+        mountain <- Registry.printing registry "Mountain"
+        aladdin <- Registry.printing registry "Aladdin"
+        -- bob pays for it, so the Mountains are HIS. S.giveControl also settles
+        -- the stolen Aladdin under bob, which CR 302.6 requires before he can
+        -- pay its {T} (#198 -- a thief does not inherit the previous
+        -- controller's settle).
+        let addMountains g = List.foldl' (\acc _ -> snd (S.addCreature mountain S.bob acc)) g [1 .. (3 :: Int)]
+            base = addMountains (Setup.emptyGame S.bothPlayers)
             (myrId, g0) = S.addCreature darksteelMyr S.alice base
-            (srcId, g1) = S.addCreature prodigalSorcerer S.alice g0
-            targetSlot = SlotName.MkSlotName (Text.pack "target")
-            ability =
-              ActivatedAbility.MkActivatedAbility
-                { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
-                  ActivatedAbility.modal =
-                    singleModeAbility
-                      [Effect.GainControl (Duration.ForAsLongAs S.youControlSource) targetSlot]
-                      (Map.singleton targetSlot (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.HasCardType CardType.Artifact)))),
-                  ActivatedAbility.timing = ActivationTiming.AnyTime
-                }
+            (srcId, g1) = S.addCreature aladdin S.alice g0
+            ability = theAbility aladdin
             -- Control of the SOURCE CREATURE moves to bob BEFORE activation.
             taken = S.giveControl srcId S.bob g1
             g2 = taken {GameState.priority = Just S.bob}
             activated = snd (Engine.runGamePure S.identityAnswer g2 (Activate.activateAbility S.bob srcId ability))
             resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
             stored = filter (S.continuousEffectAffects myrId) (GameState.continuousEffects resolved)
-        HU.assertEqual "bob controls the stolen sorcerer" (Just S.bob) (Projection.controllerOf srcId activated)
+        HU.assertEqual "bob controls the stolen Aladdin" (Just S.bob) (Projection.controllerOf srcId activated)
         HU.assertEqual "one thing on the stack" 1 (length (GameState.stack activated))
         HU.assertEqual "stack empty after resolution" [] (GameState.stack resolved)
         HU.assertEqual

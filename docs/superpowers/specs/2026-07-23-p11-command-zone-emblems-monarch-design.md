@@ -62,8 +62,8 @@ scope). So P11 drives the emblem gate with a **labeled synthetic source** — a
 test-only fixture that resolves `Effect.CreateEmblem` — carrying a *real,
 recognizable* static ability (an Elspeth-style anthem, "creatures you control get
 +1/+1"). This is the project's sanctioned "synthetic fixture as a labeled, expiring
-crutch" pattern (memory `tests-prefer-real-cards`; cf. the synthetic GainControl of
-issue #82). Its expiry: it is retired when planeswalkers or the Ring land and a
+crutch" pattern (memory `tests-prefer-real-cards`; cf. the synthetic GainControl
+that was issue #82, since retired by Aladdin). Its expiry: it is retired when planeswalkers or the Ring land and a
 real card can mint the emblem. An issue carries that expiry (§8).
 
 ### Gate cards
