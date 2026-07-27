@@ -51,4 +51,6 @@ data Subtype
     Equipment
   | -- CR 205.3m (a creature type; Branchblight Stalker's).
     Scout
+  | -- CR 205.3m (a creature type; Skilled Animator's).
+    Artificer
   deriving (Eq, Ord, Show)
