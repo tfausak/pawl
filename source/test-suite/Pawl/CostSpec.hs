@@ -598,4 +598,110 @@ longtuskCubTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.Cost" [doorTests registry, greedTests registry, villageRitesTests registry, fireblastTests registry, crossCheckTests registry, longtuskCubTests registry]
+tests registry = Tasty.testGroup "Pawl.Cost" [doorTests registry, greedTests registry, villageRitesTests registry, catharticReunionTests registry, fireblastTests registry, crossCheckTests registry, longtuskCubTests registry]
+
+-- alice has two untapped Mountains, holds one Cathartic Reunion plus `n` other
+-- cards, and has four cards in her library so the draw of three is never a
+-- CR 104.3c loss. The Village Rites board's shape, on the hand axis instead of
+-- the battlefield one.
+catharticBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+catharticBoard mountain piker catharticReunion n =
+  let base = S.landsInPlay mountain 2
+      (reunion, gs1) = S.addHandCard catharticReunion S.alice base
+      withHand = List.foldl' (\g _ -> snd (S.addHandCard piker S.alice g)) gs1 [1 .. n]
+      withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) withHand [1 .. (4 :: Int)]
+   in ( reunion,
+        withLibrary
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Answers ChooseDiscard with nothing at all, and everything else normally. Two
+-- different jobs in this group: it proves the forced case is never ASKED (an
+-- empty answer would otherwise discard nothing), and it drives the
+-- reject-not-repair case where the prompt is real.
+noDiscardAnswer :: Prompt.Prompt r -> r
+noDiscardAnswer p = case p of
+  Prompt.ChooseDiscard {} -> []
+  _ -> S.identityAnswer p
+
+-- Cathartic Reunion {1}{R} Sorcery: "As an additional cost to cast this spell,
+-- discard two cards. Draw three cards." The card CR 601.2f's "discarding cards"
+-- clause was waiting for.
+catharticReunionTests :: Registry.Type.Registry -> Tasty.TestTree
+catharticReunionTests registry =
+  Tasty.testGroup
+    "Cathartic Reunion"
+    [ HU.testCase "CR 118.8 whole card: the two cards are discarded and three are drawn" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        catharticReunion <- Registry.printing registry "Cathartic Reunion"
+        -- Exactly two other cards, so CR 701.9b has no choice to offer and the
+        -- prompt is elided -- which noDiscardAnswer proves, since an answer of
+        -- [] would discard nothing if the prompt were actually raised.
+        let (reunion, gs) = catharticBoard mountain piker catharticReunion 2
+            cast = S.runPure noDiscardAnswer gs (Cast.castSpell S.alice reunion)
+            resolved = S.runPure noDiscardAnswer cast Stack.resolveTop
+        HU.assertEqual "the hand emptied as the cost was paid" 0 (S.handSize S.alice cast)
+        HU.assertEqual "two discarded cards in the graveyard" 2 (length (Game.zoneMembers Zone.Graveyard S.alice cast))
+        HU.assertEqual "three cards drawn" 3 (S.handSize S.alice resolved)
+        -- CR 608.2n: the sorcery joins the two discards on resolution.
+        HU.assertEqual "and the spell itself is there too" 3 (length (Game.zoneMembers Zone.Graveyard S.alice resolved)),
+      HU.testCase "CR 601.2f with only one other card in hand the spell is not castable" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        catharticReunion <- Registry.printing registry "Cathartic Reunion"
+        let (reunion, gs) = catharticBoard mountain piker catharticReunion 1
+            isCastOfReunion a = case a of
+              Action.Type.Cast oid -> oid == reunion
+              _ -> False
+        -- Read through costsFor, so the assertion is against the cost the engine
+        -- would actually offer (mana cost plus the printed additional cost),
+        -- never a hand-built one.
+        HU.assertBool "no offered cost is payable" (not (any (\c -> Cost.canPay S.alice reunion c gs) (Cost.costsFor reunion gs)))
+        HU.assertBool "and no Cast is offered" (not (any isCastOfReunion (Action.legalActions S.alice gs))),
+      HU.testCase "CR 601.2h an undersized answer leaves the whole cast unpaid, not partly paid" $ do
+        -- The COST path's reject-not-repair, and deliberately the opposite of what
+        -- the Discard EFFECT does after #245: a cost may go unpaid, so Pawl.Cost.pay
+        -- restores the entry state and nothing at all happened. Three other cards
+        -- makes the prompt real (hand > count), unlike the forced case above.
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        catharticReunion <- Registry.printing registry "Cathartic Reunion"
+        let (reunion, gs) = catharticBoard mountain piker catharticReunion 3
+            cast = S.runPure noDiscardAnswer gs (Cast.castSpell S.alice reunion)
+        HU.assertEqual "nothing was discarded" 0 (length (Game.zoneMembers Zone.Graveyard S.alice cast))
+        HU.assertEqual "the hand is untouched, Reunion included" 4 (S.handSize S.alice cast)
+        HU.assertEqual "nothing reached the stack" 0 (length (GameState.stack cast))
+        HU.assertEqual "and the Mountains are untapped again" 0 (S.tappedCount S.alice cast),
+      -- Where the reject boundary actually falls, stated rather than inferred.
+      -- The answer is read as a SET, so a duplicate is normalised, not repaired:
+      -- naming two distinct cards across three entries pays, and naming one card
+      -- twice does not. Prompt.ChooseSacrifices is answered with a Set, so an
+      -- interpreter meaning [a,a,b] there builds {a,b} and the Sacrifice arm
+      -- accepts it -- this keeps the two components answering alike.
+      HU.testCase "CR 601.2h the answer is read as a set: [a,a,b] pays for two, [a,a] does not" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        catharticReunion <- Registry.printing registry "Cathartic Reunion"
+        let (reunion, gs) = catharticBoard mountain piker catharticReunion 3
+            -- Repeat the first offered card, then add a second distinct one.
+            duplicateThenDistinct q = case q of
+              Prompt.ChooseDiscard _ _ ids _ -> case ids of
+                a : b : _ -> [a, a, b]
+                _ -> []
+              _ -> S.identityAnswer q
+            -- The same card twice and nothing else: one distinct card for a
+            -- count of two.
+            sameCardTwice q = case q of
+              Prompt.ChooseDiscard _ _ ids _ -> concat (replicate 2 (take 1 ids))
+              _ -> S.identityAnswer q
+            paid = S.runPure duplicateThenDistinct gs (Cast.castSpell S.alice reunion)
+            unpaid = S.runPure sameCardTwice gs (Cast.castSpell S.alice reunion)
+        HU.assertEqual "[a,a,b] names two distinct cards, so the cost is paid" 2 (length (Game.zoneMembers Zone.Graveyard S.alice paid))
+        HU.assertEqual "and the spell is on the stack" 1 (length (GameState.stack paid))
+        HU.assertEqual "[a,a] names one, so nothing is discarded" 0 (length (Game.zoneMembers Zone.Graveyard S.alice unpaid))
+        HU.assertEqual "and nothing reached the stack" 0 (length (GameState.stack unpaid))
+    ]
