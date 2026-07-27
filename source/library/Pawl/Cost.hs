@@ -148,6 +148,15 @@ sacrificeCandidates :: PlayerId -> Filter.Type.Filter -> GameState -> [ObjectId]
 sacrificeCandidates pid filter_ gs =
   List.sort (filter (matchesFilter gs filter_) (Projection.controls pid gs))
 
+-- The cards this player may discard to pay a cost on `oid`: their hand, in its
+-- own order, minus `oid` itself. See canPayComponent's DiscardCards arm for why
+-- the exclusion is CR 601.2a and not a convenience. Hand order rather than
+-- sorted, unlike sacrificeCandidates: Game.zoneMembers already returns a hand in
+-- a fixed order, and Prompt.ChooseDiscard offers it in exactly that order both
+-- here and in the Discard effect.
+discardCandidates :: PlayerId -> ObjectId -> GameState -> [ObjectId]
+discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid gs)
+
 -- CR 118.3: "A player can't pay a cost without having the necessary resources to
 -- pay it fully." The mana part AND every component, measured against the CURRENT
 -- state -- before any part of the cost is paid. That is CR-correct rather than
@@ -186,6 +195,18 @@ canPayComponent pid oid component gs = case component of
   -- effect" is not enforced across two components of ONE cost (#104).
   CostComponent.Sacrifice n criterion ->
     length (sacrificeCandidates pid criterion gs) >= fromIntegral n
+  -- CR 601.2f: payable only if the hand holds at least that many cards.
+  --
+  -- `oid` is excluded, and that is CR 601.2a, not a convenience: "the card …
+  -- becomes a spell and is moved to the stack" is step (a) of casting, so by the
+  -- time 601.2f determines the total cost the spell is NOT in its controller's
+  -- hand and cannot be discarded to pay its own additional cost. Pawl.Cast pays
+  -- one step earlier than that, while the object is still in hand (#89), so
+  -- without this filter a hand of "Cathartic Reunion plus one other card" would
+  -- read as payable and the Reunion could discard itself. The exclusion is a
+  -- no-op the moment #89 lands.
+  CostComponent.DiscardCards n ->
+    length (discardCandidates pid oid gs) >= fromIntegral n
   -- CR 107.14 / CR 118.6: payable only if the player has at least that many
   -- energy counters. The bidirectional proof: GainPlayerCounters (P10 #37)
   -- adds energy, this component spends it.
@@ -270,6 +291,32 @@ payComponent pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && Set.size chosen == fromIntegral n
       then do
         Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
+        pure Payment.Paid
+      else pure Payment.Unpaid
+  -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.
+  -- Elided only when forced -- exactly as many cards in hand as the count, where
+  -- there is nothing to ask (the same elision the Discard EFFECT makes, #63).
+  --
+  -- Reject-not-repair, matching Sacrifice above and deliberately NOT matching the
+  -- Discard effect, which after #245 completes an undersized answer: a cost may
+  -- simply go unpaid, and `pay` restores the entry state so Unpaid is a complete
+  -- no-op. An effect has no such out, which is why the two paths differ.
+  --
+  -- CR 701.9a's move is made through Event.changeZone, the CR 400.7 funnel, so a
+  -- discarded card gets a new incarnation and Rest in Peace's redirect composes --
+  -- the same call the Discard effect makes.
+  CostComponent.DiscardCards n -> do
+    gs <- State.get
+    let held = discardCandidates pid oid gs
+        decider = Decide.deciderFor pid gs
+    chosen <-
+      if length held <= fromIntegral n
+        then pure held
+        else Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held n))
+    let distinct = List.nub chosen
+    if all (\c -> List.elem c held) distinct && length distinct == fromIntegral n
+      then do
+        Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) distinct
         pure Payment.Paid
       else pure Payment.Unpaid
   -- CR 107.14: paying energy removes that many energy counters from the

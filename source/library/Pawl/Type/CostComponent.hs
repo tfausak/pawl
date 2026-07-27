@@ -46,6 +46,19 @@ data CostComponent
     -- characteristic: Blood Moon makes a nonbasic land a Mountain, and it may be
     -- sacrificed as one.
     Sacrifice Natural Filter
+  | -- CR 601.2f's "discarding cards", one of the cost kinds that rule names
+    -- outright: discard this many cards from hand (Cathartic Reunion's two).
+    -- CR 701.9b gives the choice to the discarding player, so this is a prompt
+    -- and never an engine pick -- the same shape Sacrifice above has.
+    --
+    -- No Filter, unlike Sacrifice. "Discard a card" names no quality, and the one
+    -- card in the pool that prints this cost narrows nothing; a filtered discard
+    -- cost ("discard a creature card") would add the field when a card needs it,
+    -- exactly as Sacrifice's filter arrived with Village Rites.
+    --
+    -- A Natural and not a Quantity, for the reason PayLife and PayEnergy give: a
+    -- cost has no binding environment at CR 601.2f time.
+    DiscardCards Natural
   | -- CR 107.14 / 118: pay N energy counters. Energy-specific, not a general
     -- PayPlayerCounters -- energy is the only player counter ever spent as a
     -- cost. A Natural, not a Quantity: a cost has no binding environment at CR

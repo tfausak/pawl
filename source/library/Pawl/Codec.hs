@@ -818,6 +818,7 @@ costComponentToJson c = case c of
   CostComponent.SacrificeThis -> nullary (Text.pack "SacrificeThis")
   CostComponent.PayLife n -> Json.tagged (Text.pack "PayLife") (Just (natTo n))
   CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array [natTo n, filterToJson c_]))
+  CostComponent.DiscardCards n -> Json.tagged (Text.pack "DiscardCards") (Just (natTo n))
   CostComponent.PayEnergy n -> Json.tagged (Text.pack "PayEnergy") (Just (natTo n))
 
 jsonToCostComponent :: Value -> Either Text CostComponent.CostComponent
@@ -831,6 +832,7 @@ jsonToCostComponent value = do
       count <- natFrom n
       filter_ <- jsonToFilter c_
       pure (CostComponent.Sacrifice count filter_)
+    ("DiscardCards", Just v) -> fmap CostComponent.DiscardCards (natFrom v)
     ("PayEnergy", Just v) -> fmap CostComponent.PayEnergy (natFrom v)
     _ -> Left (Text.pack "unknown CostComponent: " <> t)
 
