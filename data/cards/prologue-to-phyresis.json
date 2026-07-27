@@ -1,0 +1,73 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Prologue to Phyresis",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "GainPlayerCounters",
+            "value": [
+              {
+                "type": "Relative",
+                "value": {
+                  "type": "Opponent"
+                }
+              },
+              {
+                "type": "Poison"
+              },
+              {
+                "type": "Literal",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "type": "Draw",
+            "value": {
+              "type": "Literal",
+              "value": 1
+            }
+          }
+        ],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}
