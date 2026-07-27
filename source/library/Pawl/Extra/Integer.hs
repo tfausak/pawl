@@ -14,8 +14,12 @@ import Numeric.Natural (Natural)
 toNatural :: Integer -> Maybe Natural
 toNatural = Bits.toIntegralSized
 
--- Zero for a negative Integer, which is what a count of less than none means
--- wherever the rules produce one: drawing -1 cards draws none.
+-- Zero for a negative Integer. That floor is CR 107.1b, not a house policy:
+-- "If a calculation that would determine the result of an effect yields a
+-- negative number, zero is used instead." The rule's exception -- doubling,
+-- tripling, or setting a life total or a creature's power/toughness -- does not
+-- route through here, because every caller is a count (damage, draws, mills,
+-- discards, sacrifices, tokens, counters) rather than one of those effects.
 toNaturalSaturating :: Integer -> Natural
 toNaturalSaturating = Maybe.fromMaybe 0 . toNatural
 

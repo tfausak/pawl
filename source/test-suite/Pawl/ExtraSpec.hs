@@ -104,7 +104,10 @@ tests =
         ],
       Tasty.testGroup
         "Integer.toNaturalSaturating"
-        [ HU.testCase "a negative Integer stops at zero" $
+        [ -- CR 107.1b: "If a calculation that would determine the result of an
+          -- effect yields a negative number, zero is used instead." The floor is
+          -- the rule, which is why every count-shaped caller wants it.
+          HU.testCase "CR 107.1b: a negative Integer stops at zero" $
             HU.assertEqual "0" 0 (Integer.toNaturalSaturating (-7)),
           -- The crash this replaces: fromInteger on a negative value bound for
           -- a Natural throws, and the rules do produce negative quantities.
