@@ -36,6 +36,7 @@ import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Count as Count.Type
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.CounterPattern as CounterPattern
+import qualified Pawl.Type.Counterability as Counterability
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.DamagePattern as DamagePattern
@@ -963,6 +964,26 @@ regenerabilityToJson r = nullary . Text.pack $ case r of
   Regenerability.Regenerable -> "Regenerable"
   Regenerability.CantBeRegenerated -> "CantBeRegenerated"
 
+counterabilityToJson :: Counterability.Counterability -> Value
+counterabilityToJson c = nullary . Text.pack $ case c of
+  Counterability.Counterable -> "Counterable"
+  Counterability.CantBeCountered -> "CantBeCountered"
+
+-- Absent means Counterable (CR 113.6g is printed text: a card either says it or
+-- does not), the shape jsonToBoolDefault gives the other defaulted keys.
+jsonToCounterabilityDefault :: Value -> Either Text Counterability.Counterability
+jsonToCounterabilityDefault value = case value of
+  Null -> Right Counterability.Counterable
+  _ -> jsonToCounterability value
+
+jsonToCounterability :: Value -> Either Text Counterability.Counterability
+jsonToCounterability =
+  decodeNullary
+    (Text.pack "Counterability")
+    [ (Text.pack "Counterable", Counterability.Counterable),
+      (Text.pack "CantBeCountered", Counterability.CantBeCountered)
+    ]
+
 jsonToRegenerability :: Value -> Either Text Regenerability.Regenerability
 jsonToRegenerability =
   decodeNullary
@@ -1765,6 +1786,14 @@ cardToJson c =
                then []
                else [(Text.pack "alternativeCosts", listTo costToJson (CardT.alternativeCosts c))]
            )
+        -- Omitted when Counterable, the posture every other defaulted key here
+        -- takes: one card in the pool prints "this spell can't be countered", and
+        -- a required key would have meant editing every other card file to say
+        -- nothing.
+        <> ( case CardT.counterability c of
+               Counterability.Counterable -> []
+               Counterability.CantBeCountered -> [(Text.pack "counterability", counterabilityToJson (CardT.counterability c))]
+           )
         <> ( if null (CardT.mulliganAction c)
                then []
                else [(Text.pack "mulliganAction", listTo effectToJson (CardT.mulliganAction c))]
@@ -1828,6 +1857,7 @@ jsonToCard value = do
   mulliganAction <- listFromDefault jsonToEffect (getOpt (Text.pack "mulliganAction") ps)
   openingHandAction <- listFromDefault jsonToEffect (getOpt (Text.pack "openingHandAction") ps)
   enchant <- maybeFrom jsonToTargetSpec (getOpt (Text.pack "enchant") ps)
+  counterability <- jsonToCounterabilityDefault (getOpt (Text.pack "counterability") ps)
   pure
     CardT.MkCard
       { CardT.name = name,
@@ -1850,7 +1880,8 @@ jsonToCard value = do
         CardT.alternativeCosts = alternativeCosts,
         CardT.mulliganAction = mulliganAction,
         CardT.openingHandAction = openingHandAction,
-        CardT.enchant = enchant
+        CardT.enchant = enchant,
+        CardT.counterability = counterability
       }
 
 printingToJson :: Printing.Printing -> Value

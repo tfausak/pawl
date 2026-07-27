@@ -37,6 +37,7 @@ import qualified Pawl.Type.Condition as Condition.Type
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Count as Count.Type
+import qualified Pawl.Type.Counterability as Counterability
 import qualified Pawl.Type.Duration as Duration
 import qualified Pawl.Type.Effect as Effect
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
@@ -255,7 +256,8 @@ cardTests registry =
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
                   Card.Type.alternativeCosts = [],
-                  Card.Type.enchant = Nothing
+                  Card.Type.enchant = Nothing,
+                  Card.Type.counterability = Counterability.Counterable
                 }
          in do
               HU.assertBool "not a permanent" (not (Card.isPermanent card))

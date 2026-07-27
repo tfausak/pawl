@@ -76,6 +76,16 @@ tests registry =
         HU.assertEqual "off the stack" [] (GameState.stack after)
         HU.assertEqual "in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
         HU.assertEqual "not on the battlefield" 0 (S.creaturesInPlay S.bob after),
+      -- CR 113.6g at the funnel itself, without a countering spell in the way:
+      -- Event.counter is what CR 701.6a's "remove it from the stack" runs
+      -- through, and the gate is there rather than in the Counter opcode so that
+      -- every future counterer inherits it.
+      HU.testCase "CR 113.6g Event.counter is a no-op on a spell that can't be countered" $ do
+        rendingVolley <- Registry.printing registry "Rending Volley"
+        let (spellId, onStack) = S.spellOnStack rendingVolley S.bob (Setup.emptyGame S.bothPlayers)
+            after = S.runPure S.identityAnswer onStack (Event.counter spellId)
+        HU.assertEqual "still on the stack, under its original id" [spellId] (GameState.stack after)
+        HU.assertEqual "nothing reached the graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.bob after)),
       HU.testCase "CR 614 a countered spell is exiled under Rest in Peace" $ do
         restInPeace <- Registry.printing registry "Rest in Peace"
         piker <- Registry.printing registry "Goblin Piker"

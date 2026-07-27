@@ -9,6 +9,7 @@ import Pawl.Type.CastingPermission (CastingPermission)
 import Pawl.Type.Color (Color)
 import Pawl.Type.Cost (Cost)
 import Pawl.Type.CostComponent (CostComponent)
+import Pawl.Type.Counterability (Counterability)
 import Pawl.Type.Effect (Effect)
 import Pawl.Type.Keyword (Keyword)
 import Pawl.Type.ManaCost (ManaCost)
@@ -105,6 +106,13 @@ data Card = MkCard
     -- SINGULAR: CR 702.5c's "multiple instances of enchant, all of them apply"
     -- is unrepresentable, and no card in this pool prints two (#189).
     enchant :: Maybe TargetSpec,
+    -- CR 113.6g: "an object's ability that states it can't be countered …
+    -- functions on the stack" (Rending Volley). Counterable for every other
+    -- printing, and read straight off the card by Event.counter rather than
+    -- through the projection -- the castingPermissions precedent, and here it is
+    -- forced rather than chosen: a spell on the stack is not on the battlefield,
+    -- so the CR 613 layer system does not reach it at all.
+    counterability :: Counterability,
     -- CR 118.8: this card's printed additional costs -- "a cost listed in a
     -- spell's rules text ... that its controller must pay at the same time they
     -- pay the spell's mana cost" (Village Rites). Empty for every other
