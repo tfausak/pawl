@@ -209,18 +209,23 @@ jsonToCardType =
       (Text.pack "Sorcery", CardType.Sorcery)
     ]
 
+-- No longer uniformly nullary: CR 122.1b's keyword counter carries the keyword it
+-- grants, so this tags like every other payload-bearing sum here rather than
+-- delegating the whole type to the nullary helper.
 counterKindToJson :: CounterKind.CounterKind -> Value
-counterKindToJson k = nullary . Text.pack $ case k of
-  CounterKind.PlusOnePlusOne -> "PlusOnePlusOne"
-  CounterKind.MinusOneMinusOne -> "MinusOneMinusOne"
+counterKindToJson k = case k of
+  CounterKind.PlusOnePlusOne -> nullary (Text.pack "PlusOnePlusOne")
+  CounterKind.MinusOneMinusOne -> nullary (Text.pack "MinusOneMinusOne")
+  CounterKind.Keyword kw -> Json.tagged (Text.pack "Keyword") (Just (keywordToJson kw))
 
 jsonToCounterKind :: Value -> Either Text CounterKind.CounterKind
-jsonToCounterKind =
-  decodeNullary
-    (Text.pack "CounterKind")
-    [ (Text.pack "PlusOnePlusOne", CounterKind.PlusOnePlusOne),
-      (Text.pack "MinusOneMinusOne", CounterKind.MinusOneMinusOne)
-    ]
+jsonToCounterKind value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("PlusOnePlusOne", _) -> Right CounterKind.PlusOnePlusOne
+    ("MinusOneMinusOne", _) -> Right CounterKind.MinusOneMinusOne
+    ("Keyword", Just v) -> CounterKind.Keyword <$> jsonToKeyword v
+    _ -> Left (Text.pack "unknown CounterKind: " <> t)
 
 playerCounterKindToJson :: PlayerCounterKind.PlayerCounterKind -> Value
 playerCounterKindToJson k = nullary . Text.pack $ case k of
