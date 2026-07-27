@@ -39,6 +39,12 @@ data Response
     -- ChoseManaSource: decode must return Nothing for a response that does not
     -- match the prompt being asked, and two prompts sharing a constructor cannot.
     ChoseManaType ManaType
+  | -- CR 704.5j: the legendary permanent its controller kept, serialized so a
+    -- DecisionLog replays the legend rule deterministically. Its own constructor
+    -- rather than a reuse of ChoseManaSource: decode must return Nothing for a
+    -- response that does not match the prompt asked, and two ObjectId-shaped
+    -- prompts sharing a constructor cannot do that.
+    ChoseLegend ObjectId
   | DeclaredAttackers [ObjectId]
   | DeclaredBlockers (Map ObjectId ObjectId)
   | AssignedCombatDamage (Map Recipient Natural)

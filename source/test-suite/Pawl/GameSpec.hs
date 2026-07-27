@@ -322,6 +322,7 @@ recordingAnswer p = case p of
   Prompt.ChooseDefender _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseManaSource _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseManaType _ _ _ candidates -> pure (NonEmpty.head candidates)
+  Prompt.ChooseLegend _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.DeclareAttackers {} -> pure []
   Prompt.DeclareBlockers {} -> pure Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -1399,6 +1400,7 @@ slaveAnswer p = case p of
   -- so the one arm that reads the Decider stays first and legible.
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
