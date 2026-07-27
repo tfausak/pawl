@@ -55,6 +55,7 @@ import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaProduction as ManaProduction
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modal as Modal
@@ -517,7 +518,8 @@ resolveTests registry =
         HU.assertEqual "slotsOf" (Set.singleton slot) (Resolve.slotsOf (Effect.ChangeText slot))
         HU.assertEqual "textChangeSlots" [slot] (Resolve.textChangeSlots card),
       HU.testCase "CR 605 manaProduced reads AddMana, nothing else" $ do
-        HU.assertEqual "add mana" (Just (ManaType.Colored Color.Green)) (Resolve.manaProduced (Effect.AddMana (ManaType.Colored Color.Green)))
+        HU.assertEqual "add mana" (Just (ManaProduction.OfType (ManaType.Colored Color.Green))) (Resolve.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))))
+        HU.assertEqual "add mana of any color" (Just ManaProduction.AnyColor) (Resolve.manaProduced (Effect.AddMana ManaProduction.AnyColor))
         HU.assertEqual "damage produces no mana" Nothing (Resolve.manaProduced (Effect.DealDamage (SlotName.MkSlotName (Text.pack "x")) (Quantity.Literal 1))),
       HU.testCase "CR 612 resolve reads projected effects: a hacked 'becomes Swamp' resolves as Mountain" $ do
         -- The target is a Forest, so the assertion {Mountain} proves the rewrite:

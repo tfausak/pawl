@@ -6,6 +6,7 @@ import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
 import Pawl.Type.Concession (Concession)
 import Pawl.Type.Cost (Cost)
+import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.MulliganDecision (MulliganDecision)
 import Pawl.Type.ObjectId (ObjectId)
@@ -32,6 +33,12 @@ data Response
     ChoseDefender PlayerId
   | -- CR 601.2g: the mana source the player chose to tap.
     ChoseManaSource ObjectId
+  | -- CR 605.3b / 105.4: the mana type the source's controller chose it to
+    -- produce, serialized so a DecisionLog replays an any-colour source (or a
+    -- dual land) deterministically. Its own constructor rather than a reuse of
+    -- ChoseManaSource: decode must return Nothing for a response that does not
+    -- match the prompt being asked, and two prompts sharing a constructor cannot.
+    ChoseManaType ManaType
   | DeclaredAttackers [ObjectId]
   | DeclaredBlockers (Map ObjectId ObjectId)
   | AssignedCombatDamage (Map Recipient Natural)

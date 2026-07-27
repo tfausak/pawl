@@ -45,6 +45,7 @@ import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Layer as Layer
 import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaProduction as ManaProduction
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modal as Modal
@@ -937,7 +938,7 @@ m45p7CardTests registry =
             HU.assertEqual "tap cost only" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost ab))
             HU.assertEqual "a real {0} mana cost, not an unpayable one (CR 118.5a/118.6)" (Just (ManaCost.MkManaCost [])) (Cost.Type.mana (ActivatedAbility.cost ab))
             case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
-              [m] -> HU.assertEqual "adds colorless" [Effect.AddMana ManaType.Colorless] (Foldable.toList (Mode.effects m))
+              [m] -> HU.assertEqual "adds colorless" [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)] (Foldable.toList (Mode.effects m))
               _ -> HU.assertFailure "expected exactly one mode"
           _ -> HU.assertFailure "expected exactly one activated ability",
       HU.testCase "Silence is a {W} instant whose one effect is AffectPlayers UntilEndOfTurn Opponents CantCastSpells" $ do

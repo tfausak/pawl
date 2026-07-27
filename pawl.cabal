@@ -157,6 +157,7 @@ library
     Pawl.Type.Layer
     Pawl.Type.Mana
     Pawl.Type.ManaCost
+    Pawl.Type.ManaProduction
     Pawl.Type.ManaSymbol
     Pawl.Type.ManaType
     Pawl.Type.ManaUnit

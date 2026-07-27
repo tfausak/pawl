@@ -321,6 +321,7 @@ recordingAnswer p = case p of
   Prompt.Concede _ -> pure Concession.Continues
   Prompt.ChooseDefender _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseManaSource _ _ candidates -> pure (NonEmpty.head candidates)
+  Prompt.ChooseManaType _ _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.DeclareAttackers {} -> pure []
   Prompt.DeclareBlockers {} -> pure Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -1397,6 +1398,7 @@ slaveAnswer p = case p of
   -- that. Placed with the other incidental arms rather than above ChooseAction,
   -- so the one arm that reads the Decider stays first and legible.
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->

@@ -16,7 +16,10 @@
               {
                 "type": "AddMana",
                 "value": {
-                  "type": "Colorless"
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colorless"
+                  }
                 }
               }
             ],

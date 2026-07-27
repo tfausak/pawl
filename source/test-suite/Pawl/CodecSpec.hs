@@ -54,6 +54,7 @@ import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.Json as Json
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaProduction as ManaProduction
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modal as Modal
@@ -194,7 +195,9 @@ tests registry =
           HU.testCase "ModifyTarget" $
             roundTrip "e2" Codec.effectToJson Codec.jsonToEffect (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (SlotName.MkSlotName (Text.pack "t"))),
           HU.testCase "AddMana" $
-            roundTrip "e3" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana (ManaType.Colored Color.Green)),
+            roundTrip "e3" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))),
+          HU.testCase "AddMana of any color" $
+            roundTrip "e3b" Codec.effectToJson Codec.jsonToEffect (Effect.AddMana ManaProduction.AnyColor),
           HU.testCase "ExileAllGraveyards" $
             roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards,
           HU.testCase "ExileHandThenDraw" $

@@ -4,7 +4,7 @@ import Pawl.Type.AbilityName (AbilityName)
 import Pawl.Type.CounterKind (CounterKind)
 import Pawl.Type.Duration (Duration)
 import Pawl.Type.Filter (Filter)
-import Pawl.Type.ManaType (ManaType)
+import Pawl.Type.ManaProduction (ManaProduction)
 import Pawl.Type.Modification (Modification)
 import Pawl.Type.MonarchTarget (MonarchTarget)
 import Pawl.Type.PlayerCounterKind (PlayerCounterKind)
@@ -43,10 +43,12 @@ data Effect card
     -- stored ChangeSubtypeWord continuous effect. Resolve stores it; Projection
     -- applies it.
     ChangeText SlotName
-  | -- CR 605: add one unit of this mana type. Executed by Mana.tapForMana at
-    -- payment (CR 605.3b: a mana ability never uses the stack); Resolve.applyEffect
-    -- never runs it. Read by Resolve.manaProduced (the "produces mana?" ABI bit).
-    AddMana ManaType
+  | -- CR 605: add one unit of mana, of the type the ManaProduction names -- one
+    -- fixed type, or one colour its controller chooses (CR 105.4). Executed by
+    -- Mana.tapForMana at payment (CR 605.3b: a mana ability never uses the stack);
+    -- Resolve.applyEffect never runs it. Read by Resolve.manaProduced (the
+    -- "produces mana?" ABI bit).
+    AddMana ManaProduction
   | -- CR 701.23: search the controller's library for a card matching the Filter,
     -- put it onto the battlefield tapped, then shuffle (Evolving Wilds' exact
     -- shape; destination/tapped are baked in for now). The Filter is evaluated

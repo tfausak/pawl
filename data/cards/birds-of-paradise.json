@@ -16,10 +16,7 @@
               {
                 "type": "AddMana",
                 "value": {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colorless"
-                  }
+                  "type": "AnyColor"
                 }
               }
             ],
@@ -34,20 +31,27 @@
     }
   ],
   "castingPermissions": [],
-  "keywords": [],
+  "keywords": [
+    {
+      "type": "Flying"
+    }
+  ],
   "manaCost": [
     {
-      "type": "Generic",
-      "value": 3
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
     }
   ],
-  "mulliganAction": [
-    {
-      "type": "ExileHandThenDraw"
-    }
-  ],
-  "name": "Serum Powder",
-  "power": null,
+  "name": "Birds of Paradise",
+  "power": {
+    "type": "Literal",
+    "value": 0
+  },
   "replacementEffects": [],
   "spell": {
     "modes": [
@@ -62,14 +66,21 @@
     }
   },
   "staticAbilities": [],
-  "toughness": null,
+  "toughness": {
+    "type": "Literal",
+    "value": 1
+  },
   "triggeredAbilities": [],
   "typeLine": {
-    "subtypes": [],
+    "subtypes": [
+      {
+        "type": "Bird"
+      }
+    ],
     "supertypes": [],
     "types": [
       {
-        "type": "Artifact"
+        "type": "Creature"
       }
     ]
   }

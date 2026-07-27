@@ -67,6 +67,7 @@ alwaysPass p = case p of
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -100,6 +101,7 @@ castAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
@@ -133,6 +135,7 @@ fightAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
