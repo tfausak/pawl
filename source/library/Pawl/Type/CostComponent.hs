@@ -7,7 +7,8 @@ import Pawl.Type.Filter (Filter)
 -- permanents, sacrificing permanents, discarding cards, and so on." One
 -- component of a Pawl.Type.Cost, alongside its mana part.
 --
--- Discard-as-cost and exile-from-a-zone components do not exist yet (#108).
+-- No component exiles a card from a zone (#108); that issue's discard half is
+-- DiscardCards and DiscardThis below.
 --
 -- The successor to Pawl.Type.AdditionalCost, whose two nullary inhabitants were
 -- named relative to that type ("Self"); here the object a cost is on is "This".
@@ -69,6 +70,25 @@ data CostComponent
     -- A Natural and not a Quantity, for the reason PayLife and PayEnergy give: a
     -- cost has no binding environment at CR 601.2f time.
     DiscardCards Natural
+  | -- CR 702.29a's "Discard this card": discard the card the cost is on, from
+    -- the hand it is in.
+    --
+    -- Deliberately NOT `DiscardCards 1`, and the distinction is the one
+    -- SacrificeThis draws against Sacrifice: CR 701.9b gives the discarding
+    -- player the choice of WHICH card, so DiscardCards prompts -- while this
+    -- names one card and offers nothing to choose. Paying with DiscardCards 1
+    -- would invent a prompt the rules do not have, and would let the player
+    -- discard some other card to cycle this one.
+    --
+    -- One of the two components that read a HAND rather than the battlefield
+    -- (DiscardCards is the other), so its payability asks about a zone rather
+    -- than about control -- CR 108.4 gives a card in a hand no controller at all.
+    --
+    -- #108 records that a hand-reading component must exclude the spell being
+    -- cast from its candidates, because CR 601.2a has already moved that card to
+    -- the stack. That does not arise here: this names the object the cost is on,
+    -- and a cost on an object that is no longer in a hand is simply unpayable.
+    DiscardThis
   | -- CR 107.14 / 118: pay N energy counters. Energy-specific, not a general
     -- PayPlayerCounters -- energy is the only player counter ever spent as a
     -- cost. A Natural, not a Quantity: a cost has no binding environment at CR

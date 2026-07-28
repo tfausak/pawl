@@ -39,8 +39,14 @@ legalActions pid gs =
           && not (Set.member pid (GameState.landPlayed gs))
       lands = if canPlayLand then fmap Action.Play (playableLands pid gs) else []
       spells = fmap Action.Cast (Cast.castableSpells pid gs)
+      -- CR 702.29a: a HAND is a source of activations too, not just the
+      -- battlefield -- that rule's cycling "functions only while the card with
+      -- cycling is in a player's hand". Which abilities an object offers from
+      -- where is Activate.abilitiesFor's question, not this one's; this list only
+      -- says where to look. The two are disjoint, since an object is in exactly
+      -- one zone.
       activations =
-        let forPermanent oid =
+        let forObject oid =
               fmap (Action.Activate oid) (filter (\ab -> Activate.activatable pid oid ab gs) (Activate.abilitiesFor oid gs))
-         in concatMap forPermanent (Projection.controls pid gs)
+         in concatMap forObject (Projection.controls pid gs <> Game.zoneMembers Zone.Hand pid gs)
    in Action.Pass : lands <> spells <> activations

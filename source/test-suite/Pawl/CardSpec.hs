@@ -1274,6 +1274,31 @@ animatorCardTests registry =
           _ -> HU.assertFailure "expected exactly one triggered ability"
     ]
 
+-- CR 702.29: the pool's first cycling card. Barkhide Mauler is a vanilla 4/4
+-- whose only text is the keyword, so nothing else about it can stand in for the
+-- keyword when a cycling test passes.
+cyclingCardTests :: Registry.Type.Registry -> Tasty.TestTree
+cyclingCardTests registry =
+  Tasty.testGroup
+    "Cycling"
+    [ HU.testCase "Barkhide Mauler is a {4}{G} 4/4 Beast whose only text is Cycling {2}" $ do
+        p <- Registry.printing registry "Barkhide Mauler"
+        let c = Printing.card p
+            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+        HU.assertEqual "name" (Text.pack "Barkhide Mauler") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 4, green]) (Card.Type.manaCost c)
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 4))) (Card.Type.power c)
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 4))) (Card.Type.toughness c)
+        HU.assertEqual "subtypes" (Set.singleton Subtype.Beast) (TypeLine.subtypes (Card.Type.typeLine c))
+        -- The card data carries the PRINTED cost and nothing else: rule 702.29a's
+        -- discard and draw are minted by Pawl.Keyword, never authored here.
+        HU.assertEqual
+          "\"Cycling {2}\""
+          (Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])))
+          (Card.Type.keywords c)
+        HU.assertEqual "and no activated ability of its own" [] (Card.Type.activatedAbilities c)
+    ]
+
 -- The pool's two world enchantments. Their abilities are ordinary -- a layer-6
 -- keyword grant and a layer-4/7b animation, both shapes the pool already had --
 -- and it is the SUPERTYPE on the type line that earns them their place: CR
@@ -1325,4 +1350,4 @@ tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry]

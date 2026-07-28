@@ -9,11 +9,16 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
+import Pawl.Type.ActivatedAbility (ActivatedAbility)
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import Pawl.Type.Card (Card)
 import Pawl.Type.CastingPermission (CastingPermission)
 import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import Pawl.Type.Cost (Cost)
+import qualified Pawl.Type.Cost as Cost
+import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Effect as Effect
 import Pawl.Type.Keyword (Keyword)
 import qualified Pawl.Type.Keyword as Keyword
@@ -22,6 +27,7 @@ import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerRef as PlayerRef
+import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.Quantity as Quantity
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
@@ -93,10 +99,91 @@ abilitiesFor keyword count = case keyword of
   Keyword.Trample -> []
   Keyword.Vigilance -> []
   Keyword.Fear -> []
+  Keyword.Cycling _ -> []
   Keyword.Flashback _ -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Toxic _ -> []
+
+-- CR 602.1: the ACTIVATED abilities rule 702 gives a card while it sits in its
+-- owner's hand -- the third sibling of triggeredAbilitiesOf above and
+-- castingPermissionsOf below, and the first that mints something a player takes
+-- an action with.
+--
+-- Named for the ZONE rather than for cycling, because that is the classification
+-- its one reader wants: Pawl.Activate.abilitiesFor asks "what can be activated
+-- from here", and gets an ordinary list of abilities back without learning that
+-- rule 702.29 produced any of them. Rule 702 has more hand abilities to come
+-- (forecast, CR 702.57, is the next), and each joins this list without its
+-- reader changing.
+--
+-- Printed keywords rather than a projection's post-layer ones, the same rules
+-- fact castingPermissionsOf records: CR 113.6b says "an ability that states
+-- which zones it functions in functions only from those zones", and rule 702.29a
+-- states the hand -- which the CR 613 layer system does not reach.
+handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card]
+handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
+
+-- Exhaustive for the reason permissionsFor is: rule 702 keeps adding abilities
+-- that function from a hand, so the next one must break this build rather than
+-- silently produce nothing.
+handAbilitiesFor :: Keyword -> [ActivatedAbility Card]
+handAbilitiesFor keyword = case keyword of
+  Keyword.Cycling cost -> [cycling cost]
+  Keyword.Deathtouch -> []
+  Keyword.Defender -> []
+  Keyword.DoubleStrike -> []
+  Keyword.FirstStrike -> []
+  Keyword.Flying -> []
+  Keyword.Haste -> []
+  Keyword.Indestructible -> []
+  Keyword.Reach -> []
+  Keyword.Trample -> []
+  Keyword.Vigilance -> []
+  Keyword.Fear -> []
+  Keyword.Flashback _ -> []
+  Keyword.Poisonous _ -> []
+  Keyword.Infect -> []
+  Keyword.Devoid -> []
+  Keyword.Toxic _ -> []
+
+-- CR 702.29a: "'Cycling [cost]' means '[Cost], Discard this card: Draw a card.'"
+-- The whole ability, minted from the one cost the keyword carries.
+--
+-- The discard is a COMPONENT of the activation cost and not an effect, because
+-- rule 702.29a puts it before the colon. Three things follow that would all be
+-- wrong the other way round: an activation the player backs out of discards
+-- nothing (Pawl.Cost.pay restores the entry state), the card is already in the
+-- graveyard while the draw is still on the stack, and CR 702.29c's "when you
+-- cycle this card" will have a cost payment to trigger off rather than a
+-- resolution (#314).
+--
+-- The card's own data carries only what is PRINTED on it -- "Cycling {2}" is a
+-- mana cost and nothing else -- and rule 702.29a's discard is added here. That
+-- is the split the whole module exists for: the card says which keyword, the
+-- rule says what it means.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
+-- is activated: the Pawl.Monarch.oneEffect shape poisonous above also takes.
+--
+-- AnyTime because rule 702.29a states no timing restriction, which leaves CR
+-- 117.1b's default: "a player may activate an activated ability any time they
+-- have priority."
+cycling :: Cost -> ActivatedAbility Card
+cycling cost =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis]},
+      ActivatedAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.timing = ActivationTiming.AnyTime
+    }
+  where
+    -- CR 702.29a draws for the ability's controller, which CR 113.8 makes "the
+    -- player who activated it" -- so You, the perspective Pawl.Resolve evaluates
+    -- a PlayerRef against.
+    effect = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
 
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword,
 -- the sibling of triggeredAbilitiesOf above. A card's own printed permissions
@@ -119,6 +206,9 @@ permissionsFor keyword = case keyword of
   -- "if the resulting spell is an instant or sorcery spell" is not checked
   -- (#295).
   Keyword.Flashback _ -> [CastingPermission.CastFromGraveyard]
+  -- CR 702.29a is an ACTIVATED ability, not a casting permission: cycling
+  -- discards the card, it never casts it. See handAbilitiesOf above.
+  Keyword.Cycling _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []

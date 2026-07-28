@@ -97,6 +97,30 @@ doorTests registry =
         HU.assertBool "a controlled permanent pays" (Cost.canPayComponent S.alice onField CostComponent.SacrificeThis gs1)
         HU.assertBool "a card in hand does not" (not (Cost.canPayComponent S.alice inHand CostComponent.SacrificeThis gs1))
         HU.assertBool "another player's permanent does not" (not (Cost.canPayComponent S.bob onField CostComponent.SacrificeThis gs1)),
+      -- CR 702.29a's "Discard this card", the exact mirror of SacrificeThis
+      -- above: one names a permanent its controller owns the choice of, the other
+      -- names a card in a hand. Asked of the ZONE and the OWNER, because CR 108.4
+      -- gives a card in a hand no controller for a control-shaped gate to read.
+      --
+      -- Tested directly rather than only through cycling, because the two gates
+      -- an activation passes -- this one and Activate.abilitiesFor's -- would
+      -- otherwise cover for each other, and either alone would look correct.
+      HU.testCase "CR 702.29a DiscardThis needs the card in this player's hand" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (inHand, gs1) = S.addHandCard piker S.alice gs0
+        HU.assertBool "a card in hand pays" (Cost.canPayComponent S.alice inHand CostComponent.DiscardThis gs1)
+        HU.assertBool "a permanent does not" (not (Cost.canPayComponent S.alice onField CostComponent.DiscardThis gs1))
+        HU.assertBool "and it is not the other player's to discard" (not (Cost.canPayComponent S.bob inHand CostComponent.DiscardThis gs1)),
+      -- CR 701.9a through Event.changeZone, the CR 400.7 funnel: the discarded
+      -- card lands in its owner's graveyard as a new incarnation, so the old id
+      -- is gone rather than moved.
+      HU.testCase "CR 701.9a paying DiscardThis puts that card in the graveyard" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (inHand, gs0) = S.addHandCard piker S.alice (Setup.emptyGame S.bothPlayers)
+            after = S.runPure S.identityAnswer gs0 (Cost.payComponent S.alice inHand CostComponent.DiscardThis)
+        HU.assertEqual "the hand is empty" 0 (length (Game.zoneMembers Zone.Hand S.alice after))
+        HU.assertEqual "and the card is in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
       -- CR 118.6 vs CR 118.5a: the distinction the Maybe carries. Nothing is an
       -- unpayable cost; an empty ManaCost is {0} and is payable.
       HU.testCase "CR 118.6 an unpayable cost can never be paid" $ do

@@ -44,6 +44,26 @@ data Keyword
   | Reach -- 702.17
   | Trample -- 702.19
   | Vigilance -- 702.20
+  | -- 702.29a: "Cycling is an activated ability that functions only while the
+    -- card with cycling is in a player's hand. 'Cycling [cost]' means '[Cost],
+    -- Discard this card: Draw a card.'"
+    --
+    -- The cost rides the constructor, as Flashback's does, because rule 702.29a
+    -- states it as part of the keyword rather than as separate card text.
+    -- Pawl.Keyword.handAbilitiesOf mints the whole ability from this one value.
+    --
+    -- The "functions only while ... in a player's hand" half is NOT a field
+    -- here. Rule 702.29b is explicit that the ability itself exists everywhere
+    -- ("it continues to exist while the object is on the battlefield and in all
+    -- other zones"), so the zone is a question the READER asks --
+    -- Pawl.Activate.abilitiesFor -- exactly as Pawl.Cost.costsFor asks it of
+    -- rule 702.34a's flashback cost.
+    --
+    -- Typecycling (702.29e) is this same ability with a library search in place
+    -- of the draw, and CR 702.29f makes it cycling for every rule that looks --
+    -- so when a printing needs it, it becomes a payload on THIS constructor
+    -- rather than a sibling (#314).
+    Cycling Cost
   | -- 702.34a: "Flashback appears on some instants and sorceries. It represents
     -- two static abilities: one that functions while the card is in a player's
     -- graveyard and another that functions while the card is on the stack.

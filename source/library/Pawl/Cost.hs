@@ -244,6 +244,18 @@ canPayComponent pid oid component gs = case component of
   -- no-op the moment #89 lands.
   CostComponent.DiscardCards n ->
     Natural.length (discardCandidates pid oid gs) >= n
+  -- CR 702.29a: payable only while the card is in the paying player's hand --
+  -- which is where rule 702.29a's "functions only while the card with cycling is
+  -- in a player's hand" is enforced for the COST half. Asked of the zone and the
+  -- owner rather than of control, because CR 108.4 gives a card in a hand no
+  -- controller to ask about.
+  --
+  -- The owner is the right player: CR 400.3 sends every card that would go to a
+  -- hand to its OWNER's, so "in this player's hand" and "owned by this player and
+  -- in a hand" are the same question asked twice.
+  CostComponent.DiscardThis -> case Game.lookupObject oid gs of
+    Nothing -> False
+    Just obj -> Object.zone obj == Zone.Hand && Object.owner obj == pid
   -- CR 107.14 / CR 118.6: payable only if the player has at least that many
   -- energy counters. The bidirectional proof: GainPlayerCounters (P10 #37)
   -- adds energy, this component spends it.
@@ -375,6 +387,18 @@ payComponent pid oid component = case component of
         Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) distinct
         pure Payment.Paid
       else pure Payment.Unpaid
+  -- CR 701.9a's move, through Event.changeZone -- the same CR 400.7 funnel
+  -- DiscardCards uses above, so a cycled card gets a new incarnation and Rest in
+  -- Peace's redirect composes. No prompt: the cost names this card.
+  --
+  -- The card is in the GRAVEYARD (or wherever the funnel redirected it) by the
+  -- time the ability resolves, which is not a problem to route around: it is what
+  -- CR 702.29c means by "these abilities trigger from whatever zone the card
+  -- winds up in after it's cycled" (#314), and the same thing SacrificeThis
+  -- already does to Ghitu Fire-Eater.
+  CostComponent.DiscardThis -> do
+    Event.changeZone oid Zone.Graveyard
+    pure Payment.Paid
   -- CR 107.14: paying energy removes that many energy counters from the
   -- player. Natural subtraction is PARTIAL (it throws on underflow), so `left`
   -- is guarded exactly like Cost.applyAdjustments's `lowered` -- the `have - n`
