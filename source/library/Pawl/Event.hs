@@ -82,6 +82,10 @@ movedOf event = case event of
   -- The Moved event emitted by the same discard is the zone change; this one
   -- describes why it happened (CR 702.29c).
   GameEvent.Cycled _ -> Nothing
+  -- CR 701.20b: "Revealing a card doesn't cause it to leave the zone it's in."
+  -- The rule that makes this arm Nothing rather than an oversight -- a reveal is
+  -- never a zone change, even when the card is about to make one.
+  GameEvent.Revealed _ _ -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent
@@ -92,6 +96,7 @@ damageOf event = case event of
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Cycled _ -> Nothing
+  GameEvent.Revealed _ _ -> Nothing
 
 -- The caster an event describes, if it is a cast (CR 601.2i).
 castOf :: GameEvent -> Maybe PlayerId
@@ -100,6 +105,18 @@ castOf event = case event of
   GameEvent.Moved _ _ -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Cycled _ -> Nothing
+  GameEvent.Revealed _ _ -> Nothing
+
+-- Who revealed what, if the event is a reveal (CR 701.20a).
+revealOf :: GameEvent -> Maybe (PlayerId, PC.ProjectedCharacteristics)
+revealOf event = case event of
+  GameEvent.Revealed pid snapshot -> Just (pid, snapshot)
+  GameEvent.Moved _ _ -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Cycled _ -> Nothing
 
@@ -469,6 +486,33 @@ drawCard pid = do
     [] -> State.put gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
     top : _ -> changeZone top Zone.Hand
 
+-- The single reveal funnel (CR 701.20a): `pid` shows the card `oid` to all
+-- players, which here means appending what was shown to the public log. No-op
+-- for an id with no object, the posture changeZone takes.
+--
+-- CR 701.20b: nothing moves and nothing about the object changes, so this
+-- function's whole effect is the event. That is not a shortcut -- it is the
+-- rule.
+--
+-- The snapshot is Projection.project, the same reading GameEvent.Moved's CR
+-- 608.2h last-known information takes -- deliberately NOT the printed-card view
+-- (Projection.viewOfCard) that Resolve's search filter matches a library card
+-- through. The two ask different questions and really can disagree: CR 604.3
+-- says a characteristic-defining ability "function[s] in all zones", so a
+-- Tarmogoyf in a library HAS a power, which viewOfCard reports as Nothing and
+-- Projection.project computes. A search may ignore that (CR 701.23a's criterion
+-- is a description, and viewOfCard's own comment gives its reasons); a reveal
+-- may not, because it has to show what a player at the table would see.
+--
+-- No card in the pool makes the two differ today -- no CDA card is searched for
+-- or revealed -- so this is the reading that will still be right rather than a
+-- passing test.
+reveal :: PlayerId -> ObjectId -> Game ()
+reveal pid oid = do
+  gs <- State.get
+  Monad.when (Maybe.isJust (Game.lookupObject oid gs)) $
+    State.modify' (recordEvent (GameEvent.Revealed pid (Projection.project oid gs)))
+
 -- CR 603.2: does this condition fire on this event, for the permanent that bears
 -- it? `bearer` is the object whose ability this is and `you` is its controller
 -- -- CR 603.3a controls the triggered ability, and CR 109.5 is what makes "your"
@@ -487,6 +531,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Cycled _ -> False
+    GameEvent.Revealed _ _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins wanted scope -> case event of
     GameEvent.StepBegan began active ->
@@ -498,6 +543,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Cycled _ -> False
+    GameEvent.Revealed _ _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
@@ -515,6 +561,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Cycled _ -> False
+    GameEvent.Revealed _ _ -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
   -- an inherent ability of no object, so its real match lives in
   -- Pawl.Monarch.inherentMatch, not here.
@@ -529,6 +576,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
+    GameEvent.Revealed _ _ -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
 -- the environment in which the ability's "that player" / "that creature" is
@@ -682,6 +730,7 @@ eventTriggers events gs =
         GameEvent.SpellCast _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
         GameEvent.Cycled _ -> Map.empty
+        GameEvent.Revealed _ _ -> Map.empty
       -- CR 702.29c: the card that was just cycled, wherever it landed. The third
       -- candidate source, and the first that is neither on the battlefield nor a
       -- permanent that just left it -- which is exactly what that rule asks for:
@@ -711,6 +760,11 @@ eventTriggers events gs =
         GameEvent.StepBegan _ _ -> Map.empty
         GameEvent.SpellCast _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
+        -- A reveal offers no candidate source of its own. The event names no
+        -- object at all (see GameEvent.Revealed), so there is nothing here to
+        -- hang an ability on; a card that triggers on a reveal would need a
+        -- TriggerCondition first, and none exists (#322).
+        GameEvent.Revealed _ _ -> Map.empty
       forOne event (oid, (ctrl, abilities)) =
         let fires ab = matchesTrigger oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (TriggeredAbility.condition ab) event)

@@ -353,14 +353,14 @@ optionalFilter value = case value of
 searchDestinationToJson :: SearchDestination.SearchDestination -> Value
 searchDestinationToJson d = nullary . Text.pack $ case d of
   SearchDestination.BattlefieldTapped -> "BattlefieldTapped"
-  SearchDestination.Hand -> "Hand"
+  SearchDestination.RevealThenHand -> "RevealThenHand"
 
 jsonToSearchDestination :: Value -> Either Text SearchDestination.SearchDestination
 jsonToSearchDestination =
   decodeNullary
     (Text.pack "SearchDestination")
     [ (Text.pack "BattlefieldTapped", SearchDestination.BattlefieldTapped),
-      (Text.pack "Hand", SearchDestination.Hand)
+      (Text.pack "RevealThenHand", SearchDestination.RevealThenHand)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -1354,6 +1354,7 @@ gameEventToJson e = case e of
   GameEvent.SpellCast pid -> Json.tagged (Text.pack "SpellCast") (Just (playerIdToJson pid))
   GameEvent.BecameMonarch pid -> Json.tagged (Text.pack "BecameMonarch") (Just (playerIdToJson pid))
   GameEvent.Cycled oid -> Json.tagged (Text.pack "Cycled") (Just (objectIdToJson oid))
+  GameEvent.Revealed pid pc -> Json.tagged (Text.pack "Revealed") (Just (Array [playerIdToJson pid, projectedCharacteristicsToJson pc]))
 
 jsonToGameEvent :: Value -> Either Text GameEvent.GameEvent
 jsonToGameEvent value = do
@@ -1365,6 +1366,7 @@ jsonToGameEvent value = do
     ("SpellCast", Just v) -> GameEvent.SpellCast <$> jsonToPlayerId v
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> jsonToPlayerId v
     ("Cycled", Just v) -> GameEvent.Cycled <$> jsonToObjectId v
+    ("Revealed", Just (Array [pid, pc])) -> GameEvent.Revealed <$> jsonToPlayerId pid <*> jsonToProjectedCharacteristics pc
     _ -> Left (Text.pack "unknown GameEvent: " <> t)
 
 -- MonarchTarget ----------------------------------------------------------------

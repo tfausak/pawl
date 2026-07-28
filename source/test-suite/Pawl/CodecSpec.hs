@@ -702,9 +702,17 @@ tests registry =
             roundTrip "cyc" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Cycling cost Nothing)
             roundTrip "typecyc" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Cycling cost (Just (Filter.Type.HasCardType CardType.Land))),
           HU.testCase "SearchDestination round-trips" $
-            mapM_ (roundTrip "dest" Codec.searchDestinationToJson Codec.jsonToSearchDestination) [SearchDestination.BattlefieldTapped, SearchDestination.Hand],
+            mapM_ (roundTrip "dest" Codec.searchDestinationToJson Codec.jsonToSearchDestination) [SearchDestination.BattlefieldTapped, SearchDestination.RevealThenHand],
           HU.testCase "GameEvent.Cycled round-trips" $
             roundTrip "cyc" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Cycled (ObjectId.MkObjectId 7)),
+          -- CR 701.20a: the reveal's whole payload IS the snapshot, so it is the
+          -- one GameEvent whose round-trip failing would silently erase what the
+          -- players were shown rather than merely mislabel it. Typhoid Rats for
+          -- the reason the Moved case gives -- every snapshot field populated.
+          HU.testCase "GameEvent.Revealed round-trips with its snapshot" $ do
+            typhoidRats <- Registry.printing registry "Typhoid Rats"
+            let (ratId, gs) = S.addLibraryCard typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
+            roundTrip "revealed" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Revealed S.alice (Projection.project ratId gs)),
           HU.testCase "TriggerCondition.SelfCycled round-trips" $
             roundTrip "sc" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfCycled,
           HU.testCase "TurnScope round-trips" $

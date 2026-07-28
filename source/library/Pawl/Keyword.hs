@@ -191,11 +191,14 @@ cycling cost searchFor =
     -- player who activated it" -- so You, the perspective Pawl.Resolve evaluates
     -- a PlayerRef against.
     --
-    -- CR 702.29e searches instead, into the HAND. Its "reveal it" is not
-    -- performed (#320).
+    -- CR 702.29e searches instead: "Search your library for a [type] card,
+    -- reveal it, and put it into your hand." The reveal is part of the
+    -- destination because it is part of that sentence -- see
+    -- Pawl.Type.SearchDestination, and CR 701.23e for why a search does not
+    -- reveal on its own.
     effect = case searchFor of
       Nothing -> Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
-      Just filter_ -> Effect.Search filter_ SearchDestination.Hand
+      Just filter_ -> Effect.Search filter_ SearchDestination.RevealThenHand
 
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword,
 -- the sibling of triggeredAbilitiesOf above. A card's own printed permissions

@@ -4,11 +4,13 @@
 -- gating, and the CR 605 mana-ability exclusion from stack activations.
 module Pawl.ActivateSpec where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Action as Action
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Engine as Engine
@@ -54,6 +56,7 @@ import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -530,6 +533,48 @@ cyclingTests registry =
             HU.assertEqual "the hand is empty" 0 (length (Game.zoneMembers Zone.Hand S.alice after))
             HU.assertEqual "and Ash Barrens was still discarded" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
           abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+      -- CR 701.20a: "To reveal a card, show that card to all players for a brief
+      -- time." Rule 702.29e's typecycling says "reveal it", and CR 701.23e is
+      -- what makes that the CARD's instruction rather than the search's: "If the
+      -- effect that contains the search instruction doesn't also contain
+      -- instructions to reveal the found card(s), then they're not revealed."
+      --
+      -- What the assertion is FOR: a tutored card is otherwise private -- it
+      -- goes from one hidden zone to another -- so the log entry is the only
+      -- record that a Forest in Alice's hand is a fact Bob gets to play around.
+      -- The log, not a per-player view: pawl has no such view yet (#322), and
+      -- this is the record one would read.
+      HU.testCase "CR 701.20a basic landcycling reveals the Forest it fetches" $ do
+        barrens <- Registry.printing registry "Ash Barrens"
+        forest <- Registry.printing registry "Forest"
+        island <- Registry.printing registry "Island"
+        let (_, g0) = S.addLibraryCard forest S.alice (S.landsInPlay island 1)
+            (g1, oid) = S.handOne barrens g0
+            gs = g1 {GameState.priority = Just S.alice}
+        case Activate.abilitiesFor oid gs of
+          [ability] -> do
+            let cycled = S.runPure findFirst gs (Activate.activateAbility S.alice oid ability)
+                after = S.runPure findFirst cycled Stack.resolveTop
+            HU.assertEqual "nothing revealed before the ability resolves" [] (S.revealsOf cycled)
+            HU.assertEqual "Alice revealed a Forest" [(S.alice, Text.pack "Forest")] (S.revealsOf after)
+          abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+      -- CR 701.20a reveals "that card", so a search that finds none reveals
+      -- nothing. The negative half of the test above: CR 701.23b lets a player
+      -- fail to find, and a failed find must not put an empty or filler reveal
+      -- into the log for an opponent to read something into.
+      HU.testCase "CR 701.20a a search that finds nothing reveals nothing" $ do
+        barrens <- Registry.printing registry "Ash Barrens"
+        piker <- Registry.printing registry "Goblin Piker"
+        island <- Registry.printing registry "Island"
+        let (_, g0) = S.addLibraryCard piker S.alice (S.landsInPlay island 1)
+            (g1, oid) = S.handOne barrens g0
+            gs = g1 {GameState.priority = Just S.alice}
+        case Activate.abilitiesFor oid gs of
+          [ability] -> do
+            let cycled = S.runPure findFirst gs (Activate.activateAbility S.alice oid ability)
+                after = S.runPure findFirst cycled Stack.resolveTop
+            HU.assertEqual "no basic land found, so nothing shown" [] (S.revealsOf after)
+          abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
       -- CR 702.29f: "typecycling abilities are cycling abilities, and typecycling
       -- costs are cycling costs." The engine gets that for free by minting both
       -- from one keyword arm -- the discard is in the cost either way, and the
@@ -549,6 +594,38 @@ cyclingTests registry =
               (Maybe.listToMaybe (reverse (Cost.Type.components (ActivatedAbility.cost typecycler))), Maybe.listToMaybe (reverse (Cost.Type.components (ActivatedAbility.cost plain))))
             HU.assertEqual "and both are instant speed" (ActivationTiming.AnyTime, ActivationTiming.AnyTime) (ActivatedAbility.timing typecycler, ActivatedAbility.timing plain)
           _ -> HU.assertFailure "expected one cycling ability on each",
+      -- CR 701.20a from the battlefield, and by a card that prints the word
+      -- itself: "{2}, {T}, Sacrifice this artifact: Search your library for a
+      -- basic land card, reveal that card, put it into your hand, then shuffle."
+      -- Ash Barrens above reaches the same destination through rule 702.29e, so
+      -- this is the half that proves the reveal belongs to the CARD's sentence
+      -- (CR 701.23e) rather than to the keyword that happened to arrive first.
+      HU.testCase "CR 701.20a whole card: Braidwood Sextant fetches a Forest and reveals it" $ do
+        sextant <- Registry.printing registry "Braidwood Sextant"
+        forest <- Registry.printing registry "Forest"
+        island <- Registry.printing registry "Island"
+        let (sextantId, g0) = S.addCreature sextant S.alice (S.landsInPlay island 2)
+            (_, g1) = S.addLibraryCard forest S.alice g0
+            gs = g1 {GameState.priority = Just S.alice}
+            ability = theAbility sextant
+            activated = S.runPure findFirst gs (Activate.activateAbility S.alice sextantId ability)
+            after = S.runPure findFirst activated Stack.resolveTop
+        HU.assertBool "the Sextant sacrificed itself paying the cost" (not (Set.member sextantId (GameState.battlefield activated)))
+        HU.assertEqual "nothing revealed while the ability is still on the stack" [] (S.revealsOf activated)
+        HU.assertEqual "Alice revealed the Forest" [(S.alice, Text.pack "Forest")] (S.revealsOf after)
+        HU.assertEqual "the Forest is in her hand" 1 (length (Game.zoneMembers Zone.Hand S.alice after))
+        HU.assertEqual "and out of her library" 0 (length (Game.zoneMembers Zone.Library S.alice after))
+        -- CR 701.20b: revealing does not move the card, so the two Islands that
+        -- paid for this are the whole battlefield -- the Forest went to hand.
+        HU.assertEqual "only the two Islands remain on the battlefield" 2 (length (Game.zoneMembers Zone.Battlefield S.alice after))
+        -- "reveal that card, put it into your hand" is an ORDER, not two
+        -- independent facts, and CR 701.20b is what gives it teeth: the reveal
+        -- happens while the card is still in the library, so it precedes the
+        -- move in the log. Swapping the two would leave every other assertion
+        -- here passing.
+        case (List.findIndex (Maybe.isJust . Event.revealOf) (Foldable.toList (GameState.events after)), List.findIndex ((== Just Zone.Hand) . fmap ZoneChange.to . Event.movedOf) (Foldable.toList (GameState.events after))) of
+          (Just revealed, Just moved) -> HU.assertBool "the reveal is logged before the move into the hand" (revealed < moved)
+          indices -> HU.assertFailure ("expected both a reveal and a move into the hand, got " <> show indices),
       -- The control: the gate cannot pass by offering every card in hand. A
       -- Piker has no cycling and nothing is minted for it.
       HU.testCase "CR 702.29a a card without cycling offers nothing from the hand" $ do

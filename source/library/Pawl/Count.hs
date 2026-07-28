@@ -169,3 +169,9 @@ snapshotView shape event = case event of
   -- the same discard emits is what carries one -- so there is nothing here for an
   -- EventShape to match against.
   GameEvent.Cycled _ -> Nothing
+  -- A reveal DOES carry a characteristics snapshot, unlike the two above, and is
+  -- still Nothing here: the only EventShape is a shape of ZONE CHANGE, and CR
+  -- 701.20b says a reveal is not one ("revealing a card doesn't cause it to
+  -- leave the zone it's in"). The arm becomes a real view the day an EventShape
+  -- names revealing (#162).
+  GameEvent.Revealed _ _ -> Nothing

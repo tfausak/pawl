@@ -1,0 +1,95 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [
+          {
+            "type": "TapThis"
+          },
+          {
+            "type": "SacrificeThis"
+          }
+        ],
+        "mana": [
+          {
+            "type": "Generic",
+            "value": 2
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Search",
+                "value": [
+                  {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Land"
+                        }
+                      },
+                      {
+                        "type": "HasSupertype",
+                        "value": {
+                          "type": "Basic"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "RevealThenHand"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    }
+  ],
+  "name": "Braidwood Sextant",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Artifact"
+      }
+    ]
+  }
+}
