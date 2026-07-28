@@ -40,6 +40,7 @@ import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword.Type
+import qualified Pawl.Type.LastKnown as LastKnown
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PendingTrigger (PendingTrigger)
@@ -171,6 +172,27 @@ changeZoneAttaching oid requestedDest seed = do
           -- honest history (a token has no printed card to re-derive from,
           -- CR 111.1).
           snapshot = Projection.project oid gs
+          -- CR 613.1b: the OTHER half of last known information, read from the
+          -- same pre-move state. Control is not a characteristic (CR 109.3's
+          -- list does not include it), so it cannot ride `snapshot`; it is kept
+          -- because CR 603.3a asks "who controlled its source at the time it
+          -- triggered" about sources that are already gone -- see
+          -- eventTriggers below.
+          --
+          -- The `Object.owner` fallback is unreachable rather than a guess:
+          -- Projection.controllerOfGiven's own base case returns
+          -- `Just (Object.owner obj)` for any id that resolves, and `oid`
+          -- resolves here (this branch matched `Just obj`). It is written as a
+          -- fallback only because controllerOf's type is honest about ids that
+          -- do not.
+          --
+          -- A second board walk on the same hot path as `snapshot` above
+          -- (controllerOf rebuilds controlGrants and its liveGiven fixpoint).
+          -- Measured on the tasty-bench suite, this commit's parent vs. this
+          -- change (goldfish / casting / fighting / fighting-aura, 2p):
+          -- 15.2/133/24.6/569 ms -> 15.5/134/25.2/575 ms -- every move inside
+          -- one run-to-run stddev, so no gate was moved to buy it back.
+          lastController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
       -- CR 614.4: replacements exist before the event, so the loop reads them from
       -- the PRE-MOVE state. CR 614.6: the modified event is what actually happens.
       --
@@ -209,7 +231,7 @@ changeZoneAttaching oid requestedDest seed = do
                     -- carries as its source (CR 113.7) -- and from the same
                     -- `snapshot` the Moved event below records, so the two
                     -- readings of "what was it" cannot drift apart.
-                    GameState.lastKnown = Map.insert oid snapshot (GameState.lastKnown g1)
+                    GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController) (GameState.lastKnown g1)
                   }
           newId <- placeObject pid mkObj dest
           -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
@@ -541,13 +563,41 @@ isPlayerRecipient r = case r of
 -- The battlefield is the ONLY scanned zone; an ability that functions from a
 -- graveyard, hand or exile is never scanned (#45).
 --
--- This scan derives its candidate set from BATTLEFIELD STATE AS IT THEN STANDS
--- at the CR 117.5 priority boundary, rather than checking against the state
--- immediately after each event -- so a permanent that enters and then dies to a
--- state-based action within the same settle loses its enters trigger (#46). Note
--- this is NOT a "look back in time" gap: that CR 603.10 term of art names the
--- opposite case, and 603.10's exception list (603.10a-g) is
--- leaves-the-battlefield, sacrifice, phase-out and similar, not enters.
+-- CR 603.10, FIRST sentence -- the NORMAL rule, not the "looks back in time"
+-- exception list that follows it (603.10a-g are leaves-the-battlefield,
+-- sacrifice, phase-out and similar, none of them enters): "objects that exist
+-- immediately after an event are checked to see if the event matched any trigger
+-- conditions". That is a per-EVENT question, and the battlefield set this scan
+-- walks answers a per-BOUNDARY one: the scan runs once, at CR 117.5, after CR
+-- 704.5's state-based actions have already run. A permanent that enters and dies
+-- inside one settle -- a creature entering with toughness 0 or less, buried by CR
+-- 704.5f -- exists immediately after its own entry event and is gone by the time
+-- the scan looks.
+--
+-- So each entry event contributes ONE extra candidate of its own: the object it
+-- names, read from CR 608.2h last known information (GameState.lastKnown), scoped
+-- to that event alone. Three things make that exact rather than approximate:
+--
+--   * NO DOUBLE FIRE, structurally. GameState.lastKnown is written by the zone
+--     change that DELETES an id, and CR 400.7 mints a fresh id per move, so no
+--     id is ever in both `lastKnown` and `objects`. A newcomer still on the
+--     battlefield at the boundary therefore has no lastKnown entry and
+--     contributes no extra candidate at all; the Map.union below prefers the
+--     live reading regardless.
+--   * THE RIGHT SNAPSHOT. `lastKnown` holds the permanent as it was in the zone
+--     it LEFT -- the battlefield -- so a creature that entered and died is read
+--     with its continuous effects applied, which is what CR 603.10's same
+--     sentence demands ("continuous effects that exist at that time are used to
+--     determine what the trigger conditions are").
+--   * A CANONICAL PLACE IN THE ORDER. Candidates are a Map keyed by ObjectId and
+--     traversed ascending, so the extra candidate sorts into the same
+--     permanents-inner order every other candidate obeys -- it is not appended.
+--
+-- Only the entry event's own newcomer is recovered. A permanent that was on the
+-- battlefield when some OTHER event in the same batch happened and is gone by the
+-- boundary still loses that event's trigger (#289) -- only an entry event names
+-- the id `lastKnown` answers for, since a departure event records the id of the
+-- object in the DESTINATION zone rather than the one that left.
 --
 -- Events outer, permanents inner (ascending by id): a deterministic canonical
 -- order, which is what the CR 603.3b ordering prompt indexes into.
@@ -559,34 +609,69 @@ eventTriggers events gs =
       -- would otherwise rebuild it, and re-run its liveGiven fixpoint, once
       -- per battlefield object.
       grants = Projection.controlGrants gs
+      -- CR 702.70a: a keyword can BE a triggered ability, so a permanent's
+      -- abilities are its printed-and-granted ones plus the ones rule 702 mints
+      -- from its keywords. Derived from the POST-LAYER counts, so Humility takes
+      -- them away and an Aura's layer-6 grant adds them without either being
+      -- special-cased. Shared by both candidate sources below, so a live
+      -- permanent and a last-known one are read the same way.
+      abilitiesOf pc = PC.triggeredAbilities pc <> Keyword.triggeredAbilitiesOf (PC.keywords pc)
       onBattlefield =
-        Maybe.mapMaybe
-          ( \oid -> case Map.lookup oid projected of
-              -- Unreachable: projected (Projection.projectAll gs) is keyed on
-              -- the same GameState.battlefield set this list walks, so every
-              -- oid drawn from that set has an entry.
-              Nothing -> Nothing
-              -- CR 603.3a: controlled by whoever controls the source when it
-              -- triggers. Projection.controllerOfGiven reads control AT THE SCAN
-              -- BOUNDARY, not at the moment the underlying event fired (#47) --
-              -- unobservable today because nothing changes control between an
-              -- event and the CR 117.5 boundary.
-              -- CR 702.70a: a keyword can BE a triggered ability, so the
-              -- permanent's abilities are its printed-and-granted ones plus the
-              -- ones rule 702 mints from its keywords. Derived from the
-              -- POST-LAYER counts, so Humility takes them away and an Aura's
-              -- layer-6 grant adds them without either being special-cased.
-              Just pc ->
-                fmap
-                  (\ctrl -> (oid, ctrl, PC.triggeredAbilities pc <> Keyword.triggeredAbilitiesOf (PC.keywords pc)))
-                  (Projection.controllerOfGiven grants Set.empty oid gs)
+        Map.fromList
+          ( Maybe.mapMaybe
+              ( \oid -> case Map.lookup oid projected of
+                  -- Unreachable: projected (Projection.projectAll gs) is keyed on
+                  -- the same GameState.battlefield set this list walks, so every
+                  -- oid drawn from that set has an entry.
+                  Nothing -> Nothing
+                  -- CR 603.3a: controlled by whoever controls the source when it
+                  -- triggers. Projection.controllerOfGiven reads control AT THE SCAN
+                  -- BOUNDARY, not at the moment the underlying event fired (#47) --
+                  -- unobservable today because nothing changes control between an
+                  -- event and the CR 117.5 boundary.
+                  Just pc ->
+                    fmap
+                      (\ctrl -> (oid, (ctrl, abilitiesOf pc)))
+                      (Projection.controllerOfGiven grants Set.empty oid gs)
+              )
+              (Set.toAscList (GameState.battlefield gs))
           )
-          (Set.toAscList (GameState.battlefield gs))
-      forOne event (oid, ctrl, abilities) =
+      -- CR 603.10: the newcomer this event put onto the battlefield, IF it no
+      -- longer exists. Empty for a newcomer that is still there -- `onBattlefield`
+      -- above already carries it, from live state rather than from a snapshot --
+      -- and empty for an object that ceased without a zone change ever running
+      -- over it (Resolve.cease, Departure.objectsLeaveWith), which files no last
+      -- known information.
+      --
+      -- CR 603.3a's controller comes from that same last known information: the
+      -- player who controlled it as it left the battlefield. Within one settle
+      -- that IS "the player who controlled its source at the time it triggered",
+      -- because the permanent entered and died with nothing in between that could
+      -- move control.
+      goneEntrant event = case event of
+        GameEvent.Moved zc _
+          | ZoneChange.to zc == Zone.Battlefield ->
+              case Map.lookup (ZoneChange.object zc) (GameState.lastKnown gs) of
+                Nothing -> Map.empty
+                Just lk ->
+                  Map.singleton
+                    (ZoneChange.object zc)
+                    (LastKnown.controller lk, abilitiesOf (LastKnown.characteristics lk))
+        GameEvent.Moved _ _ -> Map.empty
+        GameEvent.DamageDealt _ -> Map.empty
+        GameEvent.StepBegan _ _ -> Map.empty
+        GameEvent.SpellCast _ -> Map.empty
+        GameEvent.BecameMonarch _ -> Map.empty
+      forOne event (oid, (ctrl, abilities)) =
         let fires ab = matchesTrigger oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
          in fmap pend (filter fires abilities)
-   in concatMap (\event -> concatMap (forOne event) onBattlefield) events
+      -- Map.union is left-biased, so a live battlefield reading always wins over
+      -- a last-known one. Belt and braces: the two sets are disjoint by
+      -- construction (see goneEntrant), and this is what makes that a property of
+      -- the code rather than of the argument above it.
+      candidates event = Map.toAscList (Map.union onBattlefield (goneEntrant event))
+   in concatMap (\event -> concatMap (forOne event) (candidates event)) events
 
 -- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
 -- is currently TRUE and which has no instance already on the stack.

@@ -11,6 +11,7 @@ import Pawl.Type.ContinuousEffect (ContinuousEffect)
 import Pawl.Type.Decider (Decider)
 import Pawl.Type.DelayedTrigger (DelayedTrigger)
 import Pawl.Type.GameEvent (GameEvent)
+import Pawl.Type.LastKnown (LastKnown)
 import Pawl.Type.Mana (Mana)
 import Pawl.Type.MonarchWatch (MonarchWatch)
 import Pawl.Type.Object (Object)
@@ -18,7 +19,6 @@ import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Phase (Phase)
 import Pawl.Type.Player (Player)
 import Pawl.Type.PlayerId (PlayerId)
-import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
 import Pawl.Type.RestartSignal (RestartSignal)
 import Pawl.Type.Result (Result)
 import Pawl.Type.Timestamp (Timestamp)
@@ -66,11 +66,16 @@ data GameState = MkGameState
     -- answers "what was that object" by the OLD id, in one lookup rather than a
     -- backwards scan.
     --
+    -- The two are also read TOGETHER, by Event.eventTriggers: an entry event in
+    -- the log names an id this map answers for once the permanent has already
+    -- left, which is how a permanent that enters and dies inside one CR 117.5
+    -- settle still gets its CR 603.6a entry trigger scanned.
+    --
     -- Grows for the whole game, deliberately: an entry can be needed arbitrarily
     -- later (a delayed trigger's source, CR 603.7d), so there is no point at
     -- which pruning is provably safe. Correctness over footprint, per the
     -- project's standing guidance.
-    lastKnown :: Map ObjectId ProjectedCharacteristics,
+    lastKnown :: Map ObjectId LastKnown,
     -- CR 117.5: how far the trigger scan has consumed. Everything at or after
     -- this index is unscanned. Consumption is an index bump; the record stays.
     scannedThrough :: Natural,

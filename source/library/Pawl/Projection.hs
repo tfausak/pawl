@@ -29,6 +29,7 @@ import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Keyword (Keyword)
 import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.LastKnown as LastKnown
 import Pawl.Type.Layer (Layer)
 import qualified Pawl.Type.Layer as Layer
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -310,10 +311,20 @@ fullView gs oid = Just (viewOfObject oid gs)
 -- Resolve.cease does to an ability and what Departure.objectsLeaveWith does to a
 -- departing player's objects. Honest Nothing rather than a zero, and it lands on
 -- the no-op every caller already gives an unevaluable quantity.
+--
+-- The controller comes from the same record, not from a Nothing: CR 608.2h says
+-- the effect uses the object's LAST KNOWN INFORMATION, and CR 613.1b control is
+-- information about the object even though CR 109.3 denies it is a
+-- characteristic. Passing Nothing here would say the gone source was controlled
+-- by nobody rather than by whoever last controlled it -- which a ControlledBy
+-- filter read against that source would answer wrongly.
 viewWithLastKnown :: ObjectId -> GameState -> Count.ViewOf
 viewWithLastKnown src gs oid =
   if oid == src && not (Map.member oid (GameState.objects gs))
-    then fmap (\pc -> viewOfCharacteristics oid pc Nothing gs) (Map.lookup oid (GameState.lastKnown gs))
+    then
+      fmap
+        (\lk -> viewOfCharacteristics oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) gs)
+        (Map.lookup oid (GameState.lastKnown gs))
     else fullView gs oid
 
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:

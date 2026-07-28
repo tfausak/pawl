@@ -23,6 +23,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Departure as Departure
@@ -263,7 +264,49 @@ scanTests registry =
             triggers = fst (Event.gatherTriggers [event] gs1)
         HU.assertBool "ghoul1 has the lower id" (ghoul1 < ghoul2)
         HU.assertEqual "both triggers fired" 2 (length triggers)
-        HU.assertEqual "sources in ascending ObjectId order" [ghoul1, ghoul2] (fmap PendingTrigger.source triggers)
+        HU.assertEqual "sources in ascending ObjectId order" [ghoul1, ghoul2] (fmap PendingTrigger.source triggers),
+      -- CR 603.10, FIRST sentence -- the normal rule, not the "looks back in
+      -- time" exception list that follows it: "objects that exist immediately
+      -- after an event are checked to see if the event matched any trigger
+      -- conditions". Ravenous Rats existed immediately after the event that put
+      -- it onto the battlefield, so its CR 603.6a entry trigger fired -- even
+      -- though CR 704.5f then buried it as a 0/0 before the CR 117.5 boundary's
+      -- trigger scan ran.
+      --
+      -- bob holds TWO cards, so "discarded once" is distinguishable from
+      -- "discarded twice"; the companion test below is the no-double-fire half.
+      HU.testCase "CR 603.10 whole cards: under Night of Souls' Betrayal, Ravenous Rats dies as it enters and STILL makes bob discard" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        ravenousRats <- Registry.printing registry "Ravenous Rats"
+        night <- Registry.printing registry "Night of Souls' Betrayal"
+        let (_, base1) = S.addCreature night S.alice (S.landsInPlay swamp 2)
+            (_, base2) = S.addHandCard piker S.bob base1
+            (_, base3) = S.addHandCard piker S.bob base2
+            (gs, spellId) = S.handOne ravenousRats base3
+            bobBefore = S.handSize S.bob gs
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
+        HU.assertEqual "CR 704.5f buried the 0/0" 0 (S.countOnBattlefieldByName (Text.pack "Ravenous Rats") S.alice settled)
+        HU.assertEqual "in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
+        HU.assertEqual "and bob still discarded, exactly once" (bobBefore - 1) (S.handSize S.bob settled),
+      -- The no-double-fire half. Same board minus the -1/-1, so the Rats is on
+      -- the battlefield at the CR 117.5 boundary AND named by an unscanned
+      -- entry event -- the two candidate sources the scan draws from. A count,
+      -- not a boolean: a Rats counted twice discards two of bob's two cards.
+      HU.testCase "CR 603.6a whole cards: a Ravenous Rats that survives its entry triggers exactly once" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        ravenousRats <- Registry.printing registry "Ravenous Rats"
+        let (_, base1) = S.addHandCard piker S.bob (S.landsInPlay swamp 2)
+            (_, base2) = S.addHandCard piker S.bob base1
+            (gs, spellId) = S.handOne ravenousRats base2
+            bobBefore = S.handSize S.bob gs
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
+        HU.assertEqual "the Rats survived" 1 (S.countOnBattlefieldByName (Text.pack "Ravenous Rats") S.alice settled)
+        HU.assertEqual "nothing in alice's graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice settled))
+        HU.assertEqual "bob discarded exactly one" (bobBefore - 1) (S.handSize S.bob settled)
     ]
 
 -- CR 701.21: sacrificing is its own keyword action -- NOT a destruction.

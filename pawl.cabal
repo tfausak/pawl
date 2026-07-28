@@ -158,6 +158,7 @@ library
     Pawl.Type.HandActionPerformer
     Pawl.Type.Json
     Pawl.Type.Keyword
+    Pawl.Type.LastKnown
     Pawl.Type.Layer
     Pawl.Type.Mana
     Pawl.Type.ManaCost
