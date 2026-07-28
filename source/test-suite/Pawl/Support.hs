@@ -506,8 +506,9 @@ randomAnswer p = case p of
   Prompt.MulliganAction {} -> pure Nothing
   Prompt.OpeningHandAction {} -> pure Nothing
 
--- Total index into a turn order: an out-of-range draw falls back to the head,
--- which the NonEmpty guarantees exists (no partial functions).
+-- Total index into a non-empty run of candidates -- a turn order, the tokens one
+-- Create minted: an out-of-range draw falls back to the head, which the NonEmpty
+-- guarantees exists (no partial functions).
 pickFrom :: NonEmpty.NonEmpty a -> Int -> a
 pickFrom order i = case drop i (NonEmpty.toList order) of
   h : _ -> h

@@ -266,7 +266,8 @@ data Prompt r where
   -- actually minted, in creation order; the answer is the one bound.
   --
   -- Reachable only through a replacement. The Pawl.CardSpec lint rejects a card
-  -- whose Create binds a slot while its PRINTED quantity exceeds 1 (#53), but CR
+  -- whose Create binds a slot while its PRINTED quantity is anything but exactly
+  -- one -- greater, variable, or zero alike (#53), but CR
   -- 614.16 ("if an effect would create one or more tokens") scales the count at
   -- RUNTIME, long after that lint has passed: Doubling Season on Tidal Wave mints
   -- two Walls where CR 603.7c's "it" names one.

@@ -591,9 +591,9 @@ delayedTests registry =
           State.modify' (<> [NonEmpty.toList candidates])
           pure (NonEmpty.last candidates)
         _ -> pure (S.identityAnswer p)
-      -- Answers Prompt.ChooseBoundToken with an object that was never minted --
-      -- id 999 names nothing, the stand-in S.noSource already uses -- so the
-      -- engine's filter is what decides the binding.
+      -- Answers Prompt.ChooseBoundToken with an object that was never minted, so
+      -- the engine's filter is what decides the binding. Id 999 names nothing --
+      -- the same posture S.noSource takes.
       chooseUnmintedToken :: Prompt.Prompt r -> r
       chooseUnmintedToken p = case p of
         Prompt.ChooseBoundToken {} -> ObjectId.MkObjectId 999
