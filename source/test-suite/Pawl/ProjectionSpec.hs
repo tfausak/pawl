@@ -705,7 +705,7 @@ tests registry =
       -- question is whether BAD MOON's abilities were removed, not whether a
       -- LoseAllAbilities is on the battlefield. Humility's set is "each creature"
       -- and an un-animated Bad Moon is a plain enchantment, so it keeps its
-      -- ability -- and CR 613.1g's sublayers do the rest, 7b setting the base to
+      -- ability -- and CR 613.4's sublayers do the rest, 7b setting the base to
       -- 1/1 before 7c adds the +1/+1. The real ruling is that Humility plus Bad
       -- Moon makes a black creature 2/2.
       HU.testCase "CR 613.4 an un-animated Bad Moon is not stripped, so a Humility'd black creature is 2/2" $ do
@@ -719,13 +719,6 @@ tests registry =
         HU.assertBool "no animator, so Bad Moon is no creature" (not (Projection.isCreatureOf badMoonId gs))
         HU.assertEqual "1/1 from Humility's 7b, then +1/+1 from Bad Moon's 7c" (Just 2) (Projection.powerOf skelId gs)
         HU.assertEqual "and the same on toughness" (Just 2) (Projection.toughnessOf skelId gs),
-      -- The other thing the gate must not reach. CR 122.1a makes a +1/+1 counter's
-      -- +1/+1 a rule of the GAME rather than an ability of the permanent it sits
-      -- on, so there is nothing on the creature for CR 613.1f to remove and the
-      -- layer-7c effect stands after Humility's layer-7b 1/1. Projection.gather
-      -- emits the counter as a synthetic candidate with the creature as its
-      -- source, which is exactly the shape the layer-6 gate keys on -- so this
-      -- pins that counters are excluded from it.
       -- The third boundary, and the one CR 613.6 draws rather than CR 613.1f/g:
       -- an ability with a part BELOW layer 6 has already started to apply when
       -- layer 6 removes it, so "it will continue to be applied to the same set of
@@ -752,6 +745,13 @@ tests registry =
         HU.assertBool "March's layer-4 part still animates the artifact" (Projection.isCreatureOf slaverId gs)
         HU.assertEqual "and its layer-7b part still sets the mana value, 6" (Just 6) (Projection.powerOf slaverId gs)
         HU.assertEqual "and the same on toughness" (Just 6) (Projection.toughnessOf slaverId gs),
+      -- The last thing the gate must not reach. CR 122.1a makes a +1/+1 counter's
+      -- +1/+1 a rule of the GAME rather than an ability of the permanent it sits
+      -- on, so there is nothing on the creature for CR 613.1f to remove and the
+      -- layer-7c effect stands after Humility's layer-7b 1/1. Projection.gather
+      -- emits the counter as a synthetic candidate with the creature as its
+      -- source, which is exactly the shape the layer-6 gate keys on -- so this
+      -- pins that counters are excluded from it.
       HU.testCase "CR 122.1a a +1/+1 counter survives Humility: 1/1 becomes 2/2" $ do
         piker <- Registry.printing registry "Goblin Piker"
         humility <- Registry.printing registry "Humility"

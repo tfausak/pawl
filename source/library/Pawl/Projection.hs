@@ -807,18 +807,28 @@ gather gs =
 -- CR 613.1f: does this modification REMOVE abilities? The layer-6 classification
 -- abilitiesRemoved asks for, in the same standing as setLandSubtypeEffects's
 -- isSet -- Projection is the sole home of a case on Modification.
+-- Total, like modificationWrites: a new ability-removing Modification must break
+-- this build rather than silently answer False and reopen #297.
 removesAbilities :: Modification -> Bool
 removesAbilities m = case m of
   Modification.LoseAllAbilities -> True
   -- CR 613.1f names ability-ADDING effects in the same layer, and adding is not
-  -- removing; named explicitly per Modification's exhaustiveness discipline.
+  -- removing.
   Modification.GainKeyword _ -> False
   -- CR 305.7 strips a land's rules text, which IS an ability loss -- but it is a
   -- layer-4 type change (see `layer`), not a layer-6 removal, and it is gated
   -- separately and earlier by liveGiven. Answering True here would double-count
   -- it into a layer whose ordering it does not have.
   Modification.SetLandSubtype _ -> False
-  _ -> False
+  Modification.SetBasePowerToughness _ _ -> False
+  Modification.ModifyPowerToughness _ _ -> False
+  Modification.SwitchPowerToughness -> False
+  Modification.AddLandSubtype _ -> False
+  Modification.ChangeSubtypeWord _ _ -> False
+  Modification.AddCardType _ -> False
+  Modification.SetColor _ -> False
+  Modification.SetController _ -> False
+  Modification.SetControllerToSource -> False
 
 -- CR 613.1f / 613.1g: were `oid`'s abilities removed by the time layer 6
 -- finished? Layer 6 is applied before layer 7, so an ability removed there
