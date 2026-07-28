@@ -45,4 +45,19 @@ data PlayerEffect
     ReduceSpellCost Filter ManaCost
   | -- CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize
+  | -- CR 500.5 / 703.4q / Upwelling: this player does not lose the unspent mana
+    -- in their mana pool as a step or phase ends.
+    --
+    -- CR 106.4 supplies the verb: "Each player's mana pool empties at the end of
+    -- each step and phase, and the player is said to LOSE this mana." That is the
+    -- wording modern Oracle text uses ("Players don't lose unspent mana as steps
+    -- and phases end"), and it is why this is stated as a player-axis effect at
+    -- all rather than as a property of the pool.
+    --
+    -- Carries NOTHING, deliberately. Upwelling keeps every type of mana for
+    -- everyone, so there is nothing to parameterize; Omnath, Locus of Mana keeps
+    -- only green, which is a mana-type argument this constructor does not have
+    -- (#351). Shizuko and Karn, Legacy Reforged keep only the mana they just
+    -- added, which is not a player-axis property at all (#352).
+    DontLoseUnspentMana
   deriving (Eq, Ord, Show)

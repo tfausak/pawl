@@ -323,7 +323,8 @@ tests registry =
                 PlayerEffect.ReduceSpellCost
                   (Filter.Type.HasSubtype Subtype.Cleric)
                   (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)]),
-                PlayerEffect.NoMaximumHandSize
+                PlayerEffect.NoMaximumHandSize,
+                PlayerEffect.DontLoseUnspentMana
               ],
           -- CR 613.6 made a static ability "one affected set, one or more parts",
           -- so the wire format has an array where it used to have a single
