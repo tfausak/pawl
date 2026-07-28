@@ -1,0 +1,85 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Flashback",
+      "value": {
+        "components": [],
+        "mana": [
+          {
+            "type": "Generic",
+            "value": 4
+          },
+          {
+            "type": "OfType",
+            "value": {
+              "type": "Colored",
+              "value": {
+                "type": "Red"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Firebolt",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "DealDamage",
+            "value": [
+              "target",
+              {
+                "type": "Literal",
+                "value": 2
+              }
+            ]
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "target",
+            "spec": {
+              "pool": {
+                "type": "AnyTarget"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Sorcery"
+      }
+    ]
+  }
+}

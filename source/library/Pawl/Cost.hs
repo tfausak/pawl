@@ -13,6 +13,7 @@ import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Decide as Decide
@@ -20,6 +21,7 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
+import qualified Pawl.Keyword as Keyword
 import qualified Pawl.Mana as Mana
 import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Projection as Projection
@@ -60,15 +62,25 @@ firstOffered candidates = case candidates of
   c : _ -> c
   [] -> unpayable
 
--- The candidate costs for CASTING this object (CR 601.2b), printed one first.
--- Empty for anything that is not a card: a token is created onto the
--- battlefield and never cast, and an ability on the stack is not a spell.
+-- The candidate costs for CASTING this object (CR 601.2b) -- from hand, the
+-- printed one first and then each alternative. Empty for anything that is not a
+-- card: a token is created onto the battlefield and never cast, and an ability
+-- on the stack is not a spell.
 --
 -- A LAND yields one candidate whose mana part is Nothing -- CR 202.1's "a card's
 -- mana cost", absent -- which CR 118.6 makes unpayable, so canPay says False and
 -- Cast.castable never offers it. That is the same answer the retired
 -- Cast.costOf's Nothing gave, arrived at by the rule instead of by a special
 -- case.
+--
+-- The candidates depend on the ZONE the object is being cast from, because rule
+-- 702.34a's permission and its cost are one sentence: "You may cast this card
+-- from your graveyard ... by paying [cost] rather than paying its mana cost."
+-- From a graveyard, therefore, the flashback cost is the ONLY candidate -- the
+-- printed mana cost is not among them, since nothing permits casting the card
+-- from there for it -- and a card with no flashback yields no candidate at all,
+-- which is CR 601.3's default prohibition arriving through Cast.castable's
+-- affordability gate as well as through its permission gate.
 costsFor :: ObjectId -> GameState -> [Cost]
 costsFor oid gs = case Game.lookupObject oid gs of
   Nothing -> []
@@ -81,10 +93,14 @@ costsFor oid gs = case Game.lookupObject oid gs of
           -- that affect that spell are applied to that alternative cost." An
           -- alternative replaces only the MANA cost; every additional cost still
           -- applies. The increases and reductions are Pawl.Cost.total's job,
-          -- called on whichever candidate is chosen.
+          -- called on whichever candidate is chosen. CR 702.34a's own last
+          -- sentence sends flashback through the same rules, so its cost is
+          -- wrapped identically.
           withAdditional alternative =
             alternative {Cost.components = Cost.components alternative <> Card.additionalCosts card}
-       in printed : fmap withAdditional (Card.alternativeCosts card)
+       in case Object.zone obj of
+            Zone.Graveyard -> fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Card.keywords card)))
+            _ -> printed : fmap withAdditional (Card.alternativeCosts card)
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
     Source.OfTrigger _ _ -> []

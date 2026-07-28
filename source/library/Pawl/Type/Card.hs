@@ -40,7 +40,11 @@ data Card = MkCard
     -- Pawl.Type.ProjectedCharacteristics.keywords counts it there.
     --
     -- The closed half must read this through Pawl.Projection.keywordsOf, never
-    -- directly: layer 6 grants and removes abilities at M3.
+    -- directly: layer 6 grants and removes abilities at M3. The exception is a
+    -- keyword whose ability functions in a zone the CR 613 layer system does not
+    -- reach -- rule 702.34a's flashback, read here by Pawl.Cast and Pawl.Cost
+    -- via Pawl.Keyword while the card sits in a graveyard -- which is the same
+    -- carve-out castingPermissions and additionalCosts below already take.
     keywords :: Set Keyword,
     -- CR 204.1/204.2: the colour indicator printed left of the type line. An
     -- object is each colour it denotes, IN ADDITION to the colours of its mana
@@ -90,10 +94,16 @@ data Card = MkCard
     -- ability is not ON the source object -- CR 603.7d gives it no source
     -- permanent to lose, so layer 6 cannot strip it.
     delayedAbilities :: Map AbilityName (TriggeredAbility Card),
-    -- CR 601.3: this card's casting permissions -- zone/condition exceptions to
-    -- normal timing. Read directly from the card (NOT the projection): the
-    -- permission functions in the library (CR 113.6), where the CR 613 layer
-    -- system does not reach. Empty for all but Panglacial Wurm.
+    -- CR 601.3: this card's PRINTED casting permissions -- zone/condition
+    -- exceptions to normal timing. Read directly from the card (NOT the
+    -- projection): the permission functions in the library (CR 113.6), where the
+    -- CR 613 layer system does not reach. Empty for all but Panglacial Wurm.
+    --
+    -- Not the whole list: rule 702.34a gives a card with flashback a
+    -- cast-from-your-graveyard permission that is never printed here, which
+    -- Pawl.Keyword.castingPermissionsOf mints from the keyword. Pawl.Cast
+    -- (permissionsOf) is the one place the two are put together; a reader that
+    -- wants every permission a card has must do the same.
     castingPermissions :: [CastingPermission],
     -- CR 702.5a: this card's `enchant` ability -- "Enchant [object or player]"
     -- -- which "restricts what an Aura spell can target and what an Aura can
@@ -145,6 +155,11 @@ data Card = MkCard
     -- here (#103). CR 118.9's first sentence is "Some SPELLS have alternative
     -- costs", so this lives on Card and never on ActivatedAbility -- a rules
     -- fact, not an elision.
+    --
+    -- UNCONDITIONED, which is why rule 702.34a's flashback cost is deliberately
+    -- NOT one of these: a cost here is payable wherever the card can be cast
+    -- from, and flashback's may be paid only from the graveyard. It rides its
+    -- keyword instead, and Pawl.Cost.costsFor offers it by zone.
     alternativeCosts :: [Cost],
     -- CR 604.1/604.2 / 611.1: this card's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary

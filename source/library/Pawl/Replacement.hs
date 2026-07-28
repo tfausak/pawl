@@ -72,6 +72,7 @@ import qualified Pawl.Type.Uses as Uses
 import Pawl.Type.ZoneChange (ZoneChange)
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
 
 -- CR 614: settle a proposed zone change. Nothing means the move does not happen.
 -- The typed door Pawl.Event uses, so Event never cases on a ProposedEvent.
@@ -178,9 +179,10 @@ loop batch applied event = do
 --      permanents ascending by id, each permanent's own effects in printed
 --      order.
 --   2. The FLOATING store (GameState.replacements): newest first -- Resolve.hs
---      prepends each new ActiveReplacement onto the front of the list as it is
---      created, so the most recently resolved floating replacement is collected
---      before any older one.
+--      (the Replace opcode) and Pawl.Cast (rule 702.34a's flashback exile, armed
+--      as the spell goes onto the stack) each prepend a new ActiveReplacement
+--      onto the front of the list as it is created, so the most recently
+--      installed floating replacement is collected before any older one.
 --
 -- That concatenated order is what the ChooseReplacement prompt indexes into.
 collect :: GameState -> [ReplacementCandidate]
@@ -226,6 +228,7 @@ applies gs event candidate =
    in case (ReplacementCandidate.effect candidate, event) of
         (ReplacementEffect.ZoneChangeR pat _, ProposedEvent.WouldChangeZone zc) ->
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
+            && matchesZoneSubject src (ZoneChangePattern.whichObject pat) (ZoneChange.object zc)
             && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
         (ReplacementEffect.DamageR pat _, ProposedEvent.WouldDealDamage de) ->
           case DamagePattern.whichKind pat of
@@ -282,6 +285,19 @@ matchesController gs src rel oid = case rel of
   ControllerRelation.Opponents -> case (Projection.controllerOf oid gs, Projection.controllerOf src gs) of
     (Just theirs, Just yours) -> theirs /= yours
     _ -> False
+
+-- CR 614.1: is this ZONE CHANGE about the object the pattern names? AnyObject
+-- always is; TheSource is CR 702.34a's "exile THIS card", the self-scoping EntryR
+-- (CR 614.1c) and DestructionR (CR 201.5) carry by having no pattern at all.
+--
+-- The id compared is the event's own subject, which Pawl.Event proposes as the
+-- PRE-move id -- the id the effect's source still has while it sits on the
+-- stack. Board-free, so no GameState: this is an identity test, not a
+-- characteristic one.
+matchesZoneSubject :: ObjectId -> ZoneChangeSubject.ZoneChangeSubject -> ObjectId -> Bool
+matchesZoneSubject src subject oid = case subject of
+  ZoneChangeSubject.AnyObject -> True
+  ZoneChangeSubject.TheSource -> src == oid
 
 -- CR 614.1: does this ZONE CHANGE's object satisfy the pattern's relation?
 --

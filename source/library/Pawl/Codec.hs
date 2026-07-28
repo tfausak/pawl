@@ -99,6 +99,7 @@ import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
 
 -- Helpers --------------------------------------------------------------------
 
@@ -367,6 +368,7 @@ keywordToJson k = case k of
   Keyword.Reach -> nullary (Text.pack "Reach")
   Keyword.Trample -> nullary (Text.pack "Trample")
   Keyword.Vigilance -> nullary (Text.pack "Vigilance")
+  Keyword.Flashback cost -> Json.tagged (Text.pack "Flashback") (Just (costToJson cost))
   Keyword.Fear -> nullary (Text.pack "Fear")
   Keyword.Poisonous n -> Json.tagged (Text.pack "Poisonous") (Just (natTo n))
   Keyword.Infect -> nullary (Text.pack "Infect")
@@ -387,6 +389,7 @@ jsonToKeyword value = do
     ("Reach", _) -> Right Keyword.Reach
     ("Trample", _) -> Right Keyword.Trample
     ("Vigilance", _) -> Right Keyword.Vigilance
+    ("Flashback", Just v) -> Keyword.Flashback <$> jsonToCost v
     ("Fear", _) -> Right Keyword.Fear
     ("Poisonous", Just v) -> Keyword.Poisonous <$> natFrom v
     ("Infect", _) -> Right Keyword.Infect
@@ -767,6 +770,7 @@ zoneChangePatternToJson :: ZoneChangePattern.ZoneChangePattern -> Value
 zoneChangePatternToJson p =
   Object
     [ (Text.pack "whenDestination", zoneToJson (ZoneChangePattern.whenDestination p)),
+      (Text.pack "whichObject", zoneChangeSubjectToJson (ZoneChangePattern.whichObject p)),
       (Text.pack "whoseObject", controllerRelationToJson (ZoneChangePattern.whoseObject p))
     ]
 
@@ -774,12 +778,27 @@ jsonToZoneChangePattern :: Value -> Either Text ZoneChangePattern.ZoneChangePatt
 jsonToZoneChangePattern value = do
   ps <- Json.asObject value
   d <- Json.field (Text.pack "whenDestination") ps >>= jsonToZone
+  s <- Json.field (Text.pack "whichObject") ps >>= jsonToZoneChangeSubject
   w <- Json.field (Text.pack "whoseObject") ps >>= jsonToControllerRelation
   pure
     ZoneChangePattern.MkZoneChangePattern
       { ZoneChangePattern.whenDestination = d,
+        ZoneChangePattern.whichObject = s,
         ZoneChangePattern.whoseObject = w
       }
+
+zoneChangeSubjectToJson :: ZoneChangeSubject.ZoneChangeSubject -> Value
+zoneChangeSubjectToJson s = nullary . Text.pack $ case s of
+  ZoneChangeSubject.AnyObject -> "AnyObject"
+  ZoneChangeSubject.TheSource -> "TheSource"
+
+jsonToZoneChangeSubject :: Value -> Either Text ZoneChangeSubject.ZoneChangeSubject
+jsonToZoneChangeSubject =
+  decodeNullary
+    (Text.pack "ZoneChangeSubject")
+    [ (Text.pack "AnyObject", ZoneChangeSubject.AnyObject),
+      (Text.pack "TheSource", ZoneChangeSubject.TheSource)
+    ]
 
 counterPatternToJson :: CounterPattern.CounterPattern -> Value
 counterPatternToJson p =
@@ -928,12 +947,15 @@ jsonToTriggerCondition value = do
 castingPermissionToJson :: CastingPermission.CastingPermission -> Value
 castingPermissionToJson c = nullary . Text.pack $ case c of
   CastingPermission.CastFromLibraryWhileSearching -> "CastFromLibraryWhileSearching"
+  CastingPermission.CastFromGraveyard -> "CastFromGraveyard"
 
 jsonToCastingPermission :: Value -> Either Text CastingPermission.CastingPermission
 jsonToCastingPermission =
   decodeNullary
     (Text.pack "CastingPermission")
-    [(Text.pack "CastFromLibraryWhileSearching", CastingPermission.CastFromLibraryWhileSearching)]
+    [ (Text.pack "CastFromLibraryWhileSearching", CastingPermission.CastFromLibraryWhileSearching),
+      (Text.pack "CastFromGraveyard", CastingPermission.CastFromGraveyard)
+    ]
 
 -- Newtypes -------------------------------------------------------------------
 

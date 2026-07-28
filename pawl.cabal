@@ -232,6 +232,7 @@ library
     Pawl.Type.Zone
     Pawl.Type.ZoneChange
     Pawl.Type.ZoneChangePattern
+    Pawl.Type.ZoneChangeSubject
 
   hs-source-dirs: source/library
   other-modules: Paths_pawl
