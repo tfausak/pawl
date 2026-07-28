@@ -41,6 +41,27 @@ data Combat = MkCombat
     -- as the first step began" and reads DOUBLE strike live, which is what CR
     -- 510.4 says verbatim.
     struckFirst :: Maybe (Set ObjectId),
+    -- CR 506.4: who controlled each combatant AS IT JOINED combat -- the
+    -- comparand Pawl.Combat.removeControlChanged needs to answer "if its
+    -- controller changes". Keyed by the creature, so one map covers attackers
+    -- and blockers alike; written by declareAttackers and declareBlockers, the
+    -- only two things that put a creature into this record.
+    --
+    -- Stored, not re-derived, for the same reason struckFirst is: control is
+    -- DERIVED (layer 2, Projection.controllerOf), so "who controls it now" and
+    -- "who controlled it then" come apart the moment an effect grants control,
+    -- and the rule is about the difference between them. Nothing else in the
+    -- game state remembers the earlier value.
+    --
+    -- Not read off the ACTIVE PLAYER (attackers) and Combat.defender (blockers)
+    -- instead, which CR 508.1k and CR 509.1g would license today: that answers a
+    -- DIFFERENT question -- "is an attacking or defending player still its
+    -- controller?" -- which coincides with this one only while there is exactly
+    -- one of each. CR 802 is what makes several players defenders at once, and
+    -- pawl has no options concept to read it from (#175). CR 506.4 asks about the
+    -- permanent's own controller either way, so the snapshot states the rule the
+    -- rule states, for one map.
+    joinedUnder :: Map ObjectId PlayerId,
     -- CR 506.2/506.2a: the one player being attacked this combat phase. Chosen as
     -- a turn-based action immediately after the beginning of combat step begins
     -- (CR 703.4h, CR 507.1) by Pawl.Combat.chooseDefender.

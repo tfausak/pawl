@@ -1012,6 +1012,10 @@ departedAttackerTests registry =
                       { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.bob),
                         Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker),
                         Combat.Type.struckFirst = Nothing,
+                        -- CR 508.1k / 509.1g: each joined combat under its own
+                        -- controller, which is what a declaration would have
+                        -- recorded and what CR 506.4 compares against.
+                        Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
                         Combat.Type.defender = Just S.bob
                       }
                 }
@@ -1074,6 +1078,7 @@ departedDefenderTests registry =
                       { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.bob),
                         Combat.Type.blockers = Map.empty,
                         Combat.Type.struckFirst = Nothing,
+                        Combat.Type.joinedUnder = Map.singleton attacker S.alice,
                         Combat.Type.defender = Just S.bob
                       }
                 }
@@ -1112,6 +1117,7 @@ departedDefenderTests registry =
                       { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.carol),
                         Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker),
                         Combat.Type.struckFirst = Nothing,
+                        Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
                         Combat.Type.defender = Just S.carol
                       }
                 }
