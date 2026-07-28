@@ -466,11 +466,12 @@ placeOne pending = case PendingTrigger.source pending of
   TriggerSource.OfObject srcId -> placeBorne srcId pending
 
 -- Put one object-borne triggered ability on the stack as a fresh OfTrigger
--- object, choosing its mode(s) and their targets as it is placed (CR 603.3d). This mirrors
--- Cast.castSpell's cast-time flow: CR 700.2b -- the controller chooses the mode
--- when the ability triggers (elided, forced and unprompted, exactly when the
--- fillable modes are no more than the selection demands, #50) -- then CR 603.3d --
--- targets for the CHOSEN mode(s) are chosen now, at placement.
+-- object, choosing its mode(s) and their targets as it is placed (CR 603.3d).
+-- This mirrors Cast.castSpell's cast-time flow: CR 700.2b -- the controller
+-- chooses the mode when the ability triggers (elided, forced and unprompted,
+-- exactly when the fillable modes are no more than the selection demands, #50)
+-- -- then CR 603.3d -- targets for the CHOSEN mode(s) are chosen now, at
+-- placement.
 --
 -- CR 603.3c/700.2b: "If no mode is chosen, the ability is removed from the
 -- stack." This is the trigger-only half of the rule -- a SPELL that can't

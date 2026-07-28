@@ -240,14 +240,17 @@ data Prompt r where
   -- Sarcomancy and fire its ETB in the same batch. A source with two distinct
   -- abilities triggered together makes two different abilities identical entries
   -- on the wire while their order genuinely matters, and the payload would need
-  -- an ability discriminator alongside the source (#61). Sourceless is the same
-  -- shape of gap with the entries already named: CR 725.2's two abilities share
-  -- one controller and one (absent) source, so two Sourceless entries would be
-  -- indistinguishable too. Unreachable, because one triggers on a step beginning
-  -- and the other on combat damage and a settle always separates the two events;
-  -- the discriminator #61 asks for would cover both. Asked ONLY when the player controls two
-  -- or more -- with one there is nothing to choose, and where the rules leave
-  -- nothing to ask, don't prompt. CR 603.3b's TWO-PART process (first the
+  -- an ability discriminator alongside the source (#61). Sourceless is that same
+  -- gap in a second place: CR 725.2's two abilities share one controller and one
+  -- (absent) source, so two Sourceless entries would be indistinguishable too.
+  -- Unreachable, because one triggers on a step beginning and the other on combat
+  -- damage and a settle always separates the two events; the discriminator #61
+  -- asks for would cover both.
+  --
+  -- Asked ONLY when the player controls two or more -- with one there is nothing
+  -- to choose, and where the rules leave nothing to ask, don't prompt.
+  --
+  -- CR 603.3b's TWO-PART process (first the
   -- triggers whose condition is not another ability triggering, then the rest)
   -- is vacuous while no condition triggers on another ability triggering; this
   -- carries the note, not the machinery.

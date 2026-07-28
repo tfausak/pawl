@@ -9,8 +9,8 @@
 -- "died this turn") -- `historyTests`. CR 603.7 delayed triggered abilities
 -- -- `delayedTests`. The CR 603.3b ordering prompt -- `orderingTests`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
--- batch) -- `monarchOrderingTests`. The CR
--- 603.4 / 608.2a intervening "if" -- `interveningTests`. Also Pawl.Keyword: CR
+-- batch) -- `monarchOrderingTests`. The CR 603.4 / 608.2a intervening "if" --
+-- `interveningTests`. Also Pawl.Keyword: CR
 -- 702.70 poisonous, the keyword whose rule text IS a triggered ability, and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousTests`.
 {-# LANGUAGE GADTs #-}
@@ -841,8 +841,8 @@ delayedTests registry =
         ]
 
 -- CR 603.3b: "puts each triggered ability they control ... on the stack in any
--- order they choose". The
--- centerpiece: two triggers, one controller, and an order that changes the answer.
+-- order they choose". The centerpiece: two triggers, one controller, and an
+-- order that changes the answer.
 orderingTests :: Registry.Type.Registry -> Tasty.TestTree
 orderingTests registry =
   let endStep = Phase.Ending EndingStep.EndStep
