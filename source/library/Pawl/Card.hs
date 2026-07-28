@@ -16,6 +16,7 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import Pawl.Type.SlotName (SlotName)
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Supertype as Supertype
 import Pawl.Type.TargetSpec (TargetSpec)
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TypeLine as TypeLine
@@ -74,6 +75,25 @@ isCreature c = Set.member CardType.Creature (TypeLine.types (Card.typeLine c))
 -- timing classification, shaped like isPermanent.
 isInstant :: Card.Card -> Bool
 isInstant c = Set.member CardType.Instant (TypeLine.types (Card.typeLine c))
+
+-- CR 307.1: a sorcery is cast only in a main phase of its controller's own
+-- turn. The other half of the timing classification isInstant is, and the other
+-- card type CR 205.4e's casting restriction names.
+isSorcery :: Card.Card -> Bool
+isSorcery c = Set.member CardType.Sorcery (TypeLine.types (Card.typeLine c))
+
+-- CR 205.4a: does the printed type line carry the "legendary" supertype? The
+-- supertype half of the same closed-half classification isInstant is -- rule 205
+-- is part of the rulebook, so reading it is no more a case on card identity than
+-- isPermanentType's case on a card type. Two rules turn on it: CR 205.4d's
+-- legend rule (CR 704.5j, Pawl.Sba) and CR 205.4e's casting restriction
+-- (Pawl.Cast).
+--
+-- PRINTED, and only ever asked of a card rather than of a permanent: CR 704.5j's
+-- reading has to see a Clone's COPIED supertype, so Pawl.Sba goes through the
+-- projection instead of calling this.
+isLegendary :: Card.Card -> Bool
+isLegendary c = Set.member Supertype.Legendary (TypeLine.supertypes (Card.typeLine c))
 
 -- CR 110.1: the permanent card types. An enumeration -- closed half, finite.
 isPermanentType :: CardType.CardType -> Bool

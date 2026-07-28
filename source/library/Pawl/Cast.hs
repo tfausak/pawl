@@ -15,6 +15,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Keyword as Keyword
 import qualified Pawl.Modal as Modal
 import qualified Pawl.PlayerEffect as PlayerEffect
+import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
@@ -33,6 +34,7 @@ import qualified Pawl.Type.Payment as Payment
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 
@@ -114,6 +116,47 @@ inCastableZone pid oid gs =
     Nothing -> False
     Just card -> any (\zone -> elem oid (Game.zoneMembers zone pid gs)) (castableZones card)
 
+-- CR 205.4e: "Any instant or sorcery spell with the supertype 'legendary' is
+-- subject to a casting restriction. A player can't cast a legendary instant or
+-- sorcery spell unless that player controls a legendary creature or a legendary
+-- planeswalker."
+--
+-- A RULE, not a card-carried permission. Rule 205.4e restricts the PLAYER from
+-- the rulebook, so it is checked here beside the CR 601.3 checks and is
+-- emphatically not a CastingPermission -- a card-carried version would be the
+-- rules core learning from data a restriction it already knows. Reading a
+-- supertype and a card type is the same closed-half act as CR 704.5j's legend
+-- rule; nothing here touches an effect's identity.
+--
+-- The SPELL's own type line is read PRINTED (Card.isLegendary): it is in a hand
+-- or a graveyard when this is asked, where no projection exists, and CR 205.4a
+-- makes supertypes a printed-type-line read regardless
+-- (Projection.printedSupertypes says so).
+legendaryRestrictionOk :: PlayerId -> ObjectId -> GameState -> Bool
+legendaryRestrictionOk pid oid gs = case Game.cardOf oid gs of
+  Nothing -> False
+  Just card ->
+    not (Card.isLegendary card && (Card.isInstant card || Card.isSorcery card))
+      || controlsLegendaryCreature pid gs
+
+-- CR 205.4e's condition. Read through the PROJECTION rather than off the
+-- printed card, because "controls a legendary creature" is a question about the
+-- object as it exists on the battlefield: a Clone copying Thalia is a legendary
+-- creature (CR 707.2 lists supertype and card type among the copiable values)
+-- though its own card carries no supertype at all, which is the same reading
+-- Pawl.Sba.legendGroups takes for the legend rule.
+--
+-- Rule 205.4e's second disjunct, "or a legendary planeswalker", is not
+-- implemented: Pawl.Type.CardType has no Planeswalker constructor to test for
+-- (#301).
+controlsLegendaryCreature :: PlayerId -> GameState -> Bool
+controlsLegendaryCreature pid gs =
+  let qualifies oid =
+        Projection.controllerOf oid gs == Just pid
+          && Set.member Supertype.Legendary (Projection.supertypesOf oid gs)
+          && Projection.isCreatureOf oid gs
+   in any qualifies (GameState.battlefield gs)
+
 -- Affordable and correctly timed, actually in a zone this player may cast it
 -- from, fillable, and not prohibited. CR 601.2b: affordable means at least ONE
 -- candidate cost is payable -- a spell may have alternative costs, and only one
@@ -126,6 +169,7 @@ castable pid oid gs =
     -- (Rule of Law, Silence). Gated HERE, upstream of Action.legalActions,
     -- because the engine never offers an illegal action and then rejects it.
     && not (PlayerEffect.prohibitsCasting pid gs)
+    && legendaryRestrictionOk pid oid gs
     && any (payableCost pid oid gs) (Cost.costsFor oid gs)
     && targetable pid oid gs
 
@@ -169,12 +213,16 @@ permissionsOf card =
 --
 -- The prohibition is NOT omitted, and that is the point: CR 601.3 is one
 -- sentence with two halves, and the Panglacial permission excepts only the
--- timing one. A Rule of Law still stops a cast from the library.
+-- timing one. A Rule of Law still stops a cast from the library. CR 205.4e's
+-- restriction rides along for the same reason -- it is not a timing rule, so the
+-- permission does not reach it either. Unobservable in this pool (no card both
+-- searches this way and is a legendary instant or sorcery) and written anyway,
+-- because the alternative is a cast the rules forbid.
 castableWhileSearching :: PlayerId -> GameState -> [ObjectId]
 castableWhileSearching pid gs =
   let permitted oid = maybe False permitsCastWhileSearching (Game.cardOf oid gs)
       affordable oid = any (payableCost pid oid gs) (Cost.costsFor oid gs)
-      allowed oid = permitted oid && affordable oid && targetable pid oid gs
+      allowed oid = permitted oid && affordable oid && legendaryRestrictionOk pid oid gs && targetable pid oid gs
    in if PlayerEffect.prohibitsCasting pid gs
         then []
         else filter allowed (Game.zoneMembers Zone.Library pid gs)
