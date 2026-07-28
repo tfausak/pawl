@@ -14,11 +14,15 @@ import Pawl.Type.Phase (Phase)
 -- fixes it -- a phase-level pattern, or a Phase value standing for the whole
 -- phase -- is a choice a card should make, not this file.
 --
+-- Also not expressible: a skip an EFFECT creates rather than a permanent's
+-- static ability, and one consumed after a single occurrence (#333); and a skip
+-- scoped to one identified turn (#334).
+--
 -- No WHOSE field. Eon Hub's "PLAYERS skip their upkeep steps" is symmetric, and
 -- so is Stasis's "players skip their untap steps" -- every skip pawl can express
 -- applies to every player, so the pattern has no relation to read against the
--- event's PlayerId. A controller-relative skip ("skip YOUR next draw step") is
--- what would add one; it has no producer either, and per the note on
+-- event's PlayerId. A player-scoped skip -- Fatigue's "TARGET PLAYER skips their
+-- next draw step" -- is what would add one (#333); per the note on
 -- Pawl.Type.ReplacementEffect a field appears when a card needs it rather than
 -- as speculative structure.
 newtype PhasePattern = MkPhasePattern
