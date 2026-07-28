@@ -38,6 +38,7 @@ emptyCombat =
     { Combat.attackers = Map.empty,
       Combat.blockers = Map.empty,
       Combat.struckFirst = Nothing,
+      Combat.joinedUnder = Map.empty,
       Combat.defender = Nothing
     }
 
@@ -213,6 +214,73 @@ blockersOf oid gs = Map.findWithDefault Set.empty oid (Combat.blockers (GameStat
 isBlocked :: ObjectId -> GameState -> Bool
 isBlocked oid gs = Map.member oid (Combat.blockers (GameState.combat gs))
 
+-- Every creature currently IN combat: the attackers, plus everything still
+-- blocking one of them. Not the keys of Combat.joinedUnder, which can outlive the
+-- record it was taken for -- Pawl.Departure edits Combat.attackers directly, and
+-- deliberately leaves Combat.blockers alone (CR 509.1h).
+combatants :: Combat -> Set ObjectId
+combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.elems (Combat.blockers c)))
+
+-- CR 506.4: "A permanent is removed from combat if ... its controller changes."
+-- The one clause of that rule whose trigger is DERIVED state, which is why it is
+-- a sampler and not a hook: a control change has no event to hang a removal on --
+-- a control-granting static ability (Control Magic's SetControllerToSource) is
+-- re-read live by the projection, and even a stored SetController is installed by
+-- a resolution that never announces "control changed" (#198). The same shape, and
+-- the same argument, as Engine.checkControlContinuity's CR 302.6 scan; Engine's
+-- settleForPriority runs both, at every point the board can change.
+--
+-- The TIMING that costs: the rules remove the permanent the instant control
+-- changes, and this notices at the next settle. Nothing can see the difference.
+-- CR 117.5 makes "whenever a player would get priority" the coarsest moment
+-- anything observes the board, and the two readers of the combat record -- the
+-- CR 510 damage steps and Filter.IsAttacking at targeting -- both sit behind a
+-- priority grant, which settles first. The window that would open it is a single
+-- resolution that changes control and then reads combat status in a LATER effect
+-- of the same resolution; no card in the pool has one, and the settle loop is
+-- where such a card's fix would go.
+--
+-- It only ever REMOVES. That asymmetry is what makes the sampling sound, exactly
+-- as it is there: a discrepancy proves control changed, so removing is always
+-- right, while putting a creature BACK when control returns would invent a
+-- CR 506.4 the rules do not have -- removal from combat is permanent for that
+-- combat phase (the glossary: "has no further involvement in that combat phase").
+--
+-- Battlefield-scoped, so this stays the control-change clause and nothing else.
+-- CR 110.1 makes a permanent something on the battlefield, and an object that has
+-- LEFT it was already removed by that separate clause of CR 506.4 -- whose
+-- implementation is elsewhere (Pawl.Departure, and Pawl.Damage's liveness filters
+-- for the CR 509.1h key this must not disturb). Without the gate, an object gone
+-- from GameState.objects would answer Nothing here and be swept up under the
+-- wrong clause.
+--
+-- Removal goes through Game.removeFromCombat, so a stolen ATTACKER takes its
+-- blocked-ness with it (Map.delete) while a stolen BLOCKER leaves the attacker
+-- blocked with nothing blocking it (Set.delete inside a surviving key) --
+-- CR 509.1h's last sentence, argued in full at that function.
+--
+-- A combatant with no entry in Combat.joinedUnder is left alone, because there is
+-- nothing to compare it against and this only ever removes. Unreachable through
+-- the engine: declareAttackers and declareBlockers write the snapshot in the same
+-- update that puts the creature into the record.
+--
+-- Nobody in combat short-circuits, which is most of the game: the grant list
+-- costs a whole-battlefield scan (Projection.controlGrants), and this runs on
+-- every settle pass alongside checkControlContinuity's own.
+removeControlChanged :: GameState -> GameState
+removeControlChanged gs =
+  let c = GameState.combat gs
+      inCombat = combatants c
+      grants = Projection.controlGrants gs
+      changed oid = case Map.lookup oid (Combat.joinedUnder c) of
+        Nothing -> False
+        Just who -> Projection.controllerOfGiven grants Set.empty oid gs /= Just who
+      onBattlefield oid = Set.member oid (GameState.battlefield gs)
+      leaving = filter (\oid -> onBattlefield oid && changed oid) (Set.toList inCombat)
+   in if Set.null inCombat
+        then gs
+        else List.foldl' (flip Game.removeFromCombat) gs leaving
+
 -- CR 507.1 / CR 703.4h: immediately after the beginning of combat step begins,
 -- the active player chooses one of their opponents, and that player becomes the
 -- defending player. The turn-based action does not use the stack (CR 507.1), which
@@ -314,7 +382,13 @@ declareAttackers pid = do
                 then g
                 else g {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects g)}
             recorded = Map.fromList (fmap (\oid -> (oid, AttackTarget.OfPlayer defender)) attacking)
-            attach g = g {GameState.combat = (GameState.combat g) {Combat.attackers = recorded}}
+            -- CR 506.4's comparand, taken here because here is where the creature
+            -- joins combat. `pid` and not a fresh Projection.controllerOf call:
+            -- canAttack has already required controllerOf == Just pid of every
+            -- creature in `attacking` (CR 508.1a), so the two are the same value
+            -- and this one cannot disagree with the legality check.
+            joined = Map.fromList (fmap (\oid -> (oid, pid)) attacking)
+            attach g = g {GameState.combat = (GameState.combat g) {Combat.attackers = recorded, Combat.joinedUnder = joined}}
         State.modify' (\g -> attach (List.foldl' tapIt g attacking))
 
 -- CR 509.1: the defending player declares blockers -- singular. The loop is over
@@ -367,4 +441,11 @@ declareBlockers = do
         Monad.when (legalBlockDeclaration pid chosen gs1) $ do
           let add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m
               merged = List.foldl' add (Combat.blockers (GameState.combat gs1)) (Map.toList chosen)
-          State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged}}
+              -- CR 506.4's comparand for the blockers, alongside the attackers'
+              -- (declareAttackers). `pid` for the same reason it is there:
+              -- legalBlockDeclaration has already required every blocker to be
+              -- one legalBlockers offered, which is controllerOf == Just pid
+              -- (CR 509.1a). Unioned rather than replacing, since the attackers'
+              -- entries are already in this map.
+              joined = Map.union (Map.fromList (fmap (\b -> (b, pid)) (Map.keys chosen))) (Combat.joinedUnder (GameState.combat gs1))
+          State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged, Combat.joinedUnder = joined}}

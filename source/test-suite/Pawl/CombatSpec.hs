@@ -19,6 +19,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
+import qualified Pawl.Target as Target
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.AttackTarget as AttackTarget
 import qualified Pawl.Type.BeginningStep as BeginningStep
@@ -38,6 +39,7 @@ import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.TapState as TapState
@@ -927,6 +929,7 @@ combatLegalityTests registry =
                         { Combat.Type.attackers = Map.singleton oid (AttackTarget.OfPlayer S.bob),
                           Combat.Type.blockers = Map.empty,
                           Combat.Type.struckFirst = Nothing,
+                          Combat.Type.joinedUnder = Map.singleton oid S.alice,
                           Combat.Type.defender = Just S.bob
                         }
                   }
@@ -1084,18 +1087,26 @@ killShotBoard plains piker killShot =
    in -- handOne parks its state in a precombat main phase; this board is mid-combat.
       withCard {GameState.phase = GameState.phase gs0, GameState.priority = GameState.priority gs0}
 
--- Run whole steps until the end of combat step is the current phase, WITHOUT
--- running it, so a test can play that one step itself under a different
--- answerer. Bounded so a bug cannot loop forever.
-runToEndOfCombat :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-runToEndOfCombat answer gs0 =
+-- Run whole steps until `step` is the current phase, WITHOUT running it, so a
+-- test can play that one step itself under a different answerer. Bounded so a
+-- bug cannot loop forever. Stops early if combat is left, so a caller that names
+-- a step this combat never reaches gets the state at the exit rather than a
+-- hang.
+runToStep :: Phase.Phase -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runToStep step answer gs0 =
   let go n g =
         if n <= (0 :: Int)
-          || GameState.phase g == Phase.Combat CombatStep.EndOfCombat
+          || GameState.phase g == step
           || not (S.inCombatPhase (GameState.phase g))
           then g
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 8 gs0
+
+-- Run whole steps until the end of combat step is the current phase, WITHOUT
+-- running it, so a test can play that one step itself under a different
+-- answerer.
+runToEndOfCombat :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runToEndOfCombat = runToStep (Phase.Combat CombatStep.EndOfCombat)
 
 -- CR 511.3: creatures are removed from combat as the end of combat step ENDS, so
 -- they are still attacking for the whole of that step -- including its priority
@@ -1161,6 +1172,136 @@ m2bExitTests registry =
         HU.assertEqual "an attacker-less turn deals nothing" (Just 20) (S.lifeOf S.bob quiet)
     ]
 
+-- alice is mid-combat with three Pikers; bob holds a Ray of Command and exactly
+-- the four Islands that pay for it, and controls nothing else. The board sits at
+-- the declare attackers step like every combatBoardOf board, so the ENGINE
+-- declares the attack and carries it forward: no test here writes the combat
+-- record. S.addCreature is what puts the Islands out -- the "any printing, on the
+-- battlefield, untapped and Settled" helper its haddock says it is.
+rayBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, [ObjectId.ObjectId])
+rayBoard island piker ray =
+  let (gs0, mine, _) = S.combatBoardOf [piker, piker, piker] []
+      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addCreature island S.bob g))
+   in (snd (S.addHandCard ray S.bob (addLands 4 gs0)), mine)
+
+-- Attack with everything except `homebody`, never block, cast whenever a cast is
+-- offered, and aim every target at `victim`.
+--
+-- Blocks are DECLINED rather than routed, and that is what keeps the two legs
+-- comparable: a stolen attacker arrives untapped (Ray of Command untaps it) and
+-- hasty under its new controller, so an aggressive blocker answer would have bob
+-- block with the very creature the case is about and hide the damage question
+-- behind CR 509.1's routing.
+steal :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+steal homebody victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseAction {} -> S.castAnswer p
+  Prompt.DeclareAttackers _ _ ids -> filter (/= homebody) ids
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- Block with everything, cast whenever a cast is offered, aim every target at
+-- `victim`. The blocker-side twin of `steal`.
+snatch :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+snatch victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseAction {} -> S.castAnswer p
+  _ -> S.aggressiveAnswer p
+
+-- CR 506.4: "A permanent is removed from combat if it leaves the battlefield, if
+-- its controller changes, ..." -- and a creature so removed "stops being an
+-- attacking, blocking, blocked, and/or unblocked creature".
+--
+-- Ray of Command is the pool's producer for the control-change clause: {3}{U},
+-- INSTANT, "Untap target creature an opponent controls and gain control of it
+-- until end of turn. That creature gains haste until end of turn." Act of Treason
+-- has the same three effects and cannot reach this window at all, because it is a
+-- sorcery -- which is why #246 was filed card-driven rather than built
+-- speculatively. Ray of Command's remaining sentence, the delayed trigger that
+-- taps the creature when its controller loses it, is not implemented (#287).
+--
+-- Every leg runs whole steps through Engine.runStep, so the combat record under
+-- test is the engine's own and the removal is observed where a player would see
+-- it: at the CR 117.5 settle that follows the spell resolving. Each leg stops at
+-- the end of combat step, where CR 511.3 says the record still reads live.
+controlChangeRemovalTests :: Registry.Type.Registry -> Tasty.TestTree
+controlChangeRemovalTests registry =
+  Tasty.testGroup
+    "ControlChangeRemoval"
+    [ HU.testCase "CR 506.4 whole card: Ray of Command on an attacker removes THAT attacker from combat, and it deals no combat damage" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        rayOfCommand <- Registry.printing registry "Ray of Command"
+        killShot <- Registry.printing registry "Kill Shot"
+        case (rayBoard island piker rayOfCommand, S.spellTargetSpec killShot) of
+          ((gs, [stolen, other, homebody]), Just attackingSpec) -> do
+            let atEnd = runToEndOfCombat (steal homebody stolen) gs
+                attackers = Combat.Type.attackers (GameState.combat atEnd)
+                legal = Target.legalRecipients Nothing S.noSource attackingSpec atEnd
+            HU.assertEqual "the leg really reached the end of combat step, where the record still reads live (CR 511.3)" (Phase.Combat CombatStep.EndOfCombat) (GameState.phase atEnd)
+            HU.assertEqual "bob really did gain control of it" (Just S.bob) (Projection.controllerOf stolen atEnd)
+            HU.assertBool "CR 506.4: so it is no longer an attacking creature" (Map.notMember stolen attackers)
+            HU.assertBool "the attacker bob left alone is untouched" (Map.member other attackers)
+            -- The discriminating assertion: the unfixed engine keeps the stolen
+            -- Piker in the record and deals its 2 alongside the other's.
+            HU.assertEqual "CR 510.1: bob takes only the surviving attacker's 2" (Just 18) (S.lifeOf S.bob atEnd)
+            -- CR 508.1k through the door a card actually uses: Kill Shot's own
+            -- committed target spec is Pool.Creatures narrowed by IsAttacking.
+            HU.assertBool "Filter.IsAttacking no longer finds the stolen creature" (not (Set.member (Recipient.ToCreature stolen) legal))
+            HU.assertBool "and still finds the one that is attacking" (Set.member (Recipient.ToCreature other) legal)
+          _ -> HU.assertFailure "fixture should have three Pikers and Kill Shot a 'target' slot",
+      HU.testCase "CR 506.4 the twin: the same Ray of Command on a creature that is not in combat leaves combat intact" $ do
+        -- The control leg, and the reason the case above is not passing for a
+        -- trivial reason. The SAME card resolves, the SAME settle runs, and
+        -- control really does change -- just not for a combatant. A sampler that
+        -- cleared combat whenever it saw a control change, or whenever anything
+        -- resolved, would take the attackers out here too.
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        rayOfCommand <- Registry.printing registry "Ray of Command"
+        case rayBoard island piker rayOfCommand of
+          (gs, [one, two, homebody]) -> do
+            let atEnd = runToEndOfCombat (steal homebody homebody) gs
+                attackers = Combat.Type.attackers (GameState.combat atEnd)
+            HU.assertEqual "bob gained control of the creature that stayed home" (Just S.bob) (Projection.controllerOf homebody atEnd)
+            HU.assertBool "both attackers are still attacking" (Map.member one attackers && Map.member two attackers)
+            HU.assertEqual "so bob takes both hits" (Just 16) (S.lifeOf S.bob atEnd)
+          _ -> HU.assertFailure "fixture should have three Pikers",
+      HU.testCase "CR 506.4 a stolen BLOCKER is removed from combat, and CR 509.1h leaves the attacker blocked" $ do
+        -- The blocker side of the same clause, and the interaction the
+        -- Combat.blockers shape exists for: Game.removeFromCombat drops the
+        -- blocker from the SET while the attacker's KEY survives, so the attacker
+        -- stays blocked and (CR 510.1c) assigns no combat damage at all.
+        --
+        -- The theft has to land after blocks are declared, so the declare
+        -- attackers step is played under an answerer that does not cast and only
+        -- the declare blockers step onwards sees `snatch`.
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        rayOfCommand <- Registry.printing registry "Ray of Command"
+        let (gs0, mine, theirs) = S.combatBoardOf [piker] [piker]
+            addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addCreature island S.alice g))
+            gs = snd (S.addHandCard rayOfCommand S.alice (addLands 4 gs0))
+        case (mine, theirs) of
+          (attacker : _, blocker : _) -> do
+            let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+                atEnd = runToEndOfCombat (snatch blocker) atBlockers
+                -- The control leg: the same board and the same blocks, with alice
+                -- never casting. Two 2/1 Pikers then trade and both die.
+                traded = runToEndOfCombat S.aggressiveAnswer atBlockers
+            HU.assertEqual "the theft is offered in the declare blockers step, after blocks are declared" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase atBlockers)
+            -- The discriminating assertion, and first because it is the one the
+            -- unfixed engine fails: with the blocker still in the record the two
+            -- Pikers trade, and the ids below stop resolving at all.
+            HU.assertBool "CR 510.1c: neither creature was dealt combat damage" (S.onBattlefield attacker atEnd && S.onBattlefield blocker atEnd)
+            HU.assertEqual "alice really did gain control of the blocker" (Just S.alice) (Projection.controllerOf blocker atEnd)
+            HU.assertEqual "CR 506.4: it is blocking nothing" Set.empty (Combat.blockersOf attacker atEnd)
+            HU.assertBool "CR 509.1h: but the attacker remains blocked" (Combat.isBlocked attacker atEnd)
+            HU.assertEqual "and bob takes nothing" (Just 20) (S.lifeOf S.bob atEnd)
+            HU.assertBool "control leg: with no theft the two Pikers trade and both die" (not (S.onBattlefield attacker traded) && not (S.onBattlefield blocker traded))
+          _ -> HU.assertFailure "fixture did not build an attacker and a blocker"
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
@@ -1177,5 +1318,6 @@ tests registry =
       vigilanceTests registry,
       hasteTests registry,
       evasionTests registry,
-      controlChangeSicknessTests registry
+      controlChangeSicknessTests registry,
+      controlChangeRemovalTests registry
     ]

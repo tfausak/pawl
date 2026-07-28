@@ -846,14 +846,22 @@ data Aspect
 -- the printed type line (printedSupertypes) and nothing projects them; IsSource
 -- and IsPlayer ask who the candidate IS, which no effect changes.
 --
--- IsAttacking reads nothing either, but its emptiness is contingent where those
--- are definitional. It reads GameState.combat, which is STORED, so no projected
--- aspect feeds it and no modification writes it. Under the rules one could:
--- CR 506.4 removes a permanent from combat if its controller changes or if it
--- stops being a creature, so a faithful engine would have this arm read
--- Controller and Types. pawl's Game.removeFromCombat implements only the
--- leaves-the-battlefield and regeneration clauses, so there is nothing yet for
--- this arm to depend on (#246).
+-- IsAttacking reads nothing either, and the reason is worth stating because
+-- CR 506.4 makes it look otherwise. That rule removes a permanent from combat
+-- when its CONTROLLER changes or when it stops being a CREATURE, so an engine
+-- that derived attacking-ness from those characteristics would have to read
+-- Controller and Types here. pawl does not derive it: attacking-ness is a stored
+-- combat record (CR 109.3 is emphatic that it is not a characteristic), CR 506.4
+-- is performed by EDITING that record, and the edit happens between projections
+-- (Combat.removeControlChanged, from Engine.settleForPriority) rather than inside
+-- one. So the record is a fixed INPUT to any single projection: applying one
+-- modification before another cannot change what this arm answers, which is
+-- exactly the question CR 613.8a asks. The arm stays empty when the remaining
+-- CR 506.4 clauses land (#246), because they will be sampled the same way.
+--
+-- What that costs is TIMING, not dependency: the rules remove the permanent the
+-- instant control changes, and pawl removes it at the next settle. That window is
+-- argued where the sampling happens.
 filterReads :: Filter.Type.Filter -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types

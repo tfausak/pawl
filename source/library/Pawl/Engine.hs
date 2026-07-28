@@ -585,10 +585,13 @@ permute xs order =
 -- that changes nothing (the common case) costs one board projection and one
 -- length comparison per carrier, NOT a deep GameState equality check.
 --
--- On top of that, every pass pays one CR 302.6 control-continuity scan
--- (checkControlContinuity), which is linear in the battlefield and runs
--- unconditionally, because a derived control change has nothing else to notice
--- it. That is a real addition to this path's cost, not a free rider.
+-- On top of that, every pass pays two control samples, because a derived control
+-- change has nothing else to notice it. The CR 302.6 continuity scan
+-- (checkControlContinuity) is unconditional and linear in the battlefield -- a
+-- real addition to this path's cost, not a free rider. The CR 506.4
+-- removal-from-combat scan (Combat.removeControlChanged) costs the same again
+-- while creatures are in combat and nothing at all when none are, which is most
+-- of the game.
 --
 -- CR 611.2b's condition is checked continuously, and CR 704.3 makes "whenever
 -- a player would get priority" the coarsest moment anything could observe it,
@@ -615,10 +618,16 @@ settleForPriority = do
   returned <- Monarch.returnExiledForMonarch
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
-  -- Last, and for the same reason the conditional sweep runs first: it must read
-  -- the control this settle leaves behind, not the control some earlier step saw.
-  -- Outside the recursion guard on purpose -- it never makes further work, so it
-  -- is not a reason to loop, and it must run even on a pass where nothing fired.
+  -- Last, and for the same reason the conditional sweep runs first: both read
+  -- CONTROL, and must see the control this settle leaves behind rather than the
+  -- control some earlier step saw. Outside the recursion guard on purpose --
+  -- neither makes further work, so neither is a reason to loop, and both must run
+  -- even on a pass where nothing fired.
+  --
+  -- Order between the two does not matter and is not load-bearing: CR 506.4 asks
+  -- about combat and CR 302.6 about summoning sickness, and neither reads what the
+  -- other writes.
+  State.modify' Combat.removeControlChanged
   checkControlContinuity
   Monad.when (swept || returned || acted || placed) settleForPriority
 

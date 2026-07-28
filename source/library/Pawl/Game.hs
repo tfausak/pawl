@@ -53,9 +53,15 @@ zoneMembers zone pid gs =
         Zone.Command -> ownedShared (GameState.command gs)
         Zone.Stack -> filter ownedBy (GameState.stack gs)
 
--- CR 701.19a: if a permanent is attacking or blocking, remove it from combat.
+-- CR 506.4: remove a permanent from combat -- it "stops being an attacking,
+-- blocking, blocked, and/or unblocked creature". The one performer, shared by the
+-- clauses that have producers: CR 701.19a regeneration (Pawl.Replacement) and a
+-- controller change (Pawl.Combat.removeControlChanged).
 -- Edits the GameState.combat maps directly. It lives here, in the lowest layer,
 -- because Pawl.Replacement needs it and must never import Pawl.Event.
+--
+-- Combat.joinedUnder loses its entry too: the map is the CR 506.4 comparand for
+-- creatures IN combat, and this is what takes one out.
 --
 -- The blockers map is edited two different ways on purpose, and the difference is
 -- CR 509.1h's last sentence: "A creature remains blocked even if all the creatures
@@ -78,7 +84,8 @@ removeFromCombat oid gs =
       c1 =
         c
           { Combat.attackers = Map.delete oid (Combat.attackers c),
-            Combat.blockers = fmap (Set.delete oid) (Map.delete oid (Combat.blockers c))
+            Combat.blockers = fmap (Set.delete oid) (Map.delete oid (Combat.blockers c)),
+            Combat.joinedUnder = Map.delete oid (Combat.joinedUnder c)
           }
    in gs {GameState.combat = c1}
 
