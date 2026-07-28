@@ -5,9 +5,6 @@
         "components": [
           {
             "type": "TapThis"
-          },
-          {
-            "type": "SacrificeThis"
           }
         ],
         "mana": []
@@ -17,29 +14,13 @@
           {
             "effects": [
               {
-                "type": "Search",
-                "value": [
-                  {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Land"
-                        }
-                      },
-                      {
-                        "type": "HasSupertype",
-                        "value": {
-                          "type": "Basic"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "type": "BattlefieldTapped"
+                "type": "AddMana",
+                "value": {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colorless"
                   }
-                ]
+                }
               }
             ],
             "targetSpecs": []
@@ -53,9 +34,41 @@
     }
   ],
   "castingPermissions": [],
-  "keywords": [],
+  "keywords": [
+    {
+      "type": "Cycling",
+      "value": [
+        {
+          "components": [],
+          "mana": [
+            {
+              "type": "Generic",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "type": "And",
+          "value": [
+            {
+              "type": "HasCardType",
+              "value": {
+                "type": "Land"
+              }
+            },
+            {
+              "type": "HasSupertype",
+              "value": {
+                "type": "Basic"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "manaCost": null,
-  "name": "Evolving Wilds",
+  "name": "Ash Barrens",
   "power": null,
   "replacementEffects": [],
   "spell": {

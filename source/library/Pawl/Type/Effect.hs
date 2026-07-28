@@ -14,6 +14,7 @@ import Pawl.Type.PlayerScope (PlayerScope)
 import Pawl.Type.Quantity (Quantity)
 import Pawl.Type.Regenerability (Regenerability)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
+import Pawl.Type.SearchDestination (SearchDestination)
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Uses (Uses)
 import Pawl.Type.Zone (Zone)
@@ -51,12 +52,15 @@ data Effect card
     -- "produces mana?" ABI bit).
     AddMana ManaProduction
   | -- CR 701.23: search the controller's library for a card matching the Filter,
-    -- put it onto the battlefield tapped, then shuffle (Evolving Wilds' exact
-    -- shape; destination/tapped are baked in for now). The Filter is evaluated
-    -- over the PRINTED-card view (Projection.viewOfCard) -- a card in a library
-    -- has no projection. Evolving Wilds' "basic land card" (CR 701.23a / 205.4c)
-    -- is `And [HasCardType Land, HasSupertype Basic]`.
-    Search Filter
+    -- put it where the SearchDestination says, then shuffle. The Filter is
+    -- evaluated over the PRINTED-card view (Projection.viewOfCard) -- a card in a
+    -- library has no projection. Evolving Wilds' "basic land card" (CR 701.23a /
+    -- 205.4c) is `And [HasCardType Land, HasSupertype Basic]`, and CR 702.29e's
+    -- basic landcycling is the same filter with the other destination.
+    --
+    -- Finds at most one card, always: no card in the pool searches for two
+    -- (#283).
+    Search Filter SearchDestination
   | -- CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk (Rest in Peace's exact shape); a general exile-from-zone is future.
     ExileAllGraveyards

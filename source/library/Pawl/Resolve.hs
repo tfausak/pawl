@@ -61,6 +61,7 @@ import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.Result (Result)
 import qualified Pawl.Type.Result as Result
+import qualified Pawl.Type.SearchDestination as SearchDestination
 import qualified Pawl.Type.Sickness as Sickness
 import Pawl.Type.SlotName (SlotName)
 import qualified Pawl.Type.Source as Source
@@ -89,7 +90,7 @@ slotsOf effect = case effect of
   Effect.ModifyTarget _ _ slot -> Set.singleton slot
   Effect.ChangeText slot -> Set.singleton slot
   Effect.AddMana _ -> Set.empty
-  Effect.Search _ -> Set.empty
+  Effect.Search _ _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
@@ -135,7 +136,7 @@ readsX = any effectReadsX
       Effect.ModifyTarget {} -> False
       Effect.ChangeText _ -> False
       Effect.AddMana _ -> False
-      Effect.Search _ -> False
+      Effect.Search _ _ -> False
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
       Effect.ExileHandThenDraw -> False
@@ -178,7 +179,7 @@ manaProduced effect = case effect of
   Effect.DealDamage _ _ -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText _ -> Nothing
-  Effect.Search _ -> Nothing
+  Effect.Search _ _ -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
   Effect.ExileHandThenDraw -> Nothing
@@ -212,7 +213,7 @@ manaProduced effect = case effect of
 -- Search searches the controller's own library; every other effect does not.
 searchesLibrary :: Effect Card.Type.Card -> Bool
 searchesLibrary effect = case effect of
-  Effect.Search _ -> True
+  Effect.Search _ _ -> True
   Effect.Proliferate -> False
   Effect.PlayerSacrifices {} -> False
   Effect.DealDamage _ _ -> False
@@ -299,7 +300,7 @@ rewriteEffect pairs effect = case effect of
   Effect.DealDamage _ _ -> effect
   Effect.ChangeText _ -> effect
   Effect.AddMana _ -> effect
-  Effect.Search _ -> effect
+  Effect.Search _ _ -> effect
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.ExileHandThenDraw -> effect
@@ -693,7 +694,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- Mana.tapForMana at payment, never here. Reaching this arm means a mana ability
   -- was wrongly put on the stack -- an isManaAbility classification bug.
   Effect.AddMana _ -> pure ()
-  Effect.Search filter_ ->
+  Effect.Search filter_ destination ->
     -- CR 701.23a: match each library card through the PRINTED-card view -- a card
     -- in a library has no projection. The context has no perspective (CR 109.5): a
     -- search filter never references a player, so ControlledBy is vacuously False.
@@ -716,7 +717,11 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           let found = case answer of
                 Just oid | List.elem oid matches -> Just oid
                 _ -> Nothing
-          mapM_ putTapped found
+          -- Where the card goes is the CARD's instruction, not rule 701.23's --
+          -- that rule says only how to look. Evolving Wilds puts it onto the
+          -- battlefield tapped; CR 702.29e's typecycling puts it into the hand,
+          -- where the reveal that rule also asks for is not performed (#320).
+          mapM_ (putFound destination) found
           -- CR 701.23: shuffle the (possibly reduced) library afterward.
           lib <- State.gets (Game.zoneMembers Zone.Library controller)
           shuffleAnswer <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
@@ -1460,6 +1465,16 @@ bindLoserSlot holder slot loser gs =
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.
+-- CR 701.23: move a found card to where the search said, through the CR 400.7
+-- funnel either way -- so a replacement watching the destination composes, and
+-- the card that lands is a new object.
+putFound :: SearchDestination.SearchDestination -> ObjectId -> Game ()
+putFound destination cardId = case destination of
+  SearchDestination.BattlefieldTapped -> putTapped cardId
+  -- No tapped-ness to set afterwards and so no need for the found id: a card in
+  -- a hand has no tap state to speak of (CR 110.5a is about permanents).
+  SearchDestination.Hand -> Event.changeZone cardId Zone.Hand
+
 putTapped :: ObjectId -> Game ()
 putTapped cardId = do
   before <- State.get

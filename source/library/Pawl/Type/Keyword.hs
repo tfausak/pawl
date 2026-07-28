@@ -2,6 +2,7 @@ module Pawl.Type.Keyword where
 
 import Numeric.Natural (Natural)
 import Pawl.Type.Cost (Cost)
+import Pawl.Type.Filter (Filter)
 
 -- CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302.
@@ -60,10 +61,20 @@ data Keyword
     -- rule 702.34a's flashback cost.
     --
     -- Typecycling (702.29e) is this same ability with a library search in place
-    -- of the draw, and CR 702.29f makes it cycling for every rule that looks --
-    -- so when a printing needs it, it becomes a payload on THIS constructor
-    -- rather than a sibling (#314).
-    Cycling Cost
+    -- of the draw: "'[Type]cycling [cost]' means '[Cost], Discard this card:
+    -- Search your library for a [type] card, reveal it, and put it into your
+    -- hand. Then shuffle your library.'" It rides THIS constructor rather than a
+    -- sibling because CR 702.29f says every rule that looks for cycling finds it
+    -- -- "typecycling abilities are cycling abilities, and typecycling costs are
+    -- cycling costs" -- so one constructor makes that true for free instead of
+    -- restating it at each reader.
+    --
+    -- Nothing is plain cycling and draws (702.29a); Just is what to search for. A
+    -- Filter and not a Subtype, because rule 702.29e's "[type]" is not one: "this
+    -- type is usually a subtype (as in 'mountaincycling') but can be any card
+    -- type, subtype, supertype, or combination thereof (as in 'basic
+    -- landcycling')" -- which is a Filter's whole job.
+    Cycling Cost (Maybe Filter)
   | -- 702.34a: "Flashback appears on some instants and sorceries. It represents
     -- two static abilities: one that functions while the card is in a player's
     -- graveyard and another that functions while the card is on the stack.

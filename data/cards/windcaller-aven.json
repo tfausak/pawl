@@ -7,20 +7,23 @@
     },
     {
       "type": "Cycling",
-      "value": {
-        "components": [],
-        "mana": [
-          {
-            "type": "OfType",
-            "value": {
-              "type": "Colored",
+      "value": [
+        {
+          "components": [],
+          "mana": [
+            {
+              "type": "OfType",
               "value": {
-                "type": "Blue"
+                "type": "Colored",
+                "value": {
+                  "type": "Blue"
+                }
               }
             }
-          }
-        ]
-      }
+          ]
+        },
+        null
+      ]
     }
   ],
   "manaCost": [

@@ -4,15 +4,18 @@
   "keywords": [
     {
       "type": "Cycling",
-      "value": {
-        "components": [],
-        "mana": [
-          {
-            "type": "Generic",
-            "value": 2
-          }
-        ]
-      }
+      "value": [
+        {
+          "components": [],
+          "mana": [
+            {
+              "type": "Generic",
+              "value": 2
+            }
+          ]
+        },
+        null
+      ]
     }
   ],
   "manaCost": [

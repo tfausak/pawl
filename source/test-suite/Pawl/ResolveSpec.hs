@@ -86,6 +86,7 @@ import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Scope as Scope
+import qualified Pawl.Type.SearchDestination as SearchDestination
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Source as Source
@@ -657,7 +658,7 @@ resolveTests registry =
             ability =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty)) (ModeSelection.ChooseExactly 1))
                 ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
@@ -672,7 +673,7 @@ resolveTests registry =
         mountain <- Registry.printing registry "Mountain"
         let base = Setup.emptyGame S.bothPlayers
             (_, g1) = S.addLibraryCard mountain S.alice base
-            ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
+            ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
@@ -695,7 +696,7 @@ resolveTests registry =
             ability =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty)) (ModeSelection.ChooseExactly 1))
                 ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
@@ -718,7 +719,7 @@ resolveTests registry =
             ability =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty)) (ModeSelection.ChooseExactly 1))
                 ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
