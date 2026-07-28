@@ -466,7 +466,12 @@ perspective), an **aggregation** (how many; how many distinct card types), and a
 layer: `StateCondition` (the boolean customer — state triggers, intervening
 "if", "for as long as") and `CountSpec` (the numeric customer, `Quantity.Count`).
 M5.5 collapses both into one `Count = MkCount Scope Filter Aggregation`, with a
-single-constructor `Condition = MkCondition Count Comparison Quantity`.
+single-constructor `Condition = MkCondition Count Comparison Quantity`. (Both
+later gained a `quantity` parameter, so the types read `Count quantity` and
+`Aggregation quantity` today: `Aggregation.Greatest` reads a `Quantity` off each
+matched object, and `Quantity` already embeds a `Count`, so the parameter is what
+keeps the three modules from importing each other — the same knot `Effect card`
+ties.)
 
 The reason it precedes M6 rather than waiting for a card to force it: count/
 compare is one of the highest-frequency constructs in the oracle corpus (`"the
