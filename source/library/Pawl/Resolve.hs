@@ -104,6 +104,7 @@ slotsOf effect = case effect of
   Effect.Mill slot _ -> Set.singleton slot
   Effect.Discard slot _ -> Set.singleton slot
   Effect.LoseLife ref _ -> playerRefSlots ref
+  Effect.GainLife ref _ -> playerRefSlots ref
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here.
   Effect.Create {} -> Set.empty
@@ -150,6 +151,7 @@ readsX = any effectReadsX
       Effect.Mill _ quantity -> quantity == Quantity.Type.X
       Effect.Discard _ quantity -> quantity == Quantity.Type.X
       Effect.LoseLife _ quantity -> quantity == Quantity.Type.X
+      Effect.GainLife _ quantity -> quantity == Quantity.Type.X
       Effect.Create quantity _ _ -> quantity == Quantity.Type.X
       Effect.Replace {} -> False
       Effect.Counter _ -> False
@@ -193,6 +195,7 @@ manaProduced effect = case effect of
   Effect.Mill {} -> Nothing
   Effect.Discard {} -> Nothing
   Effect.LoseLife {} -> Nothing
+  Effect.GainLife {} -> Nothing
   Effect.Create {} -> Nothing
   Effect.Replace {} -> Nothing
   Effect.Counter _ -> Nothing
@@ -231,6 +234,7 @@ searchesLibrary effect = case effect of
   Effect.Mill {} -> False
   Effect.Discard {} -> False
   Effect.LoseLife {} -> False
+  Effect.GainLife {} -> False
   Effect.Create {} -> False
   Effect.Replace {} -> False
   Effect.Counter _ -> False
@@ -315,6 +319,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Discard {} -> effect
   -- No rewritable land-type word.
   Effect.LoseLife {} -> effect
+  -- No rewritable land-type word.
+  Effect.GainLife {} -> effect
   -- A text-changer does not reach a token's embedded card here (spec section 8).
   Effect.Create {} -> effect
   Effect.Replace {} -> effect
@@ -965,6 +971,31 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                       { GameState.players =
                           Map.adjust
                             (\p -> p {Player.life = Player.life p - n})
+                            pid
+                            (GameState.players g)
+                      }
+                )
+      _ -> pure ()
+  -- CR 119.3's other half, LoseLife's mirror in every respect but the sign. The
+  -- comments above apply verbatim: same `viewWithLastKnown` reading, same
+  -- unordered adjustment, same direct write to the player record. The one
+  -- difference is that nothing in CR 704.5 follows a gain -- CR 704.5a fires on
+  -- "0 or less life", which a gain cannot reach.
+  Effect.GainLife ref quantity -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = Filter.MkContext (Just controller) (Just source)
+        gainers = playerRefPlayers chosen legality controller gs ref
+    case Quantity.evaluate viewOf context gs source quantity of
+      Just n
+        | n > 0 ->
+            Monad.forM_ gainers $ \pid ->
+              State.modify'
+                ( \g ->
+                    g
+                      { GameState.players =
+                          Map.adjust
+                            (\p -> p {Player.life = Player.life p + n})
                             pid
                             (GameState.players g)
                       }

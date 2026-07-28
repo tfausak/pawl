@@ -264,6 +264,11 @@ tests registry =
           HU.testCase "LoseLife" $ do
             roundTrip "lose slot" Codec.effectToJson Codec.jsonToEffect (Effect.LoseLife (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2))
             roundTrip "lose you" Codec.effectToJson Codec.jsonToEffect (Effect.LoseLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)),
+          -- Soul Warden's "you gain 1 life", plus the slot arm no card uses
+          -- yet -- the same coverage LoseLife above gets, on the sibling opcode.
+          HU.testCase "GainLife" $ do
+            roundTrip "gain you" Codec.effectToJson Codec.jsonToEffect (Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
+            roundTrip "gain slot" Codec.effectToJson Codec.jsonToEffect (Effect.GainLife (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2)),
           HU.testCase "CreateEmblem" $ do
             piker <- Registry.printing registry "Goblin Piker"
             roundTrip "emblem" Codec.effectToJson Codec.jsonToEffect (Effect.CreateEmblem (Printing.card piker)),
@@ -715,6 +720,14 @@ tests registry =
             roundTrip "revealed" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Revealed S.alice (Projection.project ratId gs)),
           HU.testCase "TriggerCondition.SelfCycled round-trips" $
             roundTrip "sc" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfCycled,
+          -- CR 603.6a's "[type]" is a whole Filter, so the nested And/Not that
+          -- spells Soul Warden's "another creature" has to survive the trip.
+          HU.testCase "TriggerCondition.PermanentEnters round-trips with its Filter" $
+            roundTrip
+              "pe"
+              Codec.triggerConditionToJson
+              Codec.jsonToTriggerCondition
+              (TriggerCondition.PermanentEnters (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsSource])),
           HU.testCase "TurnScope round-trips" $
             mapM_ (roundTrip "scope" Codec.turnScopeToJson Codec.jsonToTurnScope) [TurnScope.EachTurn, TurnScope.ControllersTurn],
           HU.testCase "TriggerCondition.StepBegins round-trips" $

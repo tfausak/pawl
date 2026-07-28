@@ -961,6 +961,7 @@ jsonToTurnScope =
 triggerConditionToJson :: TriggerCondition.TriggerCondition -> Value
 triggerConditionToJson c = case c of
   TriggerCondition.SelfEnters -> nullary (Text.pack "SelfEnters")
+  TriggerCondition.PermanentEnters f -> Json.tagged (Text.pack "PermanentEnters") (Just (filterToJson f))
   TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array [phaseToJson p, turnScopeToJson s]))
   TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (conditionToJson c2))
   TriggerCondition.SelfDealsCombatDamageToPlayer -> nullary (Text.pack "SelfDealsCombatDamageToPlayer")
@@ -972,6 +973,7 @@ jsonToTriggerCondition value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
+    ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> jsonToFilter v
     ("StepBegins", Just (Array [p, s])) -> TriggerCondition.StepBegins <$> jsonToPhase p <*> jsonToTurnScope s
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToCondition v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
@@ -1407,6 +1409,7 @@ effectToJson e = case e of
   Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.LoseLife r q -> Json.tagged (Text.pack "LoseLife") (Just (Array [playerRefToJson r, quantityToJson q]))
+  Effect.GainLife r q -> Json.tagged (Text.pack "GainLife") (Just (Array [playerRefToJson r, quantityToJson q]))
   Effect.Create q c Nothing -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
   Effect.Create q c (Just s) -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c, slotNameToJson s]))
   Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array [durationToJson d, usesToJson u, replacementEffectToJson re]))
@@ -1465,6 +1468,9 @@ jsonToEffect value = do
     "LoseLife" -> case mv of
       Just (Array [r, q]) -> Effect.LoseLife <$> jsonToPlayerRef r <*> jsonToQuantity q
       _ -> Left (Text.pack "LoseLife expects [playerRef, quantity]")
+    "GainLife" -> case mv of
+      Just (Array [r, q]) -> Effect.GainLife <$> jsonToPlayerRef r <*> jsonToQuantity q
+      _ -> Left (Text.pack "GainLife expects [playerRef, quantity]")
     "Create" -> case mv of
       Just (Array [q, c]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure Nothing
       Just (Array [q, c, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> (Just <$> jsonToSlotName s)

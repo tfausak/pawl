@@ -521,11 +521,60 @@ reveal pid oid = do
 -- names. This module is the sole home of casing on TriggerCondition for RULES
 -- purposes; Pawl.Codec also cases on every constructor, but only as the JSON
 -- data boundary (encode/decode), not to decide game behaviour.
-matchesTrigger :: ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
-matchesTrigger bearer you cond event = case cond of
+matchesTrigger :: GameState -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
+matchesTrigger gs bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
   TriggerCondition.SelfEnters -> case event of
     GameEvent.Moved zc _ -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Cycled _ -> False
+    GameEvent.Revealed _ _ -> False
+  -- CR 603.6a's "whenever a [type] enters": a permanent the Filter admits
+  -- entered the battlefield. The bearer frames the match rather than being it --
+  -- it is the Filter.Context's source (so `Not IsSource` is Soul Warden's
+  -- "another"), and its controller is the perspective CR 109.5 gives "you" in
+  -- "a creature YOU CONTROL enters".
+  TriggerCondition.PermanentEnters f -> case event of
+    GameEvent.Moved zc _
+      | ZoneChange.to zc == Zone.Battlefield ->
+          -- Deliberately NOT the ProjectedCharacteristics the Moved event
+          -- carries. That snapshot is the object as it last existed in the zone
+          -- it LEFT -- CR 608.2h last known information for the LEAVING side --
+          -- and reading it here would answer CR 603.6b backwards: "continuous
+          -- effects that modify characteristics of a permanent do so the moment
+          -- the permanent is on the battlefield (and not before then)", and CR
+          -- 603.6b's own example is a land that an "all lands are creatures"
+          -- effect makes trigger a creature-enters ability. The entrant's
+          -- characteristics come from the game as it stands, which is what CR
+          -- 603.10 asks for in the same sentence that fixes the scan's
+          -- candidates: "continuous effects that exist at that time are used to
+          -- determine ... what the objects involved in the event look like".
+          --
+          -- viewWithLastKnown, not viewOfObject, so an entrant that has already
+          -- left again -- a creature entering as a 0/0 and buried by CR 704.5f
+          -- before the CR 117.5 boundary -- is still read as it was ON THE
+          -- BATTLEFIELD (CR 608.2h) instead of vanishing from the match. It
+          -- reads LIVE whenever the id still resolves, which is the ordinary
+          -- case; the fallback mirrors eventTriggers' own `goneEntrant`.
+          --
+          -- The projection is recomputed for each (bearer carrying THIS
+          -- condition, entry event) pair rather than shared across the scan:
+          -- `matchesTrigger` is handed the GameState and nothing else to share.
+          -- It is forced only inside this arm, so a board with no such ability
+          -- pays nothing, and eventTriggers' `projected` hoist is untouched.
+          --
+          -- Nothing is an entrant that is gone AND filed no last known
+          -- information -- Resolve.cease and Departure.objectsLeaveWith remove an
+          -- object without a zone change running over it. Nothing is known about
+          -- what entered, so no Filter can honestly admit it.
+          let entrant = ZoneChange.object zc
+           in case Projection.viewWithLastKnown entrant gs entrant of
+                Nothing -> False
+                Just view -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) view f
+    GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
@@ -766,7 +815,7 @@ eventTriggers events gs =
         -- TriggerCondition first, and none exists (#322).
         GameEvent.Revealed _ _ -> Map.empty
       forOne event (oid, (ctrl, abilities)) =
-        let fires ab = matchesTrigger oid ctrl (TriggeredAbility.condition ab) event
+        let fires ab = matchesTrigger gs oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
          in fmap pend (filter fires abilities)
       -- Map.unions is left-biased, so a live battlefield reading always wins over
@@ -843,6 +892,9 @@ stateTriggers gs =
                   Condition.holds (Projection.fullView gs) (Filter.MkContext (Just ctrl) (Just oid)) gs oid cond
                     && not (alreadyOnStack oid ab)
                 TriggerCondition.SelfEnters -> False
+                -- CR 603.6a is an EVENT trigger, matched against the log by
+                -- matchesTrigger; nothing about it is a CR 603.8 state.
+                TriggerCondition.PermanentEnters _ -> False
                 TriggerCondition.StepBegins _ _ -> False
                 TriggerCondition.SelfDealsCombatDamageToPlayer -> False
                 TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
@@ -876,7 +928,7 @@ delayedPending :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq Delayed
 delayedPending events gs =
   let fires entry =
         let cond = TriggeredAbility.condition (DelayedTrigger.ability entry)
-         in any (matchesTrigger (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
+         in any (matchesTrigger gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
       pend entry =
         PendingTrigger.MkPendingTrigger
           (TriggerSource.OfObject (DelayedTrigger.source entry))
