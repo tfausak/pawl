@@ -585,6 +585,17 @@ hasteTests registry =
         let (gs, mine, _) = S.combatBoardOf [piker] [piker]
             after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
         HU.assertEqual "attacks" mine (declaredAttackers after),
+      -- The same contrast one layer up: haste GRANTED by a static ability rather
+      -- than printed. Concordant Crossroads says "All creatures have haste", so
+      -- the very Piker that could not attack in the control case above now can,
+      -- and nothing about the Piker itself changed.
+      HU.testCase "CR 702.10b Concordant Crossroads grants haste, so a summoning-sick Piker attacks" $ do
+        crossroads <- Registry.printing registry "Concordant Crossroads"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, _) = S.combatBoardOf [piker] [piker]
+            (_, enchanted) = S.addCreature crossroads S.alice (justArrived gs)
+            after = snd (Engine.runGamePure S.aggressiveAnswer enchanted (Combat.declareAttackers S.alice))
+        HU.assertEqual "attacks anyway" mine (declaredAttackers after),
       HU.testCase "CR 702.10b a hasty creature and a sick one, in the same declaration" $ do
         -- Both sick; only the Chariot may attack. A blanket "sickness ignored"
         -- bug would let both through.

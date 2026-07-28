@@ -1274,8 +1274,55 @@ animatorCardTests registry =
           _ -> HU.assertFailure "expected exactly one triggered ability"
     ]
 
+-- The pool's two world enchantments. Their abilities are ordinary -- a layer-6
+-- keyword grant and a layer-4/7b animation, both shapes the pool already had --
+-- and it is the SUPERTYPE on the type line that earns them their place: CR
+-- 205.4f is what puts them under CR 704.5k's world rule (Pawl.Sba.worldVictims),
+-- and nothing else in the corpus carries it.
+worldCardTests :: Registry.Type.Registry -> Tasty.TestTree
+worldCardTests registry =
+  Tasty.testGroup
+    "WorldEnchantments"
+    [ HU.testCase "Concordant Crossroads is a {G} world enchantment giving all creatures haste" $ do
+        p <- Registry.printing registry "Concordant Crossroads"
+        let c = Printing.card p
+            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+        HU.assertEqual "name" (Text.pack "Concordant Crossroads") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [green]) (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine c))
+        HU.assertEqual "CR 205.4f: the supertype the world rule reads" (Set.singleton Supertype.World) (TypeLine.supertypes (Card.Type.typeLine c))
+        HU.assertEqual
+          "\"All creatures have haste\""
+          [ StaticAbility.MkStaticAbility
+              (Affected.Matching (Filter.Type.HasCardType CardType.Creature))
+              (Modification.GainKeyword Keyword.Haste NonEmpty.:| [])
+          ]
+          (Card.Type.staticAbilities c),
+      HU.testCase "Living Plane is a {2}{G}{G} world enchantment making every land a 1/1 creature" $ do
+        p <- Registry.printing registry "Living Plane"
+        let c = Printing.card p
+            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+        HU.assertEqual "name" (Text.pack "Living Plane") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2, green, green]) (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine c))
+        HU.assertEqual "CR 205.4f: the supertype the world rule reads" (Set.singleton Supertype.World) (TypeLine.supertypes (Card.Type.typeLine c))
+        -- ONE ability with two parts, not two abilities (#233) -- the shape
+        -- every animator in the pool has. CR 613.6 costs this one nothing
+        -- either way, unlike March of the Machines: its affected set reads a
+        -- card type ("all lands") that its own layer-4 part does not change.
+        HU.assertEqual
+          "\"All lands are 1/1 creatures that are still lands\""
+          [ StaticAbility.MkStaticAbility
+              (Affected.Matching (Filter.Type.HasCardType CardType.Land))
+              ( Modification.AddCardType CardType.Creature
+                  NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)]
+              )
+          ]
+          (Card.Type.staticAbilities c)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry]

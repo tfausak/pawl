@@ -15,6 +15,8 @@ import Pawl.Type.Subtype (Subtype)
 -- the same standing Pawl.Resolve has over Effect. GainKeyword carries a Keyword,
 -- a closed-half CITATION (casing on it is not an invariant violation -- see the
 -- M2a spec). P/T constructors carry signed Quantity (+3/+3 or a future -1/-1).
+-- No arm adds or removes a SUPERTYPE (#311), the case CR 205.4b is written for;
+-- the layer-4 arms below reach card types and subtypes only.
 data Modification
   = GainKeyword Keyword -- layer 6 (Serpent's Gift)
   | LoseAllAbilities -- layer 6 (Humility)
