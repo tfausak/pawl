@@ -1,6 +1,7 @@
 module Pawl.Type.TriggerCondition where
 
 import Pawl.Type.Condition (Condition)
+import Pawl.Type.Filter (Filter)
 import Pawl.Type.Phase (Phase)
 import Pawl.Type.TurnScope (TurnScope)
 
@@ -11,9 +12,29 @@ data TriggerCondition
   = -- CR 603.6a: "when this ... enters [the battlefield]" -- fires when the object
     -- BEARING the ability enters. Self-scoped: the scan checks every permanent
     -- (CR 603.6a), so the bearer's identity is part of the match, not an accident
-    -- of which object the scan happened to visit. A general "whenever a [type]
-    -- enters" is a future condition.
+    -- of which object the scan happened to visit. PermanentEnters below is the
+    -- other half of that same rule's sentence, and is kept SEPARATE rather than
+    -- rewritten as `PermanentEnters IsSource`: this arm is a bare comparison of
+    -- ids, while that one has to READ the entrant's characteristics, and reading
+    -- them can come up empty for an entrant that ceased without a zone change
+    -- ever filing last known information (see Pawl.Event.matchesTrigger).
     SelfEnters
+  | -- CR 603.6a's SECOND written form, in the same breath as the first:
+    -- "Whenever a [type] enters, . . ." -- fires when ANY permanent the Filter
+    -- admits enters the battlefield, whoever bears the ability. The "[type]" is
+    -- a Filter, matched against the entering permanent with the bearer as the
+    -- Filter.Context's source and the bearer's controller as its perspective.
+    --
+    -- Named for the rule ("a permanent enters the battlefield"), NOT
+    -- "OtherEnters": the bearer is not excluded by this constructor. CR 603.6a
+    -- says "all permanents on the battlefield (INCLUDING THE NEWCOMERS) are
+    -- checked", so a permanent must be able to see its own entry through this
+    -- condition whenever the Filter admits it. Soul Warden's "whenever ANOTHER
+    -- creature enters" writes that exclusion into the Filter as
+    -- `Not IsSource` -- the one spelling Filter.IsSource's own haddock already
+    -- fixes for "another" (#163) -- rather than into a parallel exclusion flag
+    -- here.
+    PermanentEnters Filter
   | -- CR 603.2b: "at the beginning of [each|your] <step>". Matched against a
     -- GameEvent.StepBegan; the TurnScope decides whose turn qualifies.
     StepBegins Phase TurnScope

@@ -4,7 +4,9 @@
 -- turn-scoped clearing at handoff -- `logTests`. The CR 603.2b step-beginning
 -- event and the CR 603.6a widened scan (every battlefield permanent, not just
 -- an enters event's newcomer) -- `scanTests`. The `Sacrifice` opcode and its
--- reserved trigger-source slot, CR 701.21 -- `sacrificeTests`. CR 603.8 state
+-- reserved trigger-source slot, CR 701.21 -- `sacrificeTests`. CR 603.6a's
+-- OTHER written form, "whenever a [type] enters", with Soul Warden --
+-- `permanentEntersTests`. CR 603.8 state
 -- triggers -- `stateTriggerTests`. CR 608.2i turn history (Khabál Ghoul's
 -- "died this turn") -- `historyTests`. CR 603.7 delayed triggered abilities
 -- -- `delayedTests`. The CR 603.3b ordering prompt -- `orderingTests`, and its
@@ -45,6 +47,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CounterKind as CounterKind
@@ -53,6 +56,7 @@ import qualified Pawl.Type.DamageKind as DamageKind
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword.Type
@@ -67,6 +71,7 @@ import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Regenerability as Regenerability
@@ -183,9 +188,9 @@ scanTests registry =
             cond = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn
          in do
               HU.assertBool "the end step matches" $
-                Event.matchesTrigger bearer S.alice cond (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
+                Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
               HU.assertBool "the upkeep does not" $
-                not (Event.matchesTrigger bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice)),
+                not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice)),
       -- CR 603.3a / 109.5: "your upkeep" is the ABILITY CONTROLLER's (603.3a
       -- controls the ability; 109.5 makes "your" mean that controller), so the
       -- scope is read against the bearer's controller, not the card.
@@ -194,9 +199,9 @@ scanTests registry =
             cond = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn
          in do
               HU.assertBool "alice's upkeep matches for alice" $
-                Event.matchesTrigger bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice)
+                Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice)
               HU.assertBool "bob's upkeep does not" $
-                not (Event.matchesTrigger bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.bob)),
+                not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.bob)),
       -- The widening falsifier: the scan now visits every battlefield permanent,
       -- so SelfEnters must ask whether the event is about THIS permanent. Rest in
       -- Peace is on the battlefield and a DIFFERENT object entered.
@@ -229,9 +234,9 @@ scanTests registry =
             movedTo zone = GameEvent.Moved (ZoneChange.MkZoneChange bearer Zone.Stack zone) S.emptyCharacteristics
          in do
               HU.assertBool "enters battlefield matches" $
-                Event.matchesTrigger bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Battlefield)
+                Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Battlefield)
               HU.assertBool "enters graveyard does not" $
-                not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard)),
+                not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard)),
       -- Pins the canonical emission order this module's `eventTriggers` comment
       -- documents ("events outer, permanents inner, ascending by id"), which a
       -- later task's CR 603.3b ordering prompt indexes into. Two RiP bearers
@@ -1439,5 +1444,122 @@ cyclingTriggerTests registry =
           abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities))
     ]
 
+-- CR 603.6a's SECOND written form -- "Whenever a [type] enters, . . ." -- and
+-- Soul Warden {W} Creature -- Human Cleric 1/1, "Whenever another creature
+-- enters, you gain 1 life", the card that proves it. Its effect names nothing
+-- about the entering creature, so these cases isolate the trigger CONDITION;
+-- its "another" is Filter.Not Filter.IsSource inside the condition's own
+-- Filter, never a second exclusion mechanism (#163).
+permanentEntersTests :: Registry.Type.Registry -> Tasty.TestTree
+permanentEntersTests registry =
+  let anyCreature = Filter.Type.HasCardType CardType.Creature
+      anotherCreature = Filter.Type.And [anyCreature, Filter.Type.Not Filter.Type.IsSource]
+      enters oid = GameEvent.Moved (ZoneChange.MkZoneChange oid Zone.Stack Zone.Battlefield) S.emptyCharacteristics
+      sourcesOf gs = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs))
+   in Tasty.testGroup
+        "PermanentEnters"
+        [ -- The gameplay-level proof, cast to resolution: alice's second Soul
+          -- Warden enters and the FIRST one's trigger resolves for exactly 1
+          -- life. Exactly one life, not two, is the "another" falsifier -- the
+          -- newcomer is checked against its own entry (the case below proves
+          -- the scan does check it) and its own Filter is what declines.
+          HU.testCase "CR 603.6a whole cards: a second Soul Warden entering gains alice exactly 1 life" $ do
+            plains <- Registry.printing registry "Plains"
+            soulWarden <- Registry.printing registry "Soul Warden"
+            let (_, base) = S.addCreature soulWarden S.alice (S.landsInPlay plains 1)
+                (gs, spellId) = S.handOne soulWarden base
+                cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+                settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
+            HU.assertEqual "both Wardens are on the battlefield" 2 (S.countOnBattlefieldByName (Text.pack "Soul Warden") S.alice settled)
+            HU.assertEqual "alice gained exactly 1" (fmap (+ 1) (S.lifeOf S.alice gs)) (S.lifeOf S.alice settled)
+            HU.assertEqual "bob gained nothing" (S.lifeOf S.bob gs) (S.lifeOf S.bob settled),
+          -- CR 603.6a: "all permanents on the battlefield (INCLUDING THE
+          -- NEWCOMERS) are checked for any enters-the-battlefield triggers that
+          -- match the event." The newcomer really is offered its own entry; a
+          -- bare "a creature enters" admits it, and only Soul Warden's printed
+          -- "another" turns it away. This is why the constructor is not called
+          -- OtherEnters.
+          HU.testCase "CR 603.6a including the newcomers: a permanent is checked against its own entry" $ do
+            soulWarden <- Registry.printing registry "Soul Warden"
+            let (oid, gs) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+            HU.assertBool "\"a creature enters\" admits the newcomer itself" $
+              Event.matchesTrigger gs oid S.alice (TriggerCondition.PermanentEnters anyCreature) (enters oid)
+            HU.assertBool "\"another creature enters\" does not" $
+              not (Event.matchesTrigger gs oid S.alice (TriggerCondition.PermanentEnters anotherCreature) (enters oid)),
+          -- The live-reading falsifier. `enters` above hands the event a
+          -- deliberately EMPTY ProjectedCharacteristics -- no card types at all
+          -- -- because that snapshot is CR 608.2h last known information for the
+          -- zone the object LEFT, and matching against it would answer CR 603.6b
+          -- backwards: "continuous effects that modify characteristics of a
+          -- permanent do so the moment the permanent is on the battlefield (and
+          -- not before then)". CR 603.10 says the same of an event's objects.
+          -- The Piker is a Creature only in the live projection, so a matcher
+          -- reading the snapshot fires nothing here.
+          HU.testCase "CR 603.6b/603.10 the entrant is read live, not from the Moved event's snapshot" $ do
+            soulWarden <- Registry.printing registry "Soul Warden"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+                (pikerId, gs1) = S.addCreature piker S.bob gs0
+            HU.assertEqual "no card types in the snapshot" Set.empty (PC.cardTypes S.emptyCharacteristics)
+            HU.assertBool "and the trigger still fires" $
+              Event.matchesTrigger gs1 warden S.alice (TriggerCondition.PermanentEnters anotherCreature) (enters pikerId),
+          -- CR 608.2h: an entrant that is already gone by the CR 117.5 boundary
+          -- -- here moved straight on to the graveyard -- is read from last known
+          -- information, which for a permanent that left the battlefield is the
+          -- battlefield reading. The event happened; the trigger is not lost with
+          -- the object. Same fallback eventTriggers' own `goneEntrant` takes for
+          -- the bearer side.
+          HU.testCase "CR 608.2h a creature that enters and leaves again still fires the trigger" $ do
+            soulWarden <- Registry.printing registry "Soul Warden"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+                (handCard, gs1) = S.addHandCard piker S.bob gs0
+                entered = S.runPure S.identityAnswer gs1 (Event.changeZone handCard Zone.Battlefield)
+                newIds = fmap ZoneChange.object (filter ((==) Zone.Battlefield . ZoneChange.to) (S.zoneChangesOf entered))
+            case newIds of
+              [newId] -> do
+                let gone = S.runPure S.identityAnswer entered (Event.changeZone newId Zone.Graveyard)
+                HU.assertEqual "the entrant is off the battlefield" Nothing (Game.lookupObject newId gone)
+                HU.assertEqual "the Warden still triggered, once" [TriggerSource.OfObject warden] (sourcesOf gone)
+              other -> HU.assertFailure ("expected exactly one battlefield entry, got " <> show (length other)),
+          -- The type half of the Filter: a LAND entering is not a creature
+          -- entering. Plains has no ability of its own, so nothing else can
+          -- stand in for the silence.
+          HU.testCase "CR 603.6a a noncreature permanent entering fires nothing" $ do
+            soulWarden <- Registry.printing registry "Soul Warden"
+            plains <- Registry.printing registry "Plains"
+            let (_, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+                (landId, gs1) = S.addCreature plains S.alice gs0
+                gs2 = S.withEvents [GameEvent.Moved (ZoneChange.MkZoneChange landId Zone.Stack Zone.Battlefield) (Projection.project landId gs1)] gs1
+            HU.assertEqual "no trigger" [] (sourcesOf gs2),
+          -- The destination half: CR 603.6a is an ENTERS-THE-BATTLEFIELD
+          -- ability, so a creature card moving to a graveyard is not it.
+          HU.testCase "CR 603.6a only a battlefield destination fires it" $ do
+            soulWarden <- Registry.printing registry "Soul Warden"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+                (pikerId, gs1) = S.addCreature piker S.bob gs0
+                toGrave = GameEvent.Moved (ZoneChange.MkZoneChange pikerId Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics
+            HU.assertBool "a graveyard-bound move does not match" $
+              not (Event.matchesTrigger gs1 warden S.alice (TriggerCondition.PermanentEnters anotherCreature) toGrave),
+          -- CR 603.6a: "EACH TIME an event puts one or more permanents onto the
+          -- battlefield" -- one bearer, two entering creatures, two triggers. A
+          -- count, not a boolean, so "fires once per entrant" is distinguishable
+          -- from "fires once per batch".
+          HU.testCase "CR 603.6a one Soul Warden fires once per entering creature" $ do
+            soulWarden <- Registry.printing registry "Soul Warden"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+                (first, gs1) = S.addCreature piker S.bob gs0
+                (second, gs2) = S.addCreature piker S.bob gs1
+                gs3 =
+                  S.withEvents
+                    [ GameEvent.Moved (ZoneChange.MkZoneChange first Zone.Stack Zone.Battlefield) (Projection.project first gs2),
+                      GameEvent.Moved (ZoneChange.MkZoneChange second Zone.Stack Zone.Battlefield) (Projection.project second gs2)
+                    ]
+                    gs2
+            HU.assertEqual "twice, both from the one Warden" (replicate 2 (TriggerSource.OfObject warden)) (sourcesOf gs3)
+        ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry]
