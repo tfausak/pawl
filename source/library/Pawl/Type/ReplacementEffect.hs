@@ -5,6 +5,7 @@ import Pawl.Type.DamagePattern (DamagePattern)
 import Pawl.Type.DamageRewrite (DamageRewrite)
 import Pawl.Type.DestructionRewrite (DestructionRewrite)
 import Pawl.Type.EntryRewrite (EntryRewrite)
+import Pawl.Type.PhasePattern (PhasePattern)
 import Pawl.Type.Scaling (Scaling)
 import Pawl.Type.TokenPattern (TokenPattern)
 import Pawl.Type.Zone (Zone)
@@ -30,6 +31,15 @@ import Pawl.Type.ZoneChangePattern (ZoneChangePattern)
 -- ("[Objects] enter the battlefield ...", Essence of the Wild) has no producer,
 -- so the field appears when a card needs it rather than as speculative structure.
 --
+-- PhaseR carries a pattern but NO rewrite, and that is the rule rather than an
+-- omission: CR 614.1b says skips "indicate what events, steps, phases, or turns
+-- will be replaced with NOTHING", and CR 614.10 spells the same thing out --
+-- "'skip [something]' is the same as 'instead of doing [something], do
+-- nothing'". There is only one thing a skip can do, so there is nothing for a
+-- PhaseRewrite to choose between. (CR 614.10b's "skip, then take another
+-- action" is a separate ability alongside the skip, not a different rewrite of
+-- it, and has no producer.)
+--
 -- The sole rules-casing site is Pawl.Replacement (CR 616.1's loop). Pawl.Codec
 -- also cases on every constructor, but only as the JSON data boundary.
 data ReplacementEffect
@@ -39,4 +49,5 @@ data ReplacementEffect
   | DestructionR DestructionRewrite
   | CounterR CounterPattern Scaling
   | TokenR TokenPattern Scaling
+  | PhaseR PhasePattern
   deriving (Eq, Ord, Show)

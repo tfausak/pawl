@@ -67,6 +67,7 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PhasePattern as PhasePattern
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerRef as PlayerRef
@@ -578,6 +579,11 @@ tests registry =
                         CounterPattern.onWhat = Filter.Type.And []
                       }
                     (Scaling.Multiply 2)
+             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
+          -- CR 614.1b: a skip carries a pattern and no rewrite, so the payload is
+          -- the pattern itself rather than the usual two-element array.
+          HU.testCase "a PhaseR replacement round-trips" $
+            let re = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = Phase.Beginning BeginningStep.Upkeep}
              in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re))
         ],
       Tasty.testGroup

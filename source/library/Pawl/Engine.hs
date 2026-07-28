@@ -31,6 +31,7 @@ import qualified Pawl.Monarch as Monarch
 import qualified Pawl.Mulligan as Mulligan
 import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
 import qualified Pawl.Setup as Setup
@@ -908,6 +909,39 @@ runStep = do
   -- so lower the signal before doing anything else.
   State.modify' (\gs -> gs {GameState.restartSignal = RestartSignal.Playing})
   phase <- State.gets GameState.phase
+  active <- State.gets GameState.activePlayer
+  -- CR 614.1b: "effects that use the word 'skip' are replacement effects ...
+  -- what events, steps, phases, or turns will be replaced with nothing", and CR
+  -- 500.11: "to skip a step, phase, or turn is to proceed past it as though it
+  -- didn't exist". So the question is asked HERE, of the replacement system, and
+  -- a `False` answer means the whole of `runStepThatBegan` -- the CR 603.2b
+  -- beginning event, the turn-based actions, the priority round, CR 500.5's mana
+  -- emptying -- is not merely empty but never runs. Eon Hub is the card, and CR
+  -- 500.6's "at the beginning of" triggers never triggering is the observable
+  -- that distinguishes this from a step that happened and did nothing.
+  --
+  -- CR 614.10's "once a step, phase, or turn has started, it can no longer be
+  -- skipped" is what pins the question to this line. `advance` has already
+  -- written the step into GameState.phase by now, but nothing has yet observed
+  -- it: `advance` records no event and grants no priority, and playGame does
+  -- nothing between the two but read GameState.result. So the step is scheduled,
+  -- not started, and this is its last unobserved moment.
+  --
+  -- The skipped step is left popped off the schedule by `advance` below rather
+  -- than filtered out of GameState.remaining the way CR 508.8's combat skip is
+  -- (Turn.dropSkippedCombatSteps). Both reach "as though it didn't exist"; the
+  -- difference is that CR 508.8 is a RULE, known one step ahead, while a
+  -- replacement effect has to be asked at the moment the event would happen,
+  -- because CR 616.1's loop reads the board as it then is.
+  begins <- Replacement.beginsPhase phase active
+  if not begins
+    then advance
+    else runStepThatBegan phase
+
+-- The body of a step that was not skipped, split out only so `runStep`'s CR
+-- 614.1b check reads as a guard rather than as a nesting level.
+runStepThatBegan :: Phase.Phase -> Game ()
+runStepThatBegan phase = do
   -- CR 603.2b: the step began. Recorded BEFORE the step's turn-based actions, so
   -- the first priority boundary of this step scans it. No player receives
   -- priority during the untap step (CR 502.4), so an ability that triggers then
@@ -955,7 +989,11 @@ runStep = do
         Monad.unless stillFinished advance
 
 -- Terminates because libraries are finite, each turn draws at most one card, and
--- drawing from an empty library is a loss (CR 704.5b).
+-- drawing from an empty library is a loss (CR 704.5b). That argument now rests on
+-- the DRAW step being reached: a CR 614.1b skip of it (runStep's check above)
+-- would suspend it, exactly as a real Stasis lock suspends a real game. No card
+-- in the pool skips the draw step -- Eon Hub takes the upkeep step, which draws
+-- nothing -- so the argument stands for every game this engine can currently play.
 playGame :: Game Result
 playGame =
   let loop = do

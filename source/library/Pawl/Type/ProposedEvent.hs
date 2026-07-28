@@ -5,6 +5,7 @@ import Pawl.Type.Card (Card)
 import Pawl.Type.CounterKind (CounterKind)
 import Pawl.Type.DamageEvent (DamageEvent)
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.Phase (Phase)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Regenerability (Regenerability)
 import Pawl.Type.ZoneChange (ZoneChange)
@@ -20,7 +21,12 @@ import Pawl.Type.ZoneChange (ZoneChange)
 -- ("one effect may apply to an event, and another to an event contained within
 -- the first"), expressed as call nesting rather than as a field.
 --
--- Six arms, not the ~40 replaceable event classes the rules define: each of the
+-- WouldBeginPhase is the one arm that is not about an OBJECT: CR 614.1b's skips
+-- replace a step, a phase or a turn, none of which any object owns. Its PlayerId
+-- is the active player -- the player whose step it is, and so CR 616.1's
+-- "affected player" for the choice among applicable skips.
+--
+-- Seven arms, not the ~40 replaceable event classes the rules define: each of the
 -- rest is one more arm plus the funnel that raises it -- vocabulary on a finished
 -- axis, which is what "the closed half can genuinely be finished" means here.
 data ProposedEvent
@@ -34,4 +40,10 @@ data ProposedEvent
     WouldBeDestroyed ObjectId Regenerability
   | WouldPutCounters ObjectId CounterKind Natural
   | WouldCreateTokens PlayerId Card Natural
+  | -- CR 500.11 / 614.10: a step or phase would begin, on this player's turn.
+    -- Raised by Engine.runStep before anything about the step is observable, so
+    -- a skip that takes it leaves no trace -- CR 614.10's "once a step, phase, or
+    -- turn has started, it can no longer be skipped" read as the moment this
+    -- event exists.
+    WouldBeginPhase Phase PlayerId
   deriving (Eq, Show)
