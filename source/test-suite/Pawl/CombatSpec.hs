@@ -3,6 +3,8 @@
 
 -- Covers Pawl.Combat: attack/block legality, combat damage, and the combat
 -- keywords (flying, reach, defender, vigilance, haste, first/double strike).
+-- Also Pawl.BlockRequirement, whose only consumer is Pawl.Combat's CR 509.1c
+-- check.
 module Pawl.CombatSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -823,6 +825,137 @@ evasionTests registry =
           _ -> HU.assertFailure "fixture should have an attacker and a blocker"
     ]
 
+-- Declare attackers with everything, then put a Lure on the first attacker.
+-- Attaching directly is S.attach's state-fixture posture -- Pawl.Cast can cast
+-- the Aura, but a combat fixture cannot reach a sorcery-speed cast mid-step --
+-- and the printing is the real Lure, never a synthetic.
+luring :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+luring lure mine theirs =
+  let (gs, ours, yours) = attacking mine theirs
+   in case ours of
+        -- Unreachable: every caller passes at least one attacking printing.
+        [] -> (gs, ours, yours)
+        attacker : _ ->
+          let (aura, withAura) = S.addCreature lure S.alice gs
+           in (S.attach aura attacker withAura, ours, yours)
+
+-- CR 509.1c, proved by Lure ("All creatures able to block enchanted creature do
+-- so") -- the pool's first blocking REQUIREMENT, and the first board on which
+-- declining to block is not a legal answer.
+blockRequirementTests :: Registry.Type.Registry -> Tasty.TestTree
+blockRequirementTests registry =
+  Tasty.testGroup
+    "BlockRequirements"
+    [ HU.testCase "CR 509.1c declining to block a Lured attacker is illegal" $ do
+        -- THE FALSIFIER for a restrictions-only reading of CR 509.1: the empty
+        -- declaration disobeys no restriction, which is exactly why 509.1c is a
+        -- maximization and not a per-creature check.
+        lure <- Registry.printing registry "Lure"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = luring lure [piker] [piker]
+        HU.assertBool "no blocks is illegal" (not (Combat.legalBlockDeclaration S.bob Map.empty gs)),
+      HU.testCase "CR 509.1 the same board WITHOUT the Lure lets the defender decline" $ do
+        -- The control for the test above, and the reason it is not vacuous: the
+        -- empty declaration is legal here, so the Lure is what changed the answer.
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = attacking [piker] [piker]
+        HU.assertBool "no blocks is legal" (Combat.legalBlockDeclaration S.bob Map.empty gs),
+      HU.testCase "CR 509.1c blocking the Lured attacker is legal" $ do
+        lure <- Registry.printing registry "Lure"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, theirs) = luring lure [piker] [piker]
+        case (mine, theirs) of
+          (a : _, b : _) ->
+            HU.assertBool "legal" (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)
+          _ -> HU.assertFailure "fixture should have an attacker and a blocker",
+      HU.testCase "CR 509.1c a creature that CANNOT block the Lured attacker is not required to" $ do
+        -- Lure's "able to block" doing its work: the Bird Maiden has flying (CR
+        -- 702.9b), so the ground Piker could not block it under any declaration.
+        -- No requirement instance exists, the maximum is zero, and declining stays
+        -- legal. Fails against an implementation that requires every creature to
+        -- block regardless of the restrictions.
+        lure <- Registry.printing registry "Lure"
+        birdMaiden <- Registry.printing registry "Bird Maiden"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = luring lure [birdMaiden] [piker]
+        HU.assertBool "no blocks is legal" (Combat.legalBlockDeclaration S.bob Map.empty gs),
+      HU.testCase "CR 509.1a a TAPPED creature is not able to block, so a Lure does not require it" $ do
+        -- The other half of "able": CR 509.1a's chosen creatures "must be
+        -- untapped", so a tapped creature is never a candidate and carries no
+        -- requirement.
+        lure <- Registry.printing registry "Lure"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, theirs) = luring lure [piker] [piker]
+        case theirs of
+          b : _ -> HU.assertBool "no blocks is legal" (Combat.legalBlockDeclaration S.bob Map.empty (S.tapObject b gs))
+          _ -> HU.assertFailure "fixture should have a blocker",
+      HU.testCase "CR 509.1c the maximum is over the creatures that CAN block, not all of them" $ do
+        -- The maximization biting. A Lured Bird Maiden (flying) is attacking; bob
+        -- has a ground Piker, which may not block it, and a Nimble Birdsticker,
+        -- which has reach and may. The maximum obtainable without disobeying a
+        -- restriction is ONE, and only the Birdsticker's block attains it: the
+        -- empty declaration obeys zero and is illegal, and the Piker's block is
+        -- illegal under CR 702.9b whatever it would obey.
+        lure <- Registry.printing registry "Lure"
+        birdMaiden <- Registry.printing registry "Bird Maiden"
+        piker <- Registry.printing registry "Goblin Piker"
+        nimbleBirdsticker <- Registry.printing registry "Nimble Birdsticker"
+        let (gs, mine, theirs) = luring lure [birdMaiden] [piker, nimbleBirdsticker]
+        case (mine, theirs) of
+          (a : _, [ground, reacher]) -> do
+            HU.assertBool "no blocks is illegal" (not (Combat.legalBlockDeclaration S.bob Map.empty gs))
+            HU.assertBool "the reach creature blocking is legal" (Combat.legalBlockDeclaration S.bob (Map.singleton reacher a) gs)
+            HU.assertBool "the ground creature blocking is illegal" (not (Combat.legalBlockDeclaration S.bob (Map.singleton ground a) gs))
+          _ -> HU.assertFailure "fixture should have an attacker and two blockers",
+      HU.testCase "CR 509.1c with two able creatures BOTH are required to block" $ do
+        -- One Lure over two creatures is TWO requirements, not one -- CR 509.1c
+        -- checks "each creature they control". A single block obeys one of two
+        -- and is illegal; blocking with both attains the maximum.
+        lure <- Registry.printing registry "Lure"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, theirs) = luring lure [piker] [piker, piker]
+        case (mine, theirs) of
+          (a : _, [first, second]) -> do
+            HU.assertBool "one blocker is not enough" (not (Combat.legalBlockDeclaration S.bob (Map.singleton first a) gs))
+            HU.assertBool "both blockers is legal" (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, a), (second, a)]) gs)
+          _ -> HU.assertFailure "fixture should have an attacker and two blockers",
+      HU.testCase "CR 509.1c whole cards: a Lure forces a block through a real declare blockers step" $ do
+        -- The gameplay-level case, run through Combat.declareBlockers with an
+        -- interpreter that declines to block. Declining is now an illegal answer,
+        -- and the maximum leaves exactly one legal declaration -- the rules
+        -- forcing it, not the engine choosing.
+        --
+        -- Precise rather than vacuous, and all three assertions distinguish the
+        -- two worlds. WITHOUT the requirement: nobody blocks, bob takes 2 and both
+        -- Pikers live. WITH it: the Piker blocks, bob takes nothing, and the two
+        -- 2/1s trade.
+        lure <- Registry.printing registry "Lure"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, mine, _) = S.combatBoardOf [piker] [piker]
+            declining :: Prompt.Prompt r -> r
+            declining p = case p of
+              Prompt.DeclareBlockers {} -> Map.empty
+              _ -> S.aggressiveAnswer p
+            withLure = case mine of
+              -- Unreachable: the fixture has one attacking printing.
+              [] -> gs
+              a : _ -> let (aura, withAura) = S.addCreature lure S.alice gs in S.attach aura a withAura
+            after = S.settleSba (S.fightWith declining withLure)
+        HU.assertEqual "bob took nothing" (Just 20) (S.lifeOf S.bob after)
+        HU.assertEqual "alice's attacker is dead" 0 (S.creaturesInPlay S.alice after)
+        HU.assertEqual "bob's blocker is dead" 0 (S.creaturesInPlay S.bob after),
+      HU.testCase "CR 303.4m a Lure that is not attached to anything requires nothing" $ do
+        -- CR 303.4m reads the SOURCE's attachment, so an unattached Lure names no
+        -- attacker and mints no requirement. The Aura stays ON the battlefield
+        -- throughout, so this is not a test that removing it works -- CR 704.5m
+        -- would bury it, and no state-based-action pass is run here.
+        lure <- Registry.printing registry "Lure"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = attacking [piker] [piker]
+            withAura = snd (S.addCreature lure S.alice gs)
+        HU.assertBool "no blocks is legal" (Combat.legalBlockDeclaration S.bob Map.empty withAura)
+    ]
+
 vigilanceTests :: Registry.Type.Registry -> Tasty.TestTree
 vigilanceTests registry =
   Tasty.testGroup
@@ -1329,6 +1462,7 @@ tests registry =
       vigilanceTests registry,
       hasteTests registry,
       evasionTests registry,
+      blockRequirementTests registry,
       controlChangeSicknessTests registry,
       controlChangeRemovalTests registry
     ]

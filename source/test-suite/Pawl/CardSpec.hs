@@ -27,6 +27,7 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.BeginningStep as BeginningStep
+import qualified Pawl.Type.BlockRequirement as BlockRequirement
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
@@ -254,6 +255,7 @@ cardTests registry =
                   Card.Type.castingPermissions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
+                  Card.Type.blockRequirements = [],
                   Card.Type.mulliganAction = [],
                   Card.Type.openingHandAction = [],
                   Card.Type.additionalCosts = [],
@@ -1139,6 +1141,24 @@ auraCardTests registry =
           [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 1)))]
           (Card.Type.staticAbilities card)
         -- CR 303.4: an Aura spell has no spell effects; it enters attached.
+        HU.assertEqual "no spell effects" [] (Card.allEffects card),
+      -- The pool's first CR 509.1c blocking requirement, and the first card whose
+      -- whole ability lives on neither staticAbilities nor playerAbilities --
+      -- which is the correction this file's presence records.
+      HU.testCase "Lure is a {1}{G}{G} Aura whose only ability is a CR 509.1c blocking requirement" $ do
+        p <- Registry.printing registry "Lure"
+        let card = Printing.card p
+            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+        HU.assertEqual "name" (Text.pack "Lure") (Card.Type.name card)
+        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, green, green])) (Card.Type.manaCost card)
+        HU.assertEqual "subtypes" (Set.singleton Subtype.Aura) (TypeLine.subtypes (Card.Type.typeLine card))
+        HU.assertEqual "enchant creature" (Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.Type.enchant card)
+        -- CR 303.4m: "all creatures able to block ENCHANTED CREATURE do so".
+        HU.assertEqual
+          "one requirement, naming whatever the Aura is attached to"
+          [BlockRequirement.MkBlockRequirement Affected.Attached]
+          (Card.Type.blockRequirements card)
+        HU.assertEqual "and it modifies no characteristic" [] (Card.Type.staticAbilities card)
         HU.assertEqual "no spell effects" [] (Card.allEffects card)
     ]
 

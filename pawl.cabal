@@ -65,6 +65,7 @@ library
     Pawl.Action
     Pawl.Activate
     Pawl.Binding
+    Pawl.BlockRequirement
     Pawl.Card
     Pawl.Cast
     Pawl.Codec
@@ -114,6 +115,7 @@ library
     Pawl.Type.AttackTarget
     Pawl.Type.BeginningStep
     Pawl.Type.Binding
+    Pawl.Type.BlockRequirement
     Pawl.Type.CandidateId
     Pawl.Type.Card
     Pawl.Type.CardType

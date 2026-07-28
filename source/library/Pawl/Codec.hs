@@ -25,6 +25,7 @@ import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Binding as Binding
+import qualified Pawl.Type.BlockRequirement as BlockRequirement
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.CastingPermission as CastingPermission
@@ -1575,6 +1576,16 @@ jsonToPlayerStaticAbility value = do
   e <- Json.field (Text.pack "effect") ps >>= jsonToPlayerEffect
   pure (PlayerStaticAbility.MkPlayerStaticAbility s e)
 
+blockRequirementToJson :: BlockRequirement.BlockRequirement -> Value
+blockRequirementToJson br =
+  Object [(Text.pack "attacker", affectedToJson (BlockRequirement.attacker br))]
+
+jsonToBlockRequirement :: Value -> Either Text BlockRequirement.BlockRequirement
+jsonToBlockRequirement value = do
+  ps <- Json.asObject value
+  a <- Json.field (Text.pack "attacker") ps >>= jsonToAffected
+  pure (BlockRequirement.MkBlockRequirement a)
+
 costToJson :: Cost.Cost -> Value
 costToJson c =
   Object
@@ -1888,6 +1899,10 @@ cardToJson c =
                then []
                else [(Text.pack "playerAbilities", listTo playerStaticAbilityToJson (CardT.playerAbilities c))]
            )
+        <> ( if null (CardT.blockRequirements c)
+               then []
+               else [(Text.pack "blockRequirements", listTo blockRequirementToJson (CardT.blockRequirements c))]
+           )
         <> ( if null (CardT.additionalCosts c)
                then []
                else [(Text.pack "additionalCosts", listTo costComponentToJson (CardT.additionalCosts c))]
@@ -1962,6 +1977,7 @@ jsonToCard value = do
   characteristicPT <- maybeFrom jsonToQuantity (getOpt (Text.pack "characteristicPT") ps)
   delayed <- mapFromDefault jsonToDelayedAbilities (getOpt (Text.pack "delayedAbilities") ps)
   playerAbilities <- listFromDefault jsonToPlayerStaticAbility (getOpt (Text.pack "playerAbilities") ps)
+  blockRequirements <- listFromDefault jsonToBlockRequirement (getOpt (Text.pack "blockRequirements") ps)
   additionalCosts <- listFromDefault jsonToCostComponent (getOpt (Text.pack "additionalCosts") ps)
   alternativeCosts <- listFromDefault jsonToCost (getOpt (Text.pack "alternativeCosts") ps)
   mulliganAction <- listFromDefault jsonToEffect (getOpt (Text.pack "mulliganAction") ps)
@@ -1986,6 +2002,7 @@ jsonToCard value = do
         CardT.characteristicPT = characteristicPT,
         CardT.delayedAbilities = delayed,
         CardT.playerAbilities = playerAbilities,
+        CardT.blockRequirements = blockRequirements,
         CardT.additionalCosts = additionalCosts,
         CardT.alternativeCosts = alternativeCosts,
         CardT.mulliganAction = mulliganAction,
