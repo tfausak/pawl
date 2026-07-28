@@ -68,6 +68,13 @@ findFirst p = case p of
     [] -> Nothing
   _ -> S.identityAnswer p
 
+-- Answers ChooseModes with the empty set, which is an illegal answer to any
+-- selection demanding one or more -- the reject-not-repair trigger.
+chooseNoModes :: Prompt.Prompt r -> r
+chooseNoModes p = case p of
+  Prompt.ChooseModes {} -> Set.empty
+  _ -> S.identityAnswer p
+
 -- The single ability of a printing (all M3e gates have exactly one). Total: the
 -- empty-ability fallback is unreachable in these fixtures, and honors the
 -- no-partial-functions rule (no `error`).
@@ -555,13 +562,22 @@ cyclingTests registry =
           [ability] -> do
             let cycled = S.runPure findFirst gs (Activate.activateAbility S.alice oid ability)
                 after = S.runPure findFirst cycled Stack.resolveTop
-            HU.assertEqual "nothing revealed before the ability resolves" [] (S.revealsOf cycled)
-            HU.assertEqual "Alice revealed a Forest" [(S.alice, Text.pack "Forest")] (S.revealsOf after)
+            -- TWO reveals, from the two different rules that ask for one. CR
+            -- 602.2a reveals Ash Barrens itself as the ability is announced,
+            -- because a hand is a hidden zone; CR 702.29e's "reveal it" then
+            -- reveals the Forest when the ability resolves. In that order.
+            HU.assertEqual "only the announcement reveal before the ability resolves" [(S.alice, Text.pack "Ash Barrens")] (S.revealsOf cycled)
+            HU.assertEqual
+              "then Alice revealed the Forest she found"
+              [(S.alice, Text.pack "Ash Barrens"), (S.alice, Text.pack "Forest")]
+              (S.revealsOf after)
           abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
       -- CR 701.20a reveals "that card", so a search that finds none reveals
       -- nothing. The negative half of the test above: CR 701.23b lets a player
       -- fail to find, and a failed find must not put an empty or filler reveal
-      -- into the log for an opponent to read something into.
+      -- into the log for an opponent to read something into. The CR 602.2a
+      -- announcement reveal is unaffected -- it already happened, and whether
+      -- the search finds anything cannot reach back and unshow the cycler.
       HU.testCase "CR 701.20a a search that finds nothing reveals nothing" $ do
         barrens <- Registry.printing registry "Ash Barrens"
         piker <- Registry.printing registry "Goblin Piker"
@@ -573,7 +589,7 @@ cyclingTests registry =
           [ability] -> do
             let cycled = S.runPure findFirst gs (Activate.activateAbility S.alice oid ability)
                 after = S.runPure findFirst cycled Stack.resolveTop
-            HU.assertEqual "no basic land found, so nothing shown" [] (S.revealsOf after)
+            HU.assertEqual "no basic land found, so only the announcement reveal" [(S.alice, Text.pack "Ash Barrens")] (S.revealsOf after)
           abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
       -- CR 702.29f: "typecycling abilities are cycling abilities, and typecycling
       -- costs are cycling costs." The engine gets that for free by minting both
@@ -611,8 +627,12 @@ cyclingTests registry =
             activated = S.runPure findFirst gs (Activate.activateAbility S.alice sextantId ability)
             after = S.runPure findFirst activated Stack.resolveTop
         HU.assertBool "the Sextant sacrificed itself paying the cost" (not (Set.member sextantId (GameState.battlefield activated)))
+        -- ONE reveal, where Ash Barrens' typecycling produces two: the Sextant
+        -- is announced from the BATTLEFIELD, which CR 400.2 makes a public zone,
+        -- so CR 602.2a adds nothing. The contrast between these two tests is the
+        -- whole of what that rule's zone condition does.
         HU.assertEqual "nothing revealed while the ability is still on the stack" [] (S.revealsOf activated)
-        HU.assertEqual "Alice revealed the Forest" [(S.alice, Text.pack "Forest")] (S.revealsOf after)
+        HU.assertEqual "Alice revealed the Forest, and only the Forest" [(S.alice, Text.pack "Forest")] (S.revealsOf after)
         HU.assertEqual "the Forest is in her hand" 1 (length (Game.zoneMembers Zone.Hand S.alice after))
         HU.assertEqual "and out of her library" 0 (length (Game.zoneMembers Zone.Library S.alice after))
         -- CR 701.20b: revealing does not move the card, so the two Islands that
@@ -626,6 +646,67 @@ cyclingTests registry =
         case (List.findIndex (Maybe.isJust . Event.revealOf) (Foldable.toList (GameState.events after)), List.findIndex ((== Just Zone.Hand) . fmap ZoneChange.to . Event.movedOf) (Foldable.toList (GameState.events after))) of
           (Just revealed, Just moved) -> HU.assertBool "the reveal is logged before the move into the hand" (revealed < moved)
           indices -> HU.assertFailure ("expected both a reveal and a move into the hand, got " <> show indices),
+      -- CR 602.2a: "The player announces that they are activating the ability.
+      -- If an activated ability is being activated from a hidden zone, the card
+      -- that has that ability is revealed." CR 400.2 names the hidden zones:
+      -- "Library and hand are hidden zones."
+      --
+      -- The reveal is at ANNOUNCEMENT, which for cycling is before its own cost
+      -- discards the card -- so the log shows the Mauler being revealed and only
+      -- then moving to the graveyard. Both halves are asserted: an engine that
+      -- revealed at the wrong moment would still show the right card.
+      HU.testCase "CR 602.2a cycling from hand reveals the Mauler as the ability is announced" $ do
+        (oid, gs) <- cyclingBoard registry
+        case Activate.abilitiesFor oid gs of
+          [ability] -> do
+            let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability)
+                events = Foldable.toList (GameState.events activated)
+            HU.assertEqual "Alice revealed Barkhide Mauler" [(S.alice, Text.pack "Barkhide Mauler")] (S.revealsOf activated)
+            HU.assertEqual "and the draw has not resolved, so this is the announcement" 1 (length (GameState.stack activated))
+            case (List.findIndex (Maybe.isJust . Event.revealOf) events, List.findIndex ((== Just Zone.Graveyard) . fmap ZoneChange.to . Event.movedOf) events) of
+              (Just revealed, Just discarded) -> HU.assertBool "revealed before the cost discarded it" (revealed < discarded)
+              indices -> HU.assertFailure ("expected both a reveal and a discard, got " <> show indices)
+          abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+      -- The control, and the reason CR 602.2a needs a zone test rather than
+      -- revealing unconditionally: CR 400.2 makes the battlefield a PUBLIC zone,
+      -- where every player can already see the card. Prodigal Sorcerer's {T} is
+      -- announced the same way and shows nobody anything.
+      HU.testCase "CR 400.2 activating from the battlefield reveals nothing" $ do
+        prodigalSorcerer <- Registry.printing registry "Prodigal Sorcerer"
+        let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+            gs = g0 {GameState.priority = Just S.alice}
+            activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice srcId (theAbility prodigalSorcerer))
+        HU.assertEqual "the ability is on the stack" 1 (length (GameState.stack activated))
+        HU.assertEqual "and the battlefield is public, so nothing was revealed" [] (S.revealsOf activated),
+      -- CR 602.2a's reveal belongs to an activation that HAPPENED. pawl's
+      -- reject-not-repair guard (an interpreter answering with an illegal mode
+      -- set) makes the whole activation a no-op, and the reveal has to go back
+      -- with it -- otherwise the log claims Alice showed her opponent a card
+      -- over an activation the engine refused.
+      --
+      -- The ability is hand-built because no card in the pool prints a MODAL
+      -- ability activatable from a hidden zone; the Mauler is a real card in a
+      -- real hand, which is the part under test.
+      HU.testCase "CR 602.2a a rejected activation reveals nothing" $ do
+        mauler <- Registry.printing registry "Barkhide Mauler"
+        forest <- Registry.printing registry "Forest"
+        let (g0, oid) = S.handOne mauler (S.landsInPlay forest 2)
+            gs = g0 {GameState.priority = Just S.alice}
+            -- Two fillable modes, choose one: more legal than the count, so
+            -- ChooseModes is really asked and a bad answer can really be given.
+            -- The modes are empty because what they DO is not under test.
+            twoModes =
+              ActivatedAbility.MkActivatedAbility
+                (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
+                ( Modal.MkModal
+                    (Seq.fromList [Mode.MkMode Seq.empty Map.empty, Mode.MkMode Seq.empty Map.empty])
+                    (ModeSelection.ChooseExactly 1)
+                )
+                ActivationTiming.AnyTime
+            after = S.runPure chooseNoModes gs (Activate.activateAbility S.alice oid twoModes)
+        HU.assertEqual "the activation was rejected: nothing on the stack" [] (GameState.stack after)
+        HU.assertEqual "so no reveal survives it either" [] (S.revealsOf after)
+        HU.assertEqual "and the Mauler is still in her hand" 1 (length (Game.zoneMembers Zone.Hand S.alice after)),
       -- The control: the gate cannot pass by offering every card in hand. A
       -- Piker has no cycling and nothing is minted for it.
       HU.testCase "CR 702.29a a card without cycling offers nothing from the hand" $ do
