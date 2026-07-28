@@ -1,0 +1,50 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 5
+    }
+  ],
+  "name": "Eon Hub",
+  "power": null,
+  "replacementEffects": [
+    {
+      "type": "PhaseR",
+      "value": {
+        "whichPhase": {
+          "type": "Beginning",
+          "value": {
+            "type": "Upkeep"
+          }
+        }
+      }
+    }
+  ],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Artifact"
+      }
+    ]
+  }
+}

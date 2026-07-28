@@ -109,8 +109,6 @@ facet, this is its **event-coverage** facet; together they are the full story.*
 mtgish's `PlayerEffect` (~250 variants) folds to a mechanism pawl **has no axis
 for at all**. Representative classes:
 
-- **Turn-structure skips:** `SkipsUntapStep`, `SkipsDrawStep`, `SkipsMainPhase`,
-  `SkipsCombatPhase`, `SkipsUpkeepStep`.
 - **Permission grants:** `MayPlayAdditionalLands`, `MayCastSpellsFromGraveyard`,
   `MaySpendManaAsThoughItWasAnyColor`, `HasNoMaximumHandSize`.
 - **Prohibitions:** `CantCastSpells`, `CantDrawCards`, `CantGainLife`,
@@ -130,6 +128,24 @@ verify.)*
 → **GAP-P:** a player-scoped continuous-effect / restriction axis (a `PlayerEffect`
 sibling to `Modification`, resolved by the projection over players). Big, and
 touched by nearly every control/prison/cost card.
+
+**Correction (#98, landed).** This section originally opened with a
+"**Turn-structure skips:** `SkipsUntapStep`, `SkipsDrawStep`, `SkipsMainPhase`,
+`SkipsCombatPhase`, `SkipsUpkeepStep`" bullet, listing them under GAP-P. That was
+**the wrong axis**, and following it would have hung a `SkipsDrawStep` off
+`PlayerEffect`. CR 614.1b: *"Effects that use the word 'skip' are replacement
+effects. These replacement effects use the word 'skip' to indicate what events,
+steps, phases, or turns will be replaced with nothing."* mtgish's own
+over-granular `PlayerEffect` grouping is what misled the fold; a skip is P5's
+`ReplacementEffect`, not a CR 613.11 rules-modifying continuous effect. Built as
+`ReplacementEffect.PhaseR` over a `ProposedEvent.WouldBeginPhase`, raised by
+`Engine.runStep`, proved by Eon Hub.
+
+Two neighbours that are genuinely *not* on this axis either, and are not GAP-P's
+to absorb: `Engine.skipsDraw` is CR 103.8a's first-draw-step **turn-based rule**
+(the rules state it directly rather than creating an effect), and
+`Turn.dropSkippedCombatSteps` is CR 508.8's **rule**-driven combat skip. Neither
+is an effect of any kind, so both correctly stay plain engine predicates.
 
 ### 3.3 Layer operations — GAP (layers 1, 2, 5, and CDA missing)
 

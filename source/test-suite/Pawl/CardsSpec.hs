@@ -12,6 +12,7 @@ import qualified Pawl.Json as Json
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
+import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
@@ -25,6 +26,8 @@ import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.Optionality as Optionality
+import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PhasePattern as PhasePattern
 import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.Power as Power
@@ -121,7 +124,19 @@ tests registry =
               (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents ZoneChangeSubject.AnyObject)
               Zone.Exile
           ]
+          (CardT.replacementEffects c),
+      -- CR 614.1b: the first card in the pool whose replacement effect is a
+      -- SKIP. Nothing about Eon Hub is a static ability -- the whole card is one
+      -- replacement -- which is the correction this file's presence records.
+      HU.testCase "eon-hub.json loads as a {5} artifact whose only ability is a PhaseR skip" $ do
+        c <- Registry.card registry "Eon Hub"
+        HU.assertEqual "name" (Text.pack "Eon Hub") (CardT.name c)
+        HU.assertEqual "{5}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 5])) (CardT.manaCost c)
+        HU.assertEqual
+          "players skip their upkeep steps"
+          [ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = Phase.Beginning BeginningStep.Upkeep}]
           (CardT.replacementEffects c)
+        HU.assertEqual "and it is not a continuous effect" [] (CardT.staticAbilities c)
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion

@@ -23,6 +23,7 @@ import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -51,6 +52,8 @@ import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.Phase (Phase)
+import qualified Pawl.Type.PhasePattern as PhasePattern
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.ProjectedCharacteristics as PC
@@ -89,6 +92,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
 
 -- CR 616.1's loop. `Nothing` means the event DOES NOT HAPPEN -- CR 615.6's
 -- prevented damage, CR 701.19a's replaced destruction. A rewrite that cancels an
@@ -258,6 +262,12 @@ applies gs event candidate =
             ControllerRelation.Opponents -> case Projection.controllerOf src gs of
               Just you -> pid /= you
               Nothing -> False
+        -- CR 614.1b / 500.11: a skip intercepts a step or phase BEGINNING, and
+        -- names exactly which one. The event's PlayerId is not read: every skip
+        -- in the pool is symmetric ("PLAYERS skip their upkeep steps"), so
+        -- PhasePattern carries no relation to test it against.
+        (ReplacementEffect.PhaseR pat, ProposedEvent.WouldBeginPhase phase _) ->
+          PhasePattern.whichPhase pat == phase
         -- Every row below falls through to False, because an arm ABOVE already
         -- matches every event of that class -- a row below only fires for a
         -- MISMATCHED class (e.g. a DestructionR candidate offered a
@@ -273,6 +283,7 @@ applies gs event candidate =
         (ReplacementEffect.DestructionR _, _) -> False
         (ReplacementEffect.CounterR _ _, _) -> False
         (ReplacementEffect.TokenR _ _, _) -> False
+        (ReplacementEffect.PhaseR _, _) -> False
 
 -- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation, read
 -- against the controller of the effect's SOURCE? Anyones always does.
@@ -380,6 +391,10 @@ bucketOf re = case re of
   ReplacementEffect.DestructionR _ -> ReplacementBucket.Other
   ReplacementEffect.CounterR _ _ -> ReplacementBucket.Other
   ReplacementEffect.TokenR _ _ -> ReplacementBucket.Other
+  -- CR 616.1a-d are all about entries and copies (self-replacement, entering
+  -- control, entering as a copy, entering back face up); a skip is none of
+  -- those, so it falls to CR 616.1e's "any of the applicable ... may be chosen".
+  ReplacementEffect.PhaseR _ -> ReplacementBucket.Other
 
 -- CR 616.1: "the affected object's controller (or its owner if it has no
 -- controller) or the affected player chooses one to apply."
@@ -448,6 +463,9 @@ chooserOf gs event = case event of
   ProposedEvent.WouldBeDestroyed oid _ -> Projection.controllerOf oid gs
   ProposedEvent.WouldPutCounters oid _ _ -> Projection.controllerOf oid gs
   ProposedEvent.WouldCreateTokens pid _ _ -> Just pid
+  -- CR 616.1's "affected player": a step or phase beginning affects no object,
+  -- so the player whose turn it is chooses among applicable skips.
+  ProposedEvent.WouldBeginPhase _ pid -> Just pid
 
 -- CR 614.6: apply one chosen effect. Nothing means the event does not happen.
 --
@@ -602,6 +620,21 @@ apply batch candidate event =
       pure (Just (ProposedEvent.WouldCreateTokens pid card (scale scaling n)))
     -- Unreachable: `applies` admits TokenR only against WouldCreateTokens.
     (ReplacementEffect.TokenR _ _, _) -> pure (Just event)
+    -- CR 614.1b / 614.10: "'skip [something]' is the same as 'instead of doing
+    -- [something], do nothing'" -- so the step or phase simply does not begin.
+    -- Nothing is done first, unlike DamageRewrite.PreventAll's sibling arm: a
+    -- skip has no consequence of its own to perform before it cancels.
+    --
+    -- The obligation the doc above places on every arm -- case on the inner sum
+    -- rather than bind it with `_` -- has nothing to bind here: PhaseR carries a
+    -- pattern and no rewrite, because CR 614.1b leaves a skip only one possible
+    -- outcome (see Pawl.Type.ReplacementEffect). The day a PhaseRewrite exists,
+    -- this arm owes it a case.
+    (ReplacementEffect.PhaseR _, ProposedEvent.WouldBeginPhase _ _) -> do
+      consume (ReplacementCandidate.identity candidate)
+      pure Nothing
+    -- Unreachable: `applies` admits PhaseR only against WouldBeginPhase.
+    (ReplacementEffect.PhaseR _, _) -> pure (Just event)
 
 -- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
 -- snapshot. Power and toughness are SET; keywords are UNIONED into whatever is
@@ -694,6 +727,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
 
 -- CR 701.8 / 614.8: settle a proposed destruction. `Just` is the object actually
 -- destroyed -- which need not be the one asked about, since a rewrite may
@@ -712,6 +746,7 @@ asDestruction event = case event of
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
 
 -- CR 122.6: settle a proposed counter placement. Nothing means none are put on.
 resolveCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind, Natural))
@@ -727,6 +762,7 @@ asCounters event = case event of
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
 
 -- CR 111.1: settle a proposed token creation. Nothing means none are created.
 resolveTokens :: PlayerId -> Card -> Natural -> Game (Maybe (PlayerId, Card, Natural))
@@ -742,3 +778,32 @@ asTokens event = case event of
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
+
+-- CR 500.11 / 614.10: settle whether a step or phase begins at all, on the turn
+-- of `pid`. False means a skip took it, and CR 500.11's "proceed past it as
+-- though it didn't exist" is then the caller's whole obligation -- there is no
+-- rewritten event to carry out, because CR 614.1b replaces a skipped step "with
+-- nothing".
+--
+-- Answers a Bool rather than the settled event, unlike resolveDestruction, whose
+-- `Just` had to carry an identity because a rewrite can redirect which object is
+-- destroyed. Nothing can rewrite a WouldBeginPhase: PhaseR is the only effect the
+-- class admits and it only ever cancels, so a survivor is always the event that
+-- was proposed and there is no second identity for the caller to learn.
+--
+-- The typed door Pawl.Engine uses, so Engine never cases on a ProposedEvent.
+beginsPhase :: Phase -> PlayerId -> Game Bool
+beginsPhase phase pid = do
+  outcome <- applyReplacements (ProposedEvent.WouldBeginPhase phase pid)
+  pure (Maybe.isJust (outcome >>= asPhaseBegin))
+
+asPhaseBegin :: ProposedEvent -> Maybe (Phase, PlayerId)
+asPhaseBegin event = case event of
+  ProposedEvent.WouldBeginPhase phase pid -> Just (phase, pid)
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing
