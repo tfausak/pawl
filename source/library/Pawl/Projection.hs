@@ -559,6 +559,11 @@ symbolColors symbol = case symbol of
   ManaSymbol.OfType (ManaType.Colored c) -> [c]
   ManaSymbol.OfType ManaType.Colorless -> []
   ManaSymbol.Hybrid a b -> Maybe.mapMaybe colorOfManaType [a, b]
+  -- CR 107.4e's last sentence again. A monocolored hybrid's other component is
+  -- generic mana, which CR 202.2b gives no colour, so the named half is the whole
+  -- contribution: Flame Javelin ({2/R}{2/R}{2/R}) is red and only red, however it
+  -- was paid for.
+  ManaSymbol.MonocoloredHybrid t -> Maybe.maybeToList (colorOfManaType t)
   ManaSymbol.Generic _ -> []
   ManaSymbol.Variable -> []
 

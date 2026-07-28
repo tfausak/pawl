@@ -66,9 +66,10 @@ substituteStar star quantity = case quantity of
   Quantity.X -> quantity
   Quantity.Count _ -> quantity
 
--- CR 202.3: the mana value is the total amount of mana in the cost -- each
--- generic symbol contributes its number, each colored/typed symbol contributes
--- one. A land has no mana cost (CR 202.1), so its mana value is 0.
+-- CR 202.3: the mana value is "the total amount of mana in its mana cost,
+-- regardless of color" -- each generic symbol contributes its number, each
+-- colored or colorless symbol one, and each hybrid symbol its largest half (CR
+-- 202.3f). A land has no mana cost (CR 202.1), so its mana value is 0.
 manaValueOf :: Card.Card -> Integer
 manaValueOf card = case Card.manaCost card of
   Nothing -> 0
@@ -78,9 +79,14 @@ symbolValue :: ManaSymbol.ManaSymbol -> Integer
 symbolValue symbol = case symbol of
   ManaSymbol.Generic n -> toInteger n
   ManaSymbol.OfType _ -> 1
-  -- CR 202.3: "each colored or colorless mana symbol contributes 1", and
-  -- CR 107.4e makes a hybrid symbol a coloured mana symbol -- one symbol, one
-  -- toward the mana value, whichever half is eventually paid.
+  -- CR 202.3f: "use the largest component of each hybrid symbol." Both halves of
+  -- a colour/colour hybrid are one mana, so the largest is one -- whichever half
+  -- is eventually paid, and its own example agrees: "{1}{W/U}{W/U} is 3".
   ManaSymbol.Hybrid _ _ -> 1
+  -- CR 202.3f again, and here the halves differ: {2/B}'s generic half is the
+  -- larger, so the symbol is worth 2 and not the 1 every other typed symbol is
+  -- worth. Its own example is Flame Javelin's cost: "the mana value of a card
+  -- with mana cost {2/B}{2/B}{2/B} is 6."
+  ManaSymbol.MonocoloredHybrid _ -> 2
   -- CR 202.3b: off the stack a variable's contribution to mana value is 0.
   ManaSymbol.Variable -> 0
