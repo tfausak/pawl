@@ -196,9 +196,13 @@ defaultAnswer p = case p of
   -- CR 704.5j: every candidate is a legal thing to keep, so the head is a legal
   -- answer and the least eventful fallback.
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
-  -- Declining to attack or block is always legal, and is the least eventful
-  -- thing a fallback can do.
+  -- Declining to attack is always legal, and is the least eventful thing a
+  -- fallback can do.
   Prompt.DeclareAttackers {} -> []
+  -- Declining to BLOCK is not always legal -- a CR 509.1c requirement (Lure) can
+  -- make the empty declaration the one illegal answer. Still the least eventful
+  -- fallback, and still total: Combat.declareBlockers repairs an illegal
+  -- declaration to Combat.forcedBlockDeclaration rather than dropping it.
   Prompt.DeclareBlockers {} -> Map.empty
   -- Must be a LEGAL division (Damage.legalAssignment), or the attacker deals
   -- nothing. All power onto the first blocker totals power with the defender at 0.
