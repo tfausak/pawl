@@ -15,7 +15,6 @@ import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
-import qualified Pawl.Count as Count
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Departure as Departure
@@ -1068,7 +1067,7 @@ resolveTests registry =
         HU.assertEqual
           "Alice's five"
           (Just 5)
-          (Count.evaluate (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.MkContext (Just S.alice) Nothing) gs yourHand)
+          (S.countOf (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.MkContext (Just S.alice) Nothing) gs yourHand)
     ]
 
 -- Add n Mountains to pid's battlefield, discarding the ids (used to bulk up a
@@ -1842,6 +1841,96 @@ loseLifeTests registry =
         HU.assertEqual "and alice wins" (Just (Result.Won S.alice)) (GameState.result (S.settleSba after))
     ]
 
+-- One with the Machine, the card that proves Aggregation.Greatest (#254):
+-- "Draw cards equal to the greatest mana value among artifacts you control."
+-- Nothing but the fold is new -- the effect is the existing Draw, the scope and
+-- the filter were both already expressible, and the per-member quantity is the
+-- existing Quantity.ManaValue (CR 202.3), the same read Karn, Legacy Reforged
+-- wants.
+--
+-- Alice's board is Bonesplitter ({1}), Serum Powder ({3}) and Mindslaver ({6}),
+-- chosen so that greatest (6), count (3), sum (10) and least (1) are four
+-- DIFFERENT numbers: one hand-size assertion falsifies every other fold.
+greatestTests :: Registry.Type.Registry -> Tasty.TestTree
+greatestTests registry =
+  Tasty.testGroup
+    "Greatest"
+    [ HU.testCase "CR 202.3 One with the Machine draws the GREATEST mana value, not the count, the sum or the least" $ do
+        island <- Registry.printing registry "Island"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        serumPowder <- Registry.printing registry "Serum Powder"
+        mindslaver <- Registry.printing registry "Mindslaver"
+        piker <- Registry.printing registry "Goblin Piker"
+        oneWithTheMachine <- Registry.printing registry "One with the Machine"
+        let base = S.landsInPlay island 4
+            (_, withOne) = S.addCreature bonesplitter S.alice base
+            (_, withTwo) = S.addCreature serumPowder S.alice withOne
+            (_, withThree) = S.addCreature mindslaver S.alice withTwo
+            withLib = stockLibrary piker S.alice 10 withThree
+            (gs, spellId) = S.handOne oneWithTheMachine withLib
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        -- The spell left the hand as it was cast, so the hand size IS the draw.
+        HU.assertEqual "alice drew six" 6 (S.handSize S.alice after),
+      HU.testCase "CR 109.5 an opponent's larger artifact does not raise \"artifacts YOU control\"" $ do
+        -- Bob's Mindslaver ({6}) is on the same battlefield and is the largest
+        -- artifact in the game; Alice's own Bonesplitter ({1}) is the answer.
+        island <- Registry.printing registry "Island"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        mindslaver <- Registry.printing registry "Mindslaver"
+        piker <- Registry.printing registry "Goblin Piker"
+        oneWithTheMachine <- Registry.printing registry "One with the Machine"
+        let base = S.landsInPlay island 4
+            (_, withMine) = S.addCreature bonesplitter S.alice base
+            (_, withTheirs) = S.addCreature mindslaver S.bob withMine
+            withLib = stockLibrary piker S.alice 10 withTheirs
+            (gs, spellId) = S.handOne oneWithTheMachine withLib
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "alice drew one, not six" 1 (S.handSize S.alice after),
+      HU.testCase "CR 205.2a a larger NONARTIFACT permanent does not raise \"ARTIFACTS you control\"" $ do
+        -- Panglacial Wurm is {5}{G}{G} -- mana value 7, larger than any artifact
+        -- in the pool -- and Alice controls it, so only the card-type conjunct
+        -- keeps it out of the fold. Her four Islands are the same falsifier at
+        -- mana value 0 (CR 202.1b / 202.3a), which no maximum could ever show.
+        island <- Registry.printing registry "Island"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        panglacialWurm <- Registry.printing registry "Panglacial Wurm"
+        piker <- Registry.printing registry "Goblin Piker"
+        oneWithTheMachine <- Registry.printing registry "One with the Machine"
+        let base = S.landsInPlay island 4
+            (_, withArtifact) = S.addCreature bonesplitter S.alice base
+            (_, withWurm) = S.addCreature panglacialWurm S.alice withArtifact
+            withLib = stockLibrary piker S.alice 10 withWurm
+            (gs, spellId) = S.handOne oneWithTheMachine withLib
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "alice drew one, not seven" 1 (S.handSize S.alice after),
+      -- The empty matched set. No rule in the CR gives a maximum over nothing a
+      -- value: CR 208.2a's "use 0 instead of that number" is scoped to a
+      -- characteristic-defining ability (#65), and where the CR does want an
+      -- empty maximum to be 0 it says so card-by-card (CR 714.2d, a Saga with no
+      -- chapter abilities). So the fold answers Nothing -- undeterminable, the
+      -- posture this codebase propagates everywhere -- and Resolve's Draw arm
+      -- draws nothing for it.
+      --
+      -- OBSERVATIONALLY, Nothing and 0 are the same here, and the Gatherer
+      -- ruling on Rishkar's Expertise ("if you control no creatures with power
+      -- greater than 0 ... you draw no cards") is what this matches either way.
+      -- Pawl.CountSpec pins the distinction where it IS visible, at the fold.
+      HU.testCase "CR 208.2a / #65 controlling no artifacts draws nothing rather than substituting 0" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        oneWithTheMachine <- Registry.printing registry "One with the Machine"
+        let base = S.landsInPlay island 4
+            withLib = stockLibrary piker S.alice 10 base
+            (gs, spellId) = S.handOne oneWithTheMachine withLib
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "alice drew nothing" 0 (S.handSize S.alice after)
+        HU.assertEqual "and her library is untouched" 10 (length (Game.zoneMembers Zone.Library S.alice after))
+    ]
+
 countersTests :: Registry.Type.Registry -> Tasty.TestTree
 countersTests registry =
   Tasty.testGroup
@@ -2481,4 +2570,4 @@ actOfTreasonTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]

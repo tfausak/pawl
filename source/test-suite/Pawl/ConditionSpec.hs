@@ -27,7 +27,7 @@ import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
 -- Count every battlefield object; the stub view decides how many match.
-everyPermanent :: Count.Type.Count
+everyPermanent :: Count.Type.Count Quantity.Type.Quantity
 everyPermanent =
   Count.Type.MkCount
     (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)

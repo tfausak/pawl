@@ -32,6 +32,7 @@ import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
+import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Sba as Sba
@@ -79,7 +80,7 @@ import qualified Pawl.Type.PlayerScope as PlayerScope
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
@@ -593,7 +594,7 @@ youControlSource =
         Aggregation.Objects
     )
     Comparison.Exactly
-    (Quantity.Literal 1)
+    (Quantity.Type.Literal 1)
 
 -- Barbarian Outcast's migrated StateIs (retired StateCondition.YouControlNo
 -- Swamp -- CR 603.8): "you control no Swamps" as a Count of exactly 0. Shared by
@@ -609,7 +610,7 @@ youControlNoSwamps =
         Aggregation.Objects
     )
     Comparison.Exactly
-    (Quantity.Literal 0)
+    (Quantity.Type.Literal 0)
 
 -- Does a stored continuous effect target `target` specifically? Used to tell
 -- "nothing was stored FOR THIS OBJECT" apart from an unrelated entry already
@@ -1230,7 +1231,7 @@ anthemEmblemCard piker =
                 Affected.Matching
                   (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
               StaticAbility.modifications =
-                NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+                NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))
             }
         ]
     }
@@ -1346,6 +1347,18 @@ spellOnStack printing pid gs =
             GameState.stack = oid : GameState.stack gs2
           }
       )
+
+-- Drive Pawl.Count.evaluate with the per-object quantity reader wired the way
+-- the library wires it -- Pawl.Quantity.evaluate, which is where that knot is
+-- tied (Pawl.Count cannot import it). Shared by every spec that drives the fold
+-- directly, so the injection they test is the injection the engine makes.
+countOf ::
+  Count.ViewOf ->
+  Filter.Context ->
+  GameState.GameState ->
+  Count.Type.Count Quantity.Type.Quantity ->
+  Maybe Integer
+countOf viewOf context gs = Count.evaluate viewOf (Quantity.evaluate viewOf context gs) context gs
 
 -- Shared by Pawl.CountSpec and Pawl.ConditionSpec: a stub ViewOf, so a
 -- Pawl.Count.evaluate fold is exercised apart from any real projection. Every

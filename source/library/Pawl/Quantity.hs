@@ -52,7 +52,14 @@ evaluate viewOf context gs oid quantity = case quantity of
     _ -> Nothing
   -- CR 208.2a / 608.2h: delegate to the general Count fold (Pawl.Count),
   -- which reads the CR 613 projection through the injected ViewOf.
-  Quantity.Count c -> Count.evaluate viewOf context gs c
+  --
+  -- The second injection is this function itself, aimed at whichever CANDIDATE
+  -- the fold is looking at rather than at `oid`: that is how
+  -- Aggregation.Greatest reads a per-member quantity without Pawl.Count
+  -- importing this module. Terminating, though the two functions call each
+  -- other: a Greatest's payload is a strictly smaller subterm of `quantity`,
+  -- and the value came from finite card data.
+  Quantity.Count c -> Count.evaluate viewOf (evaluate viewOf context gs) context gs c
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
 -- ability supplies, recursing through Plus so 1+* becomes 1+<the count>.
@@ -69,7 +76,8 @@ substituteStar star quantity = case quantity of
 -- CR 202.3: the mana value is "the total amount of mana in its mana cost,
 -- regardless of color" -- each generic symbol contributes its number, each
 -- colored or colorless symbol one, and each hybrid symbol its largest half (CR
--- 202.3f). A land has no mana cost (CR 202.1), so its mana value is 0.
+-- 202.3f). A land has no mana cost (CR 202.1b), so its mana value is 0 (CR
+-- 202.3a).
 manaValueOf :: Card.Card -> Integer
 manaValueOf card = case Card.manaCost card of
   Nothing -> 0

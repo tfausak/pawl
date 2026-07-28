@@ -33,7 +33,7 @@ import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
 -- CR 608.2h: the "you" player's hand (Inner Calm, Outer Strength's shape).
-cardsInYourHand :: Count.Type.Count
+cardsInYourHand :: Count.Type.Count Quantity.Type.Quantity
 cardsInYourHand =
   Count.Type.MkCount
     (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
@@ -41,7 +41,7 @@ cardsInYourHand =
     Aggregation.Objects
 
 -- CR 208.2a: the distinct card types among every graveyard (Tarmogoyf's shape).
-cardTypesInAllGraveyards :: Count.Type.Count
+cardTypesInAllGraveyards :: Count.Type.Count Quantity.Type.Quantity
 cardTypesInAllGraveyards =
   Count.Type.MkCount
     (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)

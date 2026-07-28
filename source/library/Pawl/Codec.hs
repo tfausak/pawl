@@ -619,18 +619,22 @@ jsonToScope value = do
     ("InHistory", Just v) -> Scope.InHistory <$> jsonToEventShape v
     _ -> Left (Text.pack "unknown Scope: " <> t)
 
-aggregationToJson :: Aggregation.Aggregation -> Value
-aggregationToJson a = nullary . Text.pack $ case a of
-  Aggregation.Objects -> "Objects"
-  Aggregation.DistinctCardTypes -> "DistinctCardTypes"
+-- No longer wholly nullary, and so no longer decodeNullary's shape: Greatest
+-- carries the per-member Quantity it reads.
+aggregationToJson :: Aggregation.Aggregation Quantity.Quantity -> Value
+aggregationToJson a = case a of
+  Aggregation.Objects -> nullary (Text.pack "Objects")
+  Aggregation.DistinctCardTypes -> nullary (Text.pack "DistinctCardTypes")
+  Aggregation.Greatest q -> Json.tagged (Text.pack "Greatest") (Just (quantityToJson q))
 
-jsonToAggregation :: Value -> Either Text Aggregation.Aggregation
-jsonToAggregation =
-  decodeNullary
-    (Text.pack "Aggregation")
-    [ (Text.pack "Objects", Aggregation.Objects),
-      (Text.pack "DistinctCardTypes", Aggregation.DistinctCardTypes)
-    ]
+jsonToAggregation :: Value -> Either Text (Aggregation.Aggregation Quantity.Quantity)
+jsonToAggregation value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("Objects", Nothing) -> Right Aggregation.Objects
+    ("DistinctCardTypes", Nothing) -> Right Aggregation.DistinctCardTypes
+    ("Greatest", Just v) -> Aggregation.Greatest <$> jsonToQuantity v
+    _ -> Left (Text.pack "unknown Aggregation: " <> t)
 
 comparisonToJson :: Comparison.Comparison -> Value
 comparisonToJson c = nullary . Text.pack $ case c of
@@ -647,11 +651,11 @@ jsonToComparison =
       (Text.pack "AtMost", Comparison.AtMost)
     ]
 
-countToJson :: Count.Type.Count -> Value
+countToJson :: Count.Type.Count Quantity.Quantity -> Value
 countToJson (Count.Type.MkCount s f a) =
   Json.tagged (Text.pack "Count") (Just (Array [scopeToJson s, filterToJson f, aggregationToJson a]))
 
-jsonToCount :: Value -> Either Text Count.Type.Count
+jsonToCount :: Value -> Either Text (Count.Type.Count Quantity.Quantity)
 jsonToCount value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of

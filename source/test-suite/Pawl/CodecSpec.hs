@@ -798,6 +798,37 @@ tests registry =
                       Aggregation.DistinctCardTypes
                   )
               ),
+          -- One with the Machine's aggregation, and the arm that proves the
+          -- payload is a whole Quantity rather than a nullary tag: a Greatest
+          -- whose per-member quantity is itself a Count round-trips, which is
+          -- the recursion Pawl.Type.Quantity's parameter exists to permit.
+          HU.testCase "Greatest round-trips, including a nested Count payload" $ do
+            roundTrip
+              "greatest"
+              Codec.countToJson
+              Codec.jsonToCount
+              ( Count.Type.MkCount
+                  (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                  (Filter.Type.And [Filter.Type.HasCardType CardType.Artifact, Filter.Type.ControlledBy PlayerRelation.You])
+                  (Aggregation.Greatest Quantity.ManaValue)
+              )
+            roundTrip
+              "greatest nested"
+              Codec.countToJson
+              Codec.jsonToCount
+              ( Count.Type.MkCount
+                  (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                  (Filter.Type.And [])
+                  ( Aggregation.Greatest
+                      ( Quantity.Count
+                          ( Count.Type.MkCount
+                              (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
+                              (Filter.Type.And [])
+                              Aggregation.DistinctCardTypes
+                          )
+                      )
+                  )
+              ),
           HU.testCase "Condition round-trips at every comparison" $
             mapM_
               (roundTrip "condition" Codec.conditionToJson Codec.jsonToCondition)
@@ -809,7 +840,7 @@ tests registry =
     ]
 
 -- A count with every axis non-default, so a codec that drops one is caught.
-zeroSwamps :: Count.Type.Count
+zeroSwamps :: Count.Type.Count Quantity.Quantity
 zeroSwamps =
   Count.Type.MkCount
     (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))

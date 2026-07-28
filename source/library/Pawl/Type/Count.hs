@@ -12,5 +12,10 @@ import Pawl.Type.Scope (Scope)
 -- This replaced a hand-carved variant per card (the retired
 -- Pawl.Type.CountSpec), which is the identity-casing the project's central
 -- invariant forbids.
-data Count = MkCount Scope Filter Aggregation
+--
+-- The `quantity` parameter is passed straight through to the Aggregation, which
+-- is where it is actually used and where the reason for it is written. Every
+-- customer but Pawl.Type.Quantity instantiates it concretely as
+-- `Count Quantity`.
+data Count quantity = MkCount Scope Filter (Aggregation quantity)
   deriving (Eq, Ord, Show)

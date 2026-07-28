@@ -20,7 +20,7 @@ import Pawl.Type.ObjectId (ObjectId)
 
 holds :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Condition.Type.Condition -> Bool
 holds viewOf context gs oid (Condition.Type.MkCondition count comparison threshold) =
-  case (Count.evaluate viewOf context gs count, Quantity.evaluate viewOf context gs oid threshold) of
+  case (Count.evaluate viewOf (Quantity.evaluate viewOf context gs) context gs count, Quantity.evaluate viewOf context gs oid threshold) of
     (Just n, Just t) -> case comparison of
       Comparison.Exactly -> n == t
       Comparison.AtLeast -> n >= t

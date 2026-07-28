@@ -70,5 +70,11 @@ data Quantity
     Plus Quantity Quantity
   | -- A quantity that counts game state (CR 208.2a, CR 608.2h). See
     -- Pawl.Type.Count for why the payload is its own type.
-    Count Count
+    --
+    -- This is where the knot is tied: a Count's Aggregation may itself name a
+    -- per-object Quantity (Aggregation.Greatest), so the payload is
+    -- `Count Quantity` and the recursion lives in the DATA rather than in a
+    -- module cycle. Structural, not a recursive call -- evaluating a Greatest
+    -- descends into a strictly smaller Quantity, so the fold terminates.
+    Count (Count Quantity)
   deriving (Eq, Ord, Show)

@@ -2,11 +2,12 @@
 -- fold -- enumerate the scope, keep by the Filter, aggregate -- that never
 -- learns which effect or card produced the count.
 --
--- Parameterized by the view builder rather than importing Pawl.Projection:
--- Projection imports Pawl.Quantity, which imports this module, and
--- Quantity.evaluate is called from INSIDE the layer fold. The caller supplies
--- characteristics as of whatever layers it has already applied, which is what
--- lets a count read the projection without the module cycle or the recursion.
+-- Parameterized by the view builder AND by the per-object quantity reader,
+-- rather than importing Pawl.Projection or Pawl.Quantity: Projection imports
+-- Pawl.Quantity, which imports this module, and Quantity.evaluate is called from
+-- INSIDE the layer fold. The caller supplies characteristics as of whatever
+-- layers it has already applied, which is what lets a count read the projection
+-- without the module cycle or the recursion.
 module Pawl.Count where
 
 import qualified Data.Foldable as Foldable
@@ -38,23 +39,31 @@ import qualified Pawl.Type.ZoneChange as ZoneChange
 -- the caller's bound projection cannot describe.
 type ViewOf = ObjectId -> Maybe Filter.View
 
--- Nothing when the count cannot be determined -- an unresolvable PlayerRef. It
--- propagates; CR 208.2a's "use 0 instead of that number" is a different rule
--- and is not implemented here (#65).
-evaluate :: ViewOf -> Filter.Context -> GameState -> Count.Type.Count -> Maybe Integer
-evaluate viewOf context gs (Count.Type.MkCount scope predicate aggregation) = case scope of
+-- Reads a per-object quantity off one candidate. INJECTED for exactly the
+-- module-cycle reason ViewOf is: Pawl.Quantity imports this module, so nothing
+-- here can call Pawl.Quantity.evaluate. Pawl.Quantity ties the knot at its own
+-- Count arm, and Pawl.Condition at its threshold. Every aggregation but
+-- Aggregation.Greatest ignores it.
+type QuantityOf quantity = ObjectId -> quantity -> Maybe Integer
+
+-- Nothing when the count cannot be determined -- an unresolvable PlayerRef, or
+-- (Aggregation.Greatest only) a maximum over a set that is empty or holds a
+-- member with no value. It propagates; CR 208.2a's "use 0 instead of that
+-- number" is a different rule and is not implemented here (#65).
+evaluate :: ViewOf -> QuantityOf quantity -> Filter.Context -> GameState -> Count.Type.Count quantity -> Maybe Integer
+evaluate viewOf quantityOf context gs (Count.Type.MkCount scope predicate aggregation) = case scope of
   Scope.InZone zone ref -> do
     pids <- playersFor context gs ref
     let ids = concatMap (\pid -> Game.zoneMembers zone pid gs) pids
-        kept = Maybe.mapMaybe (keep predicate context . viewOf) ids
-    Just (aggregate aggregation kept)
+        kept = Maybe.mapMaybe (\oid -> fmap ((,) (Just oid)) (keep predicate context (viewOf oid))) ids
+    aggregate quantityOf aggregation kept
   -- CR 608.2i: the event log. Views come from each event's stored snapshot
   -- (CR 608.2h last-known information), never from a live object -- a token has
   -- no printed card at all (CR 111.3) and an animated land died as a creature.
   Scope.InHistory shape ->
     let views = Maybe.mapMaybe (snapshotView shape) (Foldable.toList (GameState.events gs))
-        kept = Maybe.mapMaybe (keep predicate context . Just) views
-     in Just (aggregate aggregation kept)
+        kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
+     in aggregate quantityOf aggregation kept
 
 keep :: Filter.Type.Filter -> Filter.Context -> Maybe Filter.View -> Maybe Filter.View
 keep predicate context mv = case mv of
@@ -63,10 +72,28 @@ keep predicate context mv = case mv of
 
 -- CR 208.2a: Tarmogoyf counts card TYPES, so DistinctCardTypes is the size of
 -- the union, not the length of the list.
-aggregate :: Aggregation.Aggregation -> [Filter.View] -> Integer
-aggregate aggregation views = case aggregation of
-  Aggregation.Objects -> toInteger (length views)
-  Aggregation.DistinctCardTypes -> toInteger (Set.size (Set.unions (fmap Filter.cardTypes views)))
+--
+-- Each member carries the object it came from when there is one. An InHistory
+-- member has none: its view is a CR 608.2h snapshot of a past event rather than
+-- of anything on the battlefield now, so there is no object to read a per-object
+-- quantity against and Greatest over that scope is undeterminable (#299).
+aggregate :: QuantityOf quantity -> Aggregation.Aggregation quantity -> [(Maybe ObjectId, Filter.View)] -> Maybe Integer
+aggregate quantityOf aggregation members = case aggregation of
+  Aggregation.Objects -> Just (toInteger (length members))
+  Aggregation.DistinctCardTypes -> Just (toInteger (Set.size (Set.unions (fmap (Filter.cardTypes . snd) members))))
+  -- Total in both directions. A member whose quantity cannot be determined makes
+  -- the whole maximum undeterminable rather than being dropped, which would
+  -- report the maximum of a set the card never named; and an EMPTY matched set
+  -- has no maximum at all. Nothing, NOT 0: no rule gives a maximum over nothing
+  -- a value, CR 208.2a's "use 0 instead of that number" is scoped to a
+  -- characteristic-defining ability and unimplemented here anyway (#65), and
+  -- where the CR wants an empty maximum to be 0 it legislates it case by case
+  -- (CR 714.2d, a Saga with no chapter abilities).
+  Aggregation.Greatest quantity -> do
+    values <- traverse (\(identity, _) -> identity >>= \oid -> quantityOf oid quantity) members
+    case values of
+      [] -> Nothing
+      value : rest -> Just (Foldable.foldl' max value rest)
 
 -- CR 400.1: whose copy of the zone. Nothing when the reference cannot be
 -- resolved -- a Relative with no perspective, or a slot that is unbound or bound
