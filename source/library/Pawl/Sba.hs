@@ -348,6 +348,76 @@ chooseLegendVictims (controller, candidates) = do
   let kept = if List.elem answer (NonEmpty.toList candidates) then answer else NonEmpty.head candidates
   pure (filter (/= kept) (NonEmpty.toList candidates))
 
+-- CR 704.5k: "If two or more permanents have the supertype world, all except the
+-- one that has had the world supertype for the shortest amount of time are put
+-- into their owners' graveyards. In the event of a tie for the shortest amount of
+-- time, all are put into their owners' graveyards." The permanents this pass must
+-- bury, which is every world permanent but the newest arrival.
+--
+-- The neighbouring legend rule (CR 704.5j) is a different shape in three ways,
+-- and each one is a place this could have been wrongly copied from it:
+--
+-- 1. It ASKS; this does not. CR 704.5j has the controller choose a survivor, so
+--    chooseLegendVictims raises a prompt. CR 704.5k decides by the clock, and
+--    that answer is a fact about the board rather than a choice, so prompting
+--    here would be the engine inventing a decision the rules never offer. Not an
+--    elision -- there is nothing to ask.
+-- 2. It is scoped to one controller and one name; this is scoped to neither.
+--    "If two or more permanents" is the whole condition, so two players each with
+--    a world permanent (a board the legend rule leaves alone) is exactly the case
+--    this rule fires on.
+-- 3. It has no tie clause; this one does. Game.freshTimestamp hands out a
+--    distinct stamp per object, so no two permanents can be equally new and the
+--    tie arm below is unreachable today. Written regardless, because it costs
+--    one `case` and it is what the rule says: the day two permanents can share
+--    an arrival time, "all are put into their owners' graveyards" is the answer,
+--    not "the lower id survives".
+--
+-- The CLOCK is Object.timestamp -- when the permanent entered the battlefield
+-- (CR 613.7d) -- and NOT a separate record of when it became world. Those are
+-- the same instant for every board reachable today, which is why this is exact
+-- rather than an approximation. Supertypes are not projected: the projection
+-- seeds them from the card and no layer touches them afterwards, because no
+-- Modification arm changes a supertype (#311) -- so a permanent's world-ness
+-- cannot change while it sits on the battlefield. The one thing that can differ
+-- from the printed type line is a copy effect (CR 707.2 lists supertype among
+-- the copiable values), and a copy applies as the object ENTERS, the same moment
+-- it is stamped. And the one restamp that does NOT come with a zone change --
+-- CR 701.3c's, when an Aura or Equipment is attached to something new -- needs
+-- the world permanent to be attachable, which no printing that carries the world
+-- supertype is.
+--
+-- Read off the PROJECTION rather than the printed type line, for the reason
+-- legendGroups is: CR 707.2 makes a copy of a world permanent world too.
+--
+-- CR 801.12 narrows this rule to permanents "within its controller's range of
+-- influence". CR 801.1 makes limited range of influence an OPTION, and pawl has
+-- no representation for a multiplayer option at all (#175), so every world
+-- permanent is always in range and the narrowing is inert.
+--
+-- A put-into-graveyard, NOT a destruction: CR 704.5k says "put into", so the
+-- caller consults neither indestructible (CR 702.12b) nor a regeneration shield,
+-- exactly as CR 704.5f's zero-toughness bury and CR 704.5j's legend rule do.
+worldVictims :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> [ObjectId]
+worldVictims pcs gs =
+  let stamped oid = case Map.lookup oid pcs of
+        Nothing -> Nothing
+        Just pc
+          | Set.member Supertype.World (PC.supertypes pc) ->
+              fmap (\obj -> (Object.timestamp obj, oid)) (Game.lookupObject oid gs)
+          | otherwise -> Nothing
+      worlds = Maybe.mapMaybe stamped (Set.toList (GameState.battlefield gs))
+   in case fmap fst worlds of
+        [] -> []
+        ts : rest ->
+          -- The SHORTEST amount of time is the LARGEST timestamp: the newest
+          -- arrival is the one that has been world for the least time.
+          let newest = List.foldl' max ts rest
+              (survivors, older) = List.partition (\(t, _) -> t == newest) worlds
+           in case survivors of
+                [_] -> fmap snd older
+                _ -> fmap snd worlds
+
 -- CR 704.3: repeat until no state-based action is performed. ONE pass here, with
 -- the repeat living in Engine's CR 117.5 settle loop (settleForPriority). A
 -- single pass is NOT sufficient IN GENERAL -- CR 704.5m's Aura falls off, and CR
@@ -419,21 +489,28 @@ performStateBasedActions = do
       -- chooseLegendVictims for why a member that is dying anyway must stay on
       -- the ballot.
       legendsToResolve = legendGroups pcs gs
+      -- CR 704.5k, from the SAME pre-pass state as everything above, for the
+      -- same CR 704.3 reason. Unlike the legend rule this one asks nobody, so
+      -- it is a pure list rather than a prompt.
+      worldLosers = worldVictims pcs gs
   -- CR 704.5j: the legend rule is the one state-based action that ASKS, and it
   -- asks BEFORE anything below moves -- so every choice is made against the state
   -- this pass began in, which is what CR 704.3's "simultaneously as a single
   -- event" requires.
   legendVictims <- fmap concat (Monad.mapM chooseLegendVictims legendsToResolve)
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
-  -- CR 704.5f (toughness <= 0), CR 704.5j (the legend rule's losers) and CR
-  -- 704.5m (an Aura attached to nothing). None of the three is a destruction, so
-  -- none consults indestructible or a regeneration shield.
+  -- CR 704.5f (toughness <= 0), CR 704.5j (the legend rule's losers), CR 704.5k
+  -- (the world rule's) and CR 704.5m (an Aura attached to nothing). None of the
+  -- four is a destruction, so none consults indestructible or a regeneration
+  -- shield.
   --
-  -- Deduplicated because the three sets overlap: a legend at 0 toughness whose
+  -- Deduplicated because the sets overlap: a legend at 0 toughness whose
   -- controller kept a DIFFERENT copy is named by 704.5f and 704.5j alike, and
   -- moving it twice would emit a second zone-change event and fire its
-  -- dies-triggers again.
-  Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> unattachedAuras))
+  -- dies-triggers again. 704.5f and 704.5k overlap the same way, and reachably:
+  -- Opalescence animates a world enchantment, Night of Souls' Betrayal makes it
+  -- a 0/0, and the older of two world permanents is then named by both.
+  Monad.mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras))
   -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Event: no Moved event, no replacement, no trigger.
@@ -442,11 +519,12 @@ performStateBasedActions = do
   -- default so much as the point, since CR 701.19a's shield exists to replace
   -- exactly this destruction.
   --
-  -- A permanent the legend rule already buried is excluded rather than left to
-  -- no-op on a dead id, and the two halves of this line say the same thing from
-  -- opposite ends: CR 704.5j is a put-into-graveyard, not a destruction, so it
-  -- neither offers the shield an opportunity nor may consume one here.
-  Monad.mapM_ (Event.destroy Regenerability.Regenerable) (filter (\oid -> List.notElem oid legendVictims) toDestroy)
+  -- A permanent the legend rule or the world rule already buried is excluded
+  -- rather than left to no-op on a dead id, and the two halves of this line say
+  -- the same thing from opposite ends: CR 704.5j and CR 704.5k are
+  -- put-into-graveyards, not destructions, so neither offers the shield an
+  -- opportunity nor may consume one here.
+  Monad.mapM_ (Event.destroy Regenerability.Regenerable) (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
       departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving
@@ -478,10 +556,11 @@ performStateBasedActions = do
       -- A state-based action was performed iff a creature was buried or destroyed
       -- (a regenerated creature still counts, which the CR 704.4 settle loop
       -- re-checks and -- because the regen healed the damage -- terminates), a
-      -- player left, a token ceased to exist, an Aura fell off (CR 704.5m), or a
-      -- permanent detached (CR 704.5n / 704.5p), or the legend rule buried a
-      -- duplicate legend (CR 704.5j).
-      acted = not (null legendVictims) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching)
+      -- player left, a token ceased to exist, an Aura fell off (CR 704.5m), a
+      -- permanent detached (CR 704.5n / 704.5p), the legend rule buried a
+      -- duplicate legend (CR 704.5j), or the world rule buried an older world
+      -- permanent (CR 704.5k).
+      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as

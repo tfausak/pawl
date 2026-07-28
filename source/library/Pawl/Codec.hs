@@ -346,13 +346,15 @@ supertypeToJson :: Supertype.Supertype -> Value
 supertypeToJson s = nullary . Text.pack $ case s of
   Supertype.Basic -> "Basic"
   Supertype.Legendary -> "Legendary"
+  Supertype.World -> "World"
 
 jsonToSupertype :: Value -> Either Text Supertype.Supertype
 jsonToSupertype =
   decodeNullary
     (Text.pack "Supertype")
     [ (Text.pack "Basic", Supertype.Basic),
-      (Text.pack "Legendary", Supertype.Legendary)
+      (Text.pack "Legendary", Supertype.Legendary),
+      (Text.pack "World", Supertype.World)
     ]
 
 -- Not decodeNullary's table shape any more: CR 702.164a's toxic and CR 702.70a's

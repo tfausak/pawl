@@ -505,6 +505,160 @@ legendRuleTests registry =
         HU.assertEqual "and only the 0/0 was buried" 1 (length (Game.zoneMembers Zone.Graveyard S.alice keptHealthy))
     ]
 
+-- The two world enchantments in the pool, fetched together: most tests below
+-- want two DIFFERENTLY NAMED world permanents, since a rule that ignores names
+-- is half of the contrast with the legend rule above.
+worldPair :: Registry.Type.Registry -> IO (Printing.Printing, Printing.Printing)
+worldPair registry = do
+  crossroads <- Registry.printing registry "Concordant Crossroads"
+  livingPlane <- Registry.printing registry "Living Plane"
+  pure (crossroads, livingPlane)
+
+worldRuleTests :: Registry.Type.Registry -> Tasty.TestTree
+worldRuleTests registry =
+  Tasty.testGroup
+    "WorldRule"
+    [ -- CR 704.5k: "If two or more permanents have the supertype world, all
+      -- except the one that has had the world supertype for the shortest amount
+      -- of time are put into their owners' graveyards."
+      --
+      -- Shortest amount of time is the NEWEST arrival, so the second one to
+      -- enter is the one that lives.
+      HU.testCase "CR 704.5k the newer of two world permanents survives" $ do
+        (crossroads, livingPlane) <- worldPair registry
+        let (older, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
+            (newer, gs) = S.addCreature livingPlane S.alice g0
+            after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+        HU.assertBool "the newcomer stays" (inPlay newer after)
+        HU.assertBool "the incumbent is gone" (not (inPlay older after))
+        HU.assertEqual "exactly one was buried" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      -- The discriminating twin: the same two cards, entering in the opposite
+      -- order, produce the opposite survivor. This fails if the rule is reading
+      -- anything but the clock -- an object id, a name, or the order Sba happens
+      -- to enumerate the battlefield in.
+      HU.testCase "CR 704.5k which one survives is the entry order, not the card" $ do
+        (crossroads, livingPlane) <- worldPair registry
+        let (older, g0) = S.addCreature livingPlane S.alice (Setup.emptyGame S.bothPlayers)
+            (newer, gs) = S.addCreature crossroads S.alice g0
+            after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+        HU.assertBool "the newcomer stays" (inPlay newer after)
+        HU.assertBool "the incumbent is gone" (not (inPlay older after)),
+      -- Unlike CR 704.5j, the world rule is NOT scoped to one controller: it
+      -- says "if two or more permanents", full stop. Two players each with a
+      -- world permanent is exactly the board the legend rule leaves alone.
+      HU.testCase "CR 704.5k two players may NOT each keep a world permanent" $ do
+        (crossroads, livingPlane) <- worldPair registry
+        let (hers, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
+            (his, gs) = S.addCreature livingPlane S.bob g0
+            after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+        HU.assertBool "bob's newer one stays" (inPlay his after)
+        HU.assertBool "alice's older one is gone" (not (inPlay hers after)),
+      -- "All except the one" -- so a third arrival buries BOTH incumbents in the
+      -- same pass, rather than peeling one off per pass.
+      HU.testCase "CR 704.5k a third world permanent buries both incumbents at once" $ do
+        (crossroads, livingPlane) <- worldPair registry
+        let (first, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
+            (second, g1) = S.addCreature livingPlane S.alice g0
+            (third, gs) = S.addCreature crossroads S.alice g1
+            after = S.runPure S.identityAnswer gs Sba.performStateBasedActions
+        HU.assertBool "only the newest stays" (inPlay third after)
+        HU.assertBool "the first is gone" (not (inPlay first after))
+        HU.assertBool "the second is gone too" (not (inPlay second after))
+        HU.assertEqual "both were buried in ONE pass" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      -- "Two or more": one world permanent is nobody's business.
+      HU.testCase "CR 704.5k a lone world permanent survives" $ do
+        (crossroads, _) <- worldPair registry
+        let (only, gs) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
+            after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+        HU.assertBool "it stays" (inPlay only after),
+      -- The other half of the condition: an ordinary enchantment alongside a
+      -- world one is not a pair. Bad Moon is the control -- an enchantment in
+      -- every way except the supertype.
+      HU.testCase "CR 704.5k a world permanent and an ordinary enchantment coexist" $ do
+        (crossroads, _) <- worldPair registry
+        badMoon <- Registry.printing registry "Bad Moon"
+        let (world, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
+            (ordinary, gs) = S.addCreature badMoon S.alice g0
+            after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+        HU.assertBool "the world enchantment stays" (inPlay world after)
+        HU.assertBool "so does Bad Moon" (inPlay ordinary after),
+      -- "Put into their OWNERS' graveyards" -- alice controls bob's card, but
+      -- bob owns it, so bob's graveyard is where it lands. (CR 400.7 gives it a
+      -- fresh id on the way, so this counts the zone rather than naming the old
+      -- one.)
+      HU.testCase "CR 704.5k the loser goes to its OWNER's graveyard" $ do
+        (crossroads, livingPlane) <- worldPair registry
+        let (his, g0) = S.addCreature crossroads S.bob (Setup.emptyGame S.bothPlayers)
+            stolen = S.giveControl his S.alice g0
+            (hers, gs) = S.addCreature livingPlane S.alice stolen
+            after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+        HU.assertBool "alice's newer one stays" (inPlay hers after)
+        HU.assertBool "the stolen one left the battlefield" (not (inPlay his after))
+        HU.assertEqual "one card in bob's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.bob after))
+        HU.assertEqual "and none in alice's" 0 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      -- CR 704.3: every applicable state-based action is performed
+      -- "simultaneously as a single event", so ONE pass settles both rules.
+      -- Night of Souls' Betrayal is legendary and Concordant Crossroads is
+      -- world, so alice's board is two of each: the legend rule asks her which
+      -- Night to keep and the world rule keeps the newer Crossroads without
+      -- asking, and both losers are in the graveyard when that single pass
+      -- returns. (No printing is legendary AND world, so the two rules cannot
+      -- name the same permanent; the deduplicated batch they share is pinned by
+      -- the legend rule's own tests above.)
+      HU.testCase "CR 704.3 the world rule and the legend rule share one pass" $ do
+        (crossroads, _) <- worldPair registry
+        night <- Registry.printing registry "Night of Souls' Betrayal"
+        let (oldWorld, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
+            (firstNight, g1) = S.addCreature night S.alice g0
+            (secondNight, g2) = S.addCreature night S.alice g1
+            (newWorld, gs) = S.addCreature crossroads S.alice g2
+            after = S.runPure (keepsLegend firstNight) gs Sba.performStateBasedActions
+        HU.assertBool "the newest world permanent stays" (inPlay newWorld after)
+        HU.assertBool "the older world permanent is gone" (not (inPlay oldWorld after))
+        HU.assertBool "the chosen legend stays" (inPlay firstNight after)
+        HU.assertBool "the other legend is gone" (not (inPlay secondNight after))
+        HU.assertEqual "two cards buried, neither moved twice" 2 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      -- CR 704.3 again, this time where two state-based actions name the SAME
+      -- permanent. Opalescence animates every other non-Aura enchantment at its
+      -- mana value, so the {G} Concordant Crossroads is a 1/1; Night of Souls'
+      -- Betrayal takes every creature down -1/-1, so it is a 0/0. CR 704.5f
+      -- buries it for its toughness and CR 704.5k buries it for being the older
+      -- world permanent -- and the deduplicated batch must move it once, not
+      -- twice, or its zone change (and any dies-trigger watching) would fire
+      -- again.
+      HU.testCase "CR 704.5f/704.5k a permanent both rules name is moved once" $ do
+        (crossroads, livingPlane) <- worldPair registry
+        opalescence <- Registry.printing registry "Opalescence"
+        night <- Registry.printing registry "Night of Souls' Betrayal"
+        let (_, g0) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
+            (_, g1) = S.addCreature night S.alice g0
+            (doomed, g2) = S.addCreature crossroads S.alice g1
+            (newer, gs) = S.addCreature livingPlane S.alice g2
+        HU.assertEqual "the animated Crossroads really is a 0/0" (Just 0) (Projection.toughnessOf doomed gs)
+        let after = S.runPure S.identityAnswer gs Sba.performStateBasedActions
+        HU.assertBool "it is gone" (not (inPlay doomed after))
+        HU.assertBool "the newer world permanent stays" (inPlay newer after)
+        HU.assertEqual "and exactly one card was buried" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+      -- The whole cards, cast: alice has a Concordant Crossroads out and casts
+      -- Living Plane for its printed {2}{G}{G}. Nothing targets, nobody is
+      -- asked, and the incumbent is in the graveyard by the time she has
+      -- priority again -- the world rule as a player would meet it.
+      HU.testCase "CR 704.5k whole cards: resolving Living Plane buries the Concordant Crossroads already out" $ do
+        (crossroads, livingPlane) <- worldPair registry
+        forest <- Registry.printing registry "Forest"
+        let base = S.landsInPlay forest 4 -- {2}{G}{G}
+            (incumbent, withCrossroads) = S.addCreature crossroads S.alice base
+            (withSpell, spellId) = S.handOne livingPlane withCrossroads
+            cast = snd (Engine.runGamePure S.identityAnswer withSpell (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority))
+        HU.assertBool "the incumbent is gone" (not (inPlay incumbent after))
+        HU.assertEqual "one card in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+        -- The survivor is on the battlefield and working: its static ability has
+        -- made every Forest a creature, which is how this test knows the world
+        -- rule buried the OLD one rather than the new arrival.
+        HU.assertEqual "and the four Forests are creatures now" 4 (length (filter (\oid -> Projection.isCreatureOf oid after) (Set.toList (GameState.battlefield after))))
+    ]
+
 sbaTests :: Tasty.TestTree
 sbaTests =
   Tasty.testGroup
@@ -1208,6 +1362,7 @@ tests registry =
     "Damage"
     [ damageTests registry,
       legendRuleTests registry,
+      worldRuleTests registry,
       damageEventTests registry,
       deathtouchTests registry,
       assignmentLegalityTests,

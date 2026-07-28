@@ -254,8 +254,8 @@ affects source oid a partial gs = case a of
      in Set.member oid (GameState.battlefield gs)
           && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
 
--- CR 205.4a: supertypes are read from the printed type line (no modelled effect
--- changes a supertype). Empty when the object has no underlying card.
+-- CR 205.4a: supertypes are read from the printed type line -- no Modification
+-- arm changes a supertype (#311). Empty when the object has no underlying card.
 printedSupertypes :: ObjectId -> GameState -> Set Supertype.Supertype
 printedSupertypes oid gs = case Game.cardOf oid gs of
   Nothing -> Set.empty

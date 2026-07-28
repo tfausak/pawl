@@ -1,8 +1,8 @@
 module Pawl.Type.Supertype where
 
--- CR 205.4a lists five supertypes. The three missing ones are Snow (#305),
--- World (#306), and Ongoing, which is scheme-only (CR 205.4h) and folded into
--- #131 with the rest of Archenemy.
+-- CR 205.4a lists five supertypes. The two missing ones are Snow (#305) and
+-- Ongoing, which is scheme-only (CR 205.4h) and folded into #131 with the rest
+-- of Archenemy.
 data Supertype
   = -- CR 205.4c: any land with this supertype is a basic land, and any land
     -- without it is nonbasic even if it has a basic land type.
@@ -12,4 +12,9 @@ data Supertype
     -- unless you control a legendary creature or planeswalker -- is not
     -- checked (#307).
     Legendary
+  | -- CR 205.4f: subject to CR 704.5k's world rule, which Pawl.Sba implements
+    -- (Sba.worldVictims). Unlike the legend rule that one asks nobody: it keeps
+    -- the permanent that has had the supertype for the shortest time, which is
+    -- a fact rather than a choice.
+    World
   deriving (Eq, Ord, Show)

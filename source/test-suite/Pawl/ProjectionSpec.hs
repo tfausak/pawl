@@ -522,6 +522,22 @@ tests registry =
             (_, gs) = S.addCreature march S.alice g1
         HU.assertEqual "still its printed 0 power, not its {3} mana value" (Just 0) (Projection.powerOf myrId gs)
         HU.assertEqual "and its printed 1 toughness" (Just 1) (Projection.toughnessOf myrId gs),
+      -- Living Plane is March of the Machines' green cousin: the same layer-4
+      -- animation and layer-7b base P/T, but over LANDS and at a literal 1/1
+      -- rather than a mana value. "That are still lands" is CR 205.1b, which
+      -- AddCardType satisfies without a clause of its own -- adding a card type
+      -- never removes one.
+      HU.testCase "Living Plane makes a land a 1/1 creature that is still a land" $ do
+        livingPlane <- Registry.printing registry "Living Plane"
+        forest <- Registry.printing registry "Forest"
+        let base = Setup.emptyGame S.bothPlayers
+            (land, g1) = S.addCreature forest S.alice base
+            (self, gs) = S.addCreature livingPlane S.alice g1
+        HU.assertBool "the Forest is a creature (layer 4)" (Projection.isCreatureOf land gs)
+        HU.assertBool "and still a land" (Set.member CardType.Land (Projection.cardTypesOf land gs))
+        HU.assertEqual "power 1 (layer 7b)" (Just 1) (Projection.powerOf land gs)
+        HU.assertEqual "toughness 1" (Just 1) (Projection.toughnessOf land gs)
+        HU.assertBool "the enchantment itself is no land, so it animates nothing but lands" (not (Projection.isCreatureOf self gs)),
       -- The whole card, cast: March of the Machines' own reminder text is
       -- "(Equipment that's a creature can't equip a creature.)" -- CR 301.5c, whose
       -- state-based action is CR 704.5p. So the two halves meet here: the layer-7b
