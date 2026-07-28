@@ -725,6 +725,7 @@ playerEffectToJson e = case e of
   PlayerEffect.IncreaseSpellCost c n -> Json.tagged (Text.pack "IncreaseSpellCost") (Just (Array [filterToJson c, natTo n]))
   PlayerEffect.ReduceSpellCost c m -> Json.tagged (Text.pack "ReduceSpellCost") (Just (Array [filterToJson c, manaCostToJson m]))
   PlayerEffect.NoMaximumHandSize -> nullary (Text.pack "NoMaximumHandSize")
+  PlayerEffect.DontLoseUnspentMana -> nullary (Text.pack "DontLoseUnspentMana")
 
 jsonToPlayerEffect :: Value -> Either Text PlayerEffect.PlayerEffect
 jsonToPlayerEffect value = do
@@ -735,6 +736,7 @@ jsonToPlayerEffect value = do
     ("IncreaseSpellCost", Just (Array [c, n])) -> PlayerEffect.IncreaseSpellCost <$> jsonToFilter c <*> natFrom n
     ("ReduceSpellCost", Just (Array [c, m])) -> PlayerEffect.ReduceSpellCost <$> jsonToFilter c <*> jsonToManaCost m
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
+    ("DontLoseUnspentMana", _) -> Right PlayerEffect.DontLoseUnspentMana
     _ -> Left (Text.pack "unknown PlayerEffect: " <> t)
 
 damageRewriteToJson :: DamageRewrite.DamageRewrite -> Value

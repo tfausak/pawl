@@ -13,6 +13,7 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
+import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Summoning as Summoning
@@ -186,8 +187,25 @@ addMana pid units gs =
 -- Being a turn-based action does not put it in Engine.runTurnBasedActions, which
 -- handles a step's OPENING: CR 703.4q's own moment is the step's end, so
 -- Engine.runStep calls this there instead.
+--
+-- The RETENTION check lives here rather than at that call site, because it is
+-- part of the turn-based action and not part of the moment: CR 500.5 names one
+-- action, "any unspent mana left in a player's mana pool empties", and which
+-- mana that is belongs to the action. Engine.runStepThatBegan stays a line that
+-- says only WHEN.
+--
+-- Asked PER PLAYER, off the CR 613.11 player-axis carrier, through a typed
+-- question (PlayerEffect.keepsUnspentMana) that never reveals which effect
+-- answered it. Absent from the map already means an empty pool (poolOf), so
+-- filtering the map is the whole action: a player who keeps their mana keeps the
+-- entry, and everyone else's is dropped.
+--
+-- `gs` is the state as the step ends, so the effect is read at that moment and
+-- never captured earlier -- an Upwelling that left the battlefield during the
+-- step is simply not there to find.
 emptyManaPools :: GameState -> GameState
-emptyManaPools gs = gs {GameState.manaPool = Map.empty}
+emptyManaPools gs =
+  gs {GameState.manaPool = Map.filterWithKey (\pid _ -> PlayerEffect.keepsUnspentMana pid gs) (GameState.manaPool gs)}
 
 -- Untapped permanents this player controls that can produce mana (CR 109.4a:
 -- a mana ability's controller is determined as though it were on the stack --

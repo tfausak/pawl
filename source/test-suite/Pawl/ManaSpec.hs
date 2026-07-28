@@ -14,6 +14,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
@@ -45,6 +46,7 @@ import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
+import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
@@ -460,6 +462,113 @@ anyColorTests registry =
         HU.assertEqual "a Birds of Paradise: one real decision" 1 (asks birds)
     ]
 
+-- Alice controls one Forest and each printing in `alices`; bob controls one
+-- Forest of his own. Both Forests are tapped for mana, so each player's pool
+-- holds one unspent {G} and NOTHING has been spent -- the CR 106.4 "unspent
+-- mana" the step end would take away.
+--
+-- Both seats float, because the symmetry is the assertion: Upwelling's scope is
+-- CR 613.11 EachPlayer, and a You-scoped implementation keeps only alice's.
+--
+-- Returns the ids of the `alices` printings, in the order given, so a caller can
+-- destroy one without hunting the battlefield for it by name.
+floatedPools :: [Printing.Printing] -> Printing.Printing -> ([ObjectId.ObjectId], GameState.GameState)
+floatedPools alices forest =
+  let addOne (ids, gs) printing =
+        let (oid, gs1) = S.addCreature printing S.alice gs
+         in (ids <> [oid], gs1)
+      (extras, withAlices) = List.foldl' addOne ([], Setup.emptyGame S.bothPlayers) alices
+      (aliceForest, g1) = S.addCreature forest S.alice withAlices
+      (bobForest, g2) = S.addCreature forest S.bob g1
+      g3 = S.runPure S.identityAnswer g2 (Mana.tapForMana aliceForest)
+   in (extras, S.runPure S.identityAnswer g3 (Mana.tapForMana bobForest))
+
+-- CR 500.5: "As a step or phase ends ... any unspent mana left in a player's
+-- mana pool empties. This is a turn-based action that doesn't use the stack (see
+-- rule 703.4q)." CR 106.4 says it from the mana side and supplies the wording
+-- modern Oracle text uses: "the player is said to lose this mana."
+--
+-- Upwelling ({3}{G} Enchantment, "Players don't lose unspent mana as steps and
+-- phases end.") is the card that stops it, and it stops it for EVERY player.
+upwellingTests :: Registry.Type.Registry -> Tasty.TestTree
+upwellingTests registry =
+  Tasty.testGroup
+    "Upwelling"
+    [ -- The control. Same board, same float, no Upwelling: both pools go.
+      HU.testCase "CR 500.5 without Upwelling both players lose their unspent mana" $ do
+        forest <- Registry.printing registry "Forest"
+        let (_, floated) = floatedPools [] forest
+            ended = Mana.emptyManaPools floated
+        HU.assertEqual "alice floated one" 1 (poolSize S.alice floated)
+        HU.assertEqual "bob floated one" 1 (poolSize S.bob floated)
+        HU.assertEqual "alice lost it" 0 (poolSize S.alice ended)
+        HU.assertEqual "bob lost it" 0 (poolSize S.bob ended),
+      HU.testCase "CR 613.11 Upwelling keeps its controller's unspent mana" $ do
+        forest <- Registry.printing registry "Forest"
+        upwelling <- Registry.printing registry "Upwelling"
+        let (_, floated) = floatedPools [upwelling] forest
+        HU.assertEqual "alice kept it" 1 (poolSize S.alice (Mana.emptyManaPools floated)),
+      -- The discriminating half of the scope. Alice controls the Upwelling and
+      -- bob keeps his mana anyway -- that is what PlayerScope.EachPlayer means,
+      -- and a You-scoped implementation passes the test above and fails this one.
+      HU.testCase "CR 613.11 Upwelling is symmetric: an opponent's unspent mana is kept too" $ do
+        forest <- Registry.printing registry "Forest"
+        upwelling <- Registry.printing registry "Upwelling"
+        let (_, floated) = floatedPools [upwelling] forest
+        HU.assertEqual "bob kept it, though alice controls the Upwelling" 1 (poolSize S.bob (Mana.emptyManaPools floated)),
+      -- CR 604.2: a static ability's continuous effect is active only while its
+      -- permanent "remains on the battlefield and has the ability". The effect is
+      -- read LIVE at the moment the pools empty, so destroying the Upwelling in
+      -- the same step restores the emptying with nothing to unwind.
+      HU.testCase "CR 604.2 destroying Upwelling restores the emptying in the same step" $ do
+        forest <- Registry.printing registry "Forest"
+        upwelling <- Registry.printing registry "Upwelling"
+        let (extras, floated) = floatedPools [upwelling] forest
+        case extras of
+          [] -> HU.assertFailure "fixture should have an Upwelling on the battlefield"
+          oid : _ -> do
+            let gone = S.runPure S.identityAnswer floated (Event.destroy Regenerability.Regenerable oid)
+            HU.assertEqual "kept while it stands" 1 (poolSize S.alice (Mana.emptyManaPools floated))
+            HU.assertEqual "alice loses it once it is gone" 0 (poolSize S.alice (Mana.emptyManaPools gone))
+            HU.assertEqual "and so does bob" 0 (poolSize S.bob (Mana.emptyManaPools gone)),
+      -- The gameplay-level proof (design.md section 4), end to end through
+      -- Engine.runStep. Alice taps a Birds of Paradise for BLUE toward a green
+      -- spell. CR 105.4 makes that colour HER choice, and blue cannot pay {G}, so
+      -- the Forest is tapped as well and the {U} is genuinely unspent when the
+      -- precombat main phase ends -- CR 106.4's "unspent mana", reached by
+      -- playing rather than by writing a pool into a fixture. Upwelling keeps it,
+      -- and it pays for an Unsummon in the upkeep step that follows.
+      HU.testCase "CR 500.5 whole card: mana Upwelling keeps across a step boundary pays for Unsummon" $ do
+        forest <- Registry.printing registry "Forest"
+        birds <- Registry.printing registry "Birds of Paradise"
+        upwelling <- Registry.printing registry "Upwelling"
+        llanowarElves <- Registry.printing registry "Llanowar Elves"
+        unsummon <- Registry.printing registry "Unsummon"
+        let base = Setup.emptyGame S.bothPlayers
+            (_, g1) = S.addCreature upwelling S.alice base
+            (birdsId, g2) = S.addCreature birds S.alice g1
+            (_, g3) = S.addCreature forest S.alice g2
+            (withElves, elvesId) = S.handOne llanowarElves g3
+            (unsummonId, board) = S.addHandCard unsummon S.alice withElves
+            -- Prefer the Birds and take blue from it: it cannot pay {G}, so the
+            -- Forest is tapped next and the {U} is left over.
+            floatBlue :: Prompt.Prompt r -> r
+            floatBlue p = case p of
+              Prompt.ChooseManaSource _ _ candidates ->
+                if elem birdsId (NonEmpty.toList candidates) then birdsId else NonEmpty.head candidates
+              _ -> prefersColor Color.Blue p
+            cast = S.runPure floatBlue board (Cast.castSpell S.alice elvesId)
+            afterStep = S.runPure S.identityAnswer cast Engine.runStep
+        HU.assertEqual "the Elves are cast off the Forest, floating the Birds' blue" 1 (poolSize S.alice cast)
+        HU.assertEqual "both sources tapped" 2 (S.tappedCount S.alice afterStep)
+        HU.assertEqual "the float survived the end of the precombat main phase" 1 (poolSize S.alice afterStep)
+        HU.assertEqual "Unsummon is still in hand" [unsummonId] (Game.zoneMembers Zone.Hand S.alice afterStep)
+        let spent = S.runPure S.identityAnswer afterStep (Cast.castSpell S.alice unsummonId)
+        HU.assertEqual "the retained {U} paid for it" 0 (poolSize S.alice spent)
+        HU.assertEqual "and nothing new was tapped" 2 (S.tappedCount S.alice spent)
+        HU.assertEqual "Unsummon is on the stack" 1 (length (GameState.stack spent))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
@@ -468,7 +577,8 @@ tests registry =
       castabilityTests registry,
       anyColorTests registry,
       hybridTests registry,
-      monocoloredHybridTests registry
+      monocoloredHybridTests registry,
+      upwellingTests registry
     ]
 
 -- alice controls `n` copies of `first` and `m` copies of `second`, and nothing

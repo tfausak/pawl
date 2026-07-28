@@ -121,6 +121,9 @@ universalInvariants matchup gs =
         QC.property (Maybe.isJust (GameState.result gs)),
       QC.counterexample ("at least " <> show (deckTotal matchup) <> " ids were minted") $
         QC.property (nextIdOf gs >= deckTotal matchup),
+      -- CR 500.5, and no longer universal: an Upwelling on the battlefield keeps
+      -- every player's unspent mana through every step and phase end. It holds
+      -- across these matchups because none of Pawl.Cards' decks plays one.
       QC.counterexample "no mana floats at the end" $
         GameState.manaPool gs QC.=== Map.empty,
       -- Replaces M0's "no life changes". Nothing here GAINS life, so any

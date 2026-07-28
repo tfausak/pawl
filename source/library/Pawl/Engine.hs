@@ -966,8 +966,14 @@ runStepThatBegan phase = do
       RestartSignal.Playing -> do
         -- CR 500.5: as a step or phase ends, any unspent mana left in a player's
         -- mana pool empties -- a turn-based action that does not use the stack
-        -- (CR 703.4q). Nothing floats mana in M1a, so this is unobservable today;
-        -- it is the rule, and it is a one-liner.
+        -- (CR 703.4q). This line says only WHEN; WHOSE mana empties is the action
+        -- itself, and Mana.emptyManaPools decides it per player (Upwelling).
+        --
+        -- CR 500.5's first clause -- "if there are effects that last until the end
+        -- of that step or phase, those effects expire", and only THEN the mana --
+        -- has nothing to run before this line, because no Duration and no Expiry
+        -- can name an end-of-step or end-of-phase moment (#353). The ordering is
+        -- satisfied vacuously, and this is where the sweep goes when it exists.
         State.modify' Mana.emptyManaPools
         -- CR 511.3: "as soon as the end of combat step ends, all creatures,
         -- battles, and planeswalkers are removed from combat" -- so it belongs
