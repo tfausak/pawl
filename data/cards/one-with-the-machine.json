@@ -1,0 +1,98 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "One with the Machine",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "Draw",
+            "value": [
+              {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              },
+              {
+                "type": "Count",
+                "value": [
+                  {
+                    "type": "InZone",
+                    "value": [
+                      {
+                        "type": "Battlefield"
+                      },
+                      {
+                        "type": "EachPlayer"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Artifact"
+                        }
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Greatest",
+                    "value": {
+                      "type": "ManaValue"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Sorcery"
+      }
+    ]
+  }
+}

@@ -22,5 +22,5 @@ import Pawl.Type.Quantity (Quantity)
 -- InSlot count stored that way outlives its slot binding: Pawl.Count.playersFor
 -- then yields Nothing, and Pawl.Condition.holds collapses that to False
 -- silently (#159).
-data Condition = MkCondition Count Comparison Quantity
+data Condition = MkCondition (Count Quantity) Comparison Quantity
   deriving (Eq, Ord, Show)

@@ -270,7 +270,7 @@ cardTests registry =
 
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested
 -- through Plus's two children (CR 208.2 composition -- a printed 1+*).
-quantityCounts :: Quantity.Type.Quantity -> [Count.Type.Count]
+quantityCounts :: Quantity.Type.Quantity -> [Count.Type.Count Quantity.Type.Quantity]
 quantityCounts quantity = case quantity of
   Quantity.Type.Literal _ -> []
   Quantity.Type.ManaValue -> []
@@ -278,17 +278,27 @@ quantityCounts quantity = case quantity of
   Quantity.Type.X -> []
   Quantity.Type.Star -> []
   Quantity.Type.Plus a b -> quantityCounts a <> quantityCounts b
-  Quantity.Type.Count count -> [count]
+  Quantity.Type.Count count -> count : countCounts count
+
+-- Every Count nested inside another Count's AGGREGATION: only Greatest carries
+-- a per-member Quantity, and that Quantity may itself be a Count. Without this
+-- descent the shared-zone lint below would sweep past a misauthored inner
+-- scope.
+countCounts :: Count.Type.Count Quantity.Type.Quantity -> [Count.Type.Count Quantity.Type.Quantity]
+countCounts (Count.Type.MkCount _ _ aggregation) = case aggregation of
+  Aggregation.Objects -> []
+  Aggregation.DistinctCardTypes -> []
+  Aggregation.Greatest quantity -> quantityCounts quantity
 
 -- Every Count reachable from a Condition: its own count, plus any inside its
 -- threshold Quantity.
-conditionCounts :: Condition.Type.Condition -> [Count.Type.Count]
+conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Quantity]
 conditionCounts (Condition.Type.MkCondition count _ threshold) =
   count : quantityCounts threshold
 
 -- Every Count reachable from a Duration: only ForAsLongAs (CR 611.2b) carries
 -- a Condition.
-durationCounts :: Duration.Duration -> [Count.Type.Count]
+durationCounts :: Duration.Duration -> [Count.Type.Count Quantity.Type.Quantity]
 durationCounts duration = case duration of
   Duration.UntilEndOfTurn -> []
   Duration.Indefinite -> []
@@ -297,7 +307,7 @@ durationCounts duration = case duration of
 
 -- Every Count reachable from a Modification: only its P/T quantities
 -- (layers 7b/7c) carry one.
-modificationCounts :: Modification.Modification -> [Count.Type.Count]
+modificationCounts :: Modification.Modification -> [Count.Type.Count Quantity.Type.Quantity]
 modificationCounts modification = case modification of
   Modification.GainKeyword _ -> []
   Modification.LoseAllAbilities -> []
@@ -314,7 +324,7 @@ modificationCounts modification = case modification of
 
 -- Every Count reachable from a TriggerCondition: only StateIs (CR 603.8, a
 -- trigger's own condition) carries one.
-triggerConditionCounts :: TriggerCondition.TriggerCondition -> [Count.Type.Count]
+triggerConditionCounts :: TriggerCondition.TriggerCondition -> [Count.Type.Count Quantity.Type.Quantity]
 triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins _ _ -> []
@@ -325,7 +335,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
 -- card (the same nesting Pawl.Codec's round trip walks).
-effectCounts :: Effect.Effect Card.Type.Card -> [Count.Type.Count]
+effectCounts :: Effect.Effect Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 effectCounts effect = case effect of
   Effect.DealDamage _ quantity -> quantityCounts quantity
   Effect.ModifyTarget duration modification _ -> durationCounts duration <> modificationCounts modification
@@ -363,7 +373,7 @@ effectCounts effect = case effect of
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
 -- intervening "if" clause, and its modes' effects.
-triggeredAbilityCounts :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [Count.Type.Count]
+triggeredAbilityCounts :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 triggeredAbilityCounts ability =
   triggerConditionCounts (TriggeredAbility.condition ability)
     <> foldMap conditionCounts (TriggeredAbility.intervening ability)
@@ -397,7 +407,7 @@ cardResolutionEffects card =
     <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Card.Type.triggeredAbilities card)
     <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Card.Type.delayedAbilities card))
 
-cardCounts :: Card.Type.Card -> [Count.Type.Count]
+cardCounts :: Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 cardCounts card =
   concatMap quantityCounts (Maybe.maybeToList (Card.Type.characteristicPT card))
     <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Card.Type.power card))
@@ -1050,7 +1060,37 @@ m55CardTests registry =
             case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
               [m] -> HU.assertEqual "one Sacrifice self effect" [Effect.Sacrifice (SlotName.MkSlotName (Text.pack "self"))] (Foldable.toList (Mode.effects m))
               _ -> HU.assertFailure "expected exactly one mode"
-          _ -> HU.assertFailure "expected exactly one triggered ability"
+          _ -> HU.assertFailure "expected exactly one triggered ability",
+      -- The Aggregation.Greatest gate card (#254). The pin that matters is the
+      -- SHAPE: one Draw whose Quantity is a Count, with the per-member quantity
+      -- inside the AGGREGATION rather than beside it -- the arrangement that
+      -- makes "the greatest mana value among artifacts you control" one value
+      -- and not a card-specific opcode.
+      HU.testCase "One with the Machine is a {3}{U} Sorcery drawing the greatest mana value among artifacts you control" $ do
+        oneWithTheMachine <- Registry.printing registry "One with the Machine"
+        let c = Printing.card oneWithTheMachine
+            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+        HU.assertEqual "name" (Text.pack "One with the Machine") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, blue]) (Card.Type.manaCost c)
+        HU.assertBool "sorcery, not instant" (not (Card.isInstant c))
+        HU.assertEqual
+          "one Draw aimed at the caster, counting the battlefield"
+          [ Effect.Draw
+              (PlayerRef.Relative PlayerRelation.You)
+              ( Quantity.Type.Count
+                  ( Count.Type.MkCount
+                      (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                      ( Filter.Type.And
+                          [ Filter.Type.HasCardType CardType.Artifact,
+                            Filter.Type.ControlledBy PlayerRelation.You
+                          ]
+                      )
+                      (Aggregation.Greatest Quantity.Type.ManaValue)
+                  )
+              )
+          ]
+          (Card.allEffects c)
+        HU.assertEqual "and no target slots" Map.empty (Card.allTargetSpecs c)
     ]
 
 -- The Auras phase (a) gate card: CR 303.4m's Attached affected-set, proven by a
