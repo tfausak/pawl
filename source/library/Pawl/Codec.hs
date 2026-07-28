@@ -372,6 +372,7 @@ keywordToJson k = case k of
   Keyword.Reach -> nullary (Text.pack "Reach")
   Keyword.Trample -> nullary (Text.pack "Trample")
   Keyword.Vigilance -> nullary (Text.pack "Vigilance")
+  Keyword.Cycling cost -> Json.tagged (Text.pack "Cycling") (Just (costToJson cost))
   Keyword.Flashback cost -> Json.tagged (Text.pack "Flashback") (Just (costToJson cost))
   Keyword.Fear -> nullary (Text.pack "Fear")
   Keyword.Poisonous n -> Json.tagged (Text.pack "Poisonous") (Just (natTo n))
@@ -393,6 +394,7 @@ jsonToKeyword value = do
     ("Reach", _) -> Right Keyword.Reach
     ("Trample", _) -> Right Keyword.Trample
     ("Vigilance", _) -> Right Keyword.Vigilance
+    ("Cycling", Just v) -> Keyword.Cycling <$> jsonToCost v
     ("Flashback", Just v) -> Keyword.Flashback <$> jsonToCost v
     ("Fear", _) -> Right Keyword.Fear
     ("Poisonous", Just v) -> Keyword.Poisonous <$> natFrom v
@@ -860,6 +862,7 @@ costComponentToJson c = case c of
   CostComponent.PayLife n -> Json.tagged (Text.pack "PayLife") (Just (natTo n))
   CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array [natTo n, filterToJson c_]))
   CostComponent.DiscardCards n -> Json.tagged (Text.pack "DiscardCards") (Just (natTo n))
+  CostComponent.DiscardThis -> nullary (Text.pack "DiscardThis")
   CostComponent.PayEnergy n -> Json.tagged (Text.pack "PayEnergy") (Just (natTo n))
 
 jsonToCostComponent :: Value -> Either Text CostComponent.CostComponent
@@ -875,6 +878,7 @@ jsonToCostComponent value = do
       filter_ <- jsonToFilter c_
       pure (CostComponent.Sacrifice count filter_)
     ("DiscardCards", Just v) -> fmap CostComponent.DiscardCards (natFrom v)
+    ("DiscardThis", _) -> Right CostComponent.DiscardThis
     ("PayEnergy", Just v) -> fmap CostComponent.PayEnergy (natFrom v)
     _ -> Left (Text.pack "unknown CostComponent: " <> t)
 

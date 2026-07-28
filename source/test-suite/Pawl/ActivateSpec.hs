@@ -28,6 +28,7 @@ import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.Cost as Cost.Type
+import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.LastKnown as LastKnown
@@ -38,6 +39,7 @@ import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
@@ -403,7 +405,102 @@ lastKnownTests registry =
         HU.assertEqual
           "and every other id is untouched by the substitution"
           (Projection.fullView pumped S.noSource >>= Filter.power)
-          (Projection.viewWithLastKnown srcId pumped S.noSource >>= Filter.power)
+          (Projection.viewWithLastKnown srcId pumped S.noSource >>= Filter.power),
+      cyclingTests registry
+    ]
+
+-- CR 702.29: cycling, the first activated ability in the pool that is activated
+-- from a zone other than the battlefield. Barkhide Mauler is a {4}{G} 4/4 whose
+-- only text is "Cycling {2}", so every test below isolates the keyword: the
+-- creature half is never cast.
+--
+-- Alice holds it, two Forests pay the {2}, and her library has a card to draw --
+-- otherwise CR 704.5b would end the game around the assertion rather than the
+-- draw being observable.
+cyclingBoard :: Registry.Type.Registry -> IO (ObjectId.ObjectId, GameState.GameState)
+cyclingBoard registry = do
+  mauler <- Registry.printing registry "Barkhide Mauler"
+  forest <- Registry.printing registry "Forest"
+  piker <- Registry.printing registry "Goblin Piker"
+  let (_, g0) = S.addLibraryCard piker S.alice (S.landsInPlay forest 2)
+      (g1, oid) = S.handOne mauler g0
+  pure (oid, g1 {GameState.priority = Just S.alice})
+
+cyclingTests :: Registry.Type.Registry -> Tasty.TestTree
+cyclingTests registry =
+  Tasty.testGroup
+    "Cycling"
+    [ -- CR 702.29a: "Cycling is an activated ability that functions only while
+      -- the card with cycling is in a player's hand."
+      HU.testCase "CR 702.29a cycling is offered from the hand" $ do
+        (_, gs) <- cyclingBoard registry
+        HU.assertBool "an Activate is offered" (any isActivate (Action.legalActions S.alice gs)),
+      -- The ability rule 702.29a MEANS, rather than any the card prints: Barkhide
+      -- Mauler's own activatedAbilities list is empty, and what is offered is
+      -- minted from the keyword -- printed cost plus the rule's discard.
+      HU.testCase "CR 702.29a the minted ability is '{2}, Discard this card: Draw a card'" $ do
+        mauler <- Registry.printing registry "Barkhide Mauler"
+        (oid, gs) <- cyclingBoard registry
+        HU.assertEqual "the card itself prints no activated ability" [] (Card.Type.activatedAbilities (Printing.card mauler))
+        case Activate.abilitiesFor oid gs of
+          [ability] -> do
+            HU.assertEqual
+              "the printed {2} plus rule 702.29a's discard"
+              (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [CostComponent.DiscardThis])
+              (ActivatedAbility.cost ability)
+            HU.assertEqual "instant speed" ActivationTiming.AnyTime (ActivatedAbility.timing ability)
+          abilities -> HU.assertFailure ("expected exactly one ability, got " <> show (length abilities)),
+      -- The whole card: pay {2}, discard it, draw. The Mauler is in the graveyard
+      -- BEFORE the draw resolves, which is rule 702.29a putting the discard in
+      -- the cost rather than in the effect.
+      HU.testCase "CR 702.29a whole card: cycling discards the Mauler and draws" $ do
+        (oid, gs) <- cyclingBoard registry
+        case Activate.abilitiesFor oid gs of
+          [ability] -> do
+            let activated = snd (Engine.runGamePure S.identityAnswer gs (Activate.activateAbility S.alice oid ability))
+                resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+                tapped g = length (filter (\o -> Object.tapped o == TapState.Tapped) (Maybe.mapMaybe (\o -> Game.lookupObject o g) (Set.toList (GameState.battlefield g))))
+            HU.assertEqual "the Mauler left the hand as the cost was paid" 0 (length (Game.zoneMembers Zone.Hand S.alice activated))
+            HU.assertEqual "and is in the graveyard while the draw is still on the stack" 1 (length (Game.zoneMembers Zone.Graveyard S.alice activated))
+            HU.assertEqual "the draw is on the stack" 1 (length (GameState.stack activated))
+            HU.assertEqual "both Forests paid" 2 (tapped activated)
+            HU.assertEqual "then the draw resolves into her hand" 1 (length (Game.zoneMembers Zone.Hand S.alice resolved))
+            HU.assertEqual "her library is empty now" 0 (length (Game.zoneMembers Zone.Library S.alice resolved))
+            HU.assertEqual "the stack is empty" [] (GameState.stack resolved)
+          _ -> HU.assertFailure "expected exactly one cycling ability",
+      -- The zone gate, from the other side. CR 702.29b: the ability still EXISTS
+      -- on the battlefield ("it continues to exist ... in all other zones"), so
+      -- this is not the ability being absent -- it is not being activatable
+      -- there. A Mauler that resolved as a creature cannot be cycled.
+      HU.testCase "CR 702.29a cycling is NOT offered from the battlefield" $ do
+        mauler <- Registry.printing registry "Barkhide Mauler"
+        forest <- Registry.printing registry "Forest"
+        let (_, g0) = S.addCreature mauler S.alice (S.landsInPlay forest 2)
+            gs = g0 {GameState.priority = Just S.alice}
+        HU.assertBool "no Activate offered" (not (any isActivate (Action.legalActions S.alice gs))),
+      -- "In a PLAYER's hand" is that player's, and CR 108.4 is why this needs
+      -- saying: a card in a hand has no controller at all, so an activation gate
+      -- written against control would have offered it to nobody -- or, read
+      -- loosely, to anybody.
+      HU.testCase "CR 702.29a the other player cannot cycle a card in your hand" $ do
+        (_, gs) <- cyclingBoard registry
+        HU.assertBool "not offered to bob" (not (any isActivate (Action.legalActions S.bob gs {GameState.priority = Just S.bob}))),
+      -- CR 118.3: the cost still has to be payable. One Forest is not {2}.
+      HU.testCase "CR 118.3 cycling is not offered without the mana" $ do
+        mauler <- Registry.printing registry "Barkhide Mauler"
+        forest <- Registry.printing registry "Forest"
+        let (g0, _) = S.handOne mauler (S.landsInPlay forest 1)
+            gs = g0 {GameState.priority = Just S.alice}
+        HU.assertBool "one Forest cannot pay {2}" (not (any isActivate (Action.legalActions S.alice gs))),
+      -- The control: the gate cannot pass by offering every card in hand. A
+      -- Piker has no cycling and nothing is minted for it.
+      HU.testCase "CR 702.29a a card without cycling offers nothing from the hand" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        forest <- Registry.printing registry "Forest"
+        let (g0, oid) = S.handOne piker (S.landsInPlay forest 2)
+            gs = g0 {GameState.priority = Just S.alice}
+        HU.assertEqual "no abilities minted" [] (Activate.abilitiesFor oid gs)
+        HU.assertBool "and no Activate offered" (not (any isActivate (Action.legalActions S.alice gs)))
     ]
 
 isActivate :: A.Action -> Bool

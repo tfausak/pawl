@@ -9,6 +9,7 @@ import qualified Pawl.Cost as Cost
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
+import qualified Pawl.Keyword as Keyword
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
@@ -52,11 +53,72 @@ sicknessOk pid srcId ability gs =
       isCreature = Set.member CardType.Creature (Projection.cardTypesOf srcId gs)
    in not (needsCheck && isCreature && not (Summoning.settledOrHasty pid srcId gs))
 
--- The abilities to consider activating. Task 5: the card's PRINTED abilities.
--- Task 9 switches the body to `Projection.abilitiesOf srcId gs` so Humility
--- (layer 6) strips them -- the single switch point, the keywordsOf pattern.
+-- The abilities to consider activating, which depends on WHERE the object is --
+-- the one place that zone question is asked, so no caller repeats it.
+--
+-- On the battlefield: the PROJECTION's, so Humility (layer 6) strips them.
+--
+-- In a hand: the ones rule 702 mints for the card's printed keywords, which is
+-- cycling (CR 702.29a) and nothing else today. Read off the PRINTED card rather
+-- than a projection for the reason Keyword.handAbilitiesOf's own haddock gives:
+-- CR 613's layer system does not reach a hand, so there is nothing there to
+-- project and no Humility to respect. CR 113.6b is the rule that lets an ability
+-- name its own zone this way.
+--
+-- Anywhere else: nothing. Flashback is not a counterexample -- CR 702.34a makes
+-- it a CASTING permission, so a card in a graveyard reaches Pawl.Cast and never
+-- this function. Rule 702's other zone abilities (madness, retrace, escape) are
+-- casting permissions too; the first ability ACTIVATED from somewhere other than
+-- the battlefield or a hand adds an arm here.
+--
+-- CR 702.29b is why this gates ACTIVATION and not existence: "Although the
+-- cycling ability can be activated only if the card is in a player's hand, it
+-- continues to exist while the object is on the battlefield and in all other
+-- zones. Therefore objects with cycling will be affected by effects that depend
+-- on objects having one or more activated abilities." Nothing in the pool asks
+-- that second question yet; when something does, it must ask the CARD rather
+-- than this function, which deliberately answers a narrower one.
+--
+-- INLINE, and not for the usual reason. This body reaches Projection.project,
+-- which sicknessOk below and activatable's membership check also compute FOR THE
+-- SAME OBJECT. Inlined, GHC shares those; opaque, it cannot, and
+-- Projection.gather -- the sweep its own haddock warns is superlinear -- runs
+-- again per object per enumeration. Measured on "a three-seat lands-only mirror
+-- needs TWO deck-outs to find a winner": 10.4s inlined, 29.3s not, which was the
+-- whole of a 2x regression in the suite. The pragma is doing what
+-- Projection.controllerOfGiven and Sba's one-projection-per-pass do explicitly,
+-- and it is the cheaper of the two here; if a future zone arm makes this function
+-- too big to inline, the fix is to pass the projection in rather than to trust
+-- the optimizer harder.
+{-# INLINE abilitiesFor #-}
 abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
-abilitiesFor = Projection.abilitiesOf
+abilitiesFor oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
+  Just Zone.Battlefield -> Projection.abilitiesOf oid gs
+  Just Zone.Hand -> case Game.cardOf oid gs of
+    Nothing -> []
+    Just card -> Keyword.handAbilitiesOf (Card.keywords card)
+  _ -> []
+
+-- CR 602.2: "Only an object's controller (or its owner, if it doesn't have a
+-- controller) can activate its activated ability unless the object specifically
+-- says otherwise." Both halves of that parenthetical are live here, which is why
+-- this cannot simply be Projection.controllerOf.
+--
+-- On the battlefield the controller is the answer. A card in a hand reaches the
+-- rule's OWNER clause: CR 108.4 says "a card doesn't have a controller unless
+-- that card represents a permanent or spell", so it has none at all -- and CR
+-- 400.3 puts every card in a hand in its owner's, so the owner is also the player
+-- whose hand it is in.
+--
+-- Nothing for every other zone, matching abilitiesFor's silence there: a zone
+-- that offers no ability needs no activator.
+activatorOf :: ObjectId -> GameState -> Maybe PlayerId
+activatorOf oid gs = case Game.lookupObject oid gs of
+  Nothing -> Nothing
+  Just obj -> case Object.zone obj of
+    Zone.Battlefield -> Projection.controllerOf oid gs
+    Zone.Hand -> Just (Object.owner obj)
+    _ -> Nothing
 
 -- CR 307.5: does this ability's timing rider permit activating it right now?
 --
@@ -86,7 +148,7 @@ timingOk pid ability gs = case ActivatedAbility.timing ability of
 -- routed through Cost.total (#90).
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatable pid srcId ability gs =
-  Projection.controllerOf srcId gs == Just pid
+  activatorOf srcId gs == Just pid
     && elem ability (abilitiesFor srcId gs)
     && not (Mana.isManaAbility ability)
     && sicknessOk pid srcId ability gs
