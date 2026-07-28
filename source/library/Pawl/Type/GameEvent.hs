@@ -65,7 +65,8 @@ data GameEvent
     -- Distinct from the Moved event the same discard also records. CR 702.29d
     -- ("abilities that trigger whenever a player cycles or discards a card ...
     -- trigger only once when a card is cycled") is what says the two are one
-    -- event with two descriptions rather than two events; no card in the pool
-    -- triggers on discarding, so nothing yet has to reconcile them (#314).
+    -- event with two descriptions rather than two events. No card in the pool
+    -- triggers on discarding, so nothing yet has to reconcile them; Bartered Cow
+    -- is the card that will, and #319 is where that reconciliation is owed.
     Cycled ObjectId
   deriving (Eq, Ord, Show)
