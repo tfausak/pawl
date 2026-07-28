@@ -5,11 +5,12 @@
 -- continuous effects that affect PLAYERS and the RULES OF THE GAME, which sit
 -- outside the CR 613 layer system entirely.
 --
--- The five gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
--- Medallion, Reliquary Tower and Silence.
+-- The six gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
+-- Medallion, Edgewalker, Reliquary Tower and Silence.
 module Pawl.PlayerEffectSpec where
 
 import qualified Data.List as List
+import Numeric.Natural (Natural)
 import qualified Pawl.Action as Action
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
@@ -192,6 +193,17 @@ red = ManaSymbol.OfType (ManaType.Colored Color.Red)
 blue :: ManaSymbol.ManaSymbol
 blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
 
+white :: ManaSymbol.ManaSymbol
+white = ManaSymbol.OfType (ManaType.Colored Color.White)
+
+black :: ManaSymbol.ManaSymbol
+black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+
+-- A reduction by an amount of GENERIC mana (CR 118.7a) -- the Medallion's shape,
+-- and the only shape a reduction had before Edgewalker.
+generic :: Natural -> ManaCost.ManaCost
+generic n = ManaCost.MkManaCost [ManaSymbol.Generic n]
+
 -- Cost.total via a bare ManaCost, component-free -- this suite predates P8's
 -- Cost/CostComponent generalization and exercises only the mana half
 -- (costAdjustments), so the wrap-and-unwrap stays local here instead of
@@ -220,17 +232,17 @@ adjustmentTests =
         HU.assertEqual
           "{U} reduced by {1} is still {U}"
           (ManaCost.MkManaCost [blue])
-          (Cost.applyAdjustments ([], [1]) (ManaCost.MkManaCost [blue])),
+          (Cost.applyAdjustments ([], [generic 1]) (ManaCost.MkManaCost [blue])),
       HU.testCase "CR 118.7a a reduction takes only the generic component" $
         HU.assertEqual
           "{2}{U} reduced by {1} is {1}{U}"
           (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
-          (Cost.applyAdjustments ([], [1]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue])),
+          (Cost.applyAdjustments ([], [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue])),
       HU.testCase "CR 601.2f the total can't be reduced below {0}" $
         HU.assertEqual
           "{1} reduced by {3} is {0}"
           (ManaCost.MkManaCost [])
-          (Cost.applyAdjustments ([], [3]) (ManaCost.MkManaCost [ManaSymbol.Generic 1])),
+          (Cost.applyAdjustments ([], [generic 3]) (ManaCost.MkManaCost [ManaSymbol.Generic 1])),
       -- THE ORDER TEST, in the small. Increase first gives {1}{U}, which the
       -- reduction takes back to {U}. Reduce first loses the reduction to CR
       -- 118.7a's empty generic component, and the increase then leaves {1}{U}.
@@ -238,7 +250,45 @@ adjustmentTests =
         HU.assertEqual
           "{U} +{1} -{1} is {U}"
           (ManaCost.MkManaCost [blue])
-          (Cost.applyAdjustments ([1], [1]) (ManaCost.MkManaCost [blue]))
+          (Cost.applyAdjustments ([1], [generic 1]) (ManaCost.MkManaCost [blue])),
+      -- CR 118.7's typed half, which CR 118.7a's generic half above cannot
+      -- reach: a reduction that NAMES a mana type takes that type's symbols.
+      HU.testCase "CR 118.7 a typed reduction takes the cost's matching symbols" $
+        HU.assertEqual
+          "{1}{W}{B} reduced by {W}{B} is {1}"
+          (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+          (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black])),
+      HU.testCase "CR 118.7 one reducing symbol takes exactly one matching symbol" $
+        HU.assertEqual
+          "{W}{W} reduced by {W} is {W}"
+          (ManaCost.MkManaCost [white])
+          (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [white, white])),
+      -- THE HEADLINE FALSIFIER for the typed half, and the one place pawl
+      -- deliberately does not do what CR 118.7b-d would (#309). Edgewalker's own
+      -- reminder text is the assertion: "if you cast a Cleric spell with mana
+      -- cost {1}{W}, it costs {1} to cast" -- so the {B} half, which the cost
+      -- cannot satisfy, takes NOTHING rather than one generic mana.
+      HU.testCase "an excess typed reduction is dropped, not spilled onto generic" $
+        HU.assertEqual
+          "{1}{W} reduced by {W}{B} is {1}"
+          (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+          (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white])),
+      -- Ruling: "If you have more than one of these on the battlefield, the cost
+      -- reduction is cumulative." Cumulative, and still bounded by what the cost
+      -- actually has to give.
+      HU.testCase "two typed reductions pool, and the second finds nothing left to take" $
+        HU.assertEqual
+          "{1}{W}{B} reduced by {W}{B} twice is {1}"
+          (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+          (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black], ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black])),
+      -- The two halves of ONE reduction, on the two halves of one cost: CR
+      -- 118.7a routes the {1} to the generic component and the {U} takes the
+      -- blue symbol, and neither reaches into the other's component.
+      HU.testCase "CR 118.7a a mixed reduction splits by component" $
+        HU.assertEqual
+          "{2}{U} reduced by {1}{U} is {1}"
+          (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+          (Cost.applyAdjustments ([], [ManaCost.MkManaCost [ManaSymbol.Generic 1, blue]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
     ]
 
 -- alice controls Thalia and `n` untapped Mountains; her hand holds one
@@ -351,7 +401,6 @@ thaliaTests registry =
         panglacialWurm <- Registry.printing registry "Panglacial Wurm"
         ruleOfLaw <- Registry.printing registry "Rule of Law"
         let green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-            white = ManaSymbol.OfType (ManaType.Colored Color.White)
             base = S.landsInPlay forest 7
             (_, withThalia) = S.addCreature thalia S.alice base
             (wurm, withWurm) = S.addLibraryCard panglacialWurm S.alice withThalia
@@ -500,6 +549,105 @@ medallionTests registry =
           (Just (ManaCost.MkManaCost [blue]))
           (totalManaCost S.alice unsummon (ManaCost.MkManaCost [blue]) gs)
         HU.assertBool "so one Island is enough" (Cast.castable S.alice unsummon gs)
+    ]
+
+-- alice controls `copies` Edgewalkers and `n` untapped Plains; her hand holds
+-- one more Edgewalker ({1}{W}{B} Human Cleric) and one Goblin Piker ({1}{R}
+-- Goblin Warrior -- no Cleric anywhere on it). Loaded fresh inside each case
+-- that needs it -- equivalent because loading is deterministic and cached
+-- (batch-recipe.md).
+edgewalkerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+edgewalkerBoard plains edgewalker piker copies n =
+  let base = S.landsInPlay plains n
+      put g _ = snd (S.addCreature edgewalker S.alice g)
+      withCopies = List.foldl' put base [1 .. copies]
+      (spell, gs1) = S.addHandCard edgewalker S.alice withCopies
+      (pikerId, gs2) = S.addHandCard piker S.alice gs1
+   in ( spell,
+        pikerId,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Edgewalker {1}{W}{B} Creature -- Human Cleric 2/2: "Cleric spells you cast
+-- cost {W}{B} less to cast. This effect reduces only the amount of colored mana
+-- you pay."
+--
+-- The card the typed half of a reduction exists for, and the one that pins the
+-- excess as dropped rather than spilled (#309). Edgewalker is itself a Cleric,
+-- so the spell it discounts is another copy of itself and the pool needs no
+-- second Cleric to make the point.
+edgewalkerTests :: Registry.Type.Registry -> Tasty.TestTree
+edgewalkerTests registry =
+  Tasty.testGroup
+    "Edgewalker"
+    [ HU.testCase "CR 118.7 a Cleric spell loses one white and one black symbol" $ do
+        plains <- Registry.printing registry "Plains"
+        edgewalker <- Registry.printing registry "Edgewalker"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (spell, _, gs) = edgewalkerBoard plains edgewalker piker 1 3
+        HU.assertEqual
+          "{1}{W}{B} becomes {1}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+          (totalManaCost S.alice spell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs),
+      HU.testCase "a spell with no Cleric subtype fails the effect's criterion, so it is unaffected" $ do
+        plains <- Registry.printing registry "Plains"
+        edgewalker <- Registry.printing registry "Edgewalker"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (_, pikerId, gs) = edgewalkerBoard plains edgewalker piker 1 3
+        HU.assertEqual
+          "{1}{R} stays {1}{R}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+          (totalManaCost S.alice pikerId (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]) gs),
+      -- THE HEADLINE FALSIFIER, at the board. Ruling: "If you have more than one
+      -- of these on the battlefield, the cost reduction is cumulative" -- so two
+      -- Edgewalkers really do offer {W}{B}{W}{B}. The cost has one white and one
+      -- black to give, and the second pair strands: under CR 118.7b-d it would
+      -- go on to eat the {1} and leave the spell free, and Edgewalker's card
+      -- text stops it (#309).
+      HU.testCase "a second Edgewalker's stranded halves leave the generic component alone" $ do
+        plains <- Registry.printing registry "Plains"
+        edgewalker <- Registry.printing registry "Edgewalker"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (spell, _, gs) = edgewalkerBoard plains edgewalker piker 2 3
+        HU.assertEqual
+          "{1}{W}{B} is still {1}, not {0}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+          (totalManaCost S.alice spell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs),
+      -- BOTH cost sites, one scenario, exactly as the Thalia group tests them.
+      -- Three Plains produce white mana and nothing else, so they can never pay
+      -- a {B}: what makes the discounted spell castable is that the reduction
+      -- removed the black SYMBOL, not that it removed an amount.
+      HU.testCase "CR 601.2f castability is measured against the total cost" $ do
+        plains <- Registry.printing registry "Plains"
+        edgewalker <- Registry.printing registry "Edgewalker"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (discounted, _, withEdgewalker) = edgewalkerBoard plains edgewalker piker 1 3
+            (undiscounted, _, bare) = edgewalkerBoard plains edgewalker piker 0 3
+        HU.assertBool "three Plains cannot pay a printed {1}{W}{B}" (not (Cast.castable S.alice undiscounted bare))
+        HU.assertBool "but they can pay the discounted {1}" (Cast.castable S.alice discounted withEdgewalker),
+      HU.testCase "CR 601.2f payment spends the total cost" $ do
+        plains <- Registry.printing registry "Plains"
+        edgewalker <- Registry.printing registry "Edgewalker"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (spell, _, gs) = edgewalkerBoard plains edgewalker piker 1 3
+            paid = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spell)
+        HU.assertEqual "one Plains tapped, not three" 1 (S.tappedCount S.alice paid),
+      -- CR 611.1 / 109.5: the You scope is the effect's controller, and bob
+      -- controls no Edgewalker.
+      HU.testCase "CR 109.5 the You scope does not discount an opponent's Cleric spell" $ do
+        plains <- Registry.printing registry "Plains"
+        edgewalker <- Registry.printing registry "Edgewalker"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (_, _, gs) = edgewalkerBoard plains edgewalker piker 1 3
+            (bobEdgewalker, withBob) = S.addHandCard edgewalker S.bob gs
+        HU.assertEqual
+          "bob pays full price"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+          (totalManaCost S.bob bobEdgewalker (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) withBob)
     ]
 
 -- alice holds nine Plains cards; the board is otherwise empty unless a
@@ -886,4 +1034,4 @@ matchesSpellTests registry =
         ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests registry, adjustmentTests, thaliaTests registry, medallionTests registry, reliquaryTowerTests registry, storedTests registry, silenceTests registry, matchesSpellTests registry]
+tests registry = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests registry, adjustmentTests, thaliaTests registry, medallionTests registry, edgewalkerTests registry, reliquaryTowerTests registry, storedTests registry, silenceTests registry, matchesSpellTests registry]

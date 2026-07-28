@@ -61,4 +61,7 @@ data Subtype
     Shaman
   | -- CR 205.3m (a creature type; Master of the Feast's).
     Demon
+  | -- CR 205.3m (a creature type; Edgewalker's own, and the tribe its cost
+    -- reduction names).
+    Cleric
   deriving (Eq, Ord, Show)

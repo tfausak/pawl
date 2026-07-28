@@ -20,7 +20,12 @@
               "type": "Blue"
             }
           },
-          1
+          [
+            {
+              "type": "Generic",
+              "value": 1
+            }
+          ]
         ]
       },
       "scope": {

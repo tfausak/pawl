@@ -26,6 +26,7 @@ import qualified Pawl.Type.Card as Card
 import Pawl.Type.Filter (Filter)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
+import Pawl.Type.ManaCost (ManaCost)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerEffect (PlayerEffect)
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
@@ -158,15 +159,18 @@ matchesSpell filter_ oid gs =
 --
 -- Kept APART, never summed into one signed delta: CR 601.2f applies every
 -- increase before any reduction, and CR 118.7a gives a reduction a restriction
--- an increase does not have. Pawl.Cost.applyAdjustments is what consumes the
--- pair; this function only decides membership.
+-- an increase does not have. The two halves do not even have the same shape --
+-- an increase is an amount of generic mana (a Natural) and a reduction is an
+-- amount of mana that may name a type (a ManaCost). Pawl.Cost.applyAdjustments is
+-- what consumes the pair; this function only decides membership.
 --
 -- matchesSpell is called only from inside an arm that already matched a
 -- cost-modifying constructor, so a board with no Thalia and no Medallion runs no
 -- projections at all.
-costAdjustments :: PlayerId -> ObjectId -> GameState -> ([Natural], [Natural])
+costAdjustments :: PlayerId -> ObjectId -> GameState -> ([Natural], [ManaCost])
 costAdjustments pid oid gs =
-  let matching criterion amount = if matchesSpell criterion oid gs then Just amount else Nothing
+  let matching :: Filter -> a -> Maybe a
+      matching criterion amount = if matchesSpell criterion oid gs then Just amount else Nothing
       increaseOf effect = case effect of
         PlayerEffect.IncreaseSpellCost criterion amount -> matching criterion amount
         PlayerEffect.ReduceSpellCost _ _ -> Nothing
