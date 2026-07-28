@@ -729,6 +729,10 @@ rewriteModification pairs m =
 -- the parts of one static ability all carry that ability's key -- which is what
 -- lets projectWith decide their set once. A stored effect and a counter are each
 -- a single part and carry none.
+--
+-- CR 305.7 is the only ability loss this asks about. A layer-6 LoseAllAbilities
+-- on the SOURCE is not consulted, so a stripped source's layer-7 parts still
+-- apply here when CR 613.1f/613.1g say they must not (#297).
 gather :: GameState -> [Gathered]
 gather gs =
   let setEffs = setLandSubtypeEffects gs
@@ -1332,10 +1336,24 @@ data ControlGrant = MkControlGrant
 -- `controls` quadratic in the battlefield, inside a loop the state-based-action
 -- sweep runs at every priority boundary.
 --
--- Layer 6/Humility is invisible to this fold: a control-granting static ability
--- stripped by LoseAllAbilities still appears here, because this walk reads the
--- battlefield's printed cards directly rather than a layer-ordered projection
--- (#196).
+-- Layer 6/Humility is invisible to this fold -- a control-granting static ability
+-- stripped by LoseAllAbilities still appears here -- and CR 613.1 says that is the
+-- right answer, not a shortcut. Control-changing effects are applied in layer 2
+-- (CR 613.1b) and ability-removing effects in layer 6 (CR 613.1f), so the grant
+-- has already been made by the time anything strips the ability that made it. No
+-- reordering can reach across that: CR 613.8a scopes dependency to effects
+-- "applied in the same layer (and, if applicable, sublayer)", and CR 613.6 keeps
+-- an effect applying "even if the ability generating the effect is removed during
+-- this process". ProjectionSpec's "CR 613.1b before CR 613.1f" tests prove it.
+--
+-- That covers REMOVAL, which is the only half that exists: the layer-6 vocabulary
+-- is LoseAllAbilities and GainKeyword, and neither can put a control-granting
+-- STATIC ability on an object, so there is nothing added at layer 6 for this walk
+-- to be missing either.
+--
+-- The same blindness is a defect one layer further down, where the order flips:
+-- an ability removed at layer 6 must generate no layer-7 effect, but `gather`
+-- does not ask (#297).
 --
 -- INVARIANT this liveness gate depends on (#197): the `liveGiven` call below
 -- must never FORCE a control-dependent Filter. `liveGiven` -> affectsBase ->
