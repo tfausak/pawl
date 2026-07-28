@@ -165,3 +165,7 @@ snapshotView shape event = case event of
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
+  -- the same discard emits is what carries one -- so there is nothing here for an
+  -- EventShape to match against.
+  GameEvent.Cycled _ -> Nothing

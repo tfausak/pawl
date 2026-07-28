@@ -31,6 +31,7 @@ import qualified Pawl.Type.Cost as Cost
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Filter as Filter.Type
 import Pawl.Type.Game (Game)
+import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -394,10 +395,27 @@ payComponent pid oid component = case component of
   -- The card is in the GRAVEYARD (or wherever the funnel redirected it) by the
   -- time the ability resolves, which is not a problem to route around: it is what
   -- CR 702.29c means by "these abilities trigger from whatever zone the card
-  -- winds up in after it's cycled" (#314), and the same thing SacrificeThis
-  -- already does to Ghitu Fire-Eater.
+  -- winds up in after it's cycled", and the same thing SacrificeThis already does
+  -- to Ghitu Fire-Eater. Pawl.Event's scan reads that zone -- see its cycledCard
+  -- candidate source.
+  --
+  -- CR 702.29c: this is also where a cycling TRIGGER fires from -- "'When you
+  -- cycle this card' means 'When you discard this card to pay an activation cost
+  -- of a cycling ability'" -- so the event is recorded here, off the cost, and
+  -- carries the id the funnel just minted rather than the one that was in hand.
+  --
+  -- The one thing this site cannot see is rule 702.29c's "of a CYCLING ability":
+  -- a cost component knows it was paid, not which ability it belonged to.
+  -- Keyword.cycling is the only producer of DiscardThis, so "this component was
+  -- paid" and "a cycling ability's cost was paid" name the same event today.
+  -- Faerie Macabre prints "Discard this card:" as an ability of its own and would
+  -- break that, firing every cycling trigger on the board; the event has to carry
+  -- which ability paid it before that card can exist (#319).
   CostComponent.DiscardThis -> do
-    Event.changeZone oid Zone.Graveyard
+    moved <- Event.changeZoneReturning oid Zone.Graveyard
+    case moved of
+      Nothing -> pure ()
+      Just newId -> State.modify' (Event.recordEvent (GameEvent.Cycled newId))
     pure Payment.Paid
   -- CR 107.14: paying energy removes that many energy counters from the
   -- player. Natural subtraction is PARTIAL (it throws on underflow), so `left`

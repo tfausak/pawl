@@ -26,8 +26,10 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Cost as Cost
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
@@ -44,6 +46,7 @@ import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
@@ -1348,5 +1351,93 @@ poisonousTests registry =
                 HU.assertEqual "and took the Piker's two" (Just 18) (S.lifeOf S.bob after)
         ]
 
+-- CR 702.29c: "'When you cycle this card' means 'When you discard this card to
+-- pay an activation cost of a cycling ability.' These abilities trigger from
+-- whatever zone the card winds up in after it's cycled."
+--
+-- Windcaller Aven is the card: a {4}{U}{U} 4/3 with flying, Cycling {U}, and
+-- "When you cycle this card, target creature gains flying until end of turn".
+-- The trigger is mandatory and its effect is Serpent's Gift's exact shape, so
+-- the only new thing any test below can be passing on is the trigger itself.
+cyclingTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+cyclingTriggerTests registry =
+  Tasty.testGroup
+    "CyclingTrigger"
+    [ -- The whole card: cycle the Aven for {U}, its trigger targets the Piker as
+      -- it is placed (CR 603.3d), and the Piker is flying once it resolves.
+      HU.testCase "CR 702.29c whole card: cycling Windcaller Aven grants flying" $ do
+        aven <- Registry.printing registry "Windcaller Aven"
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (creature, g0) = S.addCreature piker S.alice (S.landsInPlay island 1)
+            (g1, avenId) = S.handOne aven g0
+            gs = g1 {GameState.priority = Just S.alice}
+        HU.assertBool "the Piker does not start with flying" (not (Projection.hasKeyword Keyword.Type.Flying creature gs))
+        case Activate.abilitiesFor avenId gs of
+          [ability] -> do
+            let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice avenId ability)
+                -- The settle PLACES the trigger and stamps its target (CR
+                -- 603.3d); resolving it is the next thing to happen, and it is on
+                -- top of the draw it was triggered alongside.
+                placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
+                after = S.runPure S.identityAnswer placed Stack.resolveTop
+            HU.assertEqual "the Aven is in the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice cycled))
+            HU.assertBool "the trigger is on the stack, above the draw" (length (GameState.stack placed) == 2)
+            HU.assertBool "and the Piker has flying once it resolves" (Projection.hasKeyword Keyword.Type.Flying creature after)
+          abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+      -- "These abilities trigger from whatever zone the card winds up in": the
+      -- trigger's source is the graveyard incarnation, which CR 400.7 makes a
+      -- DIFFERENT object from the card that was in hand. The scan finds it in
+      -- neither of the two places it looked before this rule -- the battlefield,
+      -- and a permanent that just left it.
+      HU.testCase "CR 702.29c the trigger fires from the graveyard, off a new incarnation" $ do
+        aven <- Registry.printing registry "Windcaller Aven"
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (_, g0) = S.addCreature piker S.alice (S.landsInPlay island 1)
+            (g1, avenId) = S.handOne aven g0
+            gs = g1 {GameState.priority = Just S.alice}
+        case Activate.abilitiesFor avenId gs of
+          [ability] -> do
+            let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice avenId ability)
+                placed = S.runPure S.identityAnswer cycled Engine.placePendingTriggers
+            HU.assertEqual "the id that was in hand is gone" Nothing (Game.lookupObject avenId placed)
+            HU.assertEqual "the draw and the trigger are both on the stack" 2 (length (GameState.stack placed))
+          abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+      -- The discriminating twin, and the reason CR 702.29c needs an event of its
+      -- own rather than matching the zone change the discard already records: an
+      -- ORDINARY discard of the same card, through the same CR 400.7 funnel, is
+      -- not cycling and fires nothing.
+      HU.testCase "CR 702.29c discarding the Aven without cycling fires nothing" $ do
+        aven <- Registry.printing registry "Windcaller Aven"
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (creature, g0) = S.addCreature piker S.alice (S.landsInPlay island 1)
+            (g1, _) = S.handOne aven g0
+            gs = g1 {GameState.priority = Just S.alice}
+            -- The same card, the same graveyard, one component over: a cost that
+            -- discards a card of the player's choice rather than this one.
+            discarded = S.runPure S.identityAnswer gs (Cost.payComponent S.alice S.noSource (CostComponent.DiscardCards 1))
+            after = S.runPure S.identityAnswer discarded Engine.settleForPriority
+        HU.assertEqual "the Aven really did reach the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice discarded))
+        HU.assertEqual "nothing was put on the stack" [] (GameState.stack after)
+        HU.assertBool "and the Piker never gained flying" (not (Projection.hasKeyword Keyword.Type.Flying creature after)),
+      -- The other control: cycling a card that has no cycling trigger fires
+      -- nothing, so the trigger is the Aven's and not the act of cycling.
+      HU.testCase "CR 702.29c cycling a card with no such trigger fires nothing" $ do
+        mauler <- Registry.printing registry "Barkhide Mauler"
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (_, g0) = S.addCreature piker S.alice (S.landsInPlay forest 2)
+            (g1, maulerId) = S.handOne mauler g0
+            gs = g1 {GameState.priority = Just S.alice}
+        case Activate.abilitiesFor maulerId gs of
+          [ability] -> do
+            let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice maulerId ability)
+                placed = S.runPure S.identityAnswer cycled Engine.placePendingTriggers
+            HU.assertEqual "only the draw is on the stack" 1 (length (GameState.stack placed))
+          abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry]

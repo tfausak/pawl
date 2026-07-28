@@ -1,0 +1,133 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Flying"
+    },
+    {
+      "type": "Cycling",
+      "value": {
+        "components": [],
+        "mana": [
+          {
+            "type": "OfType",
+            "value": {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 4
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Windcaller Aven",
+  "power": {
+    "type": "Literal",
+    "value": 4
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 3
+  },
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfCycled"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Flying"
+                    }
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Bird"
+      },
+      {
+        "type": "Wizard"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}
