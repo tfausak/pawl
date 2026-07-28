@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Count as Count
+import qualified Pawl.Departure as Departure
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
@@ -17,6 +18,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Type.Aggregation as Aggregation
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Count as Count.Type
+import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.EventShape as EventShape
 import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameEvent as GameEvent
@@ -139,6 +141,24 @@ tests registry =
           "bob's one plus carol's two, and none of alice's"
           (Just 3)
           (Count.evaluate viewOf (Filter.MkContext (Just S.alice) Nothing) gs count),
+      -- CR 102.1 / CR 800.4a (#279). Asserted against playersFor directly rather
+      -- than through Count.evaluate, because no count can tell the difference: a
+      -- departing player's objects leave the game with them (CR 800.4a), so
+      -- Game.zoneMembers already answered [] for every zone of theirs and a
+      -- departed seat folded to nothing whether or not it was named. The filter
+      -- is here so this reading of a PlayerRef and Resolve.playerRefPlayers's --
+      -- where it IS observable -- cannot disagree about who a PlayerRef names.
+      HU.testCase "CR 800.4a neither EachPlayer nor Opponent names a player who has left the game" $
+        let gs = Departure.depart Departure.Type.Conceded S.carol S.threePlayerGame
+         in do
+              HU.assertEqual
+                "EachPlayer names the two still in the game"
+                (Just [S.alice, S.bob])
+                (Count.playersFor (Filter.MkContext Nothing Nothing) gs PlayerRef.EachPlayer)
+              HU.assertEqual
+                "and from alice, carol is not an opponent either"
+                (Just [S.bob])
+                (Count.playersFor (Filter.MkContext (Just S.alice) Nothing) gs (PlayerRef.Relative PlayerRelation.Opponent)),
       HU.testCase "CR 109.5 Relative with no perspective is undeterminable" $
         let gs = Setup.emptyGame S.bothPlayers
             count =
