@@ -14,6 +14,7 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as CardT
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.Cost as Cost
@@ -36,7 +37,11 @@ import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Slug as Slug.Type
+import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Toughness as Toughness
+import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
@@ -110,6 +115,27 @@ tests registry =
         HU.assertEqual
           "the cycling trigger gains 2 and is optional"
           [[(Optionality.Optional, [Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)])]]
+          (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
+      -- The first card file whose triggered ability functions somewhere other
+      -- than the battlefield (CR 113.6k). Its "may" reuses renewed-faith.json's
+      -- per-mode optionality key rather than adding a second spelling.
+      HU.testCase "narcomoeba.json loads as a {1}{U} flying Illusion with an Optional graveyard trigger" $ do
+        c <- Registry.card registry "Narcomoeba"
+        HU.assertEqual "name" (Text.pack "Narcomoeba") (CardT.name c)
+        HU.assertEqual "{1}{U}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Creature -- Illusion"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Illusion))
+          (CardT.typeLine c)
+        HU.assertEqual "1/1" (Just (Power.MkPower (Quantity.Literal 1)), Just (Toughness.MkToughness (Quantity.Literal 1))) (CardT.power c, CardT.toughness c)
+        HU.assertEqual "flying, and nothing else" (Set.singleton Keyword.Flying) (CardT.keywords c)
+        HU.assertEqual
+          "the trigger watches library -> graveyard"
+          [TriggerCondition.SelfPutIntoGraveyardFromLibrary]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "and may put the card itself onto the battlefield"
+          [[(Optionality.Optional, [Effect.MoveToZone Binding.triggerSource Zone.Battlefield])]]
           (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
       HU.testCase "leyline-of-the-void.json loads with a CR 103.6a action and an Opponents redirect" $ do
         c <- Registry.card registry "Leyline of the Void"

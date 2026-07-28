@@ -1,0 +1,92 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Flying"
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Blue"
+        }
+      }
+    }
+  ],
+  "name": "Narcomoeba",
+  "power": {
+    "type": "Literal",
+    "value": 1
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 1
+  },
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfPutIntoGraveyardFromLibrary"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "MoveToZone",
+                "value": [
+                  "self",
+                  {
+                    "type": "Battlefield"
+                  }
+                ]
+              }
+            ],
+            "optionality": {
+              "type": "Optional"
+            },
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Illusion"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

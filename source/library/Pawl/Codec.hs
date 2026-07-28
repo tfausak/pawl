@@ -294,6 +294,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Shaman -> "Shaman"
   Subtype.Demon -> "Demon"
   Subtype.Cleric -> "Cleric"
+  Subtype.Illusion -> "Illusion"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -342,7 +343,8 @@ jsonToSubtype =
       (Text.pack "Nomad", Subtype.Nomad),
       (Text.pack "Shaman", Subtype.Shaman),
       (Text.pack "Demon", Subtype.Demon),
-      (Text.pack "Cleric", Subtype.Cleric)
+      (Text.pack "Cleric", Subtype.Cleric),
+      (Text.pack "Illusion", Subtype.Illusion)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -979,6 +981,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.SelfDealsCombatDamageToPlayer -> nullary (Text.pack "SelfDealsCombatDamageToPlayer")
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
   TriggerCondition.SelfCycled -> nullary (Text.pack "SelfCycled")
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> nullary (Text.pack "SelfPutIntoGraveyardFromLibrary")
 
 jsonToTriggerCondition :: Value -> Either Text TriggerCondition.TriggerCondition
 jsonToTriggerCondition value = do
@@ -991,6 +994,7 @@ jsonToTriggerCondition value = do
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
+    ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
 
 castingPermissionToJson :: CastingPermission.CastingPermission -> Value

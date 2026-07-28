@@ -337,6 +337,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.SelfCycled -> []
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
