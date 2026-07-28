@@ -1646,6 +1646,29 @@ zoneChangeTests registry =
         -- zone change; this is what keeps the list below honest about that.
         HU.assertEqual "no draw outran a library" Set.empty (GameState.drewFromEmpty after)
         HU.assertEqual "both opponents drew, and the controller did not" [S.bob, S.carol] (drawersOf after),
+      -- CR 102.1: "A player is one of the people in the game", so once CR 800.4a
+      -- takes carol out, `EachPlayer` stops naming her (#279). It needs three
+      -- seats twice over: CR 800.4 says only a multiplayer game -- CR 800.1's,
+      -- one that BEGAN with more than two players -- continues after a
+      -- departure, and a two-seat game would already have ended under CR 104.2a
+      -- with nothing left to resolve.
+      --
+      -- drewFromEmpty is what makes this observable rather than merely tidy.
+      -- CR 800.4a took carol's library out of the game with her, so a draw aimed
+      -- at her finds it empty and Event.drawCard writes her seat into that set --
+      -- engine state recorded for someone who is not in the game.
+      HU.testCase "CR 800.4a Vision Skeins does not draw for a player who has left the game" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        visionSkeins <- Registry.printing registry "Vision Skeins"
+        let withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
+            withLibs = stockLibrary piker S.carol 2 (stockLibrary piker S.bob 2 (stockLibrary piker S.alice 2 withMana))
+            (gs0, spellId) = S.handOne visionSkeins withLibs
+            gs = Departure.depart Departure.Type.Conceded S.carol gs0
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "the two players still in the game drew, in APNAP order" [S.alice, S.alice, S.bob, S.bob] (drawersOf after)
+        HU.assertEqual "and nothing was drawn against carol's departed library" Set.empty (GameState.drewFromEmpty after),
       HU.testCase "CR 701.17 Tome Scour mills five from a target player's library" $ do
         island <- Registry.printing registry "Island"
         piker <- Registry.printing registry "Goblin Piker"
@@ -2046,6 +2069,24 @@ proliferateTests registry =
         HU.assertEqual "bob poisoned" 1 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
         HU.assertEqual "carol poisoned too" 1 (S.playerCounterOf PlayerCounterKind.Poison S.carol after)
         HU.assertEqual "alice untouched" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
+      -- CR 102.1 / CR 800.4a: an opponent is one of the OTHER people in the
+      -- game, and carol is no longer one of them (#279). Poison on a departed
+      -- player's record is not idle bookkeeping -- the proliferate case below
+      -- reads Player.counters to build its candidate list, so this is the write
+      -- that would put a non-player on the next prompt.
+      HU.testCase "CR 800.4a Prologue to Phyresis does not poison a player who has left the game" $ do
+        island <- Registry.printing registry "Island"
+        piker <- Registry.printing registry "Goblin Piker"
+        prologueToPhyresis <- Registry.printing registry "Prologue to Phyresis"
+        let (_, withLibrary) = S.addLibraryCard piker S.alice S.threePlayerGame
+            withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withLibrary [1 .. (2 :: Int)]
+            (gs0, spellId) = S.handOne prologueToPhyresis withMana
+            gs = Departure.depart Departure.Type.Conceded S.carol gs0
+            cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "bob, still in the game, is poisoned" 1 (S.playerCounterOf PlayerCounterKind.Poison S.bob after)
+        HU.assertEqual "carol, who left, is not" 0 (S.playerCounterOf PlayerCounterKind.Poison S.carol after)
+        HU.assertEqual "and neither is the caster" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
       -- CR 701.34a: players carry counters too, and proliferate reaches them.
       HU.testCase "CR 701.34a proliferate adds to a player's poison and energy" $ do
         piker <- Registry.printing registry "Goblin Piker"
@@ -2063,6 +2104,28 @@ proliferateTests registry =
             gs = S.addPlayerCounter PlayerCounterKind.Poison 2 S.bob g0
             after = proliferate proliferatesAll src gs
         HU.assertEqual "alice stays clean" 0 (S.playerCounterOf PlayerCounterKind.Poison S.alice after),
+      -- CR 102.1: proliferate reaches "any number of permanents and/or PLAYERS",
+      -- and a player is one of the people in the game -- so a departed seat is
+      -- not a candidate (#279). This is the case that made the filter worth
+      -- writing rather than deferring again: CR 800.4a removes a departing
+      -- player's OBJECTS, and a player counter is not an object (CR 109.1), so
+      -- carol's poison is still sitting on her record for kindsFor to find. The
+      -- engine would offer someone who is not in the game as a choice, which is
+      -- the second invariant's other half -- where the rules leave nothing to
+      -- ask, do not ask.
+      --
+      -- proliferatesAll takes everything offered, so the assertion is exactly
+      -- "carol was not offered". bob is the discriminator: he is poisoned too and
+      -- still in the game, so a filter that dropped every player would fail here.
+      HU.testCase "CR 800.4a a player who has left the game is not a proliferate candidate" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        let (src, g0) = S.addCreature piker S.alice S.threePlayerGame
+            g1 = S.addPlayerCounter PlayerCounterKind.Poison 2 S.bob g0
+            g2 = S.addPlayerCounter PlayerCounterKind.Poison 3 S.carol g1
+            gs = Departure.depart Departure.Type.Conceded S.carol g2
+            after = proliferate proliferatesAll src gs
+        HU.assertEqual "carol has left, so her poison does not move" 3 (S.playerCounterOf PlayerCounterKind.Poison S.carol after)
+        HU.assertEqual "bob is still in the game, so his does" 3 (S.playerCounterOf PlayerCounterKind.Poison S.bob after),
       -- CR 701.34a: "any number" includes none. The discriminating twin of the
       -- first test -- same board, opposite answer -- so this fails if the engine
       -- proliferates for the player instead of asking.

@@ -72,22 +72,21 @@ aggregate aggregation views = case aggregation of
 -- resolved -- a Relative with no perspective, or a slot that is unbound or bound
 -- to something that is not a player.
 --
--- `everyone` is every player in the map, INCLUDING one who has left the game, and
--- that is masked rather than correct. It is unobservable: CR 800.4a takes every
--- object a departing player owns out of the game, and no site can mint a new one
--- owned by them afterwards, so Game.zoneMembers returns [] for every zone of
--- theirs and a departed player contributes nothing to any fold here.
+-- CR 102.1: "A player is one of the people in the game." A player who has left
+-- keeps their row in GameState.players -- Player.status turns Departed, the key
+-- stays -- so `everyone` is Game.stillPlaying rather than the map's keys, and
+-- neither EachPlayer nor Opponent names a departed seat.
 --
--- It is not fixed because there is nothing to observe, so no test could prove a
--- filter right. The obstacle this comment used to name -- that the status
--- predicate lived in Pawl.Departure, which this module cannot import -- is gone:
--- it is Game.stillPlaying now, and Pawl.Game is already imported here. Adding
--- `filter (\pid -> List.elem pid (Game.stillPlaying gs)) everyone` is a one-line
--- change whenever a card makes the difference visible (#279, which tracks the
--- same mask at Resolve.playerRefPlayers).
+-- Unobservable HERE, unlike at Resolve.playerRefPlayers, and written anyway:
+-- CR 800.4a took every object a departing player owned out of the game and no
+-- site can mint a new one owned by them, so Game.zoneMembers already answered []
+-- for each of their zones and they contributed nothing to any fold. The two
+-- readings of a PlayerRef must not disagree about who a PlayerRef names, and the
+-- first Scope that folds over PLAYERS rather than over their objects would
+-- observe the difference immediately.
 playersFor :: Filter.Context -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
 playersFor context gs ref =
-  let everyone = Map.keys (GameState.players gs)
+  let everyone = Game.stillPlaying gs
    in case ref of
         PlayerRef.EachPlayer -> Just everyone
         PlayerRef.Relative relation -> do

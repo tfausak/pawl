@@ -571,11 +571,23 @@ attachLegal src target gs =
 -- RESERVED slot -- the trigger's "that player" -- has no target spec, so
 -- legalSlot already answered True for it.
 --
--- `everyone` is not filtered to the players still in the game (CR 800.4a), and
--- it is `Map.keys` seat order rather than turn order. The first is masked rather
--- than correct, matching Count.playersFor's seat list (#279). The second is
--- deliberate: an unordered SET of players is what a PlayerRef names, and a
--- caller with an ordering rule to obey imposes it on this answer -- the Draw
+-- CR 102.1: "A player is one of the people in the game." A player who has left
+-- keeps their row in GameState.players -- Player.status turns Departed, the key
+-- stays -- so `everyone` is Game.stillPlaying rather than the map's keys, and
+-- CR 800.4a's departure takes a seat out of both enumerating arms.
+--
+-- Only those two arms, because only they read the roster. `Relative You` and
+-- `InSlot` name one specific player who arrived from elsewhere -- the
+-- resolution's controller, a recipient the caster chose -- so there is no
+-- roster here for CR 102.1 to filter. Whether a departed player can still BE
+-- one of those is a different question under different clauses: CR 800.4d keeps
+-- their triggered ability off the stack to begin with, and CR 800.4i governs an
+-- effect that needs information about a specific player who has left. The
+-- unbuilt parts of those clauses are #181, not this.
+--
+-- `everyone` is in the players map's PlayerId order rather than turn order, and
+-- that is deliberate: an unordered SET of players is what a PlayerRef names, and
+-- a caller with an ordering rule to obey imposes it on this answer -- the Draw
 -- arm does, for CR 121.2c.
 playerRefPlayers :: Map.Map SlotName Recipient -> Map.Map SlotName Bool -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
 playerRefPlayers chosen legality controller gs ref = case ref of
@@ -586,7 +598,7 @@ playerRefPlayers chosen legality controller gs ref = case ref of
   PlayerRef.Relative PlayerRelation.Opponent -> filter (/= controller) everyone
   PlayerRef.EachPlayer -> everyone
   where
-    everyone = Map.keys (GameState.players gs)
+    everyone = Game.stillPlaying gs
 
 applyEffectWith :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffectWith runSubgame source controller bound legality chosen effect = case effect of
@@ -702,14 +714,15 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- funnels through changeZone). A graveyard->exile move matches no M3f
   -- replacement or trigger, so no cascade.
   --
-  -- The loop spans every player in the map, including one who has left the game,
-  -- and that is masked rather than correct: CR 800.4a took every object a
-  -- departing player owns out of the game, so Game.zoneMembers finds nothing in
-  -- their graveyard and the extra iteration moves nothing. Left as-is for the
-  -- same reason Count.playersFor is -- see the argument there.
+  -- "Every graveyard" is every player's, and CR 102.1 makes that the players
+  -- still in the game -- Game.stillPlaying, not the keys of GameState.players,
+  -- which keep a departed seat's row. Unobservable, and written anyway for the
+  -- reason Count.playersFor gives: CR 800.4a took every object a departing
+  -- player owned out of the game, so Game.zoneMembers finds nothing in their
+  -- graveyard and the extra iteration moved nothing either way.
   Effect.ExileAllGraveyards -> do
     gs <- State.get
-    let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Map.keys (GameState.players gs))
+    let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Game.stillPlaying gs)
     Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) gyCards
   -- CR 103.5b (Serum Powder): "exile all the cards from your hand, then draw
   -- that many cards." The count is the hand size BEFORE the exile, which is why
@@ -818,18 +831,16 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         -- CR 121.2d (shared team turns) has no reader -- pawl has no teams
         -- (#175).
         --
-        -- A filter, so a drawer the roster does not name is dropped. The two
-        -- agree seat for seat in an ordinary game; where they don't -- CR 727.1
-        -- and Setup.subgameStateFrom rebuild turnOrder from the still-playing
-        -- seats while leaving a departed player in the players map -- dropping
-        -- is what CR 800.4a wants anyway.
-        --
-        -- NOT a general filter for departed players, who are still named
-        -- wherever turnOrder still seats them (#279). Drawing for one is not a
-        -- no-op: CR 800.4a took their library out of the game with them, so
-        -- Event.drawCard records them in GameState.drewFromEmpty. It is inert
-        -- rather than harmless-by-accident -- Sba.losesNow, that field's only
-        -- reader, gates every loss on Status.Playing.
+        -- An intersection: apnapOrder supplies the ORDER, `named` the
+        -- MEMBERSHIP, and a player in only one of the two does not draw. Both
+        -- directions have a case, and the one that bites is a seat apnapOrder
+        -- names and `named` does not. A departure does not shorten the seating
+        -- roster -- CR 800.4k and CR 800.4m both speak of the turn a departed
+        -- player "would have begun", so their seat stays in the order -- while
+        -- playerRefPlayers stopped naming them at CR 102.1. Drawing for one was
+        -- never a no-op: CR 800.4a took their library out of the game with them,
+        -- so Event.drawCard would record them in GameState.drewFromEmpty,
+        -- writing engine state for someone who is not in the game.
         drawers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
     case Quantity.evaluate viewOf context gs source quantity of
       Just n
@@ -1170,9 +1181,19 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
       --
       -- Targetless: nothing was targeted, so unlike every slot-reading opcode here
       -- there is no CR 608.2b legality to re-check.
+      --
+      -- The "players" of CR 701.34a are CR 102.1's -- the people IN the game --
+      -- so the roster is Game.stillPlaying, not the keys of GameState.players,
+      -- which keep a departed seat's row. This is the observable one, and the
+      -- reason #279 was worth closing rather than deferring again: a departed
+      -- player's counters stay on their record, because CR 800.4a removes their
+      -- OBJECTS and CR 109.1's list of what an object is has no room for a
+      -- counter on a player. Their poison is still there for kindsFor to find,
+      -- so the map's keys would offer someone who is not in the game as a
+      -- choice, and honouring that answer puts a fresh counter on a non-player.
   Effect.Proliferate -> do
     gs <- State.get
-    let everyone = Map.keys (GameState.players gs)
+    let everyone = Game.stillPlaying gs
         kindsOn oid = foldMap (Map.keys . Map.filter (> 0) . Object.counters) (Game.lookupObject oid gs)
         kindsFor pid = foldMap (Map.keys . Map.filter (> 0) . Player.counters) (Map.lookup pid (GameState.players gs))
         -- The battlefield is shared, and zoneMembers slices it by OWNER, so the
