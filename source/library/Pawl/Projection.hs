@@ -730,9 +730,16 @@ rewriteModification pairs m =
 -- lets projectWith decide their set once. A stored effect and a counter are each
 -- a single part and carry none.
 --
--- CR 305.7 is the only ability loss this asks about. A layer-6 LoseAllAbilities
--- on the SOURCE is not consulted, so a stripped source's layer-7 parts still
--- apply here when CR 613.1f/613.1g say they must not (#297).
+-- TWO ability losses are asked about, and only about a PERMANENT'S OWN static
+-- abilities. CR 305.7's land-subtype strip (liveGiven) drops the permanent
+-- outright; CR 613.1f's layer-6 ability removal (abilitiesRemoved) drops only an
+-- ability whose every part lands after layer 6 (gatherStatic). Neither gate
+-- touches a stored effect or a counter, because neither IS an ability for layer 6
+-- to remove: CR 611.2a gives a resolved spell's continuous effect a duration of
+-- its own ("lasts as long as stated by the spell or ability creating it ... If no
+-- duration is stated, it lasts until the end of the game"), and CR 122.1a/613.4c
+-- make a counter's +1/+1 a rule about the counter rather than an ability of the
+-- object it sits on. Humility removes neither.
 gather :: GameState -> [Gathered]
 gather gs =
   let setEffs = setLandSubtypeEffects gs
@@ -750,7 +757,7 @@ gather gs =
             gModification = ContinuousEffect.modification eff
           }
       stored = fmap fromStored (GameState.continuousEffects gs)
-      fromPermanent permId = case Game.lookupObject permId gs of
+      fromPermanent stripped permId = case Game.lookupObject permId gs of
         Nothing -> []
         Just permObj -> case Game.cardOf permId gs of
           Nothing -> []
@@ -762,9 +769,13 @@ gather gs =
                 -- effect is folded onto any other object. Hack Blood Moon's
                 -- SetLandSubtype Mountain -> SetLandSubtype Island.
                 let changes = textChangesAffecting permId gs
-                 in concat (zipWith (gatherStatic permId (Object.timestamp permObj) changes) [0 ..] (Card.Type.staticAbilities card))
+                 in -- One thunk per permanent, shared by every one of its abilities
+                    -- and forced by none of them unless that ability is entirely
+                    -- above layer 6 -- so the projection it costs is paid for at
+                    -- most once per permanent, and on almost every board not at all.
+                    concat (zipWith (gatherStatic permId (Object.timestamp permObj) changes (stripped permId)) [0 ..] (Card.Type.staticAbilities card))
               else []
-      static_ = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+      staticGiven stripped = concatMap (fromPermanent stripped) (Set.toList (GameState.battlefield gs))
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
         Nothing -> []
         Just emblemObj -> case Game.cardOf emblemId gs of
@@ -772,11 +783,78 @@ gather gs =
           Just card ->
             -- CR 114.4 / 113.6: an emblem's abilities function in the command
             -- zone. Its static ability's continuous effect shares the emblem's
-            -- entry timestamp (CR 613.7a). No liveness/text-change pass: nothing
-            -- in scope strips an emblem's abilities or rewrites land types.
-            concat (zipWith (gatherStatic emblemId (Object.timestamp emblemObj) []) [0 ..] (Card.Type.staticAbilities card))
+            -- entry timestamp (CR 613.7a). No liveness/text-change pass, and
+            -- never stripped: nothing in scope strips an emblem's abilities or
+            -- rewrites land types, and CR 613.1f's removers in the pool reach
+            -- creatures, which an emblem (CR 114.5, not a permanent) is not.
+            concat (zipWith (gatherStatic emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Card.Type.staticAbilities card))
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
-   in stored <> static_ <> emblems <> counterGathered gs
+      counters = counterGathered gs
+      -- The same list with the layer-6 gate OFF -- which is what the gate itself
+      -- reads, and why this needs one extra pass rather than a fixpoint. Deciding
+      -- whether a source's abilities were removed means projecting that source
+      -- through layers 1-5 (abilitiesRemoved), and a projection bounded below
+      -- layer 6 applies no candidate at layer 6 or later -- so it cannot see, and
+      -- so cannot be changed by, the layer-7 parts this gate drops.
+      ungated = stored <> staticGiven (const False) <> emblems <> counters
+   in -- Almost every board has no ability-removing effect at all, and then the
+      -- gathered list IS the ungated one -- no second walk of the battlefield's
+      -- static abilities and no projection spent on the question.
+      if any (removesAbilities . gModification) ungated
+        then stored <> staticGiven (abilitiesRemoved ungated gs) <> emblems <> counters
+        else ungated
+
+-- CR 613.1f: does this modification REMOVE abilities? The layer-6 classification
+-- abilitiesRemoved asks for, in the same standing as setLandSubtypeEffects's
+-- isSet -- Projection is the sole home of a case on Modification.
+removesAbilities :: Modification -> Bool
+removesAbilities m = case m of
+  Modification.LoseAllAbilities -> True
+  -- CR 613.1f names ability-ADDING effects in the same layer, and adding is not
+  -- removing; named explicitly per Modification's exhaustiveness discipline.
+  Modification.GainKeyword _ -> False
+  -- CR 305.7 strips a land's rules text, which IS an ability loss -- but it is a
+  -- layer-4 type change (see `layer`), not a layer-6 removal, and it is gated
+  -- separately and earlier by liveGiven. Answering True here would double-count
+  -- it into a layer whose ordering it does not have.
+  Modification.SetLandSubtype _ -> False
+  _ -> False
+
+-- CR 613.1f / 613.1g: were `oid`'s abilities removed by the time layer 6
+-- finished? Layer 6 is applied before layer 7, so an ability removed there
+-- generates no layer-7 effect at all, and CR 613.6's rescue ("it will continue to
+-- be applied ... even if the ability generating the effect is removed during this
+-- process") cannot reach it -- an ability whose only parts are in layer 7 never
+-- STARTED to apply in an earlier layer. gatherStatic is where that distinction is
+-- drawn; this only answers the removal question.
+--
+-- The removers are read off the SAME candidate list, which is where CR 613.6's
+-- rescue lands instead: an ability-removing effect is itself a layer-6 part, so
+-- an ability that carries one is never gated by this and a Humility'd Humility
+-- keeps applying its own layer-7b 1/1 (ProjectionSpec's Humility + Opalescence
+-- timestamp pair proves it).
+--
+-- The affected set is judged against the projection layers 1-5 leave behind
+-- (projectUpTo Layer.Ability), which is exactly the partial the fold itself uses
+-- when it applies layer 6: no layer-6 modification WRITES an aspect any Filter
+-- reads (modificationWrites), so CR 613.8 reorders nothing within layer 6 and the
+-- two readings cannot disagree. This is what lets an Opalescence-animated Bad
+-- Moon be inside Humility's "each creature" -- the animation is layer 4.
+--
+-- Layer 6 is where a remover's set is asked here, rather than CR 613.6's lowest
+-- layer of the ability carrying it (#326).
+--
+-- NOT asked of the remover's own source: whether a stripper was itself stripped
+-- is a question about ORDER WITHIN layer 6, which the fold settles by CR 613.7
+-- timestamp as it applies that layer, not something this gate can restate (#37's
+-- neighbourhood -- see the layer-6 grant/Humility timestamp test).
+abilitiesRemoved :: [Gathered] -> GameState -> ObjectId -> Bool
+abilitiesRemoved cands gs oid =
+  let partial = projectUpTo Layer.Ability cands oid gs
+      removes c =
+        removesAbilities (gModification c)
+          && affects (gSource c) oid (gAffected c) partial gs
+   in any removes cands
 
 -- One static ability's parts, ready to fold: CR 613.6's unit. `n` is the
 -- ability's index on its source, and (src, n) is what every part of a MULTI-part
@@ -787,8 +865,27 @@ gather gs =
 -- Read-point 2 (CR 612): the text-changes affecting the SOURCE rewrite each
 -- part's basic-land-type words before the part is folded onto any other object.
 -- Hack Blood Moon's SetLandSubtype Mountain -> SetLandSubtype Island.
-gatherStatic :: ObjectId -> Timestamp -> [(Subtype.Subtype, Subtype.Subtype)] -> Natural -> StaticAbility.StaticAbility -> [Gathered]
-gatherStatic src ts changes n sa =
+--
+-- `stripped` is CR 613.1f's answer for the SOURCE (abilitiesRemoved): were its
+-- abilities removed by the time layer 6 finished? It costs an ability all of its
+-- parts, and only when every one of them applies AFTER layer 6 -- CR 613.1g's
+-- layer 7 is the only such layer in the vocabulary. Two clauses, both load-
+-- bearing:
+--
+--   * ALL parts after 6, so nothing is retracted that CR 613.6 protects. An
+--     ability with a part in layers 1-5 has already started to apply by the time
+--     anything removes it, and "will continue to be applied ... even if the
+--     ability generating the effect is removed during this process" -- a March of
+--     the Machines that Opalescence animated and Humility then stripped keeps
+--     setting its artifacts' P/T at 7b, off its layer-4 part.
+--   * AFTER 6, not at-or-after. An ability whose own part is IN layer 6 starts to
+--     apply in the very layer that removes it, which is the same rescue: Humility
+--     animated by Opalescence strips itself and still sets its 1/1 at 7b.
+--
+-- The whole ability is dropped rather than only its layer-7 parts, which is the
+-- same statement: the branch is only taken when every part is a layer-7 one.
+gatherStatic :: ObjectId -> Timestamp -> [(Subtype.Subtype, Subtype.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
+gatherStatic src ts changes stripped n sa =
   let ms = StaticAbility.modifications sa
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
@@ -803,7 +900,10 @@ gatherStatic src ts changes n sa =
                 gTimestamp = ts,
                 gModification = m'
               }
-   in fmap one (NonEmpty.toList ms)
+      parts = fmap one (NonEmpty.toList ms)
+   in -- The cheap structural test first, so `stripped`'s projection is forced only
+      -- for an ability the rest of the rule could actually reach.
+      if all ((> Layer.Ability) . gLayer) parts && stripped then [] else parts
 
 -- CR 122.1a / 613.4c: a +1/+1 counter adds +1/+1 and a -1/-1 counter adds -1/-1,
 -- in layer 7c. Emit each battlefield object's counters as ONE synthetic 7c
@@ -1351,9 +1451,11 @@ data ControlGrant = MkControlGrant
 -- STATIC ability on an object, so there is nothing added at layer 6 for this walk
 -- to be missing either.
 --
--- The same blindness is a defect one layer further down, where the order flips:
--- an ability removed at layer 6 must generate no layer-7 effect, but `gather`
--- does not ask (#297).
+-- The same blindness would be a defect one layer further down, where the order
+-- flips: an ability removed at layer 6 generates no layer-7 effect, which is a
+-- question `gather` DOES ask (abilitiesRemoved). This walk stays blind on purpose
+-- because layer 2 is on the other side of layer 6, not because the question is
+-- unanswerable.
 --
 -- INVARIANT this liveness gate depends on (#197): the `liveGiven` call below
 -- must never FORCE a control-dependent Filter. `liveGiven` -> affectsBase ->
