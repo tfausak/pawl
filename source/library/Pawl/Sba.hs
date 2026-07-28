@@ -374,18 +374,28 @@ chooseLegendVictims (controller, candidates) = do
 --    not "the lower id survives".
 --
 -- The CLOCK is Object.timestamp -- when the permanent entered the battlefield
--- (CR 613.7d) -- and NOT a separate record of when it became world. Those are
--- the same instant for every board reachable today, which is why this is exact
--- rather than an approximation. Supertypes are not projected: the projection
--- seeds them from the card and no layer touches them afterwards, because no
--- Modification arm changes a supertype (#311) -- so a permanent's world-ness
--- cannot change while it sits on the battlefield. The one thing that can differ
--- from the printed type line is a copy effect (CR 707.2 lists supertype among
--- the copiable values), and a copy applies as the object ENTERS, the same moment
--- it is stamped. And the one restamp that does NOT come with a zone change --
--- CR 701.3c's, when an Aura or Equipment is attached to something new -- needs
--- the world permanent to be attachable, which no printing that carries the world
--- supertype is.
+-- (CR 613.7d) -- and NOT a separate record of when it became world. The two are
+-- the same instant for every board pawl can reach TODAY, and that is a fact
+-- about what pawl cannot yet express rather than a fact about Magic. All three
+-- of the ways they could come apart are missing capabilities, each with an issue:
+--
+-- 1. A supertype gained or lost on the battlefield. No Modification arm changes
+--    a supertype (#311), so nothing projects one -- the projection seeds
+--    supertypes from the card and no layer touches them afterwards.
+-- 2. A permanent that BECOMES a copy of a world permanent, which needs no
+--    supertype-changing effect at all: CR 707.2 lists supertype among the
+--    copiable values. pawl copies only as an object ENTERS (Binding.copyOf,
+--    written by the CR 614 as-enters replacement), the same moment it is
+--    stamped; CR 707.3's on-the-battlefield half is #313, and Crystalline
+--    Resonance is the card that would break this reading -- it can be older than
+--    the world permanent it copies, so the timestamp says "bury it" where the
+--    rule says "keep it".
+-- 3. A restamp with no zone change. CR 701.3c's is the only one, and it needs
+--    the world permanent to be attachable, which no printing that carries the
+--    world supertype is.
+--
+-- Whichever of #311 or #313 lands first has to give this rule a clock of its own:
+-- a per-object "world since", sampled where the supertype set is established.
 --
 -- Read off the PROJECTION rather than the printed type line, for the reason
 -- legendGroups is: CR 707.2 makes a copy of a world permanent world too.
