@@ -7,8 +7,10 @@
 -- reserved trigger-source slot, CR 701.21 -- `sacrificeTests`. CR 603.8 state
 -- triggers -- `stateTriggerTests`. CR 608.2i turn history (Khabál Ghoul's
 -- "died this turn") -- `historyTests`. CR 603.7 delayed triggered abilities
--- -- `delayedTests`. The CR 603.3b ordering prompt -- `orderingTests`. The CR
--- 603.4 / 608.2a intervening "if" -- `interveningTests`. Also Pawl.Keyword: CR
+-- -- `delayedTests`. The CR 603.3b ordering prompt -- `orderingTests`, and its
+-- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
+-- batch) -- `monarchOrderingTests`. The CR 603.4 / 608.2a intervening "if" --
+-- `interveningTests`. Also Pawl.Keyword: CR
 -- 702.70 poisonous, the keyword whose rule text IS a triggered ability, and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousTests`.
 {-# LANGUAGE GADTs #-}
@@ -69,6 +71,7 @@ import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerSource as TriggerSource
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.Zone as Zone
@@ -209,7 +212,7 @@ scanTests registry =
             gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
         case fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1) of
           [pt] -> do
-            HU.assertEqual "source is RiP" ripId (PendingTrigger.source pt)
+            HU.assertEqual "source is RiP" (TriggerSource.OfObject ripId) (PendingTrigger.source pt)
             HU.assertEqual "controller is alice" S.alice (PendingTrigger.controller pt)
           other -> HU.assertFailure ("expected exactly one pending trigger, got " <> show (length other)),
       HU.testCase "a graveyard-bound event yields no enters trigger" $ do
@@ -247,7 +250,7 @@ scanTests registry =
             triggers = fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2)
         HU.assertBool "rip1 has the lower id" (rip1 < rip2)
         HU.assertEqual "both triggers fired" 2 (length triggers)
-        HU.assertEqual "sources in ascending ObjectId order" [rip1, rip2] (fmap PendingTrigger.source triggers),
+        HU.assertEqual "sources in ascending ObjectId order" (fmap TriggerSource.OfObject [rip1, rip2]) (fmap PendingTrigger.source triggers),
       -- The PERMANENTS-INNER half of that same order guarantee. Every SelfEnters
       -- test above has exactly one bearer matching each event, so inner order
       -- can never affect the output -- SelfEnters alone cannot discriminate
@@ -264,7 +267,7 @@ scanTests registry =
             triggers = fst (Event.gatherTriggers [event] gs1)
         HU.assertBool "ghoul1 has the lower id" (ghoul1 < ghoul2)
         HU.assertEqual "both triggers fired" 2 (length triggers)
-        HU.assertEqual "sources in ascending ObjectId order" [ghoul1, ghoul2] (fmap PendingTrigger.source triggers),
+        HU.assertEqual "sources in ascending ObjectId order" (fmap TriggerSource.OfObject [ghoul1, ghoul2]) (fmap PendingTrigger.source triggers),
       -- CR 603.10, FIRST sentence -- the normal rule, not the "looks back in
       -- time" exception list that follows it: "objects that exist immediately
       -- after an event are checked to see if the event matched any trigger
@@ -736,7 +739,7 @@ delayedTests registry =
                 -- built with the SAME Binding.fromChoices Cast.castSpell uses, so
                 -- the collision is the real production shape, not a fabricated one.
                 captured = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 7))
-                pending = PendingTrigger.MkPendingTrigger (ObjectId.MkObjectId 0) S.alice ability captured
+                pending = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject (ObjectId.MkObjectId 0)) S.alice ability captured
                 after = snd (Engine.runGamePure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Engine.placeOne pending))
                 placedModes = case GameState.stack after of
                   placedId : _ -> case Game.lookupObject placedId after of
@@ -837,8 +840,9 @@ delayedTests registry =
               other -> HU.assertFailure ("expected two Wall tokens, got " <> show (length other))
         ]
 
--- CR 603.3b: "that player puts them on the stack in any order they choose". The
--- centerpiece: two triggers, one controller, and an order that changes the answer.
+-- CR 603.3b: "puts each triggered ability they control ... on the stack in any
+-- order they choose". The centerpiece: two triggers, one controller, and an
+-- order that changes the answer.
 orderingTests :: Registry.Type.Registry -> Tasty.TestTree
 orderingTests registry =
   let endStep = Phase.Ending EndingStep.EndStep
@@ -856,12 +860,12 @@ orderingTests registry =
       -- whose source is the resolved spell's id rather than any permanent.
       otherThan ghoul gs =
         let sources = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs))
-         in case filter (/= ghoul) sources of
-              oid : _ -> oid
-              [] -> ghoul
+         in case filter (/= TriggerSource.OfObject ghoul) sources of
+              src : _ -> src
+              [] -> TriggerSource.OfObject ghoul
       -- An answerer that puts a chosen source LAST on the stack, so it resolves
       -- FIRST (CR 603.3b's answer is the order they are PUT on the stack).
-      orderLast :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      orderLast :: TriggerSource.TriggerSource -> Prompt.Prompt r -> r
       orderLast wanted p = case p of
         Prompt.OrderTriggers _ _ sources ->
           let indexed = zip [0 ..] sources
@@ -908,7 +912,7 @@ orderingTests registry =
             island <- Registry.printing registry "Island"
             khabalGhoul <- Registry.printing registry "Khabál Ghoul"
             let (ghoul, gs) = boardOf tidalWave khabalGhoul island
-                after = snd (Engine.runGamePure (orderLast ghoul) gs Engine.priorityLoop)
+                after = snd (Engine.runGamePure (orderLast (TriggerSource.OfObject ghoul)) gs Engine.priorityLoop)
             HU.assertEqual "nothing counted" 0 (countersOn ghoul after),
           -- M-1 (review): permute's reject-not-repair guard, pinned directly. The
           -- centerpiece above only ever answers with a valid permutation (via
@@ -976,6 +980,136 @@ orderingTests registry =
                 HU.assertEqual "carol's trigger is on top -- placed second" (Just S.carol) (controllerOf top)
                 HU.assertEqual "the active player's (alice's) is at the bottom -- placed first" (Just S.alice) (controllerOf bottom)
               other -> HU.assertFailure ("expected exactly two triggers on the stack, got " <> show (length other))
+        ]
+
+-- CR 725.2: the monarch's two inherent abilities "have no source and are
+-- controlled by the player who was the monarch at the time the abilities
+-- triggered" -- triggered abilities in every other respect, so CR 603.3b's
+-- own-order choice covers them exactly as it covers an object's trigger. The
+-- collision is reachable from the pool: Palace Jailer crowns its controller, and
+-- Khabál Ghoul triggers "at the beginning of each end step", so one player's end
+-- step fires her Ghoul's trigger and the monarch's inherent draw in one batch.
+monarchOrderingTests :: Registry.Type.Registry -> Tasty.TestTree
+monarchOrderingTests registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      settleWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      settleWith answer gs = S.runPure answer gs Engine.settleForPriority
+      -- alice's Palace Jailer enters and crowns her (its first entry trigger,
+      -- BecomeMonarch TheController) on top of whatever board the caller built;
+      -- the state is then wound to the beginning of her end step. bob's Goblin
+      -- Piker is the Jailer's SECOND entry trigger's exile victim -- without one
+      -- that mode is unfillable and CR 603.3c would take the trigger back off the
+      -- stack -- and alice's library holds the card the monarch's draw takes.
+      crownAndEndStep palaceJailer piker base =
+        let (_, gs1) = S.addCreature piker S.bob base
+            (_, gs2) = S.addLibraryCard piker S.alice gs1
+            (jailer, gs3) = S.addCreature palaceJailer S.alice gs2
+            entered = ZoneChange.MkZoneChange jailer Zone.Stack Zone.Battlefield
+         in beginEndStep (resolveAll (S.withEvents [GameEvent.Moved entered (Projection.project jailer gs3)] gs3))
+      -- Records every ordering payload offered, verbatim, answering canonically.
+      recordPayloads :: Prompt.Prompt r -> State.State [[TriggerSource.TriggerSource]] r
+      recordPayloads p = case p of
+        Prompt.OrderTriggers _ _ sources -> do
+          State.modify' (<> [sources])
+          pure (zipWith const [0 ..] sources)
+        _ -> pure (S.identityAnswer p)
+      -- Puts the SOURCELESS entry -- CR 725.2's inherent draw, named by what it
+      -- is rather than by where it sits -- at the front of the permutation, so it
+      -- goes on the stack FIRST and, the stack being LIFO, resolves LAST. That is
+      -- the direction the old two-pass placement could not express: it appended
+      -- the inherent trigger after the ordered batch, i.e. always on top, always
+      -- resolving first.
+      sourcelessFirst :: Prompt.Prompt r -> r
+      sourcelessFirst p = case p of
+        Prompt.OrderTriggers _ _ sources ->
+          let indexed = zip [0 ..] sources
+              pick keep = fmap fst (filter (\entry -> (snd entry == TriggerSource.Sourceless) == keep) indexed)
+           in pick True <> pick False
+        _ -> S.identityAnswer p
+      inherentController placed oid = case fmap Object.source (Game.lookupObject oid placed) of
+        Just (Source.OfInherentTrigger pid _) -> Just pid
+        _ -> Nothing
+      triggerSourceOf placed oid = case fmap Object.source (Game.lookupObject oid placed) of
+        Just (Source.OfTrigger src _) -> Just src
+        _ -> Nothing
+   in Tasty.testGroup
+        "MonarchTriggerOrdering"
+        [ -- The collision itself: both triggers reach ONE CR 603.3b choice.
+          HU.testCase "CR 603.3b/725.2 the inherent end-step draw is offered in the same ordering choice as the Ghoul's trigger" $ do
+            palaceJailer <- Registry.printing registry "Palace Jailer"
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (ghoul, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+                gs = crownAndEndStep palaceJailer piker base
+                (_, asked) = State.runState (Engine.runGame recordPayloads gs Engine.settleForPriority) []
+            HU.assertEqual "alice really holds the crown" (Just S.alice) (GameState.monarch gs)
+            HU.assertEqual
+              "one ordering choice, offering the Ghoul's trigger and the sourceless inherent draw together"
+              [[TriggerSource.OfObject ghoul, TriggerSource.Sourceless]]
+              asked,
+          -- The order is HONOURED, in the direction the old two-pass placement
+          -- could not reach: the inherent draw goes on the stack first, so it sits
+          -- at the BOTTOM and resolves last.
+          HU.testCase "CR 603.3b/725.2 putting the inherent draw on the stack first leaves it at the bottom, resolving last" $ do
+            palaceJailer <- Registry.printing registry "Palace Jailer"
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (ghoul, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+                gs = crownAndEndStep palaceJailer piker base
+                placed = settleWith sourcelessFirst gs
+            case GameState.stack placed of
+              [top, bottom] -> do
+                HU.assertEqual "the inherent draw is at the bottom -- placed first, resolves last" (Just S.alice) (inherentController placed bottom)
+                HU.assertEqual "the Ghoul's trigger is on top -- placed second, resolves first" (Just ghoul) (triggerSourceOf placed top)
+              other -> HU.assertFailure ("expected exactly two triggers on the stack, got " <> show (length other)),
+          -- Same board, opposite answer: the inherent draw goes on the stack
+          -- last, so it is on top and resolves first. This is what the old engine
+          -- forced unconditionally; here it is a choice.
+          HU.testCase "CR 603.3b/725.2 putting the inherent draw on the stack last leaves it on top, resolving first" $ do
+            palaceJailer <- Registry.printing registry "Palace Jailer"
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (ghoul, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+                gs = crownAndEndStep palaceJailer piker base
+                placed = settleWith S.identityAnswer gs
+            case GameState.stack placed of
+              [top, bottom] -> do
+                HU.assertEqual "the inherent draw is on top -- placed second, resolves first" (Just S.alice) (inherentController placed top)
+                HU.assertEqual "the Ghoul's trigger is at the bottom -- placed first, resolves last" (Just ghoul) (triggerSourceOf placed bottom)
+              other -> HU.assertFailure ("expected exactly two triggers on the stack, got " <> show (length other)),
+          -- Both still resolve, whichever order was chosen: the merge must not
+          -- lose the inherent trigger's placement, only relocate it.
+          HU.testCase "CR 725.2 the monarch still draws when her own trigger is ordered last" $ do
+            palaceJailer <- Registry.printing registry "Palace Jailer"
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (_, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+                gs = crownAndEndStep palaceJailer piker base
+                after = snd (Engine.runGamePure sourcelessFirst gs Engine.priorityLoop)
+            HU.assertEqual "alice drew the one card in her library" 1 (length (Game.zoneMembers Zone.Hand S.alice after)),
+          -- The companion elision: with only the inherent trigger in the batch
+          -- there is nothing to order, and where the rules leave nothing to ask,
+          -- don't prompt.
+          HU.testCase "CR 603.3b the inherent draw alone is one trigger, so nothing is asked" $ do
+            palaceJailer <- Registry.printing registry "Palace Jailer"
+            piker <- Registry.printing registry "Goblin Piker"
+            let gs = crownAndEndStep palaceJailer piker (Setup.emptyGame S.bothPlayers)
+                (_, asked) = State.runState (Engine.runGame recordPayloads gs Engine.settleForPriority) []
+                after = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+            HU.assertEqual "alice really holds the crown" (Just S.alice) (GameState.monarch gs)
+            HU.assertEqual "no ordering choice was offered" [] asked
+            HU.assertEqual "and she still drew" 1 (length (Game.zoneMembers Zone.Hand S.alice after)),
+          -- And the mirror: the Ghoul's trigger alone, with no monarch at all, is
+          -- also one trigger and also asks nothing.
+          HU.testCase "CR 603.3b the Ghoul's trigger alone, with no monarch, asks nothing" $ do
+            khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+            let (_, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+                gs = beginEndStep base
+                (_, asked) = State.runState (Engine.runGame recordPayloads gs Engine.settleForPriority) []
+            HU.assertEqual "no monarch, so no inherent trigger exists" Nothing (GameState.monarch gs)
+            HU.assertEqual "no ordering choice was offered" [] asked
         ]
 
 -- Sarcomancy {B} Enchantment: "When this enchantment enters, create a 2/2 black
@@ -1215,4 +1349,4 @@ poisonousTests registry =
         ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, interveningTests registry, poisonousTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry]

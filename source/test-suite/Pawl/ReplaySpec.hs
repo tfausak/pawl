@@ -36,6 +36,7 @@ import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.TriggerSource as TriggerSource
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -109,15 +110,18 @@ combatReplayTests =
             -- Total must equal the attacker's power, or the fallback would be
             -- rejected by validation and deal no damage at all.
             HU.assertEqual "all to one blocker" (Map.singleton (Recipient.ToCreature oid) 2) (Replay.defaultAnswer damagePrompt),
+          -- The payload mixes both kinds of entry (CR 113.7's borne trigger and
+          -- CR 725.2's sourceless one), which is what the batch really looks like
+          -- when the monarch controls a trigger of her own at the same moment.
           HU.testCase "OrderTriggers records and replays a permutation" $
-            let p = Prompt.OrderTriggers decider S.alice [oid, ObjectId.MkObjectId 8]
+            let p = Prompt.OrderTriggers decider S.alice [TriggerSource.OfObject oid, TriggerSource.Sourceless]
                 answer = [1, 0] :: [Natural.Natural]
              in HU.assertEqual "round-trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
           HU.testCase "defaultAnswer keeps the canonical order" $
             HU.assertEqual
               "identity permutation"
               [0, 1 :: Natural.Natural]
-              (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice [oid, ObjectId.MkObjectId 8])),
+              (Replay.defaultAnswer (Prompt.OrderTriggers decider S.alice [TriggerSource.OfObject oid, TriggerSource.Sourceless])),
           HU.testCase "ChooseSacrifices records and replays a Set ObjectId" $
             let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
                 answer = Set.singleton (ObjectId.MkObjectId 8)

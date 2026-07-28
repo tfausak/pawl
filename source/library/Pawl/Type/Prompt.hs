@@ -20,6 +20,7 @@ import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.SlotName (SlotName)
 import Pawl.Type.Subtype (Subtype)
+import Pawl.Type.TriggerSource (TriggerSource)
 
 data Prompt r where
   ChooseAction :: Decider -> PlayerId -> [Action] -> Prompt Action
@@ -214,11 +215,18 @@ data Prompt r where
   --
   -- Asked only when two or more options are offered; one option is not a choice.
   ChooseEntryOption :: Decider -> PlayerId -> ObjectId -> [EntryOption] -> Prompt Natural
-  -- CR 603.3b: "If a player controlled two or more triggered abilities ... that
-  -- player puts them on the stack in any order they choose." The [ObjectId] is
-  -- that player's pending triggers, each entry its SOURCE object, in the engine's
-  -- canonical order; the answer is a permutation of the entry INDICES, giving the
-  -- order they are PUT ON THE STACK (so the last named resolves first).
+  -- CR 603.3b: "each player, in APNAP order, puts each triggered ability they
+  -- control ... on the stack in any order they choose." The [TriggerSource]
+  -- is that player's pending triggers, each entry naming what the ability hangs
+  -- on, in the engine's canonical order; the answer is a permutation of the entry
+  -- INDICES, giving the order they are PUT ON THE STACK (so the last named
+  -- resolves first).
+  --
+  -- TriggerSource rather than ObjectId because CR 725.2's inherent monarch
+  -- abilities "have no source" and are ordinary triggered abilities in every
+  -- other respect, so they are in this batch with everything else and have no id
+  -- to put on the wire. An interpreter reading TriggerSource.Sourceless knows it
+  -- is looking at one of those two abilities rather than at a missing object.
   --
   -- Positional by necessity, unlike a target slot: each entry carries only its
   -- SOURCE, no ability discriminator. That is CONTINGENT, not a rules property:
@@ -232,13 +240,21 @@ data Prompt r where
   -- Sarcomancy and fire its ETB in the same batch. A source with two distinct
   -- abilities triggered together makes two different abilities identical entries
   -- on the wire while their order genuinely matters, and the payload would need
-  -- an ability discriminator alongside the source (#61). Asked ONLY when the player controls two
-  -- or more -- with one there is nothing to choose, and where the rules leave
-  -- nothing to ask, don't prompt. CR 603.3b's TWO-PART process (first the
+  -- an ability discriminator alongside the source (#61). Sourceless is that same
+  -- gap in a second place: CR 725.2's two abilities share one controller and one
+  -- (absent) source, so two Sourceless entries would be indistinguishable too.
+  -- Unreachable, because one triggers on a step beginning and the other on combat
+  -- damage and a settle always separates the two events; the discriminator #61
+  -- asks for would cover both.
+  --
+  -- Asked ONLY when the player controls two or more -- with one there is nothing
+  -- to choose, and where the rules leave nothing to ask, don't prompt.
+  --
+  -- CR 603.3b's TWO-PART process (first the
   -- triggers whose condition is not another ability triggering, then the rest)
   -- is vacuous while no condition triggers on another ability triggering; this
   -- carries the note, not the machinery.
-  OrderTriggers :: Decider -> PlayerId -> [ObjectId] -> Prompt [Natural]
+  OrderTriggers :: Decider -> PlayerId -> [TriggerSource] -> Prompt [Natural]
   -- CR 616.1: with two or more applicable replacement or prevention effects in
   -- the highest non-empty bucket, the affected object's controller (or its owner,
   -- or the affected player) chooses which to apply NEXT -- and then the process

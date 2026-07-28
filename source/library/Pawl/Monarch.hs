@@ -30,6 +30,8 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.MonarchWatch as MonarchWatch
 import qualified Pawl.Type.Object as Object
+import Pawl.Type.PendingTrigger (PendingTrigger)
+import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.PlayerRef as PlayerRef
@@ -42,6 +44,7 @@ import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TapState as TapState
 import Pawl.Type.TriggerCondition (TriggerCondition)
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerSource as TriggerSource
 import Pawl.Type.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
@@ -109,29 +112,44 @@ inherentMatch monarch cond gs event = case (cond, event) of
       TurnScope.EachTurn -> True
       TurnScope.ControllersTurn -> a == monarch
 
--- CR 725.1/725.2: the inherent triggers that fire on this batch of events, each
--- as (controller, ability, bindings). Empty when there is no monarch (the
--- abilities do not exist).
-inherentMonarchPending :: [GameEvent] -> GameState -> [(PlayerId, TriggeredAbility Card, Map SlotName.SlotName Binding)]
+-- CR 725.1/725.2: the inherent triggers that fire on this batch of events, as
+-- ordinary PendingTriggers whose source is TriggerSource.Sourceless -- which is
+-- what lets Engine.placePendingTriggers merge them into the one batch CR 603.3b
+-- orders. Empty when there is no monarch (the abilities do not exist).
+--
+-- Not routed through Event.gatherTriggers, for the reason inherentMatch exists:
+-- these abilities have no bearer, so the scan that walks the battlefield asking
+-- each permanent what it triggers has nowhere to find them.
+--
+-- CR 603.4 does not apply to either ability (neither has an intervening "if" --
+-- see oneEffect), which is why skipping Event.interveningHolds costs nothing;
+-- Event.interveningHolds carries the same note from its own side.
+inherentMonarchPending :: [GameEvent] -> GameState -> [PendingTrigger]
 inherentMonarchPending events gs = case GameState.monarch gs of
   Nothing -> []
   Just m ->
     let matchEvent ab ev = case inherentMatch m (TriggeredAbility.condition ab) gs ev of
           Nothing -> Nothing
-          Just b -> Just (m, ab, b)
+          Just b -> Just (PendingTrigger.MkPendingTrigger TriggerSource.Sourceless m ab b)
         forAbility ab = Maybe.mapMaybe (matchEvent ab) events
      in concatMap forAbility monarchAbilities
 
--- Mint a sourceless inherent trigger onto the stack (the placeOne analog for an
--- ability with no source object). Single mode, no targets -- so no mode/target
--- prompt; the single mode is selected outright (CR 725.2's draw is mandatory and
--- unmodal, so there is nothing to ask). The chosen modes ride under the reserved
--- chosenModes slot, which Stack.resolveTop's OfInherentTrigger arm reads to know
--- which effects to run.
-placeInherent :: PlayerId -> TriggeredAbility Card -> Map SlotName.SlotName Binding -> Game ()
-placeInherent controller ability provided = do
+-- Mint a sourceless inherent trigger onto the stack: the Engine.placeOne arm for
+-- a TriggerSource.Sourceless entry, called from there once CR 603.3b has fixed
+-- the whole batch's order. Single mode, no targets -- so no mode/target prompt;
+-- the single mode is selected outright (CR 725.2's draw is mandatory and
+-- unmodal, so there is nothing to ask). That shortcut is licensed by CR 725.2
+-- fixing the full text of both inherent abilities, not by anything general about
+-- sourceless triggers. The chosen modes ride under the reserved chosenModes
+-- slot, which Stack.resolveTop's OfInherentTrigger arm reads to know which
+-- effects to run.
+placeInherent :: PendingTrigger -> Game ()
+placeInherent pending = do
   gs <- State.get
-  let (abilId, gs1) = Game.freshObjectId gs
+  let controller = PendingTrigger.controller pending
+      ability = PendingTrigger.ability pending
+      provided = PendingTrigger.bindings pending
+      (abilId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       modeCount = Seq.length (Modal.modes (TriggeredAbility.modal ability))
       -- take, not [0 .. modeCount - 1]: a ModeIndex counts in Natural, and

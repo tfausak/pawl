@@ -56,6 +56,7 @@ import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import Pawl.Type.TriggerCondition (TriggerCondition)
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerSource as TriggerSource
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
 import Pawl.Type.Zone (Zone)
@@ -664,7 +665,7 @@ eventTriggers events gs =
         GameEvent.BecameMonarch _ -> Map.empty
       forOne event (oid, (ctrl, abilities)) =
         let fires ab = matchesTrigger oid ctrl (TriggeredAbility.condition ab) event
-            pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
          in fmap pend (filter fires abilities)
       -- Map.union is left-biased, so a live battlefield reading always wins over
       -- a last-known one. Belt and braces: the two sets are disjoint by
@@ -741,7 +742,7 @@ stateTriggers gs =
                 TriggerCondition.StepBegins _ _ -> False
                 TriggerCondition.SelfDealsCombatDamageToPlayer -> False
                 TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
-              pend ab = PendingTrigger.MkPendingTrigger oid ctrl ab Map.empty
+              pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
            in fmap pend (filter live (Projection.triggeredAbilitiesOf oid gs))
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))
 
@@ -773,7 +774,7 @@ delayedPending events gs =
          in any (matchesTrigger (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
       pend entry =
         PendingTrigger.MkPendingTrigger
-          (DelayedTrigger.source entry)
+          (TriggerSource.OfObject (DelayedTrigger.source entry))
           (DelayedTrigger.controller entry)
           (DelayedTrigger.ability entry)
           (DelayedTrigger.bindings entry)
@@ -793,14 +794,26 @@ gatherTriggers events gs =
 -- false as the trigger event occurs. Checked HERE, at the gather -- not at
 -- placement -- because "doesn't trigger" must be indistinguishable from "no
 -- ability existed", including to the CR 117.5 settle loop's re-run flag.
+--
+-- A SOURCELESS pending trigger (CR 725.2) never reaches this: gatherTriggers is
+-- the only caller, and all three gatherers it draws from hang their triggers on
+-- an object. The monarch's inherent pair is gathered by Pawl.Monarch and merged
+-- into the batch by Engine.placePendingTriggers, after this filter has run. The
+-- arm is written to be true anyway rather than to fail: CR 725.2 fixes the full
+-- text of both inherent abilities and neither has an intervening "if"
+-- (Monarch.oneEffect pins `intervening = Nothing` for exactly that reason), so
+-- "the ability triggers" is the right answer for every sourceless ability that
+-- exists. A sourceless ability that DID carry one would have no subject object
+-- for Condition.holds to read, and is the case that must revisit this.
 interveningHolds :: GameState -> PendingTrigger -> Bool
 interveningHolds gs pending =
-  case TriggeredAbility.intervening (PendingTrigger.ability pending) of
-    Nothing -> True
-    Just cond ->
+  case (TriggeredAbility.intervening (PendingTrigger.ability pending), PendingTrigger.source pending) of
+    (Nothing, _) -> True
+    (Just _, TriggerSource.Sourceless) -> True
+    (Just cond, TriggerSource.OfObject oid) ->
       Condition.holds
         (Projection.fullView gs)
-        (Filter.MkContext (Just (PendingTrigger.controller pending)) (Just (PendingTrigger.source pending)))
+        (Filter.MkContext (Just (PendingTrigger.controller pending)) (Just oid))
         gs
-        (PendingTrigger.source pending)
+        oid
         cond
