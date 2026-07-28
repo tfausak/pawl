@@ -1289,7 +1289,7 @@ controlChangeRemovalTests registry =
                 -- The control leg: the same board and the same blocks, with alice
                 -- never casting. Two 2/1 Pikers then trade and both die.
                 traded = runToEndOfCombat S.aggressiveAnswer atBlockers
-            HU.assertEqual "the theft is offered in the declare blockers step, after blocks are declared" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase atBlockers)
+            HU.assertEqual "the leg hands over at the declare blockers step, so `snatch` is what declares the blocks and then casts" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase atBlockers)
             -- The discriminating assertion, and first because it is the one the
             -- unfixed engine fails: with the blocker still in the record the two
             -- Pikers trade, and the ids below stop resolving at all.
