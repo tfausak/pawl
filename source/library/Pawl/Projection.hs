@@ -730,8 +730,10 @@ rewriteModification pairs m =
 -- lets projectWith decide their set once. A stored effect and a counter are each
 -- a single part and carry none.
 --
--- TWO ability losses are asked about, and only about a PERMANENT'S OWN static
--- abilities. CR 305.7's land-subtype strip (liveGiven) drops the permanent
+-- TWO ability losses are asked about here, and only about a PERMANENT'S OWN
+-- static abilities -- Pawl.PlayerEffect.applying asks the same pair, about the
+-- same permanents, for the CR 613.10/613.11 half of a card's text.
+-- CR 305.7's land-subtype strip (liveGiven) drops the permanent
 -- outright; CR 613.1f's layer-6 ability removal (abilitiesRemoved) drops only an
 -- ability whose every part lands after layer 6 (gatherStatic). Neither gate
 -- touches a stored effect or a counter, because neither IS an ability for layer 6
@@ -742,6 +744,25 @@ rewriteModification pairs m =
 -- object it sits on. Humility removes neither.
 gather :: GameState -> [Gathered]
 gather gs =
+  let ungated = gatherGiven (const False) gs
+   in -- Almost every board has no ability-removing effect at all, and then the
+      -- gathered list IS the ungated one -- no second walk of the battlefield's
+      -- static abilities and no projection spent on the question. A board that
+      -- does have one pays for the stored effects, emblems and counters twice;
+      -- none of those three costs a projection, and only the second walk of the
+      -- static abilities ever did.
+      if any (removesAbilities . gModification) ungated
+        then gatherGiven (abilitiesRemoved ungated gs) gs
+        else ungated
+
+-- gather's body, with the CR 613.1f gate left open as a parameter: `stripped`
+-- answers "were this permanent's abilities removed by the time layer 6
+-- finished?" for each battlefield permanent. Called TWICE by gather -- once with
+-- the gate wired shut (`const False`) to build the very list the gate reads, and
+-- once with the real answer -- and once by abilityRemoval, which needs only the
+-- first of those.
+gatherGiven :: (ObjectId -> Bool) -> GameState -> [Gathered]
+gatherGiven stripped gs =
   let setEffs = setLandSubtypeEffects gs
       -- A stored effect carries exactly one modification (Pawl.Resolve stores one
       -- per opcode), so CR 613.6 has nothing to hold together here -- and nothing
@@ -757,7 +778,7 @@ gather gs =
             gModification = ContinuousEffect.modification eff
           }
       stored = fmap fromStored (GameState.continuousEffects gs)
-      fromPermanent stripped permId = case Game.lookupObject permId gs of
+      fromPermanent permId = case Game.lookupObject permId gs of
         Nothing -> []
         Just permObj -> case Game.cardOf permId gs of
           Nothing -> []
@@ -775,7 +796,7 @@ gather gs =
                     -- most once per permanent, and on almost every board not at all.
                     concat (zipWith (gatherStatic permId (Object.timestamp permObj) changes (stripped permId)) [0 ..] (Card.Type.staticAbilities card))
               else []
-      staticGiven stripped = concatMap (fromPermanent stripped) (Set.toList (GameState.battlefield gs))
+      static = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
         Nothing -> []
         Just emblemObj -> case Game.cardOf emblemId gs of
@@ -790,19 +811,36 @@ gather gs =
             concat (zipWith (gatherStatic emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Card.Type.staticAbilities card))
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       counters = counterGathered gs
-      -- The same list with the layer-6 gate OFF -- which is what the gate itself
-      -- reads, and why this needs one extra pass rather than a fixpoint. Deciding
-      -- whether a source's abilities were removed means projecting that source
-      -- through layers 1-5 (abilitiesRemoved), and a projection bounded below
-      -- layer 6 applies no candidate at layer 6 or later -- so it cannot see, and
-      -- so cannot be changed by, the layer-7 parts this gate drops.
-      ungated = stored <> staticGiven (const False) <> emblems <> counters
-   in -- Almost every board has no ability-removing effect at all, and then the
-      -- gathered list IS the ungated one -- no second walk of the battlefield's
-      -- static abilities and no projection spent on the question.
+   in stored <> static <> emblems <> counters
+
+-- CR 613.1f, hoisted over the whole game: "were THIS object's abilities removed
+-- by the time layer 6 finished?", as one predicate. For a caller OUTSIDE the
+-- layer machine that must ask it once per battlefield permanent
+-- (Pawl.PlayerEffect.applying, for CR 604.2's "and has the ability"), so that the
+-- candidate list is built once per read rather than once per permanent -- the
+-- same posture setLandSubtypeEffects has for CR 305.7's liveGiven.
+--
+-- The list is gathered with the layer-6 gate OFF, which is what the gate itself
+-- reads, and why this needs an extra pass rather than a fixpoint. Deciding
+-- whether a source's abilities were removed means projecting that source through
+-- layers 1-5 (abilitiesRemoved), and a projection bounded below layer 6 applies
+-- no candidate at layer 6 or later -- so it cannot see, and so cannot be changed
+-- by, the layer-7 parts the gate drops.
+--
+-- WELL-FOUNDED, and this is the whole argument: nothing reachable from here reads
+-- a player effect back. The layer machine's only inputs are static abilities,
+-- stored continuous effects and counters; a CR 613.10/613.11 effect is a sibling
+-- tier applied AFTER that machine has run and is not among them. Pawl.Projection
+-- accordingly does not import Pawl.PlayerEffect -- the module graph is what
+-- enforces it -- so the call is one-way and cannot re-enter.
+abilityRemoval :: GameState -> ObjectId -> Bool
+abilityRemoval gs =
+  let ungated = gatherGiven (const False) gs
+   in -- Almost every board has no ability-removing effect at all, and then no
+      -- projection is spent on the question at all.
       if any (removesAbilities . gModification) ungated
-        then stored <> staticGiven (abilitiesRemoved ungated gs) <> emblems <> counters
-        else ungated
+        then abilitiesRemoved ungated gs
+        else const False
 
 -- CR 613.1f: does this modification REMOVE abilities? The layer-6 classification
 -- abilitiesRemoved asks for, in the same standing as setLandSubtypeEffects's

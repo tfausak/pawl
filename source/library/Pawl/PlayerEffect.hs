@@ -4,7 +4,11 @@
 -- object's characteristics are determined by starting with the actual object",
 -- so the seven layers are a machine for computing object characteristics and
 -- nothing else, and 613.10/613.11 both apply AFTER that machine has run.
--- Pawl.Projection is untouched by this module and never sees these types.
+--
+-- The dependency is therefore ONE-WAY, and that is what keeps it well founded:
+-- this module reads the layer machine's finished answers (a projected view, a
+-- controller, CR 604.2's "has the ability"), while Pawl.Projection is untouched
+-- by this module and never sees these types.
 --
 -- This module is the ONLY module that may case on Pawl.Type.PlayerEffect and
 -- Pawl.Type.PlayerScope -- the standing Pawl.Resolve
@@ -75,6 +79,10 @@ applying pid gs =
       -- inlined call would recompute the whole game's SetLandSubtype list once
       -- per permanent.
       setEffs = Projection.setLandSubtypeEffects gs
+      -- Hoisted for the same reason, and a thunk until a permanent that actually
+      -- has a player ability forces it -- so the ordinary board pays nothing for
+      -- the CR 604.2 question below.
+      removed = Projection.abilityRemoval gs
       fromPermanent oid = case Game.cardOf oid gs of
         Nothing -> []
         Just card -> case Card.playerAbilities card of
@@ -84,16 +92,37 @@ applying pid gs =
           abilities -> case Projection.controllerOf oid gs of
             Nothing -> []
             Just controller ->
+              -- TWO ability losses, exactly the pair Projection.gather asks about
+              -- for a permanent's static abilities.
+              --
               -- CR 305.7: a land whose subtype has been SET to a basic type
               -- loses its rules-text abilities, this one included (Blood Moon on
               -- Reliquary Tower).
-              if null setEffs || Projection.liveGiven setEffs Set.empty oid gs
+              --
+              -- CR 604.2: a static ability's continuous effect is active only
+              -- while the permanent "remains on the battlefield and has the
+              -- ability", so a CR 613.1f layer-6 removal takes this one with it
+              -- (Humility on Thalia). CR 613.6's rescue -- an effect that has
+              -- STARTED to apply continues "even if the ability generating the
+              -- effect is removed during this process" -- cannot reach it: CR
+              -- 613.10/613.11 apply a player effect AFTER the seven layers have
+              -- run, so it never started to apply before layer 6 and the cut is
+              -- unconditional. That is the same shape as a static ability all of
+              -- whose parts land after layer 6 (Projection.gatherStatic).
+              if (null setEffs || Projection.liveGiven setEffs Set.empty oid gs)
+                && not (removed oid)
                 then fmap (\ability -> (controller, PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)) abilities
                 else []
       printed = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       -- CR 611.2c: the stored carrier. Its controller is read off the record and
       -- never re-derived -- see Pawl.Type.ActivePlayerEffect -- while its scope is
       -- resolved live, exactly as the printed carrier's is.
+      --
+      -- Neither gate above touches it, because it is not an ability for CR 613.1f
+      -- to remove: CR 611.2a gives a resolved spell's continuous effect a duration
+      -- of its own ("lasts as long as stated by the spell or ability creating it
+      -- ... If no duration is stated, it lasts until the end of the game").
+      -- Humility cannot take back a Silence that has already resolved.
       storedOne active =
         ( ActivePlayerEffect.controller active,
           ActivePlayerEffect.scope active,
