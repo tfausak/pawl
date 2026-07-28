@@ -684,10 +684,9 @@ tests registry =
       -- (layer 6), so Bad Moon's "black creatures get +1/+1" (layer 7c) must not
       -- apply and bob's black Skeletons is Humility's 1/1.
       --
-      -- KNOWN-INCOMPLETE (#297): Projection.gather reads every permanent's
-      -- printed static abilities and does not ask whether layer 6 removed them,
-      -- so the pump still lands and this asserts 2, not the CR's 1.
-      HU.testCase "CR 613.1f/613.1g layer 6 before layer 7c: a stripped Bad Moon still pumps (#297)" $ do
+      -- The same board without Humility is asserted alongside, so this cannot pass
+      -- for the trivial reason that the pump never reaches the Skeletons at all.
+      HU.testCase "CR 613.1f/613.1g layer 6 before layer 7c: a stripped Bad Moon pumps nothing" $ do
         skeletons <- Registry.printing registry "Drudge Skeletons"
         badMoon <- Registry.printing registry "Bad Moon"
         humility <- Registry.printing registry "Humility"
@@ -695,10 +694,73 @@ tests registry =
         let base = Setup.emptyGame S.bothPlayers
             (skelId, g1) = S.addCreature skeletons S.bob base
             (badMoonId, g2) = S.addCreature badMoon S.alice g1
+            (_, unstripped) = S.addCreature opalescence S.alice g2
             (_, g3) = S.addCreature humility S.alice g2
             (_, gs) = S.addCreature opalescence S.alice g3
+        HU.assertEqual "animated but unstripped, Bad Moon pumps: 2/2" (Just 2) (Projection.powerOf skelId unstripped)
         HU.assertBool "Bad Moon is a creature, so Humility's set holds it" (Projection.isCreatureOf badMoonId gs)
-        HU.assertEqual "the CR says 1; pawl says 2 until #297 closes" (Just 2) (Projection.powerOf skelId gs),
+        HU.assertEqual "Humility's 1/1, not 2/2" (Just 1) (Projection.powerOf skelId gs)
+        HU.assertEqual "and the same on toughness" (Just 1) (Projection.toughnessOf skelId gs),
+      -- The narrowness of that gate, in the direction it must NOT reach: the
+      -- question is whether BAD MOON's abilities were removed, not whether a
+      -- LoseAllAbilities is on the battlefield. Humility's set is "each creature"
+      -- and an un-animated Bad Moon is a plain enchantment, so it keeps its
+      -- ability -- and CR 613.4's sublayers do the rest, 7b setting the base to
+      -- 1/1 before 7c adds the +1/+1. The real ruling is that Humility plus Bad
+      -- Moon makes a black creature 2/2.
+      HU.testCase "CR 613.4 an un-animated Bad Moon is not stripped, so a Humility'd black creature is 2/2" $ do
+        skeletons <- Registry.printing registry "Drudge Skeletons"
+        badMoon <- Registry.printing registry "Bad Moon"
+        humility <- Registry.printing registry "Humility"
+        let base = Setup.emptyGame S.bothPlayers
+            (skelId, g1) = S.addCreature skeletons S.bob base
+            (badMoonId, g2) = S.addCreature badMoon S.alice g1
+            gs = S.withHumility humility g2
+        HU.assertBool "no animator, so Bad Moon is no creature" (not (Projection.isCreatureOf badMoonId gs))
+        HU.assertEqual "1/1 from Humility's 7b, then +1/+1 from Bad Moon's 7c" (Just 2) (Projection.powerOf skelId gs)
+        HU.assertEqual "and the same on toughness" (Just 2) (Projection.toughnessOf skelId gs),
+      -- The third boundary, and the one CR 613.6 draws rather than CR 613.1f/g:
+      -- an ability with a part BELOW layer 6 has already started to apply when
+      -- layer 6 removes it, so "it will continue to be applied to the same set of
+      -- objects in each other applicable layer" and its layer-7 part stands.
+      --
+      -- Opalescence animates March of the Machines, so Humility's "each creature"
+      -- reaches March and strips it -- but March's layer-4 AddCardType already
+      -- made Mindslaver a creature, so March's layer-7b "with power and toughness
+      -- each equal to its mana value" still applies. March enters last, so its 7b
+      -- has the later timestamp (CR 613.7) and beats Humility's 1/1: Mindslaver is
+      -- 6/6, not 1/1. The contrast with Bad Moon two tests up is the whole rule --
+      -- Bad Moon's ONLY part is layer 7c, so it never started to apply at all.
+      HU.testCase "CR 613.6: a stripped March of the Machines still sets P/T, because its layer-4 part started" $ do
+        mindslaver <- Registry.printing registry "Mindslaver"
+        humility <- Registry.printing registry "Humility"
+        opalescence <- Registry.printing registry "Opalescence"
+        march <- Registry.printing registry "March of the Machines"
+        let base = Setup.emptyGame S.bothPlayers
+            (slaverId, g1) = S.addCreature mindslaver S.alice base
+            (_, g2) = S.addCreature humility S.alice g1
+            (_, g3) = S.addCreature opalescence S.alice g2
+            (marchId, gs) = S.addCreature march S.alice g3
+        HU.assertBool "Opalescence animated March, so Humility's set holds it" (Projection.isCreatureOf marchId gs)
+        HU.assertBool "March's layer-4 part still animates the artifact" (Projection.isCreatureOf slaverId gs)
+        HU.assertEqual "and its layer-7b part still sets the mana value, 6" (Just 6) (Projection.powerOf slaverId gs)
+        HU.assertEqual "and the same on toughness" (Just 6) (Projection.toughnessOf slaverId gs),
+      -- The last thing the gate must not reach. CR 122.1a makes a +1/+1 counter's
+      -- +1/+1 a rule of the GAME rather than an ability of the permanent it sits
+      -- on, so there is nothing on the creature for CR 613.1f to remove and the
+      -- layer-7c effect stands after Humility's layer-7b 1/1. Projection.gather
+      -- emits the counter as a synthetic candidate with the creature as its
+      -- source, which is exactly the shape the layer-6 gate keys on -- so this
+      -- pins that counters are excluded from it.
+      HU.testCase "CR 122.1a a +1/+1 counter survives Humility: 1/1 becomes 2/2" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        humility <- Registry.printing registry "Humility"
+        let base = Setup.emptyGame S.bothPlayers
+            (pikerId, g1) = S.addCreature piker S.bob base
+            g2 = S.addCounter CounterKind.PlusOnePlusOne 1 pikerId g1
+            gs = S.withHumility humility g2
+        HU.assertEqual "power 1 + 1" (Just 2) (Projection.powerOf pikerId gs)
+        HU.assertEqual "toughness 1 + 1" (Just 2) (Projection.toughnessOf pikerId gs),
       -- CR 613.8b: "An effect dependent on one or more other effects waits to
       -- apply until just after all of those effects have been applied." A Piker
       -- made a Land by B (layer 4, TheseObjects), and A = AddLandSubtype Swamp
