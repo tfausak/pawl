@@ -69,6 +69,7 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.OptionalDecision as OptionalDecision
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
@@ -229,6 +230,10 @@ identityAnswer p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a "may" changes nothing, the least-eventful default
+  -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
+  -- so with its own interpreter, which is what makes that answer discriminating.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -277,6 +282,10 @@ castAnswer p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a "may" changes nothing, the least-eventful default
+  -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
+  -- so with its own interpreter, which is what makes that answer discriminating.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -318,6 +327,10 @@ aggressiveAnswer p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a "may" changes nothing, the least-eventful default
+  -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
+  -- so with its own interpreter, which is what makes that answer discriminating.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 -- Answers Prompt.ChooseDefender with `who` and everything else with
 -- aggressiveAnswer -- the shared shape of CombatSpec's and GameSpec's M5.6d
@@ -378,6 +391,10 @@ playLandAnswer p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a "may" changes nothing, the least-eventful default
+  -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
+  -- so with its own interpreter, which is what makes that answer discriminating.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -506,6 +523,13 @@ randomAnswer p = case p of
   Prompt.Bottom _ _ hand count -> pure (List.genericTake count hand)
   Prompt.MulliganAction {} -> pure Nothing
   Prompt.OpeningHandAction {} -> pure Nothing
+  -- CR 603.5: a random answer, so a random game exercises both taking and
+  -- declining a printed "may" (the ChooseProliferate posture).
+  Prompt.ChooseOptional {} -> do
+    g <- State.get
+    let (takeIt, g') = Random.uniform g
+    State.put g'
+    pure (if takeIt then OptionalDecision.Exercises else OptionalDecision.Declines)
 
 -- Total index into a non-empty run of candidates -- a turn order, the tokens one
 -- Create minted: an out-of-range draw falls back to the head, which the NonEmpty

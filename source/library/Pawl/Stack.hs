@@ -96,7 +96,7 @@ resolveTopWith runSubgame = do
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
                   modal = TriggeredAbility.modal ability
-               in Resolve.resolveEffects oid srcId (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)
+               in Resolve.resolveModes oid srcId (Modal.chosenModes chosen modal)
         -- CR 114.5: an emblem is never on the stack (created into the command
         -- zone, never cast). Drop it, like a token.
         Source.OfEmblem _ -> State.put gs {GameState.stack = rest}
@@ -106,7 +106,7 @@ resolveTopWith runSubgame = do
           -- directly. Object.owner is the monarch (baked at placement) -- "you".
           let chosen = Binding.modesOf (Object.bindings obj)
               modal = TriggeredAbility.modal ability
-           in Resolve.resolveEffects oid oid (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)
+           in Resolve.resolveModes oid oid (Modal.chosenModes chosen modal)
 
 -- The no-subgame resolve-top (every existing caller and test): a resolving spell
 -- with a PlaySubgame effect would draw. Engine's live loop uses resolveTopWith.

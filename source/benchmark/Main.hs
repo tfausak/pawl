@@ -13,6 +13,7 @@ import qualified Pawl.Type.Action as Action
 import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.Deck as Deck
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
+import qualified Pawl.Type.OptionalDecision as OptionalDecision
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Prompt as Prompt
@@ -94,6 +95,9 @@ alwaysPass p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
+  -- the benchmark's script deterministic.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 -- Plays lands and casts when legal, otherwise passes: the benchmark that actually
 -- exercises the stack, mana payment, and resolution.
@@ -132,6 +136,9 @@ castAnswer p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
+  -- the benchmark's script deterministic.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 -- Plays lands, casts, attacks, and blocks: the benchmark that exercises combat.
 fightAnswer :: Prompt.Prompt r -> r
@@ -171,6 +178,9 @@ fightAnswer p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
+  -- the benchmark's script deterministic.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 -- Two players, seeded from the benchmark's argument.
 playersFrom :: Natural -> NonEmpty.NonEmpty PlayerId

@@ -66,6 +66,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
@@ -1809,19 +1810,47 @@ jsonToModeSelection value = do
     ("ChooseExactly", Just n) -> ModeSelection.ChooseExactly <$> natFrom n
     _ -> Left (Text.pack "unknown ModeSelection: " <> t)
 
+optionalityToJson :: Optionality.Optionality -> Value
+optionalityToJson o = nullary . Text.pack $ case o of
+  Optionality.Mandatory -> "Mandatory"
+  Optionality.Optional -> "Optional"
+
+jsonToOptionality :: Value -> Either Text Optionality.Optionality
+jsonToOptionality =
+  decodeNullary
+    (Text.pack "Optionality")
+    [ (Text.pack "Mandatory", Optionality.Mandatory),
+      (Text.pack "Optional", Optionality.Optional)
+    ]
+
+-- An omitted optionality decodes to Mandatory, the counterability posture (and
+-- for the same reason): almost every mode in the corpus prints no "may", and a
+-- required key would have meant editing every card file to say nothing.
+jsonToOptionalityDefault :: Value -> Either Text Optionality.Optionality
+jsonToOptionalityDefault value = case value of
+  Null -> Right Optionality.Mandatory
+  _ -> jsonToOptionality value
+
 modeToJson :: Mode.Mode CardT.Card -> Value
 modeToJson m =
   Object
-    [ (Text.pack "effects", seqTo effectToJson (Mode.effects m)),
-      (Text.pack "targetSpecs", targetSpecsToJson (Mode.targetSpecs m))
-    ]
+    ( [ (Text.pack "effects", seqTo effectToJson (Mode.effects m)),
+        (Text.pack "targetSpecs", targetSpecsToJson (Mode.targetSpecs m))
+      ]
+        -- Omitted when Mandatory; see jsonToOptionalityDefault.
+        <> ( case Mode.optionality m of
+               Optionality.Mandatory -> []
+               Optionality.Optional -> [(Text.pack "optionality", optionalityToJson (Mode.optionality m))]
+           )
+    )
 
 jsonToMode :: Value -> Either Text (Mode.Mode CardT.Card)
 jsonToMode value = do
   ps <- Json.asObject value
   es <- Json.field (Text.pack "effects") ps >>= seqFrom jsonToEffect
   ts <- Json.field (Text.pack "targetSpecs") ps >>= jsonToTargetSpecs
-  pure (Mode.MkMode es ts)
+  o <- jsonToOptionalityDefault (getOpt (Text.pack "optionality") ps)
+  pure (Mode.MkMode es ts o)
 
 modalToJson :: Modal.Modal CardT.Card -> Value
 modalToJson m =

@@ -66,6 +66,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
@@ -105,6 +106,13 @@ import qualified Test.Tasty.HUnit as HU
 
 roundTrip :: (Eq a, Show a) => String -> (a -> Json.Value) -> (Json.Value -> Either Text a) -> a -> HU.Assertion
 roundTrip label enc dec x = HU.assertEqual label (Right x) (dec (enc x))
+
+-- The `optionality` key of an encoded Mode, or Nothing when it was omitted (CR
+-- 603.5's Mandatory default).
+optionalityKey :: Json.Value -> Maybe Json.Value
+optionalityKey value = case value of
+  Json.Object ps -> J.optField (Text.pack "optionality") ps
+  _ -> Nothing
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
@@ -596,10 +604,30 @@ tests registry =
                       [ Mode.MkMode
                           (Seq.fromList [Effect.DealDamage (SlotName.MkSlotName (Text.pack "creature")) (Quantity.Literal 1)])
                           (Map.singleton (SlotName.MkSlotName (Text.pack "creature")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing))
+                          Optionality.Mandatory
                       ]
                   )
                   (ModeSelection.ChooseExactly 1)
               ),
+          -- CR 603.5: an Optional mode is what a printed "may" encodes to, and
+          -- the key is emitted only for that value.
+          HU.testCase "Optionality round-trips" $ do
+            roundTrip "mandatory" Codec.optionalityToJson Codec.jsonToOptionality Optionality.Mandatory
+            roundTrip "optional" Codec.optionalityToJson Codec.jsonToOptionality Optionality.Optional,
+          HU.testCase "an Optional mode round-trips, and says so in the JSON" $ do
+            let m = Mode.MkMode Seq.empty Map.empty Optionality.Optional
+            roundTrip "optional mode" Codec.modeToJson Codec.jsonToMode m
+            HU.assertEqual
+              "the optionality key is present"
+              (Just (Codec.optionalityToJson Optionality.Optional))
+              (optionalityKey (Codec.modeToJson m)),
+          -- The byte-identity guarantee for every card file that prints no
+          -- "may": a Mandatory mode emits no key, and a mode with no key decodes
+          -- back to Mandatory. The counterability precedent.
+          HU.testCase "a Mandatory mode omits the key, and an omitted key decodes to Mandatory" $ do
+            let m = Mode.MkMode Seq.empty Map.empty Optionality.Mandatory
+            HU.assertEqual "no optionality key" Nothing (optionalityKey (Codec.modeToJson m))
+            HU.assertEqual "decodes to Mandatory" (Right m) (Codec.jsonToMode (Codec.modeToJson m)),
           HU.testCase "empty modal is a decode error" $
             HU.assertBool
               "left"
@@ -774,7 +802,7 @@ tests registry =
             let ability =
                   TriggeredAbility.MkTriggeredAbility
                     { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn,
-                      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
+                      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1),
                       TriggeredAbility.intervening = Nothing
                     }
                 entry =
@@ -789,7 +817,7 @@ tests registry =
             let ability =
                   TriggeredAbility.MkTriggeredAbility
                     { TriggeredAbility.condition = TriggerCondition.SelfEnters,
-                      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
+                      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1),
                       TriggeredAbility.intervening = Just noZombiesOnBattlefield
                     }
              in roundTrip "ta" Codec.triggeredAbilityToJson Codec.jsonToTriggeredAbility ability

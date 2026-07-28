@@ -14,6 +14,7 @@ import qualified Pawl.Type.Concession as Concession
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
+import qualified Pawl.Type.OptionalDecision as OptionalDecision
 import qualified Pawl.Type.Program as Program
 import Pawl.Type.Prompt (Prompt)
 import qualified Pawl.Type.Prompt as Prompt
@@ -56,6 +57,7 @@ encode p answer = case p of
   Prompt.Bottom {} -> Response.PutOnBottom answer
   Prompt.MulliganAction {} -> Response.TookMulliganAction answer
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
+  Prompt.ChooseOptional {} -> Response.ChoseOptional answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -156,6 +158,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.OpeningHandAction {} -> case response of
     Response.TookOpeningHandAction moid -> Just moid
+    _ -> Nothing
+  Prompt.ChooseOptional {} -> case response of
+    Response.ChoseOptional decision -> Just decision
     _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
@@ -264,6 +269,10 @@ defaultAnswer p = case p of
   -- CR 103.6: declining is always legal and the least-eventful fallback when a
   -- transcript runs short (mirrors MulliganAction -> Nothing).
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a "may" is always legal and changes nothing, the
+  -- least-eventful fallback when a transcript runs short (mirrors Concede ->
+  -- Continues and MulliganAction -> Nothing).
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])
