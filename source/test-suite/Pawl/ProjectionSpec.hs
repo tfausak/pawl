@@ -582,6 +582,106 @@ tests registry =
             (ripId, gs) = S.addCreature restInPeace S.alice withAura
         HU.assertBool "the Aura stays a non-creature" (not (Projection.isCreatureOf auraId gs))
         HU.assertBool "a non-Aura enchantment IS animated" (Projection.isCreatureOf ripId gs),
+      -- CR 613.1b puts control-changing effects in layer 2 and CR 613.1f puts
+      -- ability-removing effects in layer 6, so layer 2 is applied FIRST: by the
+      -- time Humility's LoseAllAbilities is applied, Control Magic's grant has
+      -- already moved the creature. Nothing can reverse that order -- CR 613.8a
+      -- scopes dependency to effects "applied in the same layer (and, if
+      -- applicable, sublayer)", so a layer-6 effect is never pulled ahead of a
+      -- layer-2 one -- and CR 613.6 keeps an effect applying "even if the
+      -- ability generating the effect is removed during this process". An
+      -- ability-stripped control grant therefore still holds what it took.
+      --
+      -- Humility cannot in fact reach Control Magic at all: its affected set is
+      -- "each creature" and the Aura is an enchantment, which the test above is
+      -- the other half of (the pool's one enchantment animator excludes Auras).
+      -- So the assertion that Humility is LIVE -- the stolen Piker is 1/1 -- is
+      -- what stops this passing for the trivial reason.
+      HU.testCase "CR 613.1b before CR 613.1f: Humility does not hand back a Control Magic'd creature" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        humility <- Registry.printing registry "Humility"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, g1) = S.addCreature piker S.bob base
+            (aura, g2) = S.addCreature controlMagic S.alice g1
+            stolen = S.attach aura creature g2
+            gs = S.withHumility humility stolen
+        HU.assertEqual "before Humility, alice controls it" (Just S.alice) (Projection.controllerOf creature stolen)
+        HU.assertEqual "and after Humility she still does" (Just S.alice) (Projection.controllerOf creature gs)
+        HU.assertBool "it is in alice's controls" (elem creature (Projection.controls S.alice gs))
+        HU.assertBool "and not in bob's" (notElem creature (Projection.controls S.bob gs))
+        HU.assertEqual "Humility is live: the stolen Piker is 1/1" (Just 1) (Projection.powerOf creature gs)
+        HU.assertBool "the Aura is no creature, so Humility's set never held it" (not (Projection.isCreatureOf aura gs)),
+      -- The same board built the other way round: Humility is already out when
+      -- the Aura arrives. CR 613.1 orders effects in different layers by LAYER,
+      -- and CR 613.7's timestamps only order effects within one -- so which
+      -- permanent entered first cannot change the answer.
+      HU.testCase "CR 613.1: Humility first, then Control Magic, reaches the same controller" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        humility <- Registry.printing registry "Humility"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, g1) = S.addCreature piker S.bob base
+            underHumility = S.withHumility humility g1
+            (aura, withAura) = S.addCreature controlMagic S.alice underHumility
+            gs = S.attach aura creature withAura
+        HU.assertEqual "bob's until the Aura attaches" (Just S.bob) (Projection.controllerOf creature underHumility)
+        HU.assertEqual "alice's once it does" (Just S.alice) (Projection.controllerOf creature gs)
+        HU.assertEqual "Humility is live: the stolen Piker is 1/1" (Just 1) (Projection.powerOf creature gs),
+      -- The leg that shows Humility is not moving controllers on its own.
+      HU.testCase "CR 613.1f: Humility alone changes no controller" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        humility <- Registry.printing registry "Humility"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, g1) = S.addCreature piker S.bob base
+            gs = S.withHumility humility g1
+        HU.assertEqual "still bob's" (Just S.bob) (Projection.controllerOf creature gs)
+        HU.assertEqual "though Humility is live: 1/1" (Just 1) (Projection.powerOf creature gs),
+      -- The layer-2-before-layer-6 claim pinned where no card can pin it.
+      -- Nothing in the pool strips an AURA's abilities -- Humility's set is
+      -- "each creature", and the pool's one enchantment animator excludes Auras
+      -- by its own text -- so this drops a bare layer-6 LoseAllAbilities on the
+      -- Aura itself, the stored shape the layer-6 tests above already use.
+      --
+      -- Honest about what it observes: ProjectedCharacteristics carries no
+      -- static-ability field, so the strip is a no-op on this Aura today and
+      -- this test cannot watch one land. What it pins is the DIRECTION -- gating
+      -- the control-grant walk on layer-6 ability removal breaks it, and per CR
+      -- 613.1b/613.1f that gate would be wrong.
+      HU.testCase "CR 613.1b: a layer-6 strip on the Aura does not undo its layer-2 grant" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        controlMagic <- Registry.printing registry "Control Magic"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, g1) = S.addCreature piker S.bob base
+            (aura, g2) = S.addCreature controlMagic S.alice g1
+            stolen = S.attach aura creature g2
+            gs = S.withEffectAt aura (Timestamp.MkTimestamp 500) Modification.LoseAllAbilities stolen
+        HU.assertEqual "the Aura still holds the creature" (Just S.alice) (Projection.controllerOf creature gs),
+      -- The boundary of the claim above, and the direction where it flips.
+      -- Layer 6 is applied BEFORE layer 7 (CR 613.1f, CR 613.1g), so an ability
+      -- removed in layer 6 generates no layer-7 effect -- and CR 613.6 does not
+      -- rescue it, because layer 7c is the only layer that part would ever have
+      -- started to apply in.
+      --
+      -- Opalescence animates Bad Moon (layer 4), Humility strips every creature
+      -- (layer 6), so Bad Moon's "black creatures get +1/+1" (layer 7c) must not
+      -- apply and bob's black Skeletons is Humility's 1/1.
+      --
+      -- KNOWN-INCOMPLETE (#297): Projection.gather reads every permanent's
+      -- printed static abilities and does not ask whether layer 6 removed them,
+      -- so the pump still lands and this asserts 2, not the CR's 1.
+      HU.testCase "CR 613.1f/613.1g layer 6 before layer 7c: a stripped Bad Moon still pumps (#297)" $ do
+        skeletons <- Registry.printing registry "Drudge Skeletons"
+        badMoon <- Registry.printing registry "Bad Moon"
+        humility <- Registry.printing registry "Humility"
+        opalescence <- Registry.printing registry "Opalescence"
+        let base = Setup.emptyGame S.bothPlayers
+            (skelId, g1) = S.addCreature skeletons S.bob base
+            (badMoonId, g2) = S.addCreature badMoon S.alice g1
+            (_, g3) = S.addCreature humility S.alice g2
+            (_, gs) = S.addCreature opalescence S.alice g3
+        HU.assertBool "Bad Moon is a creature, so Humility's set holds it" (Projection.isCreatureOf badMoonId gs)
+        HU.assertEqual "the CR says 1; pawl says 2 until #297 closes" (Just 2) (Projection.powerOf skelId gs),
       -- CR 613.8b: "An effect dependent on one or more other effects waits to
       -- apply until just after all of those effects have been applied." A Piker
       -- made a Land by B (layer 4, TheseObjects), and A = AddLandSubtype Swamp

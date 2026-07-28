@@ -387,6 +387,16 @@ battlefield permanent, filtered by modification), and `Affected.Attached`
 resolves to the enchanted object. The `staticAbilitiesLive` gate (§3.9) applies:
 an Aura stripped of its abilities grants no control.
 
+**Correction (landed with #196).** That last sentence is true only of the gate it
+names — CR 305.7's land-subtype stripping. It does *not* generalise to layer 6:
+control-changing effects are applied in layer 2 (CR 613.1b) and ability-removing
+effects in layer 6 (CR 613.1f), so a Humility'd control grant has already been
+made when the strip lands, CR 613.8a scopes dependency to effects "applied in the
+same layer", and CR 613.6 keeps an effect applying "even if the ability generating
+the effect is removed during this process". #196 was filed reading this sentence
+the broad way and closed as not-a-bug; the proving tests are ProjectionSpec's
+"CR 613.1b before CR 613.1f" group.
+
 ### 3.9 The recursion escape (#37's shape)
 
 `controllerOf` consulting static abilities means asking for the Aura's own
