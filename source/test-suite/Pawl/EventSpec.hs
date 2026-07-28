@@ -239,15 +239,15 @@ tests registry =
       HU.testCase "CR 603.2 SelfDealsCombatDamageToPlayer matches the bearer's combat damage to a player" $
         let bearer = ObjectId.MkObjectId 1
             ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat)
-         in HU.assertBool "matches" (Event.matchesTrigger bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev),
+         in HU.assertBool "matches" (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev),
       HU.testCase "it does not match combat damage to a creature" $
         let bearer = ObjectId.MkObjectId 1
             ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToCreature (ObjectId.MkObjectId 2)) 2 False False 0 DamageKind.Combat)
-         in HU.assertBool "no match" (not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)),
+         in HU.assertBool "no match" (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)),
       HU.testCase "it does not match noncombat damage to a player" $
         let bearer = ObjectId.MkObjectId 1
             ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Noncombat)
-         in HU.assertBool "no match" (not (Event.matchesTrigger bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)),
+         in HU.assertBool "no match" (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)),
       HU.testCase "CR 400.7: a zone change forgets attachment" $ do
         plains <- Registry.printing registry "Plains"
         piker <- Registry.printing registry "Goblin Piker"

@@ -328,6 +328,9 @@ modificationCounts modification = case modification of
 triggerConditionCounts :: TriggerCondition.TriggerCondition -> [Count.Type.Count Quantity.Type.Quantity]
 triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
+  -- CR 603.6a's Filter is a predicate over the entering permanent, and a
+  -- Filter holds no Count (Pawl.Type.Filter's atoms are all characteristics).
+  TriggerCondition.PermanentEnters _ -> []
   TriggerCondition.StepBegins _ _ -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
@@ -357,6 +360,7 @@ effectCounts effect = case effect of
   Effect.Mill _ quantity -> quantityCounts quantity
   Effect.Discard _ quantity -> quantityCounts quantity
   Effect.LoseLife _ quantity -> quantityCounts quantity
+  Effect.GainLife _ quantity -> quantityCounts quantity
   Effect.Create quantity card _ -> quantityCounts quantity <> cardCounts card
   Effect.Replace duration _ _ -> durationCounts duration
   Effect.Counter _ -> []
@@ -1414,8 +1418,48 @@ revealCardTests registry =
           abilities -> HU.assertFailure ("expected one activated ability, got " <> show (length abilities))
     ]
 
+-- CR 603.6a's second written form. Soul Warden is the pool's first card whose
+-- ability triggers on a permanent OTHER than itself entering, and its effect
+-- names nothing about the newcomer, so the card is a clean witness for the
+-- trigger condition alone.
+entersCardTests :: Registry.Type.Registry -> Tasty.TestTree
+entersCardTests registry =
+  Tasty.testGroup
+    "Enters"
+    [ HU.testCase "Soul Warden is a {W} 1/1 Human Cleric whose trigger reads \"whenever ANOTHER creature enters\"" $ do
+        p <- Registry.printing registry "Soul Warden"
+        let c = Printing.card p
+            white = ManaSymbol.OfType (ManaType.Colored Color.White)
+        HU.assertEqual "name" (Text.pack "Soul Warden") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [white]) (Card.Type.manaCost c)
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 1))) (Card.Type.power c)
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 1))) (Card.Type.toughness c)
+        HU.assertEqual "subtypes" (Set.fromList [Subtype.Human, Subtype.Cleric]) (TypeLine.subtypes (Card.Type.typeLine c))
+        case Card.Type.triggeredAbilities c of
+          [ability] -> do
+            -- "another" is `Not IsSource` INSIDE the condition's Filter, which
+            -- is the one spelling Filter.IsSource fixes for it (#163) -- there
+            -- is no exclusion flag beside the Filter to get out of step with.
+            HU.assertEqual
+              "CR 603.6a: whenever another creature enters"
+              (TriggerCondition.PermanentEnters (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsSource]))
+              (TriggeredAbility.condition ability)
+            HU.assertEqual "no intervening \"if\" (CR 603.4)" Nothing (TriggeredAbility.intervening ability)
+            case Foldable.toList (Modal.modes (TriggeredAbility.modal ability)) of
+              [m] -> do
+                -- CR 109.5's "you": the ability's controller, and no target
+                -- slot at all -- the effect never reads the entering creature.
+                HU.assertEqual
+                  "\"you gain 1 life\""
+                  [Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1)]
+                  (Foldable.toList (Mode.effects m))
+                HU.assertEqual "targetless" Map.empty (Mode.targetSpecs m)
+              modes -> HU.assertFailure ("expected one mode, got " <> show (length modes))
+          abilities -> HU.assertFailure ("expected one triggered ability, got " <> show (length abilities))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry]

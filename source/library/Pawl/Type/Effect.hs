@@ -149,11 +149,20 @@ data Effect card
     -- GameEvent.DamageDealt for CR 704.5h's deathtouch scan and every
     -- damage-history reader to consume.
     --
-    -- Gaining life is the sibling and is future: CR 119.3 states both in one
-    -- sentence, but they are distinct game events for triggers ("whenever you
-    -- gain life"), so a signed amount would fuse two events into one. The gain
-    -- arm waits for its own card, as Untap's mass variant does.
+    -- GainLife below is the sibling, and is a SEPARATE opcode rather than a
+    -- signed amount on this one: CR 119.3 states both in one sentence, but they
+    -- are distinct game events for triggers ("whenever you gain life"), which a
+    -- signed amount would fuse into one.
     LoseLife PlayerRef Quantity
+  | -- CR 119.3: "If an effect causes a player to gain life or lose life, that
+    -- player's life total is adjusted accordingly." The players the PlayerRef
+    -- names each gain this much -- Soul Warden's "you gain 1 life" is
+    -- `Relative You`. LoseLife's mirror in every respect but the sign, and
+    -- separate from it for the reason LoseLife's own comment gives.
+    --
+    -- No state-based action follows a gain (CR 704.5a is about a life total of 0
+    -- or less), so unlike LoseLife this one can never kill anybody.
+    GainLife PlayerRef Quantity
   | -- CR 111: create this many tokens with the given effect-defined characteristics
     -- (CR 111.3). The `card` is the token's "text", embedded literally in the card
     -- data (a nested card, tied to Card by Card's own instantiation; the codec and
