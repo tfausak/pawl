@@ -1,0 +1,125 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Cycling",
+      "value": [
+        {
+          "components": [],
+          "mana": [
+            {
+              "type": "Generic",
+              "value": 1
+            },
+            {
+              "type": "OfType",
+              "value": {
+                "type": "Colored",
+                "value": {
+                  "type": "White"
+                }
+              }
+            }
+          ]
+        },
+        null
+      ]
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "White"
+        }
+      }
+    }
+  ],
+  "name": "Renewed Faith",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "GainLife",
+            "value": [
+              {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              },
+              {
+                "type": "Literal",
+                "value": 6
+              }
+            ]
+          }
+        ],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfCycled"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "GainLife",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
+              }
+            ],
+            "optionality": {
+              "type": "Optional"
+            },
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}

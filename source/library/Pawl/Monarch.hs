@@ -30,6 +30,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.MonarchWatch as MonarchWatch
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.Optionality as Optionality
 import Pawl.Type.PendingTrigger (PendingTrigger)
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
@@ -61,7 +62,7 @@ oneEffect cond eff =
     { TriggeredAbility.condition = cond,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton eff) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton eff) Map.empty Optionality.Mandatory))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }

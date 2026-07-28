@@ -12,6 +12,7 @@ import qualified Pawl.Modal as Modal
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import Pawl.Type.Effect (Effect)
+import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import Pawl.Type.SlotName (SlotName)
 import qualified Pawl.Type.SlotName as SlotName
@@ -53,11 +54,13 @@ allTargetSpecs card = Map.union (enchantSpecs card) (Modal.allTargetSpecs (Card.
 modeTargetSpecs :: ModeIndex.ModeIndex -> Card.Card -> Maybe (Map SlotName TargetSpec)
 modeTargetSpecs idx card = Modal.modeTargetSpecs idx (Card.spell card)
 
--- CR 608.2c/700.2: the effects of the CHOSEN modes only, in printed (mode
--- index, then written) order -- the Set is already sorted by ModeIndex's Ord.
--- Out-of-range indices contribute nothing (total via Seq.lookup).
-modesEffects :: Set.Set ModeIndex.ModeIndex -> Card.Card -> [Effect Card.Card]
-modesEffects chosen card = Modal.modesEffects chosen (Card.spell card)
+-- CR 608.2c/700.2: the CHOSEN modes only, each with its index, in printed order
+-- -- the Set is already sorted by ModeIndex's Ord. Out-of-range indices
+-- contribute nothing (total via Seq.lookup). Modes rather than a flat effect
+-- list, for the reason Modal.chosenModes gives: the mode is the unit CR 603.5's
+-- "may" covers.
+chosenModes :: Set.Set ModeIndex.ModeIndex -> Card.Card -> [(ModeIndex.ModeIndex, Mode.Mode Card.Card)]
+chosenModes chosen card = Modal.chosenModes chosen (Card.spell card)
 
 -- CR 601.2c/700.2c: the target specs of the CHOSEN modes only (union), plus
 -- the card's enchant slot (CR 303.4a) if it has one. Only these slots are

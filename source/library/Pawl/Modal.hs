@@ -8,6 +8,7 @@ module Pawl.Modal where
 import qualified Data.Foldable as Foldable
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -30,13 +31,27 @@ allEffects m = concatMap (Foldable.toList . Mode.effects) (Modal.modes m)
 allTargetSpecs :: Modal.Modal card -> Map SlotName TargetSpec
 allTargetSpecs m = Map.unions (fmap Mode.targetSpecs (Foldable.toList (Modal.modes m)))
 
--- CR 608.2c/700.2: only the CHOSEN modes' effects, in ModeIndex order (the Set is
--- already sorted). Out-of-range indices contribute nothing (total via Seq.lookup).
+-- CR 608.2c/700.2: the CHOSEN modes themselves, each with its own index, in
+-- ModeIndex order (the Set is already sorted). Out-of-range indices contribute
+-- nothing (total via Seq.lookup).
+--
+-- Modes rather than a flat effect list because a mode is the unit CR 603.5's
+-- "may" covers (Mode.optionality) and the unit CR 700.2c scopes targets to, so a
+-- resolver that flattened first could not ask the one question per mode that
+-- Pawl.Resolve.resolveModes asks. The index rides along so the prompt can name
+-- which mode is asking.
+chosenModes :: Set ModeIndex.ModeIndex -> Modal.Modal card -> [(ModeIndex.ModeIndex, Mode.Mode card)]
+chosenModes chosen m =
+  let modeAt idx@(ModeIndex.MkModeIndex n) =
+        fmap ((,) idx) (Seq.lookup (Natural.toIntSaturating n) (Modal.modes m))
+   in Maybe.mapMaybe modeAt (Set.toAscList chosen)
+
+-- CR 608.2c/700.2: only the CHOSEN modes' effects, flattened in ModeIndex then
+-- written order. A CLASSIFICATION read (does any of this search a library?),
+-- where optionality is not part of the question; resolution goes through
+-- chosenModes instead.
 modesEffects :: Set ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
-modesEffects chosen m =
-  let modeAt (ModeIndex.MkModeIndex n) =
-        foldMap (Foldable.toList . Mode.effects) (Seq.lookup (Natural.toIntSaturating n) (Modal.modes m))
-   in concatMap modeAt (Set.toAscList chosen)
+modesEffects chosen m = concatMap (Foldable.toList . Mode.effects . snd) (chosenModes chosen m)
 
 -- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union).
 modesTargetSpecs :: Set ModeIndex.ModeIndex -> Modal.Modal card -> Map SlotName TargetSpec

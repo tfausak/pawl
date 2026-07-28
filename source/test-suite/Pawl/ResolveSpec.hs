@@ -12,6 +12,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Combat as Combat
@@ -27,6 +28,7 @@ import qualified Pawl.Modal as Modal
 import qualified Pawl.Monarch as Monarch
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Replay as Replay
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
@@ -71,6 +73,8 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.OptionalDecision as OptionalDecision
+import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
@@ -84,6 +88,7 @@ import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
+import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.Scope as Scope
 import qualified Pawl.Type.SearchDestination as SearchDestination
@@ -526,7 +531,7 @@ resolveTests registry =
                   Card.Type.staticAbilities = [],
                   Card.Type.spell =
                     Modal.MkModal
-                      (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.ChangeText slot)) Map.empty))
+                      (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.ChangeText slot)) Map.empty Optionality.Mandatory))
                       (ModeSelection.ChooseExactly 1),
                   Card.Type.activatedAbilities = [],
                   Card.Type.replacementEffects = [],
@@ -624,7 +629,7 @@ resolveTests registry =
         let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
             ability = case Card.Type.activatedAbilities (Printing.card prodigalSorcerer) of
               ab : _ -> ab
-              [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
+              [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
             (abilId, g1) = Game.freshObjectId g0
             (ts, g2) = Game.freshTimestamp g1
             slot = SlotName.MkSlotName (Text.pack "target")
@@ -659,7 +664,7 @@ resolveTests registry =
             ability =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
                 ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
@@ -674,7 +679,7 @@ resolveTests registry =
         mountain <- Registry.printing registry "Mountain"
         let base = Setup.emptyGame S.bothPlayers
             (_, g1) = S.addLibraryCard mountain S.alice base
-            ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
+            ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
             abilObj = Object.MkObject S.alice (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing ts
@@ -697,7 +702,7 @@ resolveTests registry =
             ability =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
                 ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
@@ -720,7 +725,7 @@ resolveTests registry =
             ability =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
                 ActivationTiming.AnyTime
             (abilId, g2) = Game.freshObjectId g1
             (ts, g3) = Game.freshTimestamp g2
@@ -742,7 +747,7 @@ resolveTests registry =
             ability =
               TriggeredAbility.MkTriggeredAbility
                 TriggerCondition.SelfEnters
-                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ExileAllGraveyards]) Map.empty)) (ModeSelection.ChooseExactly 1))
+                (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ExileAllGraveyards]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
                 Nothing
             (abilId, g4) = Game.freshObjectId g3
             (ts, g5) = Game.freshTimestamp g4
@@ -790,7 +795,7 @@ resolveTests registry =
                       },
                   ActivatedAbility.modal =
                     Modal.MkModal
-                      (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing))))
+                      (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory))
                       (ModeSelection.ChooseExactly 1),
                   ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
@@ -853,7 +858,7 @@ resolveTests registry =
                       },
                   ActivatedAbility.modal =
                     Modal.MkModal
-                      (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty))
+                      (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory))
                       (ModeSelection.ChooseExactly 1),
                   ActivatedAbility.timing = ActivationTiming.AnyTime
                 }
@@ -900,7 +905,7 @@ resolveTests registry =
                   Card.Type.staticAbilities = [],
                   Card.Type.spell =
                     Modal.MkModal
-                      (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage slot (Quantity.Literal 3)]) Map.empty))
+                      (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage slot (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
                       (ModeSelection.ChooseExactly 1),
                   Card.Type.activatedAbilities = [],
                   Card.Type.replacementEffects = [],
@@ -959,7 +964,7 @@ resolveTests registry =
                   Card.Type.staticAbilities = [],
                   Card.Type.spell =
                     Modal.MkModal
-                      (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage slot (Quantity.Literal 3)]) Map.empty))
+                      (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage slot (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
                       (ModeSelection.ChooseExactly 1),
                   Card.Type.activatedAbilities = [],
                   Card.Type.replacementEffects = [],
@@ -1097,7 +1102,7 @@ installControlBy mindslaver controller target gs0 =
                 },
             ActivatedAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing))))
+                (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory))
                 (ModeSelection.ChooseExactly 1),
             ActivatedAbility.timing = ActivationTiming.AnyTime
           }
@@ -1333,7 +1338,8 @@ fizzleTests registry =
             -- illegal (it's no longer a legal CreatureTarget), while the
             -- reserved slot -- never targeted -- stays vacuously legal.
             gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-            run = Resolve.resolveEffects abilId source [Effect.Destroy targetSlot Regenerability.Regenerable, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)] specs
+            mode = Mode.MkMode (Seq.fromList [Effect.Destroy targetSlot Regenerability.Regenerable, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory
+            run = Resolve.resolveModes abilId source [(ModeIndex.MkModeIndex 0, mode)]
             after = snd (Engine.runGamePure S.identityAnswer gone run)
         HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
       HU.testCase "CR 704.5a a Bolt can end the game mid-step" $ do
@@ -2573,5 +2579,141 @@ actOfTreasonTests registry =
         HU.assertEqual "control reverts at cleanup" (Just S.bob) (Projection.controllerOf oid (Expiry.dropAtCleanup resolved))
     ]
 
+-- CR 603.5 / 608.2d: an OPTIONAL effect -- "you may" -- decided as the ability
+-- resolves, not as it is put on the stack.
+--
+-- Renewed Faith is the card: a {2}{W} instant with "You gain 6 life", Cycling
+-- {1}{W}, and "When you cycle this card, you may gain 2 life". It targets
+-- nothing, so nothing here can be passing on the targeting machinery: the only
+-- new thing is whether the trigger's one effect happens.
+optionalEffectTests :: Registry.Type.Registry -> Tasty.TestTree
+optionalEffectTests registry =
+  let -- Takes the option ONLY if the prompt names the right decider, the right
+      -- player and the right mode. A prompt addressed to anybody else, or naming
+      -- a mode this ability does not have, declines -- so the life total below
+      -- is discriminating about the whole payload, not just about the answer.
+      takeOptional :: Prompt.Prompt r -> r
+      takeOptional p = case p of
+        Prompt.ChooseOptional (Decider.MkDecider d) player _ idx
+          | d == S.alice && player == S.alice && idx == ModeIndex.MkModeIndex 0 ->
+              OptionalDecision.Exercises
+        Prompt.ChooseOptional {} -> OptionalDecision.Declines
+        _ -> S.identityAnswer p
+      -- The named card in alice's hand with two of the named land in play, which
+      -- is what Renewed Faith's {1}{W} cycling costs, and alice holding priority.
+      handWithTwoLands printing land = do
+        faith <- Registry.printing registry printing
+        plains <- Registry.printing registry land
+        let (g1, faithId) = S.handOne faith (S.landsInPlay plains 2)
+        pure (g1 {GameState.priority = Just S.alice}, faithId)
+      -- Deem Worthy in hand with four Mountains for its {3}{R} cycling, and one
+      -- Goblin Piker on the battlefield as the only legal creature target.
+      deemWorthyBoard = do
+        worthy <- Registry.printing registry "Deem Worthy"
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (creature, g0) = S.addCreature piker S.alice (S.landsInPlay mountain 4)
+            (g1, worthyId) = S.handOne worthy g0
+        pure (g1 {GameState.priority = Just S.alice}, worthyId, creature)
+   in Tasty.testGroup
+        "OptionalEffect"
+        [ HU.testCase "CR 603.5 declining the may gains nothing, and the ability still resolves" $ do
+            (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
+            case Activate.abilitiesFor faithId gs of
+              [ability] -> do
+                let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice faithId ability)
+                    placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
+                    after = S.runPure S.identityAnswer placed Stack.resolveTop
+                HU.assertEqual "the trigger is on the stack, above the draw" 2 (length (GameState.stack placed))
+                HU.assertEqual "declining gains no life" (Just 20) (S.lifeOf S.alice after)
+                -- CR 608.2n, not CR 608.2b: a declined "may" is not a fizzle.
+                -- The ability resolved -- it just did nothing -- and leaving the
+                -- stack is the last part of that resolution.
+                HU.assertEqual "and the ability left the stack anyway -- it did not fizzle" 1 (length (GameState.stack after))
+              abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+          HU.testCase "CR 603.5 whole card: cycling Renewed Faith and taking the may gains exactly 2" $ do
+            (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
+            case Activate.abilitiesFor faithId gs of
+              [ability] -> do
+                let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice faithId ability)
+                    placed = S.runPure takeOptional cycled Engine.settleForPriority
+                    after = S.runPure takeOptional placed Stack.resolveTop
+                HU.assertEqual "the Faith is in the graveyard, cycled" 1 (length (Game.zoneMembers Zone.Graveyard S.alice cycled))
+                HU.assertEqual "taking it gains exactly 2" (Just 22) (S.lifeOf S.alice after)
+              abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+          -- The prompt itself, not just its consequence: recording the run puts
+          -- the answer in the transcript, which is the only place a raised
+          -- prompt is directly observable. Twinned with the mandatory control
+          -- below, which must record NO such response.
+          HU.testCase "CR 608.2d the choice is announced as a real prompt, and lands in the transcript" $ do
+            (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
+            case Activate.abilitiesFor faithId gs of
+              [ability] -> do
+                let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice faithId ability)
+                    placed = S.runPure takeOptional cycled Engine.settleForPriority
+                    (_, transcript) = Replay.record takeOptional placed Stack.resolveTop
+                HU.assertEqual
+                  "exactly one may was asked, and it was taken"
+                  [Response.ChoseOptional OptionalDecision.Exercises]
+                  (filter isOptionalResponse transcript)
+              abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+          -- The control: Windcaller Aven's cycling trigger is the SAME shape one
+          -- word short of a "may", and it must not be asked about at all.
+          HU.testCase "CR 603.5 a mandatory cycling trigger raises no such prompt" $ do
+            aven <- Registry.printing registry "Windcaller Aven"
+            island <- Registry.printing registry "Island"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (_, g0) = S.addCreature piker S.alice (S.landsInPlay island 1)
+                (g1, avenId) = S.handOne aven g0
+                gs = g1 {GameState.priority = Just S.alice}
+            case Activate.abilitiesFor avenId gs of
+              [ability] -> do
+                let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice avenId ability)
+                    placed = S.runPure takeOptional cycled Engine.settleForPriority
+                    (_, transcript) = Replay.record takeOptional placed Stack.resolveTop
+                HU.assertEqual "nothing was asked about a may" [] (filter isOptionalResponse transcript)
+              abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+          -- The second card, and the one that puts a TARGET under the "may":
+          -- Deem Worthy {4}{R} Instant, "Deem Worthy deals 7 damage to target
+          -- creature. Cycling {3}{R}. When you cycle this card, you may have it
+          -- deal 2 damage to target creature." The target is chosen as the
+          -- trigger goes on the stack (CR 603.3d) and the option only on
+          -- resolution (CR 603.5), which is the ordering a mode-selection
+          -- encoding of "may" would have collapsed.
+          HU.testCase "CR 603.5 whole card: cycling Deem Worthy and taking the may deals 2 to the target" $ do
+            (gs, worthyId, piker) <- deemWorthyBoard
+            case Activate.abilitiesFor worthyId gs of
+              [ability] -> do
+                let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice worthyId ability)
+                    placed = S.runPure takeOptional cycled Engine.settleForPriority
+                    taken = S.runPure takeOptional placed Stack.resolveTop
+                    declined = S.runPure S.identityAnswer placed Stack.resolveTop
+                HU.assertEqual "taking it marks 2 damage" (Just 2) (fmap Object.damage (Game.lookupObject piker taken))
+                HU.assertEqual "declining marks none" (Just 0) (fmap Object.damage (Game.lookupObject piker declined))
+              abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+          -- CR 608.2b before CR 603.5: with its only target gone, the ability
+          -- "doesn't resolve. It's removed from the stack" -- so there is nothing
+          -- left for the "may" to decide and the prompt is never raised. The
+          -- engine does not ask a question whose answer cannot matter.
+          HU.testCase "CR 608.2b a fizzled optional trigger is not asked about at all" $ do
+            (gs, worthyId, piker) <- deemWorthyBoard
+            case Activate.abilitiesFor worthyId gs of
+              [ability] -> do
+                let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice worthyId ability)
+                    placed = S.runPure takeOptional cycled Engine.settleForPriority
+                    gone = S.runPure S.identityAnswer placed (Event.changeZone piker Zone.Graveyard)
+                    ((_, after), transcript) = Replay.record takeOptional gone Stack.resolveTop
+                HU.assertEqual "the trigger left the stack" (length (GameState.stack placed) - 1) (length (GameState.stack after))
+                HU.assertEqual "and no may was ever asked" [] (filter isOptionalResponse transcript)
+              abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities))
+        ]
+
+-- Is this transcript entry an answer to a printed "may"? The filter both
+-- optional-effect transcript assertions share.
+isOptionalResponse :: Response.Response -> Bool
+isOptionalResponse r = case r of
+  Response.ChoseOptional _ -> True
+  _ -> False
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry, optionalEffectTests registry]

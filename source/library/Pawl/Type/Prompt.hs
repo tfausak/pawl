@@ -16,6 +16,7 @@ import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.MulliganDecision (MulliganDecision)
 import Pawl.Type.MulliganOffer (MulliganOffer)
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.OptionalDecision (OptionalDecision)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.SlotName (SlotName)
@@ -392,3 +393,28 @@ data Prompt r where
   -- either well. Not asked when the list is empty; where the rules leave nothing
   -- to ask, don't prompt.
   OpeningHandAction :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
+  -- CR 603.5 / 608.2d: whether the controller of a resolving spell or ability
+  -- exercises a printed "may". The ObjectId is the object RESOLVING (the spell,
+  -- or the ability object on the stack -- not its source, since two triggers off
+  -- one source resolve as two distinct stack objects); the ModeIndex is which of
+  -- its chosen modes is asking, so a modal payload with two optional modes puts
+  -- two DISTINGUISHABLE questions on the wire -- the discriminator OrderTriggers
+  -- (#61) and ChooseReplacement (#74) had to do without.
+  --
+  -- CR 603.5 is what makes this a resolution-time prompt rather than a
+  -- cast-time one: an optional ability "goes on the stack when it triggers,
+  -- regardless of whether their controller intends to exercise the ability's
+  -- option or not. The choice is made when the ability resolves." CR 608.2d then
+  -- places it exactly -- a choice not already made as part of putting the spell
+  -- or ability on the stack is announced "while applying the effect".
+  --
+  -- NEVER elided. "You may gain 2 life" is a genuine choice even when it looks
+  -- strictly good: a life total is read by other cards, so both answers are
+  -- distinguishable game states, and the engine does not make a player's choice.
+  -- The one case where it is not asked is where nothing is being decided: an
+  -- ability whose targets are ALL illegal never reaches this prompt, because CR
+  -- 608.2b removes it from the stack first (Pawl.Resolve's fizzle). That covers
+  -- every optional card in the pool, all of which are single-mode; a MODAL
+  -- payload mixing a live mode with a dead optional one would reach this prompt
+  -- with nothing to decide (#336).
+  ChooseOptional :: Decider -> PlayerId -> ObjectId -> ModeIndex -> Prompt OptionalDecision

@@ -993,7 +993,8 @@ runStepThatBegan phase = do
 -- the DRAW step being reached: a CR 614.1b skip of it (runStep's check above)
 -- would suspend it, exactly as a real Stasis lock suspends a real game. No card
 -- in the pool skips the draw step -- Eon Hub takes the upkeep step, which draws
--- nothing -- so the argument stands for every game this engine can currently play.
+-- nothing -- so the argument stands for every game this engine can currently
+-- play, and there is no progress bound behind it if one ever does not (#338).
 playGame :: Game Result
 playGame =
   let loop = do

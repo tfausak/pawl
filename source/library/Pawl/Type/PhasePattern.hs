@@ -10,9 +10,9 @@ import Pawl.Type.Phase (Phase)
 -- STEPLESS phase (CR 500.1's two main phases) are the same act. A phase that HAS
 -- steps is not: CR 500.1's beginning, combat and ending phases exist in this type
 -- only as their steps, so "skip your next combat phase" (Stonehorn Dignitary)
--- would have to name five of them at once. No producer today, and the shape that
--- fixes it -- a phase-level pattern, or a Phase value standing for the whole
--- phase -- is a choice a card should make, not this file.
+-- would have to name five of them at once. The shape that fixes it -- a
+-- phase-level pattern, or a Phase value standing for the whole phase -- is a
+-- choice a card should make, not this file (#337).
 --
 -- Also not expressible: a skip an EFFECT creates rather than a permanent's
 -- static ability, and one consumed after a single occurrence (#333); and a skip

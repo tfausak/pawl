@@ -42,6 +42,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
@@ -87,7 +88,7 @@ theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
 singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Modal.Modal card
 singleModeAbility effects specs =
-  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs)) (ModeSelection.ChooseExactly 1)
+  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
@@ -699,7 +700,7 @@ cyclingTests registry =
               ActivatedAbility.MkActivatedAbility
                 (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
                 ( Modal.MkModal
-                    (Seq.fromList [Mode.MkMode Seq.empty Map.empty, Mode.MkMode Seq.empty Map.empty])
+                    (Seq.fromList [Mode.MkMode Seq.empty Map.empty Optionality.Mandatory, Mode.MkMode Seq.empty Map.empty Optionality.Mandatory])
                     (ModeSelection.ChooseExactly 1)
                 )
                 ActivationTiming.AnyTime
