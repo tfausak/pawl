@@ -125,6 +125,31 @@ data Effect card
     -- Decide.deciderFor. A hand smaller than the count discards all of it (CR
     -- 609.3, "does only as much as possible"), forced -- so it is not prompted.
     Discard SlotName Quantity
+  | -- CR 119.3: "If an effect causes a player to gain life or lose life, that
+    -- player's life total is adjusted accordingly." The players the PlayerRef
+    -- names each lose this much. Sign in Blood's "target player ... loses 2
+    -- life" is `InSlot`, reading a slot that TARGETING filled (CR 601.2c); a
+    -- "you lose N life" drawback is `Relative You`. PlayerRef rather than the
+    -- SlotName Mill and Discard take, for the reason Draw's own comment gives:
+    -- a slot-only recipient needs a sibling opcode the first time a card says
+    -- "you lose N life", and one opcode is easier to keep correct than two. The
+    -- CR 704.5a state-based action that may follow is the existing one in
+    -- Pawl.Sba.
+    --
+    -- NOT a DealDamage aimed at a player. CR 119.2's "damage dealt to a player
+    -- normally causes that player to lose that much life" runs one way only, so
+    -- routing life loss through the damage funnel would wrongly subject it to
+    -- CR 614/615's damage replacement and prevention, to infect's CR 120.3b
+    -- diversion (which turns the whole amount into poison counters, losing NO
+    -- life), and to toxic's CR 120.3g rider -- and it would append a
+    -- GameEvent.DamageDealt for CR 704.5h's deathtouch scan and every
+    -- damage-history reader to consume.
+    --
+    -- Gaining life is the sibling and is future: CR 119.3 states both in one
+    -- sentence, but they are distinct game events for triggers ("whenever you
+    -- gain life"), so a signed amount would fuse two events into one. The gain
+    -- arm waits for its own card, as Untap's mass variant does.
+    LoseLife PlayerRef Quantity
   | -- CR 111: create this many tokens with the given effect-defined characteristics
     -- (CR 111.3). The `card` is the token's "text", embedded literally in the card
     -- data (a nested card, tied to Card by Card's own instantiation; the codec and

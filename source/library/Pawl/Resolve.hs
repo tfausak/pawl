@@ -101,6 +101,7 @@ slotsOf effect = case effect of
   Effect.Draw ref _ -> playerRefSlots ref
   Effect.Mill slot _ -> Set.singleton slot
   Effect.Discard slot _ -> Set.singleton slot
+  Effect.LoseLife ref _ -> playerRefSlots ref
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here.
   Effect.Create {} -> Set.empty
@@ -146,6 +147,7 @@ readsX = any effectReadsX
       Effect.Draw _ quantity -> quantity == Quantity.Type.X
       Effect.Mill _ quantity -> quantity == Quantity.Type.X
       Effect.Discard _ quantity -> quantity == Quantity.Type.X
+      Effect.LoseLife _ quantity -> quantity == Quantity.Type.X
       Effect.Create quantity _ _ -> quantity == Quantity.Type.X
       Effect.Replace {} -> False
       Effect.Counter _ -> False
@@ -188,6 +190,7 @@ manaProduced effect = case effect of
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
   Effect.Discard {} -> Nothing
+  Effect.LoseLife {} -> Nothing
   Effect.Create {} -> Nothing
   Effect.Replace {} -> Nothing
   Effect.Counter _ -> Nothing
@@ -225,6 +228,7 @@ searchesLibrary effect = case effect of
   Effect.Draw {} -> False
   Effect.Mill {} -> False
   Effect.Discard {} -> False
+  Effect.LoseLife {} -> False
   Effect.Create {} -> False
   Effect.Replace {} -> False
   Effect.Counter _ -> False
@@ -303,6 +307,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Draw {} -> effect
   Effect.Mill {} -> effect
   Effect.Discard {} -> effect
+  -- No rewritable land-type word.
+  Effect.LoseLife {} -> effect
   -- A text-changer does not reach a token's embedded card here (spec section 8).
   Effect.Create {} -> effect
   Effect.Replace {} -> effect
@@ -914,6 +920,39 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                     bury (List.genericTake count (valid <> filler))
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
+      _ -> pure ()
+  Effect.LoseLife ref quantity -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = Filter.MkContext (Just controller) (Just source)
+        -- Whoever the PlayerRef names loses the life -- the targeted player for
+        -- Sign in Blood's `InSlot`, the controller for a `Relative You`
+        -- drawback. Unordered, on the footing GainPlayerCounters is on rather
+        -- than Draw's: there is no CR 121.2c for life, and CR 704.3 checks
+        -- state-based actions only as a player would get priority, so no life
+        -- total is observable between one adjustment and the next.
+        losers = playerRefPlayers chosen legality controller gs ref
+    case Quantity.evaluate viewOf context gs source quantity of
+      Just n
+        | n > 0 ->
+            -- CR 119.3: the life total is simply adjusted, directly on the
+            -- player record. Not through Pawl.Damage: CR 119.2 makes damage a
+            -- CAUSE of life loss, not a synonym for it (the opcode's own
+            -- comment has the consequences). A direct subtraction is what
+            -- CostComponent.PayLife does for CR 119.4's cost side, and the CR
+            -- 704.5a state-based action that may follow is the existing one in
+            -- Pawl.Sba.
+            Monad.forM_ losers $ \pid ->
+              State.modify'
+                ( \g ->
+                    g
+                      { GameState.players =
+                          Map.adjust
+                            (\p -> p {Player.life = Player.life p - n})
+                            pid
+                            (GameState.players g)
+                      }
+                )
       _ -> pure ()
   -- CR 701.21a: the slot's target player sacrifices `quantity` permanents
   -- matching the filter, and THAT PLAYER chooses which -- the whole difference

@@ -1797,6 +1797,51 @@ drawCardTests registry =
          in HU.assertBool "drewFromEmpty marked" (Set.member S.alice (GameState.drewFromEmpty after))
     ]
 
+loseLifeTests :: Registry.Type.Registry -> Tasty.TestTree
+loseLifeTests registry =
+  Tasty.testGroup
+    "LoseLife"
+    -- Both cases are Sign in Blood, the card that proves the opcode (#273): its
+    -- two clauses share one target slot, so the player who draws is the player
+    -- who pays, and neither is aimed at the caster.
+    [ -- The last assertion is the falsifier for a life loss spelled as damage.
+      -- CR 119.2 makes damage a CAUSE of life loss, not a synonym for it, so
+      -- this records no damage event for CR 614/615's replacement and
+      -- prevention, infect's CR 120.3b diversion or CR 704.5h's deathtouch scan
+      -- to read.
+      HU.testCase "CR 119.3 Sign in Blood makes the player it targets draw two and lose two life" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        signInBlood <- Registry.printing registry "Sign in Blood"
+        let base = S.landsInPlay swamp 2
+            withLib = stockLibrary piker S.bob 3 base
+            (gs, spellId) = S.handOne signInBlood withLib
+            cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+            isDamage ev = case ev of
+              GameEvent.DamageDealt _ -> True
+              _ -> False
+        HU.assertEqual "bob drew two" 2 (S.handSize S.bob after)
+        HU.assertEqual "and lost two life" (fmap (subtract 2) (S.lifeOf S.bob gs)) (S.lifeOf S.bob after)
+        HU.assertEqual "alice, who cast it, lost none" (S.lifeOf S.alice gs) (S.lifeOf S.alice after)
+        HU.assertBool "no damage was dealt (CR 119.2)" (not (any isDamage (GameState.events after))),
+      -- CR 704.5a: life lost without damage still reaches the state-based
+      -- action -- the same check a CR 119.4 pay-life cost answers to. Bob is at
+      -- two, so the second clause is lethal though nothing dealt damage.
+      HU.testCase "CR 704.5a Sign in Blood's life loss can take a player to 0 and lose them the game" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        signInBlood <- Registry.printing registry "Sign in Blood"
+        let base = S.landsInPlay swamp 2
+            withLib = stockLibrary piker S.bob 3 base
+            (gs0, spellId) = S.handOne signInBlood withLib
+            gs = gs0 {GameState.players = Map.adjust (\pl -> pl {Player.life = 2}) S.bob (GameState.players gs0)}
+            cast = snd (Engine.runGamePure atBobAnswer gs (Cast.castSpell S.alice spellId))
+            after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+        HU.assertEqual "bob is at 0" (Just 0) (S.lifeOf S.bob after)
+        HU.assertEqual "and alice wins" (Just (Result.Won S.alice)) (GameState.result (S.settleSba after))
+    ]
+
 countersTests :: Registry.Type.Registry -> Tasty.TestTree
 countersTests registry =
   Tasty.testGroup
@@ -2436,4 +2481,4 @@ actOfTreasonTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry]
