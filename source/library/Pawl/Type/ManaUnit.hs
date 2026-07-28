@@ -19,6 +19,9 @@ import Pawl.Type.ManaType (ManaType)
 --
 -- Both are sets/lists, never fixed fields: a unit can carry several at once.
 --
+-- Neither collection exists yet: snow is #305 and the spending restrictions are
+-- #252.
+--
 -- Deliberately no source ObjectId. Snow cares about a PROPERTY of the source,
 -- not its identity, and a reference would dangle by construction: mana outlives
 -- its source (tap a land, the land is destroyed in response, the mana remains)
