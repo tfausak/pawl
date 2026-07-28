@@ -245,10 +245,12 @@ defaultAnswer p = case p of
   -- a legal answer whenever the prompt was legal to ask, and the least eventful
   -- fallback when a transcript runs short.
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
-  -- The first offered candidate is the PRINTED cost (Pawl.Cost.costsFor puts it
-  -- first) -- the least eventful fallback when a transcript runs short, since it
-  -- sacrifices nothing. Cost.firstOffered keeps this total for the empty list the
-  -- engine never produces.
+  -- The first offered candidate is the PRINTED cost for a cast from hand
+  -- (Pawl.Cost.costsFor puts it first) -- the least eventful fallback when a
+  -- transcript runs short, since it sacrifices nothing. A cast from the graveyard
+  -- offers only rule 702.34a's flashback cost, so the head is the sole candidate
+  -- and this prompt is not raised at all. Cost.firstOffered keeps this total for
+  -- the empty list the engine never produces.
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   -- CR 103.5: keeping is always legal and the least-eventful fallback when a
   -- transcript runs short (mirrors Concede -> Continues).

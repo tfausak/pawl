@@ -35,8 +35,11 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Concession as Concession
+import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
@@ -44,6 +47,7 @@ import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
@@ -641,11 +645,151 @@ auraTargetTests registry =
         HU.assertBool "not castable with an empty board" (not (Cast.castable S.alice spellId gs))
     ]
 
+-- alice controls `n` untapped Mountains and has one card of `printing` wherever
+-- `place` puts it, with priority in her own precombat main phase.
+boardWith :: (Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)) -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+boardWith place mountain printing n =
+  let (oid, gs) = place printing S.alice (S.landsInPlay mountain n)
+   in ( oid,
+        gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The same board with the card in alice's HAND / in her GRAVEYARD.
+inHandWith, inGraveyardWith :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+inHandWith = boardWith S.addHandCard
+inGraveyardWith = boardWith S.addGraveyardCard
+
+theRed :: ManaSymbol.ManaSymbol
+theRed = ManaSymbol.OfType (ManaType.Colored Color.Red)
+
+-- Firebolt {R} Sorcery: "Firebolt deals 2 damage to any target." / "Flashback
+-- {4}{R}" -- rule 702.34a's TWO static abilities on one card, and the proving
+-- card for casting from a zone other than the hand.
+--
+-- Three of its rulings are what this group encodes. "You must still follow any
+-- timing restrictions and permissions, including those based on the card's type.
+-- For instance, you can cast a sorcery using flashback only when you could
+-- normally cast a sorcery." "A spell cast using flashback will always be exiled
+-- afterward, whether it resolves, is countered, or leaves the stack in some
+-- other way." "The mana value of the spell is determined only by its mana cost,
+-- no matter what the total cost to cast the spell was."
+fireboltTests :: Registry.Type.Registry -> Tasty.TestTree
+fireboltTests registry =
+  Tasty.testGroup
+    "Firebolt"
+    [ -- The headline loop, end to end: hand -> stack -> graveyard -> stack ->
+      -- EXILE. The exile is the discriminating assertion -- rule 702.34a's
+      -- second static ability, and the half a bare alternative cost cannot
+      -- reach.
+      HU.testCase "CR 702.34a whole card: cast for {R}, then flash back for {4}{R} and be exiled" $ do
+        mountain <- Registry.printing registry "Mountain"
+        firebolt <- Registry.printing registry "Firebolt"
+        let (fromHand, gs) = inHandWith mountain firebolt 6
+            cast1 = S.runPure S.identityAnswer gs (Cast.castSpell S.alice fromHand)
+            resolved1 = S.runPure S.identityAnswer cast1 Stack.resolveTop
+        HU.assertEqual "the hand cast dealt 2 (identityAnswer targets the lowest recipient)" (Just 18) (S.lifeOf S.alice resolved1)
+        case Game.zoneMembers Zone.Graveyard S.alice resolved1 of
+          [inGraveyard] -> do
+            HU.assertBool "castable from the graveyard" (Cast.castable S.alice inGraveyard resolved1)
+            HU.assertBool "and offered as a legal action" (elem (A.Cast inGraveyard) (Action.legalActions S.alice resolved1))
+            let cast2 = S.runPure S.identityAnswer resolved1 (Cast.castSpell S.alice inGraveyard)
+                resolved2 = S.runPure S.identityAnswer cast2 Stack.resolveTop
+            HU.assertEqual "the flashback cast dealt 2 more" (Just 16) (S.lifeOf S.alice resolved2)
+            HU.assertEqual "it did NOT go back to the graveyard" [] (Game.zoneMembers Zone.Graveyard S.alice resolved2)
+            HU.assertEqual "it was exiled instead" 1 (length (Game.zoneMembers Zone.Exile S.alice resolved2))
+          other -> HU.assertFailure ("expected one card in the graveyard, got " <> show (length other)),
+      -- Rule 702.34a again, on the OTHER exit from the stack: "A spell cast
+      -- using flashback will always be exiled afterward, whether it resolves, is
+      -- countered, or leaves the stack in some other way."
+      HU.testCase "CR 702.34a a countered flashback spell is exiled too" $ do
+        mountain <- Registry.printing registry "Mountain"
+        firebolt <- Registry.printing registry "Firebolt"
+        let (inGraveyard, gs) = inGraveyardWith mountain firebolt 5
+            cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice inGraveyard)
+        case GameState.stack cast of
+          [] -> HU.assertFailure "expected the flashback spell on the stack"
+          onStack : _ -> do
+            let countered = S.runPure S.identityAnswer cast (Event.counter onStack)
+            HU.assertEqual "not in the graveyard" [] (Game.zoneMembers Zone.Graveyard S.alice countered)
+            HU.assertEqual "exiled" 1 (length (Game.zoneMembers Zone.Exile S.alice countered)),
+      -- The self-scoping in rule 702.34a's "exile THIS card". A flashback spell
+      -- waiting on the stack must not exile every OTHER card of its controller's
+      -- that heads for a graveyard while it sits there -- which is exactly what a
+      -- destination-only pattern (Rest in Peace's shape) would do.
+      HU.testCase "CR 702.34a the exile replacement is scoped to the spell itself" $ do
+        mountain <- Registry.printing registry "Mountain"
+        firebolt <- Registry.printing registry "Firebolt"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (inGraveyard, gs0) = inGraveyardWith mountain firebolt 5
+            (bystander, gs1) = S.addCreature piker S.alice gs0
+            cast = S.runPure S.identityAnswer gs1 (Cast.castSpell S.alice inGraveyard)
+            buried = S.runPure S.identityAnswer cast (Event.changeZone bystander Zone.Graveyard)
+        HU.assertEqual "the Piker went to the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice buried))
+        HU.assertEqual "and nothing was exiled" [] (Game.zoneMembers Zone.Exile S.alice buried),
+      -- Crux (a): flashback's cost is available only from the GRAVEYARD. A cost
+      -- simply added to Card.alternativeCosts would make Firebolt castable from
+      -- hand for {4}{R} as well, which rule 702.34a does not say.
+      HU.testCase "CR 702.34a the flashback cost is offered only from the graveyard" $ do
+        mountain <- Registry.printing registry "Mountain"
+        firebolt <- Registry.printing registry "Firebolt"
+        let (fromHand, handBoard) = inHandWith mountain firebolt 6
+            (fromGraveyard, graveyardBoard) = inGraveyardWith mountain firebolt 6
+            manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor oid gs)
+        HU.assertEqual
+          "from hand, the printed {R} and nothing else"
+          [Just (ManaCost.MkManaCost [theRed])]
+          (manaOf fromHand handBoard)
+        HU.assertEqual
+          "from the graveyard, the flashback {4}{R} and nothing else"
+          [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed])]
+          (manaOf fromGraveyard graveyardBoard)
+        -- CR 202.3 and the mana-value ruling ("The mana value of the spell is
+        -- determined only by its mana cost, no matter what the total cost to
+        -- cast the spell was"): neither of rule 702.34a's abilities touches the
+        -- card's own mana cost.
+        HU.assertEqual
+          "and the printed mana cost is still {R}"
+          (Just (ManaCost.MkManaCost [theRed]))
+          (Card.Type.manaCost (Printing.card firebolt)),
+      HU.testCase "CR 118.3 four Mountains do not pay the flashback {4}{R}; five do" $ do
+        mountain <- Registry.printing registry "Mountain"
+        firebolt <- Registry.printing registry "Firebolt"
+        let (four, fourLands) = inGraveyardWith mountain firebolt 4
+            (five, fiveLands) = inGraveyardWith mountain firebolt 5
+        HU.assertBool "not castable with four" (not (Cast.castable S.alice four fourLands))
+        HU.assertBool "castable with five" (Cast.castable S.alice five fiveLands),
+      -- The ruling: "you can cast a sorcery using flashback only when you could
+      -- normally cast a sorcery." The permission is about the ZONE, not the
+      -- timing.
+      HU.testCase "CR 117.1a flashback does not lift the sorcery timing restriction" $ do
+        mountain <- Registry.printing registry "Mountain"
+        firebolt <- Registry.printing registry "Firebolt"
+        let (inGraveyard, gs) = inGraveyardWith mountain firebolt 5
+            upkeep = gs {GameState.phase = Phase.Beginning BeginningStep.Upkeep}
+        HU.assertBool "castable in her own main phase" (Cast.castable S.alice inGraveyard gs)
+        HU.assertBool "not castable in the upkeep" (not (Cast.castable S.alice inGraveyard upkeep)),
+      -- The negative that keeps the permission a PERMISSION: an ordinary card in
+      -- the graveyard stays uncastable. Lightning Bolt is affordable from six
+      -- Mountains, so only the missing permission can be stopping it.
+      HU.testCase "CR 601.3 a card without flashback is not castable from the graveyard" $ do
+        mountain <- Registry.printing registry "Mountain"
+        bolt <- Registry.printing registry "Lightning Bolt"
+        let (inGraveyard, gs) = inGraveyardWith mountain bolt 6
+            (inHand, handBoard) = inHandWith mountain bolt 6
+        HU.assertBool "castable from hand" (Cast.castable S.alice inHand handBoard)
+        HU.assertBool "not castable from the graveyard" (not (Cast.castable S.alice inGraveyard gs))
+        HU.assertBool "and not offered" (notElem (A.Cast inGraveyard) (Action.legalActions S.alice gs))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Cast"
-    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry, auraTargetTests registry]
+    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry, auraTargetTests registry, fireboltTests registry]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

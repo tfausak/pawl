@@ -14,8 +14,10 @@ import Pawl.Type.ZoneChangePattern (ZoneChangePattern)
 -- and the REWRITE SHAPE it applies. One arm per replaceable event class -- the
 -- arm count tracks the ~40 classes the comprehensive rules define, never the card
 -- pool. Rest in Peace is DATA (`ZoneChangeR (MkZoneChangePattern Graveyard
--- Anyones) Exile`), not a constructor; so is Fog, so is regeneration, so is
--- Hardened Scales. The scenario the first invariant forbids --
+-- Anyones AnyObject) Exile`), not a constructor; so is Fog, so is regeneration,
+-- so is Hardened Scales, and so is rule 702.34a's flashback exile
+-- (Pawl.Keyword.flashbackExile, which differs from Rest in Peace only in its
+-- pattern). The scenario the first invariant forbids --
 -- `case effect of RedirectZoneChange Graveyard Exile -> restInPeace` -- is no
 -- longer expressible.
 --

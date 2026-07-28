@@ -2,6 +2,7 @@
 module Pawl.CardsSpec where
 
 import qualified Data.ByteString as ByteString
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Binding as Binding
@@ -11,9 +12,15 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Card as CardT
+import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
+import qualified Pawl.Type.Cost as Cost
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
+import qualified Pawl.Type.Keyword as Keyword
+import qualified Pawl.Type.ManaCost as ManaCost
+import qualified Pawl.Type.ManaSymbol as ManaSymbol
+import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
@@ -22,6 +29,7 @@ import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Slug as Slug.Type
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -45,6 +53,31 @@ tests registry =
         HU.assertEqual "name" (Text.pack "Serum Powder") (CardT.name c)
         HU.assertEqual "the CR 103.5b action" [Effect.ExileHandThenDraw] (CardT.mulliganAction c)
         HU.assertEqual "one activated ability, the {T}: Add {C} mana ability" 1 (length (CardT.activatedAbilities c)),
+      -- The first card file whose keyword carries a payload that is not a
+      -- number: rule 702.34a's flashback COST, which is where the whole ability
+      -- lives -- Firebolt prints no alternativeCosts and no castingPermissions of
+      -- its own, and Pawl.Keyword derives all three of rule 702.34a's
+      -- consequences from this one value.
+      HU.testCase "firebolt.json loads as a {R} Sorcery whose only keyword is flashback {4}{R}" $ do
+        c <- Registry.card registry "Firebolt"
+        HU.assertEqual "name" (Text.pack "Firebolt") (CardT.name c)
+        HU.assertEqual
+          "printed cost is {R}, unchanged by the flashback ability"
+          (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)]))
+          (CardT.manaCost c)
+        HU.assertEqual
+          "one keyword: flashback {4}{R}"
+          ( Set.singleton
+              ( Keyword.Flashback
+                  Cost.MkCost
+                    { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, ManaSymbol.OfType (ManaType.Colored Color.Red)]),
+                      Cost.components = []
+                    }
+              )
+          )
+          (CardT.keywords c)
+        HU.assertEqual "no printed alternative cost" [] (CardT.alternativeCosts c)
+        HU.assertEqual "no printed casting permission" [] (CardT.castingPermissions c),
       HU.testCase "leyline-of-the-void.json loads with a CR 103.6a action and an Opponents redirect" $ do
         c <- Registry.card registry "Leyline of the Void"
         HU.assertEqual "name" (Text.pack "Leyline of the Void") (CardT.name c)
@@ -55,7 +88,7 @@ tests registry =
         HU.assertEqual
           "and the redirect is scoped to an opponent's graveyard"
           [ ReplacementEffect.ZoneChangeR
-              (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents)
+              (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents ZoneChangeSubject.AnyObject)
               Zone.Exile
           ]
           (CardT.replacementEffects c)

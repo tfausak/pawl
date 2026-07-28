@@ -1,6 +1,7 @@
 module Pawl.Type.Keyword where
 
 import Numeric.Natural (Natural)
+import Pawl.Type.Cost (Cost)
 
 -- CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302.
@@ -43,6 +44,25 @@ data Keyword
   | Reach -- 702.17
   | Trample -- 702.19
   | Vigilance -- 702.20
+  | -- 702.34a: "Flashback appears on some instants and sorceries. It represents
+    -- two static abilities: one that functions while the card is in a player's
+    -- graveyard and another that functions while the card is on the stack.
+    -- 'Flashback [cost]' means 'You may cast this card from your graveyard if
+    -- the resulting spell is an instant or sorcery spell by paying [cost] rather
+    -- than paying its mana cost' and 'If the flashback cost was paid, exile this
+    -- card instead of putting it anywhere else any time it would leave the
+    -- stack.'"
+    --
+    -- The cost rides the constructor, as Toxic's N does, because rule 702.34a
+    -- states it as part of the keyword rather than as separate card text. It is
+    -- deliberately NOT a Card.alternativeCosts entry: that list is
+    -- unconditioned, so a flashback cost placed there would also be payable from
+    -- the HAND. Pawl.Keyword turns this one value into all three of rule
+    -- 702.34a's consequences -- the cost (Keyword.flashbackCost, read by
+    -- Pawl.Cost.costsFor only in the graveyard), the permission
+    -- (Keyword.castingPermissionsOf) and the exile replacement
+    -- (Keyword.flashbackExile).
+    Flashback Cost
   | Fear -- 702.36
   | -- 702.70a: "Poisonous is a triggered ability. 'Poisonous N' means 'Whenever
     -- this creature deals combat damage to a player, that player gets N poison

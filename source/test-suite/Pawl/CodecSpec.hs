@@ -23,6 +23,7 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Binding as Binding.Type
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardType as CardType
+import qualified Pawl.Type.CastingPermission as CastingPermission
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.Comparison as Comparison
@@ -97,6 +98,7 @@ import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChange as ZoneChange
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -128,6 +130,24 @@ tests registry =
             roundTrip "poisonous 1" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Poisonous 1)
             roundTrip "poisonous 3" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Poisonous 3)
             HU.assertBool "poisonous 3 is not toxic 3" (Codec.keywordToJson (Keyword.Poisonous 3) /= Codec.keywordToJson (Keyword.Toxic 3)),
+          -- CR 702.34a's payload is a whole Cost, not a number -- the first
+          -- keyword whose parameter is itself a composite.
+          HU.testCase "Keyword.Flashback carries its cost" $ do
+            let flashback n =
+                  Keyword.Flashback
+                    Cost.Type.MkCost
+                      { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic n]),
+                        Cost.Type.components = []
+                      }
+            roundTrip "flashback {1}" Codec.keywordToJson Codec.jsonToKeyword (flashback 1)
+            roundTrip "flashback {4}" Codec.keywordToJson Codec.jsonToKeyword (flashback 4)
+            HU.assertBool "the cost is part of the encoding" (Codec.keywordToJson (flashback 1) /= Codec.keywordToJson (flashback 4)),
+          HU.testCase "CastingPermission" $ do
+            roundTrip "library" Codec.castingPermissionToJson Codec.jsonToCastingPermission CastingPermission.CastFromLibraryWhileSearching
+            roundTrip "graveyard" Codec.castingPermissionToJson Codec.jsonToCastingPermission CastingPermission.CastFromGraveyard,
+          HU.testCase "ZoneChangeSubject" $ do
+            roundTrip "any" Codec.zoneChangeSubjectToJson Codec.jsonToZoneChangeSubject ZoneChangeSubject.AnyObject
+            roundTrip "source" Codec.zoneChangeSubjectToJson Codec.jsonToZoneChangeSubject ZoneChangeSubject.TheSource,
           HU.testCase "PlayerCounterKind" $ do
             roundTrip "energy" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Energy
             roundTrip "poison" Codec.playerCounterKindToJson Codec.jsonToPlayerCounterKind PlayerCounterKind.Poison,
@@ -484,6 +504,7 @@ tests registry =
                   ReplacementEffect.ZoneChangeR
                     ZoneChangePattern.MkZoneChangePattern
                       { ZoneChangePattern.whenDestination = Zone.Graveyard,
+                        ZoneChangePattern.whichObject = ZoneChangeSubject.AnyObject,
                         ZoneChangePattern.whoseObject = ControllerRelation.Anyones
                       }
                     Zone.Exile
@@ -495,6 +516,7 @@ tests registry =
                   ReplacementEffect.ZoneChangeR
                     ZoneChangePattern.MkZoneChangePattern
                       { ZoneChangePattern.whenDestination = Zone.Graveyard,
+                        ZoneChangePattern.whichObject = ZoneChangeSubject.AnyObject,
                         ZoneChangePattern.whoseObject = ControllerRelation.Opponents
                       }
                     Zone.Exile

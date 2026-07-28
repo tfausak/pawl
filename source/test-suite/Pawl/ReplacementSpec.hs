@@ -75,6 +75,7 @@ import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -184,7 +185,7 @@ leylineShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
         ReplacementEffect.ZoneChangeR
-          (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents)
+          (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents ZoneChangeSubject.AnyObject)
           Zone.Exile,
       ActiveReplacement.source = src,
       ActiveReplacement.timestamp = ts,

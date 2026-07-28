@@ -55,6 +55,7 @@ import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
 import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -688,7 +689,7 @@ tests registry =
         let (rip, gs) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
         HU.assertEqual
           "one redirect replacement"
-          [ReplacementEffect.ZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones) Zone.Exile]
+          [ReplacementEffect.ZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones ZoneChangeSubject.AnyObject) Zone.Exile]
           (Projection.replacementsOf rip gs),
       HU.testCase "a vanilla creature projects no replacements" $ do
         pikerPrinting <- Registry.printing registry "Goblin Piker"

@@ -3,10 +3,17 @@ module Pawl.Keyword where
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import Pawl.Type.Card (Card)
+import Pawl.Type.CastingPermission (CastingPermission)
+import qualified Pawl.Type.CastingPermission as CastingPermission
+import qualified Pawl.Type.ControllerRelation as ControllerRelation
+import Pawl.Type.Cost (Cost)
 import qualified Pawl.Type.Effect as Effect
 import Pawl.Type.Keyword (Keyword)
 import qualified Pawl.Type.Keyword as Keyword
@@ -16,9 +23,14 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.Quantity as Quantity
+import Pawl.Type.ReplacementEffect (ReplacementEffect)
+import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import Pawl.Type.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
 
 -- Rule 702 in its OTHER voice. Most keywords this pool has are read where they
 -- matter -- Projection.hasKeyword for an evasion or combat bit, Pawl.Damage for
@@ -37,10 +49,22 @@ import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 -- 702.70a's ability away for free, and an Aura's layer-6 grant adds it for free
 -- -- neither needs an arm here.
 --
--- The one caller is Pawl.Event's EVENT scan (eventTriggers). Rule 702 has no
--- state-triggered (CR 603.8) or delayed (CR 603.7) keyword ability, so
--- stateTriggers and delayedPending do not consult this; the first keyword that
--- needs them to is the one that must widen those two scans.
+-- triggeredAbilitiesOf's one caller is Pawl.Event's EVENT scan (eventTriggers).
+-- Rule 702 has no state-triggered (CR 603.8) or delayed (CR 603.7) keyword
+-- ability, so stateTriggers and delayedPending do not consult this; the first
+-- keyword that needs them to is the one that must widen those two scans.
+--
+-- Rule 702.34a's flashback is the second minting customer, and the one that
+-- shows how wide this voice is: ONE keyword becomes a cost
+-- (flashbackCost, read by Pawl.Cost), a casting permission
+-- (castingPermissionsOf, read by Pawl.Cast) and a replacement effect
+-- (flashbackExile, installed by Pawl.Cast). Those three readers get ordinary
+-- rules objects and never learn that flashback is what produced them.
+--
+-- These three are derived from a card's PRINTED keywords rather than a
+-- projection's post-layer ones, unlike triggeredAbilitiesOf: all three abilities
+-- function in the graveyard or on the stack (CR 113.6), where the CR 613 layer
+-- system does not reach.
 
 -- CR 702.70b: "If a creature has multiple instances of poisonous, each triggers
 -- separately." So this returns one ability PER INSTANCE, which is exactly what
@@ -69,9 +93,100 @@ abilitiesFor keyword count = case keyword of
   Keyword.Trample -> []
   Keyword.Vigilance -> []
   Keyword.Fear -> []
+  Keyword.Flashback _ -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Toxic _ -> []
+
+-- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword,
+-- the sibling of triggeredAbilitiesOf above. A card's own printed permissions
+-- (Card.castingPermissions) are a separate, additive list; Pawl.Cast reads both.
+--
+-- Taken over the card's PRINTED keywords rather than a projection's post-layer
+-- ones, and that is the same rules fact Card.castingPermissions' own comment
+-- records: this permission functions in the GRAVEYARD (CR 113.6), where the CR
+-- 613 layer system does not reach.
+castingPermissionsOf :: Set Keyword -> [CastingPermission]
+castingPermissionsOf = concatMap permissionsFor . Set.toAscList
+
+-- Exhaustive, exactly as abilitiesFor is, and for the same reason: rule 702 is
+-- full of keywords that grant a zone permission (madness, retrace, escape,
+-- disturb), so the next one added must break this build rather than silently
+-- grant nothing.
+permissionsFor :: Keyword -> [CastingPermission]
+permissionsFor keyword = case keyword of
+  -- CR 702.34a: "You may cast this card from your graveyard ..." Rule 702.34a's
+  -- "if the resulting spell is an instant or sorcery spell" is not checked
+  -- (#295).
+  Keyword.Flashback _ -> [CastingPermission.CastFromGraveyard]
+  Keyword.Deathtouch -> []
+  Keyword.Defender -> []
+  Keyword.DoubleStrike -> []
+  Keyword.FirstStrike -> []
+  Keyword.Flying -> []
+  Keyword.Haste -> []
+  Keyword.Indestructible -> []
+  Keyword.Reach -> []
+  Keyword.Trample -> []
+  Keyword.Vigilance -> []
+  Keyword.Fear -> []
+  Keyword.Poisonous _ -> []
+  Keyword.Infect -> []
+  Keyword.Devoid -> []
+  Keyword.Toxic _ -> []
+
+-- CR 702.34a's "... by paying [cost] rather than paying its mana cost": the cost
+-- this card may be cast from the graveyard for, or Nothing when it has no
+-- flashback. Read by Pawl.Cost.costsFor, which offers it ONLY while the object
+-- is in a graveyard -- the zone half of the same sentence.
+--
+-- A wildcard rather than an exhaustive case, the Projection.totalToxic
+-- precedent: this asks about ONE named constructor rather than classifying every
+-- keyword, so a new arm has nothing to say here.
+--
+-- Nothing beyond the FIRST flashback cost is reachable. A card printing two
+-- flashback abilities is expressible (a Set of two Flashback values with
+-- different costs) and unrepresented in what this returns; no printing does it
+-- (#294).
+flashbackCost :: Set Keyword -> Maybe Cost
+flashbackCost keywords =
+  let costOf keyword = case keyword of
+        Keyword.Flashback cost -> Just cost
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+
+-- CR 702.34a's SECOND static ability, "another that functions while the card is
+-- on the stack": "exile this card instead of putting it anywhere else any time
+-- it would leave the stack." TheSource, because the rule says "this card" -- the
+-- spell itself and no other object.
+--
+-- The destination is Graveyard rather than "anywhere else": a
+-- Pawl.Type.ZoneChangePattern names ONE destination, and the graveyard is the
+-- only place a spell leaves the stack for in this pool (resolution CR 608.2n,
+-- the CR 608.2b fizzle, and CR 701.6a's counter all call Event.changeZone with
+-- it) (#293).
+--
+-- Not gated on rule 702.34a's "if the flashback cost was paid": nothing here can
+-- see which cost was paid (#101). Pawl.Cast installs this only for a spell cast
+-- FROM THE GRAVEYARD, where the two coincide -- see its own comment.
+--
+-- The door Pawl.Cast uses, so that module installs a REPLACEMENT EFFECT it never
+-- inspects rather than asking whether a card has flashback: the replacement
+-- effects rule 702 gives a card that was cast from a graveyard, for the whole
+-- time it is on the stack.
+castFromGraveyardReplacementsOf :: Set Keyword -> [ReplacementEffect]
+castFromGraveyardReplacementsOf keywords =
+  [flashbackExile | Maybe.isJust (flashbackCost keywords)]
+
+flashbackExile :: ReplacementEffect
+flashbackExile =
+  ReplacementEffect.ZoneChangeR
+    ZoneChangePattern.MkZoneChangePattern
+      { ZoneChangePattern.whenDestination = Zone.Graveyard,
+        ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+        ZoneChangePattern.whichObject = ZoneChangeSubject.TheSource
+      }
+    Zone.Exile
 
 -- CR 702.70a: "'Poisonous N' means 'Whenever this creature deals combat damage
 -- to a player, that player gets N poison counters.'"
