@@ -50,6 +50,7 @@ import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
+import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
 import Pawl.Type.PlayerId (PlayerId)
@@ -61,6 +62,7 @@ import Pawl.Type.Result (Result)
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TriggerSource as TriggerSource
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.Zone as Zone
 
@@ -362,6 +364,10 @@ runTurnBasedActions phase = do
 -- other player's in turn order (apnapPlayers). Within one controller's own set,
 -- that player chooses the order (orderPending), asked only when they control two
 -- or more -- CR 603.3b's own-order choice is a real prompt now, not an elision.
+-- The abilities that fired include CR 725.2's sourceless inherent monarch pair:
+-- gathered apart (see `inherent` below), but ordered and placed with everything
+-- else, in ONE batch, because CR 603.3b gives the choice to a controller over
+-- every triggered ability they control, not over some subset of them.
 -- CR 603.3b's other half -- first place the triggers whose condition ISN'T
 -- another ability triggering, then the rest, as a separate pass -- is not
 -- implemented here (#49); it is vacuous while nothing in the card pool triggers
@@ -388,9 +394,10 @@ runTurnBasedActions phase = do
 -- Projection.controllerOf, and a departed player controls nothing after CR
 -- 800.4a. The entry is still CONSUMED regardless: `surviving` above already
 -- dropped it from delayedTriggers, because CR 603.7b spends the one shot on
--- the trigger event, which happened. (The monarch's `inherent` triggers below
--- bypass this pipeline entirely and are argued safe separately, at their own
--- gather site.)
+-- the trigger event, which happened. The monarch's `inherent` triggers go
+-- through the same filter, since they are merged into the batch before
+-- `orderPending` runs; belt and braces, because CR 725.4 already keeps the
+-- crown off a departed seat (see the gather site below).
 --
 -- The Bool this returns is computed from `ordered`, not the pre-filter
 -- `pending`, so it still tells the truth ("were any placed") in exactly the
@@ -424,28 +431,42 @@ placePendingTriggers = do
   gs <- State.get
   let evs = Event.unscannedEvents gs
       (pending, surviving) = Event.gatherTriggers evs gs
-      -- CR 725.2: the monarch's inherent triggers hang on no object, so the
-      -- normal ObjectId-sourced pending pipeline can't carry them. Gather them
-      -- from the SAME unscanned-event snapshot, before the watermark bump.
-      -- They bypass orderPending/apnapPlayers entirely, so CR 800.4d's filter
-      -- above does not cover this path -- but no separate guard is needed
-      -- here either: Monarch.reassignOnDeparture runs inside Departure.depart
-      -- with Game.stillPlayingInOrder, so the crown can never rest on a
-      -- departed seat in the first place, and inherentMonarchPending's
-      -- controller is always the current monarch.
+      -- CR 725.2: the monarch's inherent triggers hang on no object, so
+      -- Event.gatherTriggers -- which asks each battlefield permanent what it
+      -- triggers -- has nowhere to find them. Gathered separately, from the SAME
+      -- unscanned-event snapshot and before the watermark bump, then merged into
+      -- the one batch below: CR 603.3b gives a player the order among ALL the
+      -- abilities they control that triggered since they last had priority, and
+      -- CR 725.2 makes these abilities theirs like any other. Placing them after
+      -- the ordered batch would make them resolve first, by the engine's choice
+      -- rather than the player's.
+      --
+      -- Their controller is always the current monarch, and CR 725.4 --
+      -- Monarch.reassignOnDeparture, run inside Departure.depart over
+      -- Game.stillPlayingInOrder -- keeps the crown off a departed seat, so
+      -- CR 800.4d has nothing to catch here; apnapPlayers filters them anyway.
       inherent = Monarch.inherentMonarchPending evs gs
   State.put
     gs
       { GameState.scannedThrough = Natural.length (GameState.events gs),
         GameState.delayedTriggers = surviving
       }
-  ordered <- orderPending pending
+  ordered <- orderPending (pending <> inherent)
   Monad.mapM_ placeOne ordered
-  Monad.mapM_ (\(p, ab, b) -> Monarch.placeInherent p ab b) inherent
-  pure (not (null ordered) || not (null inherent))
+  pure (not (null ordered))
 
--- Put one triggered ability on the stack as a fresh OfTrigger object, choosing
--- its mode(s) and their targets as it is placed (CR 603.3d). This mirrors
+-- Put one triggered ability from the ordered batch on the stack. What it hangs
+-- on decides how: an ability BORNE by an object goes through placeBorne, where
+-- every step is keyed to that object -- CR 113.7's reserved source binding, and
+-- the fillableModes/legalSets pair that reads modes and targets relative to it.
+-- CR 725.2's sourceless pair has no such object and takes the other arm.
+placeOne :: PendingTrigger.PendingTrigger -> Game ()
+placeOne pending = case PendingTrigger.source pending of
+  TriggerSource.Sourceless -> Monarch.placeInherent pending
+  TriggerSource.OfObject srcId -> placeBorne srcId pending
+
+-- Put one object-borne triggered ability on the stack as a fresh OfTrigger
+-- object, choosing its mode(s) and their targets as it is placed (CR 603.3d). This mirrors
 -- Cast.castSpell's cast-time flow: CR 700.2b -- the controller chooses the mode
 -- when the ability triggers (elided, forced and unprompted, exactly when the
 -- fillable modes are no more than the selection demands, #50) -- then CR 603.3d --
@@ -458,11 +479,10 @@ placePendingTriggers = do
 -- there before modes/targets are chosen), so an unfillable one must instead be
 -- taken back OFF the stack. The guard precedes the mode prompt: a removed
 -- trigger must never be asked to choose.
-placeOne :: PendingTrigger.PendingTrigger -> Game ()
-placeOne pending = do
+placeBorne :: ObjectId.ObjectId -> PendingTrigger.PendingTrigger -> Game ()
+placeBorne srcId pending = do
   gs <- State.get
-  let srcId = PendingTrigger.source pending
-      controller = PendingTrigger.controller pending
+  let controller = PendingTrigger.controller pending
       ability = PendingTrigger.ability pending
       (abilId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1

@@ -3,23 +3,25 @@ module Pawl.Type.PendingTrigger where
 import Data.Map.Strict (Map)
 import Pawl.Type.Binding (Binding)
 import Pawl.Type.Card (Card)
-import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.SlotName (SlotName)
+import Pawl.Type.TriggerSource (TriggerSource)
 import Pawl.Type.TriggeredAbility (TriggeredAbility)
 
 -- CR 603.3: an ability that has TRIGGERED but is not yet on the stack. Gathered
--- by Pawl.Event at the CR 117.5 boundary, ordered and placed by Pawl.Engine.
+-- by Pawl.Event (and, for CR 725.2's sourceless pair, by Pawl.Monarch) at the CR
+-- 117.5 boundary, ordered and placed by Pawl.Engine.
 --
--- `source` is the object the ability belongs to (CR 113.7: "The source of a
--- triggered ability ... that has triggered and is waiting to be put on the
--- stack, is the object whose ability triggered.");
--- `controller` is who controls the ability (CR 603.3a). `bindings` is the
--- environment CAPTURED when a CR 603.7 delayed ability was armed -- how "it" and
--- "that card" (CR 603.7c) are remembered. Empty for an event- or state-matched
+-- `source` is what the ability hangs on -- the object it belongs to (CR 113.7),
+-- or nothing at all for the monarch's inherent abilities (CR 725.2). Both kinds
+-- share this type so that CR 603.3b can order them as one batch;
+-- `controller` is who controls the ability (CR 603.3a / CR 725.2). `bindings` is
+-- the environment CAPTURED when a CR 603.7 delayed ability was armed -- how "it"
+-- and "that card" (CR 603.7c) are remembered, and how CR 725.2's crown steal
+-- remembers the damaging creature. Empty for an event- or state-matched
 -- trigger, whose source binding Engine.placeOne stamps at placement instead.
 data PendingTrigger = MkPendingTrigger
-  { source :: ObjectId,
+  { source :: TriggerSource,
     controller :: PlayerId,
     ability :: TriggeredAbility Card,
     bindings :: Map SlotName Binding
