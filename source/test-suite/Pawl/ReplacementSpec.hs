@@ -37,6 +37,7 @@ import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActivationTiming as ActivationTiming
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.AttackTarget as AttackTarget
+import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Combat as Combat
@@ -54,6 +55,7 @@ import qualified Pawl.Type.Expiry as Expiry
 -- the evaluator module Pawl.Filter may later be imported and must not collide.
 import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.Game as Game.Type
+import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.ManaCost as ManaCost
@@ -192,6 +194,79 @@ leylineShape src ts =
       ActiveReplacement.expiry = Expiry.Never,
       ActiveReplacement.uses = Uses.Unlimited
     }
+
+-- Eon Hub {5} Artifact: "Players skip their upkeep steps."
+--
+-- CR 614.1b: "Effects that use the word 'skip' are replacement effects. These
+-- replacement effects use the word 'skip' to indicate what events, steps,
+-- phases, or turns will be replaced with nothing." So this is P5's carrier, not
+-- a CR 613.11 rules-modifying continuous effect.
+--
+-- Sarcomancy is the discriminating observable. Its second ability is "at the
+-- beginning of your upkeep, if there are no Zombies on the battlefield, this
+-- enchantment deals 1 damage to you" (CR 603.2b), matched against the
+-- GameEvent.StepBegan that Engine.runStep records as a step begins. A step
+-- REPLACED WITH NOTHING records no such event, so the ability never triggers
+-- (CR 614.6: "if an event is replaced, it never happens") -- as distinct from
+-- triggering and resolving to nothing, which would still put an object on the
+-- stack and still take the life. Each case below asserts on BOTH the event log
+-- and the life total, so the two outcomes cannot be confused.
+--
+-- Sarcomancy is placed straight onto the battlefield, so its enters-trigger
+-- never resolves and no Zombie token exists: CR 603.4's intervening "if" holds
+-- and the upkeep ability really would fire.
+stepSkipTests :: Registry.Type.Registry -> Tasty.TestTree
+stepSkipTests registry =
+  let untap = Phase.Beginning BeginningStep.Untap
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      drawStep = Phase.Beginning BeginningStep.DrawStep
+      -- Alice's turn, positioned at her untap step with only the upkeep and draw
+      -- steps left to schedule. Short on purpose: an empty schedule would hand
+      -- the turn off and clear the event log these cases read, and the draw step
+      -- is never entered, so nothing draws from the empty library.
+      atUntap printings =
+        let place g p = snd (S.addCreature p S.alice g)
+            placed = List.foldl' place (Setup.emptyGame S.bothPlayers) printings
+         in placed
+              { GameState.phase = untap,
+                GameState.activePlayer = S.alice,
+                GameState.remaining = Seq.fromList [upkeep, drawStep]
+              }
+      -- The untap step, then whatever the schedule says comes next.
+      twoSteps = do
+        Engine.runStep
+        Engine.runStep
+      runTwo gs = snd (Engine.runGamePure S.identityAnswer gs twoSteps)
+      began step gs = List.elem (GameEvent.StepBegan step S.alice) (foldr (:) [] (GameState.events gs))
+   in Tasty.testGroup
+        "Skip"
+        [ -- The control. Without Eon Hub the upkeep step begins normally, so the
+          -- trigger fires and resolves.
+          HU.testCase "CR 500.6 without a skip the upkeep step begins and its trigger fires" $ do
+            sarcomancy <- Registry.printing registry "Sarcomancy"
+            let after = runTwo (atUntap [sarcomancy])
+            HU.assertBool "the untap step began" (began untap after)
+            HU.assertBool "the upkeep step began" (began upkeep after)
+            HU.assertEqual "alice took 1 from the trigger" (Just 19) (S.lifeOf S.alice after)
+            HU.assertEqual "and the draw step is next" drawStep (GameState.phase after),
+          -- Eon Hub is BOB's, and it is ALICE's upkeep being skipped: "players
+          -- skip THEIR upkeep steps" is symmetric, so the effect is not scoped to
+          -- its controller.
+          HU.testCase "CR 614.1b Eon Hub replaces the upkeep step with nothing" $ do
+            sarcomancy <- Registry.printing registry "Sarcomancy"
+            eonHub <- Registry.printing registry "Eon Hub"
+            let base = atUntap [sarcomancy]
+                armed = snd (S.addCreature eonHub S.bob base)
+                after = runTwo armed
+            HU.assertBool "the untap step still began" (began untap after)
+            HU.assertBool "the upkeep step never began" (not (began upkeep after))
+            HU.assertEqual "so nothing ever reached the stack" [] (GameState.stack after)
+            HU.assertEqual "and alice took no damage" (Just 20) (S.lifeOf S.alice after)
+            -- CR 500.11: "to skip a step, phase, or turn is to proceed past it as
+            -- though it didn't exist" -- past it, not past the rest of the turn.
+            HU.assertEqual "the turn proceeded to the draw step" drawStep (GameState.phase after)
+            HU.assertEqual "having consumed exactly that one step" Seq.empty (GameState.remaining after)
+        ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
@@ -677,5 +752,6 @@ tests registry =
           let base = S.landsInPlay swamp 1
               (piker, g1) = S.addCreature pikerPrinting S.alice base
               (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Replacement.resolveDestruction Regenerability.Regenerable piker)
-          HU.assertEqual "consumed by the shield" Nothing settled
+          HU.assertEqual "consumed by the shield" Nothing settled,
+        stepSkipTests registry
       ]

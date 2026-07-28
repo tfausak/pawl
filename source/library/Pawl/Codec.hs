@@ -67,6 +67,7 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.PhasePattern as PhasePattern
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
 import qualified Pawl.Type.PlayerId as PlayerId
@@ -862,6 +863,16 @@ jsonToTokenPattern value = do
   w <- Json.field (Text.pack "whose") ps >>= jsonToControllerRelation
   pure TokenPattern.MkTokenPattern {TokenPattern.whose = w}
 
+phasePatternToJson :: PhasePattern.PhasePattern -> Value
+phasePatternToJson p =
+  Object [(Text.pack "whichPhase", phaseToJson (PhasePattern.whichPhase p))]
+
+jsonToPhasePattern :: Value -> Either Text PhasePattern.PhasePattern
+jsonToPhasePattern value = do
+  ps <- Json.asObject value
+  p <- Json.field (Text.pack "whichPhase") ps >>= jsonToPhase
+  pure PhasePattern.MkPhasePattern {PhasePattern.whichPhase = p}
+
 damagePatternToJson :: DamagePattern.DamagePattern -> Value
 damagePatternToJson p =
   Object [(Text.pack "whichKind", maybeTo damageKindToJson (DamagePattern.whichKind p))]
@@ -1626,6 +1637,8 @@ replacementEffectToJson re = case re of
     Json.tagged (Text.pack "CounterR") (Just (Array [counterPatternToJson p, scalingToJson s]))
   ReplacementEffect.TokenR p s ->
     Json.tagged (Text.pack "TokenR") (Just (Array [tokenPatternToJson p, scalingToJson s]))
+  ReplacementEffect.PhaseR p ->
+    Json.tagged (Text.pack "PhaseR") (Just (phasePatternToJson p))
 
 jsonToReplacementEffect :: Value -> Either Text ReplacementEffect.ReplacementEffect
 jsonToReplacementEffect value = do
@@ -1649,6 +1662,7 @@ jsonToReplacementEffect value = do
       pattern_ <- jsonToTokenPattern p
       scaling <- jsonToScaling s
       pure (ReplacementEffect.TokenR pattern_ scaling)
+    ("PhaseR", Just v) -> fmap ReplacementEffect.PhaseR (jsonToPhasePattern v)
     _ -> Left (Text.pack "unknown ReplacementEffect: " <> t)
 
 triggeredAbilityToJson :: TriggeredAbility.TriggeredAbility CardT.Card -> Value
