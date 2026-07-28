@@ -1,0 +1,87 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Black"
+        }
+      }
+    }
+  ],
+  "name": "Night of Souls' Betrayal",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [
+    {
+      "affected": {
+        "type": "Matching",
+        "value": {
+          "type": "HasCardType",
+          "value": {
+            "type": "Creature"
+          }
+        }
+      },
+      "modifications": [
+        {
+          "type": "ModifyPowerToughness",
+          "value": [
+            {
+              "type": "Literal",
+              "value": -1
+            },
+            {
+              "type": "Literal",
+              "value": -1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [
+      {
+        "type": "Legendary"
+      }
+    ],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

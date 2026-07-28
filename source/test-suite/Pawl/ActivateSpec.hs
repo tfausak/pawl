@@ -30,6 +30,7 @@ import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.LastKnown as LastKnown
 import qualified Pawl.Type.ManaCost as ManaCost
 import qualified Pawl.Type.ManaSymbol as ManaSymbol
 import qualified Pawl.Type.Modal as Modal
@@ -380,7 +381,14 @@ lastKnownTests registry =
         HU.assertEqual
           "the snapshot is the projected power it had, not the printed one"
           (Just (Just 5))
-          (fmap PC.power (Map.lookup srcId (GameState.lastKnown moved))),
+          (fmap (PC.power . LastKnown.characteristics) (Map.lookup srcId (GameState.lastKnown moved)))
+        -- CR 613.1b / 603.3a: the record keeps who controlled it as it left, not
+        -- only what it looked like -- the half Event.eventTriggers needs to hand
+        -- a dead entrant's trigger to the right player.
+        HU.assertEqual
+          "and who controlled it as it left"
+          (Just S.alice)
+          (fmap LastKnown.controller (Map.lookup srcId (GameState.lastKnown moved))),
       HU.testCase "CR 608.2h the fallback is only a fallback: a source still there reads LIVE" $ do
         -- Discriminating against a viewWithLastKnown that always consults the
         -- map: a Fire-Eater that has not moved must read its current projection,
