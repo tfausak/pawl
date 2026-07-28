@@ -113,9 +113,12 @@ costsFor oid gs = case Game.lookupObject oid gs of
 -- precedes 601.2f.
 --
 -- The mana part alone is adjusted, and the components are carried through
--- untouched: every increase and reduction CR 601.2f describes, and every one P7
--- can express, is an amount of mana (CR 118.7a routes it to the generic
--- component). Nor is the result ever "locked in": CR 601.2f's own last sentence
+-- untouched: every increase and reduction pawl can express is an amount of MANA,
+-- so there is nothing for a CostComponent to absorb. WHICH part of the mana cost
+-- each one lands on is applyAdjustments's business -- an increase and a
+-- reduction's generic half both go to the generic component, and a reduction
+-- that names a mana type goes to the cost's matching symbols. Nor is the result
+-- ever "locked in": CR 601.2f's own last sentence
 -- makes the total fixed once determined, but this is recomputed fresh from the
 -- current game state on every call (#94).
 --
@@ -391,29 +394,44 @@ payComponent pid oid component = case component of
 -- 1. Every INCREASE is added to the generic component (CR 601.2f's order, and
 --    Thalia's own ruling: "add any cost increases, then apply any cost
 --    reductions").
--- 2. Every REDUCTION comes off the generic component ONLY (CR 118.7a: "Effects
---    that reduce a cost by an amount of generic mana affect only the generic
---    mana component of that cost. They can't affect the colored or colorless
---    mana components."), floored at zero -- a reduction with no generic left to
---    take is simply lost.
--- 3. CR 601.2f's "if the mana component of the total cost is reduced to nothing
+-- 2. A REDUCTION is an amount of mana, read component by component. Its GENERIC
+--    part comes off the generic component only (CR 118.7a: "Effects that reduce
+--    a cost by an amount of generic mana affect only the generic mana component
+--    of that cost. They can't affect the colored or colorless mana
+--    components."), floored at zero -- a generic reduction with no generic left
+--    to take is simply lost. Its TYPED part cancels matching typed symbols in
+--    the cost, one symbol for one symbol (Edgewalker: a {W}{B} reduction takes
+--    one white and one black out of a Cleric spell's cost).
+-- 3. An EXCESS typed symbol -- one whose type the cost has already run out of --
+--    is DROPPED, not spilled onto the generic component. That is the card text
+--    CR 101.1 lets override the rules, not CR 118.7b-d: every reducer that names
+--    a type prints "This effect reduces only the amount of colored mana you
+--    pay", and Edgewalker's own reminder text settles what that means -- "if you
+--    cast a Cleric spell with mana cost {1}{W}, it costs {1} to cast", so the
+--    stranded {B} leaves the {1} alone. CR 118.7b-d's spill has no producer
+--    here (#309).
+-- 4. CR 601.2f's "if the mana component of the total cost is reduced to nothing
 --    ... it is considered to be {0}. It can't be reduced to less than {0}" needs
 --    no special case: ManaCost is a list of symbols and the empty list IS {0}.
 --
--- Reductions are SUMMED rather than applied one at a time. CR 601.2f's "if
+-- Reductions are POOLED rather than applied one at a time. CR 601.2f's "if
 -- multiple cost reductions apply, the player may apply them in any order" is a
--- prompt in the rules and an elision here (#88): every reduction P7 can express
--- is an amount of generic mana routed to the same component by CR 118.7a, so
--- summing is not merely equivalent to some order -- it is equivalent to EVERY
--- order.
+-- prompt in the rules and an elision here (#88): the generic parts all route to
+-- the one generic component, and a typed part only ever removes symbols of its
+-- own type -- and one {W} in a cost is indistinguishable from another, so which
+-- reduction took which is not a distinction the result can carry. Pooling is not
+-- merely equivalent to some order -- it is equivalent to EVERY order. That every
+-- reduction applies at all, rather than one of them, is Edgewalker's own ruling:
+-- "if you have more than one of these on the battlefield, the cost reduction is
+-- cumulative."
 --
 -- The result is CANONICAL: one leading Generic symbol carrying the whole generic
--- component (omitted entirely when it is zero), then the printed typed symbols in
--- their original order. Presentation, not semantics -- Mana.spend sums every
--- generic symbol and matches typed symbols first -- but it is what makes a total
--- cost comparable, so "{U} taxed and then discounted is exactly {U}" is a
+-- component (omitted entirely when it is zero), then the SURVIVING printed typed
+-- symbols in their original order. Presentation, not semantics -- Mana.spend sums
+-- every generic symbol and matches typed symbols first -- but it is what makes a
+-- total cost comparable, so "{U} taxed and then discounted is exactly {U}" is a
 -- statement a test can make.
-applyAdjustments :: ([Natural], [Natural]) -> ManaCost.ManaCost -> ManaCost.ManaCost
+applyAdjustments :: ([Natural], [ManaCost.ManaCost]) -> ManaCost.ManaCost -> ManaCost.ManaCost
 applyAdjustments adjustments cost =
   let (increases, reductions) = adjustments
       ManaCost.MkManaCost symbols = cost
@@ -440,8 +458,9 @@ applyAdjustments adjustments cost =
         ManaSymbol.Generic _ -> False
         ManaSymbol.OfType _ -> True
         -- Typed for this function's purpose: it survives the filter and keeps
-        -- its printed position, which is what "the printed typed symbols in
-        -- their original order" above promises.
+        -- its printed position, which is what "the SURVIVING printed typed
+        -- symbols in their original order" above promises. It survives the
+        -- cancellation too, for the reason manaTypeOf's own Hybrid arm gives.
         ManaSymbol.Hybrid _ _ -> True
         -- Typed for the same reason: it survives the filter and keeps its
         -- printed position, which is the only way an unreducible symbol can
@@ -451,10 +470,43 @@ applyAdjustments adjustments cost =
         -- (retained, not stripped) so that if it ever were reachable, a bare
         -- {X} would still be treated as typed and survive the filter below.
         ManaSymbol.Variable -> True
+      -- Which ONE mana type a symbol names, for both sides of the cancellation:
+      -- in a reduction it is the type being taken away, and in the cost it is
+      -- the type that can be taken. Nothing means the symbol is not a
+      -- one-type-one-mana symbol and so plays no part in it.
+      manaTypeOf symbol = case symbol of
+        ManaSymbol.Generic _ -> Nothing
+        ManaSymbol.OfType manaType -> Just manaType
+        -- CR 107.4e names TWO types, so neither side of the cancellation can
+        -- read one off it. In the COST that is the same elision genericOf's
+        -- MonocoloredHybrid arm makes -- pawl announces no choice of half
+        -- (#261) -- and Edgewalker's ruling is what the elision costs: "if you
+        -- choose to pay such a cost with {W} or {B}, Edgewalker can reduce that
+        -- part of the cost." In a REDUCTION it is CR 118.7e, where the choice
+        -- belongs to the player paying "at the time the cost reduction is
+        -- applied", and which nothing produces (#309).
+        ManaSymbol.Hybrid _ _ -> Nothing
+        -- Same two reasons: the {2} half is generic mana and the other half is
+        -- one colour, and nothing has announced which is being paid.
+        ManaSymbol.MonocoloredHybrid _ -> Nothing
+        -- Unreachable for the reason genericOf's Variable arm gives; {X} names
+        -- no mana type either way.
+        ManaSymbol.Variable -> Nothing
+      reducingSymbols = concatMap (\(ManaCost.MkManaCost xs) -> xs) reductions
       raised = sum (fmap genericOf symbols) + sum increases
-      taken = sum reductions
+      taken = sum (fmap genericOf reducingSymbols)
       -- Natural subtraction is PARTIAL (it throws on underflow), so the CR
       -- 601.2f floor is also what keeps this total.
       lowered = if raised >= taken then raised - taken else 0
       leading = if lowered == 0 then [] else [ManaSymbol.Generic lowered]
-   in ManaCost.MkManaCost (leading <> filter isTyped symbols)
+      -- Each reducing symbol cancels ONE matching symbol in the cost. Walks the
+      -- printed symbols in their printed order, so the survivors keep it;
+      -- `unspent` is the bag of reducing types that have not found a match yet,
+      -- and whatever is left in it when the walk ends is the excess that (#309)
+      -- drops rather than spilling onto `lowered`.
+      cancel unspent remaining = case remaining of
+        [] -> []
+        symbol : rest -> case manaTypeOf symbol of
+          Just manaType | elem manaType unspent -> cancel (List.delete manaType unspent) rest
+          _ -> symbol : cancel unspent rest
+   in ManaCost.MkManaCost (leading <> cancel (Maybe.mapMaybe manaTypeOf reducingSymbols) (filter isTyped symbols))

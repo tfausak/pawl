@@ -302,7 +302,12 @@ tests registry =
               [ PlayerEffect.CantCastSpells,
                 PlayerEffect.CantCastMoreThan 1,
                 PlayerEffect.IncreaseSpellCost (Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)) 1,
-                PlayerEffect.ReduceSpellCost (Filter.Type.HasColor Color.Blue) 1,
+                PlayerEffect.ReduceSpellCost (Filter.Type.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
+                -- Edgewalker's: the reduction that names a mana type, which the
+                -- Medallion's generic one would not catch a regression in.
+                PlayerEffect.ReduceSpellCost
+                  (Filter.Type.HasSubtype Subtype.Cleric)
+                  (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)]),
                 PlayerEffect.NoMaximumHandSize
               ],
           -- CR 613.6 made a static ability "one affected set, one or more parts",

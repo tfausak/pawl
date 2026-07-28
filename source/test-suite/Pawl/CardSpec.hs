@@ -989,7 +989,24 @@ m45p7CardTests registry =
         HU.assertEqual "types" (Set.singleton CardType.Artifact) (TypeLine.types (Card.Type.typeLine c))
         HU.assertEqual
           "one player ability"
-          [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (Filter.Type.HasColor Color.Blue) 1)]
+          [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (Filter.Type.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]))]
+          (Card.Type.playerAbilities c),
+      -- The reduction that NAMES a mana type, as against the Medallion's generic
+      -- one: "Cleric spells you cast cost {W}{B} less to cast."
+      HU.testCase "Edgewalker is a {1}{W}{B} Human Cleric with one You ReduceSpellCost {W}{B} ability" $ do
+        edgewalker <- Registry.printing registry "Edgewalker"
+        let c = Printing.card edgewalker
+            white = ManaSymbol.OfType (ManaType.Colored Color.White)
+            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+        HU.assertEqual "name" (Text.pack "Edgewalker") (Card.Type.name c)
+        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black])) (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Creature) (TypeLine.types (Card.Type.typeLine c))
+        HU.assertEqual "subtypes" (Set.fromList [Subtype.Human, Subtype.Cleric]) (TypeLine.subtypes (Card.Type.typeLine c))
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 2))) (Card.Type.power c)
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (Card.Type.toughness c)
+        HU.assertEqual
+          "one player ability"
+          [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.ReduceSpellCost (Filter.Type.HasSubtype Subtype.Cleric) (ManaCost.MkManaCost [white, black]))]
           (Card.Type.playerAbilities c),
       HU.testCase "Reliquary Tower is a land with a You NoMaximumHandSize ability and a {T} colorless mana ability" $ do
         reliquaryTower <- Registry.printing registry "Reliquary Tower"

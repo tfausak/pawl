@@ -2,6 +2,7 @@ module Pawl.Type.PlayerEffect where
 
 import Numeric.Natural (Natural)
 import Pawl.Type.Filter (Filter)
+import Pawl.Type.ManaCost (ManaCost)
 
 -- CR 611.1's third clause: a continuous effect that "affects players or the
 -- rules of the game" rather than the characteristics of an object. The player
@@ -22,8 +23,8 @@ data PlayerEffect
   | -- CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
     -- mana to cast.
     IncreaseSpellCost Filter Natural
-  | -- CR 613.11 / 601.2f / Sapphire Medallion: matching spells cost this much
-    -- less to cast.
+  | -- CR 613.11 / 601.2f / Sapphire Medallion, Edgewalker: matching spells cost
+    -- this much less to cast.
     --
     -- A SEPARATE constructor from IncreaseSpellCost, never one signed delta. The
     -- rules distinguish them in two ways a signed integer cannot express: CR
@@ -32,10 +33,16 @@ data PlayerEffect
     -- colored or colorless mana components". Collapsing them would put both
     -- rules into arithmetic that cannot state either.
     --
-    -- The Natural is an amount of GENERIC mana and nothing else. CR 118.7b-g's
-    -- colored, colorless, hybrid, Phyrexian and snow reductions are not
-    -- representable (#91).
-    ReduceSpellCost Filter Natural
+    -- An AMOUNT OF MANA rather than a bare number, because CR 118.7 reduces by
+    -- mana of a stated type and not only by generic: the Medallion's {1} and
+    -- Edgewalker's {W}{B} are the same shape of thing. Pawl.Cost.applyAdjustments
+    -- reads it component by component -- generic off generic (CR 118.7a), each
+    -- typed symbol off one matching typed symbol.
+    --
+    -- An EXCESS typed symbol is dropped rather than spilling onto the generic
+    -- component, which is Edgewalker's "This effect reduces only the amount of
+    -- colored mana you pay" and not CR 118.7b-d (#309).
+    ReduceSpellCost Filter ManaCost
   | -- CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize
   deriving (Eq, Ord, Show)

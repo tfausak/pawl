@@ -290,6 +290,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Nomad -> "Nomad"
   Subtype.Shaman -> "Shaman"
   Subtype.Demon -> "Demon"
+  Subtype.Cleric -> "Cleric"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -337,7 +338,8 @@ jsonToSubtype =
       (Text.pack "Troll", Subtype.Troll),
       (Text.pack "Nomad", Subtype.Nomad),
       (Text.pack "Shaman", Subtype.Shaman),
-      (Text.pack "Demon", Subtype.Demon)
+      (Text.pack "Demon", Subtype.Demon),
+      (Text.pack "Cleric", Subtype.Cleric)
     ]
 
 supertypeToJson :: Supertype.Supertype -> Value
@@ -693,7 +695,7 @@ playerEffectToJson e = case e of
   PlayerEffect.CantCastSpells -> nullary (Text.pack "CantCastSpells")
   PlayerEffect.CantCastMoreThan n -> Json.tagged (Text.pack "CantCastMoreThan") (Just (natTo n))
   PlayerEffect.IncreaseSpellCost c n -> Json.tagged (Text.pack "IncreaseSpellCost") (Just (Array [filterToJson c, natTo n]))
-  PlayerEffect.ReduceSpellCost c n -> Json.tagged (Text.pack "ReduceSpellCost") (Just (Array [filterToJson c, natTo n]))
+  PlayerEffect.ReduceSpellCost c m -> Json.tagged (Text.pack "ReduceSpellCost") (Just (Array [filterToJson c, manaCostToJson m]))
   PlayerEffect.NoMaximumHandSize -> nullary (Text.pack "NoMaximumHandSize")
 
 jsonToPlayerEffect :: Value -> Either Text PlayerEffect.PlayerEffect
@@ -703,7 +705,7 @@ jsonToPlayerEffect value = do
     ("CantCastSpells", _) -> Right PlayerEffect.CantCastSpells
     ("CantCastMoreThan", Just v) -> PlayerEffect.CantCastMoreThan <$> natFrom v
     ("IncreaseSpellCost", Just (Array [c, n])) -> PlayerEffect.IncreaseSpellCost <$> jsonToFilter c <*> natFrom n
-    ("ReduceSpellCost", Just (Array [c, n])) -> PlayerEffect.ReduceSpellCost <$> jsonToFilter c <*> natFrom n
+    ("ReduceSpellCost", Just (Array [c, m])) -> PlayerEffect.ReduceSpellCost <$> jsonToFilter c <*> jsonToManaCost m
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
     _ -> Left (Text.pack "unknown PlayerEffect: " <> t)
 
