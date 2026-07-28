@@ -460,13 +460,22 @@ anyColorTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Mana" [manaTests registry, castabilityTests registry, anyColorTests registry, hybridTests registry]
+tests registry =
+  Tasty.testGroup
+    "Mana"
+    [ manaTests registry,
+      castabilityTests registry,
+      anyColorTests registry,
+      hybridTests registry,
+      monocoloredHybridTests registry
+    ]
 
--- alice controls `reds` Mountains and `greens` Forests and nothing else.
+-- alice controls `n` copies of `first` and `m` copies of `second`, and nothing
+-- else. Both are lands in every caller, but nothing here requires it.
 mixedLands :: Printing.Printing -> Printing.Printing -> Int -> Int -> GameState.GameState
-mixedLands mountain forest reds greens =
-  let base = S.landsInPlay mountain reds
-   in List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) base [1 .. greens]
+mixedLands first second n m =
+  let base = S.landsInPlay first n
+   in List.foldl' (\g _ -> snd (S.addCreature second S.alice g)) base [1 .. m]
 
 redGreen :: ManaSymbol.ManaSymbol
 redGreen = ManaSymbol.Hybrid (ManaType.Colored Color.Red) (ManaType.Colored Color.Green)
@@ -534,3 +543,121 @@ hybridTests registry =
           (Set.fromList [Color.Red, Color.Green])
           (Projection.colorsOf oid gs)
     ]
+
+twoOrRed :: ManaSymbol.ManaSymbol
+twoOrRed = ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Red)
+
+-- Flame Javelin's printed cost. Restated rather than read off the card so that
+-- the payment assertions below say what they mean; CardSpec is what pins this
+-- against data/cards/flame-javelin.json.
+javelinCost :: ManaCost.ManaCost
+javelinCost = ManaCost.MkManaCost [twoOrRed, twoOrRed, twoOrRed]
+
+-- CR 107.4e's other half: "a monocolored hybrid symbol such as {2/B} can be paid
+-- with either one black mana or two mana of any type."
+--
+-- Flame Javelin ({2/R}{2/R}{2/R}) throughout, because the symbol only becomes
+-- interesting in bulk: one of them is barely distinguishable from {R}, three of
+-- them span {R}{R}{R} to {6}.
+monocoloredHybridTests :: Registry.Type.Registry -> Tasty.TestTree
+monocoloredHybridTests registry =
+  let -- How many objects the stack holds after alice tries to cast the Javelin
+      -- with `gs` already on the battlefield: 1 when the cost was paid, 0 when
+      -- CR 601.2h rolled the whole attempt back.
+      castsOff javelin gs =
+        let (g, spellId) = S.handOne javelin gs
+         in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))))
+   in Tasty.testGroup
+        "MonocoloredHybrid"
+        [ HU.testCase "CR 107.4e one {2/R} takes one Mountain OR two Islands, and one Island is not enough" $ do
+            mountain <- Registry.printing registry "Mountain"
+            island <- Registry.printing registry "Island"
+            let cost = ManaCost.MkManaCost [twoOrRed]
+            HU.assertBool "one Mountain pays it" (Mana.canPay S.alice cost (S.landsInPlay mountain 1))
+            HU.assertBool "two Islands pay it" (Mana.canPay S.alice cost (S.landsInPlay island 2))
+            HU.assertBool "one Island does not" (not (Mana.canPay S.alice cost (S.landsInPlay island 1)))
+            HU.assertBool "and nothing does not" (not (Mana.canPay S.alice cost (S.landsInPlay island 0))),
+          -- The coloured route, end to end. Three lands for three symbols is the
+          -- reading a payment path that charged every symbol one mana would also
+          -- get right, so this is the control the cases below discriminate
+          -- against -- and the tap count is what says the route was really taken:
+          -- six Mountains would still be three taps, because payCost stops as
+          -- soon as the cost is payable.
+          HU.testCase "CR 107.4e whole card: Flame Javelin casts off three Mountains, {R} per symbol" $ do
+            mountain <- Registry.printing registry "Mountain"
+            flameJavelin <- Registry.printing registry "Flame Javelin"
+            let gs = S.landsInPlay mountain 3
+            HU.assertBool "canPay says yes" (Mana.canPay S.alice javelinCost gs)
+            HU.assertEqual "and it casts" 1 (castsOff flameJavelin gs)
+            let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 6) (Mana.payCost S.alice javelinCost)
+            HU.assertBool "six Mountains pay it too" paid
+            HU.assertEqual "and only three of them are tapped" 3 (S.tappedCount S.alice after)
+            HU.assertEqual "with nothing left floating" 0 (poolSize S.alice after),
+          -- The generic route, with no red mana anywhere on the board.
+          HU.testCase "CR 107.4e whole card: Flame Javelin casts off six Islands, two generic per symbol" $ do
+            island <- Registry.printing registry "Island"
+            flameJavelin <- Registry.printing registry "Flame Javelin"
+            let gs = S.landsInPlay island 6
+            HU.assertBool "canPay says yes" (Mana.canPay S.alice javelinCost gs)
+            HU.assertEqual "and it casts" 1 (castsOff flameJavelin gs),
+          -- THE discriminating negative. Five Islands is one short of the {6} the
+          -- all-generic route needs, and a payment path that charged one mana per
+          -- {2/R} would call three of them sufficient, let alone five.
+          HU.testCase "CR 107.4e five Islands cannot cast Flame Javelin -- {6} is one mana away" $ do
+            island <- Registry.printing registry "Island"
+            flameJavelin <- Registry.printing registry "Flame Javelin"
+            let gs = S.landsInPlay island 5
+            HU.assertBool "canPay says no" (not (Mana.canPay S.alice javelinCost gs))
+            HU.assertEqual "and it does not cast" 0 (castsOff flameJavelin gs)
+            HU.assertBool "three Islands are nowhere near" (not (Mana.canPay S.alice javelinCost (S.landsInPlay island 3))),
+          -- CR 107.4e symbol by symbol, which the card's own ruling spells out:
+          -- "you can pay for Flame Javelin by spending {R}{R}{R}, {2}{R}{R},
+          -- {4}{R}, or {6}." So the routes are chosen per symbol, and a search
+          -- that picked one route for the whole cost would reject both of these.
+          HU.testCase "CR 107.4e each symbol picks its own route: {R}{R}{2} and {R}{4}" $ do
+            mountain <- Registry.printing registry "Mountain"
+            island <- Registry.printing registry "Island"
+            flameJavelin <- Registry.printing registry "Flame Javelin"
+            let cost = javelinCost
+            HU.assertBool "two Mountains and two Islands: {R}{R}{2}" (Mana.canPay S.alice cost (mixedLands mountain island 2 2))
+            HU.assertBool "one Mountain and four Islands: {R}{4}" (Mana.canPay S.alice cost (mixedLands mountain island 1 4))
+            HU.assertEqual "and that one really casts" 1 (castsOff flameJavelin (mixedLands mountain island 1 4))
+            -- One short of {R}{4} and one red short of {R}{R}{2}: four mana with
+            -- only one red pays no route at all.
+            HU.assertBool "one Mountain and three Islands: no route" (not (Mana.canPay S.alice cost (mixedLands mountain island 1 3))),
+          -- The gameplay-level proof (design.md section 4): the whole card, cast
+          -- and resolved off the all-generic route, doing what it says.
+          HU.testCase "CR 107.4e Flame Javelin cast off six Islands resolves for 4 damage" $ do
+            island <- Registry.printing registry "Island"
+            flameJavelin <- Registry.printing registry "Flame Javelin"
+            let (g, spellId) = S.handOne flameJavelin (S.landsInPlay island 6)
+                cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
+                resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+            HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
+            HU.assertEqual "every Island tapped" 6 (S.tappedCount S.alice resolved)
+            HU.assertEqual "nothing left floating" 0 (poolSize S.alice resolved)
+            -- S.identityAnswer takes the least Recipient on offer, which with no
+            -- creatures anywhere is alice herself. Who it hits is the answer's
+            -- business; that it hits for 4 is the card's.
+            HU.assertEqual "4 damage to the chosen target" (Just 16) (S.lifeOf S.alice resolved),
+          -- The elision, made visible rather than left implied. Both halves are
+          -- payable out of this pool and they leave DIFFERENT pools behind, so
+          -- unlike a colour/colour hybrid the choice is observable, and pawl
+          -- makes it: it spends the fewest units. CR 601.2b puts that choice with
+          -- the player, at announcement (#261).
+          HU.testCase "CR 601.2b the engine takes a {2/R}'s one-mana half when both halves are payable (#261)" $
+            let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red}
+                colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless}
+             in HU.assertEqual
+                  "the {R} is spent and both {C} remain -- the other half would spend both {C} and leave the {R}"
+                  (Just (Mana.Type.MkMana [colorless, colorless]))
+                  (Mana.spend (ManaCost.MkManaCost [twoOrRed]) (Mana.Type.MkMana [red, colorless, colorless])),
+          -- CR 107.4e's last sentence, as CR 202.2d restates it for the whole
+          -- object: a monocolored hybrid's other component is generic mana, which
+          -- is no colour, so only the named half counts. Flame Javelin is red
+          -- even when six Islands paid for it.
+          HU.testCase "CR 107.4e a monocolored hybrid symbol is its coloured half, and only that" $ do
+            flameJavelin <- Registry.printing registry "Flame Javelin"
+            let (oid, gs) = S.addCreature flameJavelin S.alice (Setup.emptyGame S.bothPlayers)
+            HU.assertEqual "red, not colourless" (Set.singleton Color.Red) (Projection.colorsOf oid gs)
+        ]

@@ -1027,6 +1027,7 @@ manaSymbolToJson ms = case ms of
   ManaSymbol.Generic n -> Json.tagged (Text.pack "Generic") (Just (natTo n))
   ManaSymbol.OfType mt -> Json.tagged (Text.pack "OfType") (Just (manaTypeToJson mt))
   ManaSymbol.Hybrid a b -> Json.tagged (Text.pack "Hybrid") (Just (Array [manaTypeToJson a, manaTypeToJson b]))
+  ManaSymbol.MonocoloredHybrid mt -> Json.tagged (Text.pack "MonocoloredHybrid") (Just (manaTypeToJson mt))
   ManaSymbol.Variable -> nullary (Text.pack "Variable")
 
 jsonToManaSymbol :: Value -> Either Text ManaSymbol.ManaSymbol
@@ -1036,6 +1037,7 @@ jsonToManaSymbol value = do
     ("Generic", Just v) -> ManaSymbol.Generic <$> natFrom v
     ("OfType", Just v) -> ManaSymbol.OfType <$> jsonToManaType v
     ("Hybrid", Just (Array [av, bv])) -> ManaSymbol.Hybrid <$> jsonToManaType av <*> jsonToManaType bv
+    ("MonocoloredHybrid", Just v) -> ManaSymbol.MonocoloredHybrid <$> jsonToManaType v
     ("Variable", _) -> Right ManaSymbol.Variable
     _ -> Left (Text.pack "unknown ManaSymbol: " <> t)
 

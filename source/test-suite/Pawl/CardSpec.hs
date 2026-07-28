@@ -852,12 +852,31 @@ m4bCardTests registry =
           ]
           (Card.allEffects c)
         HU.assertEqual "one PlayerTarget slot, shared by both" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.allTargetSpecs c),
-      -- CR 202.3: "each colored or colorless mana symbol contributes 1", and
-      -- CR 107.4e makes a hybrid symbol a coloured mana symbol -- so {R/G}{R/G}
-      -- is mana value 2, not 4 (both halves) and not 0 (neither).
+      -- CR 202.3f: "When calculating the mana value of an object with a hybrid
+      -- mana symbol in its mana cost, use the largest component of each hybrid
+      -- symbol." Both halves of {R/G} are one mana, so the largest is 1 and
+      -- {R/G}{R/G} is mana value 2 -- not 4 (both halves) and not 0 (neither).
       HU.testCase "Burning-Tree Emissary's two hybrid symbols make mana value 2" $ do
         burningTreeEmissary <- Registry.printing registry "Burning-Tree Emissary"
-        HU.assertEqual "two" 2 (Quantity.manaValueOf (Printing.card burningTreeEmissary))
+        HU.assertEqual "two" 2 (Quantity.manaValueOf (Printing.card burningTreeEmissary)),
+      HU.testCase "Flame Javelin is a {2/R}{2/R}{2/R} Instant dealing 4 to any target" $ do
+        flameJavelin <- Registry.printing registry "Flame Javelin"
+        let c = Printing.card flameJavelin
+            twoOrRed = ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Red)
+            target = SlotName.MkSlotName (Text.pack "target")
+        HU.assertEqual "name" (Text.pack "Flame Javelin") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [twoOrRed, twoOrRed, twoOrRed]) (Card.Type.manaCost c)
+        HU.assertBool "an instant" (Card.isInstant c)
+        HU.assertEqual "effect deals four" [Effect.DealDamage target (Quantity.Type.Literal 4)] (Card.allEffects c)
+        HU.assertEqual "one AnyTarget slot" (Map.singleton target (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) (Card.allTargetSpecs c),
+      -- CR 202.3f again, whose own worked example is this card's cost: "The mana
+      -- value of a card with mana cost {2/B}{2/B}{2/B} is 6." The generic half is
+      -- the larger one, so a monocolored hybrid contributes 2 and not the 1 every
+      -- other typed symbol contributes -- the detail that silently corrupts every
+      -- mana-value reading downstream if it is wrong.
+      HU.testCase "Flame Javelin's three monocolored hybrid symbols make mana value 6, not 3" $ do
+        flameJavelin <- Registry.printing registry "Flame Javelin"
+        HU.assertEqual "six" 6 (Quantity.manaValueOf (Printing.card flameJavelin))
     ]
 
 m45p6CardTests :: Registry.Type.Registry -> Tasty.TestTree

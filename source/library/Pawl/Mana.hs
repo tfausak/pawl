@@ -254,33 +254,62 @@ chooseManaType pid oid candidates gs = case candidates of
         then answer
         else NonEmpty.head candidates
 
--- What one non-generic symbol demands: the SET of mana types that can satisfy it,
--- and Nothing for a symbol that demands no particular type.
+-- Every way ONE symbol can be paid: a typed demand -- the SET of mana types one
+-- unit of which satisfies it, and Nothing for a symbol that demands no particular
+-- type -- paired with the generic mana that way adds.
 --
 -- A set rather than a single type, because CR 107.4e's hybrid symbol "can be paid
 -- in one of two ways". A plain `{R}` is the singleton case, so both payment paths
 -- below read one shape and never case on hybrid-ness.
 --
--- The set survives all the way to payment rather than collapsing to one type as
--- the spell is announced, which CR 118.13a is what asks for (#261).
-demandOf :: ManaSymbol -> Maybe (Set.Set ManaType)
-demandOf symbol = case symbol of
-  ManaSymbol.OfType t -> Just (Set.singleton t)
-  ManaSymbol.Hybrid a b -> Just (Set.fromList [a, b])
-  ManaSymbol.Generic _ -> Nothing
-  ManaSymbol.Variable -> Nothing
-
-genericOf :: ManaSymbol -> Natural
-genericOf symbol = case symbol of
-  ManaSymbol.Generic n -> n
-  ManaSymbol.OfType _ -> 0
-  -- CR 107.4e: a colour/colour hybrid is paid with one mana of a stated type, so
-  -- it contributes nothing to the generic count. ({2/B}'s "two mana of any type"
-  -- half is the reason that symbol is not this constructor -- see ManaSymbol.)
-  ManaSymbol.Hybrid _ _ -> 0
+-- A LIST of ways, because CR 107.4e's other half is not a wider set but a
+-- different SHAPE: "a monocolored hybrid symbol such as {2/B} can be paid with
+-- either one black mana or two mana of any type", and one mana and two mana
+-- cannot be the same demand. Every other symbol offers exactly one way, so the
+-- list is a singleton everywhere else.
+--
+-- The ways survive all the way to payment rather than collapsing to one as the
+-- spell is proposed, which is what CR 118.13a and CR 601.2b actually call for and
+-- what pawl does not do (#261).
+waysOf :: ManaSymbol -> [(Maybe (Set.Set ManaType), Natural)]
+waysOf symbol = case symbol of
+  ManaSymbol.OfType t -> [(Just (Set.singleton t), 0)]
+  -- CR 107.4e: a colour/colour hybrid is paid with one mana of a stated type
+  -- either way, so it contributes nothing to the generic count.
+  ManaSymbol.Hybrid a b -> [(Just (Set.fromList [a, b]), 0)]
+  -- CR 107.4e's two ways, and the one-mana way is FIRST -- see resolutions.
+  ManaSymbol.MonocoloredHybrid t -> [(Just (Set.singleton t), 0), (Nothing, 2)]
+  ManaSymbol.Generic n -> [(Nothing, n)]
   -- Unreachable in payment: substituteX removes every Variable before canPay
-  -- (Task 4). The match must be total, so a bare {X} counts as 0 generic.
-  ManaSymbol.Variable -> 0
+  -- (Task 4). The match must be total, so a bare {X} demands nothing and counts
+  -- as 0 generic.
+  ManaSymbol.Variable -> [(Nothing, 0)]
+
+-- CR 601.2b's "nonhybrid equivalent cost", enumerated: every way the whole cost
+-- resolves into typed demands plus an amount of generic mana, one entry per
+-- combination of per-symbol ways. `traverse` over the list applicative is that
+-- product.
+--
+-- This is what lets everything below it keep the ONE-SUPPLY-PER-DEMAND shape
+-- spendDemands and canPay's Hall condition both rest on. CR 107.4e's {2/B} is the
+-- only symbol two mana can pay, and rather than teach those two about a demand
+-- that consumes two units -- which would break the counting each of them does --
+-- the choice is made here, above them. Each of them still sees a cost in which
+-- every typed demand is exactly one mana.
+--
+-- Finite and small, which is what keeps the search terminating: the product over
+-- symbols of their ways, so 2^(number of monocolored hybrid symbols), and exactly
+-- one entry for every cost without one. Flame Javelin ({2/R}{2/R}{2/R}) is 8;
+-- Reaper King ({2/W}{2/U}{2/B}{2/R}{2/G}) is 32.
+--
+-- ORDERED, and the order is a choice pawl makes for the player, because unlike a
+-- colour/colour hybrid the two ways spend DIFFERENT AMOUNTS of mana and so leave
+-- different pools behind. waysOf puts the one-mana way first, so `spend` takes
+-- the resolution that spends the fewest units (#261).
+resolutions :: ManaCost -> [([Set.Set ManaType], Natural)]
+resolutions (ManaCost.MkManaCost symbols) =
+  let collect ways = (Maybe.mapMaybe fst ways, sum (fmap snd ways))
+   in fmap collect (traverse waysOf symbols)
 
 -- CR 601.2f: the total cost with X resolved -- each Variable symbol becomes
 -- Generic n, every other symbol unchanged, order preserved (ManaCost is a list,
@@ -334,15 +363,16 @@ takeAny units _ = case units of
 -- Typed symbols are matched FIRST because they are the constrained ones: generic
 -- takes any unit, so paying it first could consume the only red and strand a
 -- {R} that nothing else can satisfy.
+--
+-- The FIRST resolution that works wins. For every cost without a monocolored
+-- hybrid there is only one, so this is the plain spend it always was; where there
+-- are several, `resolutions` has already put the cheapest first.
 spend :: ManaCost -> Mana -> Maybe Mana
 spend cost (Mana.MkMana units) =
-  let ManaCost.MkManaCost symbols = cost
-      demands = Maybe.mapMaybe demandOf symbols
-      generic = sum (fmap genericOf symbols)
-   in do
+  let attempt (demands, generic) = do
         afterTyped <- spendDemands units demands
-        afterGeneric <- Monad.foldM takeAny afterTyped [1 .. generic]
-        pure (Mana.MkMana afterGeneric)
+        Monad.foldM takeAny afterTyped [1 .. generic]
+   in fmap Mana.MkMana (Maybe.listToMaybe (Maybe.mapMaybe attempt (resolutions cost)))
 
 -- CR 601.2g: "If the total cost includes a mana payment, the player then has a
 -- chance to activate mana abilities." Reached from an ability too, by CR 602.2b
@@ -435,7 +465,7 @@ chooseSource pid candidates gs = case candidates of
 -- of the cost is a DEMAND for a specific type; generic symbols demand a count
 -- and nothing more.
 --
--- The cost is payable exactly when both hold:
+-- A RESOLVED cost is payable exactly when both hold:
 --
 --   1. every typed demand can be met at once -- a matching of demands into
 --      supplies that saturates the demand side; and
@@ -450,27 +480,33 @@ chooseSource pid candidates gs = case candidates of
 -- practice a handful. Checked directly rather than by running a matching
 -- algorithm: the condition IS the specification, so there is no gap between what
 -- this says and what it does.
+--
+-- Both clauses count one supply per typed demand, which is exactly why CR
+-- 107.4e's {2/B} is resolved AWAY before either is asked: `resolutions` turns the
+-- cost into the nonhybrid equivalents, and the cost is payable when ANY of them
+-- is. Neither clause has to learn about a demand two supplies satisfy, and
+-- neither can be fooled into charging {2/B} a single mana.
 canPay :: PlayerId -> ManaCost -> GameState -> Bool
 canPay pid cost gs =
-  let ManaCost.MkManaCost symbols = cost
-      demands = Maybe.mapMaybe demandOf symbols
-      generic = sum (fmap genericOf symbols)
-      Mana.MkMana units = poolOf pid gs
+  let Mana.MkMana units = poolOf pid gs
       supplies =
         fmap (Set.singleton . ManaUnit.manaType) units
           <> fmap (\oid -> Set.fromList (manaTypesOf oid gs)) (manaSources pid gs)
-      -- A demand belongs to the set W exactly when every type that could satisfy
-      -- it is in W -- `isSubsetOf`, where a single-type demand only needed
-      -- `member`. That is the whole generalization CR 107.4e's hybrid asks of
-      -- Hall's condition: the demand side gained option-sets, and the condition
-      -- is still "no set of demands outruns the supplies that could serve it".
-      demandedIn wanted = length (filter (`Set.isSubsetOf` wanted) demands)
       couldServe wanted = length (filter (not . Set.disjoint wanted) supplies)
-      hallHolds wanted = demandedIn wanted <= couldServe wanted
-      -- Enumerated over TYPES, not over demands: taking W = the union of a
-      -- demand set's options recovers the worst case for that set, so subsets of
-      -- the demanded types cover every subset of demands. At most 2^6 by
-      -- CR 106.1b, unchanged by hybrids.
-      demandedTypes = Set.toList (Set.unions demands)
-   in Natural.length supplies >= Natural.length demands + generic
-        && all (hallHolds . Set.fromList) (List.subsequences demandedTypes)
+      payable (demands, generic) =
+        let -- A demand belongs to the set W exactly when every type that could
+            -- satisfy it is in W -- `isSubsetOf`, where a single-type demand only
+            -- needed `member`. That is the whole generalization CR 107.4e's
+            -- hybrid asks of Hall's condition: the demand side gained
+            -- option-sets, and the condition is still "no set of demands outruns
+            -- the supplies that could serve it".
+            demandedIn wanted = length (filter (`Set.isSubsetOf` wanted) demands)
+            hallHolds wanted = demandedIn wanted <= couldServe wanted
+            -- Enumerated over TYPES, not over demands: taking W = the union of a
+            -- demand set's options recovers the worst case for that set, so
+            -- subsets of the demanded types cover every subset of demands. At
+            -- most 2^6 by CR 106.1b, unchanged by hybrids.
+            demandedTypes = Set.toList (Set.unions demands)
+         in Natural.length supplies >= Natural.length demands + generic
+              && all (hallHolds . Set.fromList) (List.subsequences demandedTypes)
+   in any payable (resolutions cost)
