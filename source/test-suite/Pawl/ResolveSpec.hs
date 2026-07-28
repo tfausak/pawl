@@ -1803,7 +1803,7 @@ loseLifeTests registry =
     "LoseLife"
     -- Both cases are Sign in Blood, the card that proves the opcode (#273): its
     -- two clauses share one target slot, so the player who draws is the player
-    -- who pays, and neither is aimed at the caster.
+    -- who loses life, and neither is aimed at the caster.
     [ -- The last assertion is the falsifier for a life loss spelled as damage.
       -- CR 119.2 makes damage a CAUSE of life loss, not a synonym for it, so
       -- this records no damage event for CR 614/615's replacement and

@@ -238,8 +238,8 @@ tests registry =
           HU.testCase "Draw" $ do
             roundTrip "draw" Codec.effectToJson Codec.jsonToEffect (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
             roundTrip "draw slot" Codec.effectToJson Codec.jsonToEffect (Effect.Draw (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3)),
-          -- Sign in Blood's targeted loss, and the `Relative You` arm no card in
-          -- the pool authors yet -- the codec accepts every PlayerRef either way.
+          -- Sign in Blood's targeted loss, and the `Relative You` arm that no
+          -- card in the pool uses yet -- the codec accepts every PlayerRef either way.
           HU.testCase "LoseLife" $ do
             roundTrip "lose slot" Codec.effectToJson Codec.jsonToEffect (Effect.LoseLife (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2))
             roundTrip "lose you" Codec.effectToJson Codec.jsonToEffect (Effect.LoseLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)),

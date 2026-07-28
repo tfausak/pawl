@@ -838,7 +838,7 @@ m4bCardTests registry =
       -- Two effects of DIFFERENT opcodes reading one slot, in printed order --
       -- the pin that a rewrite reordering the mode's effect list, or splitting
       -- the clauses across two slots, would break.
-      HU.testCase "Sign in Blood is a {B}{B} Sorcery drawing two and draining two from one target player" $ do
+      HU.testCase "Sign in Blood is a {B}{B} Sorcery drawing two and making one target player lose two life" $ do
         signInBlood <- Registry.printing registry "Sign in Blood"
         let c = Printing.card signInBlood
             target = SlotName.MkSlotName (Text.pack "target")
