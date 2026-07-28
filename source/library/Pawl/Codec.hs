@@ -84,6 +84,7 @@ import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.Scope as Scope
+import qualified Pawl.Type.SearchDestination as SearchDestination
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
@@ -342,6 +343,26 @@ jsonToSubtype =
       (Text.pack "Cleric", Subtype.Cleric)
     ]
 
+-- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
+-- omitted key, because this rides inside a positional pair.
+optionalFilter :: Value -> Either Text (Maybe Filter.Filter)
+optionalFilter value = case value of
+  Null -> Right Nothing
+  _ -> fmap Just (jsonToFilter value)
+
+searchDestinationToJson :: SearchDestination.SearchDestination -> Value
+searchDestinationToJson d = nullary . Text.pack $ case d of
+  SearchDestination.BattlefieldTapped -> "BattlefieldTapped"
+  SearchDestination.Hand -> "Hand"
+
+jsonToSearchDestination :: Value -> Either Text SearchDestination.SearchDestination
+jsonToSearchDestination =
+  decodeNullary
+    (Text.pack "SearchDestination")
+    [ (Text.pack "BattlefieldTapped", SearchDestination.BattlefieldTapped),
+      (Text.pack "Hand", SearchDestination.Hand)
+    ]
+
 supertypeToJson :: Supertype.Supertype -> Value
 supertypeToJson s = nullary . Text.pack $ case s of
   Supertype.Basic -> "Basic"
@@ -372,7 +393,7 @@ keywordToJson k = case k of
   Keyword.Reach -> nullary (Text.pack "Reach")
   Keyword.Trample -> nullary (Text.pack "Trample")
   Keyword.Vigilance -> nullary (Text.pack "Vigilance")
-  Keyword.Cycling cost -> Json.tagged (Text.pack "Cycling") (Just (costToJson cost))
+  Keyword.Cycling cost searchFor -> Json.tagged (Text.pack "Cycling") (Just (Array [costToJson cost, maybe Null filterToJson searchFor]))
   Keyword.Flashback cost -> Json.tagged (Text.pack "Flashback") (Just (costToJson cost))
   Keyword.Fear -> nullary (Text.pack "Fear")
   Keyword.Poisonous n -> Json.tagged (Text.pack "Poisonous") (Just (natTo n))
@@ -394,7 +415,7 @@ jsonToKeyword value = do
     ("Reach", _) -> Right Keyword.Reach
     ("Trample", _) -> Right Keyword.Trample
     ("Vigilance", _) -> Right Keyword.Vigilance
-    ("Cycling", Just v) -> Keyword.Cycling <$> jsonToCost v
+    ("Cycling", Just (Array [c, f])) -> Keyword.Cycling <$> jsonToCost c <*> optionalFilter f
     ("Flashback", Just v) -> Keyword.Flashback <$> jsonToCost v
     ("Fear", _) -> Right Keyword.Fear
     ("Poisonous", Just v) -> Keyword.Poisonous <$> natFrom v
@@ -1369,7 +1390,7 @@ effectToJson e = case e of
   Effect.ModifyTarget d m s -> Json.tagged (Text.pack "ModifyTarget") (Just (Array [durationToJson d, modificationToJson m, slotNameToJson s]))
   Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (slotNameToJson s))
   Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (manaProductionToJson production))
-  Effect.Search f -> Json.tagged (Text.pack "Search") (Just (filterToJson f))
+  Effect.Search f d -> Json.tagged (Text.pack "Search") (Just (Array [filterToJson f, searchDestinationToJson d]))
   Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
   Effect.Proliferate -> nullary (Text.pack "Proliferate")
   Effect.ExileHandThenDraw -> nullary (Text.pack "ExileHandThenDraw")
@@ -1411,7 +1432,9 @@ jsonToEffect value = do
       _ -> Left (Text.pack "ModifyTarget expects [duration, modification, slot]")
     "ChangeText" -> withValue mv (fmap Effect.ChangeText . jsonToSlotName)
     "AddMana" -> withValue mv (fmap Effect.AddMana . jsonToManaProduction)
-    "Search" -> withValue mv (fmap Effect.Search . jsonToFilter)
+    "Search" -> case mv of
+      Just (Array [f, d]) -> Effect.Search <$> jsonToFilter f <*> jsonToSearchDestination d
+      _ -> Left (Text.pack "Search expects [filter, destination]")
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw

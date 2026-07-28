@@ -84,6 +84,7 @@ import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Scaling as Scaling
 import qualified Pawl.Type.Scope as Scope
+import qualified Pawl.Type.SearchDestination as SearchDestination
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
@@ -694,6 +695,14 @@ tests registry =
           HU.testCase "GameEvent.BecameMonarch" $
             roundTrip "bm" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.BecameMonarch S.alice),
           -- CR 702.29c's event, carrying the incarnation the cycled card became.
+          -- CR 702.29e: the typecycling filter rides the same keyword arm, absent
+          -- for plain cycling -- so both spellings have to survive the trip.
+          HU.testCase "Keyword.Cycling round-trips with and without a typecycling filter" $ do
+            let cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
+            roundTrip "cyc" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Cycling cost Nothing)
+            roundTrip "typecyc" Codec.keywordToJson Codec.jsonToKeyword (Keyword.Cycling cost (Just (Filter.Type.HasCardType CardType.Land))),
+          HU.testCase "SearchDestination round-trips" $
+            mapM_ (roundTrip "dest" Codec.searchDestinationToJson Codec.jsonToSearchDestination) [SearchDestination.BattlefieldTapped, SearchDestination.Hand],
           HU.testCase "GameEvent.Cycled round-trips" $
             roundTrip "cyc" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Cycled (ObjectId.MkObjectId 7)),
           HU.testCase "TriggerCondition.SelfCycled round-trips" $

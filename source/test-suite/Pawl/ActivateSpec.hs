@@ -492,6 +492,63 @@ cyclingTests registry =
         let (g0, _) = S.handOne mauler (S.landsInPlay forest 1)
             gs = g0 {GameState.priority = Just S.alice}
         HU.assertBool "one Forest cannot pay {2}" (not (any isActivate (Action.legalActions S.alice gs))),
+      -- CR 702.29e: typecycling is the same ability with a search in place of the
+      -- draw. Ash Barrens' basic landcycling {1} finds a basic land card and puts
+      -- it in HAND -- not onto the battlefield, which is the destination Evolving
+      -- Wilds' search has and the one this rule does not.
+      HU.testCase "CR 702.29e whole card: basic landcycling Ash Barrens fetches a Forest to hand" $ do
+        barrens <- Registry.printing registry "Ash Barrens"
+        forest <- Registry.printing registry "Forest"
+        island <- Registry.printing registry "Island"
+        let (_, g0) = S.addLibraryCard forest S.alice (S.landsInPlay island 1)
+            (g1, oid) = S.handOne barrens g0
+            gs = g1 {GameState.priority = Just S.alice}
+        case Activate.abilitiesFor oid gs of
+          [ability] -> do
+            let cycled = S.runPure findFirst gs (Activate.activateAbility S.alice oid ability)
+                after = S.runPure findFirst cycled Stack.resolveTop
+            HU.assertEqual "Ash Barrens paid its own cost into the graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice cycled))
+            HU.assertEqual "the Forest is in hand" 1 (length (Game.zoneMembers Zone.Hand S.alice after))
+            HU.assertEqual "and out of the library" 0 (length (Game.zoneMembers Zone.Library S.alice after))
+            HU.assertEqual "nothing was put onto the battlefield: one Island, no Forest" 1 (length (Set.toList (GameState.battlefield after)))
+          abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+      -- CR 702.29e's filter is the card's, and it is a real narrowing: a library
+      -- with no basic land in it finds nothing, and the cycler is still discarded
+      -- (CR 701.23b -- a player "isn't required to find" a card, and here cannot).
+      HU.testCase "CR 702.29e basic landcycling finds nothing in a library of nonbasics" $ do
+        barrens <- Registry.printing registry "Ash Barrens"
+        piker <- Registry.printing registry "Goblin Piker"
+        island <- Registry.printing registry "Island"
+        let (_, g0) = S.addLibraryCard piker S.alice (S.landsInPlay island 1)
+            (g1, oid) = S.handOne barrens g0
+            gs = g1 {GameState.priority = Just S.alice}
+        case Activate.abilitiesFor oid gs of
+          [ability] -> do
+            let cycled = S.runPure findFirst gs (Activate.activateAbility S.alice oid ability)
+                after = S.runPure findFirst cycled Stack.resolveTop
+            HU.assertEqual "the Piker is not a basic land, so it stays in the library" 1 (length (Game.zoneMembers Zone.Library S.alice after))
+            HU.assertEqual "the hand is empty" 0 (length (Game.zoneMembers Zone.Hand S.alice after))
+            HU.assertEqual "and Ash Barrens was still discarded" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+          abilities -> HU.assertFailure ("expected one cycling ability, got " <> show (length abilities)),
+      -- CR 702.29f: "typecycling abilities are cycling abilities, and typecycling
+      -- costs are cycling costs." The engine gets that for free by minting both
+      -- from one keyword arm -- the discard is in the cost either way, and the
+      -- only difference is what resolves.
+      HU.testCase "CR 702.29f a typecycling ability is a cycling ability" $ do
+        barrens <- Registry.printing registry "Ash Barrens"
+        mauler <- Registry.printing registry "Barkhide Mauler"
+        island <- Registry.printing registry "Island"
+        let (g0, barrensId) = S.handOne barrens (S.landsInPlay island 2)
+            (g1, maulerId) = S.handOne mauler g0
+            gs = g1 {GameState.priority = Just S.alice}
+        case (Activate.abilitiesFor barrensId gs, Activate.abilitiesFor maulerId gs) of
+          ([typecycler], [plain]) -> do
+            HU.assertEqual
+              "both costs end in rule 702.29a's discard"
+              (Just CostComponent.DiscardThis, Just CostComponent.DiscardThis)
+              (Maybe.listToMaybe (reverse (Cost.Type.components (ActivatedAbility.cost typecycler))), Maybe.listToMaybe (reverse (Cost.Type.components (ActivatedAbility.cost plain))))
+            HU.assertEqual "and both are instant speed" (ActivationTiming.AnyTime, ActivationTiming.AnyTime) (ActivatedAbility.timing typecycler, ActivatedAbility.timing plain)
+          _ -> HU.assertFailure "expected one cycling ability on each",
       -- The control: the gate cannot pass by offering every card in hand. A
       -- Piker has no cycling and nothing is minted for it.
       HU.testCase "CR 702.29a a card without cycling offers nothing from the hand" $ do

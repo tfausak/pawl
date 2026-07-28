@@ -20,6 +20,7 @@ import Pawl.Type.Cost (Cost)
 import qualified Pawl.Type.Cost as Cost
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Effect as Effect
+import Pawl.Type.Filter (Filter)
 import Pawl.Type.Keyword (Keyword)
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modal as Modal
@@ -31,6 +32,7 @@ import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.Quantity as Quantity
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.SearchDestination as SearchDestination
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import Pawl.Type.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
@@ -99,7 +101,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Trample -> []
   Keyword.Vigilance -> []
   Keyword.Fear -> []
-  Keyword.Cycling _ -> []
+  Keyword.Cycling _ _ -> []
   Keyword.Flashback _ -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
@@ -129,7 +131,7 @@ handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 -- silently produce nothing.
 handAbilitiesFor :: Keyword -> [ActivatedAbility Card]
 handAbilitiesFor keyword = case keyword of
-  Keyword.Cycling cost -> [cycling cost]
+  Keyword.Cycling cost searchFor -> [cycling cost searchFor]
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -155,8 +157,8 @@ handAbilitiesFor keyword = case keyword of
 -- wrong the other way round: an activation the player backs out of discards
 -- nothing (Pawl.Cost.pay restores the entry state), the card is already in the
 -- graveyard while the draw is still on the stack, and CR 702.29c's "when you
--- cycle this card" will have a cost payment to trigger off rather than a
--- resolution (#314).
+-- cycle this card" has a cost payment to trigger off rather than a resolution
+-- (Pawl.Cost records the event; Pawl.Event matches it).
 --
 -- The card's own data carries only what is PRINTED on it -- "Cycling {2}" is a
 -- mana cost and nothing else -- and rule 702.29a's discard is added here. That
@@ -169,8 +171,8 @@ handAbilitiesFor keyword = case keyword of
 -- AnyTime because rule 702.29a states no timing restriction, which leaves CR
 -- 117.1b's default: "a player may activate an activated ability any time they
 -- have priority."
-cycling :: Cost -> ActivatedAbility Card
-cycling cost =
+cycling :: Cost -> Maybe Filter -> ActivatedAbility Card
+cycling cost searchFor =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis]},
       ActivatedAbility.modal =
@@ -180,10 +182,20 @@ cycling cost =
       ActivatedAbility.timing = ActivationTiming.AnyTime
     }
   where
+    -- The only difference between rule 702.29a and rule 702.29e: what the
+    -- ability does once its cost is paid. Everything above -- the discard in the
+    -- cost, the timing, the single forced mode -- is shared, which is CR 702.29f
+    -- ("typecycling abilities are cycling abilities") holding by construction.
+    --
     -- CR 702.29a draws for the ability's controller, which CR 113.8 makes "the
     -- player who activated it" -- so You, the perspective Pawl.Resolve evaluates
     -- a PlayerRef against.
-    effect = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
+    --
+    -- CR 702.29e searches instead, into the HAND. Its "reveal it" is not
+    -- performed (#320).
+    effect = case searchFor of
+      Nothing -> Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
+      Just filter_ -> Effect.Search filter_ SearchDestination.Hand
 
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword,
 -- the sibling of triggeredAbilitiesOf above. A card's own printed permissions
@@ -208,7 +220,7 @@ permissionsFor keyword = case keyword of
   Keyword.Flashback _ -> [CastingPermission.CastFromGraveyard]
   -- CR 702.29a is an ACTIVATED ability, not a casting permission: cycling
   -- discards the card, it never casts it. See handAbilitiesOf above.
-  Keyword.Cycling _ -> []
+  Keyword.Cycling _ _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []

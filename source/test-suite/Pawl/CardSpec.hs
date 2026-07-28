@@ -342,7 +342,7 @@ effectCounts effect = case effect of
   Effect.ModifyTarget duration modification _ -> durationCounts duration <> modificationCounts modification
   Effect.ChangeText _ -> []
   Effect.AddMana _ -> []
-  Effect.Search _ -> []
+  Effect.Search _ _ -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ExileHandThenDraw -> []
@@ -1293,7 +1293,7 @@ cyclingCardTests registry =
         -- is minted by Pawl.Keyword.
         HU.assertEqual
           "flying and Cycling {U}"
-          (Set.fromList [Keyword.Flying, Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [blue])) [])])
+          (Set.fromList [Keyword.Flying, Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [blue])) []) Nothing])
           (Card.Type.keywords c)
         case Card.Type.triggeredAbilities c of
           [ability] ->
@@ -1302,6 +1302,20 @@ cyclingCardTests registry =
               TriggerCondition.SelfCycled
               (TriggeredAbility.condition ability)
           abilities -> HU.assertFailure ("expected one triggered ability, got " <> show (length abilities)),
+      HU.testCase "Ash Barrens is a Land with {T}: Add {C} and basic landcycling {1}" $ do
+        p <- Registry.printing registry "Ash Barrens"
+        let c = Printing.card p
+            basicLand = Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic]
+        HU.assertEqual "name" (Text.pack "Ash Barrens") (Card.Type.name c)
+        HU.assertEqual "a land, with no mana cost (CR 202.1)" Nothing (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Land) (TypeLine.types (Card.Type.typeLine c))
+        -- CR 702.29e's "[type]" is a Filter, and "basic land" is why: the same
+        -- two-atom filter Evolving Wilds' search carries.
+        HU.assertEqual
+          "basic landcycling {1}"
+          (Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []) (Just basicLand)))
+          (Card.Type.keywords c)
+        HU.assertEqual "one activated ability, its own mana ability" 1 (length (Card.Type.activatedAbilities c)),
       HU.testCase "Barkhide Mauler is a {4}{G} 4/4 Beast whose only text is Cycling {2}" $ do
         p <- Registry.printing registry "Barkhide Mauler"
         let c = Printing.card p
@@ -1315,7 +1329,7 @@ cyclingCardTests registry =
         -- discard and draw are minted by Pawl.Keyword, never authored here.
         HU.assertEqual
           "\"Cycling {2}\""
-          (Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])))
+          (Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []) Nothing))
           (Card.Type.keywords c)
         HU.assertEqual "and no activated ability of its own" [] (Card.Type.activatedAbilities c)
     ]
