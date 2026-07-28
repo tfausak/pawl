@@ -1343,6 +1343,7 @@ effectToJson e = case e of
   Effect.Draw r q -> Json.tagged (Text.pack "Draw") (Just (Array [playerRefToJson r, quantityToJson q]))
   Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
+  Effect.LoseLife r q -> Json.tagged (Text.pack "LoseLife") (Just (Array [playerRefToJson r, quantityToJson q]))
   Effect.Create q c Nothing -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
   Effect.Create q c (Just s) -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c, slotNameToJson s]))
   Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array [durationToJson d, usesToJson u, replacementEffectToJson re]))
@@ -1396,6 +1397,9 @@ jsonToEffect value = do
     "Discard" -> case mv of
       Just (Array [s, q]) -> Effect.Discard <$> jsonToSlotName s <*> jsonToQuantity q
       _ -> Left (Text.pack "Discard expects [slot, quantity]")
+    "LoseLife" -> case mv of
+      Just (Array [r, q]) -> Effect.LoseLife <$> jsonToPlayerRef r <*> jsonToQuantity q
+      _ -> Left (Text.pack "LoseLife expects [playerRef, quantity]")
     "Create" -> case mv of
       Just (Array [q, c]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure Nothing
       Just (Array [q, c, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> (Just <$> jsonToSlotName s)

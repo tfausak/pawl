@@ -344,6 +344,7 @@ effectCounts effect = case effect of
   Effect.Draw _ quantity -> quantityCounts quantity
   Effect.Mill _ quantity -> quantityCounts quantity
   Effect.Discard _ quantity -> quantityCounts quantity
+  Effect.LoseLife _ quantity -> quantityCounts quantity
   Effect.Create quantity card _ -> quantityCounts quantity <> cardCounts card
   Effect.Replace duration _ _ -> durationCounts duration
   Effect.Counter _ -> []
@@ -834,6 +835,23 @@ m4bCardTests registry =
         let c = Printing.card mindRot
         HU.assertEqual "effect discards two" [Effect.Discard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Type.Literal 2)] (Card.allEffects c)
         HU.assertEqual "one PlayerTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.allTargetSpecs c),
+      -- Two effects of DIFFERENT opcodes reading one slot, in printed order --
+      -- the pin that a rewrite reordering the mode's effect list, or splitting
+      -- the clauses across two slots, would break.
+      HU.testCase "Sign in Blood is a {B}{B} Sorcery drawing two and making one target player lose two life" $ do
+        signInBlood <- Registry.printing registry "Sign in Blood"
+        let c = Printing.card signInBlood
+            target = SlotName.MkSlotName (Text.pack "target")
+            black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [black, black])) (Card.Type.manaCost c)
+        HU.assertBool "not an instant" (not (Card.isInstant c))
+        HU.assertEqual
+          "draws first, then loses life"
+          [ Effect.Draw (PlayerRef.InSlot target) (Quantity.Type.Literal 2),
+            Effect.LoseLife (PlayerRef.InSlot target) (Quantity.Type.Literal 2)
+          ]
+          (Card.allEffects c)
+        HU.assertEqual "one PlayerTarget slot, shared by both" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Players Nothing)) (Card.allTargetSpecs c),
       -- CR 202.3: "each colored or colorless mana symbol contributes 1", and
       -- CR 107.4e makes a hybrid symbol a coloured mana symbol -- so {R/G}{R/G}
       -- is mana value 2, not 4 (both halves) and not 0 (neither).
