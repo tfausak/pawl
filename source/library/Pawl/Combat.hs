@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Pawl.BlockRequirement as BlockRequirement
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
@@ -155,39 +156,136 @@ fearAllows blocker attacker gs =
     || Set.member CardType.Artifact (Projection.cardTypesOf blocker gs)
     || Set.member Color.Black (Projection.colorsOf blocker gs)
 
--- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
--- any are disobeyed the DECLARATION is illegal.
---
--- The unit of legality is the whole declaration, not the pair, and that is not a
--- stylistic choice. Menace (CR 702.111, one punchlist entry away) says a creature
--- can't be blocked except by TWO OR MORE creatures -- a constraint on the SET
--- blocking an attacker, which no per-pair predicate can express. Only flying and
--- reach are pairwise; designing to them would be designing to the case that
--- misleads. See the M2a spec, section 3.
+-- CR 509.1b asked of ONE (blocker, attacker) pair: may this creature block that
+-- one at all? This is also what CR 509.1c's requirements mean by "able to block"
+-- (Lure), which is why it is a named function and not a lambda inside the
+-- declaration check.
 --
 -- A conjunction of independent restriction checks, because CR 509.1b says
 -- different evasion abilities are cumulative: an attacker with flying AND shadow
 -- admits only blockers that answer both.
 --
--- CR 509.1c REQUIREMENTS ("must block if able") are NOT implemented, and are not
--- a check but a maximization: 509.1c demands the declaration obey the maximum
--- possible number of requirements achievable without disobeying any restriction.
--- Nothing in the pool creates a requirement, so that maximum is trivially zero.
--- This function is named for restrictions so requirements arrive as a SECOND
--- function rather than as a surprise inside this one (#27). The first
--- requirement also invalidates declareBlockers' fallback -- see there.
+-- Every restriction in the pool today happens to be pairwise. Menace (CR 702.111b,
+-- "can't be blocked except by two or more creatures") is not -- it constrains the
+-- SET blocking one attacker -- and when it lands it belongs in
+-- declarationAllowed, which is asked of the whole declaration, never here.
+pairAllowed :: [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
+pairAllowed candidates attackers blocker attacker gs =
+  -- CR 509.1a: the blocker must be one this player could block with at all, and
+  -- the attacker must actually be attacking.
+  List.elem blocker candidates
+    && List.elem attacker attackers
+    && evasionAllows blocker attacker gs
+    && fearAllows blocker attacker gs
+
+-- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
+-- any are disobeyed the DECLARATION is illegal.
+--
+-- The unit of legality is the whole declaration, not the pair, and that is not a
+-- stylistic choice. Menace (CR 702.111b, one punchlist entry away) says a creature
+-- can't be blocked except by TWO OR MORE creatures -- a constraint on the SET
+-- blocking an attacker, which no per-pair predicate can express. Only flying and
+-- reach are pairwise; designing to them would be designing to the case that
+-- misleads. See the M2a spec, section 3. So this stays a whole-declaration
+-- function even though its body is currently a fold of pairAllowed: this is the
+-- seam a set-shaped restriction plugs into, and it is the seam blockCeiling's
+-- enumeration is filtered through.
+declarationAllowed :: (ObjectId -> ObjectId -> Bool) -> Map ObjectId ObjectId -> Bool
+declarationAllowed able declaration = all (uncurry able) (Map.toList declaration)
+
+-- How many of `requirements` this declaration obeys -- CR 509.1c's "the number of
+-- requirements that are being obeyed". A requirement instance is obeyed exactly
+-- when the declaration has its blocker blocking its attacker.
+requirementsMet :: Set (ObjectId, ObjectId) -> Map ObjectId ObjectId -> Int
+requirementsMet requirements declaration =
+  Set.size (Set.filter (\(blocker, attacker) -> Map.lookup blocker declaration == Just attacker) requirements)
+
+-- Every declaration CR 509.1a lets the defending player write down, given the
+-- pairs CR 509.1b allows: each candidate blocker independently either blocks
+-- nothing or blocks one attacker it may block.
+--
+-- EXPONENTIAL, and honestly so: the list has product over candidates of
+-- (1 + how many attackers that candidate may block) entries, so it is
+-- O((attackers + 1) ^ blockers) in the worst case. Nothing caps it and nothing
+-- samples it -- a cap would answer CR 509.1c's "maximum possible number" with a
+-- number that is not the maximum, which is worse than being slow. What keeps it
+-- off the hot path is blockCeiling's guard: this is never called unless some
+-- requirement is actually in force, which needs a card like Lure on the
+-- battlefield (#342).
+candidateDeclarations :: (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> [Map ObjectId ObjectId]
+candidateDeclarations able candidates attackers =
+  let extend acc blocker =
+        let options = Nothing : fmap Just (filter (\attacker -> able blocker attacker) attackers)
+            apply declaration option = case option of
+              Nothing -> declaration
+              Just attacker -> Map.insert blocker attacker declaration
+         in concatMap (\declaration -> fmap (apply declaration) options) acc
+   in List.foldl' extend [Map.empty] candidates
+
+-- CR 509.1c's two halves, computed together because neither is usable alone: the
+-- requirement instances in force, and a declaration obeying the "maximum possible
+-- number of requirements that could be obeyed without disobeying any
+-- restrictions".
+--
+-- Map.empty when no requirement is in force, WITHOUT enumerating anything. That
+-- is not an optimization of the common case so much as the whole of it: with no
+-- requirement the maximum is zero, every declaration obeys zero, and CR 509.1c
+-- has nothing to say. A board without Lure never pays a search.
+--
+-- The maximum is taken by folding rather than by `maximum`, and the fold's seed is
+-- Map.empty -- which is always a legal declaration under restrictions alone, since
+-- declining to block disobeys no restriction -- so the answer is total and needs
+-- no partial function. Ties go to the EARLIER declaration in enumeration order;
+-- which one is picked matters only to forcedBlockDeclaration's broken-interpreter
+-- path, never to legality, which compares counts.
+blockCeiling :: PlayerId -> GameState -> (Set (ObjectId, ObjectId), Map ObjectId ObjectId)
+blockCeiling pid gs =
+  let attackers = Map.keys (Combat.attackers (GameState.combat gs))
+      candidates = legalBlockers pid gs
+      able blocker attacker = pairAllowed candidates attackers blocker attacker gs
+      requirements = BlockRequirement.instances able candidates attackers gs
+      better best declaration =
+        if requirementsMet requirements declaration > requirementsMet requirements best
+          then declaration
+          else best
+      legal = filter (declarationAllowed able) (candidateDeclarations able candidates attackers)
+   in ( requirements,
+        if Set.null requirements
+          then Map.empty
+          else List.foldl' better Map.empty legal
+      )
+
+-- CR 509.1: is this declaration one the defending player may make? Both checks
+-- the rule asks for, in the order it asks them: CR 509.1b's restrictions, then CR
+-- 509.1c's requirements.
+--
+-- CR 509.1c is not a check but a MAXIMIZATION -- "if the number of requirements
+-- that are being obeyed is fewer than the maximum possible number of requirements
+-- that could be obeyed without disobeying any restrictions, the declaration of
+-- blockers is illegal" -- so it cannot be asked of the declaration alone. It is
+-- what makes declaring no blockers at all illegal while a Lure is on the
+-- battlefield.
+--
+-- CR 509.1c's cost clause ("if a creature can't block unless a player pays a
+-- cost, that player is not required to pay that cost") and CR 509.1d's cost
+-- locking are not implemented: no card in the pool makes blocking cost anything
+-- (#343).
 legalBlockDeclaration :: PlayerId -> Map ObjectId ObjectId -> GameState -> Bool
 legalBlockDeclaration pid declaration gs =
   let attackers = Map.keys (Combat.attackers (GameState.combat gs))
       candidates = legalBlockers pid gs
-      -- CR 509.1a: the blocker must be one this player could block with at all,
-      -- and the attacker must actually be attacking.
-      wellFormed blocker attacker = List.elem blocker candidates && List.elem attacker attackers
-      ok (blocker, attacker) =
-        wellFormed blocker attacker
-          && evasionAllows blocker attacker gs
-          && fearAllows blocker attacker gs
-   in all ok (Map.toList declaration)
+      able blocker attacker = pairAllowed candidates attackers blocker attacker gs
+      (requirements, best) = blockCeiling pid gs
+   in declarationAllowed able declaration
+        && requirementsMet requirements declaration >= requirementsMet requirements best
+
+-- A declaration that is always legal: one attaining CR 509.1c's maximum, which
+-- with no requirement in force is the empty one (declining to block). Not an
+-- answer the engine ever prefers to the defending player's own -- declareBlockers
+-- reaches for it only when an interpreter hands back a declaration the rules
+-- forbid.
+forcedBlockDeclaration :: PlayerId -> GameState -> Map ObjectId ObjectId
+forcedBlockDeclaration pid gs = snd (blockCeiling pid gs)
 
 -- Who is CURRENTLY blocking this attacker -- not whether it is blocked. The two
 -- questions come apart (see isBlocked), and a reader that wants blocked-ness must
@@ -433,19 +531,32 @@ declareBlockers = do
         -- illegal declaration, so only a broken interpreter arrives here, and
         -- re-prompting a pure `Prompt r -> r` returns the identical wrong answer.
         --
-        -- Declining to block is always legal today, so "no blocks" is a legal
-        -- state to fall back to. With a CR 509.1c requirement in the pool, "no
-        -- blocks" can itself be illegal and this fallback stops being
-        -- available (#27).
+        -- Declining to block is NOT always legal: with a CR 509.1c requirement on
+        -- the board (Lure), "no blocks" can itself be the illegal answer, so
+        -- doing nothing is not a state this can fall back to. It degrades to
+        -- forcedBlockDeclaration instead -- always legal, and equal to "no
+        -- blocks" whenever no requirement is in force, so this is the same
+        -- fallback as before on every board that had one.
+        --
+        -- The same posture chooseDefender takes for an out-of-candidates answer:
+        -- degrade TOTALLY rather than fail, and never re-prompt. It is not the
+        -- engine choosing for the player -- the player's answer was taken and
+        -- rejected -- and where a requirement leaves exactly one legal
+        -- declaration, this hands back the one the rules already forced.
+        -- Replay.defaultAnswer's "no blocks" for this prompt routes through here
+        -- too, so the two cannot disagree about what an illegal answer becomes.
         gs1 <- State.get
-        Monad.when (legalBlockDeclaration pid chosen gs1) $ do
+        let declaration = if legalBlockDeclaration pid chosen gs1 then chosen else forcedBlockDeclaration pid gs1
+        Monad.unless (Map.null declaration) $ do
           let add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m
-              merged = List.foldl' add (Combat.blockers (GameState.combat gs1)) (Map.toList chosen)
+              merged = List.foldl' add (Combat.blockers (GameState.combat gs1)) (Map.toList declaration)
               -- CR 506.4's comparand for the blockers, alongside the attackers'
-              -- (declareAttackers). `pid` for the same reason it is there:
-              -- legalBlockDeclaration has already required every blocker to be
-              -- one legalBlockers offered, which is controllerOf == Just pid
-              -- (CR 509.1a). Unioned rather than replacing, since the attackers'
-              -- entries are already in this map.
-              joined = Map.union (Map.fromList (fmap (\b -> (b, pid)) (Map.keys chosen))) (Combat.joinedUnder (GameState.combat gs1))
+              -- (declareAttackers). `pid` for the same reason it is there: every
+              -- blocker here is one legalBlockers offered, which is
+              -- controllerOf == Just pid (CR 509.1a) -- required by
+              -- legalBlockDeclaration on the accepted path, and true by
+              -- construction on the forcedBlockDeclaration one, whose candidates
+              -- come from that same list. Unioned rather than replacing, since
+              -- the attackers' entries are already in this map.
+              joined = Map.union (Map.fromList (fmap (\b -> (b, pid)) (Map.keys declaration))) (Combat.joinedUnder (GameState.combat gs1))
           State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged, Combat.joinedUnder = joined}}

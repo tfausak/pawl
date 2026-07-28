@@ -5,6 +5,7 @@ import Data.Set (Set)
 import Data.Text (Text)
 import Pawl.Type.AbilityName (AbilityName)
 import Pawl.Type.ActivatedAbility (ActivatedAbility)
+import Pawl.Type.BlockRequirement (BlockRequirement)
 import Pawl.Type.CastingPermission (CastingPermission)
 import Pawl.Type.Color (Color)
 import Pawl.Type.Cost (Cost)
@@ -167,6 +168,14 @@ data Card = MkCard
     -- OUTSIDE the layer system, so these are read by Pawl.PlayerEffect and never
     -- by Pawl.Projection. Empty for every other printing.
     playerAbilities :: [PlayerStaticAbility],
+    -- CR 604.1/604.2 / 509.1c: this card's printed BLOCKING REQUIREMENTS -- "all
+    -- creatures able to block enchanted creature do so" (Lure). The THIRD
+    -- printed-static-ability field, alongside staticAbilities and
+    -- playerAbilities; Pawl.Type.BlockRequirement argues why neither of those two
+    -- can hold one. Read by Pawl.BlockRequirement and never by Pawl.Projection,
+    -- since CR 613.11 applies these after the layer system rather than inside it.
+    -- Empty for every other printing.
+    blockRequirements :: [BlockRequirement],
     -- CR 103.5b: the effects of this card's "any time you could mulligan"
     -- action, in written order. Empty for every printing but Serum Powder.
     --

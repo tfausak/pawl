@@ -1,0 +1,72 @@
+{
+  "activatedAbilities": [],
+  "blockRequirements": [
+    {
+      "attacker": {
+        "type": "Attached"
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "enchant": {
+    "pool": {
+      "type": "Creatures"
+    }
+  },
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    }
+  ],
+  "name": "Lure",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Aura"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}
