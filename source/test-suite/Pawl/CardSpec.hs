@@ -331,6 +331,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.SelfCycled -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -1281,7 +1282,27 @@ cyclingCardTests :: Registry.Type.Registry -> Tasty.TestTree
 cyclingCardTests registry =
   Tasty.testGroup
     "Cycling"
-    [ HU.testCase "Barkhide Mauler is a {4}{G} 4/4 Beast whose only text is Cycling {2}" $ do
+    [ HU.testCase "Windcaller Aven is a {4}{U}{U} 4/3 with flying, Cycling {U} and a cycling trigger" $ do
+        p <- Registry.printing registry "Windcaller Aven"
+        let c = Printing.card p
+            blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+        HU.assertEqual "name" (Text.pack "Windcaller Aven") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 4, blue, blue]) (Card.Type.manaCost c)
+        -- Two keywords, one printed and one that mints an ability: rule 702.9's
+        -- flying is read where evasion is asked about, and rule 702.29a's cycling
+        -- is minted by Pawl.Keyword.
+        HU.assertEqual
+          "flying and Cycling {U}"
+          (Set.fromList [Keyword.Flying, Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [blue])) [])])
+          (Card.Type.keywords c)
+        case Card.Type.triggeredAbilities c of
+          [ability] ->
+            HU.assertEqual
+              "CR 702.29c: it triggers on being cycled"
+              TriggerCondition.SelfCycled
+              (TriggeredAbility.condition ability)
+          abilities -> HU.assertFailure ("expected one triggered ability, got " <> show (length abilities)),
+      HU.testCase "Barkhide Mauler is a {4}{G} 4/4 Beast whose only text is Cycling {2}" $ do
         p <- Registry.printing registry "Barkhide Mauler"
         let c = Printing.card p
             green = ManaSymbol.OfType (ManaType.Colored Color.Green)

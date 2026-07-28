@@ -29,4 +29,13 @@ data TriggerCondition
     -- (any creature); matched only via Pawl.Monarch.inherentMatch, never through a
     -- card's bearer. Rides P4's DamageDealt history.
     CreatureDealtCombatDamageToMonarch
+  | -- CR 702.29c: "'When you cycle this card' means 'When you discard this card
+    -- to pay an activation cost of a cycling ability.'" Self-scoped like
+    -- SelfEnters: the scan visits every candidate source, so the bearer being the
+    -- cycled card is part of the match.
+    --
+    -- The bearer is the card in the zone it landed in, because that same rule
+    -- continues "these abilities trigger from whatever zone the card winds up in
+    -- after it's cycled" -- the graveyard, for every printing today.
+    SelfCycled
   deriving (Eq, Ord, Show)

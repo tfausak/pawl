@@ -693,6 +693,11 @@ tests registry =
             roundTrip "cos" Codec.monarchTargetToJson Codec.jsonToMonarchTarget MonarchTarget.ControllerOfSource,
           HU.testCase "GameEvent.BecameMonarch" $
             roundTrip "bm" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.BecameMonarch S.alice),
+          -- CR 702.29c's event, carrying the incarnation the cycled card became.
+          HU.testCase "GameEvent.Cycled round-trips" $
+            roundTrip "cyc" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Cycled (ObjectId.MkObjectId 7)),
+          HU.testCase "TriggerCondition.SelfCycled round-trips" $
+            roundTrip "sc" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfCycled,
           HU.testCase "TurnScope round-trips" $
             mapM_ (roundTrip "scope" Codec.turnScopeToJson Codec.jsonToTurnScope) [TurnScope.EachTurn, TurnScope.ControllersTurn],
           HU.testCase "TriggerCondition.StepBegins round-trips" $

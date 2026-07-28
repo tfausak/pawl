@@ -1,6 +1,7 @@
 module Pawl.Type.GameEvent where
 
 import Pawl.Type.DamageEvent (DamageEvent)
+import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.Phase (Phase)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
@@ -50,4 +51,21 @@ data GameEvent
     -- keys off, and the substrate for any future "whenever a player becomes the
     -- monarch" trigger.
     BecameMonarch PlayerId
+  | -- CR 702.29c: a card was cycled -- "discard[ed] ... to pay an activation cost
+    -- of a cycling ability". Recorded by Pawl.Cost as that cost component is
+    -- paid, which is what makes the trigger fire off the COST rather than off the
+    -- ability resolving.
+    --
+    -- The ObjectId is the incarnation the card became, not the one that was in
+    -- the hand: CR 400.7 mints a new object as it moves, and CR 702.29c's
+    -- abilities "trigger from whatever zone the card winds up in after it's
+    -- cycled" -- so the graveyard object is the one bearing the ability that
+    -- triggers.
+    --
+    -- Distinct from the Moved event the same discard also records. CR 702.29d
+    -- ("abilities that trigger whenever a player cycles or discards a card ...
+    -- trigger only once when a card is cycled") is what says the two are one
+    -- event with two descriptions rather than two events; no card in the pool
+    -- triggers on discarding, so nothing yet has to reconcile them (#314).
+    Cycled ObjectId
   deriving (Eq, Ord, Show)

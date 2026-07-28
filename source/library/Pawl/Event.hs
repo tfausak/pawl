@@ -79,6 +79,9 @@ movedOf event = case event of
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  -- The Moved event emitted by the same discard is the zone change; this one
+  -- describes why it happened (CR 702.29c).
+  GameEvent.Cycled _ -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent
@@ -88,6 +91,7 @@ damageOf event = case event of
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Cycled _ -> Nothing
 
 -- The caster an event describes, if it is a cast (CR 601.2i).
 castOf :: GameEvent -> Maybe PlayerId
@@ -97,6 +101,7 @@ castOf event = case event of
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Cycled _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed.
 unscannedEvents :: GameState -> [GameEvent]
@@ -481,6 +486,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
+    GameEvent.Cycled _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins wanted scope -> case event of
     GameEvent.StepBegan began active ->
@@ -491,6 +497,7 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
+    GameEvent.Cycled _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
@@ -507,10 +514,21 @@ matchesTrigger bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
+    GameEvent.Cycled _ -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
   -- an inherent ability of no object, so its real match lives in
   -- Pawl.Monarch.inherentMatch, not here.
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+  -- CR 702.29c: the bearer IS the card that was cycled. The event carries the
+  -- incarnation the card became (CR 400.7), which is the object the scan offers
+  -- as the bearer -- see cycledCard in eventTriggers below.
+  TriggerCondition.SelfCycled -> case event of
+    GameEvent.Cycled oid -> oid == bearer
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
 -- the environment in which the ability's "that player" / "that creature" is
@@ -663,15 +681,47 @@ eventTriggers events gs =
         GameEvent.StepBegan _ _ -> Map.empty
         GameEvent.SpellCast _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
+        GameEvent.Cycled _ -> Map.empty
+      -- CR 702.29c: the card that was just cycled, wherever it landed. The third
+      -- candidate source, and the first that is neither on the battlefield nor a
+      -- permanent that just left it -- which is exactly what that rule asks for:
+      -- "these abilities trigger from whatever zone the card winds up in after
+      -- it's cycled", the graveyard for every printing today.
+      --
+      -- Its abilities come from the PRINTED card, not from a projection, for the
+      -- reason Keyword.handAbilitiesOf gives about a hand: CR 613's layer system
+      -- reaches the battlefield, so there is nothing in a graveyard to project.
+      -- Rule 702's own minted triggered abilities are not consulted either --
+      -- rule 702.70a's poisonous is a permanent's ability, and no keyword mints
+      -- one that functions from a graveyard.
+      --
+      -- The controller is the OWNER, which is CR 113.8's second clause for a
+      -- triggered ability -- "or, if it had no controller, the player who owned
+      -- the ability's source when it triggered". A card in a graveyard has no
+      -- controller (CR 108.4), the same reason Activate.activatorOf reaches for
+      -- the owner of a card in a hand.
+      cycledCard event = case event of
+        GameEvent.Cycled oid -> case Game.lookupObject oid gs of
+          Nothing -> Map.empty
+          Just obj -> case Game.cardOf oid gs of
+            Nothing -> Map.empty
+            Just card -> Map.singleton oid (Object.owner obj, Card.triggeredAbilities card)
+        GameEvent.Moved _ _ -> Map.empty
+        GameEvent.DamageDealt _ -> Map.empty
+        GameEvent.StepBegan _ _ -> Map.empty
+        GameEvent.SpellCast _ -> Map.empty
+        GameEvent.BecameMonarch _ -> Map.empty
       forOne event (oid, (ctrl, abilities)) =
         let fires ab = matchesTrigger oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
          in fmap pend (filter fires abilities)
-      -- Map.union is left-biased, so a live battlefield reading always wins over
-      -- a last-known one. Belt and braces: the two sets are disjoint by
-      -- construction (see goneEntrant), and this is what makes that a property of
-      -- the code rather than of the argument above it.
-      candidates event = Map.toAscList (Map.union onBattlefield (goneEntrant event))
+      -- Map.unions is left-biased, so a live battlefield reading always wins over
+      -- a last-known one, and over a cycled card. Belt and braces: the three sets
+      -- are disjoint by construction -- goneEntrant files only an id that no
+      -- longer exists, and cycledCard only one the funnel just minted in a
+      -- graveyard -- and this is what makes that a property of the code rather
+      -- than of the argument above it.
+      candidates event = Map.toAscList (Map.unions [onBattlefield, goneEntrant event, cycledCard event])
    in concatMap (\event -> concatMap (forOne event) (candidates event)) events
 
 -- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
@@ -742,6 +792,7 @@ stateTriggers gs =
                 TriggerCondition.StepBegins _ _ -> False
                 TriggerCondition.SelfDealsCombatDamageToPlayer -> False
                 TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+                TriggerCondition.SelfCycled -> False
               pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
            in fmap pend (filter live (Projection.triggeredAbilitiesOf oid gs))
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))

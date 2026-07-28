@@ -944,6 +944,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (conditionToJson c2))
   TriggerCondition.SelfDealsCombatDamageToPlayer -> nullary (Text.pack "SelfDealsCombatDamageToPlayer")
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
+  TriggerCondition.SelfCycled -> nullary (Text.pack "SelfCycled")
 
 jsonToTriggerCondition :: Value -> Either Text TriggerCondition.TriggerCondition
 jsonToTriggerCondition value = do
@@ -954,6 +955,7 @@ jsonToTriggerCondition value = do
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToCondition v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
+    ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
 
 castingPermissionToJson :: CastingPermission.CastingPermission -> Value
@@ -1330,6 +1332,7 @@ gameEventToJson e = case e of
   GameEvent.StepBegan p pid -> Json.tagged (Text.pack "StepBegan") (Just (Array [phaseToJson p, playerIdToJson pid]))
   GameEvent.SpellCast pid -> Json.tagged (Text.pack "SpellCast") (Just (playerIdToJson pid))
   GameEvent.BecameMonarch pid -> Json.tagged (Text.pack "BecameMonarch") (Just (playerIdToJson pid))
+  GameEvent.Cycled oid -> Json.tagged (Text.pack "Cycled") (Just (objectIdToJson oid))
 
 jsonToGameEvent :: Value -> Either Text GameEvent.GameEvent
 jsonToGameEvent value = do
@@ -1340,6 +1343,7 @@ jsonToGameEvent value = do
     ("StepBegan", Just (Array [p, pid])) -> GameEvent.StepBegan <$> jsonToPhase p <*> jsonToPlayerId pid
     ("SpellCast", Just v) -> GameEvent.SpellCast <$> jsonToPlayerId v
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> jsonToPlayerId v
+    ("Cycled", Just v) -> GameEvent.Cycled <$> jsonToObjectId v
     _ -> Left (Text.pack "unknown GameEvent: " <> t)
 
 -- MonarchTarget ----------------------------------------------------------------
