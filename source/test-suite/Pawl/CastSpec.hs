@@ -785,11 +785,92 @@ fireboltTests registry =
         HU.assertBool "and not offered" (notElem (A.Cast inGraveyard) (Action.legalActions S.alice gs))
     ]
 
+-- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
+-- that player controls a legendary creature or a legendary planeswalker." The
+-- OTHER half of what the legendary supertype means -- CR 205.4d's legend rule
+-- (CR 704.5j) is Pawl.Sba's, and this one is Pawl.Cast's.
+--
+-- The proving card is a LABELED SYNTHETIC: "Synthetic Legendary Sorcery", a {0}
+-- legendary sorcery whose one effect is "you lose 3 life". No real legendary
+-- instant or sorcery is expressible today (#328).
+--
+-- The three permanents in play across these cases are what make the assertions
+-- discriminating. Thalia, Guardian of Thraben is the pool's only legendary
+-- CREATURE. Mindslaver is a legendary ARTIFACT -- the case that fails if the
+-- check reads the supertype and forgets the card type. And Thalia under bob's
+-- control is the case that fails if the check forgets "that player controls".
+legendarySpellTests :: Registry.Type.Registry -> Tasty.TestTree
+legendarySpellTests registry =
+  Tasty.testGroup
+    "LegendarySpell"
+    [ -- The control for every negative below: same board, same one Mountain,
+      -- plus a legendary creature. Thalia taxes the sorcery {1} (her own
+      -- "noncreature spells cost {1} more"), which the Mountain pays -- so the
+      -- other cases, where nothing taxes it at all, are affordable a fortiori
+      -- and only CR 205.4e can be stopping them.
+      HU.testCase "CR 205.4e castable while its caster controls a legendary creature" $ do
+        mountain <- Registry.printing registry "Mountain"
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+        let (oid, gs) = inHandWith mountain sorcery 1
+            board = snd (S.addCreature thalia S.alice gs)
+        HU.assertBool "castable" (Cast.castable S.alice oid board)
+        HU.assertBool "and offered as a legal action" (elem (A.Cast oid) (Action.legalActions S.alice board)),
+      HU.testCase "CR 205.4e not castable with no legendary permanent at all" $ do
+        mountain <- Registry.printing registry "Mountain"
+        sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+        let (oid, gs) = inHandWith mountain sorcery 1
+        HU.assertBool "not castable" (not (Cast.castable S.alice oid gs))
+        HU.assertBool "and not offered" (notElem (A.Cast oid) (Action.legalActions S.alice gs)),
+      -- The supertype alone is not the condition: rule 205.4e names a legendary
+      -- CREATURE (or planeswalker), and Mindslaver is a legendary artifact.
+      HU.testCase "CR 205.4e a legendary artifact does not satisfy it" $ do
+        mountain <- Registry.printing registry "Mountain"
+        mindslaver <- Registry.printing registry "Mindslaver"
+        sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+        let (oid, gs) = inHandWith mountain sorcery 1
+            board = snd (S.addCreature mindslaver S.alice gs)
+        HU.assertBool "not castable" (not (Cast.castable S.alice oid board))
+        HU.assertBool "and not offered" (notElem (A.Cast oid) (Action.legalActions S.alice board)),
+      -- "unless THAT PLAYER controls": an opponent's legendary creature is no
+      -- help. Bob's Thalia still taxes alice (her ability is EachPlayer-scoped),
+      -- so a second Mountain keeps the spell affordable and CR 205.4e the only
+      -- thing left to fail.
+      HU.testCase "CR 205.4e an opponent's legendary creature does not satisfy it" $ do
+        mountain <- Registry.printing registry "Mountain"
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+        let (oid, gs) = inHandWith mountain sorcery 2
+            board = snd (S.addCreature thalia S.bob gs)
+        HU.assertBool "not castable" (not (Cast.castable S.alice oid board)),
+      -- The scope of the restriction, from the other side: rule 205.4e is about
+      -- a legendary INSTANT OR SORCERY, so a legendary creature spell is cast
+      -- from an empty board exactly as before. A check that read only the
+      -- supertype would make Thalia uncastable until a Thalia was already out.
+      HU.testCase "CR 205.4e does not touch a legendary creature spell" $ do
+        plains <- Registry.printing registry "Plains"
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        let (oid, gs) = inHandWith plains thalia 2
+        HU.assertBool "castable" (Cast.castable S.alice oid gs)
+        HU.assertBool "and offered as a legal action" (elem (A.Cast oid) (Action.legalActions S.alice gs)),
+      -- Gameplay level, through the stack: the permitted cast resolves and its
+      -- effect lands, so the gate is a gate and not a silent no-op.
+      HU.testCase "CR 205.4e the permitted cast resolves" $ do
+        mountain <- Registry.printing registry "Mountain"
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        sorcery <- Registry.printing registry "Synthetic Legendary Sorcery"
+        let (oid, gs) = inHandWith mountain sorcery 1
+            board = snd (S.addCreature thalia S.alice gs)
+            cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice oid)
+            resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+        HU.assertEqual "alice lost 3 life" (Just 17) (S.lifeOf S.alice resolved)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Cast"
-    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry, auraTargetTests registry, fireboltTests registry]
+    [castTests registry, castEngineTests registry, stackTests registry, discardTests registry, sicknessTests registry, magicalHackTests registry, blazeTests registry, modalCastTests registry, auraTargetTests registry, fireboltTests registry, legendarySpellTests registry]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

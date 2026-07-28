@@ -1,0 +1,53 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [],
+  "name": "Synthetic Legendary Sorcery",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "LoseLife",
+            "value": [
+              {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              },
+              {
+                "type": "Literal",
+                "value": 3
+              }
+            ]
+          }
+        ],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [
+      {
+        "type": "Legendary"
+      }
+    ],
+    "types": [
+      {
+        "type": "Sorcery"
+      }
+    ]
+  }
+}
