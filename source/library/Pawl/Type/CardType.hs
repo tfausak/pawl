@@ -1,6 +1,8 @@
 module Pawl.Type.CardType where
 
--- Grows: Sorcery, Artifact, Planeswalker, Battle, …
+-- CR 205.2a lists fifteen card types. The nine missing ones are Planeswalker
+-- (#301), Battle (#302), Kindred (#303), and the six command-zone residents in
+-- #131 -- Dungeon, Plane, Phenomenon, Vanguard, Scheme and Conspiracy.
 data CardType
   = Land
   | Creature
