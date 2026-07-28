@@ -67,6 +67,7 @@ import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Scope as Scope
+import qualified Pawl.Type.SearchDestination as SearchDestination
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
@@ -1381,8 +1382,40 @@ worldCardTests registry =
           (Card.Type.staticAbilities c)
     ]
 
+-- CR 701.20: the cards that say "reveal" in their own text, as opposed to
+-- inheriting it from a keyword the way Ash Barrens' typecycling does.
+revealCardTests :: Registry.Type.Registry -> Tasty.TestTree
+revealCardTests registry =
+  Tasty.testGroup
+    "Reveal"
+    [ HU.testCase "Braidwood Sextant is a {1} Artifact whose {2}, {T}, Sacrifice fetches a revealed basic land" $ do
+        p <- Registry.printing registry "Braidwood Sextant"
+        let c = Printing.card p
+            basicLand = Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic]
+        HU.assertEqual "name" (Text.pack "Braidwood Sextant") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 1]) (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Artifact) (TypeLine.types (Card.Type.typeLine c))
+        case Card.Type.activatedAbilities c of
+          [ability] -> do
+            HU.assertEqual
+              "\"{2}, {T}, Sacrifice this artifact\""
+              (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [CostComponent.TapThis, CostComponent.SacrificeThis])
+              (ActivatedAbility.cost ability)
+            -- The whole point of the card, in the destination: "reveal that
+            -- card, put it into your hand" is ONE instruction (CR 701.23e), and
+            -- the same filter Evolving Wilds and Ash Barrens carry.
+            case Foldable.toList (Modal.modes (ActivatedAbility.modal ability)) of
+              [m] ->
+                HU.assertEqual
+                  "\"Search your library for a basic land card, reveal that card, put it into your hand\""
+                  [Effect.Search basicLand SearchDestination.RevealThenHand]
+                  (Foldable.toList (Mode.effects m))
+              modes -> HU.assertFailure ("expected one mode, got " <> show (length modes))
+          abilities -> HU.assertFailure ("expected one activated ability, got " <> show (length abilities))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry]

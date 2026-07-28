@@ -718,10 +718,16 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                 Just oid | List.elem oid matches -> Just oid
                 _ -> Nothing
           -- Where the card goes is the CARD's instruction, not rule 701.23's --
-          -- that rule says only how to look. Evolving Wilds puts it onto the
-          -- battlefield tapped; CR 702.29e's typecycling puts it into the hand,
-          -- where the reveal that rule also asks for is not performed (#320).
-          mapM_ (putFound destination) found
+          -- that rule says only how to look, and CR 701.23e says the same of the
+          -- reveal ("if the effect that contains the search instruction doesn't
+          -- also contain instructions to reveal the found card(s), then they're
+          -- not revealed"). Evolving Wilds puts it onto the battlefield tapped;
+          -- CR 702.29e's typecycling reveals it and puts it into the hand.
+          --
+          -- The searcher is the revealer: CR 701.20a's "show that card to all
+          -- players" is done by the player following the instruction, which for
+          -- a search of "your library" is its controller.
+          mapM_ (putFound controller destination) found
           -- CR 701.23: shuffle the (possibly reduced) library afterward.
           lib <- State.gets (Game.zoneMembers Zone.Library controller)
           shuffleAnswer <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
@@ -1463,18 +1469,34 @@ bindLoserSlot holder slot loser gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer loser) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
--- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
--- shape). changeZone mints a new object; tap it by id after the move.
--- CR 701.23: move a found card to where the search said, through the CR 400.7
--- funnel either way -- so a replacement watching the destination composes, and
--- the card that lands is a new object.
-putFound :: SearchDestination.SearchDestination -> ObjectId -> Game ()
-putFound destination cardId = case destination of
+-- CR 701.23: do to a found card what the search said -- a move for every
+-- destination and, for one of them, a CR 701.20a reveal first. The move goes
+-- through the CR 400.7 funnel either way, so a replacement watching the
+-- destination composes and the card that lands is a new object.
+putFound :: PlayerId -> SearchDestination.SearchDestination -> ObjectId -> Game ()
+putFound searcher destination cardId = case destination of
   SearchDestination.BattlefieldTapped -> putTapped cardId
   -- No tapped-ness to set afterwards and so no need for the found id: a card in
-  -- a hand has no tap state to speak of (CR 110.5a is about permanents).
-  SearchDestination.Hand -> Event.changeZone cardId Zone.Hand
+  -- a hand has no tap state to speak of (CR 110.5 gives a status only to a
+  -- permanent).
+  --
+  -- The reveal comes FIRST, in the card's own order ("reveal that card, put it
+  -- into your hand"), and CR 701.20b is what makes that an order rather than
+  -- decoration: revealing does not move the card, so it happens while the card
+  -- is still in the library.
+  --
+  -- Not a stylistic preference -- these two lines do not commute, in two
+  -- different ways. Swapped as written, the reveal shows NOTHING: CR 400.7 has
+  -- already ceased `cardId`, so Event.reveal finds no object and no-ops.
+  -- Revealing the incarnation the move mints instead would record something,
+  -- with the same characteristics today, and would still be the wrong act --
+  -- what was shown was the card in the library, not the card in the hand.
+  SearchDestination.RevealThenHand -> do
+    Event.reveal searcher cardId
+    Event.changeZone cardId Zone.Hand
 
+-- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
+-- shape). changeZone mints a new object; tap it by id after the move.
 putTapped :: ObjectId -> Game ()
 putTapped cardId = do
   before <- State.get

@@ -13,8 +13,16 @@ data SearchDestination
   = -- Evolving Wilds: "Search your library for a basic land card, put it onto
     -- the battlefield tapped, then shuffle."
     BattlefieldTapped
-  | -- CR 702.29e's typecycling: "Search your library for a [type] card, reveal
-    -- it, and put it into your hand. Then shuffle your library." The reveal is
-    -- not performed (#320).
-    Hand
+  | -- Braidwood Sextant: "Search your library for a basic land card, reveal that
+    -- card, put it into your hand, then shuffle." CR 702.29e's typecycling says
+    -- the same sentence in the rulebook's words ("reveal it, and put it into
+    -- your hand").
+    --
+    -- The reveal is named in the constructor because it is named in the card,
+    -- and CR 701.23e is why that has to be so: "If the effect that contains the
+    -- search instruction doesn't also contain instructions to reveal the found
+    -- card(s), then they're not revealed." A search-to-hand that stays private
+    -- (Demonic Tutor) is a DIFFERENT sentence and gets a different arm when a
+    -- card in the pool prints it -- it is not this one with a flag.
+    RevealThenHand
   deriving (Eq, Ord, Show)

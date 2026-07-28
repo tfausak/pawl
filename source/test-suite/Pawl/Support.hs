@@ -1087,6 +1087,13 @@ damageEventsOf gs = Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.ev
 zoneChangesOf :: GameState.GameState -> [ZoneChange.ZoneChange]
 zoneChangesOf gs = Maybe.mapMaybe Event.movedOf (Foldable.toList (GameState.events gs))
 
+-- Who revealed what, so far this turn, in order (CR 701.20a). Projects the
+-- snapshot down to the card's NAME: a reveal shows every characteristic, but the
+-- name is what identifies the card to the table and the only part an assertion
+-- can write down legibly. A test that needs more reads Event.revealOf directly.
+revealsOf :: GameState.GameState -> [(PlayerId.PlayerId, Text.Text)]
+revealsOf gs = fmap (fmap PC.name) (Maybe.mapMaybe Event.revealOf (Foldable.toList (GameState.events gs)))
+
 -- The characteristics of nothing: Projection.project on an id with no card in
 -- Setup.emptyGame. The filler snapshot for a hand-built GameEvent.Moved whose
 -- payload no assertion reads.

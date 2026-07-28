@@ -69,4 +69,33 @@ data GameEvent
     -- triggers on discarding, so nothing yet has to reconcile them; Bartered Cow
     -- is the card that will, and #319 is where that reconciliation is owed.
     Cycled ObjectId
+  | -- CR 701.20a: a player revealed a card -- "show that card to all players for
+    -- a brief time."
+    --
+    -- A reveal is the one game action whose entire content is INFORMATION, so
+    -- the log is where it has to live: CR 701.20b says revealing does not move
+    -- the card, and nothing about the object changes, so an engine that did not
+    -- record the reveal would be bit-for-bit identical to one that never
+    -- performed it. What the reveal changes is what the players know, and this
+    -- log is the public record of what happened (CR 608.2i).
+    --
+    -- Carries the CARD's characteristics rather than an ObjectId, because what a
+    -- reveal discloses is a card and not an identity -- and because the id is
+    -- routinely dead by the time anything reads the event. Every reveal in the
+    -- pool today is a search's "reveal it, and put it into your hand", where CR
+    -- 400.7 mints a new object for the card one step later, so the id recorded
+    -- here would name an object that has already ceased -- which is the problem
+    -- GameEvent.Moved's snapshot field exists to solve. An id joins this payload
+    -- when a card needs to refer back to "that card" it revealed.
+    --
+    -- Strict (!) for GameEvent.Moved's reason: the snapshot is taken as of THIS
+    -- reveal, and an unforced field would retain the whole GameState it was
+    -- projected from for as long as the turn's log lives.
+    --
+    -- This is the MOMENTARY reveal only. CR 701.20a's lasting cases -- a card
+    -- revealed to pay a cost, which "remains revealed ... until the time it
+    -- leaves the stack", and a card that stays revealed while a triggered
+    -- ability it caused is on the stack -- need a per-object flag that no card
+    -- in the pool asks for (#185, #282).
+    Revealed PlayerId !ProjectedCharacteristics
   deriving (Eq, Ord, Show)
