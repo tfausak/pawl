@@ -6,7 +6,9 @@
 -- outside the CR 613 layer system entirely.
 --
 -- The six gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
--- Medallion, Edgewalker, Reliquary Tower and Silence.
+-- Medallion, Edgewalker, Reliquary Tower and Silence. Humility and Opalescence
+-- join them for CR 604.2's "and has the ability" -- the one place this axis does
+-- meet the CR 613 layer system.
 module Pawl.PlayerEffectSpec where
 
 import qualified Data.List as List
@@ -551,6 +553,96 @@ medallionTests registry =
         HU.assertBool "so one Island is enough" (Cast.castable S.alice unsummon gs)
     ]
 
+-- Humility {2}{W}{W} Enchantment: "All creatures lose all abilities and have
+-- base power and toughness 1/1." CR 604.2: a static ability's continuous effect
+-- is active only "as long as the permanent with the ability remains on the
+-- battlefield AND HAS THE ABILITY", so a CR 613.1f layer-6 removal takes the
+-- player-affecting half of a card's text with it -- the axis Pawl.Projection
+-- already gates for the projected characteristics (abilitiesRemoved).
+--
+-- CR 613.6's rescue ("if an effect starts to apply in one layer ... it will
+-- continue to be applied ... even if the ability generating the effect is
+-- removed") cannot reach a player ability: CR 613.10/613.11 apply these effects
+-- AFTER the seven layers have run, so one never starts to apply before layer 6
+-- and the cut is unconditional. Same shape as the layer-7-only static ability
+-- gatherStatic drops.
+humilityTests :: Registry.Type.Registry -> Tasty.TestTree
+humilityTests registry =
+  Tasty.testGroup
+    "Humility"
+    [ -- THE PROVING CASE. Thalia is a creature, so Humility reaches her with no
+      -- animator in the way, and her tax is the only thing standing between the
+      -- Bolt and its printed cost.
+      HU.testCase "CR 604.2 Humility takes Thalia's ability, so her tax stops applying" $ do
+        mountain <- Registry.printing registry "Mountain"
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        piker <- Registry.printing registry "Goblin Piker"
+        humility <- Registry.printing registry "Humility"
+        let (bolt, _, taxed) = thaliaBoard mountain thalia lightningBolt piker 3
+            humbled = S.withHumility humility taxed
+        HU.assertEqual
+          "control: with Thalia's ability intact, {R} is {1}{R}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+          (totalManaCost S.alice bolt (ManaCost.MkManaCost [red]) taxed)
+        HU.assertEqual
+          "under Humility the printed {R} is the whole cost"
+          (Just (ManaCost.MkManaCost [red]))
+          (totalManaCost S.alice bolt (ManaCost.MkManaCost [red]) humbled),
+      -- The same statement at the two gameplay sites the Thalia group tests,
+      -- with ONE Mountain -- the amount that tells the taxed and untaxed costs
+      -- apart.
+      HU.testCase "CR 601.2f castability and payment both drop the stripped tax" $ do
+        mountain <- Registry.printing registry "Mountain"
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        piker <- Registry.printing registry "Goblin Piker"
+        humility <- Registry.printing registry "Humility"
+        let (bolt, _, oneLand) = thaliaBoard mountain thalia lightningBolt piker 1
+            humbled = S.withHumility humility oneLand
+            paid = S.runPure S.identityAnswer humbled (Cast.castSpell S.alice bolt)
+        HU.assertBool "control: one Mountain cannot pay the taxed Bolt" (not (Cast.castable S.alice bolt oneLand))
+        HU.assertBool "under Humility one Mountain is enough" (Cast.castable S.alice bolt humbled)
+        HU.assertEqual "and paying it taps exactly that one" 1 (S.tappedCount S.alice paid),
+      -- THE DISCRIMINATOR against "Humility silences every player ability".
+      -- Humility's affected set is "each creature", and Sapphire Medallion is an
+      -- artifact -- nothing animates it here, so its discount is untouched.
+      HU.testCase "CR 613.1f Humility reaches only creatures, so an artifact's ability stands" $ do
+        island <- Registry.printing registry "Island"
+        sapphireMedallion <- Registry.printing registry "Sapphire Medallion"
+        unsummonPrinting <- Registry.printing registry "Unsummon"
+        divinationPrinting <- Registry.printing registry "Divination"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        humility <- Registry.printing registry "Humility"
+        let (_, divination, _, gs) = medallionBoard island sapphireMedallion unsummonPrinting divinationPrinting lightningBolt 2
+            humbled = S.withHumility humility gs
+        HU.assertEqual
+          "the Medallion still discounts {2}{U} to {1}{U}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue]))
+          (totalManaCost S.alice divination (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]) humbled),
+      -- The animated case: Rule of Law is an enchantment, so Humility alone
+      -- leaves it alone. Opalescence's CR 613.1d layer-4 AddCardType is what
+      -- brings it inside "each creature" -- and abilitiesRemoved judges the
+      -- affected set against the layers 1-5 partial, which is where that
+      -- animation already is. Opalescence itself is spared by its own "each
+      -- other enchantment", so it keeps animating.
+      HU.testCase "CR 613.1d Opalescence animates Rule of Law into Humility's set" $ do
+        ruleOfLaw <- Registry.printing registry "Rule of Law"
+        humility <- Registry.printing registry "Humility"
+        opalescence <- Registry.printing registry "Opalescence"
+        let base = Setup.emptyGame S.bothPlayers
+            (_, withRuleOfLaw) = S.addCreature ruleOfLaw S.alice base
+            withHumility = S.withHumility humility withRuleOfLaw
+            (_, withOpalescence) = S.addCreature opalescence S.alice withHumility
+            castOne = S.withEvents [GameEvent.SpellCast S.alice]
+        HU.assertBool
+          "control: Humility alone does not reach an enchantment"
+          (PlayerEffect.prohibitsCasting S.alice (castOne withHumility))
+        HU.assertBool
+          "once animated, Rule of Law loses the ability and the limit lifts"
+          (not (PlayerEffect.prohibitsCasting S.alice (castOne withOpalescence)))
+    ]
+
 -- alice controls `copies` Edgewalkers and `n` untapped Plains; her hand holds
 -- one more Edgewalker ({1}{W}{B} Human Cleric) and one Goblin Piker ({1}{R}
 -- Goblin Warrior -- no Cleric anywhere on it). Loaded fresh inside each case
@@ -1034,4 +1126,4 @@ matchesSpellTests registry =
         ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests registry, adjustmentTests, thaliaTests registry, medallionTests registry, edgewalkerTests registry, reliquaryTowerTests registry, storedTests registry, silenceTests registry, matchesSpellTests registry]
+tests registry = Tasty.testGroup "Pawl.PlayerEffectSpec" [ruleOfLawTests registry, adjustmentTests, thaliaTests registry, medallionTests registry, humilityTests registry, edgewalkerTests registry, reliquaryTowerTests registry, storedTests registry, silenceTests registry, matchesSpellTests registry]
