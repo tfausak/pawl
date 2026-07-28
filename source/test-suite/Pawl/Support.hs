@@ -221,6 +221,7 @@ identityAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
@@ -268,6 +269,7 @@ castAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
@@ -308,6 +310,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
@@ -367,6 +370,7 @@ playLandAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
@@ -487,6 +491,14 @@ randomAnswer p = case p of
   Prompt.ChooseEntryOption {} -> pure 0
   Prompt.OrderTriggers _ _ sources -> pure (zipWith const [0 ..] sources)
   Prompt.ChooseReplacement {} -> pure 0
+  -- CR 603.7c: a random minted token, so a random game does not always bind the
+  -- first one a doubled Create produced.
+  Prompt.ChooseBoundToken _ _ _ candidates -> do
+    g <- State.get
+    let tokens = NonEmpty.toList candidates
+        (i, g') = Random.uniformR (0, length tokens - 1) g
+    State.put g'
+    pure (pickFrom candidates i)
   Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (List.genericTake count candidates))
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
   Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep

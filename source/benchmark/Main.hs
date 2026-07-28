@@ -87,6 +87,7 @@ alwaysPass p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
@@ -124,6 +125,7 @@ castAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
@@ -162,6 +164,7 @@ fightAnswer p = case p of
   Prompt.ChooseEntryOption {} -> 0
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
+  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep

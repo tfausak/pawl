@@ -239,6 +239,29 @@ combatReplayTests =
             -- than getting its own ObjectId-shaped constructor.
             let p = Prompt.ChooseLegend decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
              in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))),
+          -- CR 603.7c: which of several minted tokens "it" names is a decision, so
+          -- it has to survive a transcript like any other.
+          HU.testCase "ChooseBoundToken round-trips through the transcript" $
+            let a = ObjectId.MkObjectId 7
+                b = ObjectId.MkObjectId 9
+                p = Prompt.ChooseBoundToken decider S.alice oid (a NonEmpty.:| [b])
+             in do
+                  HU.assertEqual "binding the second round trips" (Just b) (Replay.decode p (Replay.encode p b))
+                  -- Discriminating: a decode that ignored the response and returned
+                  -- the head would pass one leg by accident.
+                  HU.assertEqual "binding the first round trips" (Just a) (Replay.decode p (Replay.encode p a)),
+          HU.testCase "a bound-token choice does not decode as a legend choice" $
+            -- Discriminating: fails if ChooseBoundToken reuses ChoseLegend rather
+            -- than getting its own ObjectId-shaped constructor.
+            let p = Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseLegend (ObjectId.MkObjectId 7))),
+          HU.testCase "a short transcript binds the first token minted" $
+            -- CR 603.7c: every minted token is a legal referent, so the head is
+            -- legal -- and it is what the engine bound before the choice existed.
+            HU.assertEqual
+              "the head"
+              (ObjectId.MkObjectId 7)
+              (Replay.defaultAnswer (Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9]))),
           HU.testCase "a short transcript produces the first offered mana type" $
             HU.assertEqual
               "the head"
