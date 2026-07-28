@@ -45,6 +45,7 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.OptionalDecision as OptionalDecision
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
@@ -442,6 +443,8 @@ discardLastAnswer p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a printed "may" is the least-eventful answer.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 lastN :: Natural -> [a] -> [a]
 lastN n xs = reverse (List.genericTake n (reverse xs))
@@ -910,6 +913,8 @@ castFirstOption p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a printed "may" is the least-eventful answer.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
@@ -959,3 +964,5 @@ castPanglacial p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a printed "may" is the least-eventful answer.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines

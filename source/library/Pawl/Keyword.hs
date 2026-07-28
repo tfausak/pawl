@@ -26,6 +26,7 @@ import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
+import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
@@ -177,7 +178,7 @@ cycling cost searchFor =
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis]},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.timing = ActivationTiming.AnyTime
     }
@@ -312,7 +313,7 @@ poisonous n =
     { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }

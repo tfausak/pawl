@@ -29,6 +29,7 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.MulliganOffer as MulliganOffer
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.OptionalDecision as OptionalDecision
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
@@ -102,6 +103,26 @@ combatReplayTests =
             let p = Prompt.OpeningHandAction decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
                 answer = Just (ObjectId.MkObjectId 7)
              in HU.assertEqual "round trip" (Just answer) (Replay.decode p (Replay.encode p answer)),
+          -- CR 603.5: both answers to a printed "may", so the transcript is
+          -- proved to distinguish them -- a codec that collapsed them would
+          -- replay a declined Renewed Faith as a taken one.
+          HU.testCase "ChooseOptional records and replays both answers" $
+            let p = Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)
+             in do
+                  HU.assertEqual "exercised" (Just OptionalDecision.Exercises) (Replay.decode p (Replay.encode p OptionalDecision.Exercises))
+                  HU.assertEqual "declined" (Just OptionalDecision.Declines) (Replay.decode p (Replay.encode p OptionalDecision.Declines)),
+          -- CR 603.5: a transcript that runs short must not silently take an
+          -- option its author never chose.
+          HU.testCase "defaultAnswer declines a may" $
+            HU.assertEqual
+              "declines"
+              OptionalDecision.Declines
+              (Replay.defaultAnswer (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0))),
+          HU.testCase "a mismatched response does not decode as a may" $
+            HU.assertEqual
+              "mismatch"
+              Nothing
+              (Replay.decode (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)) (Response.Conceded Concession.Continues)),
           HU.testCase "defaultAnswer attacks with nothing" $
             HU.assertEqual "no attacks" [] (Replay.defaultAnswer attackPrompt),
           HU.testCase "defaultAnswer blocks with nothing" $

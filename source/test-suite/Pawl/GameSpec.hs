@@ -57,6 +57,8 @@ import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.MulliganOffer as MulliganOffer
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.OptionalDecision as OptionalDecision
+import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
@@ -360,6 +362,8 @@ recordingAnswer p = case p of
   Prompt.Bottom _ _ hand count -> pure (List.genericTake count hand)
   Prompt.MulliganAction {} -> pure Nothing
   Prompt.OpeningHandAction {} -> pure Nothing
+  -- CR 603.5: declining a printed "may" is the least-eventful answer.
+  Prompt.ChooseOptional {} -> pure OptionalDecision.Declines
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
@@ -1428,6 +1432,8 @@ slaveAnswer p = case p of
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
   Prompt.MulliganAction {} -> Nothing
   Prompt.OpeningHandAction {} -> Nothing
+  -- CR 603.5: declining a printed "may" is the least-eventful answer.
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
 
 -- CR 723.5 combat: alice, controlling bob, declares bob's attackers. Attackers
 -- are declared only when the prompt's Decider is alice for player bob; a naive
@@ -1645,7 +1651,7 @@ restartOnStack mountain =
               Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
             ActivatedAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty))
+                (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory))
                 (ModeSelection.ChooseExactly 1),
             ActivatedAbility.timing = ActivationTiming.AnyTime
           }

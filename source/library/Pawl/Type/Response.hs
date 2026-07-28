@@ -10,6 +10,7 @@ import Pawl.Type.ManaType (ManaType)
 import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.MulliganDecision (MulliganDecision)
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.OptionalDecision (OptionalDecision)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.SlotName (SlotName)
@@ -112,4 +113,11 @@ data Response
     -- records: decode must return Nothing for a response that does not match the
     -- prompt being asked, and two prompts sharing a constructor cannot do that.
     TookOpeningHandAction (Maybe ObjectId)
+  | -- CR 603.5: whether the controller of a resolving spell or ability exercised
+    -- a printed "may", serialized so a DecisionLog replays an optional effect
+    -- deterministically. Its own constructor rather than a reuse of Conceded or
+    -- DeclaredMulligan, for the reason ChoseDefender records: decode must return
+    -- Nothing for a response that does not match the prompt being asked, and two
+    -- prompts sharing a constructor cannot do that.
+    ChoseOptional OptionalDecision
   deriving (Eq, Show)

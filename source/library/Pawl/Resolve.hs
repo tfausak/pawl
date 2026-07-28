@@ -44,11 +44,15 @@ import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.HandActionPerformer as HandActionPerformer
 import Pawl.Type.ManaProduction (ManaProduction)
+import qualified Pawl.Type.Mode as Mode
+import Pawl.Type.ModeIndex (ModeIndex)
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.MonarchWatch as MonarchWatch
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.OptionalDecision as OptionalDecision
+import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.PlayerRef (PlayerRef)
@@ -68,7 +72,6 @@ import qualified Pawl.Type.Source as Source
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
-import Pawl.Type.TargetSpec (TargetSpec)
 import qualified Pawl.Type.Zone as Zone
 
 -- The slots a PlayerRef reads. Only InSlot names one; EachPlayer and Relative
@@ -345,19 +348,26 @@ rewriteEffect pairs effect = case effect of
   -- No rewritable land-type word.
   Effect.PlaySubgame _ -> effect
 
--- A resolving spell's PROJECTED effects: ONLY its chosen modes' effects (CR
--- 608.2c/700.2 -- an unchosen mode's effects never resolve), with every
--- text-change affecting it applied (CR 612). This is read-point 3 of the
--- rewritable AST -- the resolver honors a spell hacked on the stack. A
--- non-modal card has one mode, always chosen, so this is unchanged for it.
-effectsOf :: ObjectId -> GameState -> [Effect Card.Type.Card]
-effectsOf oid gs = case Game.lookupObject oid gs of
+-- A resolving spell's PROJECTED modes: ONLY its chosen ones (CR 608.2c/700.2 --
+-- an unchosen mode's effects never resolve), with every text-change affecting it
+-- applied (CR 612) to each effect. This is read-point 3 of the rewritable AST --
+-- the resolver honors a spell hacked on the stack. A non-modal card has one
+-- mode, always chosen, so this is unchanged for it.
+--
+-- Modes rather than a flat effect list because CR 603.5's "may" is a property of
+-- the mode, and resolveSpellWith has to ask about it once per mode. A text
+-- change rewrites EFFECTS only -- CR 612's word swap has nothing to say about
+-- whether an instruction is optional -- so the optionality passes through.
+modesOf :: ObjectId -> GameState -> [(ModeIndex, Mode.Mode Card.Type.Card)]
+modesOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj -> case Game.cardOf oid gs of
     Nothing -> []
     Just card ->
       let chosen = Binding.modesOf (Object.bindings obj)
-       in fmap (rewriteEffect (Projection.textChangesAffecting oid gs)) (Card.modesEffects chosen card)
+          rewrite = rewriteEffect (Projection.textChangesAffecting oid gs)
+          rewriteMode m = m {Mode.effects = fmap rewrite (Mode.effects m)}
+       in fmap (fmap rewriteMode) (Card.chosenModes chosen card)
 
 -- CR 608.2b: are ALL of this spell's targets illegal? "For every instance of the
 -- word 'target'" -- so a spell with no target spec never fizzles, and one with
@@ -452,15 +462,21 @@ resolveSpellWith runSubgame oid = do
                 -- rather than trusting the frozen owner outright, the same
                 -- shape an ability's controller recompute used to take (#83).
                 let effectController = spellController obj oid gs
-                Monad.forM_ (effectsOf oid gs) $ \eff -> do
-                  -- Re-read the live bindings for THIS effect: a prior PlaySubgame
-                  -- may have bound its loser slot. Target legality is recomputed
-                  -- with the same pre-fold `legalSlot` (targets unchanged; the new
-                  -- reserved slot is vacuously legal).
-                  bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
-                  let chosenNow = Binding.targetsOf bindingsNow
-                      legalityNow = Map.mapWithKey legalSlot chosenNow
-                  applyEffectWith runSubgame oid effectController (Binding.subtypesOf bindingsNow) legalityNow chosenNow eff
+                Monad.forM_ (modesOf oid gs) $ \(idx, mode) -> do
+                  -- CR 603.5 / 608.2d: a printed "may" is answered HERE, between
+                  -- the preceding mode's instructions and this one's -- the
+                  -- announcement CR 608.2d places "while applying the effect".
+                  taken <- exercises oid effectController idx mode
+                  let applyOne eff = do
+                        -- Re-read the live bindings for THIS effect: a prior PlaySubgame
+                        -- may have bound its loser slot. Target legality is recomputed
+                        -- with the same pre-fold `legalSlot` (targets unchanged; the new
+                        -- reserved slot is vacuously legal).
+                        bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
+                        let chosenNow = Binding.targetsOf bindingsNow
+                            legalityNow = Map.mapWithKey legalSlot chosenNow
+                        applyEffectWith runSubgame oid effectController (Binding.subtypesOf bindingsNow) legalityNow chosenNow eff
+                  Monad.when taken (Monad.forM_ (Mode.effects mode) applyOne)
                 Event.changeZone oid Zone.Graveyard
 
 -- The no-subgame spell resolver (Stack's default path and every direct caller).
@@ -468,17 +484,23 @@ resolveSpell :: ObjectId -> Game ()
 resolveSpell = resolveSpellWith noSubgame
 
 -- CR 608.2: the executor shared by an activated ability (M3e) and a triggered
--- ability (M3f) on the stack. Re-validate filled slots (CR 608.2b), fold
--- applyEffect over the effects with `srcId` (the source permanent) as the effect
--- source (CR 113.7), then the ability ceases (CR 608.2n). `stackId` is the
--- ability object's own id.
-resolveEffects :: ObjectId -> ObjectId -> [Effect Card.Type.Card] -> Map.Map SlotName TargetSpec -> Game ()
-resolveEffects stackId srcId effects specs = do
+-- ability (M3f) on the stack. Re-validate filled slots (CR 608.2b), then walk
+-- the CHOSEN MODES in order (CR 608.2c/700.2c) applying each one's effects with
+-- `srcId` (the source permanent) as the effect source (CR 113.7), asking about
+-- any printed "may" as it goes (CR 603.5); then the ability ceases (CR 608.2n).
+-- `stackId` is the ability object's own id.
+--
+-- Takes the modes rather than a flat effect list plus a separate spec map: the
+-- specs ARE the union of those modes' own (CR 700.2c), so deriving them here is
+-- one fewer pair of arguments that could disagree.
+resolveModes :: ObjectId -> ObjectId -> [(ModeIndex, Mode.Mode Card.Type.Card)] -> Game ()
+resolveModes stackId srcId modes = do
   gs <- State.get
   case Game.lookupObject stackId gs of
     Nothing -> pure ()
     Just obj ->
-      let chosen = Binding.targetsOf (Object.bindings obj)
+      let specs = Map.unions (fmap (Mode.targetSpecs . snd) modes)
+          chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipient = case Map.lookup slot specs of
             -- CR 608.2b is about TARGETS. A slot with no target spec is a
             -- RESERVED binding -- the trigger's source (Pawl.Binding.triggerSource),
@@ -512,17 +534,47 @@ resolveEffects stackId srcId effects specs = do
           -- `stackId`, not `srcId`), so its stamped owner IS the answer; a
           -- stolen permanent's later controller must not override it.
           effectController = Object.owner obj
+          resolveOne (idx, mode) = do
+            -- CR 603.5 / 608.2d: the printed "may", answered as this mode's
+            -- instructions are applied. Run only when `fizzles` is False, which
+            -- is what keeps the question from being asked about an ability whose
+            -- every target is already gone (CR 608.2b) -- it never resolves, so
+            -- there is nothing for the answer to decide.
+            taken <- exercises stackId effectController idx mode
+            Monad.when taken (Monad.mapM_ (applyEffect srcId effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) (Mode.effects mode))
        in do
-            Monad.unless fizzles $
-              Monad.mapM_ (applyEffect srcId effectController (Binding.subtypesOf (Object.bindings obj)) legality chosen) effects
+            Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (cease stackId)
+
+-- CR 603.5 / 608.2d: does this mode's instruction list happen at all? A
+-- mandatory mode always does. An OPTIONAL one -- a printed "may" -- is its
+-- controller's call, and it is made HERE, as the effect is applied, never by the
+-- engine and never earlier: CR 603.5 says an optional ability goes on the stack
+-- "regardless of whether their controller intends to exercise the ability's
+-- option or not. The choice is made when the ability resolves."
+--
+-- `resolving` is the object on the stack -- the spell, or the ability object --
+-- which is what the prompt names. `controller` is who "you" means (CR 405.4 for
+-- a spell, CR 113.8 for an ability) and therefore who is asked; the ask goes
+-- through Decide.deciderFor, so a player controlled under CR 723.1 has their
+-- controller answer, exactly like every other choice.
+exercises :: ObjectId -> PlayerId -> ModeIndex -> Mode.Mode Card.Type.Card -> Game Bool
+exercises resolving controller idx mode = case Mode.optionality mode of
+  Optionality.Mandatory -> pure True
+  Optionality.Optional -> do
+    gs <- State.get
+    let decider = Decide.deciderFor controller gs
+    decision <- Trans.lift (Program.prompt (Prompt.ChooseOptional decider controller resolving idx))
+    pure $ case decision of
+      OptionalDecision.Exercises -> True
+      OptionalDecision.Declines -> False
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
 -- (srcId), not the ability object -- so DealDamage comes from Prodigal Sorcerer
 -- (CR 113.7a). CR 700.2c/M4g: reads only the ability's CHOSEN modes (stamped at
--- activation, Activate.activateAbility) via Modal.modesEffects/modesTargetSpecs,
--- the same mode-scoping resolveSpell already applies to a modal spell. Reuses
--- applyEffect with the same per-slot legality and CR 608.2b fizzle as a spell.
+-- activation, Activate.activateAbility) via Modal.chosenModes, the same
+-- mode-scoping resolveSpell already applies to a modal spell. Reuses applyEffect
+-- with the same per-slot legality and CR 608.2b fizzle as a spell.
 -- CR 608.2n: the ability then ceases to exist -- removed from the stack and
 -- objects, NOT buried (an ability is not a card).
 resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Game ()
@@ -532,8 +584,7 @@ resolveAbility abilId srcId ability = do
     Nothing -> pure ()
     Just obj ->
       let chosen = Binding.modesOf (Object.bindings obj)
-          modal = ActivatedAbility.modal ability
-       in resolveEffects abilId srcId (Modal.modesEffects chosen modal) (Modal.modesTargetSpecs chosen modal)
+       in resolveModes abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
 
 -- CR 608.2n: an ability leaves the stack and ceases to exist (no graveyard).
 cease :: ObjectId -> GameState -> GameState

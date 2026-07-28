@@ -67,6 +67,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
@@ -736,7 +737,7 @@ delayedTests registry =
           -- direction (`Map.union captured placementTime`) the captured {7} would
           -- win instead, and this assertion would fail.
           HU.testCase "CR 603.7c placement-time's own chosen mode wins a collision with the captured environment" $
-            let onlyMode = Mode.MkMode {Mode.effects = Seq.empty, Mode.targetSpecs = Map.empty}
+            let onlyMode = Mode.MkMode {Mode.effects = Seq.empty, Mode.targetSpecs = Map.empty, Mode.optionality = Optionality.Mandatory}
                 ability =
                   TriggeredAbility.MkTriggeredAbility
                     { TriggeredAbility.condition = TriggerCondition.SelfEnters,
