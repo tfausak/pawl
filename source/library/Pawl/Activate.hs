@@ -85,11 +85,11 @@ sicknessOk pid srcId ability gs =
 -- Projection.gather -- the sweep its own haddock warns is superlinear -- runs
 -- again per object per enumeration. Measured on "a three-seat lands-only mirror
 -- needs TWO deck-outs to find a winner": 10.4s inlined, 29.3s not, which was the
--- whole of a 2x regression in the suite. The pragma is doing what
--- Projection.controllerOfGiven and Sba's one-projection-per-pass do explicitly,
--- and it is the cheaper of the two here; if a future zone arm makes this function
--- too big to inline, the fix is to pass the projection in rather than to trust
--- the optimizer harder.
+-- whole of a 2x regression in the suite.
+--
+-- The sharing is NOT explicit here, the way Projection.controllerOfGiven and
+-- Sba's one-projection-per-pass make it (#316). Until it is, a future zone arm
+-- that makes this function too big to inline costs that 2x silently.
 {-# INLINE abilitiesFor #-}
 abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
 abilitiesFor oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
