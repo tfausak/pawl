@@ -641,6 +641,9 @@ matchesTrigger gs bearer you cond event = case cond of
 -- The parallel for a SOURCELESS inherent ability is Pawl.Monarch.inherentMatch,
 -- which binds its own event's creature; there is no shared matcher because that
 -- one has no bearer to scope the match to.
+--
+-- PermanentEnters contributes no binding: the permanent that entered is not
+-- named by any slot, so an enters trigger cannot refer back to it (#330).
 eventBindings :: TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
 eventBindings cond event = case (cond, event) of
   -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
