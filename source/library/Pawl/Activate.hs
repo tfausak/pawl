@@ -7,6 +7,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Event as Event
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
 import qualified Pawl.Keyword as Keyword
@@ -157,12 +158,77 @@ activatable pid srcId ability gs =
       >= Modal.selectionCount (ActivatedAbility.modal ability)
     && Cost.canPay pid srcId (ActivatedAbility.cost ability) gs
 
--- CR 602.2: put the ability on the stack (a fresh OfAbility object), choose
--- modes (602.2b) then stamp targets, pay the additional costs, keep priority
--- (117.3c). Reject-not-repair on an illegal mode or target answer; enumeration
--- guarantees costs are payable, so payment cannot fail after the prompt.
+-- CR 400.2: "Public zones are zones in which all players can see the cards'
+-- faces ... Library and hand are hidden zones, even if all the cards in one such
+-- zone happen to be revealed." That trailing clause is why this is a property of
+-- the ZONE and never of the card: a hand every one of whose cards is currently
+-- revealed is still a hidden zone.
+--
+-- Exhaustive rather than a membership test against a two-element list, so a new
+-- Zone constructor cannot join the public side by default.
+isHiddenZone :: Zone.Zone -> Bool
+isHiddenZone zone = case zone of
+  Zone.Library -> True
+  Zone.Hand -> True
+  Zone.Graveyard -> False
+  Zone.Battlefield -> False
+  Zone.Stack -> False
+  Zone.Exile -> False
+  -- CR 400.2 names the command zone among the public ones, alongside ante.
+  Zone.Command -> False
+
+-- CR 602.2a: "If an activated ability is being activated from a hidden zone, the
+-- card that has that ability is revealed (see rule 701.20a)." Note what the rule
+-- does NOT say: there is no qualifier about the cost. Every activation from a
+-- hidden zone reveals, and the "cost that can't be paid while the object is on
+-- the battlefield" clause people remember is CR 113.6j, which is about where an
+-- ability FUNCTIONS, not about revealing.
+--
+-- The revealer is the activating player. CR 602.2a is worded passively and names
+-- nobody, but the hidden zone being read is theirs -- CR 400.3 puts every card in
+-- a hand in its owner's, and Activate.activatorOf gives a card in a hand to that
+-- owner precisely because CR 108.4 leaves it with no controller.
+--
+-- Reaches exactly the hand today: abilitiesFor serves the battlefield (public)
+-- and the hand, and answers [] for every other zone -- so the library, the other
+-- hidden zone, offers nothing to activate. Mana abilities never reach this
+-- function -- CR 605.3b keeps them off the stack ("an activated mana ability
+-- doesn't go on the stack"), `activatable` excludes them, and Mana.tapForMana
+-- handles them by tapping a permanent, which is on the battlefield, so a mana
+-- ability could not be a hidden-zone activation in any case.
+--
+-- CR 701.20a's duration for this case -- "the card remains revealed from the
+-- time the spell or ability is announced until the time it leaves the stack" --
+-- is not modeled, and is vacuous for every card in the pool: cycling discards
+-- the card as a cost (CR 702.29a), so it is in a public graveyard a moment
+-- later and there is no window in which "still revealed" differs from "visible
+-- anyway". A forecast ability (CR 702.57a) is the shape that keeps the card in
+-- hand and makes the duration observable; none is in the pool (#185, #282).
+revealIfHidden :: PlayerId -> ObjectId -> Game ()
+revealIfHidden pid srcId = do
+  gs <- State.get
+  case fmap Object.zone (Game.lookupObject srcId gs) of
+    Just zone | isHiddenZone zone -> Event.reveal pid srcId
+    _ -> pure ()
+
+-- CR 602.2: announce the activation, revealing the card if it is coming from a
+-- hidden zone (602.2a), put the ability on the stack (a fresh OfAbility object),
+-- choose modes (602.2b) then stamp targets, pay the additional costs, keep
+-- priority (117.3c). Reject-not-repair on an illegal mode or target answer;
+-- enumeration guarantees costs are payable, so payment cannot fail after the
+-- prompt.
+--
+-- `before` is the pre-announcement state and is the ONLY thing the rejection
+-- paths restore to, which is what puts CR 602.2a's reveal inside the rollback:
+-- an activation the engine refused revealed nothing, and must leave no reveal
+-- in the log claiming otherwise. Everything else reads `gs`, the state as of the
+-- announcement.
 activateAbility :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> Game ()
 activateAbility pid srcId ability = do
+  before <- State.get
+  -- CR 602.2a's own order: the reveal is part of announcing, and so precedes
+  -- the ability becoming an object on the stack (the rest of that same rule).
+  revealIfHidden pid srcId
   gs <- State.get
   let (abilId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
@@ -200,7 +266,7 @@ activateAbility pid srcId ability = do
   -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
   -- modes makes the whole activation a no-op, guarding every step below.
   if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
-    then State.put gs
+    then State.put before
     else do
       let sets = Target.legalSets (Just pid) srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
       chosen <-
@@ -210,7 +276,7 @@ activateAbility pid srcId ability = do
       let keysAgree = Map.keysSet chosen == Map.keysSet sets
           eachLegal = and (Map.intersectionWith Set.member chosen sets)
       if not (keysAgree && eachLegal)
-        then State.put gs -- reject: the whole activation is a no-op
+        then State.put before -- reject: the whole activation is a no-op
         else do
           -- CR 113.7: bind the source permanent under the reserved self slot, so
           -- an activated ability that refers to "this creature" (e.g. Longtusk
@@ -228,4 +294,4 @@ activateAbility pid srcId ability = do
           payment <- Cost.pay pid srcId (ActivatedAbility.cost ability)
           case payment of
             Payment.Paid -> pure ()
-            Payment.Unpaid -> State.put gs
+            Payment.Unpaid -> State.put before
