@@ -259,6 +259,35 @@ data Prompt r where
   -- as values: with one there is nothing to choose, and among equal values every
   -- order yields the same board (each still gets its own CR 614.5 opportunity).
   ChooseReplacement :: Decider -> PlayerId -> [ObjectId] -> Prompt Natural
+  -- CR 603.7c: which of several minted tokens a Create's slot binds -- the "it"
+  -- that a delayed triggered ability armed in the same resolution will name
+  -- ("Sacrifice it at the beginning of the next end step"). The ObjectId is the
+  -- resolving source holding the binding; the NonEmpty is the tokens that were
+  -- actually minted, in creation order; the answer is the one bound.
+  --
+  -- Reachable only through a replacement. The Pawl.CardSpec lint rejects a card
+  -- whose Create binds a slot while its PRINTED quantity is anything but exactly
+  -- one -- greater, variable, or zero alike (#53), but CR
+  -- 614.16 ("if an effect would create one or more tokens") scales the count at
+  -- RUNTIME, long after that lint has passed: Doubling Season on Tidal Wave mints
+  -- two Walls where CR 603.7c's "it" names one.
+  --
+  -- CR 707.10e is the codified analogue, and it is what settles this as a CHOICE
+  -- rather than a rule the engine may apply itself: where a replacement effect
+  -- causes a copy to target more than one object, "the copy's controller chooses
+  -- one of them to be the new target." Its Frontline Heroism / Anointed
+  -- Procession example is this exact shape -- two tokens are created, and "the
+  -- copy targets one of those tokens of your choice. The copy doesn't target both
+  -- the tokens." Binding the first minted token would be the engine choosing.
+  --
+  -- No SlotName in the payload: the candidates are distinct minted objects, so
+  -- two slot-binding Creates in one resolution already ask distinguishable
+  -- questions, and the slot name is card-data vocabulary rather than anything a
+  -- player sees.
+  --
+  -- Asked ONLY when two or more tokens were minted. One token is the whole
+  -- candidate set, and where the rules leave nothing to ask, don't prompt.
+  ChooseBoundToken :: Decider -> PlayerId -> ObjectId -> NonEmpty ObjectId -> Prompt ObjectId
   -- CR 701.21a: which permanents to sacrifice to pay a cost. The ObjectId is the
   -- spell being cast or the permanent whose ability is being activated; the
   -- [ObjectId] is the payer's permanents matching the component's criterion (the

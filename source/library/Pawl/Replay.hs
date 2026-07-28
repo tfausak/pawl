@@ -49,6 +49,7 @@ encode p answer = case p of
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
+  Prompt.ChooseBoundToken {} -> Response.ChoseBoundToken answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
   Prompt.ChooseCost {} -> Response.ChoseCost answer
   Prompt.DeclareMulligan {} -> Response.DeclaredMulligan answer
@@ -134,6 +135,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseReplacement {} -> case response of
     Response.ChoseReplacement n -> Just n
+    _ -> Nothing
+  Prompt.ChooseBoundToken {} -> case response of
+    Response.ChoseBoundToken oid -> Just oid
     _ -> Nothing
   Prompt.ChooseSacrifices {} -> case response of
     Response.ChoseSacrifices ids -> Just ids
@@ -233,6 +237,10 @@ defaultAnswer p = case p of
   -- CR 616.1: index 0 is always a legal answer (the bucket is non-empty when this
   -- is asked), and is the least eventful fallback when a transcript runs short.
   Prompt.ChooseReplacement {} -> 0
+  -- CR 603.7c: every minted token is a legal thing for "it" to name, so the head
+  -- is a legal answer and the least eventful fallback when a transcript runs
+  -- short -- it is exactly what the engine bound before the choice had a channel.
+  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   -- The first `count` candidates, which the engine offers in ascending order --
   -- a legal answer whenever the prompt was legal to ask, and the least eventful
   -- fallback when a transcript runs short.

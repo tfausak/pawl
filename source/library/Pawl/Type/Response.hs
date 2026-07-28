@@ -80,6 +80,13 @@ data Response
   | -- CR 616.1: the index of the replacement effect a player chose to apply next,
     -- serialized so a DecisionLog replays a replacement race deterministically.
     ChoseReplacement Natural
+  | -- CR 603.7c: the minted token a Create's slot bound, once a CR 614.16
+    -- replacement had made several of them, serialized so a DecisionLog replays
+    -- the binding deterministically. Its own constructor rather than a reuse of
+    -- ChoseLegend, for the reason ChoseDefender records: decode must return
+    -- Nothing for a response that does not match the prompt being asked, and two
+    -- ObjectId-shaped prompts sharing a constructor cannot do that.
+    ChoseBoundToken ObjectId
   | -- CR 701.21a: the permanents a player chose to sacrifice to pay a cost,
     -- serialized so a DecisionLog replays the payment deterministically.
     ChoseSacrifices (Set ObjectId)

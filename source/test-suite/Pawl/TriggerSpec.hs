@@ -18,6 +18,7 @@ module Pawl.TriggerSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -580,6 +581,32 @@ delayedTests registry =
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       walls gs = filter (\oid -> Set.member Subtype.Wall (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
+      -- Answers Prompt.ChooseBoundToken with the LAST token minted, recording
+      -- every candidate list so a test can assert whether the prompt was issued
+      -- at all. Naming the last is what makes the assertion discriminating:
+      -- binding the FIRST is exactly what the engine used to do silently.
+      chooseLastToken :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+      chooseLastToken p = case p of
+        Prompt.ChooseBoundToken _ _ _ candidates -> do
+          State.modify' (<> [NonEmpty.toList candidates])
+          pure (NonEmpty.last candidates)
+        _ -> pure (S.identityAnswer p)
+      -- Answers Prompt.ChooseBoundToken with an object that was never minted, so
+      -- the engine's filter is what decides the binding. Id 999 names nothing --
+      -- the same posture S.noSource takes.
+      chooseUnmintedToken :: Prompt.Prompt r -> r
+      chooseUnmintedToken p = case p of
+        Prompt.ChooseBoundToken {} -> ObjectId.MkObjectId 999
+        _ -> S.identityAnswer p
+      -- alice casts the spell in hand and resolves it under chooseLastToken,
+      -- handing back the board alongside the candidate lists it was asked about.
+      castUnderChoice gs oid =
+        State.runState
+          ( Engine.runGame chooseLastToken gs $ do
+              Cast.castSpell S.alice oid
+              Engine.priorityLoop
+          )
+          []
    in Tasty.testGroup
         "DelayedTrigger"
         [ HU.testCase "CR 111.3 the spell mints a 5/5 Wall with defender and arms one delayed ability" $ do
@@ -703,7 +730,68 @@ delayedTests registry =
             HU.assertEqual "CR 603.7b: it still triggered, so its one shot is spent" 0 (Seq.length (GameState.delayedTriggers placed))
             HU.assertEqual "with bob still in the game the SAME ability IS placed -- the filter is what did it" 1 (length (GameState.stack control))
             HU.assertEqual "nothing reached the stack, so placePendingTriggers honestly reports it placed nothing" False placedAny
-            HU.assertEqual "with bob still in the game, something genuinely got placed" True controlAny
+            HU.assertEqual "with bob still in the game, something genuinely got placed" True controlAny,
+          -- CR 614.16 meets CR 603.7c. Doubling Season ("If an effect would
+          -- create one or more tokens under your control, it creates twice that
+          -- many of those tokens instead") scales Tidal Wave's Create at
+          -- RESOLUTION, so two Walls are minted where CR 603.7c's "it" names one
+          -- particular object. CR 707.10e is the codified analogue and settles
+          -- that the leftover is a CHOICE, not something the engine may decide:
+          -- where a replacement causes a copy to target more than one object,
+          -- "the copy's controller chooses one of them to be the new target",
+          -- and its Frontline Heroism / Anointed Procession example is this exact
+          -- shape -- two tokens created, "the copy targets one of those tokens of
+          -- your choice."
+          --
+          -- Discriminating: the answerer names the LAST minted token, and the
+          -- unfixed engine bound the first, so the wrong Wall would be the one
+          -- that died and the surviving assertion would fail too.
+          HU.testCase "CR 614.16/603.7c a doubled Create asks which minted token \"it\" names" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            doublingSeason <- Registry.printing registry "Doubling Season"
+            let (_, base) = S.addCreature doublingSeason S.alice (S.landsInPlay island 3)
+                (gs, waveId) = S.handOne tidalWave base
+                ((_, armed), asked) = castUnderChoice gs waveId
+                after = resolveAll (settle (beginEndStep armed))
+            HU.assertEqual "the replacement really doubled the Create" 2 (length (walls armed))
+            case asked of
+              [[unchosen, chosen]] -> do
+                HU.assertEqual "the token named by \"it\" was sacrificed, and only it" [unchosen] (walls after)
+                HU.assertBool "the chosen Wall is off the battlefield" (Set.notMember chosen (GameState.battlefield after))
+              _ -> HU.assertFailure ("expected one prompt offering two tokens, got " <> show asked),
+          -- The companion, and the elision this pairs with: without the
+          -- replacement the Create mints exactly one token, so "it" has only one
+          -- possible referent and there is nothing to ask. Where the rules leave
+          -- nothing to ask, don't prompt.
+          HU.testCase "CR 603.7c one minted token is no choice, so nothing is asked" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let (gs, waveId) = S.handOne tidalWave (S.landsInPlay island 3)
+                ((_, armed), asked) = castUnderChoice gs waveId
+                after = resolveAll (settle (beginEndStep armed))
+            HU.assertEqual "one Wall minted" 1 (length (walls armed))
+            HU.assertEqual "no binding prompt was issued" [] asked
+            HU.assertEqual "and it is still sacrificed at the end step" [] (walls after),
+          -- FILTERED, NOT TRUSTED, the posture Sba.chooseLegendVictims takes for
+          -- CR 704.5j: an answer naming something that was never minted would
+          -- otherwise leave CR 603.7c's "it" pointing at nothing and the delayed
+          -- ability would sacrifice neither Wall. The slot is bound either way,
+          -- deterministically to the first token.
+          HU.testCase "CR 603.7c an answer naming an unminted object falls back to the first token" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            doublingSeason <- Registry.printing registry "Doubling Season"
+            let (_, base) = S.addCreature doublingSeason S.alice (S.landsInPlay island 3)
+                (gs, waveId) = S.handOne tidalWave base
+                cast = S.runPure chooseUnmintedToken gs (Cast.castSpell S.alice waveId)
+                armed = S.runPure chooseUnmintedToken cast Engine.priorityLoop
+                after = resolveAll (settle (beginEndStep armed))
+            case walls armed of
+              [firstWall, secondWall] -> do
+                HU.assertEqual "only the second minted Wall is left" [secondWall] (walls after)
+                HU.assertBool "the first minted Wall was bound, and it is gone" (Set.notMember firstWall (GameState.battlefield after))
+              other -> HU.assertFailure ("expected two Wall tokens, got " <> show (length other))
         ]
 
 -- CR 603.3b: "that player puts them on the stack in any order they choose". The

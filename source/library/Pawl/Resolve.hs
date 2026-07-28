@@ -4,6 +4,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -276,6 +277,10 @@ definedSlots effects =
 -- Does any Create bind a slot while minting more than one token? CR 603.7c's "it"
 -- names ONE object; binding one of several would be the engine choosing, so the
 -- lint rejects it rather than guessing (#53).
+--
+-- The PRINTED quantity is all a lint can see. A CR 614.16 replacement (Doubling
+-- Season) multiplies the count at RESOLUTION, past this check; the Create arm
+-- below handles that by asking the controller which token "it" names.
 bindsSeveralTokens :: [Effect Card.Type.Card] -> Bool
 bindsSeveralTokens effects =
   let offends effect = case effect of
@@ -1025,12 +1030,30 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               -- token was never named" instead of crashing.
               (Just _, []) -> pure ()
               -- CR 603.7c: bind the minted token into live Object.bindings so a
-              -- delayed ability THIS SAME resolution arms can name it. The lint
-              -- guarantees the PRINTED quantity is 1 here (#53) -- but a
-              -- replacement can now make it more (Doubling Season doubling a
-              -- delayed ability's named token), in which case "it" names the
-              -- first and the rest are unnamed (#77).
-              (Just slot, newId : _) -> State.modify' (bindSlot source slot newId)
+              -- delayed ability THIS SAME resolution arms can name it. One token
+              -- is the whole candidate set, so there is nothing to ask -- and
+              -- where the rules leave nothing to ask, don't prompt. The
+              -- Pawl.CardSpec lint keeps the PRINTED quantity at 1 (#53), which is
+              -- why this is the ordinary case.
+              (Just slot, [only]) -> State.modify' (bindSlot source slot only)
+              -- CR 614.16 got there first: a token replacement (Doubling Season)
+              -- multiplied the count at RESOLUTION, after the lint had passed, so
+              -- several tokens now stand where CR 603.7c's "it" names one
+              -- PARTICULAR object. CR 707.10e is the codified analogue -- when a
+              -- replacement makes a copy target more than one object, "the copy's
+              -- controller chooses one of them" -- so this asks rather than
+              -- picking the first, which would be the engine choosing.
+              --
+              -- FILTERED, NOT TRUSTED, the same posture Sba.chooseLegendVictims
+              -- takes: an answer naming something that was not minted falls back
+              -- to the first, since the slot must end up bound either way.
+              (Just slot, first : second : rest) -> do
+                gs1 <- State.get
+                let candidates = first NonEmpty.:| (second : rest)
+                    decider = Decide.deciderFor controller gs1
+                answer <- Trans.lift (Program.prompt (Prompt.ChooseBoundToken decider controller source candidates))
+                let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
+                State.modify' (bindSlot source slot named)
       _ -> pure ()
   Effect.ArmDelayedTrigger name -> do
     gs <- State.get
