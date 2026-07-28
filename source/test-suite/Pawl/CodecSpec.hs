@@ -754,6 +754,10 @@ tests registry =
             roundTrip "revealed" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Revealed S.alice (Projection.project ratId gs)),
           HU.testCase "TriggerCondition.SelfCycled round-trips" $
             roundTrip "sc" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfCycled,
+          -- CR 113.6k's condition (Narcomoeba's), the first that names a zone
+          -- pair rather than the battlefield.
+          HU.testCase "TriggerCondition.SelfPutIntoGraveyardFromLibrary round-trips" $
+            roundTrip "spigfl" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfPutIntoGraveyardFromLibrary,
           -- CR 603.6a's "[type]" is a whole Filter, so the nested And/Not that
           -- spells Soul Warden's "another creature" has to survive the trip.
           HU.testCase "TriggerCondition.PermanentEnters round-trips with its Filter" $
