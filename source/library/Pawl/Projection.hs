@@ -144,15 +144,17 @@ applyModification lyr src cands gs oid m pc =
         -- permanent has to survive.
         --
         -- The ABILITY clause takes every kind of ability a card's rules text can
-        -- generate, which is every one this record carries plus the two decided
+        -- generate, which is every one this record carries plus the three decided
         -- outside it. Keywords and the four fields below are stripped here; a
-        -- permanent's static abilities and its player abilities are decided
-        -- before the fold instead, by the CR 305.7 gates in gather (liveGiven)
-        -- and Pawl.PlayerEffect.applying, because a static ability's effect has
-        -- to be kept out of the candidate list rather than erased from its own
-        -- projection. The gates read BASE characteristics and this arm reads the
-        -- projection, so the two do not agree on an object that became a land at
-        -- layer 4 (#391); what this arm reaches, it strips completely.
+        -- permanent's static abilities, its player abilities and its block
+        -- requirements are decided before the fold instead, by the CR 305.7 gates
+        -- in gather, Pawl.PlayerEffect.applying and Pawl.BlockRequirement.
+        -- instances -- all three calling liveGiven -- because an ability whose
+        -- effect lands on OTHER objects has to be kept out of the candidate list
+        -- rather than erased from its own projection. Those gates read BASE
+        -- characteristics and this arm reads the projection, so the two halves do
+        -- not agree on an object that became a land at layer 4 (#391); what this
+        -- arm reaches, it strips completely.
         --
         -- CR 305.7's next sentence -- "Note that this doesn't remove any
         -- abilities that were GRANTED to the land by other effects" -- needs no
@@ -759,12 +761,13 @@ setLandSubtypeEffects gs =
         <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 
 -- CR 305.7: a land whose subtype is SET to a basic type loses its rules-text
--- abilities. This is ONE of the two places that rule is enforced, and the
--- narrower one: it decides whether a permanent's STATIC abilities reach the
--- candidate list at all, because a static ability's effect lands on other objects
--- and so cannot be erased from the permanent's own projection afterwards. Every
--- other kind of rules-text ability is stripped inside the fold instead, by
--- applyModification's SetLandSubtype arm. So an object's static abilities are
+-- abilities. This is the GATE half of that rule, shared by all three readers whose
+-- ability lands on objects other than the bearer -- gather here,
+-- Pawl.PlayerEffect.applying and Pawl.BlockRequirement.instances -- since such an
+-- ability has to be kept out of its reader's candidate list rather than erased
+-- from the bearer's own projection afterwards. Every other kind of rules-text
+-- ability is stripped inside the fold instead, by applyModification's
+-- SetLandSubtype arm. So an object's static abilities are
 -- live unless a live SetLandSubtype applies to it. "Live" recurses on the
 -- stripper's own source; "applies to" reads BASE characteristics (nonbasic is a
 -- printed supertype, and card-type Land is read off the printed type line here),
@@ -779,7 +782,7 @@ setLandSubtypeEffects gs =
 -- the card that does that. Blood Moon takes her characteristic-defining P/T, her
 -- activated, triggered and replacement abilities and her keywords -- all of which
 -- the arm reaches -- and leaves her own animating STATIC ability standing, which
--- this gate does not (#391).
+-- only this gate could have taken (#391).
 --
 -- Ashaya is NOT the dependency loop #37 waits for, and the way she misses is
 -- worth recording so the next reader does not re-derive it. A loop needs each
