@@ -1537,8 +1537,32 @@ unspentManaCardTests registry =
           (Card.Type.playerAbilities c)
     ]
 
+phyrexianCardTests :: Registry.Type.Registry -> Tasty.TestTree
+phyrexianCardTests registry =
+  Tasty.testGroup
+    "Phyrexian"
+    [ HU.testCase "Mutagenic Growth is a {G/P} Instant giving target creature +2/+2" $ do
+        p <- Registry.printing registry "Mutagenic Growth"
+        let c = Printing.card p
+            target = SlotName.MkSlotName (Text.pack "target")
+        HU.assertEqual "name" (Text.pack "Mutagenic Growth") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Phyrexian Color.Green]) (Card.Type.manaCost c)
+        HU.assertBool "an instant" (Card.isInstant c)
+        HU.assertEqual
+          "+2/+2 until end of turn"
+          [Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 2)) target]
+          (Card.allEffects c)
+        HU.assertEqual "one creature slot" (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
+      -- CR 202.3g: "Each Phyrexian mana symbol in a card's mana cost contributes
+      -- 1 to its mana value." Not 2 (the life half is not mana at all, so CR
+      -- 202.3f's "largest component" reading does not apply) and not 0.
+      HU.testCase "CR 202.3g Mutagenic Growth's Phyrexian symbol makes mana value 1" $ do
+        p <- Registry.printing registry "Mutagenic Growth"
+        HU.assertEqual "one" 1 (Quantity.manaValueOf (Printing.card p))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry, phyrexianCardTests registry]

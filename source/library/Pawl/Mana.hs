@@ -38,6 +38,7 @@ import Pawl.Type.ManaUnit (ManaUnit)
 import qualified Pawl.Type.ManaUnit as ManaUnit
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
 import qualified Pawl.Type.Prompt as Prompt
@@ -276,7 +277,7 @@ chooseManaType pid oid candidates gs = case candidates of
 
 -- Every way ONE symbol can be paid: a typed demand -- the SET of mana types one
 -- unit of which satisfies it, and Nothing for a symbol that demands no particular
--- type -- paired with the generic mana that way adds.
+-- type -- paired with the generic mana that way adds and the LIFE it costs.
 --
 -- A set rather than a single type, because CR 107.4e's hybrid symbol "can be paid
 -- in one of two ways". A plain `{R}` is the singleton case, so both payment paths
@@ -288,48 +289,81 @@ chooseManaType pid oid candidates gs = case candidates of
 -- cannot be the same demand. Every other symbol offers exactly one way, so the
 -- list is a singleton everywhere else.
 --
+-- The LIFE field is CR 107.4f's Phyrexian symbol, and it is the one way that is
+-- not a mana payment at all, so it could not be folded into either of the other
+-- two: 2 life is not 2 generic mana (CR 118.7a's reductions never touch it, and
+-- CR 202.3g values the symbol at 1 rather than 2), and it is no typed demand
+-- because it consumes no supply. Zero for every other symbol.
+--
 -- The ways survive all the way to payment rather than collapsing to one as the
 -- spell is proposed, which is what CR 118.13a and CR 601.2b actually call for and
--- what pawl does not do (#261).
-waysOf :: ManaSymbol -> [(Maybe (Set.Set ManaType), Natural)]
+-- what pawl does not do (#261, #361).
+waysOf :: ManaSymbol -> [(Maybe (Set.Set ManaType), Natural, Natural)]
 waysOf symbol = case symbol of
-  ManaSymbol.OfType t -> [(Just (Set.singleton t), 0)]
+  ManaSymbol.OfType t -> [(Just (Set.singleton t), 0, 0)]
   -- CR 107.4e: a colour/colour hybrid is paid with one mana of a stated type
   -- either way, so it contributes nothing to the generic count.
-  ManaSymbol.Hybrid a b -> [(Just (Set.fromList [a, b]), 0)]
+  ManaSymbol.Hybrid a b -> [(Just (Set.fromList [a, b]), 0, 0)]
   -- CR 107.4e's two ways, and the one-mana way is FIRST -- see resolutions.
-  ManaSymbol.MonocoloredHybrid t -> [(Just (Set.singleton t), 0), (Nothing, 2)]
-  ManaSymbol.Generic n -> [(Nothing, n)]
+  ManaSymbol.MonocoloredHybrid t -> [(Just (Set.singleton t), 0, 0), (Nothing, 2, 0)]
+  -- CR 107.4f's two ways: "a cost that can be paid either with one mana of its
+  -- color or by paying 2 life." The colour is a ManaType here because that is
+  -- what a demand is made of; CR 107.4f admits no colourless Phyrexian symbol,
+  -- so ManaType.Colored is total rather than a case.
+  --
+  -- The mana way is FIRST, which resolutions' sort then keeps -- see there.
+  ManaSymbol.Phyrexian c -> [(Just (Set.singleton (ManaType.Colored c)), 0, 0), (Nothing, 0, 2)]
+  ManaSymbol.Generic n -> [(Nothing, n, 0)]
   -- Unreachable in payment: substituteX removes every Variable before canPay
   -- (Task 4). The match must be total, so a bare {X} demands nothing and counts
   -- as 0 generic.
-  ManaSymbol.Variable -> [(Nothing, 0)]
+  ManaSymbol.Variable -> [(Nothing, 0, 0)]
 
 -- CR 601.2b's "nonhybrid equivalent cost", enumerated: every way the whole cost
--- resolves into typed demands plus an amount of generic mana, one entry per
--- combination of per-symbol ways. `traverse` over the list applicative is that
--- product.
+-- resolves into typed demands, an amount of generic mana and an amount of life,
+-- one entry per combination of per-symbol ways. `traverse` over the list
+-- applicative is that product.
 --
 -- This is what lets everything below it keep the ONE-SUPPLY-PER-DEMAND shape
 -- spendDemands and canPay's Hall condition both rest on. CR 107.4e's {2/B} is the
 -- only symbol two mana can pay, and rather than teach those two about a demand
 -- that consumes two units -- which would break the counting each of them does --
 -- the choice is made here, above them. Each of them still sees a cost in which
--- every typed demand is exactly one mana.
+-- every typed demand is exactly one mana. CR 107.4f's {G/P} is absorbed the same
+-- way and for the same reason: a symbol payable with no mana at all would be a
+-- demand nothing serves, so the life is lifted out here and neither of them ever
+-- sees it.
 --
 -- Finite and small, which is what keeps the search terminating: the product over
--- symbols of their ways, so 2^(number of monocolored hybrid symbols), and exactly
--- one entry for every cost without one. Flame Javelin ({2/R}{2/R}{2/R}) is 8;
--- Reaper King ({2/W}{2/U}{2/B}{2/R}{2/G}) is 32.
+-- symbols of their ways, so 2^(number of monocolored hybrid and Phyrexian
+-- symbols), and exactly one entry for every cost without one. Flame Javelin
+-- ({2/R}{2/R}{2/R}) is 8; Reaper King ({2/W}{2/U}{2/B}{2/R}{2/G}) is 32;
+-- Mutagenic Growth ({G/P}) is 2.
 --
 -- ORDERED, and the order is a choice pawl makes for the player, because unlike a
--- colour/colour hybrid the two ways spend DIFFERENT AMOUNTS of mana and so leave
--- different pools behind. waysOf puts the one-mana way first, so `spend` takes
--- the resolution that spends the fewest units (#261).
-resolutions :: ManaCost -> [([Set.Set ManaType], Natural)]
+-- colour/colour hybrid these ways are DISTINGUISHABLE -- they spend different
+-- amounts of mana, or mana against life, and so leave a different board behind.
+-- Two rules, in this priority:
+--
+--   1. LEAST LIFE first, by the sort. CR 107.4f's life is the resource that does
+--      not come back: an unspent pool empties every step (CR 500.5) and a land
+--      untaps, so preferring mana can never cost the player something they keep,
+--      while preferring life would drain 2 off every Mutagenic Growth cast with a
+--      Forest untapped. Conservative, and still pawl choosing (#361).
+--   2. Among equal life, FEWEST UNITS, which waysOf's per-symbol order already
+--      gives and a STABLE sort preserves -- so a monocolored hybrid's behaviour
+--      is exactly what it was (#261).
+--
+-- The sort is what makes rule 1 hold across symbols rather than within one: for
+-- {2/R}{G/P} the product alone would offer a 2-life way before a 0-life one.
+resolutions :: ManaCost -> [([Set.Set ManaType], Natural, Natural)]
 resolutions (ManaCost.MkManaCost symbols) =
-  let collect ways = (Maybe.mapMaybe fst ways, sum (fmap snd ways))
-   in fmap collect (traverse waysOf symbols)
+  let collect ways =
+        ( Maybe.mapMaybe (\(demand, _, _) -> demand) ways,
+          sum (fmap (\(_, generic, _) -> generic) ways),
+          sum (fmap (\(_, _, life) -> life) ways)
+        )
+   in List.sortOn (\(_, _, life) -> life) (fmap collect (traverse waysOf symbols))
 
 -- CR 601.2f: the total cost with X resolved -- each Variable symbol becomes
 -- Generic n, every other symbol unchanged, order preserved (ManaCost is a list,
@@ -378,21 +412,33 @@ takeAny units _ = case units of
   _ : rest -> Just rest
   [] -> Nothing
 
--- Spend a pool against a cost. Nothing when the pool cannot cover it.
+-- Spend a pool against a cost, within a budget of `budget` life. Nothing when no
+-- resolution fits; otherwise the pool that is left and the life to pay for it.
 --
 -- Typed symbols are matched FIRST because they are the constrained ones: generic
 -- takes any unit, so paying it first could consume the only red and strand a
 -- {R} that nothing else can satisfy.
 --
--- The FIRST resolution that works wins. For every cost without a monocolored
--- hybrid there is only one, so this is the plain spend it always was; where there
--- are several, `resolutions` has already put the cheapest first.
-spend :: ManaCost -> Mana -> Maybe Mana
-spend cost (Mana.MkMana units) =
-  let attempt (demands, generic) = do
+-- The FIRST resolution that fits wins. For every cost without a monocolored
+-- hybrid or a Phyrexian symbol there is only one, so this is the plain spend it
+-- always was; where there are several, `resolutions` has already put the
+-- least-life, fewest-units one first.
+--
+-- The BUDGET is a cap and not a target, and it is what keeps that ordering
+-- meaningful during payCost's loop. Left uncapped, a {G/P} would take the 2-life
+-- resolution on the first pass -- the pool is empty before any source is tapped,
+-- so the mana resolution cannot fit yet -- and the Forest would never be tapped
+-- at all. payCost passes `lifeNeeded`, the least life any PAYABLE resolution
+-- costs, so a cost the board can pay with mana is capped at zero life and the
+-- loop is forced to tap for it.
+spend :: Natural -> ManaCost -> Mana -> Maybe (Mana, Natural)
+spend budget cost (Mana.MkMana units) =
+  let attempt (demands, generic, life) = do
+        Monad.guard (life <= budget)
         afterTyped <- spendDemands units demands
-        Monad.foldM takeAny afterTyped [1 .. generic]
-   in fmap Mana.MkMana (Maybe.listToMaybe (Maybe.mapMaybe attempt (resolutions cost)))
+        left <- Monad.foldM takeAny afterTyped [1 .. generic]
+        pure (Mana.MkMana left, life)
+   in Maybe.listToMaybe (Maybe.mapMaybe attempt (resolutions cost))
 
 -- CR 601.2g: "If the total cost includes a mana payment, the player then has a
 -- chance to activate mana abilities." Reached from an ability too, by CR 602.2b
@@ -415,6 +461,16 @@ spend cost (Mana.MkMana units) =
 -- One prompt per source tapped, against a shrinking candidate list, rather than
 -- one prompt for a whole subset: a cost needing {G}{G} is two decisions, and the
 -- second is made knowing the first.
+--
+-- The life budget is recomputed on EVERY pass rather than fixed at entry, because
+-- a tap can change it: a Birds of Paradise tapped for blue takes the mana way to
+-- a {G/P} off the board, and the cost is then payable only by CR 107.4f's 2 life.
+-- Recomputing means pawl pays it, rather than failing the payment the way the
+-- paragraph above lets a mis-tapped {B} fail -- which is the same MORE PERMISSIVE
+-- posture #261 records, and the same one that makes a life payment pawl's call
+-- and not the player's (#361). Zero when the cost is unpayable outright, which
+-- leaves the loop exactly as it was -- spend fails, sources are exhausted one
+-- prompt at a time, and the answer is False.
 payCost :: PlayerId -> ManaCost -> Game Bool
 payCost pid cost = do
   before <- State.get
@@ -424,9 +480,10 @@ payCost pid cost = do
   where
     tapUntilPaid = do
       gs <- State.get
-      case spend cost (poolOf pid gs) of
-        Just left -> do
-          State.put (setPool pid left gs)
+      let budget = Maybe.fromMaybe 0 (lifeNeeded pid cost gs)
+      case spend budget cost (poolOf pid gs) of
+        Just (left, life) -> do
+          State.put (payLife pid life (setPool pid left gs))
           pure True
         Nothing -> case manaSources pid gs of
           [] -> pure False
@@ -472,26 +529,46 @@ chooseSource pid candidates gs = case candidates of
 -- it while merely ENUMERATING actions, where prompting would be absurd -- so it
 -- cannot simply walk tapForMana, which now asks a question.
 --
--- It must not simulate one greedily either. Once a source can produce more than
--- one type, WHICH type each source makes decides whether the cost is affordable:
--- a Forest and a Birds of Paradise pay {G}{B}, but only if the Birds makes
--- black, and a greedy walk that tapped the Forest for green and took the Birds'
--- first colour would call it unaffordable.
+-- A cost is payable exactly when SOME resolution of it is: `resolutions` has
+-- already turned CR 107.4e's {2/B} and CR 107.4f's {G/P} into their nonhybrid
+-- equivalents, so this asks nothing about hybrid-ness. payableResolutions is
+-- where the per-resolution test lives.
+canPay :: PlayerId -> ManaCost -> GameState -> Bool
+canPay pid cost gs = not (null (payableResolutions pid cost gs))
+
+-- The resolutions of `cost` this player could actually pay right now, in
+-- `resolutions`' order -- so the head costs the least life of any of them, which
+-- is what lifeNeeded reads. NOT the resolution `spend` will take: `spend` walks
+-- the same list against the POOL alone, where a resolution this one admits on the
+-- strength of an untapped source may not yet fit. What the two agree on is the
+-- life, because the budget is what carries between them.
 --
--- So this is an assignment question, and it is answered exactly. Model each
+-- The mana part must not be simulated greedily. Once a source can produce more
+-- than one type, WHICH type each source makes decides whether the cost is
+-- affordable: a Forest and a Birds of Paradise pay {G}{B}, but only if the Birds
+-- makes black, and a greedy walk that tapped the Forest for green and took the
+-- Birds' first colour would call it unaffordable.
+--
+-- So it is an assignment question, and it is answered exactly. Model each
 -- available mana as a SUPPLY carrying the set of types it could be -- a pool
 -- unit is its own type; an untapped source is everything manaTypesOf offers,
 -- because tapping it yields exactly one mana of one of them. Each typed symbol
 -- of the cost is a DEMAND for a specific type; generic symbols demand a count
 -- and nothing more.
 --
--- A RESOLVED cost is payable exactly when both hold:
+-- A RESOLVED cost is payable exactly when all three hold:
 --
 --   1. every typed demand can be met at once -- a matching of demands into
---      supplies that saturates the demand side; and
+--      supplies that saturates the demand side;
 --   2. enough supplies are left over for the generic part. Every full typed
 --      matching consumes exactly one supply per typed symbol, so the leftover
---      count does not depend on WHICH matching, and this is a plain comparison.
+--      count does not depend on WHICH matching, and this is a plain comparison;
+--      and
+--   3. CR 119.4's floor admits the life. This is the clause that reads the
+--      PLAYER rather than the board, and the only one a Phyrexian-free cost can
+--      never fail: every resolution of such a cost costs 0 life, and CR 119.4b
+--      lets anyone pay that -- see canPayLife, which answers 0 without a lookup
+--      precisely so that this holds for a player the map does not hold either.
 --
 -- Clause 1 is Hall's condition: a saturating matching exists iff no set of
 -- demands outruns the supplies that could serve it. Demands of the same type
@@ -501,19 +578,22 @@ chooseSource pid candidates gs = case candidates of
 -- algorithm: the condition IS the specification, so there is no gap between what
 -- this says and what it does.
 --
--- Both clauses count one supply per typed demand, which is exactly why CR
+-- Clauses 1 and 2 count one supply per typed demand, which is exactly why CR
 -- 107.4e's {2/B} is resolved AWAY before either is asked: `resolutions` turns the
 -- cost into the nonhybrid equivalents, and the cost is payable when ANY of them
 -- is. Neither clause has to learn about a demand two supplies satisfy, and
--- neither can be fooled into charging {2/B} a single mana.
-canPay :: PlayerId -> ManaCost -> GameState -> Bool
-canPay pid cost gs =
+-- neither can be fooled into charging {2/B} a single mana. CR 107.4f's {G/P}
+-- rides on the same enumeration: its life way is a resolution with one fewer
+-- demand, so neither clause has to learn about a symbol that consumes no supply
+-- at all.
+payableResolutions :: PlayerId -> ManaCost -> GameState -> [([Set.Set ManaType], Natural, Natural)]
+payableResolutions pid cost gs =
   let Mana.MkMana units = poolOf pid gs
       supplies =
         fmap (Set.singleton . ManaUnit.manaType) units
           <> fmap (\oid -> Set.fromList (manaTypesOf oid gs)) (manaSources pid gs)
       couldServe wanted = length (filter (not . Set.disjoint wanted) supplies)
-      payable (demands, generic) =
+      payable (demands, generic, life) =
         let -- A demand belongs to the set W exactly when every type that could
             -- satisfy it is in W -- `isSubsetOf`, where a single-type demand only
             -- needed `member`. That is the whole generalization CR 107.4e's
@@ -527,6 +607,50 @@ canPay pid cost gs =
             -- subsets of the demanded types cover every subset of demands. At
             -- most 2^6 by CR 106.1b, unchanged by hybrids.
             demandedTypes = Set.toList (Set.unions demands)
-         in Natural.length supplies >= Natural.length demands + generic
+         in canPayLife pid life gs
+              && Natural.length supplies >= Natural.length demands + generic
               && all (hallHolds . Set.fromList) (List.subsequences demandedTypes)
-   in any payable (resolutions cost)
+   in filter payable (resolutions cost)
+
+-- The least life any payable resolution of this cost costs, or Nothing when none
+-- is payable. `resolutions` is sorted by life ascending and payableResolutions
+-- keeps that order, so the head is the minimum.
+--
+-- This is the budget payCost pays under: pawl spends life only for the symbols
+-- the board's mana cannot cover, and never more (#361).
+lifeNeeded :: PlayerId -> ManaCost -> GameState -> Maybe Natural
+lifeNeeded pid cost gs = case payableResolutions pid cost gs of
+  (_, _, life) : _ -> Just life
+  [] -> Nothing
+
+-- CR 119.4: "If a cost or effect allows a player to pay an amount of life greater
+-- than 0, the player may do so only if their life total is greater than or equal
+-- to the amount of the payment."
+--
+-- Lives here rather than in Pawl.Cost so that CR 107.4f's Phyrexian symbol and
+-- CR 119.4's own PayLife component share one reading of the rule; Pawl.Cost
+-- imports this module, so the dependency only goes one way.
+--
+-- CR 119.4b is answered BEFORE the lookup, not by the `>=` that would usually
+-- absorb it: "Players can always pay 0 life, no matter what their (or their
+-- team's) life total is, and even if an effect says players can't pay life."
+-- ALWAYS, so a player the map does not hold must not turn a zero payment into an
+-- unpayable one -- and every resolution of a cost with no Phyrexian symbol is a
+-- zero payment, so this is also what keeps payableResolutions' life clause
+-- unable to change any answer such a cost used to give.
+canPayLife :: PlayerId -> Natural -> GameState -> Bool
+canPayLife pid n gs =
+  n == 0 || case Map.lookup pid (GameState.players gs) of
+    Nothing -> False
+    Just player -> Player.life player >= toInteger n
+
+-- CR 119.4: "the payment is subtracted from their life total; in other words, the
+-- player loses that much life." A direct subtraction, and the CR 704.5a
+-- state-based action that may follow is the existing one in Pawl.Sba -- paying to
+-- exactly 0 is a legal payment, not a barred one.
+payLife :: PlayerId -> Natural -> GameState -> GameState
+payLife pid n gs =
+  gs
+    { GameState.players =
+        Map.adjust (\p -> p {Player.life = Player.life p - toInteger n}) pid (GameState.players gs)
+    }
