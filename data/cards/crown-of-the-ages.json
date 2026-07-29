@@ -1,0 +1,102 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [
+          {
+            "type": "TapThis"
+          }
+        ],
+        "mana": [
+          {
+            "type": "Generic",
+            "value": 4
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "AttachTarget",
+                "value": [
+                  "target",
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Aura"
+                        }
+                      },
+                      {
+                        "type": "IsAttachedToCreature"
+                      }
+                    ]
+                  },
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    }
+  ],
+  "name": "Crown of the Ages",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Artifact"
+      }
+    ]
+  }
+}

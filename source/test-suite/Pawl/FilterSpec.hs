@@ -28,7 +28,8 @@ blackCreature =
       Filter.controller = Just (PlayerId.MkPlayerId 0),
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
-      Filter.attacking = False
+      Filter.attacking = False,
+      Filter.attachedToCreature = False
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -43,7 +44,8 @@ devoidBigCreature =
       Filter.controller = Nothing,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
-      Filter.attacking = False
+      Filter.attacking = False,
+      Filter.attachedToCreature = False
     }
 
 self :: Filter.Context
@@ -143,5 +145,28 @@ tests =
             . HU.assertBool "player"
             . not
             $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsAttacking
+        ],
+      Tasty.testGroup
+        "IsAttachedToCreature"
+        [ HU.testCase "matches a view whose attachment says so"
+            . HU.assertBool "attached to a creature"
+            $ Filter.matches self (blackCreature {Filter.attachedToCreature = True}) Filter.Type.IsAttachedToCreature,
+          HU.testCase "does not match a permanent attached to nothing"
+            . HU.assertBool "unattached"
+            . not
+            $ Filter.matches self blackCreature Filter.Type.IsAttachedToCreature,
+          -- CR 109.3 names "what an Aura enchants" among the things that are not
+          -- characteristics, so no characteristic axis can stand in for it: being
+          -- an Aura by subtype says nothing about whether it is on a creature.
+          HU.testCase "is independent of every characteristic axis"
+            . HU.assertBool "subtype does not imply attachment"
+            . not
+            $ Filter.matches self (blackCreature {Filter.subtypes = Set.singleton Subtype.Aura}) Filter.Type.IsAttachedToCreature,
+          -- CR 303.4: a player is enchanted BY an Aura, never attached to
+          -- anything (#190).
+          HU.testCase "a player candidate is vacuously false"
+            . HU.assertBool "player"
+            . not
+            $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsAttachedToCreature
         ]
     ]

@@ -41,7 +41,24 @@ data View = MkView
     -- Pawl.Projection.viewOfCharacteristics. False for every candidate with no
     -- combat status to read: a printed card off the battlefield, a player, and an
     -- event snapshot -- the same vacuous posture power and controller take.
-    attacking :: Bool
+    attacking :: Bool,
+    -- CR 701.3a: is this candidate attached to a CREATURE right now? Not a
+    -- characteristic either (CR 109.3 names "what an Aura enchants" among the
+    -- things that are not one), so it is read from Object.attachedTo plus the
+    -- HOST's projected card types rather than from the candidate's own
+    -- projection -- see Pawl.Projection.viewOfCharacteristics. False for every
+    -- candidate with no attachment to read: a printed card off the battlefield,
+    -- a player, and an event snapshot -- the vacuous posture `attacking` takes.
+    --
+    -- LAZY, and load-bearingly so. Filling it costs a projection OF ANOTHER
+    -- OBJECT, and viewOfCharacteristics is itself called from inside
+    -- Projection.affects while a projection is being computed. Nothing forces
+    -- this field unless a Filter actually contains IsAttachedToCreature, and no
+    -- affected-set filter in the pool does; one that did would recurse back into
+    -- the projection that is asking. That is the same laziness accident
+    -- Projection.affects records for `perspective` (#197), and it is a fact about
+    -- the pool's card data rather than a guarantee this record enforces.
+    attachedToCreature :: Bool
   }
   deriving (Eq, Show)
 
@@ -60,7 +77,11 @@ playerView pid =
       identity = Nothing,
       playerIdentity = Just pid,
       -- CR 506.3: only a creature can attack, and a player is not one.
-      attacking = False
+      attacking = False,
+      -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
+      -- player is not itself attached to anything (Object.attachedTo runs the
+      -- other way and names an object, #190).
+      attachedToCreature = False
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and
@@ -117,6 +138,10 @@ matches context view predicate = case predicate of
   -- or the combat phase ends, whichever comes first" -- so this is a live read of
   -- the combat record, never a stamp on the object.
   Filter.IsAttacking -> attacking view
+  -- CR 701.3a: a live read of Object.attachedTo and the host's projected types,
+  -- never a stamp on the candidate -- an Aura whose host stops being a creature
+  -- stops matching, and CR 704.5m buries it on the next state-based-action pass.
+  Filter.IsAttachedToCreature -> attachedToCreature view
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)

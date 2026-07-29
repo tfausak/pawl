@@ -590,6 +590,7 @@ filterToJson filter_ = case filter_ of
   Filter.IsPlayer r -> Json.tagged (Text.pack "IsPlayer") (Just (playerRelationToJson r))
   Filter.IsSource -> nullary (Text.pack "IsSource")
   Filter.IsAttacking -> nullary (Text.pack "IsAttacking")
+  Filter.IsAttachedToCreature -> nullary (Text.pack "IsAttachedToCreature")
   Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (fmap filterToJson fs)))
   Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (fmap filterToJson fs)))
   Filter.Not f -> Json.tagged (Text.pack "Not") (Just (filterToJson f))
@@ -607,6 +608,7 @@ jsonToFilter value = do
     ("IsPlayer", Just v) -> Filter.IsPlayer <$> jsonToPlayerRelation v
     ("IsSource", _) -> Right Filter.IsSource
     ("IsAttacking", _) -> Right Filter.IsAttacking
+    ("IsAttachedToCreature", _) -> Right Filter.IsAttachedToCreature
     ("And", Just (Array vs)) -> Filter.And <$> traverse jsonToFilter vs
     ("Or", Just (Array vs)) -> Filter.Or <$> traverse jsonToFilter vs
     ("Not", Just v) -> Filter.Not <$> jsonToFilter v
@@ -1445,6 +1447,7 @@ effectToJson e = case e of
   Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (monarchTargetToJson t))
   Effect.ExileUntilMonarch s -> Json.tagged (Text.pack "ExileUntilMonarch") (Just (slotNameToJson s))
   Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (slotNameToJson s))
+  Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array [slotNameToJson s, filterToJson f]))
   Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (slotNameToJson s))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
@@ -1522,6 +1525,9 @@ jsonToEffect value = do
     "BecomeMonarch" -> withValue mv (fmap Effect.BecomeMonarch . jsonToMonarchTarget)
     "ExileUntilMonarch" -> withValue mv (fmap Effect.ExileUntilMonarch . jsonToSlotName)
     "Attach" -> withValue mv (fmap Effect.Attach . jsonToSlotName)
+    "AttachTarget" -> case mv of
+      Just (Array [s, f]) -> Effect.AttachTarget <$> jsonToSlotName s <*> jsonToFilter f
+      _ -> Left (Text.pack "AttachTarget expects [slot, filter]")
     "PlaySubgame" -> withValue mv (fmap Effect.PlaySubgame . jsonToSlotName)
     _ -> Left (Text.pack "unknown Effect: " <> t)
 

@@ -224,6 +224,7 @@ identityAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
@@ -276,6 +277,7 @@ castAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
@@ -321,6 +323,7 @@ aggressiveAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
@@ -385,6 +388,7 @@ playLandAnswer p = case p of
   Prompt.OrderTriggers _ _ sources -> zipWith const [0 ..] sources
   Prompt.ChooseReplacement {} -> 0
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
@@ -515,6 +519,14 @@ randomAnswer p = case p of
     g <- State.get
     let tokens = NonEmpty.toList candidates
         (i, g') = Random.uniformR (0, length tokens - 1) g
+    State.put g'
+    pure (pickFrom candidates i)
+  -- CR 701.3a: a random destination, so a random game does not always move an
+  -- Aura onto the first permanent offered.
+  Prompt.ChooseAttachment _ _ _ candidates -> do
+    g <- State.get
+    let destinations = NonEmpty.toList candidates
+        (i, g') = Random.uniformR (0, length destinations - 1) g
     State.put g'
     pure (pickFrom candidates i)
   Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (List.genericTake count candidates))
@@ -1412,7 +1424,8 @@ stubView table oid =
                 Filter.controller = ctrl,
                 Filter.identity = Just o,
                 Filter.playerIdentity = Nothing,
-                Filter.attacking = False
+                Filter.attacking = False,
+                Filter.attachedToCreature = False
               }
         [] -> Nothing
 

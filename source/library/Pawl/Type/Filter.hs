@@ -67,6 +67,22 @@ data Filter
     -- type. What the invariant forbids is casing on an EFFECT's identity, which
     -- this arm still does not do.
     IsAttacking
+  | -- CR 303.4b / 701.3a: the candidate is ATTACHED to a creature -- "the object
+    -- or player an Aura is attached to is called enchanted" -- which is what
+    -- Crown of the Ages' "target Aura attached to a creature" narrows by.
+    --
+    -- The second atom, after IsAttacking, reading something CR 109.3 explicitly
+    -- says is not a characteristic -- and it names attachment among its examples
+    -- ("what an Aura enchants"). IsAttacking's own defence covers this one word
+    -- for word: attachment is a RULES concept the closed half already owns (CR
+    -- 301.5, 303.4, 701.3, Object.attachedTo), so reading it is the same kind of
+    -- act as reading a card type, and casing on an EFFECT's identity is still
+    -- what the invariant forbids and still not what this does.
+    --
+    -- Nullary and creature-specific rather than a recursive `AttachedTo Filter`
+    -- that would compose with the rest of this type: the narrowest atom the one
+    -- card in the pool needs. The generalization is #356.
+    IsAttachedToCreature
   | And [Filter]
   | Or [Filter]
   | Not Filter
