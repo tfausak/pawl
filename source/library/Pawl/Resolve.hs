@@ -1361,6 +1361,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
               destination <- case rest of
                 -- One destination is no choice at all, and the effect is not a
                 -- "may" -- where the rules leave nothing to ask, don't prompt.
+                -- The elision is not re-derived for an optional attach (#359).
                 [] -> pure first
                 second : more -> do
                   let offered = first NonEmpty.:| (second : more)
