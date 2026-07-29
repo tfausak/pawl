@@ -92,8 +92,9 @@ data Effect card
     -- DestroyAll opcode was the alternative, and it would have had to carry its
     -- own copy of the CR 702.12b gate, the CR 616.1 funnel and the CR 701.19c
     -- rider -- the duplication PlayerRef already exists to avoid on the player
-    -- side (Draw's comment). The other object-affecting opcodes still take a bare
-    -- SlotName; none of them has a card that names a set (#378).
+    -- side (Draw's comment). Untap has since taken the same parameter for the
+    -- same reason; the other object-affecting opcodes still take a bare
+    -- SlotName, none of them having a card that names a set (#378).
     Destroy ObjectRef Regenerability
   | -- CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction: CR 701.21a
@@ -269,9 +270,29 @@ data Effect card
     -- TARGETING (CR 601.2c), which is how a future "target player gets two
     -- poison counters" is written, but nothing here demands it (#120).
     GainPlayerCounters PlayerRef PlayerCounterKind Quantity
-  | -- CR 701.26b: untap the slot's target permanent. Single-target (Act of
-    -- Treason's "untap that creature"); mass/conditional untap is future.
-    Untap SlotName
+  | -- CR 701.26b: untap the permanents the ObjectRef names. Act of Treason's
+    -- "untap that creature" is `InSlot`; Aggravated Assault's "untap all
+    -- creatures you control" is `EachMatching`, swept at resolution.
+    --
+    -- ObjectRef rather than a bare SlotName for the reason Destroy's comment
+    -- gives at length: one opcode serving both the chosen permanent and the
+    -- named set, rather than a sibling UntapAll to keep in step with it.
+    Untap ObjectRef
+  | -- CR 500.8: "Some effects can add phases to a turn. They do this by adding
+    -- the phases directly after the specified phase." This one adds an
+    -- additional combat phase followed by an additional main phase, after the
+    -- phase it resolves in -- Aggravated Assault's "After this main phase, there
+    -- is an additional combat phase followed by an additional main phase".
+    --
+    -- Nullary, and the pair rather than either alone: the card says both in one
+    -- sentence, and neither half has a card of its own in the pool. A card that
+    -- adds only a combat phase (Aurelia, the Warleader) or only a main phase
+    -- wants a payload here rather than a sibling opcode (#393).
+    --
+    -- Targetless and unprompted -- CR 500.8 leaves nothing to choose. Executed
+    -- by Resolve.applyEffect via Turn.spliceCombatAndMainPhase, which is where
+    -- the CR 505.1a/506.1 detail of WHAT is inserted lives.
+    AddCombatAndMainPhase
   | -- CR 613.1b / 611.2c: install a layer-2 control effect on the slot's target
     -- for a duration. The new controller is THIS effect's source's controller
     -- (the `controller` passed to applyEffect), baked into a stored

@@ -71,8 +71,11 @@ clearCombat gs = gs {GameState.combat = emptyCombat}
 --
 -- A creature put onto the battlefield attacking LATER than that step cannot
 -- un-skip anything, and does not need to: the steps this drops are the only ones
--- it could enter during, so if they were dropped there is no such moment, and if
--- they were not then nothing is skipped anyway.
+-- of THIS combat phase it could enter during, so if they were dropped there is
+-- no such moment, and if they were not then nothing is skipped anyway. A CR
+-- 500.8 additional combat phase later in the turn is not this call's business
+-- and Turn.dropSkippedCombatSteps does not touch it -- that phase reaches its
+-- own declare attackers step and asks this question again for itself.
 --
 -- No test exercises the second clause on its own -- a creature put onto the
 -- battlefield attacking while nothing was declared. The pool's only source of one

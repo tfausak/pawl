@@ -345,7 +345,7 @@ payComponent pid oid component = case component of
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)})
     pure Payment.Paid
   -- CR 107.6: "Untap this permanent." A direct edit like TapThis above, and not
-  -- through any funnel: untapping to pay a cost is not CR 701.20's untap EVENT
+  -- through any funnel: untapping to pay a cost is not CR 701.26b's untap EVENT
   -- (Effect.Untap), which is what a spell or ability does TO a permanent.
   CostComponent.UntapThis -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)})
