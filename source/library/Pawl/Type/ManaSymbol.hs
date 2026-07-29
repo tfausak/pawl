@@ -59,8 +59,9 @@ data ManaSymbol
     -- no mana at all, so Pawl.Mana's cost resolution carries an amount of LIFE
     -- alongside its demands, and CR 119.4's floor ("only if their life total is
     -- greater than or equal to the amount of the payment") is what decides
-    -- whether that way is open. Which way is taken is pawl's choice and not the
-    -- player's (#361).
+    -- whether that way is open. WHICH way is taken is the player's, announced as
+    -- they propose the spell (CR 118.13a) by Pawl.Mana's announcePhyrexian, so
+    -- this symbol is gone before the cost is paid at all.
     --
     -- CR 107.4f's OTHER half -- the ten hybrid Phyrexian symbols, "{G/U/P}", paid
     -- with either of two colours or with 2 life -- is not this constructor and

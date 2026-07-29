@@ -450,6 +450,9 @@ discardLastAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 lastN :: Natural -> [a] -> [a]
 lastN n xs = reverse (List.genericTake n (reverse xs))
@@ -921,6 +924,9 @@ castFirstOption p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 nameOnStack :: Text.Text -> GameState.GameState -> ObjectId.ObjectId -> Bool
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
@@ -973,3 +979,6 @@ castPanglacial p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers

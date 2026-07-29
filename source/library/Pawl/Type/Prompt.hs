@@ -7,6 +7,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Numeric.Natural (Natural)
 import Pawl.Type.Action (Action)
+import Pawl.Type.Color (Color)
 import Pawl.Type.Concession (Concession)
 import Pawl.Type.Cost (Cost)
 import Pawl.Type.Decider (Decider)
@@ -17,6 +18,7 @@ import Pawl.Type.MulliganDecision (MulliganDecision)
 import Pawl.Type.MulliganOffer (MulliganOffer)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.OptionalDecision (OptionalDecision)
+import Pawl.Type.PhyrexianPayment (PhyrexianPayment)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.SlotName (SlotName)
@@ -439,3 +441,24 @@ data Prompt r where
   -- payload mixing a live mode with a dead optional one would reach this prompt
   -- with nothing to decide (#336).
   ChooseOptional :: Decider -> PlayerId -> ObjectId -> ModeIndex -> Prompt OptionalDecision
+  -- CR 601.2b: "If a cost that will be paid as the spell is being cast includes
+  -- Phyrexian mana symbols, the player announces whether they intend to pay 2
+  -- life or a corresponding colored mana cost for each of those symbols." CR
+  -- 118.13a is the rule that puts the choice HERE rather than at payment: it "is
+  -- made as its controller proposes that spell or ability". The ObjectId is the
+  -- spell being cast or the permanent whose ability is being activated (CR
+  -- 602.2b sends an activation through the same rule); the Color is the symbol's
+  -- own, so a {W/P} and a {G/P} in one cost put DISTINGUISHABLE questions on the
+  -- wire.
+  --
+  -- ONE PROMPT PER SYMBOL, in printed order, and the NonEmpty is the routes that
+  -- are actually payable given the announcements already made -- so a player can
+  -- never announce a route CR 118.3 will not let them complete. Two symbols of
+  -- the SAME colour ask two identical questions, which is sound where it would
+  -- not be for OrderTriggers (#61): the answers are interchangeable, since both
+  -- symbols demand the same mana and the same 2 life, so the pair of answers is
+  -- all that is observable and which prompt got which is not.
+  --
+  -- Elided when only one route is payable, where no choice exists -- no green
+  -- source at all, or a life total below CR 119.4's floor (#372).
+  AnnouncePhyrexianPayment :: Decider -> PlayerId -> ObjectId -> Color -> NonEmpty PhyrexianPayment -> Prompt PhyrexianPayment
