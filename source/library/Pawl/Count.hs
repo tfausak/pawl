@@ -162,7 +162,12 @@ snapshotView shape event = case event of
                 -- Nor is what a permanent was attached to (CR 109.3 names it
                 -- explicitly), and the snapshot records no attachment either --
                 -- so IsAttachedToCreature is vacuously False here too.
-                Filter.attachedToCreature = False
+                Filter.attachedToCreature = False,
+                -- Nor is what a permanent is represented by (CR 111.6: a token
+                -- "isn't a card"), and the snapshot records characteristics only
+                -- -- so IsToken is vacuously False over a past event, the third
+                -- arm to take that posture here.
+                Filter.token = False
               }
         else Nothing
   GameEvent.DamageDealt _ -> Nothing

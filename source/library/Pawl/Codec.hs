@@ -594,6 +594,7 @@ filterToJson filter_ = case filter_ of
   Filter.IsSource -> nullary (Text.pack "IsSource")
   Filter.IsAttacking -> nullary (Text.pack "IsAttacking")
   Filter.IsAttachedToCreature -> nullary (Text.pack "IsAttachedToCreature")
+  Filter.IsToken -> nullary (Text.pack "IsToken")
   Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (fmap filterToJson fs)))
   Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (fmap filterToJson fs)))
   Filter.Not f -> Json.tagged (Text.pack "Not") (Just (filterToJson f))
@@ -612,6 +613,7 @@ jsonToFilter value = do
     ("IsSource", _) -> Right Filter.IsSource
     ("IsAttacking", _) -> Right Filter.IsAttacking
     ("IsAttachedToCreature", _) -> Right Filter.IsAttachedToCreature
+    ("IsToken", _) -> Right Filter.IsToken
     ("And", Just (Array vs)) -> Filter.And <$> traverse jsonToFilter vs
     ("Or", Just (Array vs)) -> Filter.Or <$> traverse jsonToFilter vs
     ("Not", Just v) -> Filter.Not <$> jsonToFilter v

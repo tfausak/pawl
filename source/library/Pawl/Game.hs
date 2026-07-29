@@ -140,6 +140,22 @@ isSpell oid gs = case lookupObject oid gs of
       Source.OfEmblem _ -> False
       Source.OfInherentTrigger _ _ -> False
 
+-- CR 111.1 / 111.6: is this object a token rather than a card? Asks the object's
+-- KIND (its Source), a classification in the same standing as isSpell just above,
+-- never the card's identity. False for an unknown id, and for every non-token
+-- kind -- an ability or trigger on the stack has no permanent behind it at all,
+-- and an emblem (CR 114.5) is not a permanent either.
+isToken :: ObjectId -> GameState -> Bool
+isToken oid gs = case lookupObject oid gs of
+  Nothing -> False
+  Just obj -> case Object.source obj of
+    Source.OfToken _ -> True
+    Source.OfCard _ -> False
+    Source.OfAbility _ _ -> False
+    Source.OfTrigger _ _ -> False
+    Source.OfEmblem _ -> False
+    Source.OfInherentTrigger _ _ -> False
+
 -- CR 104.2a: who is still in the game. A pure query over the players map, so it
 -- lives here with the other GameState accessors rather than in Pawl.Departure
 -- with the machinery that acts on leaving. That is not only tidiness: Departure

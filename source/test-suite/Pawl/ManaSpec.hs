@@ -25,6 +25,7 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActivationTiming as ActivationTiming
+import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.Effect as Effect
@@ -205,6 +206,44 @@ manaTests registry =
             (_, gs) = S.addCreature bloodMoon S.alice g1
         HU.assertBool "red available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf urborgId gs)
         HU.assertBool "black not available (stripped)" (ManaType.Colored Color.Black `notElem` Mana.manaTypesOf urborgId gs),
+      -- CR 305.6: the intrinsic mana ability comes with the land TYPE, whether
+      -- the type was printed or added at layer 4 -- so an Ashaya-animated
+      -- creature taps for green, and Blood Moon (CR 305.7) rewrites that to red
+      -- by setting the same subtype it reads.
+      HU.testCase "CR 305.6 a creature Ashaya made a Forest land taps for green" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        let base = Setup.emptyGame S.bothPlayers
+            (pikerId, g1) = S.addCreature piker S.alice base
+            (_, gs) = S.addCreature ashaya S.alice g1
+        HU.assertBool "green available" (ManaType.Colored Color.Green `elem` Mana.manaTypesOf pikerId gs)
+        HU.assertBool "and it is a mana source" (pikerId `elem` Mana.manaSources S.alice gs),
+      HU.testCase "CR 305.7 Blood Moon turns that same creature-land red" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let base = Setup.emptyGame S.bothPlayers
+            (pikerId, g1) = S.addCreature piker S.alice base
+            (_, g2) = S.addCreature bloodMoon S.alice g1
+            (_, gs) = S.addCreature ashaya S.alice g2
+        HU.assertBool "red available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf pikerId gs)
+        HU.assertBool "green gone" (ManaType.Colored Color.Green `notElem` Mana.manaTypesOf pikerId gs),
+      -- Ashaya's reminder text: "(They're still affected by summoning sickness.)"
+      -- CR 302.6 gates a CREATURE's {T} ability, and CR 205.1b's "in addition to
+      -- their other types" keeps the creature type -- so gaining CR 305.6's mana
+      -- ability does not hand a fresh creature a land's exemption. Nothing had to
+      -- be built for this; it falls out of Mana.manaSources reading the PROJECTED
+      -- card types.
+      HU.testCase "CR 302.6 a summoning-sick creature Ashaya animated still cannot tap for mana" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        let base = Setup.emptyGame S.bothPlayers
+            (pikerId, g1) = S.addCreature piker S.alice base
+            (_, g2) = S.addCreature ashaya S.alice g1
+            sick = g2 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) pikerId (GameState.objects g2)}
+        HU.assertBool "it is a land now" (Set.member CardType.Land (Projection.cardTypesOf pikerId sick))
+        HU.assertBool "and still a creature" (Projection.isCreatureOf pikerId sick)
+        HU.assertBool "so the sick creature is no mana source" (pikerId `notElem` Mana.manaSources S.alice sick),
       HU.testCase "CR 605.1a a {T}: Add {G} ability is a mana ability" $
         let ab =
               ActivatedAbility.MkActivatedAbility
