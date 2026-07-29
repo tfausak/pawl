@@ -2061,7 +2061,7 @@ untapTests registry =
                 Map.empty
                 (Map.singleton slot True)
                 (Map.singleton slot (Recipient.ToCreature oid))
-                (Effect.Untap slot)
+                (Effect.Untap (ObjectRef.InSlot slot))
             after = snd (Engine.runGamePure S.identityAnswer base run)
         HU.assertEqual "target is untapped" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject oid after))
     ]

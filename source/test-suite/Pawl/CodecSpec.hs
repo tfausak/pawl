@@ -250,6 +250,14 @@ tests registry =
             roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards,
           HU.testCase "Proliferate" $
             roundTrip "e4b" Codec.effectToJson Codec.jsonToEffect Effect.Proliferate,
+          HU.testCase "AddCombatAndMainPhase" $
+            roundTrip "e4c" Codec.effectToJson Codec.jsonToEffect Effect.AddCombatAndMainPhase,
+          -- Untap takes the same untagged ObjectRef Destroy does, so both arms
+          -- have to survive the trip: Act of Treason's slot and Aggravated
+          -- Assault's swept set.
+          HU.testCase "Untap round-trips both ObjectRef arms" $ do
+            roundTrip "e4d" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+            roundTrip "e4e" Codec.effectToJson Codec.jsonToEffect (Effect.Untap (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature))),
           HU.testCase "Destroy carries its CR 701.19c rider both ways" $ do
             roundTrip "e5a" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable)
             roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated),

@@ -26,6 +26,7 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Target as Target
+import qualified Pawl.Turn as Turn
 import Pawl.Type.AbilityName (AbilityName)
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
@@ -129,7 +130,8 @@ slotsOf effect = case effect of
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ _ slot -> Set.singleton slot
   Effect.GainPlayerCounters ref _ _ -> playerRefSlots ref
-  Effect.Untap slot -> Set.singleton slot
+  Effect.Untap ref -> objectRefSlots ref
+  Effect.AddCombatAndMainPhase -> Set.empty
   Effect.GainControl _ slot -> Set.singleton slot
   Effect.ArmDelayedTrigger _ -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
@@ -176,6 +178,7 @@ readsX = any effectReadsX
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
       Effect.Untap _ -> False
+      Effect.AddCombatAndMainPhase -> False
       Effect.GainControl _ _ -> False
       Effect.ArmDelayedTrigger _ -> False
       Effect.AffectPlayers {} -> False
@@ -221,6 +224,7 @@ manaProduced effect = case effect of
   Effect.PutCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
   Effect.Untap _ -> Nothing
+  Effect.AddCombatAndMainPhase -> Nothing
   Effect.GainControl _ _ -> Nothing
   Effect.ArmDelayedTrigger _ -> Nothing
   Effect.AffectPlayers {} -> Nothing
@@ -261,6 +265,7 @@ searchesLibrary effect = case effect of
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
   Effect.Untap _ -> False
+  Effect.AddCombatAndMainPhase -> False
   Effect.GainControl _ _ -> False
   Effect.ArmDelayedTrigger _ -> False
   Effect.AffectPlayers {} -> False
@@ -318,6 +323,9 @@ bindsSeveralTokens effects =
 -- (Resolve's charter); delegates the inner modification of ModifyTarget to
 -- Projection.rewriteModification, so neither module touches the other's
 -- constructors. DealDamage and ChangeText carry no rewritable land-type word.
+--
+-- A Filter carried by an effect (Search's, Destroy's and Untap's EachMatching,
+-- PlayerSacrifices', AttachTarget's) is NOT rewritten (#395).
 rewriteEffect :: [(Subtype, Subtype)] -> Effect Card.Type.Card -> Effect Card.Type.Card
 rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget duration modification slot ->
@@ -351,6 +359,8 @@ rewriteEffect pairs effect = case effect of
   -- No rewritable land-type word.
   Effect.GainPlayerCounters {} -> effect
   Effect.Untap _ -> effect
+  -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
+  Effect.AddCombatAndMainPhase -> effect
   Effect.GainControl _ _ -> effect
   Effect.ArmDelayedTrigger _ -> effect
   -- A player effect carries no basic-land-type word for CR 612 to rewrite.
@@ -1598,14 +1608,30 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                       }
                 )
       _ -> pure ()
-  Effect.Untap slot ->
+  Effect.Untap ref ->
     State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        -- CR 701.26b: rotate the slot's target back to the upright position.
-        (Just recipient, True) -> case recipientObject recipient of
-          Nothing -> gs -- a player recipient cannot be untapped
-          Just target -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) target (GameState.objects gs)}
-        _ -> gs -- illegal slot at resolution (CR 608.2b): no-op
+      -- CR 701.26b: rotate each named permanent back to the upright position.
+      -- The victims are enumerated ONCE, for the CR 608.2f simultaneity
+      -- objectRefObjects buys; an illegal slot (CR 608.2b), a player recipient
+      -- and a set that matched nothing all arrive as the empty list and untap
+      -- nothing, so there is one path rather than three.
+      let untap o = o {Object.tapped = TapState.Untapped}
+       in gs
+            { GameState.objects =
+                foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
+            }
+  -- CR 500.8: add the phases, directly after the phase this is resolving in --
+  -- GameState.remaining is exactly what is left after the current one, so
+  -- Turn.spliceCombatAndMainPhase's cons-at-head puts them there.
+  --
+  -- Cons-at-head means "directly after this PHASE" only because the phase this
+  -- can resolve in has no steps: what is left of a stepped phase would sit in
+  -- `remaining` too, and the new phases would go inside it rather than after it.
+  -- Turn.spliceCombatAndMainPhase's own comment carries the CR 307.5 argument
+  -- for why the resolving phase is always a main phase (CR 505.2: no steps).
+  Effect.AddCombatAndMainPhase ->
+    State.modify' $ \gs ->
+      gs {GameState.remaining = Turn.spliceCombatAndMainPhase (GameState.remaining gs)}
   Effect.GainControl duration slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

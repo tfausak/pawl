@@ -923,7 +923,7 @@ runStep = do
   -- not started, and this is its last unobserved moment.
   --
   -- The skipped step is left popped off the schedule by `advance` below rather
-  -- than filtered out of GameState.remaining the way CR 508.8's combat skip is
+  -- than dropped from GameState.remaining the way CR 508.8's combat skip is
   -- (Turn.dropSkippedCombatSteps). Both reach "as though it didn't exist"; the
   -- difference is that CR 508.8 is a RULE, known one step ahead, while a
   -- replacement effect has to be asked at the moment the event would happen,

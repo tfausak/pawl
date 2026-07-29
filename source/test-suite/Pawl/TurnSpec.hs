@@ -1,18 +1,34 @@
--- Covers Pawl.Turn: turn structure, the phase schedule, and the CR 508.8 skips.
+{-# LANGUAGE RankNTypes #-}
+
+-- Covers Pawl.Turn: turn structure, the phase schedule, the CR 508.8 skips, and
+-- CR 500.8's added phases (Aggravated Assault).
 module Pawl.TurnSpec where
 
+import qualified Data.Maybe as Maybe
+import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Engine as Engine
+import qualified Pawl.Game as Game
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
+import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.BeginningStep as BeginningStep
+import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Type.Object as Object
+import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.Phase (Phase)
 import qualified Pawl.Type.Phase as Phase
+import qualified Pawl.Type.Printing as Printing
+import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Registry as Registry.Type
+import qualified Pawl.Type.TapState as TapState
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 import qualified Test.Tasty.QuickCheck as QC
@@ -86,6 +102,37 @@ skipTests registry =
                 ]
             expected = Seq.fromList [Phase.Combat CombatStep.EndOfCombat, Phase.PostcombatMain]
          in HU.assertEqual "dropped" expected (Turn.dropSkippedCombatSteps full),
+      HU.testCase "CR 500.8 dropSkippedCombatSteps spares a LATER combat phase's steps" $
+        -- The schedule a CR 500.8 additional combat phase leaves behind: this
+        -- combat's tail, then an additional main phase, then the turn's normal
+        -- combat phase in full. CR 508.8 skipped THIS combat, so only the two
+        -- steps before this phase's end of combat step (CR 511.3: "after the end
+        -- of combat step ends, the combat phase is over") may go.
+        let full =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain,
+                  Phase.Combat CombatStep.BeginningOfCombat,
+                  Phase.Combat CombatStep.DeclareAttackers,
+                  Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain
+                ]
+            expected =
+              Seq.fromList
+                [ Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain,
+                  Phase.Combat CombatStep.BeginningOfCombat,
+                  Phase.Combat CombatStep.DeclareAttackers,
+                  Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain
+                ]
+         in HU.assertEqual "only this phase's steps dropped" expected (Turn.dropSkippedCombatSteps full),
       HU.testCase "CR 508.8 no attacker declared skips to end of combat" $
         -- Nobody has a creature, so no attackers are declared: the declare
         -- blockers and combat damage steps must not run at all.
@@ -128,10 +175,175 @@ skipTests registry =
         HU.assertBool "no damage step" (notElem (Phase.Combat CombatStep.CombatDamage) remaining)
     ]
 
+-- The schedule Engine.advance leaves once the precombat main phase is current:
+-- everything after it in an ordinary turn (Turn.allPhases).
+afterPrecombatMain :: Seq Phase
+afterPrecombatMain =
+  Seq.fromList
+    [ Phase.Combat CombatStep.BeginningOfCombat,
+      Phase.Combat CombatStep.DeclareAttackers,
+      Phase.Combat CombatStep.DeclareBlockers,
+      Phase.Combat CombatStep.CombatDamage,
+      Phase.Combat CombatStep.EndOfCombat,
+      Phase.PostcombatMain,
+      Phase.Ending EndingStep.EndStep,
+      Phase.Ending EndingStep.Cleanup
+    ]
+
+-- alice, in her precombat main phase with priority, controlling five untapped
+-- Mountains (exactly the {3}{R}{R} activation), an Aggravated Assault, and one
+-- TAPPED creature of the given printing. bob has a tapped Goblin Piker, which
+-- the ability's "you control" must leave alone.
+assaultBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId, ObjectId, ObjectId)
+assaultBoard mountain assault mine piker =
+  let (enchantment, gs1) = S.addCreature assault S.alice (S.landsInPlay mountain 5)
+      (ours, gs2) = S.addCreature mine S.alice gs1
+      (theirs, gs3) = S.addCreature piker S.bob gs2
+      gs =
+        (S.tapObject theirs (S.tapObject ours gs3))
+          { GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.remaining = afterPrecombatMain
+          }
+   in (gs, enchantment, ours, theirs)
+
+-- The card's one printed activated ability.
+assaultAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+assaultAbility assault = case Card.Type.activatedAbilities (Printing.card assault) of
+  [] -> Nothing
+  ability : _ -> Just ability
+
+-- Activate it and let it resolve, through the real activation path (the
+-- Bonesplitter shape in Pawl.AuraSpec) -- not Resolve.applyEffect, so the
+-- {3}{R}{R} is genuinely paid off the board. The CR 307.5 rider is NOT checked
+-- here: Activate.timingOk gates Action.legalActions, and a direct
+-- activateAbility call goes around it, so the test that cares asks
+-- Activate.activatable itself.
+activateAssault :: ActivatedAbility.ActivatedAbility Card.Type.Card -> ObjectId -> GameState.GameState -> GameState.GameState
+activateAssault ability enchantment gs =
+  let activated = snd (Engine.runGamePure S.identityAnswer gs (Activate.activateAbility S.alice enchantment ability))
+   in snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+
+-- Run whole steps until the turn hands off (Engine.advance on an empty
+-- schedule) or the game ends, keeping the phase each step ran in alongside the
+-- board the turn left. Bounded so a bug cannot loop forever.
+runTurn :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> (GameState.GameState, [Phase])
+runTurn answer gs0 =
+  let turn = GameState.turnNumber gs0
+      go n g =
+        if n <= (0 :: Int) || Maybe.isJust (GameState.result g) || GameState.turnNumber g /= turn
+          then (g, [])
+          else
+            let (final, later) = go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+             in (final, GameState.phase g : later)
+   in go 32 gs0
+
+-- CR 500.8's added phases, end to end, through the one card in the pool that
+-- adds any: Aggravated Assault ({3}{R}{R}: Untap all creatures you control.
+-- After this main phase, there is an additional combat phase followed by an
+-- additional main phase. Activate only as a sorcery.)
+extraPhaseTests :: Registry.Type.Registry -> Tasty.TestTree
+extraPhaseTests registry =
+  Tasty.testGroup
+    "ExtraPhase"
+    [ HU.testCase "CR 500.8 whole card: Aggravated Assault untaps your creatures and adds a combat and a main phase" $ do
+        mountain <- Registry.printing registry "Mountain"
+        assault <- Registry.printing registry "Aggravated Assault"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, enchantment, ours, theirs) = assaultBoard mountain assault piker piker
+        case assaultAbility assault of
+          Nothing -> HU.assertFailure "Aggravated Assault should print one activated ability"
+          Just ability -> do
+            -- CR 307.5: "Activate only as a sorcery" is a real gate, not decoration
+            -- -- offered in alice's main phase with an empty stack, withheld in her
+            -- combat phase. Asked of Activate.activatable, because that is what
+            -- Action.legalActions consults; activateAbility itself goes around it.
+            HU.assertBool "offered in the main phase" (Activate.activatable S.alice enchantment ability gs)
+            HU.assertBool
+              "withheld in the combat phase"
+              (not (Activate.activatable S.alice enchantment ability gs {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}))
+            let after = activateAssault ability enchantment gs
+            -- CR 701.26b over the swept set: alice's creature, and only it.
+            HU.assertEqual "alice's creature untapped" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject ours after))
+            HU.assertEqual "bob's creature still tapped" (Just TapState.Tapped) (fmap Object.tapped (Game.lookupObject theirs after))
+            -- The five Mountains paid the cost, so they are tapped -- and they
+            -- are lands, so "all creatures you control" must leave them alone.
+            HU.assertEqual "the lands that paid stay tapped" 5 (S.tappedCount S.alice after)
+            -- CR 500.8: "directly after the specified phase", not at the end of
+            -- the turn. The whole of the ordinary remainder still follows.
+            HU.assertEqual
+              "the phases went in directly after this main phase"
+              (Turn.combatAndMainPhase <> afterPrecombatMain)
+              (GameState.remaining after)
+            HU.assertEqual "and the main phase it was activated in is still current" Phase.PrecombatMain (GameState.phase after),
+      HU.testCase "CR 508.8 + 500.8 skipping the added combat phase leaves the turn's own combat phase whole" $ do
+        -- The falsifier for #31. The added combat phase runs FIRST (it goes in
+        -- directly after the precombat main phase), nobody attacks in it, so CR
+        -- 508.8 skips its declare blockers and combat damage steps -- and the
+        -- turn's own combat phase, still ahead in the schedule, must keep both.
+        mountain <- Registry.printing registry "Mountain"
+        assault <- Registry.printing registry "Aggravated Assault"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, enchantment, _, _) = assaultBoard mountain assault piker piker
+        case assaultAbility assault of
+          Nothing -> HU.assertFailure "Aggravated Assault should print one activated ability"
+          Just ability -> do
+            -- Three steps: the main phase ends, then beginning of combat, then
+            -- declare attackers -- which is where Combat.skipEmptyCombat fires.
+            let resolved = activateAssault ability enchantment gs
+                step g = snd (Engine.runGamePure S.identityAnswer g Engine.runStep)
+                after = step (step (step resolved))
+            HU.assertEqual "the added combat jumped to its end of combat step" (Phase.Combat CombatStep.EndOfCombat) (GameState.phase after)
+            HU.assertEqual
+              "the turn's own combat phase kept every step"
+              (Seq.fromList [Phase.PostcombatMain] <> afterPrecombatMain)
+              (GameState.remaining after),
+      HU.testCase "CR 500.8 whole card: a vigilant creature attacks in the added combat phase AND the turn's own" $ do
+        -- CR 506.1's five steps really run twice: Windseeker Centaur has
+        -- vigilance (CR 702.20b: attacking does not tap it), so it is a legal
+        -- attacker again in the second declare attackers step, and bob takes 2
+        -- in each combat damage step.
+        mountain <- Registry.printing registry "Mountain"
+        assault <- Registry.printing registry "Aggravated Assault"
+        centaur <- Registry.printing registry "Windseeker Centaur"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, enchantment, _, _) = assaultBoard mountain assault centaur piker
+        case assaultAbility assault of
+          Nothing -> HU.assertFailure "Aggravated Assault should print one activated ability"
+          Just ability -> do
+            let (played, ran) = runTurn (S.attackTo S.bob) (activateAssault ability enchantment gs)
+            HU.assertEqual
+              "the turn ran a whole extra combat phase and main phase"
+              [ Phase.PrecombatMain,
+                Phase.Combat CombatStep.BeginningOfCombat,
+                Phase.Combat CombatStep.DeclareAttackers,
+                Phase.Combat CombatStep.DeclareBlockers,
+                Phase.Combat CombatStep.CombatDamage,
+                Phase.Combat CombatStep.EndOfCombat,
+                Phase.PostcombatMain,
+                Phase.Combat CombatStep.BeginningOfCombat,
+                Phase.Combat CombatStep.DeclareAttackers,
+                Phase.Combat CombatStep.DeclareBlockers,
+                Phase.Combat CombatStep.CombatDamage,
+                Phase.Combat CombatStep.EndOfCombat,
+                Phase.PostcombatMain,
+                Phase.Ending EndingStep.EndStep,
+                Phase.Ending EndingStep.Cleanup
+              ]
+              ran
+            HU.assertEqual "bob took 2 in each of the two combats" (Just 16) (S.lifeOf S.bob played)
+    ]
+
 dedupe :: (Eq a) => [a] -> [a]
 dedupe xs = case xs of
   [] -> []
   h : t -> h : dedupe (filter (/= h) t)
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests registry]
+tests registry = Tasty.testGroup "Turn" [turnTests, turnDataTests, skipTests registry, extraPhaseTests registry]
