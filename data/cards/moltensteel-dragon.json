@@ -1,0 +1,119 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [],
+        "mana": [
+          {
+            "type": "Phyrexian",
+            "value": {
+              "type": "Red"
+            }
+          }
+        ]
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "self"
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [
+    {
+      "type": "Flying"
+    }
+  ],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 4
+    },
+    {
+      "type": "Phyrexian",
+      "value": {
+        "type": "Red"
+      }
+    },
+    {
+      "type": "Phyrexian",
+      "value": {
+        "type": "Red"
+      }
+    }
+  ],
+  "name": "Moltensteel Dragon",
+  "power": {
+    "type": "Literal",
+    "value": 4
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 4
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Phyrexian"
+      },
+      {
+        "type": "Dragon"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      },
+      {
+        "type": "Artifact"
+      }
+    ]
+  }
+}

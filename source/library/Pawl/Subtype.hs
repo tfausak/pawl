@@ -78,3 +78,5 @@ isLandType subtype = case subtype of
   Subtype.Angel -> False
   Subtype.Insect -> False
   Subtype.Berserker -> False
+  Subtype.Thopter -> False
+  Subtype.Dragon -> False

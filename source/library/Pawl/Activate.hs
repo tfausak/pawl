@@ -272,11 +272,17 @@ activateAbility pid srcId ability = do
       -- identical to the process for casting a spell listed in rules 601.2b-i",
       -- so CR 118.13a's announcement -- which names "the activation cost of an
       -- activated ability" in its own words -- happens here, at 601.2b's
-      -- position, and not when the cost is paid. No ability in the pool has a
-      -- Phyrexian symbol in its cost, so this is Cost.announce's identity case
-      -- for every one of them; it is the rule's second named site, not a
-      -- speculative feature.
-      announcedCost <- Cost.announce pid srcId (ActivatedAbility.cost ability)
+      -- position, and not when the cost is paid. Moltensteel Dragon's "{R/P}: This
+      -- creature gets +1/+0 until end of turn" is what exercises it, and the rule's
+      -- other two clauses -- a cost paid during a resolution, or for a special
+      -- action -- are the ones still unreached (#373).
+      --
+      -- `id` rather than Cost.totalMana, and that is #90 rather than an oversight:
+      -- an activation cost is not routed through Cost.total anywhere, so
+      -- `activatable` above checked the PRINTED cost and the printed cost is what
+      -- will be paid. Measuring the announcement through anything else would
+      -- offer routes against a total this engine never computes.
+      announcedCost <- Cost.announce pid srcId id (ActivatedAbility.cost ability)
       let sets = Target.legalSets (Just pid) srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
       chosen <-
         if Map.null sets
@@ -296,10 +302,14 @@ activateAbility pid srcId ability = do
           -- ability reads the self slot, so this cannot disturb them.
           State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen Map.empty Nothing chosenModes)}) abilId (GameState.objects g)})
           -- CR 601.2g/h via Pawl.Cost.pay: the mana window, then the components.
-          -- activatable pre-checks payability (Cost.canPay, which is pure), so
-          -- Unpaid is unreachable; reject-not-repair restores the whole
-          -- activation -- including the ability object this function put on the
-          -- stack -- if it ever is not.
+          -- activatable pre-checks payability (Cost.canPay, which is pure), so an
+          -- ability offered here is one SOME sequence of choices pays for -- but
+          -- Unpaid is reachable all the same, because the mana window then asks the
+          -- player to make those choices and a mis-tapped colour is a choice the
+          -- engine must honour (Mana.payCost's haddock, and ManaSpec's "a Birds
+          -- tapped for green does not pay {B}"). Reject-not-repair restores the
+          -- whole activation -- including the ability object this function put on
+          -- the stack -- when it happens.
           payment <- Cost.pay pid srcId announcedCost
           case payment of
             Payment.Paid -> pure ()

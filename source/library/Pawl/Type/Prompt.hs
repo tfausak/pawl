@@ -460,12 +460,16 @@ data Prompt r where
   --
   -- ONE PROMPT PER SYMBOL, in printed order, and the NonEmpty is the routes that
   -- are actually payable given the announcements already made -- so a player can
-  -- never announce a route CR 118.3 will not let them complete. Two symbols of
-  -- the SAME colour ask two identical questions, which is sound where it would
-  -- not be for OrderTriggers (#61): the answers are interchangeable, since both
-  -- symbols demand the same mana and the same 2 life, so the pair of answers is
-  -- all that is observable and which prompt got which is not.
+  -- never announce a route CR 118.3 will not let them complete. Payable is
+  -- measured at CR 601.2f's TOTAL and not at the printed cost, which is what keeps
+  -- that promise in the presence of a cost increase or reduction (ManaSpec's
+  -- "CR 601.2f a reduction opens the coloured-mana route, so the announcement is
+  -- asked"). Two symbols of the SAME colour ask two identical questions, which is
+  -- sound where it would not be for OrderTriggers (#61): the answers are
+  -- interchangeable, since both symbols demand the same mana and the same 2 life,
+  -- so the pair of answers is all that is observable and which prompt got which is
+  -- not. Dismember ({1}{B/P}{B/P}) is the card that asks them.
   --
-  -- Elided when only one route is payable, where no choice exists -- no green
-  -- source at all, or a life total below CR 119.4's floor (#372).
+  -- Elided when only one route is payable, where no choice exists -- no source of
+  -- the symbol's colour at all, or a life total below CR 119.4's floor.
   AnnouncePhyrexianPayment :: Decider -> PlayerId -> ObjectId -> Color -> NonEmpty PhyrexianPayment -> Prompt PhyrexianPayment

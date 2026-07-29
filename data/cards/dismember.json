@@ -1,0 +1,82 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "Phyrexian",
+      "value": {
+        "type": "Black"
+      }
+    },
+    {
+      "type": "Phyrexian",
+      "value": {
+        "type": "Black"
+      }
+    }
+  ],
+  "name": "Dismember",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "ModifyTarget",
+            "value": [
+              {
+                "type": "UntilEndOfTurn"
+              },
+              {
+                "type": "ModifyPowerToughness",
+                "value": [
+                  {
+                    "type": "Literal",
+                    "value": -5
+                  },
+                  {
+                    "type": "Literal",
+                    "value": -5
+                  }
+                ]
+              },
+              "target"
+            ]
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "target",
+            "spec": {
+              "pool": {
+                "type": "Creatures"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}
