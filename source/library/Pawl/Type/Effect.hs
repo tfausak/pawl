@@ -273,7 +273,8 @@ data Effect card
     GainPlayerCounters PlayerRef PlayerCounterKind Quantity
   | -- CR 701.26b: untap the permanents the ObjectRef names. Act of Treason's
     -- "untap that creature" is `InSlot`; Aggravated Assault's "untap all
-    -- creatures you control" is `EachMatching`, swept at resolution.
+    -- creatures you control" and Relentless Assault's "untap all creatures that
+    -- attacked this turn" are both `EachMatching`, swept at resolution.
     --
     -- ObjectRef rather than a bare SlotName for the reason Destroy's comment
     -- gives at length: one opcode serving both the chosen permanent and the

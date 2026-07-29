@@ -11,12 +11,15 @@ import Pawl.Type.Supertype (Supertype)
 -- target may be either -- expressed as data and evaluated by one generic
 -- matcher (Pawl.Filter.matches) that never learns which effect produced it. Its
 -- atoms case on CHARACTERISTICS (card type, supertype, colour, subtype, power,
--- controller, and for a player candidate its identity) -- and, in IsAttacking's
--- case, on a combat status that is not one (CR 109.3) but that the closed half
--- owns just as squarely -- exactly as the rules
--- already case on a CardType -- casing on a
--- characteristic classification is legitimate; the invariant forbids only casing
--- on an EFFECT's identity, which this type never does.
+-- controller, and for a player candidate its identity) -- exactly as the rules
+-- already case on a CardType -- and on a handful of things CR 109.3 says are NOT
+-- characteristics but that the closed half owns just as squarely: combat status
+-- (IsAttacking), attachment (IsAttachedToCreature), what a permanent is
+-- represented by (IsToken), and what happened earlier this turn
+-- (AttackedThisTurn, the only one that is not a present state at all). Each arm
+-- carries its own defence. Casing on a characteristic classification is
+-- legitimate; the invariant forbids only casing on an EFFECT's identity, which
+-- this type never does.
 --
 -- Flat, not layered: the atoms and the And/Or/Not combinators are sibling arms of
 -- one type, mirroring Pawl.Type.Quantity's flat `Plus Quantity Quantity`

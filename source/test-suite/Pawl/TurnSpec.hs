@@ -1,7 +1,9 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Turn: turn structure, the phase schedule, the CR 508.8 skips, and
--- CR 500.8's added phases (Aggravated Assault).
+-- CR 500.8's added phases -- Aggravated Assault and Relentless Assault for the
+-- combat-and-main pair, Aurelia, the Warleader for one added from INSIDE a
+-- combat phase, and Full Throttle for two combat phases and none of main.
 module Pawl.TurnSpec where
 
 import qualified Data.Foldable as Foldable
