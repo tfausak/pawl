@@ -66,7 +66,8 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- UNEVALUATED quantities (power, toughness) with the printed star already
     -- substituted. Seeded from the card, so it rides copiableCharacteristics and a
     -- Clone acquires the ability rather than the number (CR 707.2a); emptied by
-    -- LoseAllAbilities at layer 6, which is BEFORE 7a.
+    -- LoseAllAbilities at layer 6 and by CR 305.7's SetLandSubtype at layer 4,
+    -- both of which are BEFORE 7a.
     characteristicPT :: Maybe (Quantity, Quantity),
     cardTypes :: Set CardType,
     subtypes :: Set Subtype,
@@ -76,10 +77,10 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- ability fields around it.
     activatedAbilities :: [ActivatedAbility Card],
     -- CR 614 layer 6: the object's replacement effects after the layer system,
-    -- the same projection posture as activatedAbilities. Emptied by LoseAllAbilities.
+    -- the same projection posture as activatedAbilities, emptied by the same two.
     replacementEffects :: [ReplacementEffect],
     -- CR 603 layer 6: the object's triggered abilities after the layer system,
-    -- the same projection posture as activatedAbilities. Emptied by LoseAllAbilities.
+    -- the same projection posture as activatedAbilities, emptied by the same two.
     triggeredAbilities :: [TriggeredAbility Card]
   }
   deriving (Eq, Ord, Show)

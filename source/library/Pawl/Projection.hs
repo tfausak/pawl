@@ -162,9 +162,9 @@ applyModification lyr src cands gs oid m pc =
         -- lands on an already-emptied map.
         --
         -- CR 604.3 makes a characteristic-defining ability a static ability, so
-        -- characteristicPT goes with the rest. CR 613.6 does not rescue it: it
-        -- would first apply at layer 7a, AFTER the layer 4 that takes it away --
-        -- the mirror of the case LoseAllAbilities' own comment describes.
+        -- characteristicPT goes with the rest -- the same reason LoseAllAbilities
+        -- clears it at layer 6. CR 613.6 rescues neither: a CDA would first apply
+        -- at layer 7a, which is after both.
         --
         -- Not stripped, and not an oversight: CR 305.7's third clause, "any
         -- copiable effects affecting that land", is a layer-1 question this
@@ -759,19 +759,27 @@ setLandSubtypeEffects gs =
         <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 
 -- CR 305.7: a land whose subtype is SET to a basic type loses its rules-text
--- abilities. So an object's static abilities are live unless a live SetLandSubtype
--- applies to it. "Live" recurses on the stripper's own source; "applies to" reads
--- BASE characteristics (nonbasic is a printed supertype, and card-type Land is
--- read off the printed type line here), so nothing recurses into the projection
--- and the result is order-INDEPENDENT. A cycle trips the visited set (both
--- treated as live -- the CR 613.8b loop-escape analog, not an implementation of
--- it, #37).
+-- abilities. This is ONE of the two places that rule is enforced, and the
+-- narrower one: it decides whether a permanent's STATIC abilities reach the
+-- candidate list at all, because a static ability's effect lands on other objects
+-- and so cannot be erased from the permanent's own projection afterwards. Every
+-- other kind of rules-text ability is stripped inside the fold instead, by
+-- applyModification's SetLandSubtype arm. So an object's static abilities are
+-- live unless a live SetLandSubtype applies to it. "Live" recurses on the
+-- stripper's own source; "applies to" reads BASE characteristics (nonbasic is a
+-- printed supertype, and card-type Land is read off the printed type line here),
+-- so nothing recurses into the projection and the result is order-INDEPENDENT. A
+-- cycle trips the visited set (both treated as live -- the CR 613.8b loop-escape
+-- analog, not an implementation of it, #37).
 --
--- The base read is a RESTRICTION, not merely a shortcut: a permanent that becomes
--- a land only through a layer-4 type change is not seen here at all, so the strip
--- never reaches it. Ashaya, Soul of the Wild is the card that does that, and she
--- keeps her own characteristic-defining P/T under a Blood Moon that the CR would
--- have stripped her rules text away entirely (#391).
+-- The base read is a RESTRICTION, not merely a shortcut, and the two halves of
+-- CR 305.7 therefore disagree about their affected set: a permanent that becomes
+-- a land only through a layer-4 type change is not seen HERE at all, while the
+-- fold's arm reads the projection and does reach it. Ashaya, Soul of the Wild is
+-- the card that does that. Blood Moon takes her characteristic-defining P/T, her
+-- activated, triggered and replacement abilities and her keywords -- all of which
+-- the arm reaches -- and leaves her own animating STATIC ability standing, which
+-- this gate does not (#391).
 --
 -- Ashaya is NOT the dependency loop #37 waits for, and the way she misses is
 -- worth recording so the next reader does not re-derive it. A loop needs each
@@ -970,9 +978,11 @@ removesAbilities m = case m of
   -- removing.
   Modification.GainKeyword _ -> False
   -- CR 305.7 strips a land's rules text, which IS an ability loss -- but it is a
-  -- layer-4 type change (see `layer`), not a layer-6 removal, and it is gated
-  -- separately and earlier by liveGiven. Answering True here would double-count
-  -- it into a layer whose ordering it does not have.
+  -- layer-4 type change (see `layer`), not a layer-6 removal, and it is performed
+  -- separately and earlier: applyModification's own arm empties the ability
+  -- fields, and liveGiven keeps the static abilities out of the candidate list.
+  -- Answering True here would double-count it into a layer whose ordering it does
+  -- not have.
   Modification.SetLandSubtype _ -> False
   Modification.SetBasePowerToughness _ _ -> False
   Modification.ModifyPowerToughness _ _ -> False
@@ -1192,6 +1202,10 @@ filterReads f = case f of
 -- same as saying an ability change cannot matter to CR 613.8 at all -- it can
 -- change an effect's EXISTENCE, which is a different clause of CR 613.8a and
 -- lives in staticAbilitiesLive (CR 305.7).
+--
+-- SetLandSubtype writes abilities too, and declares only Subtypes for the same
+-- reason: the abilities it empties are unreadable by any Filter, so the only part
+-- of it CR 613.8a can see is the subtype it sets.
 modificationWrites :: Modification -> Set Aspect
 modificationWrites m = case m of
   Modification.GainKeyword _ -> Set.empty

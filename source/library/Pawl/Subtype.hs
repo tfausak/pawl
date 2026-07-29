@@ -12,9 +12,11 @@ import qualified Pawl.Type.Subtype as Subtype
 -- Lair, Locus, Mine, Mountain, Plains, Planet, Power-Plant, Sphere, Swamp,
 -- Tower, Town, and Urza's."
 --
--- CR 205.3a makes the families disjoint ("Each card type has its own set of
--- possible subtypes"), so every other constructor is a False that a new subtype
--- must decide deliberately -- hence total, with no wildcard.
+-- CR 205.3c gives each subtype exactly one card type it is "correlated to", and
+-- CR 205.3d forbids gaining one that does not match, so the families named by CR
+-- 205.3g-205.3m are disjoint: a subtype is a land type or it is not. Every other
+-- constructor is therefore a False a new subtype must decide deliberately --
+-- hence total, with no wildcard.
 --
 -- Five of CR 205.3i's seventeen exist in this type today, and they happen to be
 -- exactly the five BASIC land types (CR 305.6). That coincidence is not what
