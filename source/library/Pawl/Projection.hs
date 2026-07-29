@@ -143,6 +143,12 @@ applyModification lyr src cands gs oid m pc =
         -- creature) or supertypes" -- is why a creature type on an animated
         -- permanent has to survive.
         --
+        -- CR 305.7 says "one or more of the basic land types" and this
+        -- modification carries exactly one, which is not a narrowing: no printed
+        -- card SETS a land's subtype to more than one basic type (Blood Moon,
+        -- Magus of the Moon and Zhao all set Mountain alone; the multi-type
+        -- cards -- Urborg, Prismatic Omen -- all ADD).
+        --
         -- The ABILITY clause takes every kind of ability a card's rules text can
         -- generate, which is every one this record carries plus the three decided
         -- outside it. Keywords and the four fields below are stripped here; a
