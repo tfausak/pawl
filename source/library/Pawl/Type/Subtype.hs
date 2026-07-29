@@ -66,4 +66,6 @@ data Subtype
     Cleric
   | -- CR 205.3m (a creature type; Narcomoeba's).
     Illusion
+  | -- CR 205.3m (a creature type; the token Doomed Traveler creates).
+    Spirit
   deriving (Eq, Ord, Show)

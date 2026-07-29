@@ -181,8 +181,8 @@ tests registry =
         -- and a graveyard -> exile move does not, whatever its snapshot says.
         let gs0 = Setup.emptyGame S.bothPlayers
             creatureSnapshot = S.emptyCharacteristics {PC.cardTypes = Set.singleton CardType.Creature}
-            died = GameEvent.Moved (ZoneChange.MkZoneChange S.noSource Zone.Battlefield Zone.Graveyard) creatureSnapshot
-            exiled = GameEvent.Moved (ZoneChange.MkZoneChange S.noSource Zone.Graveyard Zone.Exile) creatureSnapshot
+            died = GameEvent.Moved (ZoneChange.MkZoneChange S.noSource S.noSource Zone.Battlefield Zone.Graveyard) creatureSnapshot
+            exiled = GameEvent.Moved (ZoneChange.MkZoneChange S.noSource S.noSource Zone.Graveyard Zone.Exile) creatureSnapshot
             gs =
               gs0
                 { GameState.events = Seq.fromList [died, exiled],

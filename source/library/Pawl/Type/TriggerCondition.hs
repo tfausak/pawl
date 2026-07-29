@@ -102,4 +102,35 @@ data TriggerCondition
     -- controller that same owner: the two "your"s can only ever name the player
     -- the scan already picks.
     SelfPutIntoGraveyardFromLibrary
+  | -- CR 603.6c: a LEAVES-THE-BATTLEFIELD ability, narrowed to the one written
+    -- form Doomed Traveler prints. That rule's second written form is "Whenever
+    -- [something] is put into a graveyard from the battlefield", and CR 700.4
+    -- abbreviates it: "The term dies means 'is put into a graveyard from the
+    -- battlefield.'" So the match is a zone PAIR -- battlefield to graveyard --
+    -- and NOT the whole of CR 603.6c, whose first clause is "a permanent moves
+    -- from the battlefield to another zone", any zone at all. A card that says
+    -- "leaves the battlefield" must not be conflated with one that says "dies",
+    -- so the wider condition is a separate one that does not exist yet (#384).
+    --
+    -- Self-scoped like SelfEnters and SelfCycled: the scan visits every
+    -- candidate source, so the bearer being the permanent that died is part of
+    -- the match, not an accident of which object the scan visited.
+    --
+    -- The bearer is the incarnation that was ON THE BATTLEFIELD -- the id
+    -- ZoneChange.departed carries and GameState.lastKnown files under -- and
+    -- NOT the CR 400.7 incarnation that arrived in the graveyard. That is CR
+    -- 603.10a ("some zone-change triggers look back in time. These are
+    -- leaves-the-battlefield abilities ...") read through CR 603.10's own
+    -- definition of looking back: "using the existence of those abilities and
+    -- the appearance of objects immediately prior to the event". Both halves
+    -- live in that one last-known record -- the ability exists because the
+    -- characteristics taken from the pre-move projection say so, and CR 603.3a's
+    -- controller is the player who controlled the permanent as it left.
+    --
+    -- The contrast with SelfPutIntoGraveyardFromLibrary above is exact, and the
+    -- two must not be conflated: that one is library to graveyard, functions IN
+    -- the graveyard (CR 113.6k, since it can never trigger from the
+    -- battlefield), and reads the ARRIVING incarnation; this one is battlefield
+    -- to graveyard, functions on the battlefield, and reads the DEPARTING one.
+    SelfDies
   deriving (Eq, Ord, Show)

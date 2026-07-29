@@ -331,7 +331,7 @@ activationModalTests registry =
 triggerModalEtb :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 triggerModalEtb acPrinting pid gs0 =
   let (acId, gs1) = S.addCreature acPrinting pid gs0
-      entered = ZoneChange.MkZoneChange acId Zone.Stack Zone.Battlefield
+      entered = ZoneChange.MkZoneChange acId acId Zone.Stack Zone.Battlefield
    in (acId, S.withEvents [GameEvent.Moved entered (Projection.project acId gs1)] gs1)
 
 triggerModalOf :: Printing.Printing -> Maybe (ModalT.Modal Card.Type.Card)
@@ -427,7 +427,7 @@ triggerModalTests registry =
         mountain <- Registry.printing registry "Mountain"
         let gs0 = S.landsInPlay mountain 2
             (smtId, gs1) = S.addCreature smtPrinting S.alice gs0
-            entered = ZoneChange.MkZoneChange smtId Zone.Stack Zone.Battlefield
+            entered = ZoneChange.MkZoneChange smtId smtId Zone.Stack Zone.Battlefield
             gs2 = S.withEvents [GameEvent.Moved entered (Projection.project smtId gs1)] gs1
             answer :: Prompt.Prompt r -> r
             answer = S.identityAnswer
