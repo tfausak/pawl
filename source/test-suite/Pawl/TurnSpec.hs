@@ -92,7 +92,52 @@ skipTests :: Registry.Type.Registry -> Tasty.TestTree
 skipTests registry =
   Tasty.testGroup
     "Skip"
-    [ HU.testCase "CR 508.8 dropSkippedCombatSteps removes declare blockers and combat damage" $
+    [ HU.testCase "CR 511.3 thisPhase inside a combat phase ends at ITS end of combat" $
+        -- Two whole combat phases back to back -- the arrangement CR 500.8
+        -- permits and Aurelia, the Warleader builds. Splitting at the FIRST end
+        -- of combat step is what leaves the second one whole.
+        let remaining =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.Combat CombatStep.BeginningOfCombat,
+                  Phase.Combat CombatStep.DeclareAttackers,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain
+                ]
+            expected =
+              ( Seq.fromList
+                  [ Phase.Combat CombatStep.DeclareBlockers,
+                    Phase.Combat CombatStep.CombatDamage,
+                    Phase.Combat CombatStep.EndOfCombat
+                  ],
+                Seq.fromList
+                  [ Phase.Combat CombatStep.BeginningOfCombat,
+                    Phase.Combat CombatStep.DeclareAttackers,
+                    Phase.Combat CombatStep.EndOfCombat,
+                    Phase.PostcombatMain
+                  ]
+              )
+         in HU.assertEqual
+              "split at the first end of combat, inclusive"
+              expected
+              (Turn.thisPhase (Phase.Combat CombatStep.DeclareAttackers) remaining),
+      HU.testCase "CR 505.2 thisPhase in a main phase has no steps of its own" $
+        -- "The main phase has no steps", so there is nothing of it left in the
+        -- schedule and everything remaining is already after it.
+        let remaining = Seq.fromList [Phase.Combat CombatStep.BeginningOfCombat, Phase.PostcombatMain]
+         in HU.assertEqual "empty prefix" (Seq.empty, remaining) (Turn.thisPhase Phase.PrecombatMain remaining),
+      HU.testCase "thisPhase yields an empty prefix when this phase's final step is gone" $
+        -- Unreachable from either caller, and asserted anyway: dropping nothing
+        -- is the safer failure than treating the whole rest of the turn as this
+        -- phase.
+        let remaining = Seq.fromList [Phase.PostcombatMain, Phase.Ending EndingStep.EndStep]
+         in HU.assertEqual
+              "empty prefix"
+              (Seq.empty, remaining)
+              (Turn.thisPhase (Phase.Combat CombatStep.EndOfCombat) remaining),
+      HU.testCase "CR 508.8 dropSkippedCombatSteps removes declare blockers and combat damage" $
         let full =
               Seq.fromList
                 [ Phase.Combat CombatStep.DeclareBlockers,
@@ -101,7 +146,7 @@ skipTests registry =
                   Phase.PostcombatMain
                 ]
             expected = Seq.fromList [Phase.Combat CombatStep.EndOfCombat, Phase.PostcombatMain]
-         in HU.assertEqual "dropped" expected (Turn.dropSkippedCombatSteps full),
+         in HU.assertEqual "dropped" expected (Turn.dropSkippedCombatSteps (Phase.Combat CombatStep.DeclareAttackers) full),
       HU.testCase "CR 500.8 dropSkippedCombatSteps spares a LATER combat phase's steps" $
         -- The schedule a CR 500.8 additional combat phase leaves behind: this
         -- combat's tail, then an additional main phase, then the turn's normal
@@ -132,7 +177,10 @@ skipTests registry =
                   Phase.Combat CombatStep.EndOfCombat,
                   Phase.PostcombatMain
                 ]
-         in HU.assertEqual "only this phase's steps dropped" expected (Turn.dropSkippedCombatSteps full),
+         in HU.assertEqual
+              "only this phase's steps dropped"
+              expected
+              (Turn.dropSkippedCombatSteps (Phase.Combat CombatStep.DeclareAttackers) full),
       HU.testCase "CR 508.8 no attacker declared skips to end of combat" $
         -- Nobody has a creature, so no attackers are declared: the declare
         -- blockers and combat damage steps must not run at all.

@@ -84,7 +84,7 @@ clearCombat gs = gs {GameState.combat = emptyCombat}
 skipEmptyCombat :: GameState -> GameState
 skipEmptyCombat gs =
   if Map.null (Combat.attackers (GameState.combat gs))
-    then gs {GameState.remaining = Turn.dropSkippedCombatSteps (GameState.remaining gs)}
+    then gs {GameState.remaining = Turn.dropSkippedCombatSteps (GameState.phase gs) (GameState.remaining gs)}
     else gs
 
 -- CR 506.2a: the candidates the attacking player chooses from. Read only by

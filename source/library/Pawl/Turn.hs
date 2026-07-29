@@ -73,35 +73,63 @@ isMainPhase phase = case phase of
   Phase.PostcombatMain -> True
   _ -> False
 
+-- CR 500: the final step of the phase this one belongs to -- the step whose end
+-- ends the phase. CR 511.3 names combat's ("After the end of combat step ends,
+-- the combat phase is over"); CR 501.1 lists the beginning phase's three steps,
+-- of which draw is the last; CR 512.1 lists the ending phase's two, of which
+-- cleanup is the last. A main phase has NO steps at all (CR 505.2), so there is
+-- no step whose end ends it -- which is what Nothing says here.
+lastStepOf :: Phase -> Maybe Phase
+lastStepOf phase = case phase of
+  Phase.Beginning _ -> Just (Phase.Beginning BeginningStep.DrawStep)
+  Phase.PrecombatMain -> Nothing
+  Phase.Combat _ -> Just (Phase.Combat CombatStep.EndOfCombat)
+  Phase.PostcombatMain -> Nothing
+  Phase.Ending _ -> Just (Phase.Ending EndingStep.Cleanup)
+
+-- Split what is left of the turn into THIS phase's remaining steps and
+-- everything after it. The one place that answers where a phase ends, so
+-- CR 511.3 is cited once rather than once per caller.
+--
+-- The final step goes in the PREFIX: it belongs to the phase it ends.
+--
+-- The bound is that final step rather than "the leading run of steps of the same
+-- kind", because CR 500.8 permits a combat phase directly after a combat phase
+-- -- Aurelia, the Warleader's "after this phase, there is an additional combat
+-- phase", added from within one -- and the run would swallow both.
+--
+-- An absent final step yields an EMPTY prefix, not the whole schedule: if this
+-- phase's last step is no longer scheduled then the phase is already over as far
+-- as `remaining` shows, and "directly after this phase" (CR 500.8) is the head.
+-- Unreachable from either caller -- Combat.skipEmptyCombat runs as the declare
+-- attackers step ends, and Resolve's splice runs while the resolving object's
+-- phase is current -- so no game can observe the choice; it is written this way
+-- because dropping nothing is the safer failure than dropping everything.
+thisPhase :: Phase -> Seq Phase -> (Seq Phase, Seq Phase)
+thisPhase phase remaining = case lastStepOf phase >>= \step -> Seq.elemIndexL step remaining of
+  Nothing -> (Seq.empty, remaining)
+  Just i -> Seq.splitAt (i + 1) remaining
+
 -- CR 508.8 / 500.11: drop the declare blockers and combat damage steps of THE
 -- COMBAT PHASE NOW UNDER WAY from what is left of the turn, so it proceeds "as
 -- though they didn't exist". Positional, not a filter over the whole schedule:
 -- CR 500.8 lets an effect add a second combat phase, and skipping this one says
 -- nothing about that one.
 --
--- What bounds "this phase" is CR 511.3 -- "After the end of combat step ends,
--- the combat phase is over" -- so the current phase is the schedule up to its
--- FIRST end of combat step, and that step and everything past it are left
--- alone. The end of combat step itself is never one of the two being dropped,
--- so which side of the split it lands on is unobservable; Seq.breakl leaves it
--- on the untouched side. That bound rather than "the leading run of combat
--- steps",
--- because CR 500.8 permits a combat phase directly after a combat phase --
--- Aurelia, the Warleader's "after this phase, there is an additional combat
--- phase", added from within one -- and the run would swallow both. No card in
--- the pool can build that arrangement, so nothing tests it (#393).
+-- Where this phase ends is `thisPhase`'s question, not this function's. The end
+-- of combat step it splits on is never one of the two steps dropped here, so
+-- which side of the split it lands on is unobservable.
 --
 -- The caller is Combat.skipEmptyCombat, which runs as the declare attackers step
--- ends, so the schedule always still holds this phase's end of combat step. If
--- it somehow did not, Seq.breakl yields the whole schedule as "this phase" and
--- the old whole-schedule filter is recovered.
-dropSkippedCombatSteps :: Seq Phase -> Seq Phase
-dropSkippedCombatSteps remaining =
+-- ends, so the phase is always a combat phase and its end of combat step is
+-- always still scheduled.
+dropSkippedCombatSteps :: Phase -> Seq Phase -> Seq Phase
+dropSkippedCombatSteps phase remaining =
   let kept p =
         p /= Phase.Combat CombatStep.DeclareBlockers
           && p /= Phase.Combat CombatStep.CombatDamage
-      (thisPhase, rest) = Seq.breakl (== Phase.Combat CombatStep.EndOfCombat) remaining
-   in Seq.filter kept thisPhase <> rest
+      (current, rest) = thisPhase phase remaining
+   in Seq.filter kept current <> rest
 
 -- CR 510.4 / 500.9: a second combat damage step, spliced directly after the
 -- current one -- i.e. at the head of the remaining schedule, so it runs next.
