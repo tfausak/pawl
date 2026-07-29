@@ -2,19 +2,23 @@
 -- ONLY module that may case on Pawl.Type.Expiry -- the standing Pawl.Resolve
 -- has over Effect, Pawl.Projection over Modification and Pawl.Event over
 -- TriggerCondition. It owns the transformation from the PRINTED Duration to the
--- STORED Expiry (`arm`) and every sweep that ends one, over THREE carriers:
--- GameState.continuousEffects, GameState.replacements and
--- GameState.playerEffects share one expiry vocabulary, so they share one sweep.
+-- STORED Expiry (`arm`) and every sweep that ends one, over FOUR carriers:
+-- GameState.continuousEffects, GameState.replacements, GameState.playerEffects
+-- and GameState.delayedTriggers share one expiry vocabulary, so they share one
+-- sweep. The fourth differs only in carrying MAYBE an expiry, because CR 603.7b
+-- lets a delayed ability have no stated duration at all.
 module Pawl.Expiry where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Sequence as Seq
 import qualified Pawl.Condition as Condition
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import Pawl.Type.Duration (Duration)
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Expiry (Expiry)
@@ -60,10 +64,12 @@ dropAtCleanup gs =
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
+      keepDelayed = maybe True survives . DelayedTrigger.expiry
    in gs
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
           GameState.replacements = filter keepReplacement (GameState.replacements gs),
-          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs)
+          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
+          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs)
         }
 
 -- CR 611.2b: drop every While whose condition has stopped holding. The effect is
@@ -95,19 +101,23 @@ sweepConditional = do
       keepEffect eff = survives (ContinuousEffect.source eff) (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.source active) (ActivePlayerEffect.expiry active)
+      keepDelayed entry = maybe True (survives (DelayedTrigger.source entry)) (DelayedTrigger.expiry entry)
       keptEffects = filter keepEffect (GameState.continuousEffects gs)
       keptReplacements = filter keepReplacement (GameState.replacements gs)
       keptPlayerEffects = filter keepPlayerEffect (GameState.playerEffects gs)
+      keptDelayed = Seq.filter keepDelayed (GameState.delayedTriggers gs)
       changed =
         length keptEffects /= length (GameState.continuousEffects gs)
           || length keptReplacements /= length (GameState.replacements gs)
           || length keptPlayerEffects /= length (GameState.playerEffects gs)
+          || Seq.length keptDelayed /= Seq.length (GameState.delayedTriggers gs)
   Monad.when changed $
     State.put
       gs
         { GameState.continuousEffects = keptEffects,
           GameState.replacements = keptReplacements,
-          GameState.playerEffects = keptPlayerEffects
+          GameState.playerEffects = keptPlayerEffects,
+          GameState.delayedTriggers = keptDelayed
         }
   pure changed
 
@@ -128,8 +138,8 @@ sweepConditional = do
 -- to receive priority) leave nothing that could observe the difference. The
 -- first observation point is the upkeep step (CR 503.1).
 --
--- One sweep over the three carriers, as the neighbouring sweeps do. AtCleanup,
--- Never and While are untouched.
+-- One sweep over the four carriers, as the neighbouring sweeps do. AtCleanup,
+-- Never and While are untouched, and so is a delayed entry on no duration.
 dropAtTurnOf :: PlayerId -> GameState -> GameState
 dropAtTurnOf pid gs =
   let survives expiry = case expiry of
@@ -140,8 +150,10 @@ dropAtTurnOf pid gs =
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
+      keepDelayed = maybe True survives . DelayedTrigger.expiry
    in gs
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
           GameState.replacements = filter keepReplacement (GameState.replacements gs),
-          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs)
+          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
+          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs)
         }

@@ -84,9 +84,11 @@ data GameState = MkGameState
     damageScannedThrough :: Natural,
     -- CR 603.7: delayed triggered abilities awaiting their event, in creation
     -- order. Appended by Resolve's ArmDelayedTrigger; an entry is removed as it
-    -- fires (CR 603.7b). NOT cleared at turn handoff -- "at the beginning of the
-    -- next end step" survives into the next turn if this turn's end step passed
-    -- before the ability was armed.
+    -- fires (CR 603.7b) unless it states a duration, in which case one of the
+    -- Pawl.Expiry sweeps ends it instead. NOT cleared at turn handoff -- "at the
+    -- beginning of the next end step" survives into the next turn if this turn's
+    -- end step passed before the ability was armed, and a stated duration is the
+    -- entry's own business rather than the handoff's.
     delayedTriggers :: Seq DelayedTrigger,
     -- CR 611.2: stored continuous effects from resolutions (Giant Growth,
     -- Serpent's Gift), each with an expiry the Pawl.Expiry sweeps consult.

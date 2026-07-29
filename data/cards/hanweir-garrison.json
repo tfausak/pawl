@@ -43,7 +43,10 @@
   "triggeredAbilities": [
     {
       "condition": {
-        "type": "SelfAttacks"
+        "type": "SelfAttacks",
+        "value": {
+          "type": "EveryTime"
+        }
       },
       "modal": {
         "modes": [

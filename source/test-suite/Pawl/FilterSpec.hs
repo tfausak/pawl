@@ -29,6 +29,7 @@ blackCreature =
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
+      Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.token = False
     }
@@ -46,6 +47,7 @@ devoidBigCreature =
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
+      Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.token = False
     }
@@ -147,6 +149,62 @@ tests =
             . HU.assertBool "player"
             . not
             $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsAttacking
+        ],
+      Tasty.testGroup
+        "rewrite"
+        -- CR 612.1: a text-changing effect applies to "any words or symbols
+        -- printed on that object", and HasSubtype is the only atom that can
+        -- carry a basic land type. Threaded into effects by Resolve.rewriteEffect.
+        [ HU.testCase "swaps the named subtype word" $
+            HU.assertEqual
+              "Island became Forest"
+              (Filter.Type.HasSubtype Subtype.Forest)
+              (Filter.rewrite [(Subtype.Island, Subtype.Forest)] (Filter.Type.HasSubtype Subtype.Island)),
+          HU.testCase "leaves an unnamed subtype word alone" $
+            HU.assertEqual
+              "Wall untouched"
+              (Filter.Type.HasSubtype Subtype.Wall)
+              (Filter.rewrite [(Subtype.Island, Subtype.Forest)] (Filter.Type.HasSubtype Subtype.Wall)),
+          HU.testCase "recurses through And, Or and Not" $
+            let before = Filter.Type.And [Filter.Type.Not (Filter.Type.HasSubtype Subtype.Island), Filter.Type.Or [Filter.Type.HasSubtype Subtype.Island, Filter.Type.IsAttacking]]
+                after = Filter.Type.And [Filter.Type.Not (Filter.Type.HasSubtype Subtype.Forest), Filter.Type.Or [Filter.Type.HasSubtype Subtype.Forest, Filter.Type.IsAttacking]]
+             in HU.assertEqual "every occurrence" after (Filter.rewrite [(Subtype.Island, Subtype.Forest)] before),
+          -- CR 612.1 changes WORDS, and a card type is not a subtype word.
+          HU.testCase "leaves an atom that names no subtype alone" $
+            HU.assertEqual
+              "card type untouched"
+              (Filter.Type.HasCardType CardType.Creature)
+              (Filter.rewrite [(Subtype.Island, Subtype.Forest)] (Filter.Type.HasCardType CardType.Creature))
+        ],
+      Tasty.testGroup
+        "AttackedThisTurn"
+        [ HU.testCase "matches a view whose history says so"
+            . HU.assertBool "attacked"
+            $ Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.AttackedThisTurn,
+          HU.testCase "does not match a creature that never attacked"
+            . HU.assertBool "did not attack"
+            . not
+            $ Filter.matches self blackCreature Filter.Type.AttackedThisTurn,
+          -- The two axes are independent in BOTH directions, which is the whole
+          -- reason this atom exists. A creature attacking right now may not have
+          -- been declared this turn (CR 508.4 puts one onto the battlefield
+          -- attacking without it ever having attacked), and one that attacked
+          -- earlier this turn is no longer attacking once CR 511.3 has removed it
+          -- from combat -- which is Relentless Assault's whole case.
+          HU.testCase "is not implied by attacking right now"
+            . HU.assertBool "attacking does not imply attacked"
+            . not
+            $ Filter.matches self (blackCreature {Filter.attacking = True}) Filter.Type.AttackedThisTurn,
+          HU.testCase "does not imply attacking right now"
+            . HU.assertBool "attacked does not imply attacking"
+            . not
+            $ Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.IsAttacking,
+          -- CR 506.3: only a creature can be declared as an attacker, and a
+          -- player is not one.
+          HU.testCase "a player candidate is vacuously false"
+            . HU.assertBool "player"
+            . not
+            $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.AttackedThisTurn
         ],
       Tasty.testGroup
         "IsAttachedToCreature"

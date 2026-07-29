@@ -48,6 +48,8 @@ import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.EventShape as EventShape
+import qualified Pawl.Type.Expiry as Expiry
+import qualified Pawl.Type.ExtraPhase as ExtraPhase
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
 -- evaluator module Pawl.Filter is not imported here today, but the alias
 -- convention is fixed project-wide so a later import never collides.
@@ -98,6 +100,7 @@ import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.TokenEntry as TokenEntry
 import qualified Pawl.Type.TokenPattern as TokenPattern
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.TypeLine as TypeLine
@@ -250,8 +253,12 @@ tests registry =
             roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards,
           HU.testCase "Proliferate" $
             roundTrip "e4b" Codec.effectToJson Codec.jsonToEffect Effect.Proliferate,
-          HU.testCase "AddCombatAndMainPhase" $
-            roundTrip "e4c" Codec.effectToJson Codec.jsonToEffect Effect.AddCombatAndMainPhase,
+          -- Both shapes in the pool: Aggravated Assault's pair and Full
+          -- Throttle's two combat phases with no main phase between them.
+          HU.testCase "AddPhases round-trips the pair" $
+            roundTrip "e4c" Codec.effectToJson Codec.jsonToEffect (Effect.AddPhases [ExtraPhase.ExtraCombat, ExtraPhase.ExtraMain]),
+          HU.testCase "AddPhases round-trips a repeated phase" $
+            roundTrip "e4c1" Codec.effectToJson Codec.jsonToEffect (Effect.AddPhases [ExtraPhase.ExtraCombat, ExtraPhase.ExtraCombat]),
           -- Untap takes the same untagged ObjectRef Destroy does, so both arms
           -- have to survive the trip: Act of Treason's slot and Aggravated
           -- Assault's swept set.
@@ -456,10 +463,11 @@ tests registry =
                 isSource = Filter.Type.IsSource
                 ravenousRats = Filter.Type.IsPlayer PlayerRelation.Opponent
                 killShot = Filter.Type.IsAttacking
+                relentlessAssault = Filter.Type.AttackedThisTurn
                 crownOfTheAges = Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToCreature]
              in mapM_
                   (roundTrip "filter" Codec.filterToJson Codec.jsonToFilter)
-                  [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot, crownOfTheAges],
+                  [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot, relentlessAssault, crownOfTheAges],
           HU.testCase "PlayerRelation round-trips" $
             mapM_
               (roundTrip "relation" Codec.playerRelationToJson Codec.jsonToPlayerRelation)
@@ -795,8 +803,9 @@ tests registry =
             roundTrip "revealed" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Revealed S.alice (Projection.project ratId gs)),
           HU.testCase "TriggerCondition.SelfCycled round-trips" $
             roundTrip "sc" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfCycled,
-          HU.testCase "TriggerCondition.SelfAttacks round-trips" $
-            roundTrip "sa" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfAttacks,
+          HU.testCase "TriggerCondition.SelfAttacks round-trips both frequencies" $ do
+            roundTrip "sa" Codec.triggerConditionToJson Codec.jsonToTriggerCondition (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime)
+            roundTrip "sa1" Codec.triggerConditionToJson Codec.jsonToTriggerCondition (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn),
           HU.testCase "GameEvent.AttackerDeclared round-trips" $
             roundTrip "ad" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3)),
           -- Create's TokenEntry is ELIDED when it is the CR 110.5b default, so
@@ -859,7 +868,11 @@ tests registry =
           HU.testCase "AbilityName round-trips" $
             roundTrip "name" Codec.abilityNameToJson Codec.jsonToAbilityName (AbilityName.MkAbilityName (Text.pack "sacrifice it")),
           HU.testCase "ArmDelayedTrigger round-trips" $
-            roundTrip "arm" Codec.effectToJson Codec.jsonToEffect (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it"))),
+            roundTrip "arm" Codec.effectToJson Codec.jsonToEffect (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it")) Nothing),
+          -- CR 603.7b's stated duration takes the two-element form; the absent
+          -- one above must keep the bare shape, so both have to survive.
+          HU.testCase "ArmDelayedTrigger round-trips a stated duration" $
+            roundTrip "arm1" Codec.effectToJson Codec.jsonToEffect (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "each combat")) (Just Duration.UntilEndOfTurn)),
           -- M-5 (fix pass 1): the "DelayedTrigger round-trips" test below exercises
           -- only a Binding's `target` field via Binding.toObject. The codec is
           -- meant to be total over every Binding field -- subtypes, amount, modes,
@@ -890,9 +903,15 @@ tests registry =
                     { DelayedTrigger.ability = ability,
                       DelayedTrigger.source = ObjectId.MkObjectId 4,
                       DelayedTrigger.controller = S.alice,
-                      DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.toObject (ObjectId.MkObjectId 9))
+                      DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.toObject (ObjectId.MkObjectId 9)),
+                      DelayedTrigger.expiry = Nothing
                     }
-             in roundTrip "delayed" Codec.delayedTriggerToJson Codec.jsonToDelayedTrigger entry,
+             in do
+                  -- CR 603.7b's default and its stated-duration exception both
+                  -- have to survive: the absent expiry is elided to null, and a
+                  -- present one must come back as itself.
+                  roundTrip "delayed" Codec.delayedTriggerToJson Codec.jsonToDelayedTrigger entry
+                  roundTrip "delayed1" Codec.delayedTriggerToJson Codec.jsonToDelayedTrigger entry {DelayedTrigger.expiry = Just Expiry.AtCleanup},
           HU.testCase "a TriggeredAbility with an intervening if round-trips" $
             let ability =
                   TriggeredAbility.MkTriggeredAbility

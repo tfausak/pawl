@@ -56,6 +56,7 @@ import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import Pawl.Type.TriggerCondition (TriggerCondition)
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Type.TriggerSource as TriggerSource
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
@@ -543,6 +544,18 @@ reveal pid oid = do
 -- names. This module is the sole home of casing on TriggerCondition for RULES
 -- purposes; Pawl.Codec also cases on every constructor, but only as the JSON
 -- data boundary (encode/decode), not to decide game behaviour.
+-- CR 508.3a / 608.2i: how many times this object has been declared as an
+-- attacker so far this turn, read out of the turn-scoped event log. Only
+-- Combat.declareAttackers appends the event, which is what keeps CR 508.4's
+-- creature put onto the battlefield attacking -- one that "never attacked" --
+-- out of the count.
+declarationsOf :: ObjectId -> GameState -> Int
+declarationsOf bearer gs =
+  let declaredIt event = case event of
+        GameEvent.AttackerDeclared oid -> oid == bearer
+        _ -> False
+   in length (Seq.filter declaredIt (GameState.events gs))
+
 matchesTrigger :: GameState -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
 matchesTrigger gs bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
@@ -660,8 +673,23 @@ matchesTrigger gs bearer you cond event = case cond of
   -- attacking is in that record and has no event here. CombatSpec's "the tokens
   -- are attacking, and the attack trigger fired only for the Garrison" is the
   -- test that proves it.
-  TriggerCondition.SelfAttacks -> case event of
-    GameEvent.AttackerDeclared oid -> oid == bearer
+  TriggerCondition.SelfAttacks frequency -> case event of
+    GameEvent.AttackerDeclared oid ->
+      oid == bearer && case frequency of
+        TriggerFrequency.EveryTime -> True
+        -- Aurelia, the Warleader's "for the first time each turn". The
+        -- declaration being matched is already in GameState.events when the scan
+        -- reaches here, so "the first time" is "this is the only one so far",
+        -- and the log being cleared at turn handoff is what makes it "each
+        -- turn".
+        --
+        -- Counted per BEARER, so two creatures declared in the same attack are
+        -- each attacking for the first time.
+        --
+        -- CR 400.7 mints a new object on a zone change, so a creature that left
+        -- the battlefield and returned is a different id and attacks for the
+        -- first time again -- which is what the rules say happened.
+        TriggerFrequency.FirstTimeEachTurn -> declarationsOf bearer gs <= 1
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
@@ -1086,7 +1114,7 @@ functionsInGraveyard cond = case cond of
   -- CR 302.6 and CR 508.1a: only a permanent on the battlefield can be declared
   -- as an attacker, so this condition triggers from the battlefield and CR
   -- 113.6k never reaches it.
-  TriggerCondition.SelfAttacks -> False
+  TriggerCondition.SelfAttacks _ -> False
   -- CR 702.29c: "these abilities trigger from whatever zone the card winds up in
   -- after it's cycled" -- the graveyard for every printing in this pool. A
   -- cycled card cannot be on the battlefield (cycling discards it from a hand),
@@ -1182,7 +1210,7 @@ stateTriggers gs =
                 TriggerCondition.StepBegins _ _ -> False
                 TriggerCondition.SelfDealsCombatDamageToPlayer -> False
                 TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
-                TriggerCondition.SelfAttacks -> False
+                TriggerCondition.SelfAttacks _ -> False
                 TriggerCondition.SelfCycled -> False
                 TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
                 TriggerCondition.SelfDies -> False
@@ -1190,27 +1218,34 @@ stateTriggers gs =
            in fmap pend (filter live (Projection.triggeredAbilitiesOf oid gs))
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))
 
--- CR 603.7: delayed abilities whose trigger event is among these events. Each one
--- that fires is REMOVED from the store (CR 603.7b: "only once, the next time its
--- trigger event occurs"); the survivors are returned so the caller can store them
--- back. CR 603.7d-f: the controller travels with the entry, so a delayed ability
--- resolves under the player who controlled the spell that created it even if that
--- spell's source object is long gone.
+-- CR 603.7: delayed abilities whose trigger event is among these events. An
+-- entry that fires is REMOVED from the store -- CR 603.7b: "only once, the next
+-- time its trigger event occurs" -- UNLESS it carries a stated duration, which
+-- is the same rule's own exception ("unless it has a stated duration, such as
+-- 'this turn'"). One of Pawl.Expiry's sweeps ends those instead; CR 514.2's
+-- cleanup, for Full Throttle. The survivors are returned so the caller can store
+-- them back. CR 603.7d-f: the controller travels with the entry, so a delayed
+-- ability resolves under the player who controlled the spell that created it
+-- even if that spell's source object is long gone.
 --
 -- `fires` matches only against EVENTS (`matchesTrigger`), never against live
 -- game state, so a stored entry whose condition is TriggerCondition.StateIs would
--- never match here -- it would neither fire nor ever be evicted from the store.
--- Not a live gap: TriggerCondition is a closed type (Pawl.Type.TriggerCondition)
--- and no card in this pool arms a delayed ability with a StateIs condition (CR
--- 603.7's few state-triggered delayed abilities, e.g. "at the beginning of the
--- next end step" clauses, are all StepBegins in this pool). Noted because a later
--- P4 task touches state conditions again and should see this before adding one.
+-- never match here -- it would never fire, and unless it states a duration for a
+-- Pawl.Expiry sweep to end, never leave the store either. Not a live gap:
+-- TriggerCondition is a closed type (Pawl.Type.TriggerCondition) and no card in
+-- this pool arms a delayed ability with a StateIs condition (CR 603.7's few
+-- state-triggered delayed abilities, e.g. "at the beginning of the next end
+-- step" clauses, are all StepBegins in this pool). Noted because a later P4 task
+-- touches state conditions again and should see this before adding one.
 --
 -- The surviving store this function returns is computed from the EVENT MATCH
 -- (`fires`) alone, before gatherTriggers's CR 603.4 intervening-"if" filter
 -- (`interveningHolds`) ever runs on the entries it produces -- so an entry whose
 -- intervening "if" is false is removed here, spending CR 603.7b's one shot,
--- rather than staying armed for the trigger event's next occurrence (#48).
+-- rather than staying armed for the trigger event's next occurrence (#48). That
+-- reaches only an entry with no stated duration: one that has a duration is not
+-- spent by firing at all, so a false intervening "if" costs it nothing and it is
+-- still armed for the next occurrence.
 delayedPending :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 delayedPending events gs =
   let fires entry =
@@ -1223,7 +1258,9 @@ delayedPending events gs =
           (DelayedTrigger.ability entry)
           (DelayedTrigger.bindings entry)
       store = GameState.delayedTriggers gs
-   in (fmap pend (Foldable.toList (Seq.filter fires store)), Seq.filter (not . fires) store)
+      -- Firing spends the one shot only for an entry with no stated duration.
+      spent entry = fires entry && Maybe.isNothing (DelayedTrigger.expiry entry)
+   in (fmap pend (Foldable.toList (Seq.filter fires store)), Seq.filter (not . spent) store)
 
 -- Everything that has triggered and is not yet on the stack, from all three
 -- sources, plus the delayed store as it stands afterwards. One function, so

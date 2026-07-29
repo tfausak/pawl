@@ -25,6 +25,7 @@ import qualified Pawl.Type.Combat as Combat
 import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.Filter as Filter.Type
+import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Keyword (Keyword)
@@ -366,6 +367,9 @@ viewOfCard card =
           -- CR 506.3: only a creature can attack, and a card in a library or hand
           -- is not one -- so it has no combat status either.
           Filter.attacking = False,
+          -- And it was never on the battlefield to be declared as one, so the
+          -- turn's event log holds nothing about it either.
+          Filter.attackedThisTurn = False,
           -- CR 303.4b: only a permanent on the battlefield is attached to
           -- anything, and a printed card off it is not one.
           Filter.attachedToCreature = False,
@@ -378,6 +382,15 @@ viewOfCard card =
 
 -- Shared assembly: fill a View from a projection's characteristics plus the
 -- printed supertypes (not projected) and a supplied controller.
+-- CR 508.3a: does this event record THIS object being declared as an attacker?
+-- Only Combat.declareAttackers appends one, which is what keeps CR 508.4's
+-- creature put onto the battlefield attacking -- one that "never attacked" --
+-- out of the answer.
+declaredIt :: ObjectId -> GameEvent.GameEvent -> Bool
+declaredIt oid event = case event of
+  GameEvent.AttackerDeclared declared -> declared == oid
+  _ -> False
+
 viewOfCharacteristics :: ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> GameState -> Filter.View
 viewOfCharacteristics oid pc controller gs =
   Filter.MkView
@@ -393,6 +406,12 @@ viewOfCharacteristics oid pc controller gs =
       -- so it comes straight off the combat record and not from the projection
       -- this function is otherwise assembling.
       Filter.attacking = Map.member oid (Combat.attackers (GameState.combat gs)),
+      -- CR 608.2i: a look-back read of the turn's event log rather than of the
+      -- combat record, because the record does not survive the phase -- CR 511.3
+      -- removes every creature from combat as the end of combat step ends, and
+      -- Combat.clearCombat is what does it. The log outlives that and is cleared
+      -- at turn handoff, which is the span "this turn" names.
+      Filter.attackedThisTurn = any (declaredIt oid) (GameState.events gs),
       -- CR 701.3a: likewise not a characteristic (CR 109.3 names "what an Aura
       -- enchants" among the things that are not one), so the attachment comes
       -- off Object.attachedTo. The HOST's creature-ness, though, is projected --
@@ -1110,6 +1129,11 @@ filterReads f = case f of
   Filter.Type.IsSource -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
   Filter.Type.IsAttacking -> Set.empty
+  -- Reads nothing, for IsToken's strong reason rather than IsAttacking's. No
+  -- Modification writes GameState.events -- CR 608.2i's record is appended by
+  -- the change-and-emit funnels and never edited -- so no CR 613 layer can move
+  -- a set this atom selects, and CR 613.8a sees no dependency through it.
+  Filter.Type.AttackedThisTurn -> Set.empty
   -- Declared as reading Types even though the types it reads are the HOST's, not
   -- the candidate's. Aspect names an aspect of ONE object's projection, so there
   -- is nothing here that can say "another object's card types"; over-declaring

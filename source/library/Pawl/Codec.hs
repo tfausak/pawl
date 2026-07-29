@@ -52,6 +52,8 @@ import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.EventShape as EventShape
+import qualified Pawl.Type.Expiry as Expiry
+import qualified Pawl.Type.ExtraPhase as ExtraPhase
 import qualified Pawl.Type.Filter as Filter
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.Json (Value (Array, Boolean, Null, Object))
@@ -99,6 +101,7 @@ import qualified Pawl.Type.TokenEntry as TokenEntry
 import qualified Pawl.Type.TokenPattern as TokenPattern
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.TypeLine as TypeLine
@@ -300,6 +303,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Cleric -> "Cleric"
   Subtype.Illusion -> "Illusion"
   Subtype.Spirit -> "Spirit"
+  Subtype.Angel -> "Angel"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -350,7 +354,8 @@ jsonToSubtype =
       (Text.pack "Demon", Subtype.Demon),
       (Text.pack "Cleric", Subtype.Cleric),
       (Text.pack "Illusion", Subtype.Illusion),
-      (Text.pack "Spirit", Subtype.Spirit)
+      (Text.pack "Spirit", Subtype.Spirit),
+      (Text.pack "Angel", Subtype.Angel)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -595,6 +600,7 @@ filterToJson filter_ = case filter_ of
   Filter.IsPlayer r -> Json.tagged (Text.pack "IsPlayer") (Just (playerRelationToJson r))
   Filter.IsSource -> nullary (Text.pack "IsSource")
   Filter.IsAttacking -> nullary (Text.pack "IsAttacking")
+  Filter.AttackedThisTurn -> nullary (Text.pack "AttackedThisTurn")
   Filter.IsAttachedToCreature -> nullary (Text.pack "IsAttachedToCreature")
   Filter.IsToken -> nullary (Text.pack "IsToken")
   Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (fmap filterToJson fs)))
@@ -614,6 +620,7 @@ jsonToFilter value = do
     ("IsPlayer", Just v) -> Filter.IsPlayer <$> jsonToPlayerRelation v
     ("IsSource", _) -> Right Filter.IsSource
     ("IsAttacking", _) -> Right Filter.IsAttacking
+    ("AttackedThisTurn", _) -> Right Filter.AttackedThisTurn
     ("IsAttachedToCreature", _) -> Right Filter.IsAttachedToCreature
     ("IsToken", _) -> Right Filter.IsToken
     ("And", Just (Array vs)) -> Filter.And <$> traverse jsonToFilter vs
@@ -1007,7 +1014,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (conditionToJson c2))
   TriggerCondition.SelfDealsCombatDamageToPlayer -> nullary (Text.pack "SelfDealsCombatDamageToPlayer")
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
-  TriggerCondition.SelfAttacks -> nullary (Text.pack "SelfAttacks")
+  TriggerCondition.SelfAttacks f -> Json.tagged (Text.pack "SelfAttacks") (Just (triggerFrequencyToJson f))
   TriggerCondition.SelfCycled -> nullary (Text.pack "SelfCycled")
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> nullary (Text.pack "SelfPutIntoGraveyardFromLibrary")
   TriggerCondition.SelfDies -> nullary (Text.pack "SelfDies")
@@ -1022,7 +1029,7 @@ jsonToTriggerCondition value = do
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToCondition v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
-    ("SelfAttacks", _) -> Right TriggerCondition.SelfAttacks
+    ("SelfAttacks", Just v) -> TriggerCondition.SelfAttacks <$> jsonToTriggerFrequency v
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
     ("SelfDies", _) -> Right TriggerCondition.SelfDies
@@ -1087,6 +1094,16 @@ regenerabilityToJson r = nullary . Text.pack $ case r of
   Regenerability.Regenerable -> "Regenerable"
   Regenerability.CantBeRegenerated -> "CantBeRegenerated"
 
+triggerFrequencyToJson :: TriggerFrequency.TriggerFrequency -> Value
+triggerFrequencyToJson f = nullary . Text.pack $ case f of
+  TriggerFrequency.EveryTime -> "EveryTime"
+  TriggerFrequency.FirstTimeEachTurn -> "FirstTimeEachTurn"
+
+extraPhaseToJson :: ExtraPhase.ExtraPhase -> Value
+extraPhaseToJson e = nullary . Text.pack $ case e of
+  ExtraPhase.ExtraCombat -> "ExtraCombat"
+  ExtraPhase.ExtraMain -> "ExtraMain"
+
 counterabilityToJson :: Counterability.Counterability -> Value
 counterabilityToJson c = nullary . Text.pack $ case c of
   Counterability.Counterable -> "Counterable"
@@ -1113,6 +1130,22 @@ jsonToRegenerability =
     (Text.pack "Regenerability")
     [ (Text.pack "Regenerable", Regenerability.Regenerable),
       (Text.pack "CantBeRegenerated", Regenerability.CantBeRegenerated)
+    ]
+
+jsonToTriggerFrequency :: Value -> Either Text TriggerFrequency.TriggerFrequency
+jsonToTriggerFrequency =
+  decodeNullary
+    (Text.pack "TriggerFrequency")
+    [ (Text.pack "EveryTime", TriggerFrequency.EveryTime),
+      (Text.pack "FirstTimeEachTurn", TriggerFrequency.FirstTimeEachTurn)
+    ]
+
+jsonToExtraPhase :: Value -> Either Text ExtraPhase.ExtraPhase
+jsonToExtraPhase =
+  decodeNullary
+    (Text.pack "ExtraPhase")
+    [ (Text.pack "ExtraCombat", ExtraPhase.ExtraCombat),
+      (Text.pack "ExtraMain", ExtraPhase.ExtraMain)
     ]
 
 manaProductionToJson :: ManaProduction.ManaProduction -> Value
@@ -1530,9 +1563,15 @@ effectToJson e = case e of
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array [playerRefToJson r, playerCounterKindToJson k, quantityToJson q]))
   Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (objectRefToJson r))
-  Effect.AddCombatAndMainPhase -> nullary (Text.pack "AddCombatAndMainPhase")
+  Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (fmap extraPhaseToJson ps)))
   Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array [durationToJson d, slotNameToJson s]))
-  Effect.ArmDelayedTrigger n -> Json.tagged (Text.pack "ArmDelayedTrigger") (Just (abilityNameToJson n))
+  -- The duration is ELIDED when absent, which is CR 603.7b's default -- so
+  -- Tidal Wave's one-shot entry stays a bare ability name and only a card that
+  -- states a duration writes the two-element form.
+  Effect.ArmDelayedTrigger n md ->
+    Json.tagged (Text.pack "ArmDelayedTrigger") . Just $ case md of
+      Nothing -> abilityNameToJson n
+      Just d -> Array [abilityNameToJson n, durationToJson d]
   Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array [durationToJson d, playerScopeToJson s, playerEffectToJson pe]))
   Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (cardToJson c))
   Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (monarchTargetToJson t))
@@ -1597,7 +1636,9 @@ jsonToEffect value = do
       Just (Array [q, c, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure defaultTokenEntry <*> (Just <$> jsonToSlotName s)
       Just (Array [q, c, e, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> jsonToTokenEntry e <*> (Just <$> jsonToSlotName s)
       _ -> Left (Text.pack "Create expects [Quantity, Card], optionally with a TokenEntry and/or a slot")
-    "ArmDelayedTrigger" -> withValue mv (fmap Effect.ArmDelayedTrigger . jsonToAbilityName)
+    "ArmDelayedTrigger" -> case mv of
+      Just (Array [n, d]) -> Effect.ArmDelayedTrigger <$> jsonToAbilityName n <*> fmap Just (jsonToDuration d)
+      _ -> withValue mv (fmap (`Effect.ArmDelayedTrigger` Nothing) . jsonToAbilityName)
     "Replace" -> case mv of
       Just (Array [d, u, re]) -> do
         duration <- jsonToDuration d
@@ -1612,7 +1653,9 @@ jsonToEffect value = do
       Just (Array [r, k, q]) -> Effect.GainPlayerCounters <$> jsonToPlayerRef r <*> jsonToPlayerCounterKind k <*> jsonToQuantity q
       _ -> Left (Text.pack "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]")
     "Untap" -> withValue mv (fmap Effect.Untap . jsonToObjectRef)
-    "AddCombatAndMainPhase" -> Right Effect.AddCombatAndMainPhase
+    "AddPhases" -> case mv of
+      Just (Array ps) -> Effect.AddPhases <$> traverse jsonToExtraPhase ps
+      _ -> Left (Text.pack "AddPhases expects [ExtraPhase]")
     "GainControl" -> case mv of
       Just (Array [d, s]) -> Effect.GainControl <$> jsonToDuration d <*> jsonToSlotName s
       _ -> Left (Text.pack "GainControl expects [duration, slot]")
@@ -1905,13 +1948,37 @@ jsonToBindings value =
         pure (k, b)
    in Map.fromList <$> listFrom decodeEntry value
 
+-- CR 611.2: the STORED duration, which unlike every other type in this module
+-- never appears in card JSON -- a card carries a Duration and Pawl.Expiry.arm
+-- turns it into this. The one thing that serialises an Expiry is a
+-- DelayedTrigger, below, because CR 603.7b lets a delayed ability state one.
+expiryToJson :: Expiry.Expiry -> Value
+expiryToJson e = case e of
+  Expiry.AtCleanup -> nullary (Text.pack "AtCleanup")
+  Expiry.Never -> nullary (Text.pack "Never")
+  Expiry.While p c -> Json.tagged (Text.pack "While") (Just (Array [playerIdToJson p, conditionToJson c]))
+  Expiry.AtTurnOf p -> Json.tagged (Text.pack "AtTurnOf") (Just (playerIdToJson p))
+
+jsonToExpiry :: Value -> Either Text Expiry.Expiry
+jsonToExpiry value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("AtCleanup", _) -> Right Expiry.AtCleanup
+    ("Never", _) -> Right Expiry.Never
+    ("While", Just (Array [p, c])) -> Expiry.While <$> jsonToPlayerId p <*> jsonToCondition c
+    ("AtTurnOf", Just v) -> Expiry.AtTurnOf <$> jsonToPlayerId v
+    _ -> Left (Text.pack "unknown Expiry: " <> t)
+
 delayedTriggerToJson :: DelayedTrigger.DelayedTrigger -> Value
 delayedTriggerToJson d =
   Object
     [ (Text.pack "ability", triggeredAbilityToJson (DelayedTrigger.ability d)),
       (Text.pack "source", objectIdToJson (DelayedTrigger.source d)),
       (Text.pack "controller", playerIdToJson (DelayedTrigger.controller d)),
-      (Text.pack "bindings", bindingsToJson (DelayedTrigger.bindings d))
+      (Text.pack "bindings", bindingsToJson (DelayedTrigger.bindings d)),
+      -- CR 603.7b: absent for an ability with no stated duration, which is the
+      -- rule's default and every entry in the pool but Full Throttle's.
+      (Text.pack "expiry", maybeTo expiryToJson (DelayedTrigger.expiry d))
     ]
 
 jsonToDelayedTrigger :: Value -> Either Text DelayedTrigger.DelayedTrigger
@@ -1921,12 +1988,14 @@ jsonToDelayedTrigger value = do
   s <- Json.field (Text.pack "source") ps >>= jsonToObjectId
   c <- Json.field (Text.pack "controller") ps >>= jsonToPlayerId
   b <- Json.field (Text.pack "bindings") ps >>= jsonToBindings
+  e <- maybeFrom jsonToExpiry (getOpt (Text.pack "expiry") ps)
   pure
     DelayedTrigger.MkDelayedTrigger
       { DelayedTrigger.ability = a,
         DelayedTrigger.source = s,
         DelayedTrigger.controller = c,
-        DelayedTrigger.bindings = b
+        DelayedTrigger.bindings = b,
+        DelayedTrigger.expiry = e
       }
 
 -- Modal -----------------------------------------------------------------------

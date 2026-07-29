@@ -339,7 +339,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
-  TriggerCondition.SelfAttacks -> []
+  TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfDies -> []
@@ -374,9 +374,9 @@ effectCounts effect = case effect of
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
   Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
   Effect.Untap _ -> []
-  Effect.AddCombatAndMainPhase -> []
+  Effect.AddPhases _ -> []
   Effect.GainControl duration _ -> durationCounts duration
-  Effect.ArmDelayedTrigger _ -> []
+  Effect.ArmDelayedTrigger _ _ -> []
   Effect.AffectPlayers duration _ _ -> durationCounts duration
   Effect.CreateEmblem card -> cardCounts card
   Effect.BecomeMonarch _ -> []

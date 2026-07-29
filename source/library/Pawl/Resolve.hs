@@ -131,9 +131,9 @@ slotsOf effect = case effect of
   Effect.PutCounters _ _ slot -> Set.singleton slot
   Effect.GainPlayerCounters ref _ _ -> playerRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
-  Effect.AddCombatAndMainPhase -> Set.empty
+  Effect.AddPhases _ -> Set.empty
   Effect.GainControl _ slot -> Set.singleton slot
-  Effect.ArmDelayedTrigger _ -> Set.empty
+  Effect.ArmDelayedTrigger _ _ -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
@@ -178,9 +178,9 @@ readsX = any effectReadsX
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
       Effect.Untap _ -> False
-      Effect.AddCombatAndMainPhase -> False
+      Effect.AddPhases _ -> False
       Effect.GainControl _ _ -> False
-      Effect.ArmDelayedTrigger _ -> False
+      Effect.ArmDelayedTrigger _ _ -> False
       Effect.AffectPlayers {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
@@ -224,9 +224,9 @@ manaProduced effect = case effect of
   Effect.PutCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
   Effect.Untap _ -> Nothing
-  Effect.AddCombatAndMainPhase -> Nothing
+  Effect.AddPhases _ -> Nothing
   Effect.GainControl _ _ -> Nothing
-  Effect.ArmDelayedTrigger _ -> Nothing
+  Effect.ArmDelayedTrigger _ _ -> Nothing
   Effect.AffectPlayers {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
@@ -265,9 +265,9 @@ searchesLibrary effect = case effect of
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
   Effect.Untap _ -> False
-  Effect.AddCombatAndMainPhase -> False
+  Effect.AddPhases _ -> False
   Effect.GainControl _ _ -> False
-  Effect.ArmDelayedTrigger _ -> False
+  Effect.ArmDelayedTrigger _ _ -> False
   Effect.AffectPlayers {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
@@ -291,7 +291,7 @@ textChangeSlots card =
 armedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
 armedAbilities effects =
   let named effect = case effect of
-        Effect.ArmDelayedTrigger name -> Just name
+        Effect.ArmDelayedTrigger name _ -> Just name
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe named effects)
 
@@ -319,13 +319,25 @@ bindsSeveralTokens effects =
         _ -> False
    in any offends effects
 
--- Rewrite basic-land-type words in an effect's AST (CR 612). Cases on Effect
--- (Resolve's charter); delegates the inner modification of ModifyTarget to
--- Projection.rewriteModification, so neither module touches the other's
--- constructors. DealDamage and ChangeText carry no rewritable land-type word.
+-- CR 612's basic-land-type word swap, over an effect's AST. Cases on Effect
+-- (Resolve's charter); delegates the inner Modification of ModifyTarget to
+-- Projection.rewriteModification and every carried Filter to Filter.rewrite, so
+-- no module touches another's constructors. DealDamage and ChangeText carry no
+-- rewritable land-type word.
 --
--- A Filter carried by an effect (Search's, Destroy's and Untap's EachMatching,
--- PlayerSacrifices', AttachTarget's) is NOT rewritten (#395).
+-- CR 612.1 rewrites "any words or symbols printed on that object", so a Filter
+-- an effect carries is not exempt: Boil's "destroy all Islands" is a land-type
+-- word inside an ObjectRef.EachMatching. Every arm holding one goes through
+-- Filter.rewrite or rewriteObjectRef rather than being special-cased here.
+-- CR 612.1 through an ObjectRef. InSlot names an object CHOSEN at cast time, not
+-- a word on the card, so there is nothing in it to rewrite; EachMatching's
+-- Filter is card text like any other. Lives here beside objectRefObjects rather
+-- than in a module of its own, which the type does not have.
+rewriteObjectRef :: [(Subtype, Subtype)] -> ObjectRef -> ObjectRef
+rewriteObjectRef pairs ref = case ref of
+  ObjectRef.InSlot _ -> ref
+  ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
+
 rewriteEffect :: [(Subtype, Subtype)] -> Effect Card.Type.Card -> Effect Card.Type.Card
 rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget duration modification slot ->
@@ -333,14 +345,14 @@ rewriteEffect pairs effect = case effect of
   Effect.DealDamage _ _ -> effect
   Effect.ChangeText _ -> effect
   Effect.AddMana _ -> effect
-  Effect.Search _ _ -> effect
+  Effect.Search filter_ destination -> Effect.Search (Filter.rewrite pairs filter_) destination
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.ExileHandThenDraw -> effect
-  Effect.PlayerSacrifices {} -> effect
+  Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
   Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
-  Effect.Destroy {} -> effect
+  Effect.Destroy ref regenerability -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability
   Effect.Sacrifice _ -> effect
   Effect.MoveToZone {} -> effect
   Effect.Draw {} -> effect
@@ -358,11 +370,11 @@ rewriteEffect pairs effect = case effect of
   Effect.PutCounters {} -> effect
   -- No rewritable land-type word.
   Effect.GainPlayerCounters {} -> effect
-  Effect.Untap _ -> effect
+  Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
-  Effect.AddCombatAndMainPhase -> effect
+  Effect.AddPhases _ -> effect
   Effect.GainControl _ _ -> effect
-  Effect.ArmDelayedTrigger _ -> effect
+  Effect.ArmDelayedTrigger _ _ -> effect
   -- A player effect carries no basic-land-type word for CR 612 to rewrite.
   Effect.AffectPlayers {} -> effect
   -- An emblem's embedded card carries no basic-land-type word here (as Create's
@@ -373,8 +385,7 @@ rewriteEffect pairs effect = case effect of
   -- No rewritable land-type word.
   Effect.ExileUntilMonarch _ -> effect
   Effect.Attach _ -> effect
-  -- The destination Filter names a card type, never a basic land type.
-  Effect.AttachTarget {} -> effect
+  Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
   -- No rewritable land-type word.
   Effect.PlaySubgame _ -> effect
 
@@ -1277,7 +1288,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                 let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
                 State.modify' (bindSlot source slot named)
       _ -> pure ()
-  Effect.ArmDelayedTrigger name -> do
+  Effect.ArmDelayedTrigger name duration -> do
     gs <- State.get
     case Game.cardOf source gs >>= (Map.lookup name . Card.Type.delayedAbilities) of
       -- The dataflow lint makes a dangling name a failing test, never a silent
@@ -1294,7 +1305,17 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                 { DelayedTrigger.ability = ability,
                   DelayedTrigger.source = source,
                   DelayedTrigger.controller = controller,
-                  DelayedTrigger.bindings = captured
+                  DelayedTrigger.bindings = captured,
+                  -- CR 603.7b's stated duration, armed the way a continuous
+                  -- effect's is. The two Maybes meet here and mean different
+                  -- things: the OUTER one is the card printing no duration at
+                  -- all, and the inner one is Expiry.arm reporting that a
+                  -- printed duration never STARTED (CR 611.2b's "if the 'for as
+                  -- long as' duration never starts, the effect does nothing").
+                  -- Both collapse to Nothing, and both should: an ability whose
+                  -- stated duration never began has no duration to outlive its
+                  -- first firing, so CR 603.7b's default is exactly right for it.
+                  DelayedTrigger.expiry = duration >>= \d -> Expiry.arm controller source d gs
                 }
          in State.put gs {GameState.delayedTriggers = GameState.delayedTriggers gs Seq.|> entry}
   Effect.Replace duration uses re ->
@@ -1620,18 +1641,17 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             { GameState.objects =
                 foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
             }
-  -- CR 500.8: add the phases, directly after the phase this is resolving in --
-  -- GameState.remaining is exactly what is left after the current one, so
-  -- Turn.spliceCombatAndMainPhase's cons-at-head puts them there.
+  -- CR 500.8: add the phases, directly after the phase this is resolving in.
   --
-  -- Cons-at-head means "directly after this PHASE" only because the phase this
-  -- can resolve in has no steps: what is left of a stepped phase would sit in
-  -- `remaining` too, and the new phases would go inside it rather than after it.
-  -- Turn.spliceCombatAndMainPhase's own comment carries the CR 307.5 argument
-  -- for why the resolving phase is always a main phase (CR 505.2: no steps).
-  Effect.AddCombatAndMainPhase ->
+  -- Turn.splicePhases is handed GameState.phase because "directly after this
+  -- phase" is NOT the head of `remaining` when the resolving phase still has
+  -- steps to come: Aurelia, the Warleader's trigger resolves in the declare
+  -- attackers step, where this combat phase's own declare blockers, combat
+  -- damage and end of combat steps are all still ahead. CR 511.3 is what bounds
+  -- the phase, and Turn.thisPhase is where that lives.
+  Effect.AddPhases extras ->
     State.modify' $ \gs ->
-      gs {GameState.remaining = Turn.spliceCombatAndMainPhase (GameState.remaining gs)}
+      gs {GameState.remaining = Turn.splicePhases (GameState.phase gs) extras (GameState.remaining gs)}
   Effect.GainControl duration slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

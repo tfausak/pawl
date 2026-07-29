@@ -42,6 +42,7 @@ import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TokenEntry as TokenEntry
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TypeLine as TypeLine
 import qualified Pawl.Type.Zone as Zone
@@ -152,7 +153,7 @@ tests registry =
         -- is the whole of this condition.
         HU.assertEqual
           "one trigger, on being declared as an attacker"
-          [TriggerCondition.SelfAttacks]
+          [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
           (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
         HU.assertEqual
           "two tokens, tapped and attacking"

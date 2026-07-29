@@ -37,6 +37,7 @@ import qualified Pawl.Cost as Cost
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Keyword as Keyword
 import qualified Pawl.Modal as Modal
@@ -51,13 +52,16 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Expiry as Expiry.Type
 import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
@@ -83,6 +87,7 @@ import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Type.TriggerSource as TriggerSource
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
@@ -241,6 +246,40 @@ scanTests registry =
                 Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Battlefield)
               HU.assertBool "enters graveyard does not" $
                 not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard)),
+      -- CR 508.3a plus Aurelia, the Warleader's "for the first time each turn".
+      -- The declaration being matched is already in the log when the scan runs,
+      -- so "the first time" is "this is the only one so far".
+      HU.testCase "SelfAttacks FirstTimeEachTurn matches only the first declaration" $
+        let bearer = ObjectId.MkObjectId 1
+            declared = GameEvent.AttackerDeclared bearer
+            gsWith events = S.withEvents events (Setup.emptyGame S.bothPlayers)
+            matches frequency events =
+              Event.matchesTrigger (gsWith events) bearer S.alice (TriggerCondition.SelfAttacks frequency) declared
+         in do
+              HU.assertBool "the first declaration matches" $
+                matches TriggerFrequency.FirstTimeEachTurn [declared]
+              HU.assertBool "a second declaration this turn does not" $
+                not (matches TriggerFrequency.FirstTimeEachTurn [declared, declared])
+              -- Hanweir Garrison's shape is untouched by the narrowing.
+              HU.assertBool "EveryTime matches the first" $
+                matches TriggerFrequency.EveryTime [declared]
+              HU.assertBool "EveryTime matches the second too" $
+                matches TriggerFrequency.EveryTime [declared, declared]
+              -- The count is per bearer, not per turn: two creatures declared
+              -- together are each attacking for the first time.
+              HU.assertBool "another creature's declaration does not spend this one's first time" $
+                matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (ObjectId.MkObjectId 2), declared]
+              -- CR 508.3a's last sentence, unchanged by the frequency: a
+              -- non-declaration event never matches.
+              HU.assertBool "a step beginning is not an attack" $
+                not
+                  ( Event.matchesTrigger
+                      (gsWith [declared])
+                      bearer
+                      S.alice
+                      (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn)
+                      (GameEvent.StepBegan (Phase.Combat CombatStep.DeclareAttackers) S.alice)
+                  ),
       -- Pins the canonical emission order this module's `eventTriggers` comment
       -- documents ("events outer, permanents inner, ascending by id"), which a
       -- later task's CR 603.3b ordering prompt indexes into. Two RiP bearers
@@ -652,6 +691,13 @@ delayedTests registry =
       -- Answers Prompt.ChooseBoundToken with an object that was never minted, so
       -- the engine's filter is what decides the binding. Id 999 names nothing --
       -- the same posture S.noSource takes.
+      -- Stamp an expiry onto every armed delayed ability, so the CR 603.7b
+      -- stated-duration mechanism can be exercised on a real armed entry.
+      withExpiry expiry gs =
+        gs
+          { GameState.delayedTriggers =
+              fmap (\entry -> entry {DelayedTrigger.expiry = expiry}) (GameState.delayedTriggers gs)
+          }
       chooseUnmintedToken :: Prompt.Prompt r -> r
       chooseUnmintedToken p = case p of
         Prompt.ChooseBoundToken {} -> ObjectId.MkObjectId 999
@@ -685,6 +731,41 @@ delayedTests registry =
             let after = resolveAll (settle (beginEndStep (castWave tidalWave island)))
             HU.assertEqual "no Wall left" [] (walls after)
             HU.assertEqual "the store is empty" 0 (Seq.length (GameState.delayedTriggers after)),
+          -- CR 603.7b's other half: "unless it has a stated duration, such as
+          -- 'this turn.'" Tidal Wave's entry is reused with an expiry stamped on
+          -- it, so the mechanism is tested without inventing a card; Full
+          -- Throttle is the card that actually prints one.
+          HU.testCase "CR 603.7b a stated-duration delayed ability stays armed after firing" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let armed = castWave tidalWave island
+                stated = withExpiry (Just Expiry.Type.AtCleanup) armed
+                began = [GameEvent.StepBegan endStep S.alice]
+                (firedOnce, survivors) = Event.delayedPending began stated
+                (firedAgain, _) = Event.delayedPending began stated {GameState.delayedTriggers = survivors}
+            HU.assertEqual "it fired" 1 (length firedOnce)
+            HU.assertEqual "and stayed armed" 1 (Seq.length survivors)
+            HU.assertEqual "so the next end step fires it again" 1 (length firedAgain),
+          HU.testCase "CR 603.7b without a stated duration firing still spends it" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let armed = castWave tidalWave island
+                (fired, survivors) = Event.delayedPending [GameEvent.StepBegan endStep S.alice] armed
+            HU.assertEqual "it fired" 1 (length fired)
+            HU.assertEqual "and was evicted" 0 (Seq.length survivors),
+          -- CR 514.2: "all 'until end of turn' and 'this turn' effects end"
+          -- during the cleanup step -- which is what ends the stated duration,
+          -- and the reason an armed entry cannot outlive the turn that made it.
+          HU.testCase "CR 514.2 cleanup drops a stated-duration delayed ability" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let armed = castWave tidalWave island
+                swept expiry = GameState.delayedTriggers (Expiry.dropAtCleanup (withExpiry expiry armed))
+            HU.assertEqual "an 'this turn' entry is gone" 0 (Seq.length (swept (Just Expiry.Type.AtCleanup)))
+            HU.assertEqual "an end-of-game entry stays" 1 (Seq.length (swept (Just Expiry.Type.Never)))
+            -- CR 603.7b's one shot is spent by FIRING, not by time, so an entry
+            -- on no duration at all must survive every sweep.
+            HU.assertEqual "and a one-shot entry stays" 1 (Seq.length (swept Nothing)),
           HU.testCase "CR 603.7b a second end step does not re-fire it" $ do
             tidalWave <- Registry.printing registry "Tidal Wave"
             island <- Registry.printing registry "Island"

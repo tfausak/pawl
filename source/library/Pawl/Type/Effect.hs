@@ -3,6 +3,7 @@ module Pawl.Type.Effect where
 import Pawl.Type.AbilityName (AbilityName)
 import Pawl.Type.CounterKind (CounterKind)
 import Pawl.Type.Duration (Duration)
+import Pawl.Type.ExtraPhase (ExtraPhase)
 import Pawl.Type.Filter (Filter)
 import Pawl.Type.ManaProduction (ManaProduction)
 import Pawl.Type.Modification (Modification)
@@ -272,27 +273,29 @@ data Effect card
     GainPlayerCounters PlayerRef PlayerCounterKind Quantity
   | -- CR 701.26b: untap the permanents the ObjectRef names. Act of Treason's
     -- "untap that creature" is `InSlot`; Aggravated Assault's "untap all
-    -- creatures you control" is `EachMatching`, swept at resolution.
+    -- creatures you control" and Relentless Assault's "untap all creatures that
+    -- attacked this turn" are both `EachMatching`, swept at resolution.
     --
     -- ObjectRef rather than a bare SlotName for the reason Destroy's comment
     -- gives at length: one opcode serving both the chosen permanent and the
     -- named set, rather than a sibling UntapAll to keep in step with it.
     Untap ObjectRef
   | -- CR 500.8: "Some effects can add phases to a turn. They do this by adding
-    -- the phases directly after the specified phase." This one adds an
-    -- additional combat phase followed by an additional main phase, after the
-    -- phase it resolves in -- Aggravated Assault's "After this main phase, there
-    -- is an additional combat phase followed by an additional main phase".
+    -- the phases directly after the specified phase." The payload says which
+    -- phases, in written order: Aggravated Assault and Relentless Assault are
+    -- `[ExtraCombat, ExtraMain]`, Aurelia, the Warleader is `[ExtraCombat]`, and
+    -- Full Throttle is `[ExtraCombat, ExtraCombat]`.
     --
-    -- Nullary, and the pair rather than either alone: the card says both in one
-    -- sentence, and neither half has a card of its own in the pool. A card that
-    -- adds only a combat phase (Aurelia, the Warleader) or only a main phase
-    -- wants a payload here rather than a sibling opcode (#393).
+    -- A payload rather than a sibling opcode per shape, because CR 500.8 does not
+    -- fix which phases are added and the printed cards genuinely differ. The
+    -- list may be empty in the type; no card writes one, and an empty splice is
+    -- a no-op rather than a case to guard.
     --
     -- Targetless and unprompted -- CR 500.8 leaves nothing to choose. Executed
-    -- by Resolve.applyEffect via Turn.spliceCombatAndMainPhase, which is where
-    -- the CR 505.1a/506.1 detail of WHAT is inserted lives.
-    AddCombatAndMainPhase
+    -- by Resolve.applyEffect via Turn.splicePhases, which is where both the CR
+    -- 505.1a/506.1 detail of WHAT is inserted and the CR 511.3 question of WHERE
+    -- live.
+    AddPhases [ExtraPhase]
   | -- CR 613.1b / 611.2c: install a layer-2 control effect on the slot's target
     -- for a duration. The new controller is THIS effect's source's controller
     -- (the `controller` passed to applyEffect), baked into a stored
@@ -309,7 +312,13 @@ data Effect card
     -- type parameter. The resolving object's binding environment is captured as
     -- the ability is armed, which is how "it" / "that card" (CR 603.7c) is
     -- remembered after this resolution ends.
-    ArmDelayedTrigger AbilityName
+    --
+    -- The Duration is CR 603.7b's "stated duration, such as 'this turn'" --
+    -- Full Throttle's "at the beginning of each combat this turn". Nothing is
+    -- that rule's default, "only once, the next time its trigger event occurs"
+    -- (Tidal Wave), and it is Nothing rather than a Duration arm meaning "once"
+    -- because the rule words once-ness as the ABSENCE of a duration.
+    ArmDelayedTrigger AbilityName (Maybe Duration)
   | -- CR 611.1 / 613.11: install a stored PLAYER or RULES-modifying continuous
     -- effect on a class of players for a duration. Silence is
     -- `AffectPlayers UntilEndOfTurn Opponents CantCastSpells`.

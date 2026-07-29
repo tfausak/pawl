@@ -1,5 +1,6 @@
 module Pawl.Filter where
 
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
@@ -42,6 +43,19 @@ data View = MkView
     -- combat status to read: a printed card off the battlefield, a player, and an
     -- event snapshot -- the same vacuous posture power and controller take.
     attacking :: Bool,
+    -- CR 608.2i: was this candidate declared as an attacker earlier this turn?
+    -- Not a characteristic either, and unlike `attacking` not even a present
+    -- state: it is a look-back read of the turn-scoped GameEvent log, which
+    -- CR 608.2i is the rule for -- see Pawl.Projection.viewOfCharacteristics.
+    -- False for every candidate with no history to read: a printed card off the
+    -- battlefield, a player, and an event snapshot -- the vacuous posture
+    -- `attacking` takes.
+    --
+    -- LAZY, like `attachedToCreature` below but for a plainer reason: filling it
+    -- folds the whole turn's event log, and nothing forces it unless a Filter
+    -- actually contains AttackedThisTurn. That is a cost argument rather than
+    -- the recursion hazard the next field records.
+    attackedThisTurn :: Bool,
     -- CR 701.3a: is this candidate attached to a CREATURE right now? Not a
     -- characteristic either (CR 109.3 names "what an Aura enchants" among the
     -- things that are not one), so it is read from Object.attachedTo plus the
@@ -86,6 +100,8 @@ playerView pid =
       playerIdentity = Just pid,
       -- CR 506.3: only a creature can attack, and a player is not one.
       attacking = False,
+      -- CR 506.3 again: a player was never declared as an attacker either.
+      attackedThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
       -- player is not itself attached to anything (Object.attachedTo runs the
       -- other way and names an object, #190).
@@ -148,6 +164,11 @@ matches context view predicate = case predicate of
   -- or the combat phase ends, whichever comes first" -- so this is a live read of
   -- the combat record, never a stamp on the object.
   Filter.IsAttacking -> attacking view
+  -- CR 608.2i: a look-back read of the turn's event log. Unlike IsAttacking it
+  -- cannot stop being true within a turn -- nothing removes a GameEvent -- so a
+  -- creature removed from combat (CR 506.4) still attacked, which is what
+  -- Relentless Assault's "creatures that attacked this turn" means.
+  Filter.AttackedThisTurn -> attackedThisTurn view
   -- CR 701.3a: a live read of Object.attachedTo and the host's projected types,
   -- never a stamp on the candidate -- an Aura whose host stops being a creature
   -- stops matching, and CR 704.5m buries it on the next state-based-action pass.
@@ -161,3 +182,33 @@ matches context view predicate = case predicate of
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)
+
+-- CR 612.1: swap basic-land-type words wherever they appear in a Filter. A
+-- text-changing effect "can apply to any words or symbols printed on that
+-- object", and a Filter carried by an effect is part of that text -- so this is
+-- the shape Pawl.Projection.rewriteModification already has, for the type THIS
+-- module owns. Pawl.Resolve threads one call per Filter-carrying effect arm
+-- rather than learning what is inside each one.
+--
+-- HasSubtype is the only atom that can carry a basic land type (CR 205.3i); the
+-- rest name a card type, a supertype, a colour, a number, a relation or a
+-- status, none of which CR 612's word swap reaches. Written out exhaustively
+-- rather than with a catch-all, so a later atom that CAN carry one fails to
+-- compile here instead of silently going unrewritten.
+rewrite :: [(Subtype.Subtype, Subtype.Subtype)] -> Filter.Filter -> Filter.Filter
+rewrite pairs predicate = case predicate of
+  Filter.HasSubtype s -> Filter.HasSubtype (Maybe.fromMaybe s (lookup s pairs))
+  Filter.And fs -> Filter.And (fmap (rewrite pairs) fs)
+  Filter.Or fs -> Filter.Or (fmap (rewrite pairs) fs)
+  Filter.Not f -> Filter.Not (rewrite pairs f)
+  Filter.HasCardType _ -> predicate
+  Filter.HasSupertype _ -> predicate
+  Filter.HasColor _ -> predicate
+  Filter.PowerAtLeast _ -> predicate
+  Filter.ControlledBy _ -> predicate
+  Filter.IsSource -> predicate
+  Filter.IsPlayer _ -> predicate
+  Filter.IsAttacking -> predicate
+  Filter.AttackedThisTurn -> predicate
+  Filter.IsAttachedToCreature -> predicate
+  Filter.IsToken -> predicate

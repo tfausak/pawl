@@ -1,13 +1,19 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Turn: turn structure, the phase schedule, the CR 508.8 skips, and
--- CR 500.8's added phases (Aggravated Assault).
+-- CR 500.8's added phases -- Aggravated Assault and Relentless Assault for the
+-- combat-and-main pair, Aurelia, the Warleader for one added from INSIDE a
+-- combat phase, and Full Throttle for two combat phases and none of main.
 module Pawl.TurnSpec where
 
+import qualified Data.Foldable as Foldable
+import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Pawl.Activate as Activate
+import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Registry as Registry
@@ -18,8 +24,10 @@ import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Combat as Combat
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.ExtraPhase as ExtraPhase
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
@@ -92,7 +100,52 @@ skipTests :: Registry.Type.Registry -> Tasty.TestTree
 skipTests registry =
   Tasty.testGroup
     "Skip"
-    [ HU.testCase "CR 508.8 dropSkippedCombatSteps removes declare blockers and combat damage" $
+    [ HU.testCase "CR 511.3 thisPhase inside a combat phase ends at ITS end of combat" $
+        -- Two whole combat phases back to back -- the arrangement CR 500.8
+        -- permits and Aurelia, the Warleader builds. Splitting at the FIRST end
+        -- of combat step is what leaves the second one whole.
+        let remaining =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.Combat CombatStep.BeginningOfCombat,
+                  Phase.Combat CombatStep.DeclareAttackers,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain
+                ]
+            expected =
+              ( Seq.fromList
+                  [ Phase.Combat CombatStep.DeclareBlockers,
+                    Phase.Combat CombatStep.CombatDamage,
+                    Phase.Combat CombatStep.EndOfCombat
+                  ],
+                Seq.fromList
+                  [ Phase.Combat CombatStep.BeginningOfCombat,
+                    Phase.Combat CombatStep.DeclareAttackers,
+                    Phase.Combat CombatStep.EndOfCombat,
+                    Phase.PostcombatMain
+                  ]
+              )
+         in HU.assertEqual
+              "split at the first end of combat, inclusive"
+              expected
+              (Turn.thisPhase (Phase.Combat CombatStep.DeclareAttackers) remaining),
+      HU.testCase "CR 505.2 thisPhase in a main phase has no steps of its own" $
+        -- "The main phase has no steps", so there is nothing of it left in the
+        -- schedule and everything remaining is already after it.
+        let remaining = Seq.fromList [Phase.Combat CombatStep.BeginningOfCombat, Phase.PostcombatMain]
+         in HU.assertEqual "empty prefix" (Seq.empty, remaining) (Turn.thisPhase Phase.PrecombatMain remaining),
+      HU.testCase "thisPhase yields an empty prefix when this phase's final step is gone" $
+        -- Unreachable from either caller, and asserted anyway: dropping nothing
+        -- is the safer failure than treating the whole rest of the turn as this
+        -- phase.
+        let remaining = Seq.fromList [Phase.PostcombatMain, Phase.Ending EndingStep.EndStep]
+         in HU.assertEqual
+              "empty prefix"
+              (Seq.empty, remaining)
+              (Turn.thisPhase (Phase.Combat CombatStep.EndOfCombat) remaining),
+      HU.testCase "CR 508.8 dropSkippedCombatSteps removes declare blockers and combat damage" $
         let full =
               Seq.fromList
                 [ Phase.Combat CombatStep.DeclareBlockers,
@@ -101,7 +154,7 @@ skipTests registry =
                   Phase.PostcombatMain
                 ]
             expected = Seq.fromList [Phase.Combat CombatStep.EndOfCombat, Phase.PostcombatMain]
-         in HU.assertEqual "dropped" expected (Turn.dropSkippedCombatSteps full),
+         in HU.assertEqual "dropped" expected (Turn.dropSkippedCombatSteps (Phase.Combat CombatStep.DeclareAttackers) full),
       HU.testCase "CR 500.8 dropSkippedCombatSteps spares a LATER combat phase's steps" $
         -- The schedule a CR 500.8 additional combat phase leaves behind: this
         -- combat's tail, then an additional main phase, then the turn's normal
@@ -132,7 +185,10 @@ skipTests registry =
                   Phase.Combat CombatStep.EndOfCombat,
                   Phase.PostcombatMain
                 ]
-         in HU.assertEqual "only this phase's steps dropped" expected (Turn.dropSkippedCombatSteps full),
+         in HU.assertEqual
+              "only this phase's steps dropped"
+              expected
+              (Turn.dropSkippedCombatSteps (Phase.Combat CombatStep.DeclareAttackers) full),
       HU.testCase "CR 508.8 no attacker declared skips to end of combat" $
         -- Nobody has a creature, so no attackers are declared: the declare
         -- blockers and combat damage steps must not run at all.
@@ -244,15 +300,113 @@ runTurn answer gs0 =
              in (final, GameState.phase g : later)
    in go 32 gs0
 
--- CR 500.8's added phases, end to end, through the one card in the pool that
--- adds any: Aggravated Assault ({3}{R}{R}: Untap all creatures you control.
--- After this main phase, there is an additional combat phase followed by an
--- additional main phase. Activate only as a sorcery.)
+-- alice at her declare attackers step, defending player bob, with two Settled
+-- creatures of the given printing -- the first untapped and free to attack, the
+-- second TAPPED so CR 508.1a keeps it out of combat -- four untapped Mountains
+-- (exactly Relentless Assault's {2}{R}{R}) and the spell in hand.
+relentlessBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId, ObjectId, ObjectId)
+relentlessBoard mountain assault piker =
+  let (base, ours, _) = S.combatBoardOf [piker, piker] []
+      (attacker, bystander) = case ours of
+        [a, b] -> (a, b)
+        _ -> error "combatBoardOf should return two creatures"
+      withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) base [1 :: Int .. 4]
+      (gs, spell) = S.handOne assault (S.tapObject bystander withLands)
+   in ( gs
+          { GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = GameState.combat base,
+            GameState.remaining = GameState.remaining base
+          },
+        spell,
+        attacker,
+        bystander
+      )
+
+-- alice in her precombat main phase with priority, six untapped Mountains
+-- (exactly Full Throttle's {4}{R}{R}), one Settled creature of the given
+-- printing, and the spell in hand.
+throttleBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId, ObjectId)
+throttleBoard mountain throttle piker =
+  let (attacker, gs1) = S.addCreature piker S.alice (S.landsInPlay mountain 6)
+      (gs2, spell) = S.handOne throttle gs1
+   in ( gs2
+          { GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.remaining = afterPrecombatMain
+          },
+        spell,
+        attacker
+      )
+
+-- Cast a spell from alice's hand through the real path -- Cast.castSpell pays
+-- its cost off the board -- and let it resolve.
+castAndResolve :: ObjectId -> GameState.GameState -> GameState.GameState
+castAndResolve spell gs =
+  let cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spell))
+   in snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+
+-- CR 500.8's added phases, end to end, through the cards in the pool that add
+-- any: Aggravated Assault ({3}{R}{R}: Untap all creatures you control. After
+-- this main phase, there is an additional combat phase followed by an additional
+-- main phase. Activate only as a sorcery.) and Relentless Assault ({2}{R}{R}:
+-- Untap all creatures that attacked this turn. After this main phase, there is
+-- an additional combat phase followed by an additional main phase.)
 extraPhaseTests :: Registry.Type.Registry -> Tasty.TestTree
 extraPhaseTests registry =
   Tasty.testGroup
     "ExtraPhase"
-    [ HU.testCase "CR 500.8 whole card: Aggravated Assault untaps your creatures and adds a combat and a main phase" $ do
+    [ HU.testCase "CR 500.8 splicePhases from a MAIN phase goes at the head" $
+        -- CR 505.2: a main phase has no steps, so nothing of it is left in the
+        -- schedule and "directly after the specified phase" is the head. This is
+        -- Aggravated Assault's case, and the reason its behaviour is unchanged.
+        let remaining = Seq.fromList [Phase.Combat CombatStep.BeginningOfCombat, Phase.PostcombatMain]
+         in HU.assertEqual
+              "directly after this phase"
+              (Turn.combatAndMainPhase <> remaining)
+              (Turn.splicePhases Phase.PrecombatMain [ExtraPhase.ExtraCombat, ExtraPhase.ExtraMain] remaining),
+      HU.testCase "CR 500.8 splicePhases from INSIDE a combat phase goes after its end of combat" $
+        -- Aurelia, the Warleader's case. Her trigger resolves in the declare
+        -- attackers step, where this phase's own later steps are still in
+        -- `remaining` -- so the head is INSIDE the phase the added one must
+        -- follow, and CR 511.3's boundary is what puts it in the right place.
+        let remaining =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain
+                ]
+            expected =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat
+                ]
+                <> Turn.expandExtraPhase ExtraPhase.ExtraCombat
+                <> Seq.fromList [Phase.PostcombatMain]
+         in HU.assertEqual
+              "not inside the current phase"
+              expected
+              (Turn.splicePhases (Phase.Combat CombatStep.DeclareAttackers) [ExtraPhase.ExtraCombat] remaining),
+      HU.testCase "CR 500.8 splicePhases inserts a multi-phase list in written order" $
+        -- Full Throttle's "there are two additional combat phases": two whole
+        -- combat phases, back to back, and no main phase between them.
+        HU.assertEqual
+          "two combat phases, back to back"
+          (Turn.expandExtraPhase ExtraPhase.ExtraCombat <> Turn.expandExtraPhase ExtraPhase.ExtraCombat)
+          (Turn.splicePhases Phase.PrecombatMain [ExtraPhase.ExtraCombat, ExtraPhase.ExtraCombat] Seq.empty),
+      HU.testCase "CR 500.8 whole card: Aggravated Assault untaps your creatures and adds a combat and a main phase" $ do
         mountain <- Registry.printing registry "Mountain"
         assault <- Registry.printing registry "Aggravated Assault"
         piker <- Registry.printing registry "Goblin Piker"
@@ -337,7 +491,136 @@ extraPhaseTests registry =
                 Phase.Ending EndingStep.Cleanup
               ]
               ran
-            HU.assertEqual "bob took 2 in each of the two combats" (Just 16) (S.lifeOf S.bob played)
+            HU.assertEqual "bob took 2 in each of the two combats" (Just 16) (S.lifeOf S.bob played),
+      HU.testCase "CR 500.8 whole card: Relentless Assault untaps only what ATTACKED" $ do
+        -- The assertion that distinguishes Filter.AttackedThisTurn from
+        -- "creatures you control": both creatures are alice's and both are
+        -- tapped by the time the spell resolves, and only the one that was
+        -- DECLARED as an attacker (CR 508.3a) may untap.
+        mountain <- Registry.printing registry "Mountain"
+        assault <- Registry.printing registry "Relentless Assault"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, spell, attacker, bystander) = relentlessBoard mountain assault piker
+            fought = S.runCombat (S.attackTo S.bob) gs
+            after = castAndResolve spell fought
+        HU.assertEqual "the spell was cast in the postcombat main phase" Phase.PostcombatMain (GameState.phase fought)
+        HU.assertEqual "it really attacked" [attacker] (S.attackerDeclarationsOf fought)
+        HU.assertEqual "the attacker untapped" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject attacker after))
+        HU.assertEqual "the non-attacker stayed tapped" (Just TapState.Tapped) (fmap Object.tapped (Game.lookupObject bystander after))
+        HU.assertEqual
+          "and the phases went in directly after this main phase"
+          (Turn.combatAndMainPhase <> Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup])
+          (GameState.remaining after),
+      HU.testCase "CR 500.8 Aurelia's added combat phase goes AFTER this one, not inside it" $ do
+        -- The falsifier for splicing at the head of GameState.remaining.
+        -- Aurelia's trigger resolves in the declare attackers step, where this
+        -- combat phase's own declare blockers, combat damage and end of combat
+        -- steps are all still in `remaining` -- so the head is INSIDE the phase
+        -- the added one has to follow. CR 511.3 is what bounds it.
+        aurelia <- Registry.printing registry "Aurelia, the Warleader"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, ours, _) = S.combatBoardOf [aurelia, piker] []
+            after = snd (Engine.runGamePure (S.attackTo S.bob) gs Engine.runStep)
+        -- Under a head-cons the added phase's beginning of combat step would be
+        -- popped here instead.
+        HU.assertEqual "this combat phase's own next step ran next" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase after)
+        HU.assertEqual
+          "the rest of this phase still comes before the added one"
+          ( Seq.fromList [Phase.Combat CombatStep.CombatDamage, Phase.Combat CombatStep.EndOfCombat]
+              <> Turn.expandExtraPhase ExtraPhase.ExtraCombat
+              <> Seq.fromList [Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+          )
+          (GameState.remaining after)
+        -- And the trigger's other clause really ran: the Piker tapped to attack
+        -- (CR 508.1f) and Aurelia untapped it.
+        HU.assertEqual
+          "untapped all creatures you control"
+          (Just TapState.Untapped)
+          (fmap Object.tapped (Game.lookupObject (ours !! 1) after)),
+      HU.testCase "CR 500.8 Aurelia's second attack adds no third combat phase" $ do
+        -- "For the first time each turn" is load-bearing: without it Aurelia
+        -- attacks in the phase she added, adds another, and the turn never ends.
+        aurelia <- Registry.printing registry "Aurelia, the Warleader"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = S.combatBoardOf [aurelia, piker] []
+            (played, ran) = runTurn (S.attackTo S.bob) gs
+        HU.assertEqual
+          "exactly two combat phases, and the second adds nothing"
+          [ Phase.Combat CombatStep.DeclareAttackers,
+            Phase.Combat CombatStep.DeclareBlockers,
+            Phase.Combat CombatStep.CombatDamage,
+            Phase.Combat CombatStep.EndOfCombat,
+            Phase.Combat CombatStep.BeginningOfCombat,
+            Phase.Combat CombatStep.DeclareAttackers,
+            Phase.Combat CombatStep.DeclareBlockers,
+            Phase.Combat CombatStep.CombatDamage,
+            Phase.Combat CombatStep.EndOfCombat,
+            Phase.PostcombatMain,
+            Phase.Ending EndingStep.EndStep,
+            Phase.Ending EndingStep.Cleanup
+          ]
+          ran
+        -- 3 + 2 in each of the two combats.
+        HU.assertEqual "bob took both combats" (Just 10) (S.lifeOf S.bob played),
+      HU.testCase "CR 500.8 whole card: Full Throttle adds two combat phases and NO main phase" $ do
+        -- The one two-element payload in the pool, and the one that adds a
+        -- combat phase directly after a combat phase. CR 500.8 fixes neither the
+        -- number nor the kind, which is why the opcode carries a list.
+        mountain <- Registry.printing registry "Mountain"
+        throttle <- Registry.printing registry "Full Throttle"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, spell, _) = throttleBoard mountain throttle piker
+            after = castAndResolve spell gs
+        HU.assertEqual
+          "two whole combat phases, back to back, then the ordinary rest of the turn"
+          ( Turn.expandExtraPhase ExtraPhase.ExtraCombat
+              <> Turn.expandExtraPhase ExtraPhase.ExtraCombat
+              <> afterPrecombatMain
+          )
+          (GameState.remaining after)
+        HU.assertEqual "one delayed ability armed" 1 (Seq.length (GameState.delayedTriggers after)),
+      HU.testCase "CR 603.7b whole card: Full Throttle's delayed trigger fires at EVERY combat this turn" $ do
+        -- The falsifier for CR 603.7b's one shot. "At the beginning of each
+        -- combat this turn" is a STATED duration, so the ability stays armed and
+        -- fires at all three of the turn's beginning of combat steps -- the two
+        -- it added and the turn's own. Under the old store it would fire once,
+        -- the Piker would stay tapped from its first attack (CR 508.1f), and bob
+        -- would take 2 instead of 6.
+        mountain <- Registry.printing registry "Mountain"
+        throttle <- Registry.printing registry "Full Throttle"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, spell, _) = throttleBoard mountain throttle piker
+            (played, ran) = runTurn (S.attackTo S.bob) (castAndResolve spell gs)
+            combatPhase = Turn.expandExtraPhase ExtraPhase.ExtraCombat
+        HU.assertEqual
+          "three whole combat phases ran"
+          ( [Phase.PrecombatMain]
+              <> concat (replicate 3 (Foldable.toList combatPhase))
+              <> [Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+          )
+          ran
+        -- The Piker attacked in every one of them, which it could only do if the
+        -- delayed ability untapped it before each -- and it found it by
+        -- Filter.AttackedThisTurn, since CR 511.3 had cleared the combat record.
+        HU.assertEqual "bob took 2 in each of the three combats" (Just 14) (S.lifeOf S.bob played)
+        -- CR 514.2 ends the stated duration, so nothing is left armed.
+        HU.assertEqual "and the store is empty by the end of the turn" 0 (Seq.length (GameState.delayedTriggers played)),
+      HU.testCase "CR 511.3 Relentless Assault still finds an attacker after clearCombat" $ do
+        -- The reason the atom reads the turn-scoped event log rather than the
+        -- live combat record. By the postcombat main phase the end of combat
+        -- step has ended, so CR 511.3 has removed every creature from combat and
+        -- Combat.attackers is empty -- an IsAttacking-shaped implementation would
+        -- untap nothing here and this test would fail.
+        mountain <- Registry.printing registry "Mountain"
+        assault <- Registry.printing registry "Relentless Assault"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, spell, attacker, _) = relentlessBoard mountain assault piker
+            fought = S.runCombat (S.attackTo S.bob) gs
+        HU.assertEqual "combat really was cleared" [] (Map.keys (Combat.attackers (GameState.combat fought)))
+        HU.assertEqual
+          "and the attacker untapped anyway"
+          (Just TapState.Untapped)
+          (fmap Object.tapped (Game.lookupObject attacker (castAndResolve spell fought)))
     ]
 
 dedupe :: (Eq a) => [a] -> [a]

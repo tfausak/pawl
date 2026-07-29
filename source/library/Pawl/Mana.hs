@@ -123,6 +123,7 @@ subtypeMana subtype = case subtype of
   -- CR 205.3m: Spirit is a creature type, not a basic land type, so CR 305.6's
   -- intrinsic mana ability never applies to it.
   Subtype.Spirit -> Nothing
+  Subtype.Angel -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an

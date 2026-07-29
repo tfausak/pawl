@@ -7,7 +7,10 @@ import Pawl.Type.PlayerId (PlayerId)
 -- runtime counterpart of the printed Pawl.Type.Duration, the same way
 -- ActiveReplacement is ReplacementEffect's and PendingTrigger is
 -- DelayedTrigger's: card data says "until your next turn", the game remembers
--- WHOSE. Never appears in card JSON and has no codec.
+-- WHOSE. Never appears in card JSON: a card writes a Duration, and only
+-- Pawl.Expiry.arm makes one of these. It does have a runtime codec, whose one
+-- caller is a DelayedTrigger's -- CR 603.7b lets a delayed ability state a
+-- duration, so a stored one has to survive the trip.
 --
 -- The split is what makes a card-only value in GameState unrepresentable. With
 -- one type carrying both, a printed arm that leaked into a stored effect would

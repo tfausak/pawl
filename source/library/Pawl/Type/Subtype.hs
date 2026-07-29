@@ -68,4 +68,6 @@ data Subtype
     Illusion
   | -- CR 205.3m (a creature type; the token Doomed Traveler creates).
     Spirit
+  | -- CR 205.3m (a creature type; Aurelia, the Warleader's).
+    Angel
   deriving (Eq, Ord, Show)
