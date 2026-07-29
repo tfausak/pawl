@@ -246,6 +246,10 @@ tests registry =
             roundTrip "e-powder" Codec.effectToJson Codec.jsonToEffect Effect.ExileHandThenDraw,
           HU.testCase "PlayerSacrifices" $
             roundTrip "e6" Codec.effectToJson Codec.jsonToEffect (Effect.PlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.Type.HasCardType CardType.Creature) (Quantity.Literal 1)),
+          -- CR 701.3: the destination filter travels in the payload, which is what
+          -- distinguishes this arm's wire format from Attach's bare slot.
+          HU.testCase "AttachTarget" $
+            roundTrip "e-crown" Codec.effectToJson Codec.jsonToEffect (Effect.AttachTarget (SlotName.MkSlotName (Text.pack "target")) (Filter.Type.HasCardType CardType.Creature)),
           HU.testCase "Sacrifice round-trips" $
             roundTrip "e5" Codec.effectToJson Codec.jsonToEffect (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "self"))),
           HU.testCase "PutCounters effect round-trips through the codec" $
@@ -416,9 +420,10 @@ tests registry =
                 isSource = Filter.Type.IsSource
                 ravenousRats = Filter.Type.IsPlayer PlayerRelation.Opponent
                 killShot = Filter.Type.IsAttacking
+                crownOfTheAges = Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToCreature]
              in mapM_
                   (roundTrip "filter" Codec.filterToJson Codec.jsonToFilter)
-                  [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot],
+                  [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot, crownOfTheAges],
           HU.testCase "PlayerRelation round-trips" $
             mapM_
               (roundTrip "relation" Codec.playerRelationToJson Codec.jsonToPlayerRelation)

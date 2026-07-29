@@ -19,15 +19,19 @@ import qualified Pawl.Combat as Combat
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
+import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
+import qualified Pawl.Target as Target
+import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
@@ -36,14 +40,17 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.SlotName as SlotName
+import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
 -- CR 301.5 / 702.6: Equipment. Shares the attachment substrate with Auras --
 -- Object.attachedTo, Affected.Attached -- so what is genuinely new is the CR
--- 701.3 Attach keyword action that MOVES an already-on-the-battlefield permanent
--- (#187), and CR 704.5n's detach-rather-than-bury state-based action (#193).
+-- 701.3 Attach keyword action that MOVES an already-on-the-battlefield permanent,
+-- and CR 704.5n's detach-rather-than-bury state-based action (#193). The
+-- Reattach group below is the same keyword action aimed the other way, at a
+-- permanent the effect TARGETS rather than at its own source.
 equipmentTests :: Registry.Type.Registry -> Tasty.TestTree
 equipmentTests registry =
   Tasty.testGroup
@@ -82,9 +89,8 @@ equipmentTests registry =
         HU.assertEqual "unequipped, the Piker is 2/1" (Just 2) (Projection.powerOf creature gs)
         HU.assertEqual "equipped, it is 4/1" (Just 4) (Projection.powerOf creature attached)
         HU.assertEqual "toughness is untouched by +2/+0" (Just 1) (Projection.toughnessOf creature attached),
-      -- CR 701.3a: attaching a permanent that is already attached MOVES it. This
-      -- is the whole point of the Attach opcode -- Aura attachment happens once,
-      -- as the Aura enters, and nothing could relocate it afterwards (#187).
+      -- CR 701.3a: attaching a permanent that is already attached MOVES it --
+      -- "take it from where it currently is and put it onto that object".
       HU.testCase "CR 701.3a equipping again moves the Equipment off the first creature" $ do
         piker <- Registry.printing registry "Goblin Piker"
         warMammoth <- Registry.printing registry "War Mammoth"
@@ -336,7 +342,234 @@ unattachableTests registry =
     ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.Aura" [auraTests registry, equipmentTests registry, unattachableTests registry]
+tests registry = Tasty.testGroup "Pawl.Aura" [auraTests registry, equipmentTests registry, unattachableTests registry, reattachTests registry]
+
+-- Answers every target slot with one fixed recipient, deferring everything else
+-- to S.identityAnswer. aimAt above does the same for a Pool.Permanents slot
+-- only, because it hard-codes Recipient.ToObject; these cases mix a
+-- Pool.Creatures slot (Unholy Strength's enchant) with a Pool.Permanents one
+-- (Crown of the Ages' "target Aura"), and a recipient tagged for the wrong pool
+-- is not in the legal set at all.
+aimRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
+aimRecipient recipient p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const recipient) sets
+  _ -> S.identityAnswer p
+
+-- Answers Prompt.ChooseAttachment with one fixed object -- the destination an
+-- attach-moving effect picks on resolution (CR 701.3a). Discriminating where
+-- S.identityAnswer's head-of-candidates would not be: these boards deliberately
+-- offer several.
+destination :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+destination oid p = case p of
+  Prompt.ChooseAttachment {} -> oid
+  _ -> S.identityAnswer p
+
+-- Crown of the Ages' one target slot, read off its printed activated ability --
+-- the committed spec, not a restatement of it, so a test asserting what it admits
+-- is asserting what the card really says.
+crownTargetSpec :: Printing.Printing -> Maybe TargetSpec.TargetSpec
+crownTargetSpec printing = case Card.Type.activatedAbilities (Printing.card printing) of
+  ability : _ -> Map.lookup (SlotName.MkSlotName (Text.pack "target")) (Modal.allTargetSpecs (ActivatedAbility.modal ability))
+  [] -> Nothing
+
+-- CR 701.3 Attach, aimed at the effect's TARGET rather than at its source: an
+-- opcode that moves an Aura already on the battlefield, which the Auras unit left
+-- unbuilt. Crown of the Ages is the proving card -- "{4}, {T}: Attach target Aura
+-- attached to a creature to another creature".
+reattachTests :: Registry.Type.Registry -> Tasty.TestTree
+reattachTests registry =
+  Tasty.testGroup
+    "Reattach"
+    [ -- The gameplay-level proof design.md section 4 asks for: cast the Aura, cast
+      -- the Crown, activate its printed ability through the real activation path,
+      -- let it resolve, and see the bonus MOVE -- which is what "the Aura moved"
+      -- means observably, not a field changing.
+      HU.testCase "CR 701.3 whole card: Crown of the Ages moves Unholy Strength from the Piker to the Mammoth" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        crown <- Registry.printing registry "Crown of the Ages"
+        -- {B} for the Aura, {2} to cast the Crown, {4} to activate it.
+        let base0 = S.landsInPlay swamp 7
+            (first, base1) = S.addCreature piker S.alice base0
+            -- A THIRD creature, and deliberately the one with the lower object id
+            -- of the two destinations: "another creature" offers both, so the
+            -- Prompt.ChooseAttachment answer below is a real choice rather than a
+            -- forced single candidate, and answering with the Mammoth is not the
+            -- head of the candidate list.
+            (decoy, base1b) = S.addCreature piker S.alice base1
+            (second, base2) = S.addCreature warMammoth S.alice base1b
+            (withAura, auraSpell) = S.handOne unholyStrength base2
+            castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature first)) withAura (Cast.castSpell S.alice auraSpell))
+            enchanted = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature first)) castAura Stack.resolveTop)
+            auraId = case filter (\oid -> fmap Object.attachedTo (Game.lookupObject oid enchanted) == Just (Just first)) (Set.toList (GameState.battlefield enchanted)) of
+              oid : _ -> Just oid
+              [] -> Nothing
+        case auraId of
+          Nothing -> HU.assertFailure "Unholy Strength should have entered attached to the Piker"
+          Just aura -> do
+            let (withCrown, crownSpell) = S.handOne crown enchanted
+                castCrown = snd (Engine.runGamePure S.identityAnswer withCrown (Cast.castSpell S.alice crownSpell))
+                onBattlefield = snd (Engine.runGamePure S.identityAnswer castCrown Stack.resolveTop)
+                crownId = case filter (\oid -> Game.cardOf oid onBattlefield == Just (Printing.card crown)) (Set.toList (GameState.battlefield onBattlefield)) of
+                  oid : _ -> Just oid
+                  [] -> Nothing
+            case crownId of
+              Nothing -> HU.assertFailure "Crown of the Ages should have resolved onto the battlefield"
+              Just crownObj -> do
+                let ability = case Card.Type.activatedAbilities (Printing.card crown) of
+                      ab : _ -> Just ab
+                      [] -> Nothing
+                case ability of
+                  Nothing -> HU.assertFailure "Crown of the Ages should print one activated ability"
+                  Just move -> do
+                    let answer :: Prompt.Prompt r -> r
+                        answer p = case p of
+                          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject aura)) sets
+                          Prompt.ChooseAttachment {} -> second
+                          _ -> S.identityAnswer p
+                        ready = onBattlefield {GameState.priority = Just S.alice}
+                        activated = snd (Engine.runGamePure answer ready (Activate.activateAbility S.alice crownObj move))
+                        after = snd (Engine.runGamePure answer activated Stack.resolveTop)
+                        settled = S.settleSba (S.settleSba after)
+                    HU.assertEqual "before, the Piker is 2/1 + 2/+1" (Just (4, 2)) (S.powerToughnessOf first onBattlefield)
+                    HU.assertEqual "and the Mammoth is a plain 3/3" (Just (3, 3)) (S.powerToughnessOf second onBattlefield)
+                    HU.assertEqual "the Aura is attached to the Mammoth now" (Just (Just second)) (fmap Object.attachedTo (Game.lookupObject aura after))
+                    HU.assertEqual "so the Piker is back to 2/1" (Just (2, 1)) (S.powerToughnessOf first after)
+                    HU.assertEqual "and the Mammoth is 5/4" (Just (5, 4)) (S.powerToughnessOf second after)
+                    HU.assertEqual "the creature nobody chose is untouched" (Just (2, 1)) (S.powerToughnessOf decoy after)
+                    -- CR 704.5m: the Aura landed on a legal host, so nothing buries it.
+                    HU.assertBool "the Aura survives the state-based actions" (Set.member aura (GameState.battlefield settled))
+                    HU.assertEqual "still on the Mammoth" (Just (Just second)) (fmap Object.attachedTo (Game.lookupObject aura settled)),
+      -- CR 303.4b through the target slot: "target Aura ATTACHED TO A CREATURE"
+      -- is Pool.Permanents narrowed by HasSubtype Aura and IsAttachedToCreature,
+      -- so the narrowing has to do real work. The same Aura is offered when it
+      -- sits on the Piker and withheld when it sits on a Mountain -- nothing
+      -- about the Aura itself differs between the two boards, which is what makes
+      -- the pair discriminating.
+      --
+      -- An Aura on a noncreature permanent is hand-built here, as the CR 704.5p
+      -- land case above hand-builds its attachment: CR 704.5m would bury such an
+      -- Aura on the next state-based-action pass, so no sequence of card plays
+      -- leaves one standing for a player to look at.
+      HU.testCase "CR 303.4b Crown of the Ages offers an Aura on a creature and not one on a land" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        crown <- Registry.printing registry "Crown of the Ages"
+        let base = Setup.emptyGame S.bothPlayers
+            (creature, g1) = S.addCreature piker S.alice base
+            (land, g2) = S.addCreature mountain S.alice g1
+            (aura, g3) = S.addCreature unholyStrength S.alice g2
+            (crownObj, g4) = S.addCreature crown S.alice g3
+            onCreature = S.attach aura creature g4
+            onLand = S.attach aura land g4
+            offered gs = fmap (\spec -> Target.legalRecipients (Just S.alice) crownObj spec gs) (crownTargetSpec crown)
+            admits oid gs = fmap (Set.member (Recipient.ToObject oid)) (offered gs)
+        HU.assertEqual "on the Piker the Aura is a legal target" (Just True) (admits aura onCreature)
+        HU.assertEqual "on the Mountain it is not" (Just False) (admits aura onLand)
+        -- Not vacuous for a second reason: the slot rejects the Crown itself on
+        -- the very board where it accepts the Aura.
+        HU.assertEqual "and the Crown is never a candidate" (Just False) (admits crownObj onCreature),
+      -- CR 701.3c: "Attaching an Aura, Equipment, or Fortification on the
+      -- battlefield to a different object or player causes [it] to receive a new
+      -- timestamp." Feeds CR 613.7's layer ordering, so it is not cosmetic.
+      HU.testCase "CR 701.3c moving an Aura to a different creature restamps it" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        warMammoth <- Registry.printing registry "War Mammoth"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        crown <- Registry.printing registry "Crown of the Ages"
+        let base = Setup.emptyGame S.bothPlayers
+            (first, g1) = S.addCreature piker S.alice base
+            (second, g2) = S.addCreature warMammoth S.alice g1
+            (aura, g3) = S.addCreature unholyStrength S.alice g2
+            (crownObj, g4) = S.addCreature crown S.alice g3
+            gs = S.attach aura first g4
+            slot = SlotName.MkSlotName (Text.pack "target")
+            after =
+              S.runPure (destination second) gs $
+                Resolve.applyEffect
+                  crownObj
+                  S.alice
+                  Map.empty
+                  (Map.singleton slot True)
+                  (Map.singleton slot (Recipient.ToObject aura))
+                  (Effect.AttachTarget slot (Filter.Type.HasCardType CardType.Creature))
+            stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
+        HU.assertEqual "it moved" (Just (Just second)) (fmap Object.attachedTo (Game.lookupObject aura after))
+        HU.assertBool "and was restamped" (stampOf after /= stampOf gs),
+      -- CR 701.3b, second sentence: "If an effect tries to attach an Aura,
+      -- Equipment, or Fortification to the object or player it's already attached
+      -- to, the effect does nothing." Crown of the Ages spells the same exclusion
+      -- as "ANOTHER creature", so with no other creature on the battlefield there
+      -- is nothing to choose and nothing happens -- in particular no restamp.
+      HU.testCase "CR 701.3b with only its own host available the Aura does not move and is not restamped" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        crown <- Registry.printing registry "Crown of the Ages"
+        let base = Setup.emptyGame S.bothPlayers
+            (first, g1) = S.addCreature piker S.alice base
+            (aura, g2) = S.addCreature unholyStrength S.alice g1
+            (crownObj, g3) = S.addCreature crown S.alice g2
+            gs = S.attach aura first g3
+            slot = SlotName.MkSlotName (Text.pack "target")
+            after =
+              S.runPure S.identityAnswer gs $
+                Resolve.applyEffect
+                  crownObj
+                  S.alice
+                  Map.empty
+                  (Map.singleton slot True)
+                  (Map.singleton slot (Recipient.ToObject aura))
+                  (Effect.AttachTarget slot (Filter.Type.HasCardType CardType.Creature))
+            stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
+        HU.assertEqual "still on the Piker" (Just (Just first)) (fmap Object.attachedTo (Game.lookupObject aura after))
+        HU.assertEqual "and not restamped" (stampOf gs) (stampOf after),
+      -- CR 303.4j: "If an effect attempts to attach an Aura on the battlefield to
+      -- an object or player it can't legally enchant, the Aura doesn't move." A
+      -- FAILURE MODE, not a fizzle: the ability resolved, and the only thing that
+      -- did not happen is the move.
+      --
+      -- No printed card in the pool reaches this through its own text: every
+      -- Card.enchant in the pool is an unfiltered Pool.Creatures, and Crown of the
+      -- Ages only ever offers creatures, so every destination it can offer is one
+      -- the Aura may legally enchant. The opcode is driven directly with a wider
+      -- destination filter instead -- the same way the Effect.Attach cases in the
+      -- Equipment group above drive that opcode -- because the clause is the rule
+      -- whether or not a card exercises it (#355).
+      HU.testCase "CR 303.4j attaching an Aura to something it cannot enchant leaves it where it was" $ do
+        mountain <- Registry.printing registry "Mountain"
+        piker <- Registry.printing registry "Goblin Piker"
+        unholyStrength <- Registry.printing registry "Unholy Strength"
+        crown <- Registry.printing registry "Crown of the Ages"
+        let base = Setup.emptyGame S.bothPlayers
+            (first, g1) = S.addCreature piker S.alice base
+            (land, g2) = S.addCreature mountain S.alice g1
+            (aura, g3) = S.addCreature unholyStrength S.alice g2
+            (crownObj, g4) = S.addCreature crown S.alice g3
+            gs = S.attach aura first g4
+            slot = SlotName.MkSlotName (Text.pack "target")
+            after =
+              S.runPure (destination land) gs $
+                Resolve.applyEffect
+                  crownObj
+                  S.alice
+                  Map.empty
+                  (Map.singleton slot True)
+                  (Map.singleton slot (Recipient.ToObject aura))
+                  -- `And []` matches everything, so the land is offered as a
+                  -- destination and CR 303.4j is what rejects it.
+                  (Effect.AttachTarget slot (Filter.Type.And []))
+            stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
+            settled = S.settleSba (S.settleSba after)
+        HU.assertEqual "the Aura did not move onto the land" (Just (Just first)) (fmap Object.attachedTo (Game.lookupObject aura after))
+        HU.assertEqual "and was not restamped" (stampOf gs) (stampOf after)
+        HU.assertEqual "the Piker still has the bonus" (Just (4, 2)) (S.powerToughnessOf first after)
+        -- CR 704.5m: a failed move must not leave the Aura in a state the
+        -- state-based actions then punish -- it is still on a legal host.
+        HU.assertBool "and the Aura is not buried afterwards" (Set.member aura (GameState.battlefield settled))
+    ]
 
 auraTests :: Registry.Type.Registry -> Tasty.TestTree
 auraTests registry =

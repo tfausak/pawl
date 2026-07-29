@@ -362,7 +362,10 @@ viewOfCard card =
           Filter.playerIdentity = Nothing,
           -- CR 506.3: only a creature can attack, and a card in a library or hand
           -- is not one -- so it has no combat status either.
-          Filter.attacking = False
+          Filter.attacking = False,
+          -- CR 303.4b: only a permanent on the battlefield is attached to
+          -- anything, and a printed card off it is not one.
+          Filter.attachedToCreature = False
         }
 
 -- Shared assembly: fill a View from a projection's characteristics plus the
@@ -381,7 +384,19 @@ viewOfCharacteristics oid pc controller gs =
       -- CR 508.1k: attacking is a combat STATUS, not a characteristic (CR 109.3),
       -- so it comes straight off the combat record and not from the projection
       -- this function is otherwise assembling.
-      Filter.attacking = Map.member oid (Combat.attackers (GameState.combat gs))
+      Filter.attacking = Map.member oid (Combat.attackers (GameState.combat gs)),
+      -- CR 701.3a: likewise not a characteristic (CR 109.3 names "what an Aura
+      -- enchants" among the things that are not one), so the attachment comes
+      -- off Object.attachedTo. The HOST's creature-ness, though, is projected --
+      -- CR 613 layer 4 can make a land a creature -- so it goes through
+      -- isCreatureOf, which is a projection OF ANOTHER OBJECT.
+      --
+      -- That is why this field must stay lazy: `affects` calls this function
+      -- from inside a projection, and forcing a second projection there would
+      -- recurse. See Pawl.Filter.View's own note on the field.
+      Filter.attachedToCreature = case Game.lookupObject oid gs >>= Object.attachedTo of
+        Nothing -> False
+        Just host -> isCreatureOf host gs
     }
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result -- the value the layer fold
@@ -1043,6 +1058,13 @@ filterReads f = case f of
   Filter.Type.IsSource -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
   Filter.Type.IsAttacking -> Set.empty
+  -- Declared as reading Types even though the types it reads are the HOST's, not
+  -- the candidate's. Aspect names an aspect of ONE object's projection, so there
+  -- is nothing here that can say "another object's card types"; over-declaring
+  -- orders a Types-writing effect before an effect whose affected set asks this,
+  -- which is the conservative direction. Nothing in the pool puts this atom in an
+  -- affected set, so no ordering observable today turns on the choice (#357).
+  Filter.Type.IsAttachedToCreature -> Set.singleton Types
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g

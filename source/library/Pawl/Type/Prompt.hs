@@ -324,6 +324,27 @@ data Prompt r where
   -- already consumed, so two Sacrifice components of one cost each see the full
   -- candidate list (#112).
   ChooseSacrifices :: Decider -> PlayerId -> ObjectId -> [ObjectId] -> Natural -> Prompt (Set ObjectId)
+  -- CR 701.3a: where an effect that moves an already-attached permanent puts it.
+  -- The first ObjectId is the permanent being moved (Crown of the Ages' targeted
+  -- Aura); the NonEmpty is the destinations its card text admits.
+  --
+  -- CHOOSE, not target. Crown of the Ages' ruling is explicit -- "This only
+  -- targets the Aura and not either creature" -- so a destination is offered no
+  -- matter whose it is and no matter whether it can be targeted, and nothing here
+  -- is re-checked under CR 608.2b. The engine deliberately does NOT pre-filter to
+  -- destinations the move would be LEGAL for: "another creature" is the whole of
+  -- what the card says, and narrowing it further would answer CR 303.4j's
+  -- question on the player's behalf.
+  --
+  -- Elided at exactly one candidate, the ChooseManaSource posture: the effect is
+  -- mandatory ("Attach ... to another creature", no "may"), so a single
+  -- destination leaves nothing to decide. The current host is never among the
+  -- candidates (CR 701.3b's second sentence), so it is not an option being
+  -- withheld.
+  --
+  -- NonEmpty, not []: the caller does not raise this at all when no destination
+  -- exists, and a fallback must be total.
+  ChooseAttachment :: Decider -> PlayerId -> ObjectId -> NonEmpty ObjectId -> Prompt ObjectId
   -- CR 601.2b: "If the spell has alternative or additional costs that will be
   -- paid as it's being cast ... the player announces their intentions to pay any
   -- or all of those costs." Issued after the modes and before X and targets, at

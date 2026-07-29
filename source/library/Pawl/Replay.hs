@@ -52,6 +52,7 @@ encode p answer = case p of
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
   Prompt.ChooseBoundToken {} -> Response.ChoseBoundToken answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
+  Prompt.ChooseAttachment {} -> Response.ChoseAttachment answer
   Prompt.ChooseCost {} -> Response.ChoseCost answer
   Prompt.DeclareMulligan {} -> Response.DeclaredMulligan answer
   Prompt.Bottom {} -> Response.PutOnBottom answer
@@ -143,6 +144,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseSacrifices {} -> case response of
     Response.ChoseSacrifices ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseAttachment {} -> case response of
+    Response.ChoseAttachment oid -> Just oid
     _ -> Nothing
   Prompt.ChooseCost {} -> case response of
     Response.ChoseCost cost -> Just cost
@@ -254,6 +258,11 @@ defaultAnswer p = case p of
   -- a legal answer whenever the prompt was legal to ask, and the least eventful
   -- fallback when a transcript runs short.
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
+  -- CR 701.3a: every candidate is a legal destination the card's own text
+  -- offered, so the head is a legal answer and the least eventful fallback when a
+  -- transcript runs short -- it is the destination offered first, in the
+  -- ascending order the engine builds the list in.
+  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   -- The first offered candidate is the PRINTED cost for a cast from hand
   -- (Pawl.Cost.costsFor puts it first) -- the least eventful fallback when a
   -- transcript runs short, since it sacrifices nothing. A cast from the graveyard

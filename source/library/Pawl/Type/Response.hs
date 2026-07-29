@@ -91,6 +91,13 @@ data Response
   | -- CR 701.21a: the permanents a player chose to sacrifice to pay a cost,
     -- serialized so a DecisionLog replays the payment deterministically.
     ChoseSacrifices (Set ObjectId)
+  | -- CR 701.3a: the object a player chose to attach a moving permanent to,
+    -- serialized so a DecisionLog replays the move deterministically. Its own
+    -- constructor rather than a reuse of ChoseBoundToken, for the reason
+    -- ChoseDefender records: decode must return Nothing for a response that does
+    -- not match the prompt being asked, and two ObjectId-shaped prompts sharing a
+    -- constructor cannot do that.
+    ChoseAttachment ObjectId
   | -- CR 601.2b: the cost a caster announced they would pay, serialized so a
     -- DecisionLog replays an alternative-cost cast deterministically.
     ChoseCost Cost

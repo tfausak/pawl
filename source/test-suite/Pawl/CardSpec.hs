@@ -377,6 +377,7 @@ effectCounts effect = case effect of
   Effect.BecomeMonarch _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
+  Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
@@ -1160,7 +1161,41 @@ auraCardTests registry =
           [BlockRequirement.MkBlockRequirement Affected.Attached]
           (Card.Type.blockRequirements card)
         HU.assertEqual "and it modifies no characteristic" [] (Card.Type.staticAbilities card)
-        HU.assertEqual "no spell effects" [] (Card.allEffects card)
+        HU.assertEqual "no spell effects" [] (Card.allEffects card),
+      -- Not an Aura itself, but the only card in the pool that MOVES one: CR
+      -- 701.3's Attach keyword action aimed at a permanent already on the
+      -- battlefield. Its shape is the whole design argument -- one target slot for
+      -- the Aura, no slot at all for the destination.
+      HU.testCase "Crown of the Ages is a {2} artifact whose {4},{T} ability moves an Aura" $ do
+        p <- Registry.printing registry "Crown of the Ages"
+        let c = Printing.card p
+            target = SlotName.MkSlotName (Text.pack "target")
+        HU.assertEqual "name" (Text.pack "Crown of the Ages") (Card.Type.name c)
+        -- The {4} is the ACTIVATION cost; the card itself costs {2}.
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 2]) (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Artifact) (TypeLine.types (Card.Type.typeLine c))
+        HU.assertEqual "no enchant ability: it is not an Aura" Nothing (Card.Type.enchant c)
+        case Card.Type.activatedAbilities c of
+          [ab] -> do
+            HU.assertEqual "tap cost" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost ab))
+            HU.assertEqual "plus {4}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) (Cost.Type.mana (ActivatedAbility.cost ab))
+            case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
+              [m] -> do
+                -- "to another CREATURE" is the destination filter, and it is a
+                -- bare Filter rather than a target spec: CR 701.3 / the card's own
+                -- ruling, "this only targets the Aura and not either creature".
+                HU.assertEqual
+                  "CR 701.3: attach the targeted permanent to a chosen creature"
+                  [Effect.AttachTarget target (Filter.Type.HasCardType CardType.Creature)]
+                  (Foldable.toList (Mode.effects m))
+                -- "target Aura attached to a creature" -- the one slot, and the
+                -- only place IsAttachedToCreature appears in the pool.
+                HU.assertEqual
+                  "CR 115.1: one target slot, an Aura on a creature"
+                  (Map.singleton target (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToCreature]))))
+                  (Mode.targetSpecs m)
+              ms -> HU.assertFailure ("expected one mode, got " <> show (length ms))
+          abs_ -> HU.assertFailure ("expected one activated ability, got " <> show (length abs_))
     ]
 
 -- Skilled Animator's "for as long as this creature remains on the battlefield",
