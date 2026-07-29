@@ -1230,18 +1230,22 @@ stateTriggers gs =
 --
 -- `fires` matches only against EVENTS (`matchesTrigger`), never against live
 -- game state, so a stored entry whose condition is TriggerCondition.StateIs would
--- never match here -- it would neither fire nor ever be evicted from the store.
--- Not a live gap: TriggerCondition is a closed type (Pawl.Type.TriggerCondition)
--- and no card in this pool arms a delayed ability with a StateIs condition (CR
--- 603.7's few state-triggered delayed abilities, e.g. "at the beginning of the
--- next end step" clauses, are all StepBegins in this pool). Noted because a later
--- P4 task touches state conditions again and should see this before adding one.
+-- never match here -- it would never fire, and unless it states a duration for a
+-- Pawl.Expiry sweep to end, never leave the store either. Not a live gap:
+-- TriggerCondition is a closed type (Pawl.Type.TriggerCondition) and no card in
+-- this pool arms a delayed ability with a StateIs condition (CR 603.7's few
+-- state-triggered delayed abilities, e.g. "at the beginning of the next end
+-- step" clauses, are all StepBegins in this pool). Noted because a later P4 task
+-- touches state conditions again and should see this before adding one.
 --
 -- The surviving store this function returns is computed from the EVENT MATCH
 -- (`fires`) alone, before gatherTriggers's CR 603.4 intervening-"if" filter
 -- (`interveningHolds`) ever runs on the entries it produces -- so an entry whose
 -- intervening "if" is false is removed here, spending CR 603.7b's one shot,
--- rather than staying armed for the trigger event's next occurrence (#48).
+-- rather than staying armed for the trigger event's next occurrence (#48). That
+-- reaches only an entry with no stated duration: one that has a duration is not
+-- spent by firing at all, so a false intervening "if" costs it nothing and it is
+-- still armed for the next occurrence.
 delayedPending :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 delayedPending events gs =
   let fires entry =
