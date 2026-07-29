@@ -487,6 +487,57 @@ extraPhaseTests registry =
           "and the phases went in directly after this main phase"
           (Turn.combatAndMainPhase <> Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup])
           (GameState.remaining after),
+      HU.testCase "CR 500.8 Aurelia's added combat phase goes AFTER this one, not inside it" $ do
+        -- The falsifier for splicing at the head of GameState.remaining.
+        -- Aurelia's trigger resolves in the declare attackers step, where this
+        -- combat phase's own declare blockers, combat damage and end of combat
+        -- steps are all still in `remaining` -- so the head is INSIDE the phase
+        -- the added one has to follow. CR 511.3 is what bounds it.
+        aurelia <- Registry.printing registry "Aurelia, the Warleader"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, ours, _) = S.combatBoardOf [aurelia, piker] []
+            after = snd (Engine.runGamePure (S.attackTo S.bob) gs Engine.runStep)
+        -- Under a head-cons the added phase's beginning of combat step would be
+        -- popped here instead.
+        HU.assertEqual "this combat phase's own next step ran next" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase after)
+        HU.assertEqual
+          "the rest of this phase still comes before the added one"
+          ( Seq.fromList [Phase.Combat CombatStep.CombatDamage, Phase.Combat CombatStep.EndOfCombat]
+              <> Turn.expandExtraPhase ExtraPhase.ExtraCombat
+              <> Seq.fromList [Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+          )
+          (GameState.remaining after)
+        -- And the trigger's other clause really ran: the Piker tapped to attack
+        -- (CR 508.1f) and Aurelia untapped it.
+        HU.assertEqual
+          "untapped all creatures you control"
+          (Just TapState.Untapped)
+          (fmap Object.tapped (Game.lookupObject (ours !! 1) after)),
+      HU.testCase "CR 500.8 Aurelia's second attack adds no third combat phase" $ do
+        -- "For the first time each turn" is load-bearing: without it Aurelia
+        -- attacks in the phase she added, adds another, and the turn never ends.
+        aurelia <- Registry.printing registry "Aurelia, the Warleader"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, _, _) = S.combatBoardOf [aurelia, piker] []
+            (played, ran) = runTurn (S.attackTo S.bob) gs
+        HU.assertEqual
+          "exactly two combat phases, and the second adds nothing"
+          [ Phase.Combat CombatStep.DeclareAttackers,
+            Phase.Combat CombatStep.DeclareBlockers,
+            Phase.Combat CombatStep.CombatDamage,
+            Phase.Combat CombatStep.EndOfCombat,
+            Phase.Combat CombatStep.BeginningOfCombat,
+            Phase.Combat CombatStep.DeclareAttackers,
+            Phase.Combat CombatStep.DeclareBlockers,
+            Phase.Combat CombatStep.CombatDamage,
+            Phase.Combat CombatStep.EndOfCombat,
+            Phase.PostcombatMain,
+            Phase.Ending EndingStep.EndStep,
+            Phase.Ending EndingStep.Cleanup
+          ]
+          ran
+        -- 3 + 2 in each of the two combats.
+        HU.assertEqual "bob took both combats" (Just 10) (S.lifeOf S.bob played),
       HU.testCase "CR 511.3 Relentless Assault still finds an attacker after clearCombat" $ do
         -- The reason the atom reads the turn-scoped event log rather than the
         -- live combat record. By the postcombat main phase the end of combat
