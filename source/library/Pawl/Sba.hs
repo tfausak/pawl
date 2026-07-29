@@ -534,7 +534,16 @@ performStateBasedActions = do
   -- the same thing from opposite ends: CR 704.5j and CR 704.5k are
   -- put-into-graveyards, not destructions, so neither offers the shield an
   -- opportunity nor may consume one here.
-  Monad.mapM_ (Event.destroy Regenerability.Regenerable) (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
+  --
+  -- ONE batch, not one call per victim, for CR 704.3's "simultaneously as a
+  -- single event" -- the same reason every classification above was computed from
+  -- the pre-pass state. The funnel's own CR 702.12b gate is therefore judged once
+  -- for the whole batch rather than against a board the earlier victims have
+  -- already left. `destroyedBySba` has already applied that gate against the
+  -- state this pass began in, so the funnel's is a second, narrower look, and it
+  -- can only spare a permanent that lost indestructible since -- never condemn
+  -- one this pass had already excluded.
+  Event.destroy Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
       departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving

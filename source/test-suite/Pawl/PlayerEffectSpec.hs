@@ -152,7 +152,7 @@ ruleOfLawTests registry =
         let (_, _, z, plain) = ruleOfLawBoard plains ruleOfLaw
             (rol, onBoard) = S.addCreature ruleOfLaw S.alice plain
             castOne = S.withEvents [GameEvent.SpellCast S.alice] onBoard
-            gone = S.runPure S.identityAnswer castOne (Event.destroy Regenerability.Regenerable rol)
+            gone = S.runPure S.identityAnswer castOne (Event.destroy Regenerability.Regenerable [rol])
         HU.assertBool "prohibited while it stands" (PlayerEffect.prohibitsCasting S.alice castOne)
         HU.assertBool "not prohibited once it is gone" (not (PlayerEffect.prohibitsCasting S.alice gone))
         HU.assertBool "and a cast is offered again" (elem (Action.Type.Cast z) (Action.legalActions S.alice gone)),
@@ -902,7 +902,7 @@ storedTests registry =
           HU.testCase "CR 611.2b the conditional sweep deletes a player effect whose condition has failed" $ do
             piker <- Registry.printing registry "Goblin Piker"
             let (srcId, conditional) = storedConditional piker
-                gone = S.runPure S.identityAnswer conditional (Event.destroy Regenerability.Regenerable srcId)
+                gone = S.runPure S.identityAnswer conditional (Event.destroy Regenerability.Regenerable [srcId])
                 (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
             HU.assertBool "the sweep reports a change" changed
             HU.assertEqual "deleted, not masked" [] (GameState.playerEffects swept)

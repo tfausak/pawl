@@ -371,8 +371,8 @@ tests registry =
               -- GameState.combat's attacker map directly -- the same shortcut
               -- Support.addRegenShield takes for the shield itself.
               attacking = armed {GameState.combat = (GameState.combat armed) {Combat.attackers = Map.singleton skel (AttackTarget.OfPlayer S.bob)}}
-              once = S.runPure S.identityAnswer attacking (Event.destroy Regenerability.Regenerable skel)
-              twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable skel)
+              once = S.runPure S.identityAnswer attacking (Event.destroy Regenerability.Regenerable [skel])
+              twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable [skel])
           HU.assertBool "combat started with no attackers" (Map.null (Combat.attackers (GameState.combat armed)))
           HU.assertBool "survived the first destruction" (Set.member skel (GameState.battlefield once))
           HU.assertEqual "the shield was spent" [] (GameState.replacements once)
@@ -387,7 +387,7 @@ tests registry =
           drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
           let (skel, g1) = S.addCreature drudgeSkeletons S.alice (S.landsInPlay swamp 1)
               shielded = S.addRegenShield skel g1
-              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.CantBeRegenerated skel)
+              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.CantBeRegenerated [skel])
           HU.assertBool "it died anyway" (not (Set.member skel (GameState.battlefield after)))
           -- CR 701.19c again, and the sharp half: an unapplied shield is not a
           -- spent one. Nothing consumed it, because it was never chosen.
@@ -401,7 +401,7 @@ tests registry =
           drudgeSkeletons <- Registry.printing registry "Drudge Skeletons"
           let (skel, g1) = S.addCreature drudgeSkeletons S.alice (S.landsInPlay swamp 1)
               shielded = S.addRegenShield skel g1
-              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable skel)
+              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [skel])
           HU.assertBool "it survived" (Set.member skel (GameState.battlefield after))
           HU.assertEqual "and this time the shield was spent" [] (GameState.replacements after),
         -- The gameplay-level proof (design.md section 4): real cards, cast and
@@ -442,7 +442,7 @@ tests registry =
               (_, g1) = S.addCreature restInPeace S.bob base
               (skel, g2) = S.addCreature drudgeSkeletons S.alice g1
               shielded = S.addRegenShield skel g2
-              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable skel)
+              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [skel])
           HU.assertBool "still on the battlefield" (Set.member skel (GameState.battlefield after))
           HU.assertEqual "nothing was exiled -- the put-into-graveyard never happened" 0 (Set.size (GameState.exile after))
           HU.assertEqual "and nothing reached a graveyard" 0 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
@@ -451,7 +451,7 @@ tests registry =
           let base = Setup.emptyGame S.bothPlayers
               (myr, g1) = S.addCreature darksteelMyr S.alice base
               shielded = S.addRegenShield myr g1
-              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable myr)
+              after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [myr])
           HU.assertBool "the indestructible creature survives" (Set.member myr (GameState.battlefield after))
           HU.assertEqual "the shield is intact" 1 (length (GameState.replacements after)),
         HU.testCase "CR 616.1 Scales first, then Corpsejack: 1 -> 2 -> 4" $ do

@@ -2871,6 +2871,50 @@ destroyAllTests registry =
         HU.assertBool "March died" (not (S.onBattlefield animator resolved))
         HU.assertBool "and so did the Bonesplitter it animated" (not (S.onBattlefield equipment resolved))
         HU.assertBool "Opalescence animates each OTHER enchantment, so it was never a creature" (S.onBattlefield opal resolved),
+      -- CR 608.2f again, on the other half of what "simultaneously" means: not
+      -- just WHICH permanents the instruction names, but WHEN each one's CR
+      -- 702.12b gate is judged. "A permanent with indestructible can't be
+      -- destroyed" is asked of every victim while every other victim is still on
+      -- the battlefield -- including the one whose static ability is granting the
+      -- indestructible. So the Walls of Ba Sing Se die and what they protect does
+      -- not.
+      --
+      -- The Walls are added FIRST on purpose, so they hold the lower ObjectId and
+      -- are swept first. An implementation that judged each victim against the
+      -- board the previous ones had already left would find the grant gone by the
+      -- time it reached the Piker and kill it too.
+      HU.testCase "CR 608.2f every victim's CR 702.12b gate is judged before any of them dies: the Walls of Ba Sing Se die, what they protect stands" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        walls <- Registry.printing registry "The Walls of Ba Sing Se"
+        dayOfJudgment <- Registry.printing registry "Day of Judgment"
+        let (granter, g1) = S.addCreature walls S.alice (Setup.emptyGame S.bothPlayers)
+            (protected, g2) = S.addCreature piker S.alice g1
+            (his, board) = S.addCreature piker S.bob g2
+        HU.assertBool "setup: the Walls are swept before the creature they protect" (granter < protected)
+        HU.assertBool "setup: the Walls do not benefit from their own grant" (not (Projection.hasKeyword Keyword.Indestructible granter board))
+        HU.assertBool "setup: their controller's other creature does" (Projection.hasKeyword Keyword.Indestructible protected board)
+        HU.assertBool "setup: the opponent's does not" (not (Projection.hasKeyword Keyword.Indestructible his board))
+        let resolved = castDayOfJudgment plains dayOfJudgment board
+        HU.assertBool "the Walls are destroyed" (not (S.onBattlefield granter resolved))
+        HU.assertBool "the creature they protected stands" (S.onBattlefield protected resolved)
+        HU.assertBool "and the opponent's creature, never protected, died" (not (S.onBattlefield his resolved)),
+      -- The same board with the two permanents added in the other order, so the
+      -- Walls are swept LAST. CR 608.2f leaves nothing for the sweep order to
+      -- decide here, and that is the claim: the outcome is identical. This is the
+      -- arrangement the sequential reading happens to get right, and it is worth
+      -- pinning precisely because it is the one that would keep passing.
+      HU.testCase "CR 608.2f the outcome does not depend on where the granter falls in the sweep order" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        walls <- Registry.printing registry "The Walls of Ba Sing Se"
+        dayOfJudgment <- Registry.printing registry "Day of Judgment"
+        let (protected, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (granter, board) = S.addCreature walls S.alice g1
+        HU.assertBool "setup: the Walls are swept last this time" (protected < granter)
+        let resolved = castDayOfJudgment plains dayOfJudgment board
+        HU.assertBool "the Walls are destroyed" (not (S.onBattlefield granter resolved))
+        HU.assertBool "the creature they protected stands" (S.onBattlefield protected resolved),
       -- CR 115.10a: "Unless that object or player is identified by the word
       -- 'target' ... it's not a target." "All creatures" is not a target, so the
       -- card declares no target spec and the cast never raises a target prompt

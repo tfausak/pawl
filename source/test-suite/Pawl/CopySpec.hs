@@ -159,7 +159,7 @@ tests registry =
             (pikerId, board) = S.addCreature piker S.alice gs0
             (_, staged) = S.spellOnStack clone S.alice board
             resolved = resolveAndSettle copyNewest staged
-            afterKill = S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable pikerId)
+            afterKill = S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [pikerId])
         case cloneOnBattlefield afterKill of
           Nothing -> HU.assertFailure "Clone should survive the source's death"
           Just cloneId -> do

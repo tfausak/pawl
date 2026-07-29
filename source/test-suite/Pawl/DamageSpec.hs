@@ -938,7 +938,7 @@ killBlockerMidCombat victim answer gs =
   S.runPure answer gs $ do
     Combat.declareAttackers S.alice
     Combat.declareBlockers
-    Event.destroy Regenerability.Regenerable victim
+    Event.destroy Regenerability.Regenerable [victim]
     Monad.void Damage.dealCombatDamage
 
 -- Every DamageDealt event in the history addressed to `oid`, however much.
@@ -1120,7 +1120,7 @@ killAttackerMidCombat victim gs =
   S.runPure S.aggressiveAnswer gs $ do
     Combat.declareAttackers S.alice
     Combat.declareBlockers
-    Event.destroy Regenerability.Regenerable victim
+    Event.destroy Regenerability.Regenerable [victim]
     Monad.void Damage.dealCombatDamage
 
 departedAttackerTests :: Registry.Type.Registry -> Tasty.TestTree

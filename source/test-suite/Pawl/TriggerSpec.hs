@@ -499,7 +499,7 @@ stateTriggerTests registry =
                   ids -> case filter (\oid -> Set.member Subtype.Swamp (Projection.subtypesOf oid quiet)) ids of
                     s : _ -> s
                     [] -> ObjectId.MkObjectId 999
-                gone = settle (S.runPure S.identityAnswer quiet (Event.destroy Regenerability.Regenerable swampOid))
+                gone = settle (S.runPure S.identityAnswer quiet (Event.destroy Regenerability.Regenerable [swampOid]))
             HU.assertEqual "the Swamp's death arms it" 1 (length (triggerIds gone)),
           -- CR 603.8: "doesn't trigger again until the ability has resolved, has
           -- been countered, or has otherwise left the stack" -- all three are
@@ -603,7 +603,7 @@ historyTests registry =
             let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
                 (p1, gs1) = S.addCreature piker S.bob gs0
                 (p2, gs2) = S.addCreature piker S.bob gs1
-                dead = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs2 (Event.destroy Regenerability.Regenerable p1)) (Event.destroy Regenerability.Regenerable p2)
+                dead = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs2 (Event.destroy Regenerability.Regenerable [p1])) (Event.destroy Regenerability.Regenerable [p2])
                 scanned = settle dead
                 atEnd = resolveAll (settle (beginEndStep scanned))
             HU.assertEqual "two +1/+1 counters" 2 (countersOn ghoul atEnd)
@@ -616,7 +616,7 @@ historyTests registry =
             piker <- Registry.printing registry "Goblin Piker"
             let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
                 (tok, gs1) = S.addToken (Printing.card piker) S.bob gs0
-                dead = S.settleSba (S.runPure S.identityAnswer gs1 (Event.destroy Regenerability.Regenerable tok))
+                dead = S.settleSba (S.runPure S.identityAnswer gs1 (Event.destroy Regenerability.Regenerable [tok]))
                 atEnd = resolveAll (settle (beginEndStep dead))
             HU.assertEqual "the token is counted" 1 (countersOn ghoul atEnd),
           HU.testCase "a creature that left the battlefield for HAND did not die (CR 700.4)" $ do
@@ -640,7 +640,7 @@ historyTests registry =
             piker <- Registry.printing registry "Goblin Piker"
             khabalGhoul <- Registry.printing registry "Khabál Ghoul"
             let (p1, gs0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
-                dead = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable p1)
+                dead = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [p1])
                 (ghoul, gs1) = S.addCreature khabalGhoul S.alice (settle dead)
                 atEnd = resolveAll (settle (beginEndStep gs1))
             HU.assertEqual "one +1/+1 counter" 1 (countersOn ghoul atEnd),
@@ -650,7 +650,7 @@ historyTests registry =
             piker <- Registry.printing registry "Goblin Piker"
             let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
                 (p1, gs1) = S.addCreature piker S.bob gs0
-                dead = S.runPure S.identityAnswer gs1 (Event.destroy Regenerability.Regenerable p1)
+                dead = S.runPure S.identityAnswer gs1 (Event.destroy Regenerability.Regenerable [p1])
                 nextTurn = snd (Engine.runGamePure S.identityAnswer dead Engine.handoffTurn)
                 atEnd = resolveAll (settle (beginEndStep nextTurn))
             HU.assertEqual "last turn's death does not count" 0 (countersOn ghoul atEnd),
@@ -793,7 +793,7 @@ delayedTests registry =
             island <- Registry.printing registry "Island"
             let armed = castWave tidalWave island
                 killed = case walls armed of
-                  wall : _ -> S.settleSba (S.runPure S.identityAnswer armed (Event.destroy Regenerability.Regenerable wall))
+                  wall : _ -> S.settleSba (S.runPure S.identityAnswer armed (Event.destroy Regenerability.Regenerable [wall]))
                   [] -> armed
                 after = resolveAll (settle (beginEndStep killed))
             HU.assertEqual "no Wall" [] (walls after)
@@ -1245,7 +1245,7 @@ interveningTests registry =
             sarcomancy <- Registry.printing registry "Sarcomancy"
             let (_, board) = withZombie sarcomancy
                 killed = case zombies board of
-                  tok : _ -> S.settleSba (S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable tok))
+                  tok : _ -> S.settleSba (S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [tok]))
                   [] -> board
                 after = resolveAll (settle (beginUpkeep killed))
             HU.assertEqual "alice took 1" (Just 19) (S.lifeOf S.alice after),
@@ -1257,7 +1257,7 @@ interveningTests registry =
             piker <- Registry.printing registry "Goblin Piker"
             let (_, board) = withZombie sarcomancy
                 killed = case zombies board of
-                  tok : _ -> S.settleSba (S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable tok))
+                  tok : _ -> S.settleSba (S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [tok]))
                   [] -> board
                 onStack = settle (beginUpkeep killed)
                 -- The Zombie arrives under BOB's control, which is exactly the

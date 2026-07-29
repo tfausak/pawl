@@ -1041,7 +1041,7 @@ fightWith answer gs =
 -- Run a Game action purely under an answerer and keep only the final state. The
 -- shape every direct-call test needs now that the change-and-emit funnels are
 -- monadic (P5): `Event.destroy oid gs` becomes
--- `S.runPure S.identityAnswer gs (Event.destroy regenerability oid)`.
+-- `S.runPure S.identityAnswer gs (Event.destroy regenerability [oid])`.
 runPure :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> GameState.GameState
 runPure answer gs game = snd (Engine.runGamePure answer gs game)
 
