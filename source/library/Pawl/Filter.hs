@@ -1,5 +1,6 @@
 module Pawl.Filter where
 
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
@@ -181,3 +182,33 @@ matches context view predicate = case predicate of
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)
+
+-- CR 612.1: swap basic-land-type words wherever they appear in a Filter. A
+-- text-changing effect "can apply to any words or symbols printed on that
+-- object", and a Filter carried by an effect is part of that text -- so this is
+-- the shape Pawl.Projection.rewriteModification already has, for the type THIS
+-- module owns. Pawl.Resolve threads one call per Filter-carrying effect arm
+-- rather than learning what is inside each one.
+--
+-- HasSubtype is the only atom that can carry a basic land type (CR 205.3i); the
+-- rest name a card type, a supertype, a colour, a number, a relation or a
+-- status, none of which CR 612's word swap reaches. Written out exhaustively
+-- rather than with a catch-all, so a later atom that CAN carry one fails to
+-- compile here instead of silently going unrewritten.
+rewrite :: [(Subtype.Subtype, Subtype.Subtype)] -> Filter.Filter -> Filter.Filter
+rewrite pairs predicate = case predicate of
+  Filter.HasSubtype s -> Filter.HasSubtype (Maybe.fromMaybe s (lookup s pairs))
+  Filter.And fs -> Filter.And (fmap (rewrite pairs) fs)
+  Filter.Or fs -> Filter.Or (fmap (rewrite pairs) fs)
+  Filter.Not f -> Filter.Not (rewrite pairs f)
+  Filter.HasCardType _ -> predicate
+  Filter.HasSupertype _ -> predicate
+  Filter.HasColor _ -> predicate
+  Filter.PowerAtLeast _ -> predicate
+  Filter.ControlledBy _ -> predicate
+  Filter.IsSource -> predicate
+  Filter.IsPlayer _ -> predicate
+  Filter.IsAttacking -> predicate
+  Filter.AttackedThisTurn -> predicate
+  Filter.IsAttachedToCreature -> predicate
+  Filter.IsToken -> predicate

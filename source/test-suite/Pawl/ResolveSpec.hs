@@ -596,6 +596,49 @@ resolveTests registry =
         -- Landform's own subtype does not matter; its EFFECT was rewritten to
         -- SetLandSubtype Mountain, so the target land ends up a Mountain.
         HU.assertEqual "target land became Mountain, not Swamp" (Set.singleton Subtype.Mountain) (Projection.subtypesOf targetLand after),
+      HU.testCase "CR 612.1 a text change reaches a Filter carried by an effect" $ do
+        -- Boil ("Destroy all Islands") is the first card whose effect selects by
+        -- a BASIC LAND TYPE, so it is the first that can tell whether CR 612.1's
+        -- "any words or symbols printed on that object" reaches inside an
+        -- effect's Filter. The stored ChangeSubtypeWord is what a resolved
+        -- Magical Hack leaves on the spell, exactly as the Landform case above.
+        island <- Registry.printing registry "Island"
+        forest <- Registry.printing registry "Forest"
+        boil <- Registry.printing registry "Boil"
+        let base = Setup.emptyGame S.bothPlayers
+            (islandId, g1) = S.addCreature island S.alice base
+            (forestId, g2) = S.addCreature forest S.alice g1
+            (boilId, g3) = Game.freshObjectId g2
+            boilObj =
+              Object.MkObject
+                { Object.owner = S.alice,
+                  Object.source = Source.OfCard boil,
+                  Object.zone = Zone.Stack,
+                  Object.tapped = TapState.Untapped,
+                  Object.damage = 0,
+                  Object.sickness = Sickness.Settled S.alice,
+                  -- CR 700.2, as the Landform case explains: a directly-built
+                  -- stack object must stamp its one mode chosen.
+                  Object.bindings = Binding.fromChoices Map.empty Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+                  Object.counters = Map.empty,
+                  Object.attachedTo = Nothing,
+                  Object.timestamp = Timestamp.MkTimestamp 0
+                }
+            g4 =
+              g3
+                { GameState.objects = Map.insert boilId boilObj (GameState.objects g3),
+                  GameState.stack = boilId : GameState.stack g3
+                }
+            resolve g = snd (Engine.runGamePure S.identityAnswer g (Resolve.resolveSpell boilId))
+            onBattlefield oid g = Set.member oid (GameState.battlefield g)
+            plain = resolve g4
+            hacked = resolve (S.withEffectAt boilId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Island Subtype.Forest) g4)
+        -- The control: unhacked, Boil does what it prints.
+        HU.assertBool "unhacked, the Island dies" (not (onBattlefield islandId plain))
+        HU.assertBool "unhacked, the Forest lives" (onBattlefield forestId plain)
+        -- And hacked, the word swap moves which lands the filter admits.
+        HU.assertBool "hacked, the Forest dies" (not (onBattlefield forestId hacked))
+        HU.assertBool "hacked, the Island lives" (onBattlefield islandId hacked),
       HU.testCase "CR 400.7 hacking Blood Moon on the stack is lost when it resolves" $ do
         urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
         bloodMoon <- Registry.printing registry "Blood Moon"

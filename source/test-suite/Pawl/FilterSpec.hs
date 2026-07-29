@@ -151,6 +151,32 @@ tests =
             $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsAttacking
         ],
       Tasty.testGroup
+        "rewrite"
+        -- CR 612.1: a text-changing effect applies to "any words or symbols
+        -- printed on that object", and HasSubtype is the only atom that can
+        -- carry a basic land type. Threaded into effects by Resolve.rewriteEffect.
+        [ HU.testCase "swaps the named subtype word" $
+            HU.assertEqual
+              "Island became Forest"
+              (Filter.Type.HasSubtype Subtype.Forest)
+              (Filter.rewrite [(Subtype.Island, Subtype.Forest)] (Filter.Type.HasSubtype Subtype.Island)),
+          HU.testCase "leaves an unnamed subtype word alone" $
+            HU.assertEqual
+              "Wall untouched"
+              (Filter.Type.HasSubtype Subtype.Wall)
+              (Filter.rewrite [(Subtype.Island, Subtype.Forest)] (Filter.Type.HasSubtype Subtype.Wall)),
+          HU.testCase "recurses through And, Or and Not" $
+            let before = Filter.Type.And [Filter.Type.Not (Filter.Type.HasSubtype Subtype.Island), Filter.Type.Or [Filter.Type.HasSubtype Subtype.Island, Filter.Type.IsAttacking]]
+                after = Filter.Type.And [Filter.Type.Not (Filter.Type.HasSubtype Subtype.Forest), Filter.Type.Or [Filter.Type.HasSubtype Subtype.Forest, Filter.Type.IsAttacking]]
+             in HU.assertEqual "every occurrence" after (Filter.rewrite [(Subtype.Island, Subtype.Forest)] before),
+          -- CR 612.1 changes WORDS, and a card type is not a subtype word.
+          HU.testCase "leaves an atom that names no subtype alone" $
+            HU.assertEqual
+              "card type untouched"
+              (Filter.Type.HasCardType CardType.Creature)
+              (Filter.rewrite [(Subtype.Island, Subtype.Forest)] (Filter.Type.HasCardType CardType.Creature))
+        ],
+      Tasty.testGroup
         "AttackedThisTurn"
         [ HU.testCase "matches a view whose history says so"
             . HU.assertBool "attacked"

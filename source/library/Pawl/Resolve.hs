@@ -319,13 +319,25 @@ bindsSeveralTokens effects =
         _ -> False
    in any offends effects
 
--- Rewrite basic-land-type words in an effect's AST (CR 612). Cases on Effect
--- (Resolve's charter); delegates the inner modification of ModifyTarget to
--- Projection.rewriteModification, so neither module touches the other's
--- constructors. DealDamage and ChangeText carry no rewritable land-type word.
+-- CR 612's basic-land-type word swap, over an effect's AST. Cases on Effect
+-- (Resolve's charter); delegates the inner Modification of ModifyTarget to
+-- Projection.rewriteModification and every carried Filter to Filter.rewrite, so
+-- no module touches another's constructors. DealDamage and ChangeText carry no
+-- rewritable land-type word.
 --
--- A Filter carried by an effect (Search's, Destroy's and Untap's EachMatching,
--- PlayerSacrifices', AttachTarget's) is NOT rewritten (#395).
+-- CR 612.1 rewrites "any words or symbols printed on that object", so a Filter
+-- an effect carries is not exempt: Boil's "destroy all Islands" is a land-type
+-- word inside an ObjectRef.EachMatching. Every arm holding one goes through
+-- Filter.rewrite or rewriteObjectRef rather than being special-cased here.
+-- CR 612.1 through an ObjectRef. InSlot names an object CHOSEN at cast time, not
+-- a word on the card, so there is nothing in it to rewrite; EachMatching's
+-- Filter is card text like any other. Lives here beside objectRefObjects rather
+-- than in a module of its own, which the type does not have.
+rewriteObjectRef :: [(Subtype, Subtype)] -> ObjectRef -> ObjectRef
+rewriteObjectRef pairs ref = case ref of
+  ObjectRef.InSlot _ -> ref
+  ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
+
 rewriteEffect :: [(Subtype, Subtype)] -> Effect Card.Type.Card -> Effect Card.Type.Card
 rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget duration modification slot ->
@@ -333,14 +345,14 @@ rewriteEffect pairs effect = case effect of
   Effect.DealDamage _ _ -> effect
   Effect.ChangeText _ -> effect
   Effect.AddMana _ -> effect
-  Effect.Search _ _ -> effect
+  Effect.Search filter_ destination -> Effect.Search (Filter.rewrite pairs filter_) destination
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.ExileHandThenDraw -> effect
-  Effect.PlayerSacrifices {} -> effect
+  Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
   Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
-  Effect.Destroy {} -> effect
+  Effect.Destroy ref regenerability -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability
   Effect.Sacrifice _ -> effect
   Effect.MoveToZone {} -> effect
   Effect.Draw {} -> effect
@@ -358,7 +370,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PutCounters {} -> effect
   -- No rewritable land-type word.
   Effect.GainPlayerCounters {} -> effect
-  Effect.Untap _ -> effect
+  Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
   Effect.AddPhases _ -> effect
   Effect.GainControl _ _ -> effect
@@ -373,8 +385,7 @@ rewriteEffect pairs effect = case effect of
   -- No rewritable land-type word.
   Effect.ExileUntilMonarch _ -> effect
   Effect.Attach _ -> effect
-  -- The destination Filter names a card type, never a basic land type.
-  Effect.AttachTarget {} -> effect
+  Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
   -- No rewritable land-type word.
   Effect.PlaySubgame _ -> effect
 
