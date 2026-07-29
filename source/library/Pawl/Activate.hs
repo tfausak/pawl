@@ -268,6 +268,15 @@ activateAbility pid srcId ability = do
   if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
     then State.put before
     else do
+      -- CR 602.2b: "the remainder of the process for activating an ability is
+      -- identical to the process for casting a spell listed in rules 601.2b-i",
+      -- so CR 118.13a's announcement -- which names "the activation cost of an
+      -- activated ability" in its own words -- happens here, at 601.2b's
+      -- position, and not when the cost is paid. No ability in the pool has a
+      -- Phyrexian symbol in its cost, so this is Cost.announce's identity case
+      -- for every one of them; it is the rule's second named site, not a
+      -- speculative feature.
+      announcedCost <- Cost.announce pid srcId (ActivatedAbility.cost ability)
       let sets = Target.legalSets (Just pid) srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
       chosen <-
         if Map.null sets
@@ -291,7 +300,7 @@ activateAbility pid srcId ability = do
           -- Unpaid is unreachable; reject-not-repair restores the whole
           -- activation -- including the ability object this function put on the
           -- stack -- if it ever is not.
-          payment <- Cost.pay pid srcId (ActivatedAbility.cost ability)
+          payment <- Cost.pay pid srcId announcedCost
           case payment of
             Payment.Paid -> pure ()
             Payment.Unpaid -> State.put before

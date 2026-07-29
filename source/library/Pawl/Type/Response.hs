@@ -11,6 +11,7 @@ import Pawl.Type.ModeIndex (ModeIndex)
 import Pawl.Type.MulliganDecision (MulliganDecision)
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.OptionalDecision (OptionalDecision)
+import Pawl.Type.PhyrexianPayment (PhyrexianPayment)
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.Recipient (Recipient)
 import Pawl.Type.SlotName (SlotName)
@@ -127,4 +128,12 @@ data Response
     -- Nothing for a response that does not match the prompt being asked, and two
     -- prompts sharing a constructor cannot do that.
     ChoseOptional OptionalDecision
+  | -- CR 118.13a / 601.2b: which way a caster announced they would pay a
+    -- Phyrexian mana symbol, serialized so a DecisionLog replays a Mutagenic
+    -- Growth paid out of life exactly as it was cast. Its own constructor rather
+    -- than a reuse of ChoseOptional, Conceded or DeclaredMulligan, for the reason
+    -- ChoseDefender records: decode must return Nothing for a response that does
+    -- not match the prompt being asked, and two two-valued prompts sharing a
+    -- constructor cannot do that.
+    AnnouncedPhyrexianPayment PhyrexianPayment
   deriving (Eq, Show)

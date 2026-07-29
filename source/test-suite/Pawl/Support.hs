@@ -235,6 +235,9 @@ identityAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
@@ -288,6 +291,9 @@ castAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
@@ -334,6 +340,9 @@ aggressiveAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 -- Answers Prompt.ChooseDefender with `who` and everything else with
 -- aggressiveAnswer -- the shared shape of CombatSpec's and GameSpec's M5.6d
@@ -399,6 +408,9 @@ playLandAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 -- A StdGen-driven interpreter: random shuffle and random legal action.
 randomAnswer :: Prompt.Prompt r -> State.State Random.StdGen r
@@ -542,6 +554,10 @@ randomAnswer p = case p of
     let (takeIt, g') = Random.uniform g
     State.put g'
     pure (if takeIt then OptionalDecision.Exercises else OptionalDecision.Declines)
+  -- CR 118.13a: deterministic rather than random, the ChooseSacrifices and
+  -- ChooseCost posture -- no Phyrexian card is in any deck Pawl.Cards builds, so
+  -- a random draw here would explore nothing and only complicate replay.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
 
 -- Total index into a non-empty run of candidates -- a turn order, the tokens one
 -- Create minted: an out-of-range draw falls back to the head, which the NonEmpty
