@@ -206,6 +206,30 @@ manaTests registry =
             (_, gs) = S.addCreature bloodMoon S.alice g1
         HU.assertBool "red available" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf urborgId gs)
         HU.assertBool "black not available (stripped)" (ManaType.Colored Color.Black `notElem` Mana.manaTypesOf urborgId gs),
+      -- CR 305.7 takes away the land's PRINTED mana ability and hands back the
+      -- one its new basic land type carries: "It loses all abilities generated
+      -- from its rules text ... and it gains the appropriate mana ability for
+      -- each new basic land type." Reliquary Tower's "{T}: Add {C}" is an
+      -- ACTIVATED ability, and it is the pool's sharpest witness that the strip
+      -- reaches all of a land's rules text: PlayerEffectSpec already pins the
+      -- other half of this same card's text going away under the same Blood Moon.
+      HU.testCase "CR 305.7 a Blood Moon'd Reliquary Tower taps for red, not colorless" $ do
+        reliquaryTower <- Registry.printing registry "Reliquary Tower"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let base = Setup.emptyGame S.bothPlayers
+            (towerId, g1) = S.addCreature reliquaryTower S.alice base
+            (_, gs) = S.addCreature bloodMoon S.alice g1
+        HU.assertBool "red available (CR 305.6, from the new Mountain type)" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf towerId gs)
+        HU.assertBool "colorless gone (the printed {T}: Add {C} was stripped)" (ManaType.Colorless `notElem` Mana.manaTypesOf towerId gs),
+      -- The same strip, on a land whose rules text is not a mana ability at all.
+      HU.testCase "CR 305.7 a Blood Moon'd Evolving Wilds has no activated ability left" $ do
+        evolvingWilds <- Registry.printing registry "Evolving Wilds"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let base = Setup.emptyGame S.bothPlayers
+            (wildsId, g1) = S.addCreature evolvingWilds S.alice base
+            (_, gs) = S.addCreature bloodMoon S.alice g1
+        HU.assertEqual "the fetch ability is gone" [] (Projection.abilitiesOf wildsId gs)
+        HU.assertBool "and it taps for red instead" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf wildsId gs),
       -- CR 305.6: the intrinsic mana ability comes with the land TYPE, whether
       -- the type was printed or added at layer 4 -- so an Ashaya-animated
       -- creature taps for green, and Blood Moon (CR 305.7) rewrites that to red

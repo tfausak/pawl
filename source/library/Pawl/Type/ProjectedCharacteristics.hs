@@ -17,9 +17,13 @@ import Pawl.Type.TriggeredAbility (TriggeredAbility)
 
 -- The characteristics of an object after the layer fold (design.md §2.5). Maybe
 -- P/T because a land has none. cardTypes/subtypes are the projected type line
--- (CR 613 layer 4). rulesTextActive is CR 305.7: False once an effect SETS this
--- object's land subtype to a basic type, stripping its rules-text abilities.
--- Ord derived so a copy snapshot can ride a Binding (CR 707.2, P2).
+-- (CR 613 layer 4). Ord derived so a copy snapshot can ride a Binding (CR 707.2,
+-- P2).
+--
+-- There is no "are this object's rules-text abilities live" flag. CR 305.7's
+-- strip is not a condition to be recorded and consulted later: the ability
+-- fields below simply come back EMPTY, exactly as they do for CR 613.1f's layer-6
+-- removal, and every reader sees the strip without having to know it happened.
 data ProjectedCharacteristics = MkProjectedCharacteristics
   { -- CR 201.1: the object's name after the layer fold. Copiable -- CR 707.2 lists
     -- name first among the copiable values -- and
@@ -62,19 +66,21 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- UNEVALUATED quantities (power, toughness) with the printed star already
     -- substituted. Seeded from the card, so it rides copiableCharacteristics and a
     -- Clone acquires the ability rather than the number (CR 707.2a); emptied by
-    -- LoseAllAbilities at layer 6, which is BEFORE 7a.
+    -- LoseAllAbilities at layer 6 and by CR 305.7's SetLandSubtype at layer 4,
+    -- both of which are BEFORE 7a.
     characteristicPT :: Maybe (Quantity, Quantity),
     cardTypes :: Set CardType,
     subtypes :: Set Subtype,
-    rulesTextActive :: Bool,
     -- CR 602 / 613 layer 6: the object's activated abilities after the layer
-    -- system. Seeded from the card; emptied by LoseAllAbilities (Humility).
+    -- system. Seeded from the card; emptied by LoseAllAbilities (Humility) and
+    -- by CR 305.7's SetLandSubtype at layer 4 (Blood Moon), as are the three
+    -- ability fields around it.
     activatedAbilities :: [ActivatedAbility Card],
     -- CR 614 layer 6: the object's replacement effects after the layer system,
-    -- the same projection posture as activatedAbilities. Emptied by LoseAllAbilities.
+    -- the same projection posture as activatedAbilities, emptied by the same two.
     replacementEffects :: [ReplacementEffect],
     -- CR 603 layer 6: the object's triggered abilities after the layer system,
-    -- the same projection posture as activatedAbilities. Emptied by LoseAllAbilities.
+    -- the same projection posture as activatedAbilities, emptied by the same two.
     triggeredAbilities :: [TriggeredAbility Card]
   }
   deriving (Eq, Ord, Show)

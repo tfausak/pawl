@@ -40,6 +40,7 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Keyword as Keyword
+import qualified Pawl.Mana as Mana
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
@@ -66,6 +67,7 @@ import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword.Type
+import qualified Pawl.Type.ManaType as ManaType
 import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeIndex as ModeIndex
@@ -1849,5 +1851,45 @@ diesTriggerTests registry =
             HU.assertEqual "so the trigger is hers, not its owner's" [S.alice] (fmap PendingTrigger.controller (fst (Event.gatherTriggers (Event.unscannedEvents died) died)))
         ]
 
+-- Radiant Fountain, a Land: "When this land enters, you gain 2 life. / {T}: Add
+-- {C}." A nonbasic land whose whole text box is one triggered ability and one
+-- activated one, which is what makes it the pool's witness for CR 305.7's
+-- "It loses all abilities generated from its rules text" reaching a TRIGGER.
+--
+-- The entry is staged the way Pawl.TriggerSpec's other entry fixtures stage it:
+-- the permanent is placed, its Moved event recorded, and the scan run at the next
+-- settle. CR 603.6a checks every battlefield permanent against the event, and it
+-- reads each one's PROJECTION -- so a Blood Moon that has already made the
+-- Fountain a Mountain leaves nothing there to trigger.
+strippedTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+strippedTriggerTests registry =
+  let settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      entering oid gs =
+        let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
+         in resolveAll (settle (S.withEvents [GameEvent.Moved moved (Projection.project oid gs)] gs))
+   in Tasty.testGroup
+        "CR 305.7 strips a triggered ability"
+        [ HU.testCase "CR 603.6a Radiant Fountain's entry trigger gains its controller 2 life" $ do
+            radiantFountain <- Registry.printing registry "Radiant Fountain"
+            let (fountainId, gs) = S.addCreature radiantFountain S.alice (Setup.emptyGame S.bothPlayers)
+                after = entering fountainId gs
+            HU.assertEqual "20 + 2" (Just 22) (S.lifeOf S.alice after)
+            HU.assertBool "and it taps for colorless" (ManaType.Colorless `elem` Mana.manaTypesOf fountainId after),
+          HU.testCase "CR 305.7 under Blood Moon the same entry triggers nothing" $ do
+            radiantFountain <- Registry.printing registry "Radiant Fountain"
+            bloodMoon <- Registry.printing registry "Blood Moon"
+            let (_, withMoon) = S.addCreature bloodMoon S.alice (Setup.emptyGame S.bothPlayers)
+                (fountainId, gs) = S.addCreature radiantFountain S.alice withMoon
+                after = entering fountainId gs
+            HU.assertBool "it entered as a Mountain" (Set.member Subtype.Mountain (Projection.subtypesOf fountainId after))
+            HU.assertEqual "nothing reached the stack" [] (GameState.stack after)
+            HU.assertEqual "and no life was gained" (Just 20) (S.lifeOf S.alice after)
+            -- CR 305.7's last clause, on the same board: the printed mana ability
+            -- goes and the new basic land type's replaces it.
+            HU.assertBool "red instead" (ManaType.Colored Color.Red `elem` Mana.manaTypesOf fountainId after)
+            HU.assertBool "colorless gone" (ManaType.Colorless `notElem` Mana.manaTypesOf fountainId after)
+        ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, strippedTriggerTests registry]

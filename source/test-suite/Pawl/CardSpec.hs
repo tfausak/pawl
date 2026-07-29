@@ -1061,6 +1061,33 @@ m45p7CardTests registry =
               [m] -> HU.assertEqual "adds colorless" [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)] (Foldable.toList (Mode.effects m))
               _ -> HU.assertFailure "expected exactly one mode"
           _ -> HU.assertFailure "expected exactly one activated ability",
+      -- Radiant Fountain, a Land: "When this land enters, you gain 2 life. /
+      -- {T}: Add {C}." A nonbasic land whose whole text box is rules-text
+      -- abilities of two different kinds, which is what CR 305.7's strip needs
+      -- to reach (Pawl.TriggerSpec).
+      HU.testCase "Radiant Fountain is a nonbasic land with a SelfEnters life gain and a {T} colorless mana ability" $ do
+        radiantFountain <- Registry.printing registry "Radiant Fountain"
+        let c = Printing.card radiantFountain
+        HU.assertEqual "name" (Text.pack "Radiant Fountain") (Card.Type.name c)
+        HU.assertEqual "no mana cost" Nothing (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Land) (TypeLine.types (Card.Type.typeLine c))
+        HU.assertEqual "not basic, so Blood Moon reaches it (CR 305.8)" Set.empty (TypeLine.supertypes (Card.Type.typeLine c))
+        HU.assertEqual "no land types of its own" Set.empty (TypeLine.subtypes (Card.Type.typeLine c))
+        HU.assertEqual "no player abilities" [] (Card.Type.playerAbilities c)
+        case Card.Type.triggeredAbilities c of
+          [ab] -> do
+            HU.assertEqual "on its own entry (CR 603.6a)" TriggerCondition.SelfEnters (TriggeredAbility.condition ab)
+            case Foldable.toList (Modal.modes (TriggeredAbility.modal ab)) of
+              [m] -> HU.assertEqual "you gain 2" [Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 2)] (Foldable.toList (Mode.effects m))
+              _ -> HU.assertFailure "expected exactly one mode"
+          _ -> HU.assertFailure "expected exactly one triggered ability"
+        case Card.Type.activatedAbilities c of
+          [ab] -> do
+            HU.assertEqual "tap cost only" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost ab))
+            case Foldable.toList (Modal.modes (ActivatedAbility.modal ab)) of
+              [m] -> HU.assertEqual "adds colorless" [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)] (Foldable.toList (Mode.effects m))
+              _ -> HU.assertFailure "expected exactly one mode"
+          _ -> HU.assertFailure "expected exactly one activated ability",
       HU.testCase "Silence is a {W} instant whose one effect is AffectPlayers UntilEndOfTurn Opponents CantCastSpells" $ do
         silence <- Registry.printing registry "Silence"
         let c = Printing.card silence

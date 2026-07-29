@@ -26,7 +26,6 @@ sampleSnapshot =
       PC.characteristicPT = Nothing,
       PC.cardTypes = Set.empty,
       PC.subtypes = Set.empty,
-      PC.rulesTextActive = True,
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = []

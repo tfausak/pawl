@@ -144,7 +144,9 @@ producedTypes production = case production of
 -- Every mana type an object could produce: its intrinsic subtype mana (CR 305.6)
 -- PLUS every projected activated ability that is a mana ability (CR 605.1a),
 -- resolved inline at payment and never on the stack. Read through the projection
--- (abilitiesOf), so Humility (layer 6) strips a creature's mana ability too.
+-- (abilitiesOf), so Humility (layer 6) strips a creature's mana ability too --
+-- and so does CR 305.7 at layer 4, which is what swaps a Blood Moon'd Reliquary
+-- Tower's printed "{T}: Add {C}" for the Mountain's {R} rather than adding to it.
 --
 -- These are OPTIONS, not a yield: the object produces ONE of them when tapped
 -- (tapForMana), so a five-entry list is Birds of Paradise offering five colours,

@@ -5,6 +5,8 @@
 -- within-layer timestamp order, and the CR 613.8 dependency reorder that
 -- overrides it. Mostly directly-constructed continuous effects, so the engine is
 -- proven independently of any card wiring; the card-level proofs live alongside.
+-- Also Pawl.Subtype, the CR 205.3i land-type classification the layer-4
+-- SetLandSubtype arm folds with.
 module Pawl.ProjectionSpec where
 
 import qualified Data.Map.Strict as Map
@@ -22,6 +24,7 @@ import qualified Pawl.Replacement as Replacement
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
+import qualified Pawl.Subtype as Subtype
 import qualified Pawl.Support as S
 import qualified Pawl.Type.Affected as Affected
 import qualified Pawl.Type.Card as Card.Type
@@ -33,7 +36,8 @@ import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.Expiry as Expiry
 -- Pawl.Type.Filter aliased Filter.Type: the evaluator Pawl.Filter already claims
--- the alias Filter above (documented phase exception).
+-- the alias Filter above (documented phase exception). Pawl.Type.Subtype is
+-- aliased Subtype.Type below for the same reason, against Pawl.Subtype.
 import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -50,7 +54,7 @@ import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Subtype as Subtype.Type
 import qualified Pawl.Type.Supertype as Supertype
 import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.Zone as Zone
@@ -372,7 +376,7 @@ tests registry =
         let (oid, gs) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
         HU.assertBool "is a creature" (Projection.isCreatureOf oid gs)
         HU.assertEqual "card types" (Set.singleton CardType.Creature) (Projection.cardTypesOf oid gs)
-        HU.assertEqual "subtypes" (Set.fromList [Subtype.Goblin, Subtype.Warrior]) (Projection.subtypesOf oid gs),
+        HU.assertEqual "subtypes" (Set.fromList [Subtype.Type.Goblin, Subtype.Type.Warrior]) (Projection.subtypesOf oid gs),
       HU.testCase "projected type line: a Mountain is a Land - Mountain, not a creature" $ do
         mountain <- Registry.printing registry "Mountain"
         let gs = S.landsInPlay mountain 1
@@ -380,45 +384,45 @@ tests registry =
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
         HU.assertBool "not a creature" (not (Projection.isCreatureOf landId gs))
-        HU.assertEqual "subtypes" (Set.singleton Subtype.Mountain) (Projection.subtypesOf landId gs),
+        HU.assertEqual "subtypes" (Set.singleton Subtype.Type.Mountain) (Projection.subtypesOf landId gs),
       HU.testCase "CR 613.1d layer 4: the three type-changing modifications are Type" $ do
-        HU.assertEqual "set land subtype" Layer.Type (Projection.layer (Modification.SetLandSubtype Subtype.Mountain))
-        HU.assertEqual "add land subtype" Layer.Type (Projection.layer (Modification.AddLandSubtype Subtype.Swamp))
+        HU.assertEqual "set land subtype" Layer.Type (Projection.layer (Modification.SetLandSubtype Subtype.Type.Mountain))
+        HU.assertEqual "add land subtype" Layer.Type (Projection.layer (Modification.AddLandSubtype Subtype.Type.Swamp))
         HU.assertEqual "add card type" Layer.Type (Projection.layer (Modification.AddCardType CardType.Creature)),
       HU.testCase "CR 613.1c layer 3: ChangeSubtypeWord is Text" $
-        HU.assertEqual "text layer" Layer.Text (Projection.layer (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island)),
+        HU.assertEqual "text layer" Layer.Text (Projection.layer (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island)),
       HU.testCase "CR 612.1 ChangeSubtypeWord rewrites a Forest's subtype to Island" $ do
         forest <- Registry.printing registry "Forest"
         let gs0 = S.landsInPlay forest 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
-            gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Forest Subtype.Island) gs0
-        HU.assertEqual "only Island" (Set.singleton Subtype.Island) (Projection.subtypesOf landId gs),
+            gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Forest Subtype.Type.Island) gs0
+        HU.assertEqual "only Island" (Set.singleton Subtype.Type.Island) (Projection.subtypesOf landId gs),
       HU.testCase "CR 612.2 ChangeSubtypeWord for an absent type is a no-op" $ do
         forest <- Registry.printing registry "Forest"
         let gs0 = S.landsInPlay forest 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
-            gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) gs0
-        HU.assertEqual "still Forest" (Set.singleton Subtype.Forest) (Projection.subtypesOf landId gs),
+            gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) gs0
+        HU.assertEqual "still Forest" (Set.singleton Subtype.Type.Forest) (Projection.subtypesOf landId gs),
       HU.testCase "CR 613.1d AddLandSubtype gives a Forest the Swamp subtype" $ do
         forest <- Registry.printing registry "Forest"
         let gs0 = S.landsInPlay forest 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
-            gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.AddLandSubtype Subtype.Swamp) gs0
-        HU.assertEqual "Forest and Swamp" (Set.fromList [Subtype.Forest, Subtype.Swamp]) (Projection.subtypesOf landId gs),
+            gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.AddLandSubtype Subtype.Type.Swamp) gs0
+        HU.assertEqual "Forest and Swamp" (Set.fromList [Subtype.Type.Forest, Subtype.Type.Swamp]) (Projection.subtypesOf landId gs),
       HU.testCase "CR 305.7 SetLandSubtype sets a Forest to only Mountain" $ do
         forest <- Registry.printing registry "Forest"
         let gs0 = S.landsInPlay forest 1
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
-            gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.SetLandSubtype Subtype.Mountain) gs0
-        HU.assertEqual "only Mountain" (Set.singleton Subtype.Mountain) (Projection.subtypesOf landId gs),
+            gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.SetLandSubtype Subtype.Type.Mountain) gs0
+        HU.assertEqual "only Mountain" (Set.singleton Subtype.Type.Mountain) (Projection.subtypesOf landId gs),
       HU.testCase "CR 613.1d AddCardType makes a land a creature" $ do
         forest <- Registry.printing registry "Forest"
         let gs0 = S.landsInPlay forest 1
@@ -451,25 +455,25 @@ tests registry =
         urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
         bloodMoon <- Registry.printing registry "Blood Moon"
         let (_, urborgId, gs) = bloodMoonUrborg forest urborg bloodMoon False
-        HU.assertEqual "Urborg subtypes" (Set.singleton Subtype.Mountain) (Projection.subtypesOf urborgId gs),
+        HU.assertEqual "Urborg subtypes" (Set.singleton Subtype.Type.Mountain) (Projection.subtypesOf urborgId gs),
       HU.testCase "CR 305.7/613.8 Blood Moon strips Urborg: Urborg is only a Mountain (Urborg older)" $ do
         forest <- Registry.printing registry "Forest"
         urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
         bloodMoon <- Registry.printing registry "Blood Moon"
         let (_, urborgId, gs) = bloodMoonUrborg forest urborg bloodMoon True
-        HU.assertEqual "Urborg subtypes, order-independent" (Set.singleton Subtype.Mountain) (Projection.subtypesOf urborgId gs),
+        HU.assertEqual "Urborg subtypes, order-independent" (Set.singleton Subtype.Type.Mountain) (Projection.subtypesOf urborgId gs),
       HU.testCase "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Blood Moon older)" $ do
         forest <- Registry.printing registry "Forest"
         urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
         bloodMoon <- Registry.printing registry "Blood Moon"
         let (forestId, _, gs) = bloodMoonUrborg forest urborg bloodMoon False
-        HU.assertEqual "Forest stays a Forest" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs),
+        HU.assertEqual "Forest stays a Forest" (Set.singleton Subtype.Type.Forest) (Projection.subtypesOf forestId gs),
       HU.testCase "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Urborg older)" $ do
         forest <- Registry.printing registry "Forest"
         urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
         bloodMoon <- Registry.printing registry "Blood Moon"
         let (forestId, _, gs) = bloodMoonUrborg forest urborg bloodMoon True
-        HU.assertEqual "Forest stays a Forest, order-independent" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs),
+        HU.assertEqual "Forest stays a Forest, order-independent" (Set.singleton Subtype.Type.Forest) (Projection.subtypesOf forestId gs),
       -- Ashaya + Blood Moon. Both effects are layer 4 (CR 613.1d) and neither is
       -- a characteristic-defining ability (CR 604.3a(3): both directly affect
       -- OTHER objects), so CR 613.8a clauses (a) and (c) are satisfied and the
@@ -507,8 +511,8 @@ tests registry =
         ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
         bloodMoon <- Registry.printing registry "Blood Moon"
         let (_, pikerId, _, _, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
-        HU.assertBool "the animated Piker is a Mountain" (Set.member Subtype.Mountain (Projection.subtypesOf pikerId gs))
-        HU.assertBool "and not the Forest Ashaya made it" (not (Set.member Subtype.Forest (Projection.subtypesOf pikerId gs))),
+        HU.assertBool "the animated Piker is a Mountain" (Set.member Subtype.Type.Mountain (Projection.subtypesOf pikerId gs))
+        HU.assertBool "and not the Forest Ashaya made it" (not (Set.member Subtype.Type.Forest (Projection.subtypesOf pikerId gs))),
       -- The proving test for Projection.effectUnits, and it fails without it:
       -- Ashaya's one ability has two layer-4 parts, Blood Moon depends only on the
       -- first (the card-type add), and ordered per MODIFICATION an older Blood Moon
@@ -521,8 +525,8 @@ tests registry =
         bloodMoon <- Registry.printing registry "Blood Moon"
         let (_, pikerId, _, _, gs) = ashayaBloodMoon forest piker ashaya bloodMoon False
         HU.assertBool "still a land" (Set.member CardType.Land (Projection.cardTypesOf pikerId gs))
-        HU.assertBool "still a Mountain, order-independent" (Set.member Subtype.Mountain (Projection.subtypesOf pikerId gs))
-        HU.assertBool "still not a Forest, order-independent" (not (Set.member Subtype.Forest (Projection.subtypesOf pikerId gs))),
+        HU.assertBool "still a Mountain, order-independent" (Set.member Subtype.Type.Mountain (Projection.subtypesOf pikerId gs))
+        HU.assertBool "still not a Forest, order-independent" (not (Set.member Subtype.Type.Forest (Projection.subtypesOf pikerId gs))),
       HU.testCase "CR 305.7 Ashaya's own type change reaches herself, and Blood Moon then reaches her" $ do
         forest <- Registry.printing registry "Forest"
         piker <- Registry.printing registry "Goblin Piker"
@@ -530,7 +534,7 @@ tests registry =
         bloodMoon <- Registry.printing registry "Blood Moon"
         let (_, _, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
         HU.assertBool "Ashaya is a land" (Set.member CardType.Land (Projection.cardTypesOf ashayaId gs))
-        HU.assertBool "Ashaya is a Mountain" (Set.member Subtype.Mountain (Projection.subtypesOf ashayaId gs)),
+        HU.assertBool "Ashaya is a Mountain" (Set.member Subtype.Type.Mountain (Projection.subtypesOf ashayaId gs)),
       -- CR 111.3: a token is not a card, and nothing in CR 613 changes that -- so
       -- Not IsToken reads no projected aspect and no ordering turns on it.
       HU.testCase "Ashaya's 'nontoken creatures' excludes a token creature" $ do
@@ -541,7 +545,7 @@ tests registry =
         let (_, pikerId, tokenId, _, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
         HU.assertBool "the nontoken Piker was animated" (Set.member CardType.Land (Projection.cardTypesOf pikerId gs))
         HU.assertBool "the token copy of it was not" (not (Set.member CardType.Land (Projection.cardTypesOf tokenId gs)))
-        HU.assertBool "so Blood Moon never reaches the token" (not (Set.member Subtype.Mountain (Projection.subtypesOf tokenId gs))),
+        HU.assertBool "so Blood Moon never reaches the token" (not (Set.member Subtype.Type.Mountain (Projection.subtypesOf tokenId gs))),
       -- CR 604.3 / 613.4a: Ashaya's own */* is a characteristic-defining ability
       -- counting lands you control, and it counts the lands her OTHER ability
       -- just made -- layer 4 is applied before layer 7a. Without Blood Moon that
@@ -558,14 +562,75 @@ tests registry =
             (ashayaId, gs) = S.addCreature ashaya S.alice g3
         HU.assertEqual "Forest + animated Piker + Ashaya" (Just 3) (Projection.powerOf ashayaId gs)
         HU.assertEqual "toughness the same" (Just 3) (Projection.toughnessOf ashayaId gs),
+      -- CR 305.7's second sentence, in full: "It loses all abilities generated
+      -- from its rules text, ITS OLD LAND TYPES, and any copiable effects
+      -- affecting that land". Only the LAND types go; the fourth sentence spells
+      -- out what stays -- "Setting a land's subtype doesn't add or remove any
+      -- card types (such as creature) or supertypes". A creature type is neither
+      -- a land type nor a card type, so it survives untouched.
+      -- CR 205.3i's list, directly: the classification the arm above folds with,
+      -- and the boundary that makes "keeps its creature types" mean anything.
+      -- Pawl.Mana.subtypeMana answers the different CR 305.6 question and happens
+      -- to agree on all five constructors this type has today.
+      HU.testCase "CR 205.3i a land type is a land type and a creature type is not"
+        . HU.assertEqual "Forest and Mountain in, Goblin and Wall out" [True, True, False, False]
+        $ fmap Subtype.isLandType [Subtype.Type.Forest, Subtype.Type.Mountain, Subtype.Type.Goblin, Subtype.Type.Wall],
+      HU.testCase "CR 305.7 a Blood Moon'd creature-land keeps its creature types" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let (_, pikerId, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
+        -- Goblin Piker is a Creature - Goblin Warrior; Ashaya's Forest and the
+        -- Piker's printed Goblin/Warrior are the two kinds in one set, and only
+        -- the first is a land type.
+        HU.assertEqual "the Forest went, Goblin and Warrior stayed" (Set.fromList [Subtype.Type.Mountain, Subtype.Type.Goblin, Subtype.Type.Warrior]) (Projection.subtypesOf pikerId gs)
+        HU.assertEqual "and Ashaya keeps Elemental" (Set.fromList [Subtype.Type.Mountain, Subtype.Type.Elemental]) (Projection.subtypesOf ashayaId gs),
+      -- CR 305.7's FIRST clause -- "It loses all abilities generated from its
+      -- rules text" -- reaches a characteristic-defining ability like any other:
+      -- CR 604.3 makes a CDA a static ability, and CR 613.6's rescue does not
+      -- apply because Ashaya's */* would first apply at layer 7a, after the layer
+      -- 4 that takes it away.
+      --
+      -- Her power is then Nothing rather than the 0 CR 208.5 asks for ("If a
+      -- creature somehow has no value for its power, its power is 0"), which is
+      -- the read-point gap #65 already tracks -- not something this fixture is
+      -- claiming is right.
+      HU.testCase "CR 305.7 Blood Moon takes Ashaya's CDA with the rest of her rules text" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let (_, _, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
+        HU.assertEqual "no CDA left to define power" Nothing (Projection.powerOf ashayaId gs)
+        HU.assertEqual "nor toughness" Nothing (Projection.toughnessOf ashayaId gs),
+      -- The remaining two ability kinds the strip has to reach, at the projection
+      -- rather than through a game: Corpsejack Menace's counter-doubling
+      -- replacement effect and Goblin Piker's (empty) trigger list are read off
+      -- PC.replacementEffects and PC.triggeredAbilities, and CR 305.7 empties
+      -- both. The gameplay proof of the replacement half is in
+      -- Pawl.ReplacementSpec.
+      HU.testCase "CR 305.7 Blood Moon takes an animated creature's replacement effect" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        corpsejackMenace <- Registry.printing registry "Corpsejack Menace"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let base = Setup.emptyGame S.bothPlayers
+            (corpsejackId, g1) = S.addCreature corpsejackMenace S.alice base
+            (_, g2) = S.addCreature piker S.alice g1
+            (_, g3) = S.addCreature ashaya S.alice g2
+        HU.assertEqual "it has one before Blood Moon" 1 (length (Projection.replacementsOf corpsejackId g3))
+        let (_, gs) = S.addCreature bloodMoon S.alice g3
+        HU.assertBool "the Menace is a Mountain now" (Set.member Subtype.Type.Mountain (Projection.subtypesOf corpsejackId gs))
+        HU.assertEqual "and its rules text is gone" [] (Projection.replacementsOf corpsejackId gs),
       HU.testCase "CR 612 hacking Blood Moon Mountain->Island: nonbasic lands become Islands (hack newer)" $ do
         urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
         bloodMoon <- Registry.printing registry "Blood Moon"
         let base = Setup.emptyGame S.bothPlayers
             (nonbasicId, g1) = S.addCreature urborg S.alice base
             (bloodMoonId, g2) = S.addCreature bloodMoon S.alice g1
-            gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 500) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g2
-        HU.assertEqual "nonbasic land is now Island" (Set.singleton Subtype.Island) (Projection.subtypesOf nonbasicId gs),
+            gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 500) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) g2
+        HU.assertEqual "nonbasic land is now Island" (Set.singleton Subtype.Type.Island) (Projection.subtypesOf nonbasicId gs),
       HU.testCase "CR 612 hacking Blood Moon is order-independent (hack older)" $ do
         urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
         bloodMoon <- Registry.printing registry "Blood Moon"
@@ -574,8 +639,8 @@ tests registry =
             (bloodMoonId, g2) = S.addCreature bloodMoon S.alice g1
             -- Timestamp 1 is older than Blood Moon's own object timestamp; the
             -- outcome must not change.
-            gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g2
-        HU.assertEqual "nonbasic land is Island, order-independent" (Set.singleton Subtype.Island) (Projection.subtypesOf nonbasicId gs),
+            gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) g2
+        HU.assertEqual "nonbasic land is Island, order-independent" (Set.singleton Subtype.Type.Island) (Projection.subtypesOf nonbasicId gs),
       HU.testCase "Opalescence makes Humility a creature: legal creature target and SBA-killable" $ do
         humility <- Registry.printing registry "Humility"
         opalescence <- Registry.printing registry "Opalescence"
@@ -891,22 +956,26 @@ tests registry =
         piker <- Registry.printing registry "Goblin Piker"
         mountain <- Registry.printing registry "Mountain"
         let (pikerId, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
-            gsA = withDynamicEffect (Affected.Matching (Filter.Type.HasCardType CardType.Land)) (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Swamp) gs0
+            gsA = withDynamicEffect (Affected.Matching (Filter.Type.HasCardType CardType.Land)) (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Type.Swamp) gs0
             gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.AddCardType CardType.Land) gsA
-        HU.assertBool "the newer land-maker applied first, so the Swamp lands" (Set.member Subtype.Swamp (Projection.subtypesOf pikerId gs)),
+        HU.assertBool "the newer land-maker applied first, so the Swamp lands" (Set.member Subtype.Type.Swamp (Projection.subtypesOf pikerId gs)),
       -- The other direction, which is CR 613.7 surviving underneath CR 613.8: with
       -- no dependency between them, two same-layer effects are still applied in
       -- timestamp order. Here B makes the Piker a land at timestamp 20 and A adds
       -- a Swamp to a FIXED set (the Piker) at timestamp 10 -- A's set names an
       -- object id, so applying B cannot change it, so A does not depend on B and
       -- nothing is reordered.
+      --
+      -- Each SetLandSubtype retires the LAND type its predecessor left and no
+      -- more (CR 305.7), so the Piker's printed creature types ride through both
+      -- and the Swamp/Forest pair alone carries the ordering claim.
       HU.testCase "CR 613.7 within layer 4, no dependency leaves timestamp order alone" $ do
         piker <- Registry.printing registry "Goblin Piker"
         mountain <- Registry.printing registry "Mountain"
         let (pikerId, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
-            gsA = S.withEffectAt pikerId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Swamp) gs0
-            gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.SetLandSubtype Subtype.Forest) gsA
-        HU.assertEqual "the later SetLandSubtype wins" (Set.singleton Subtype.Forest) (Projection.subtypesOf pikerId gs),
+            gsA = S.withEffectAt pikerId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Type.Swamp) gs0
+            gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.SetLandSubtype Subtype.Type.Forest) gsA
+        HU.assertEqual "the later SetLandSubtype wins, and only the land types moved" (Set.fromList [Subtype.Type.Forest, Subtype.Type.Goblin, Subtype.Type.Warrior]) (Projection.subtypesOf pikerId gs),
       -- CR 613.8b's last sentence: "If several dependent effects form a dependency
       -- loop, then this rule is ignored and the effects IN THE DEPENDENCY LOOP are
       -- applied in timestamp order." Only the loop's own members escape the
@@ -931,12 +1000,12 @@ tests registry =
             landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
               i : _ -> i
               [] -> ObjectId.MkObjectId 999
-            withC = withDynamicEffect (Affected.Matching (Filter.Type.HasSubtype Subtype.Swamp)) (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Mountain) gs0
-            withA = withDynamicEffect (Affected.Matching (Filter.Type.Not (Filter.Type.HasCardType CardType.Creature))) (Timestamp.MkTimestamp 20) (Modification.AddLandSubtype Subtype.Swamp) withC
-            gs = withDynamicEffect (Affected.Matching (Filter.Type.Not (Filter.Type.HasSubtype Subtype.Swamp))) (Timestamp.MkTimestamp 30) (Modification.AddCardType CardType.Creature) withA
+            withC = withDynamicEffect (Affected.Matching (Filter.Type.HasSubtype Subtype.Type.Swamp)) (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Type.Mountain) gs0
+            withA = withDynamicEffect (Affected.Matching (Filter.Type.Not (Filter.Type.HasCardType CardType.Creature))) (Timestamp.MkTimestamp 20) (Modification.AddLandSubtype Subtype.Type.Swamp) withC
+            gs = withDynamicEffect (Affected.Matching (Filter.Type.Not (Filter.Type.HasSubtype Subtype.Type.Swamp))) (Timestamp.MkTimestamp 30) (Modification.AddCardType CardType.Creature) withA
             subtypes = Projection.subtypesOf landId gs
-        HU.assertBool "A applied: the Forest is a Swamp" (Set.member Subtype.Swamp subtypes)
-        HU.assertBool "and C, which was only waiting on the loop, still got its turn" (Set.member Subtype.Mountain subtypes)
+        HU.assertBool "A applied: the Forest is a Swamp" (Set.member Subtype.Type.Swamp subtypes)
+        HU.assertBool "and C, which was only waiting on the loop, still got its turn" (Set.member Subtype.Type.Mountain subtypes)
         HU.assertBool "B lost its window once A applied, so this is no creature" (not (Projection.isCreatureOf landId gs)),
       -- CR 613.8b with real cards, and the pair that retired #11's expiry trigger:
       -- Liquimetal Coating ("{T}: Target permanent becomes an artifact in addition
