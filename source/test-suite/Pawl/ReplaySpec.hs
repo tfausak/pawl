@@ -30,6 +30,7 @@ import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.MulliganOffer as MulliganOffer
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.OptionalDecision as OptionalDecision
+import qualified Pawl.Type.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Recipient as Recipient
@@ -287,6 +288,56 @@ combatReplayTests =
               "the head"
               (ObjectId.MkObjectId 7)
               (Replay.defaultAnswer (Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9]))),
+          -- CR 118.13a: which way a Phyrexian mana symbol was announced to be
+          -- paid is a decision made as the spell is proposed, so it has to
+          -- survive a transcript like any other.
+          HU.testCase "AnnouncePhyrexianPayment round-trips through the transcript" $
+            let p =
+                  Prompt.AnnouncePhyrexianPayment
+                    decider
+                    S.alice
+                    oid
+                    Color.Green
+                    (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
+             in do
+                  HU.assertEqual
+                    "the life route round trips"
+                    (Just PhyrexianPayment.PaysLife)
+                    (Replay.decode p (Replay.encode p PhyrexianPayment.PaysLife))
+                  -- Discriminating for the same reason the pairs above are: a
+                  -- decode that ignored the response and returned the head would
+                  -- pass one leg by accident.
+                  HU.assertEqual
+                    "the mana route round trips"
+                    (Just PhyrexianPayment.PaysMana)
+                    (Replay.decode p (Replay.encode p PhyrexianPayment.PaysMana)),
+          HU.testCase "an optional decision does not decode as a Phyrexian announcement" $
+            -- Discriminating: fails if AnnouncePhyrexianPayment reuses another
+            -- two-valued response (ChoseOptional, Conceded, DeclaredMulligan)
+            -- rather than getting its own constructor.
+            let p =
+                  Prompt.AnnouncePhyrexianPayment
+                    decider
+                    S.alice
+                    oid
+                    Color.Green
+                    (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
+             in HU.assertEqual "mismatch" Nothing (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)),
+          HU.testCase "a short transcript announces the first offered Phyrexian route" $
+            -- Every offered route is payable (the prompt is raised only with two
+            -- payable routes), so the head is a legal answer.
+            HU.assertEqual
+              "the head"
+              PhyrexianPayment.PaysLife
+              ( Replay.defaultAnswer
+                  ( Prompt.AnnouncePhyrexianPayment
+                      decider
+                      S.alice
+                      oid
+                      Color.Green
+                      (PhyrexianPayment.PaysLife NonEmpty.:| [PhyrexianPayment.PaysMana])
+                  )
+              ),
           HU.testCase "a short transcript produces the first offered mana type" $
             HU.assertEqual
               "the head"

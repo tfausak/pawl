@@ -19,6 +19,7 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Mana as Mana
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Replay as Replay
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
@@ -41,6 +42,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Optionality as Optionality
+import qualified Pawl.Type.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Pool as Pool
@@ -49,6 +51,7 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
+import qualified Pawl.Type.Response as Response
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Subtype as Subtype
@@ -781,6 +784,53 @@ monocoloredHybridTests registry =
 phyrexianCost :: ManaCost.ManaCost
 phyrexianCost = ManaCost.MkManaCost [ManaSymbol.Phyrexian Color.Green]
 
+-- Answers Prompt.AnnouncePhyrexianPayment with `way` whenever it is on offer,
+-- and defers everything else to S.identityAnswer -- the prefersSource shape. The
+-- "whenever it is on offer" is what makes the two elision cases below
+-- discriminating: an interpreter asking for the life route on a board that does
+-- not offer it must not get it.
+announces :: PhyrexianPayment.PhyrexianPayment -> Prompt.Prompt r -> r
+announces way p = case p of
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers ->
+    if elem way (NonEmpty.toList offers) then way else NonEmpty.head offers
+  _ -> S.identityAnswer p
+
+-- Was CR 118.13a's announcement actually asked for, or did the engine decide?
+wasAskedHowToPayPhyrexian :: [Response.Response] -> Bool
+wasAskedHowToPayPhyrexian responses =
+  let isAnnouncement r = case r of
+        Response.AnnouncedPhyrexianPayment _ -> True
+        _ -> False
+   in any isAnnouncement responses
+
+-- The board issue #361 named: alice controls one untapped Forest and a Goblin Piker for
+-- Mutagenic Growth to target, and holds Mutagenic Growth ({G/P}) and Llanowar
+-- Elves ({G}). ONE green source and two spells that want it, so which way CR
+-- 107.4f's symbol is paid decides whether the Elves can be cast at all -- the
+-- most direct observation there is that the choice is not the engine's.
+phyrexianBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+phyrexianBoard forest piker growth elves =
+  let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+      (withGrowth, growthId) = S.handOne growth withPiker
+      (elvesId, gs) = S.addHandCard elves S.alice withGrowth
+   in (growthId, elvesId, gs)
+
+-- Cast `oid` under `answer` and resolve what it put on the stack, returning the
+-- transcript of everything the engine asked alongside the final state.
+castAndResolve ::
+  (forall r. Prompt.Prompt r -> r) ->
+  GameState.GameState ->
+  ObjectId.ObjectId ->
+  ([Response.Response], GameState.GameState)
+castAndResolve answer gs oid =
+  let ((_, cast), asked) = Replay.record answer gs (Cast.castSpell S.alice oid)
+   in (asked, snd (S.runPureWith answer cast Stack.resolveTop))
+
 -- alice at `n` life and nothing else on the board.
 aliceAt :: Integer -> GameState.GameState
 aliceAt n =
@@ -792,6 +842,12 @@ aliceAt n =
 --
 -- Mutagenic Growth ({G/P}) throughout -- a plain pump, so every assertion below
 -- is about the symbol and nothing else.
+--
+-- TWO PATHS, and which one a case takes decides who chooses. A case calling
+-- Mana.payCost directly pays an UNANNOUNCED cost, where the least-life rule still
+-- decides (#373); a case going through Cast.castSpell announces first, under CR
+-- 118.13a, and the player decides. The CR 118.13a cases at the end of this group
+-- are the second path.
 phyrexianTests :: Registry.Type.Registry -> Tasty.TestTree
 phyrexianTests registry =
   Tasty.testGroup
@@ -800,9 +856,12 @@ phyrexianTests registry =
       -- both routes are open here, and paying life as WELL as the mana, or
       -- INSTEAD of it, would each read as "paid" without it.
       --
-      -- It also pins the elision. Both routes being open is a choice CR 118.13a
-      -- gives the player as they propose the spell, and pawl makes it for them:
-      -- it pays the least life it can, which here is none (#361).
+      -- It also pins what Mana.payCost does with an UNANNOUNCED cost, which is
+      -- what this and the four cases after it exercise: they call payCost
+      -- directly, so no CR 118.13a announcement has happened and the least-life
+      -- rule still decides, which here means none (#373). A cast goes through
+      -- Cast.castSpell instead and asks -- see the CR 118.13a cases at the end of
+      -- this group.
       HU.testCase "CR 107.4f one {G/P} is paid with one green mana and no life" $ do
         forest <- Registry.printing registry "Forest"
         let gs = S.landsInPlay forest 1
@@ -949,7 +1008,8 @@ phyrexianTests registry =
       -- life and taps it -- and when the player names blue instead, the mana way
       -- is gone and CR 107.4f's 2 life is all that is left. pawl pays it rather
       -- than failing the payment, which is the same MORE PERMISSIVE posture
-      -- Mana.payCost's haddock takes towards a mis-tapped colour (#261, #361).
+      -- Mana.payCost's haddock takes towards a mis-tapped colour (#261). Reached
+      -- only because this calls payCost directly, with nothing announced (#373).
       HU.testCase "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
         birds <- Registry.printing registry "Birds of Paradise"
         let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
@@ -962,5 +1022,69 @@ phyrexianTests registry =
         let (paidGreen, afterGreen) = S.runPureWith (prefersColor Color.Green) gs (Mana.payCost S.alice phyrexianCost)
         HU.assertBool "green pays it too" paidGreen
         HU.assertEqual "and costs no life at all" (Just 20) (S.lifeOf S.alice afterGreen)
-        HU.assertEqual "with nothing left floating" 0 (poolSize S.alice afterGreen)
+        HU.assertEqual "with nothing left floating" 0 (poolSize S.alice afterGreen),
+      -- CR 118.13a: "If the mana cost of a spell ... contains a mana symbol that
+      -- can be paid in multiple ways, the choice of how to pay for that symbol is
+      -- made as its controller proposes that spell or ability (see rule 601.2b)."
+      --
+      -- THE proving scenario (#361), and the reason the choice is not the
+      -- engine's to make conservatively: a player holding one Forest can cast
+      -- Mutagenic Growth AND Llanowar Elves only by announcing 2 life for the
+      -- {G/P}. The Elves' castability is the discriminator -- a life total alone
+      -- could be produced by paying life on TOP of the mana.
+      HU.testCase "CR 118.13a announcing 2 life keeps the Forest, so Llanowar Elves is still castable" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        growth <- Registry.printing registry "Mutagenic Growth"
+        elves <- Registry.printing registry "Llanowar Elves"
+        let (growthId, elvesId, gs) = phyrexianBoard forest piker growth elves
+            (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs growthId
+        HU.assertBool "the engine asked rather than deciding" (wasAskedHowToPayPhyrexian asked)
+        HU.assertEqual "the Growth resolved" 0 (length (GameState.stack resolved))
+        HU.assertEqual "exactly 2 life" (Just 18) (S.lifeOf S.alice resolved)
+        HU.assertEqual "and the Forest is untapped" 0 (S.tappedCount S.alice resolved)
+        HU.assertBool "so the Elves can still be cast" (Cast.castable S.alice elvesId resolved),
+      -- The control, one answer different on the same board: the mana route
+      -- spends the Forest and the Elves are stranded. Both legs are needed --
+      -- either alone would pass against an engine that ignored the answer.
+      HU.testCase "CR 118.13a announcing coloured mana taps the Forest, and the Elves are stranded" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        growth <- Registry.printing registry "Mutagenic Growth"
+        elves <- Registry.printing registry "Llanowar Elves"
+        let (growthId, elvesId, gs) = phyrexianBoard forest piker growth elves
+            (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs growthId
+        HU.assertBool "the engine asked here too" (wasAskedHowToPayPhyrexian asked)
+        HU.assertEqual "life untouched" (Just 20) (S.lifeOf S.alice resolved)
+        HU.assertEqual "the Forest paid for it" 1 (S.tappedCount S.alice resolved)
+        HU.assertBool "and the Elves cannot be cast" (not (Cast.castable S.alice elvesId resolved)),
+      -- The elision, both directions. Where only ONE route is payable there is
+      -- nothing to ask, and the interpreter asking for the other route does not
+      -- get it -- CR 601.2b's "previously made choices ... may restrict the
+      -- player's options" arriving as a board that offers one option.
+      HU.testCase "CR 118.13a no green source: the life route is taken and nothing is asked" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        growth <- Registry.printing registry "Mutagenic Growth"
+        elves <- Registry.printing registry "Llanowar Elves"
+        let (_, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (withGrowth, growthId) = S.handOne growth withPiker
+            (_, gs) = S.addHandCard elves S.alice withGrowth
+            (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs growthId
+        HU.assertBool "no choice existed, so none was asked" (not (wasAskedHowToPayPhyrexian asked))
+        HU.assertEqual "the Growth resolved" 0 (length (GameState.stack resolved))
+        HU.assertEqual "and 2 life paid for it" (Just 18) (S.lifeOf S.alice resolved),
+      -- CR 119.4's floor closing the life route instead: one Forest, one life.
+      -- The interpreter asks for life and must not be given it.
+      HU.testCase "CR 119.4 at 1 life the life route is not offered, and nothing is asked" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        growth <- Registry.printing registry "Mutagenic Growth"
+        elves <- Registry.printing registry "Llanowar Elves"
+        let (growthId, _, board) = phyrexianBoard forest piker growth elves
+            gs = board {GameState.players = Map.adjust (\p -> p {Player.life = 1}) S.alice (GameState.players board)}
+            (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs growthId
+        HU.assertBool "no choice existed, so none was asked" (not (wasAskedHowToPayPhyrexian asked))
+        HU.assertEqual "the Growth resolved" 0 (length (GameState.stack resolved))
+        HU.assertEqual "the Forest paid for it" 1 (S.tappedCount S.alice resolved)
+        HU.assertEqual "and the life total is untouched" (Just 1) (S.lifeOf S.alice resolved)
     ]

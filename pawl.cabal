@@ -187,6 +187,7 @@ library
     Pawl.Type.PendingTrigger
     Pawl.Type.Phase
     Pawl.Type.PhasePattern
+    Pawl.Type.PhyrexianPayment
     Pawl.Type.Player
     Pawl.Type.PlayerCounterKind
     Pawl.Type.PlayerEffect

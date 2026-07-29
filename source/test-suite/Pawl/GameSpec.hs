@@ -365,6 +365,9 @@ recordingAnswer p = case p of
   Prompt.OpeningHandAction {} -> pure Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> pure OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
 
 -- pikerInHand already builds on Setup.emptyGame bothPlayers, so turnOrder is
 -- [alice, bob] and both players are in the players map.
@@ -1436,6 +1439,9 @@ slaveAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 -- CR 723.5 combat: alice, controlling bob, declares bob's attackers. Attackers
 -- are declared only when the prompt's Decider is alice for player bob; a naive

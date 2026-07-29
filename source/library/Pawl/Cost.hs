@@ -142,6 +142,41 @@ hasVariable cost = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
 
+-- CR 118.13a: "If the mana cost of a spell or the activation cost of an
+-- activated ability contains a mana symbol that can be paid in multiple ways,
+-- the choice of how to pay for that symbol is made as its controller proposes
+-- that spell or ability (see rule 601.2b)." The seam Pawl.Cast and Pawl.Activate
+-- call at exactly that moment, one step before CR 601.2f's total.
+--
+-- Only CR 107.4f's Phyrexian symbol is announced. CR 107.4e's hybrids are the
+-- other "paid in multiple ways" symbols and they are NOT announced here (#261):
+-- Pawl.Mana still resolves them at payment.
+--
+-- The life the announcement committed becomes a CostComponent.PayLife, which is
+-- not a re-encoding but the rule's own words -- CR 107.4f says the symbol "can be
+-- paid ... by paying 2 life", and CR 119.4 governs paying life wherever it comes
+-- from. That makes the returned cost CR 601.2b's "nonhybrid equivalent cost" in
+-- full: a mana part with nothing left in it that spends no mana, plus the life as
+-- a cost like any other. Omitted entirely at zero, so a cost with no Phyrexian
+-- symbol comes back untouched.
+--
+-- APPENDED rather than merged into a PayLife the cost already carries, which is
+-- why #365 survives this change unaltered: Cost.canPay measures each component
+-- separately, so two PayLife components of one cost can together outrun a life
+-- total that admits each of them.
+announce :: PlayerId -> ObjectId -> Cost -> Game Cost
+announce pid oid cost = case Cost.mana cost of
+  -- CR 118.6: an object with no mana cost has no mana symbols to announce.
+  Nothing -> pure cost
+  Just manaCost -> do
+    (announced, life) <- Mana.announcePhyrexian pid oid manaCost
+    pure
+      cost
+        { Cost.mana = Just announced,
+          Cost.components =
+            Cost.components cost <> (if life > 0 then [CostComponent.PayLife life] else [])
+        }
+
 -- CR 302.6: does paying this cost put the object's ability behind the
 -- summoning-sickness gate? The CLASSIFICATION Pawl.Activate reads, so that this
 -- module stays the only one matching a CostComponent constructor.
@@ -542,11 +577,14 @@ applyAdjustments adjustments cost =
         -- Same two reasons: the {2} half is generic mana and the other half is
         -- one colour, and nothing has announced which is being paid.
         ManaSymbol.MonocoloredHybrid _ -> Nothing
-        -- Nothing for two different reasons, one per side. In the COST it is the
-        -- elision the two arms above make: CR 107.4f's symbol is one green mana
-        -- OR 2 life, and pawl announces which only at payment time (#261, #361),
-        -- so nothing has established there is a green mana here to cancel. In a
-        -- REDUCTION, CR 118.7f needs no announcement at all -- "the cost is
+        -- Nothing for two different reasons, one per side. In the COST the
+        -- symbol is necessarily UNANNOUNCED, or it would not be a Phyrexian
+        -- symbol any more: CR 601.2b's announcement precedes CR 601.2f's total,
+        -- so a cast has already turned it into an OfType or into life, and the
+        -- one caller that reaches this arm is Cast.payableCost measuring
+        -- castability against the printed cost -- where nothing has established
+        -- there is a green mana here to cancel. In a REDUCTION, CR 118.7f needs
+        -- no announcement at all -- "the cost is
         -- reduced by one mana of that symbol's color" -- and this arm is simply
         -- wrong for it, which nothing in the pool can show because no card emits
         -- a reduction containing a Phyrexian symbol (#362).

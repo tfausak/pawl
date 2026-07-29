@@ -38,6 +38,7 @@ import Pawl.Type.ManaUnit (ManaUnit)
 import qualified Pawl.Type.ManaUnit as ManaUnit
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Type.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
@@ -295,9 +296,10 @@ chooseManaType pid oid candidates gs = case candidates of
 -- CR 202.3g values the symbol at 1 rather than 2), and it is no typed demand
 -- because it consumes no supply. Zero for every other symbol.
 --
--- The ways survive all the way to payment rather than collapsing to one as the
--- spell is proposed, which is what CR 118.13a and CR 601.2b actually call for and
--- what pawl does not do (#261, #361).
+-- CR 107.4f's ways are collapsed to ONE before payment, by announcePhyrexian,
+-- which is what CR 118.13a and CR 601.2b call for -- so this enumeration reaches
+-- payment only where nothing announced. CR 107.4e's hybrid ways do survive to
+-- payment, which is the elision that remains (#261).
 waysOf :: ManaSymbol -> [(Maybe (Set.Set ManaType), Natural, Natural)]
 waysOf symbol = case symbol of
   ManaSymbol.OfType t -> [(Just (Set.singleton t), 0, 0)]
@@ -347,9 +349,11 @@ waysOf symbol = case symbol of
 --
 --   1. LEAST LIFE first, by the sort. CR 107.4f's life is the resource that does
 --      not come back: an unspent pool empties every step (CR 500.5) and a land
---      untaps, so preferring mana can never cost the player something they keep,
---      while preferring life would drain 2 off every Mutagenic Growth cast with a
---      Forest untapped. Conservative, and still pawl choosing (#361).
+--      untaps, so preferring mana can never cost the player something they keep.
+--      Conservative, and still pawl choosing -- which is why a cast or an
+--      activation announces first (announcePhyrexian, CR 118.13a) and reaches
+--      this sort with no Phyrexian symbol left to order. A cost paid during a
+--      resolution or for a special action has no such announcement (#373).
 --   2. Among equal life, FEWEST UNITS, which waysOf's per-symbol order already
 --      gives and a STABLE sort preserves -- so a monocolored hybrid's behaviour
 --      is exactly what it was (#261).
@@ -462,15 +466,21 @@ spend budget cost (Mana.MkMana units) =
 -- one prompt for a whole subset: a cost needing {G}{G} is two decisions, and the
 -- second is made knowing the first.
 --
--- The life budget is recomputed on EVERY pass rather than fixed at entry, because
--- a tap can change it: a Birds of Paradise tapped for blue takes the mana way to
--- a {G/P} off the board, and the cost is then payable only by CR 107.4f's 2 life.
--- Recomputing means pawl pays it, rather than failing the payment the way the
--- paragraph above lets a mis-tapped {B} fail -- which is the same MORE PERMISSIVE
--- posture #261 records, and the same one that makes a life payment pawl's call
--- and not the player's (#361). Zero when the cost is unpayable outright, which
--- leaves the loop exactly as it was -- spend fails, sources are exhausted one
--- prompt at a time, and the answer is False.
+-- The life budget only ever binds a cost NOTHING ANNOUNCED for. A cast (CR
+-- 601.2b) and an activation (CR 602.2b) both run announcePhyrexian first, so the
+-- cost arriving here holds no Phyrexian symbol, every resolution of it costs 0
+-- life, and the budget is 0 -- CR 107.4f's life is a Pawl.Cost component by then.
+-- What is left under the budget is CR 118.13b/c, a cost paid during a resolution
+-- or for a special action, where pawl still chooses (#373).
+--
+-- It is recomputed on EVERY pass rather than fixed at entry, because a tap can
+-- change it: a Birds of Paradise tapped for blue takes the mana way to an
+-- unannounced {G/P} off the board, and the cost is then payable only by CR
+-- 107.4f's 2 life. Recomputing means pawl pays it, rather than failing the
+-- payment the way the paragraph above lets a mis-tapped {B} fail -- the same MORE
+-- PERMISSIVE posture #261 records. Zero when the cost is unpayable outright,
+-- which leaves the loop exactly as it was -- spend fails, sources are exhausted
+-- one prompt at a time, and the answer is False.
 payCost :: PlayerId -> ManaCost -> Game Bool
 payCost pid cost = do
   before <- State.get
@@ -525,6 +535,70 @@ chooseSource pid candidates gs = case candidates of
         then answer
         else NonEmpty.head candidates
 
+-- CR 107.4f: "...or by paying 2 life." The one place that number is written.
+phyrexianLife :: Natural
+phyrexianLife = 2
+
+-- CR 601.2b: "If a cost that will be paid as the spell is being cast includes
+-- Phyrexian mana symbols, the player announces whether they intend to pay 2 life
+-- or a corresponding colored mana cost for each of those symbols." CR 118.13a is
+-- what places that announcement: it "is made as its controller proposes that
+-- spell or ability", NOT when the cost is paid. CR 602.2b sends an activated
+-- ability's cost through the same rule.
+--
+-- Returns CR 601.2b's own phrase -- the "nonhybrid equivalent cost", a mana cost
+-- with no Phyrexian symbol left in it -- and the life the announcement committed.
+-- Pawl.Cost.announce is what turns that life into CR 119.4's payment, so nothing
+-- below this function ever sees a mana symbol that spends no mana.
+--
+-- ONE SYMBOL AT A TIME, in printed order, each question asked knowing the answers
+-- before it -- the shape payCost's source prompts already take. What makes that
+-- sound is the OFFER: a route is offered only if the whole cost is still payable
+-- after taking it, so an earlier answer may narrow a later one's options but can
+-- never strand the payment. That is also CR 601.2b's last sentence, arriving as a
+-- board rather than as a rule: "previously made choices ... may restrict the
+-- player's options when making these choices."
+--
+-- Measured against the BOARD and not the pool: canPayCommitting counts an
+-- untapped source as the mana it could make (payableResolutions), so a Forest
+-- still in play offers the mana route before anything is tapped. A player who
+-- then taps it for something else fails the payment, which is CR 601.2h's
+-- business and not this function's -- announcing is not producing.
+--
+-- FILTERED, NOT TRUSTED, the chooseSource posture: an answer outside the offered
+-- set is rejected and the head used instead.
+announcePhyrexian :: PlayerId -> ObjectId -> ManaCost -> Game (ManaCost, Natural)
+announcePhyrexian pid oid (ManaCost.MkManaCost symbols) = go [] 0 symbols
+  where
+    go done committed remaining = case remaining of
+      [] -> pure (ManaCost.MkManaCost (reverse done), committed)
+      ManaSymbol.Phyrexian color : rest -> do
+        gs <- State.get
+        let asMana = ManaSymbol.OfType (ManaType.Colored color)
+            -- The symbols not yet announced are left exactly as they are, so
+            -- "payable" here means "SOME completion of the remaining
+            -- announcements pays it" -- which is what canPay already enumerates.
+            stillPayable extra ways =
+              canPayCommitting pid extra (ManaCost.MkManaCost (reverse done <> ways <> rest)) gs
+            offers =
+              [PhyrexianPayment.PaysMana | stillPayable committed [asMana]]
+                <> [PhyrexianPayment.PaysLife | stillPayable (committed + phyrexianLife) []]
+        announced <- case offers of
+          -- Neither route pays, so the cost is unpayable and there is nothing to
+          -- announce: the printed symbol stands and the payment fails (CR 118.6,
+          -- CR 601.2h). Reachable only from a caller announcing on a cost
+          -- Cast.castable and Activate.activatable never admitted.
+          [] -> pure PhyrexianPayment.PaysMana
+          [only] -> pure only
+          first : others -> do
+            let prompt = Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid color (first NonEmpty.:| others)
+            answer <- Trans.lift (Program.prompt prompt)
+            pure (if List.elem answer offers then answer else first)
+        case announced of
+          PhyrexianPayment.PaysMana -> go (asMana : done) committed rest
+          PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) rest
+      other : rest -> go (other : done) committed rest
+
 -- CR 118.3: can this cost be paid at all? Pure, because Action.legalActions asks
 -- it while merely ENUMERATING actions, where prompting would be absurd -- so it
 -- cannot simply walk tapForMana, which now asks a question.
@@ -534,7 +608,14 @@ chooseSource pid candidates gs = case candidates of
 -- equivalents, so this asks nothing about hybrid-ness. payableResolutions is
 -- where the per-resolution test lives.
 canPay :: PlayerId -> ManaCost -> GameState -> Bool
-canPay pid cost gs = not (null (payableResolutions pid cost gs))
+canPay pid = canPayCommitting pid 0
+
+-- The same question asked mid-announcement, where CR 118.13a's choices already
+-- made have committed `committed` life that CR 119.4's floor must still admit
+-- alongside whatever the rest of the cost costs. Zero everywhere else, which is
+-- what `canPay` is.
+canPayCommitting :: PlayerId -> Natural -> ManaCost -> GameState -> Bool
+canPayCommitting pid committed cost gs = not (null (payableResolutions pid committed cost gs))
 
 -- The resolutions of `cost` this player could actually pay right now, in
 -- `resolutions`' order -- so the head costs the least life of any of them, which
@@ -564,7 +645,9 @@ canPay pid cost gs = not (null (payableResolutions pid cost gs))
 --      matching consumes exactly one supply per typed symbol, so the leftover
 --      count does not depend on WHICH matching, and this is a plain comparison;
 --      and
---   3. CR 119.4's floor admits the life. This is the clause that reads the
+--   3. CR 119.4's floor admits the life -- this resolution's own, PLUS whatever
+--      an announcement in progress has already committed (`committed`, zero for
+--      every caller but announcePhyrexian). This is the clause that reads the
 --      PLAYER rather than the board, and the only one a Phyrexian-free cost can
 --      never fail: every resolution of such a cost costs 0 life, and CR 119.4b
 --      lets anyone pay that -- see canPayLife, which answers 0 without a lookup
@@ -586,8 +669,8 @@ canPay pid cost gs = not (null (payableResolutions pid cost gs))
 -- rides on the same enumeration: its life way is a resolution with one fewer
 -- demand, so neither clause has to learn about a symbol that consumes no supply
 -- at all.
-payableResolutions :: PlayerId -> ManaCost -> GameState -> [([Set.Set ManaType], Natural, Natural)]
-payableResolutions pid cost gs =
+payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Set.Set ManaType], Natural, Natural)]
+payableResolutions pid committed cost gs =
   let Mana.MkMana units = poolOf pid gs
       supplies =
         fmap (Set.singleton . ManaUnit.manaType) units
@@ -607,7 +690,7 @@ payableResolutions pid cost gs =
             -- subsets of the demanded types cover every subset of demands. At
             -- most 2^6 by CR 106.1b, unchanged by hybrids.
             demandedTypes = Set.toList (Set.unions demands)
-         in canPayLife pid life gs
+         in canPayLife pid (committed + life) gs
               && Natural.length supplies >= Natural.length demands + generic
               && all (hallHolds . Set.fromList) (List.subsequences demandedTypes)
    in filter payable (resolutions cost)
@@ -616,10 +699,11 @@ payableResolutions pid cost gs =
 -- is payable. `resolutions` is sorted by life ascending and payableResolutions
 -- keeps that order, so the head is the minimum.
 --
--- This is the budget payCost pays under: pawl spends life only for the symbols
--- the board's mana cannot cover, and never more (#361).
+-- This is the budget payCost pays under. A cast or an activation has already
+-- announced its Phyrexian symbols away (announcePhyrexian, CR 118.13a), so this
+-- answers 0 for them; it decides anything only where nothing announced (#373).
 lifeNeeded :: PlayerId -> ManaCost -> GameState -> Maybe Natural
-lifeNeeded pid cost gs = case payableResolutions pid cost gs of
+lifeNeeded pid cost gs = case payableResolutions pid 0 cost gs of
   (_, _, life) : _ -> Just life
   [] -> Nothing
 

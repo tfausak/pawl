@@ -296,6 +296,13 @@ castSpell pid oid = do
               if Cost.hasVariable chosenCost
                 then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid)))
                 else pure Nothing
+            -- CR 601.2b's own order puts the Phyrexian announcement AFTER the
+            -- value of X and before CR 601.2c's targets: "If a cost that will be
+            -- paid as the spell is being cast includes Phyrexian mana symbols,
+            -- the player announces whether they intend to pay 2 life or a
+            -- corresponding colored mana cost for each of those symbols." CR
+            -- 118.13a is what forbids deferring it to payment time.
+            announcedCost <- Cost.announce pid oid (maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount)
             chosen <-
               if Map.null sets
                 then pure Map.empty
@@ -311,11 +318,11 @@ castSpell pid oid = do
                     pair <- Trans.lift (Program.prompt (Prompt.ChooseBasicLandTypes decider pid oid slot))
                     pure (slot, pair)
               bound <- fmap Map.fromList (traverse ask textSlots)
-              -- CR 601.2b then 601.2f: substitute X, then compute the total
-              -- cost. The object is still in HAND here, one step before 601.2a
-              -- moves it to the stack, so a criterion is read against its hand
-              -- projection (#89).
-              let paidCost = Cost.total pid oid (maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount) gs
+              -- CR 601.2b then 601.2f: substitute X and announce the Phyrexian
+              -- symbols (both above), then compute the total cost. The object is
+              -- still in HAND here, one step before 601.2a moves it to the
+              -- stack, so a criterion is read against its hand projection (#89).
+              let paidCost = Cost.total pid oid announcedCost gs
               payment <- Cost.pay pid oid paidCost
               case payment of
                 Payment.Unpaid -> pure ()

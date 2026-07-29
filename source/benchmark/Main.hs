@@ -99,6 +99,9 @@ alwaysPass p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 -- Plays lands and casts when legal, otherwise passes: the benchmark that actually
 -- exercises the stack, mana payment, and resolution.
@@ -141,6 +144,9 @@ castAnswer p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 -- Plays lands, casts, attacks, and blocks: the benchmark that exercises combat.
 fightAnswer :: Prompt.Prompt r -> r
@@ -184,6 +190,9 @@ fightAnswer p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
+  -- and is the least eventful default, matching Replay.defaultAnswer.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 -- Two players, seeded from the benchmark's argument.
 playersFrom :: Natural -> NonEmpty.NonEmpty PlayerId

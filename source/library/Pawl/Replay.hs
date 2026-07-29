@@ -59,6 +59,7 @@ encode p answer = case p of
   Prompt.MulliganAction {} -> Response.TookMulliganAction answer
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
   Prompt.ChooseOptional {} -> Response.ChoseOptional answer
+  Prompt.AnnouncePhyrexianPayment {} -> Response.AnnouncedPhyrexianPayment answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -165,6 +166,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseOptional {} -> case response of
     Response.ChoseOptional decision -> Just decision
+    _ -> Nothing
+  Prompt.AnnouncePhyrexianPayment {} -> case response of
+    Response.AnnouncedPhyrexianPayment way -> Just way
     _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
@@ -286,6 +290,10 @@ defaultAnswer p = case p of
   -- least-eventful fallback when a transcript runs short (mirrors Concede ->
   -- Continues and MulliganAction -> Nothing).
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.13a: every offered route is payable (the prompt is raised only where
+  -- two are), so the head is a legal answer and the least eventful fallback when
+  -- a transcript runs short. NonEmpty.head is total.
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
 
 -- Run a game under a base interpreter, keeping every answer in order.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])
