@@ -179,3 +179,6 @@ snapshotView shape event = case event of
   -- leave the zone it's in"). The arm becomes a real view the day an EventShape
   -- names revealing (#162).
   GameEvent.Revealed _ _ -> Nothing
+  -- The same reason as the reveal: an attacker being declared (CR 508.2b) is not
+  -- a zone change, and every EventShape is a shape of one.
+  GameEvent.AttackerDeclared _ -> Nothing

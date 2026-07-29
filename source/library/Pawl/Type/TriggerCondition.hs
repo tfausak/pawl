@@ -59,6 +59,22 @@ data TriggerCondition
     -- continues "these abilities trigger from whatever zone the card winds up in
     -- after it's cycled" -- the graveyard, for every printing today.
     SelfCycled
+  | -- CR 508.3a: "An ability that reads 'Whenever [a creature] attacks, . . .'
+    -- triggers if that creature is declared as an attacker." Hanweir Garrison's.
+    -- Self-scoped like SelfEnters and SelfCycled: the scan visits every
+    -- permanent, so the bearer being the declared attacker is part of the match.
+    --
+    -- DECLARED is the whole content of the condition, not a synonym for
+    -- "attacking": the same rule's last sentence is "such abilities won't trigger
+    -- if a creature is put onto the battlefield attacking", and CR 508.4 says such
+    -- a creature is attacking but "for the purposes of trigger events and effects
+    -- ... never attacked". So this matches GameEvent.AttackerDeclared, which only
+    -- the declaration appends, and never the combat record.
+    --
+    -- No attack TARGET is carried. CR 508.3a's second sentence ("Whenever [a
+    -- creature] attacks [a player, planeswalker, or battle]") is a different
+    -- condition, and no card in the pool has it.
+    SelfAttacks
   | -- CR 603.6 (a zone-change trigger): "when this card is put into your
     -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters
     -- and SelfCycled: the scan visits every candidate source, so the bearer

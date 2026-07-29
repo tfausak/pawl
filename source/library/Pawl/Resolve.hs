@@ -12,6 +12,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Damage as Damage
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
@@ -72,6 +73,7 @@ import qualified Pawl.Type.Source as Source
 import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TokenEntry as TokenEntry
 import qualified Pawl.Type.Zone as Zone
 
 -- The slots a PlayerRef reads. Only InSlot names one; EachPlayer and Relative
@@ -156,7 +158,7 @@ readsX = any effectReadsX
       Effect.Discard _ quantity -> quantity == Quantity.Type.X
       Effect.LoseLife _ quantity -> quantity == Quantity.Type.X
       Effect.GainLife _ quantity -> quantity == Quantity.Type.X
-      Effect.Create quantity _ _ -> quantity == Quantity.Type.X
+      Effect.Create quantity _ _ _ -> quantity == Quantity.Type.X
       Effect.Replace {} -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
@@ -281,7 +283,7 @@ armedAbilities effects =
 definedSlots :: [Effect Card.Type.Card] -> Set SlotName
 definedSlots effects =
   let bound effect = case effect of
-        Effect.Create _ _ mSlot -> mSlot
+        Effect.Create _ _ _ mSlot -> mSlot
         Effect.PlaySubgame slot -> Just slot
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe bound effects)
@@ -296,7 +298,7 @@ definedSlots effects =
 bindsSeveralTokens :: [Effect Card.Type.Card] -> Bool
 bindsSeveralTokens effects =
   let offends effect = case effect of
-        Effect.Create quantity _ (Just _) -> quantity /= Quantity.Type.Literal 1
+        Effect.Create quantity _ _ (Just _) -> quantity /= Quantity.Type.Literal 1
         _ -> False
    in any offends effects
 
@@ -1146,7 +1148,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
-  Effect.Create quantity card mSlot -> do
+  Effect.Create quantity card entry mSlot -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
@@ -1156,7 +1158,19 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             -- CR 111: create n tokens with these characteristics under the
             -- effect's controller (CR 111.2), through the single funnel -- so CR
             -- 614's token replacements (Doubling Season) get their opportunity.
-            minted <- Event.createTokens controller card (Integer.toNaturalSaturating n)
+            -- CR 110.5b: the funnel is handed the entry's tap state, so a token
+            -- the effect says is tapped is never untapped for an instant.
+            minted <- Event.createTokens controller card (Integer.toNaturalSaturating n) (TokenEntry.tapped entry)
+            -- CR 508.4: "if a creature is put onto the battlefield attacking, its
+            -- controller chooses which defending player ... it's attacking". The
+            -- rules for that live in Pawl.Combat, which is also what keeps this
+            -- from looking like a declaration -- CR 508.3a's attack triggers see
+            -- nothing (Pawl.Combat.putOntoBattlefieldAttacking's own comment).
+            --
+            -- After the entry loops rather than inside them: CR 614.16's token
+            -- replacement settles the COUNT first, so this joins the tokens that
+            -- actually entered, however many that turned out to be.
+            Monad.when (TokenEntry.attacking entry) (Monad.mapM_ Combat.putOntoBattlefieldAttacking minted)
             case (mSlot, minted) of
               (Nothing, _) -> pure ()
               -- Unreachable: createTokens places every token onto the battlefield

@@ -1446,6 +1446,71 @@ controlChangeRemovalTests registry =
           _ -> HU.assertFailure "fixture did not build an attacker and a blocker"
     ]
 
+-- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
+-- chooses which defending player ... it's attacking ... Such creatures are
+-- 'attacking' but, for the purposes of trigger events and effects, they never
+-- 'attacked'."
+--
+-- Hanweir Garrison is the pool's only source of one: "Whenever this creature
+-- attacks, create two 1/1 red Human creature tokens that are tapped and
+-- attacking."
+putOntoBattlefieldAttackingTests :: Registry.Type.Registry -> Tasty.TestTree
+putOntoBattlefieldAttackingTests registry =
+  Tasty.testGroup
+    "PutOntoBattlefieldAttacking"
+    [ HU.testCase "CR 508.4 whole card: Hanweir Garrison's two Humans enter tapped and attacking" $ do
+        garrison <- Registry.printing registry "Hanweir Garrison"
+        let (gs, mine, _) = S.combatBoardOf [garrison] []
+            -- The vantage point is the declare blockers step: the trigger fired
+            -- at the declaration (CR 508.2b) and resolved in the declare
+            -- attackers step's priority round, and CR 511.3 has not yet cleared
+            -- the record.
+            atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+            tokens = S.tokensOf atBlockers
+            attackers = Combat.Type.attackers (GameState.combat atBlockers)
+            sicknessOf oid = fmap Object.sickness (Game.lookupObject oid atBlockers)
+        HU.assertEqual "the fixture reached the declare blockers step" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase atBlockers)
+        HU.assertEqual "the trigger fired once: two tokens" 2 (length tokens)
+        mapM_ (\oid -> HU.assertEqual "tapped" (Just TapState.Tapped) (tapStateOf oid atBlockers)) tokens
+        mapM_ (\oid -> HU.assertEqual "attacking bob" (Just (AttackTarget.OfPlayer S.bob)) (Map.lookup oid attackers)) tokens
+        -- CR 302.6 restricts a creature from ATTACKING, and CR 508.4c exempts a
+        -- creature put onto the battlefield attacking from the restrictions that
+        -- apply to the declaration of attackers -- so a token that has been
+        -- controlled for no time at all is attacking anyway.
+        mapM_ (\oid -> HU.assertEqual "still summoning sick" (Just Sickness.Sick) (sicknessOf oid)) tokens
+        case mine of
+          [garrisonId] -> HU.assertEqual "and the Garrison itself is attacking" (Just (AttackTarget.OfPlayer S.bob)) (Map.lookup garrisonId attackers)
+          _ -> HU.assertFailure "fixture should have one Hanweir Garrison",
+      HU.testCase "CR 508.3a the tokens are attacking, and the attack trigger fired only for the Garrison" $ do
+        -- THE discriminating case, and the one a naive implementation gets
+        -- wrong: CR 508.3a's "such abilities won't trigger if a creature is put
+        -- onto the battlefield attacking", and CR 508.4's "such creatures are
+        -- 'attacking' but ... they never 'attacked'". An engine that put the
+        -- tokens into combat by routing them through the declaration would
+        -- record them here, and every "whenever a creature attacks" ability
+        -- would then fire for the tokens as well.
+        --
+        -- Two Garrisons, so the assertion is a LIST and not a singleton: a
+        -- declaration really does record one entry per creature, which is what
+        -- makes the tokens' absence a fact about the tokens rather than about
+        -- the shape of the log.
+        garrison <- Registry.printing registry "Hanweir Garrison"
+        let (gs, mine, _) = S.combatBoardOf [garrison, garrison] []
+            atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+            tokens = S.tokensOf atBlockers
+            attackers = Combat.Type.attackers (GameState.combat atBlockers)
+        HU.assertEqual "each Garrison's trigger fired once: four tokens" 4 (length tokens)
+        HU.assertEqual "all six creatures are attacking" 6 (Map.size attackers)
+        HU.assertEqual "but only the two Garrisons were DECLARED" mine (S.attackerDeclarationsOf atBlockers)
+        mapM_ (\oid -> HU.assertBool "no token was declared" (notElem oid (S.attackerDeclarationsOf atBlockers))) tokens,
+      HU.testCase "CR 510.1b the tokens deal combat damage like any attacker" $ do
+        garrison <- Registry.printing registry "Hanweir Garrison"
+        let (gs, _, _) = S.combatBoardOf [garrison] []
+            after = S.runCombat S.aggressiveAnswer gs
+        -- The 2/3 Garrison plus two 1/1 tokens, all unblocked, against bob's 20.
+        HU.assertEqual "bob takes 2 + 1 + 1" (Just 16) (S.lifeOf S.bob after)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
@@ -1464,5 +1529,6 @@ tests registry =
       evasionTests registry,
       blockRequirementTests registry,
       controlChangeSicknessTests registry,
-      controlChangeRemovalTests registry
+      controlChangeRemovalTests registry,
+      putOntoBattlefieldAttackingTests registry
     ]

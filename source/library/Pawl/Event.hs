@@ -86,6 +86,7 @@ movedOf event = case event of
   -- The rule that makes this arm Nothing rather than an oversight -- a reveal is
   -- never a zone change, even when the card is about to make one.
   GameEvent.Revealed _ _ -> Nothing
+  GameEvent.AttackerDeclared _ -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent
@@ -97,6 +98,7 @@ damageOf event = case event of
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Cycled _ -> Nothing
   GameEvent.Revealed _ _ -> Nothing
+  GameEvent.AttackerDeclared _ -> Nothing
 
 -- The caster an event describes, if it is a cast (CR 601.2i).
 castOf :: GameEvent -> Maybe PlayerId
@@ -108,6 +110,7 @@ castOf event = case event of
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Cycled _ -> Nothing
   GameEvent.Revealed _ _ -> Nothing
+  GameEvent.AttackerDeclared _ -> Nothing
 
 -- Who revealed what, if the event is a reveal (CR 701.20a).
 revealOf :: GameEvent -> Maybe (PlayerId, PC.ProjectedCharacteristics)
@@ -119,6 +122,7 @@ revealOf event = case event of
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Cycled _ -> Nothing
+  GameEvent.AttackerDeclared _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed.
 unscannedEvents :: GameState -> [GameEvent]
@@ -436,8 +440,8 @@ sacrifice pid oid = do
 -- writes no export lists, so a second top-level name would be a public door
 -- straight past the check, and the whole argument for putting the guard here is
 -- that this is the ONE door.
-createTokens :: PlayerId -> Card -> Natural -> Game [ObjectId]
-createTokens controller card n = do
+createTokens :: PlayerId -> Card -> Natural -> TapState.TapState -> Game [ObjectId]
+createTokens controller card n tapped = do
   gs <- State.get
   if List.notElem controller (Game.stillPlaying gs)
     then pure []
@@ -451,7 +455,12 @@ createTokens controller card n = do
                   { Object.owner = owner,
                     Object.source = Source.OfToken tokenCard,
                     Object.zone = Zone.Battlefield,
-                    Object.tapped = TapState.Untapped,
+                    -- CR 110.5b: "permanents enter the battlefield untapped ...
+                    -- unless a spell or ability says otherwise". Untapped for
+                    -- every token but the ones an effect says are tapped
+                    -- (Hanweir Garrison), which is why the caller supplies it
+                    -- rather than this taking the default and tapping after.
+                    Object.tapped = tapped,
                     Object.damage = 0,
                     Object.sickness = Sickness.Sick,
                     Object.bindings = Map.empty,
@@ -532,6 +541,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Cycled _ -> False
     GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
   -- CR 603.6a's "whenever a [type] enters": a permanent the Filter admits
   -- entered the battlefield. The bearer frames the match rather than being it --
   -- it is the Filter.Context's source (so `Not IsSource` is Soul Warden's
@@ -581,6 +591,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Cycled _ -> False
     GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins wanted scope -> case event of
     GameEvent.StepBegan began active ->
@@ -593,6 +604,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Cycled _ -> False
     GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
@@ -611,6 +623,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Cycled _ -> False
     GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
   -- an inherent ability of no object, so its real match lives in
   -- Pawl.Monarch.inherentMatch, not here.
@@ -625,6 +638,23 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+  -- CR 508.3a: the bearer was DECLARED as an attacker. Matched against the
+  -- declaration event and not against Combat.attackers, which is what keeps the
+  -- same rule's last sentence true -- "such abilities won't trigger if a creature
+  -- is put onto the battlefield attacking" -- since a creature that entered
+  -- attacking is in that record and has no event here. CombatSpec's "the tokens
+  -- are attacking, and the attack trigger fired only for the Garrison" is the
+  -- test that proves it.
+  TriggerCondition.SelfAttacks -> case event of
+    GameEvent.AttackerDeclared oid -> oid == bearer
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Cycled _ -> False
     GameEvent.Revealed _ _ -> False
   -- CR 603.6: a zone-change trigger, matched on BOTH ends of the move -- library
   -- to graveyard. The bearer is the incarnation the card became on arrival, and
@@ -650,6 +680,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Cycled _ -> False
     GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
 -- the environment in which the ability's "that player" / "that creature" is
@@ -808,6 +839,7 @@ eventTriggers events gs =
         GameEvent.BecameMonarch _ -> Map.empty
         GameEvent.Cycled _ -> Map.empty
         GameEvent.Revealed _ _ -> Map.empty
+        GameEvent.AttackerDeclared _ -> Map.empty
       -- CR 702.29c: the card that was just cycled, wherever it landed. The third
       -- candidate source, and the first that is neither on the battlefield nor a
       -- permanent that just left it -- which is exactly what that rule asks for:
@@ -842,6 +874,7 @@ eventTriggers events gs =
         -- hang an ability on; a card that triggers on a reveal would need a
         -- TriggerCondition first, and none exists (#322).
         GameEvent.Revealed _ _ -> Map.empty
+        GameEvent.AttackerDeclared _ -> Map.empty
       -- CR 113.6k: the fourth candidate source -- every card in every graveyard
       -- that carries at least one ability CR 113.6k puts there. The one source
       -- that widens the SCANNED ZONE rather than recovering an object a single
@@ -934,6 +967,10 @@ functionsInGraveyard cond = case cond of
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+  -- CR 302.6 and CR 508.1a: only a permanent on the battlefield can be declared
+  -- as an attacker, so this condition triggers from the battlefield and CR
+  -- 113.6k never reaches it.
+  TriggerCondition.SelfAttacks -> False
   -- CR 702.29c: "these abilities trigger from whatever zone the card winds up in
   -- after it's cycled" -- the graveyard for every printing in this pool. A
   -- cycled card cannot be on the battlefield (cycling discards it from a hand),
@@ -1019,6 +1056,7 @@ stateTriggers gs =
                 TriggerCondition.StepBegins _ _ -> False
                 TriggerCondition.SelfDealsCombatDamageToPlayer -> False
                 TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+                TriggerCondition.SelfAttacks -> False
                 TriggerCondition.SelfCycled -> False
                 TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
               pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty

@@ -23,24 +23,13 @@ import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
 import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
-
--- The battlefield objects that are tokens (CR 111.1) rather than cards.
-tokensOf :: GameState.GameState -> [ObjectId.ObjectId]
-tokensOf gs = filter isToken (Set.toList (GameState.battlefield gs))
-  where
-    isToken oid = case fmap Object.source (Game.lookupObject oid gs) of
-      Just (Source.OfToken _) -> True
-      _ -> False
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
@@ -141,7 +130,7 @@ tests registry =
             (gs, spellId) = S.handOne dragonFodder withMoon
             cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        case tokensOf after of
+        case S.tokensOf after of
           [] -> HU.assertFailure "Dragon Fodder made no tokens"
           tokenIds -> do
             HU.assertEqual "two Goblins" 2 (length tokenIds)

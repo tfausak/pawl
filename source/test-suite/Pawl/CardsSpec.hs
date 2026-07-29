@@ -38,6 +38,8 @@ import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Type.Slug as Slug.Type
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Type.TokenEntry as TokenEntry
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
@@ -137,6 +139,33 @@ tests registry =
           "and may put the card itself onto the battlefield"
           [[(Optionality.Optional, [Effect.MoveToZone Binding.triggerSource Zone.Battlefield])]]
           (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
+      HU.testCase "hanweir-garrison.json loads as a {2}{R} 2/3 whose attack trigger makes two tapped attacking Humans" $ do
+        c <- Registry.card registry "Hanweir Garrison"
+        HU.assertEqual "name" (Text.pack "Hanweir Garrison") (CardT.name c)
+        HU.assertEqual "{2}{R}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Red)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Creature -- Human Soldier"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Human, Subtype.Soldier]))
+          (CardT.typeLine c)
+        HU.assertEqual "2/3" (Just (Power.MkPower (Quantity.Literal 2)), Just (Toughness.MkToughness (Quantity.Literal 3))) (CardT.power c, CardT.toughness c)
+        -- CR 508.3a: "whenever this creature attacks" is the DECLARATION, which
+        -- is the whole of this condition.
+        HU.assertEqual
+          "one trigger, on being declared as an attacker"
+          [TriggerCondition.SelfAttacks]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "two tokens, tapped and attacking"
+          [Quantity.Literal 2]
+          [q | ab <- CardT.triggeredAbilities c, Effect.Create q _ _ _ <- concatMap snd (modeShapes (TriggeredAbility.modal ab))]
+        HU.assertEqual
+          "the entry riders are the effect's, not the token's"
+          [TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Tapped, TokenEntry.attacking = True}]
+          [te | ab <- CardT.triggeredAbilities c, Effect.Create _ _ te _ <- concatMap snd (modeShapes (TriggeredAbility.modal ab))]
+        -- Meld (CR 702.157) is not modelled: the printed reminder text says it
+        -- melds with Hanweir Battlements, and neither the partner nor the melded
+        -- permanent is in the pool (#369).
+        HU.assertEqual "no keywords" Set.empty (CardT.keywords c),
       HU.testCase "leyline-of-the-void.json loads with a CR 103.6a action and an Opponents redirect" $ do
         c <- Registry.card registry "Leyline of the Void"
         HU.assertEqual "name" (Text.pack "Leyline of the Void") (CardT.name c)

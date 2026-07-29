@@ -329,12 +329,7 @@ runTurnBasedActions phase = do
     -- an effect) -- and its comment states this same argument from the other
     -- end.
     Phase.Combat CombatStep.BeginningOfCombat -> Monad.when hasActive Combat.chooseDefender
-    Phase.Combat CombatStep.DeclareAttackers -> do
-      Monad.when hasActive (Combat.declareAttackers active)
-      -- CR 508.8: with the attacker set now final, drop the two combat steps that
-      -- have nothing to do if nobody attacked. NOT guarded: a turn with no active
-      -- player declares no attackers, which is precisely 508.8's condition.
-      State.modify' Combat.skipEmptyCombat
+    Phase.Combat CombatStep.DeclareAttackers -> Monad.when hasActive (Combat.declareAttackers active)
     Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers
     Phase.Combat CombatStep.CombatDamage -> do
       -- CR 510.4: deal this step's damage; if it was the first-strike step,
@@ -990,6 +985,22 @@ runStepThatBegan phase = do
         -- reads a mana pool through the combat record or the reverse -- and
         -- neither raises a state-based action, so checkSba below is unaffected.
         Monad.when (phase == Phase.Combat CombatStep.EndOfCombat) (State.modify' Combat.clearCombat)
+        -- CR 508.8: drop the two combat steps that have nothing to do if nobody
+        -- attacked. Asked as the declare attackers step ENDS, not when its
+        -- turn-based action finishes, because the rule's condition has two
+        -- clauses: "no creatures are declared as attackers OR put onto the
+        -- battlefield attacking", and the second can only happen in the priority
+        -- round this line sits after -- an attack trigger (Hanweir Garrison)
+        -- resolving. Asking earlier answered the first clause and assumed the
+        -- second away (#30).
+        --
+        -- NOT guarded by hasActive: a turn with no active player declares no
+        -- attackers, which is precisely CR 508.8's condition.
+        --
+        -- Order against the two lines above is free -- neither the mana emptying
+        -- nor CR 511.3's removal happens in this step -- and it is before
+        -- `advance`, which is what CR 500.11's "as though it didn't exist" needs.
+        Monad.when (phase == Phase.Combat CombatStep.DeclareAttackers) (State.modify' Combat.skipEmptyCombat)
         checkSba
         stillFinished <- State.gets (Maybe.isJust . GameState.result)
         Monad.unless stillFinished advance

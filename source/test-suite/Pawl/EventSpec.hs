@@ -121,7 +121,7 @@ tests registry =
         let goblinCard = Printing.card piker
             gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
             before = Game.objectCount gone
-            after = S.runPure S.identityAnswer gone (Event.createTokens S.alice goblinCard 2)
+            after = S.runPure S.identityAnswer gone (Event.createTokens S.alice goblinCard 2 TapState.Untapped)
         HU.assertBool "alice really has left" (notElem S.alice (Game.stillPlaying gone))
         HU.assertEqual "no object was ever minted" before (Game.objectCount after)
         HU.assertEqual "and nothing reached the battlefield" 0 (Set.size (GameState.battlefield after)),
@@ -132,7 +132,7 @@ tests registry =
         let goblinCard = Printing.card piker
             gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
             before = Game.objectCount gone
-            after = S.runPure S.identityAnswer gone (Event.createTokens S.bob goblinCard 2)
+            after = S.runPure S.identityAnswer gone (Event.createTokens S.bob goblinCard 2 TapState.Untapped)
         HU.assertEqual "bob's two tokens exist" (before + 2) (Game.objectCount after)
         HU.assertEqual "both on the battlefield" 2 (Set.size (GameState.battlefield after)),
       HU.testCase "CR 111.2 createTokens puts a token on the battlefield and emits an enters event" $ do
@@ -140,7 +140,7 @@ tests registry =
         let base = Setup.emptyGame S.bothPlayers
             goblinCard = Printing.card piker
             before = Game.objectCount base
-            after = S.runPure S.identityAnswer base (Event.createTokens S.alice goblinCard 1)
+            after = S.runPure S.identityAnswer base (Event.createTokens S.alice goblinCard 1 TapState.Untapped)
             newIds = Set.toList (GameState.battlefield after)
         HU.assertEqual "one more object exists" (before + 1) (Game.objectCount after)
         HU.assertEqual "exactly one battlefield object" 1 (length newIds)

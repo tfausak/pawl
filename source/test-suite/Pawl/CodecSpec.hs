@@ -91,8 +91,10 @@ import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
+import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
 import qualified Pawl.Type.Timestamp as Timestamp
+import qualified Pawl.Type.TokenEntry as TokenEntry
 import qualified Pawl.Type.TokenPattern as TokenPattern
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
@@ -760,6 +762,32 @@ tests registry =
             roundTrip "revealed" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Revealed S.alice (Projection.project ratId gs)),
           HU.testCase "TriggerCondition.SelfCycled round-trips" $
             roundTrip "sc" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfCycled,
+          HU.testCase "TriggerCondition.SelfAttacks round-trips" $
+            roundTrip "sa" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfAttacks,
+          HU.testCase "GameEvent.AttackerDeclared round-trips" $
+            roundTrip "ad" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3)),
+          -- Create's TokenEntry is ELIDED when it is the CR 110.5b default, so
+          -- the round trip has to hold for all four shapes the encoder emits --
+          -- and the two three-element ones (a slot, or an entry) are told apart
+          -- by JSON type alone, which is the part that could silently confuse
+          -- them.
+          HU.testCase "Effect.Create round-trips with and without a TokenEntry and a slot" $ do
+            piker <- Registry.printing registry "Goblin Piker"
+            let card = Printing.card piker
+                attacking = TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Tapped, TokenEntry.attacking = True}
+                plain = TokenEntry.MkTokenEntry {TokenEntry.tapped = TapState.Untapped, TokenEntry.attacking = False}
+                slot = SlotName.MkSlotName (Text.pack "token")
+            roundTrip "plain" Codec.effectToJson Codec.jsonToEffect (Effect.Create (Quantity.Literal 2) card plain Nothing)
+            roundTrip "plain+slot" Codec.effectToJson Codec.jsonToEffect (Effect.Create (Quantity.Literal 1) card plain (Just slot))
+            roundTrip "entry" Codec.effectToJson Codec.jsonToEffect (Effect.Create (Quantity.Literal 2) card attacking Nothing)
+            roundTrip "entry+slot" Codec.effectToJson Codec.jsonToEffect (Effect.Create (Quantity.Literal 1) card attacking (Just slot))
+            -- The elision itself: a default entry adds nothing to the payload,
+            -- which is what keeps every token-making card file written before
+            -- this one byte-identical.
+            HU.assertEqual
+              "a default TokenEntry is not written"
+              (Codec.effectToJson (Effect.Create (Quantity.Literal 2) card plain Nothing))
+              (J.tagged (Text.pack "Create") (Just (Json.Array [Codec.quantityToJson (Quantity.Literal 2), Codec.cardToJson card]))),
           -- CR 113.6k's condition (Narcomoeba's), the first that names a zone
           -- pair rather than the battlefield.
           HU.testCase "TriggerCondition.SelfPutIntoGraveyardFromLibrary round-trips" $

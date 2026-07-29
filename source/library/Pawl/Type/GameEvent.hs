@@ -69,6 +69,17 @@ data GameEvent
     -- triggers on discarding, so nothing yet has to reconcile them; Bartered Cow
     -- is the card that will, and #319 is where that reconciliation is owed.
     Cycled ObjectId
+  | -- CR 508.2b: an attacker was DECLARED -- one entry per creature the active
+    -- player chose in CR 508.1's turn-based action. What "whenever this creature
+    -- attacks" matches (CR 508.3a).
+    --
+    -- The declaration is the event, and that is the whole point of recording it
+    -- rather than reading Combat.attackers. CR 508.3a's last sentence -- "such
+    -- abilities won't trigger if a creature is put onto the battlefield
+    -- attacking" -- makes the two indistinguishable in the combat record and
+    -- distinct here: only Pawl.Combat.declareAttackers appends this, and
+    -- Pawl.Combat.putOntoBattlefieldAttacking deliberately does not.
+    AttackerDeclared ObjectId
   | -- CR 701.20a: a player revealed a card -- "show that card to all players for
     -- a brief time."
     --

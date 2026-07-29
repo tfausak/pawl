@@ -112,11 +112,17 @@ skipTests registry =
         -- bob holds a castable Bolt; nobody attacks. The blockers and damage
         -- steps are still dropped -- the priority windows an instant would use
         -- in them do not exist (CR 500.11: proceed as though they don't).
+        --
+        -- The WHOLE step, not just its turn-based actions: CR 508.8's condition
+        -- is settled as the declare attackers step ends, because its second
+        -- clause ("or put onto the battlefield attacking") can only come true in
+        -- that step's priority round -- which is also the round this test's Bolt
+        -- would be cast in.
         mountain <- Registry.printing registry "Mountain"
         bolt <- Registry.printing registry "Lightning Bolt"
         let (base, _) = S.boltInHand mountain bolt 1 (Phase.Combat CombatStep.DeclareAttackers)
             armed = base {GameState.activePlayer = S.bob}
-            after = snd (Engine.runGamePure S.identityAnswer armed (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers)))
+            after = snd (Engine.runGamePure S.identityAnswer armed Engine.runStep)
             remaining = foldr (:) [] (GameState.remaining after)
         HU.assertBool "no blockers step" (notElem (Phase.Combat CombatStep.DeclareBlockers) remaining)
         HU.assertBool "no damage step" (notElem (Phase.Combat CombatStep.CombatDamage) remaining)
