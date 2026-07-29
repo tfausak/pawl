@@ -98,9 +98,7 @@ The toolchain comes from the Nix flake — GHC 9.14.1, already on `PATH` in the
 dev shell (`nix develop` or direnv).
 
 - `cabal build all` — compile. The suites break separately from the library, so
-  build `all`, not just the library. Incremental builds **hide** warnings from
-  unchanged modules; when you need a definitive check, `cabal clean` first —
-  never poke at paths inside `dist-newstyle`.
+  build `all`, not just the library. Never poke at paths inside `dist-newstyle`.
 - `cabal test` — the `tasty` suite. `cabal bench` and `cabal repl` as usual.
 - **One build at a time.** `jobs: $ncpus` already saturates the machine, so a
   second concurrent build buys nothing and can lose: two of them racing on the
