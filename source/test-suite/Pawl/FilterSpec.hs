@@ -29,7 +29,8 @@ blackCreature =
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
-      Filter.attachedToCreature = False
+      Filter.attachedToCreature = False,
+      Filter.token = False
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -45,7 +46,8 @@ devoidBigCreature =
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
-      Filter.attachedToCreature = False
+      Filter.attachedToCreature = False,
+      Filter.token = False
     }
 
 self :: Filter.Context
@@ -168,5 +170,29 @@ tests =
             . HU.assertBool "player"
             . not
             $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsAttachedToCreature
+        ],
+      Tasty.testGroup
+        "IsToken"
+        [ HU.testCase "matches a view whose object is a token"
+            . HU.assertBool "token"
+            $ Filter.matches self (blackCreature {Filter.token = True}) Filter.Type.IsToken,
+          -- Ashaya's "nontoken creatures you control" is spelled `Not IsToken`, the
+          -- way CR 601.2c's "another" is spelled `Not IsSource` (#163).
+          HU.testCase "Not IsToken is how 'nontoken' is written" $ do
+            HU.assertBool "a card permanent is nontoken" (Filter.matches self blackCreature (Filter.Type.Not Filter.Type.IsToken))
+            HU.assertBool "a token is not" (not (Filter.matches self (blackCreature {Filter.token = True}) (Filter.Type.Not Filter.Type.IsToken))),
+          -- CR 111.3: a token's characteristics are effect-defined and are
+          -- "functionally equivalent" to printed ones, so no characteristic axis
+          -- distinguishes a token from the card it copies.
+          HU.testCase "is independent of every characteristic axis"
+            . HU.assertBool "power does not imply token"
+            . not
+            $ Filter.matches self devoidBigCreature Filter.Type.IsToken,
+          -- CR 111.1: a token is a marker used to represent a PERMANENT; a player
+          -- is not one.
+          HU.testCase "a player candidate is vacuously false"
+            . HU.assertBool "player"
+            . not
+            $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsToken
         ]
     ]

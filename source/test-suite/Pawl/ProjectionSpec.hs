@@ -131,6 +131,34 @@ bloodMoonUrborg forest urborg bloodMoon urborgFirst =
       (urborgId, gs) = place g1
    in (forestId, urborgId, gs)
 
+-- Ashaya, Blood Moon, a Goblin Piker and a Goblin Piker TOKEN, all under alice,
+-- plus a basic Forest for the CDA to count. `ashayaFirst` controls the timestamp
+-- order (fresh timestamps ascend with placement).
+--
+-- The mirror image of bloodMoonUrborg. There, the LATER-applying effect (Urborg's)
+-- is the one that gets stripped, so it never applies. Here it is the other way
+-- round: Ashaya's layer-4 type change is what puts her (and every other nontoken
+-- creature you control) INTO Blood Moon's affected set, so Blood Moon depends on
+-- Ashaya under CR 613.8a and must apply second -- in either timestamp order.
+ashayaBloodMoon :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
+  let base = Setup.emptyGame S.bothPlayers
+      (forestId, g1) = S.addCreature forest S.alice base
+      (pikerId, g2) = S.addCreature piker S.alice g1
+      (tokenId, g3) = S.addToken (Printing.card piker) S.alice g2
+      place g =
+        if ashayaFirst
+          then
+            let (a, g') = S.addCreature ashaya S.alice g
+                (_, g'') = S.addCreature bloodMoon S.alice g'
+             in (a, g'')
+          else
+            let (_, g') = S.addCreature bloodMoon S.alice g
+                (a, g'') = S.addCreature ashaya S.alice g'
+             in (a, g'')
+      (ashayaId, gs) = place g3
+   in (forestId, pikerId, tokenId, ashayaId, gs)
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
@@ -442,6 +470,94 @@ tests registry =
         bloodMoon <- Registry.printing registry "Blood Moon"
         let (forestId, _, gs) = bloodMoonUrborg forest urborg bloodMoon True
         HU.assertEqual "Forest stays a Forest, order-independent" (Set.singleton Subtype.Forest) (Projection.subtypesOf forestId gs),
+      -- Ashaya + Blood Moon. Both effects are layer 4 (CR 613.1d) and neither is
+      -- a characteristic-defining ability (CR 604.3a(3): both directly affect
+      -- OTHER objects), so CR 613.8a clauses (a) and (c) are satisfied and the
+      -- pair is eligible to depend.
+      --
+      -- CR 613.8a clause (b), evaluated where the rule evaluates it -- against the
+      -- state as the layer begins, with CR 613.8c re-asking after each application:
+      --
+      --   * Blood Moon DEPENDS on Ashaya. Applying Ashaya adds the card type Land
+      --     to alice's nontoken creatures, which changes "what it applies to" for
+      --     an effect whose set is "nonbasic lands".
+      --   * Ashaya does NOT depend on Blood Moon. Applying Blood Moon rewrites land
+      --     subtypes and (CR 305.7) strips rules text from NONBASIC LANDS; at that
+      --     moment Ashaya is a Legendary Creature -- Elemental and no creature of
+      --     alice's is a land, so nothing about Ashaya's text, existence, set or
+      --     result changes.
+      --
+      -- So this is a one-way dependency, NOT the dependency LOOP of CR 613.8b's
+      -- last sentence, and the answer the CR gives is Ashaya-then-Blood-Moon in
+      -- BOTH timestamp orders. That is what the paired order tests below pin: were
+      -- the engine to fall back to CR 613.7 timestamp order (which is what the
+      -- loop clause prescribes), the Blood-Moon-older board would leave the Piker
+      -- a Forest instead of a Mountain and the two would disagree.
+      HU.testCase "CR 613.8a Ashaya animates a nontoken creature into a land (Ashaya older)" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let (_, pikerId, _, _, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
+        HU.assertBool "the Piker is a land" (Set.member CardType.Land (Projection.cardTypesOf pikerId gs))
+        HU.assertBool "and still a creature (CR 205.1b: adding a type keeps the others)" (Projection.isCreatureOf pikerId gs),
+      HU.testCase "CR 613.8b Blood Moon depends on Ashaya, so it applies second (Ashaya older)" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let (_, pikerId, _, _, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
+        HU.assertBool "the animated Piker is a Mountain" (Set.member Subtype.Mountain (Projection.subtypesOf pikerId gs))
+        HU.assertBool "and not the Forest Ashaya made it" (not (Set.member Subtype.Forest (Projection.subtypesOf pikerId gs))),
+      -- The proving test for Projection.effectUnits, and it fails without it:
+      -- Ashaya's one ability has two layer-4 parts, Blood Moon depends only on the
+      -- first (the card-type add), and ordered per MODIFICATION an older Blood Moon
+      -- applies between them -- leaving the Piker a Mountain AND the Forest the
+      -- second part then re-adds. CR 613.8 orders effects, not modifications.
+      HU.testCase "CR 613.8b the dependency overrides timestamp order (Blood Moon older)" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let (_, pikerId, _, _, gs) = ashayaBloodMoon forest piker ashaya bloodMoon False
+        HU.assertBool "still a land" (Set.member CardType.Land (Projection.cardTypesOf pikerId gs))
+        HU.assertBool "still a Mountain, order-independent" (Set.member Subtype.Mountain (Projection.subtypesOf pikerId gs))
+        HU.assertBool "still not a Forest, order-independent" (not (Set.member Subtype.Forest (Projection.subtypesOf pikerId gs))),
+      HU.testCase "CR 305.7 Ashaya's own type change reaches herself, and Blood Moon then reaches her" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let (_, _, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
+        HU.assertBool "Ashaya is a land" (Set.member CardType.Land (Projection.cardTypesOf ashayaId gs))
+        HU.assertBool "Ashaya is a Mountain" (Set.member Subtype.Mountain (Projection.subtypesOf ashayaId gs)),
+      -- CR 111.3: a token is not a card, and nothing in CR 613 changes that -- so
+      -- Not IsToken reads no projected aspect and no ordering turns on it.
+      HU.testCase "Ashaya's 'nontoken creatures' excludes a token creature" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let (_, pikerId, tokenId, _, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
+        HU.assertBool "the nontoken Piker was animated" (Set.member CardType.Land (Projection.cardTypesOf pikerId gs))
+        HU.assertBool "the token copy of it was not" (not (Set.member CardType.Land (Projection.cardTypesOf tokenId gs)))
+        HU.assertBool "so Blood Moon never reaches the token" (not (Set.member Subtype.Mountain (Projection.subtypesOf tokenId gs))),
+      -- CR 604.3 / 613.4a: Ashaya's own */* is a characteristic-defining ability
+      -- counting lands you control, and it counts the lands her OTHER ability
+      -- just made -- layer 4 is applied before layer 7a. Without Blood Moon that
+      -- is the Forest, the animated Piker and Ashaya herself; the token is
+      -- excluded from the animation and so is not a land either.
+      HU.testCase "CR 613.4a Ashaya's CDA counts the lands her layer-4 ability made" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        let base = Setup.emptyGame S.bothPlayers
+            (_, g1) = S.addCreature forest S.alice base
+            (_, g2) = S.addCreature piker S.alice g1
+            (_, g3) = S.addToken (Printing.card piker) S.alice g2
+            (ashayaId, gs) = S.addCreature ashaya S.alice g3
+        HU.assertEqual "Forest + animated Piker + Ashaya" (Just 3) (Projection.powerOf ashayaId gs)
+        HU.assertEqual "toughness the same" (Just 3) (Projection.toughnessOf ashayaId gs),
       HU.testCase "CR 612 hacking Blood Moon Mountain->Island: nonbasic lands become Islands (hack newer)" $ do
         urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
         bloodMoon <- Registry.printing registry "Blood Moon"

@@ -58,7 +58,15 @@ data View = MkView
     -- the projection that is asking. That is the same laziness accident
     -- Projection.affects records for `perspective` (#197), and it is a fact about
     -- the pool's card data rather than a guarantee this record enforces.
-    attachedToCreature :: Bool
+    attachedToCreature :: Bool,
+    -- CR 111.1 / 111.6: is this candidate a token rather than a card? Read from
+    -- Object.source (Pawl.Game.isToken), never from a projection -- CR 111.3 makes
+    -- a token's effect-defined characteristics equivalent to printed ones, so no
+    -- characteristic axis distinguishes the two and no CR 613 layer can change the
+    -- answer. False for every candidate with no object behind it: a printed card
+    -- off the battlefield, a player, and an event snapshot -- the same vacuous
+    -- posture `attacking` and `attachedToCreature` take.
+    token :: Bool
   }
   deriving (Eq, Show)
 
@@ -81,7 +89,9 @@ playerView pid =
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
       -- player is not itself attached to anything (Object.attachedTo runs the
       -- other way and names an object, #190).
-      attachedToCreature = False
+      attachedToCreature = False,
+      -- CR 111.1: a token represents a PERMANENT, and a player is not one.
+      token = False
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and
@@ -142,6 +152,12 @@ matches context view predicate = case predicate of
   -- never a stamp on the candidate -- an Aura whose host stops being a creature
   -- stops matching, and CR 704.5m buries it on the next state-based-action pass.
   Filter.IsAttachedToCreature -> attachedToCreature view
+  -- CR 111.6: "A token isn't a card." A live read of what the object is
+  -- represented by (Object.source), never a stamp on the candidate -- and unlike
+  -- the two arms above it cannot change while the game runs, because CR 111.3
+  -- makes a token's characteristics equivalent to a card's rather than a
+  -- different kind of thing that some effect could convert.
+  Filter.IsToken -> token view
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)

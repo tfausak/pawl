@@ -83,6 +83,23 @@ data Filter
     -- that would compose with the rest of this type: the narrowest atom the one
     -- card in the pool needs. The generalization is #356.
     IsAttachedToCreature
+  | -- CR 111.6: "A token isn't a card." Ashaya, Soul of the Wild's "nontoken
+    -- creatures you control" is the card text this exists for, and it is spelled
+    -- `Not IsToken` -- one relation, one spelling, the way CR 601.2c's "another"
+    -- is spelled `Not IsSource` (#163) rather than given a second arm.
+    --
+    -- The third atom, after IsAttacking and IsAttachedToCreature, reading
+    -- something CR 109.3 leaves off the characteristic list. Their defence covers
+    -- this one too: what a permanent IS represented by is a RULES concept the
+    -- closed half owns outright (CR 111, Pawl.Type.Source), so reading it is the
+    -- same kind of act as reading a card type, and casing on an EFFECT's identity
+    -- is still what the invariant forbids and still not what this does.
+    --
+    -- Unlike those two it is not merely uncharacteristic but IMMUTABLE: CR 111.3
+    -- makes a token's effect-defined values "functionally equivalent" to printed
+    -- ones, so nothing in CR 613 can turn a card into a token or back. That is
+    -- what lets Pawl.Projection.filterReads declare it as reading nothing.
+    IsToken
   | And [Filter]
   | Or [Filter]
   | Not Filter

@@ -1,0 +1,147 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "characteristicPT": {
+    "type": "Count",
+    "value": [
+      {
+        "type": "InZone",
+        "value": [
+          {
+            "type": "Battlefield"
+          },
+          {
+            "type": "EachPlayer"
+          }
+        ]
+      },
+      {
+        "type": "And",
+        "value": [
+          {
+            "type": "HasCardType",
+            "value": {
+              "type": "Land"
+            }
+          },
+          {
+            "type": "ControlledBy",
+            "value": {
+              "type": "You"
+            }
+          }
+        ]
+      },
+      {
+        "type": "Objects"
+      }
+    ]
+  },
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 3
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    }
+  ],
+  "name": "Ashaya, Soul of the Wild",
+  "power": {
+    "type": "Star"
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [
+    {
+      "affected": {
+        "type": "Matching",
+        "value": {
+          "type": "And",
+          "value": [
+            {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            },
+            {
+              "type": "ControlledBy",
+              "value": {
+                "type": "You"
+              }
+            },
+            {
+              "type": "Not",
+              "value": {
+                "type": "IsToken"
+              }
+            }
+          ]
+        }
+      },
+      "modifications": [
+        {
+          "type": "AddCardType",
+          "value": {
+            "type": "Land"
+          }
+        },
+        {
+          "type": "AddLandSubtype",
+          "value": {
+            "type": "Forest"
+          }
+        }
+      ]
+    }
+  ],
+  "toughness": {
+    "type": "Star"
+  },
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Elemental"
+      }
+    ],
+    "supertypes": [
+      {
+        "type": "Legendary"
+      }
+    ],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

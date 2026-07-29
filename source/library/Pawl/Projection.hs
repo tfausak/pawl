@@ -134,6 +134,9 @@ applyModification lyr src cands gs oid m pc =
         -- via rulesTextActive, its static abilities -- see gather). It gains
         -- the new mana ability from the subtype (CR 305.6, read at the mana
         -- call site).
+        --
+        -- Only the object's old LAND types are meant to go; the singleton also
+        -- discards its creature types, which CR 305.7 keeps (#390).
         Modification.SetLandSubtype s ->
           pc
             { PC.subtypes = Set.singleton s,
@@ -365,7 +368,12 @@ viewOfCard card =
           Filter.attacking = False,
           -- CR 303.4b: only a permanent on the battlefield is attached to
           -- anything, and a printed card off it is not one.
-          Filter.attachedToCreature = False
+          Filter.attachedToCreature = False,
+          -- CR 111.6: "A token isn't a card." This builder describes a card in a
+          -- zone the battlefield is not (a library search, viewUpTo's fallback),
+          -- and CR 704.5d already made a token in any such zone cease to exist --
+          -- so no token can reach here, and False is not a lost distinction.
+          Filter.token = False
         }
 
 -- Shared assembly: fill a View from a projection's characteristics plus the
@@ -396,7 +404,12 @@ viewOfCharacteristics oid pc controller gs =
       -- recurse. See Pawl.Filter.View's own note on the field.
       Filter.attachedToCreature = case Game.lookupObject oid gs >>= Object.attachedTo of
         Nothing -> False
-        Just host -> isCreatureOf host gs
+        Just host -> isCreatureOf host gs,
+      -- CR 111.6: not a characteristic either, and unlike the two fields above it
+      -- is not even mutable -- Object.source is fixed for the life of the object
+      -- (CR 400.7 mints a new one on every zone change), so this is a constant
+      -- input to the projection being assembled and costs it nothing.
+      Filter.token = Game.isToken oid gs
     }
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result -- the value the layer fold
@@ -697,10 +710,33 @@ setLandSubtypeEffects gs =
 -- CR 305.7: a land whose subtype is SET to a basic type loses its rules-text
 -- abilities. So an object's static abilities are live unless a live SetLandSubtype
 -- applies to it. "Live" recurses on the stripper's own source; "applies to" reads
--- BASE characteristics (nonbasic is a printed supertype; card-type Land is
--- unchanged by any M3c effect), so nothing recurses into the projection and the
--- result is order-INDEPENDENT. A cycle trips the visited set (both treated as
--- live -- the CR 613.8b loop-escape analog, not an implementation of it, #37).
+-- BASE characteristics (nonbasic is a printed supertype, and card-type Land is
+-- read off the printed type line here), so nothing recurses into the projection
+-- and the result is order-INDEPENDENT. A cycle trips the visited set (both
+-- treated as live -- the CR 613.8b loop-escape analog, not an implementation of
+-- it, #37).
+--
+-- The base read is a RESTRICTION, not merely a shortcut: a permanent that becomes
+-- a land only through a layer-4 type change is not seen here at all, so the strip
+-- never reaches it. Ashaya, Soul of the Wild is the card that does that, and she
+-- keeps her own characteristic-defining P/T under a Blood Moon that the CR would
+-- have stripped her rules text away entirely (#391).
+--
+-- Ashaya is NOT the dependency loop #37 waits for, and the way she misses is
+-- worth recording so the next reader does not re-derive it. A loop needs each
+-- effect to change the other's existence; here only one direction holds. Blood
+-- Moon depends on Ashaya (CR 613.8a clause (b): applying Ashaya's type change
+-- puts alice's creatures INTO "nonbasic lands"), and Ashaya does not depend on
+-- Blood Moon, because CR 613.8a asks what applying the other would change FROM
+-- THE CURRENT STATE -- CR 613.8c re-asks after each application -- and in that
+-- state Ashaya is a Legendary Creature -- Elemental that no subtype-setting
+-- effect reaches. Pawl.ProjectionSpec's Ashaya + Blood Moon pair proves that
+-- one-way half in both timestamp orders.
+--
+-- So no board in the pool makes the escape's ANSWER observable. The visited
+-- branch is taken on every such board -- Blood Moon asking whether Blood Moon
+-- strips Blood Moon -- but what it returns is then thrown away by an affectsBase
+-- that is False for an enchantment.
 staticAbilitiesLive :: ObjectId -> GameState -> Bool
 staticAbilitiesLive oid gs = liveGiven (setLandSubtypeEffects gs) Set.empty oid gs
 
@@ -1041,9 +1077,11 @@ data Aspect
 -- reads a projected characteristic must be classified here, or CR 613.8a would
 -- silently stop seeing dependencies through it.
 --
--- Two arms read nothing a modification can write. CR 205.4a supertypes come off
--- the printed type line (printedSupertypes) and nothing projects them; IsSource
--- and IsPlayer ask who the candidate IS, which no effect changes.
+-- Several arms read nothing a modification can write. CR 205.4a supertypes come
+-- off the printed type line (printedSupertypes) and nothing projects them;
+-- IsSource and IsPlayer ask who the candidate IS, which no effect changes; and
+-- IsToken asks what it is REPRESENTED BY, which no effect changes either (its own
+-- arm below).
 --
 -- IsAttacking reads nothing either, and the reason is worth stating because
 -- CR 506.4 makes it look otherwise. That rule removes a permanent from combat
@@ -1079,6 +1117,13 @@ filterReads f = case f of
   -- which is the conservative direction. Nothing in the pool puts this atom in an
   -- affected set, so no ordering observable today turns on the choice (#357).
   Filter.Type.IsAttachedToCreature -> Set.singleton Types
+  -- Reads nothing, and for a stronger reason than the three empty arms above:
+  -- CR 111.3 makes a token's effect-defined values "functionally equivalent" to
+  -- printed ones rather than a separate kind of characteristic, and no
+  -- Modification writes Object.source. So no effect can move a "nontoken" set,
+  -- and CR 613.8a sees no dependency through this atom -- which is what makes
+  -- Ashaya's affected set depend only on card type and controller.
+  Filter.Type.IsToken -> Set.empty
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g
@@ -1116,6 +1161,34 @@ staticallyMovable c = case gAffected c of
   Affected.Matching _ -> True
   Affected.TheseObjects _ -> False
   Affected.Attached -> False
+
+-- CR 613.8's unit is an EFFECT, not a modification: "an effect is said to
+-- 'depend on' another", and CR 613.6 calls one ability's modifications "the parts
+-- of the effect". Two parts that land in the SAME layer are therefore applied
+-- together, with nothing else allowed between them -- so the reorder groups a
+-- layer's candidates into effects before it orders them.
+--
+-- gatherStatic emits one ability's parts contiguously and keys them alike
+-- (gEffect), and filtering by layer preserves that order, so adjacency is enough
+-- to find a unit. A Nothing key is always a unit of one: it marks a
+-- single-modification ability, a stored effect or a counter, none of which has a
+-- second part to be separated from.
+--
+-- Ashaya, Soul of the Wild + Blood Moon is the pair that needs it, and the reason
+-- nothing before it did. Ashaya's one ability adds the card type Land AND the
+-- subtype Forest; Blood Moon's affected set reads card types only, so it depends
+-- (CR 613.8a) on the first part and not on the second. Ordered per modification,
+-- an older Blood Moon slots in BETWEEN them and its SetLandSubtype is overwritten
+-- by the Forest it was meant to replace, leaving a creature that is a Mountain and
+-- a Forest at once. March of the Machines' two AddCardType parts are the pool's
+-- other same-layer pair, and never noticed: nothing on its boards is ordered
+-- against it.
+effectUnits :: [Gathered] -> [NonEmpty.NonEmpty Gathered]
+effectUnits =
+  let sameEffect a b = case (gEffect a, gEffect b) of
+        (Just x, Just y) -> x == y
+        _ -> False
+   in NonEmpty.groupBy sameEffect
 
 -- CR 613: apply continuous effects layer by layer (only the layers with effects,
 -- ascending). Within a layer, CR 613.8's dependency ordering, falling back to CR
@@ -1226,15 +1299,21 @@ projectWith admits cands = forObject
                 appliesTo ds pc c = case gEffect c of
                   Just k | Just answer <- Map.lookup k ds -> answer
                   _ -> affects (gSource c) oid (gAffected c) pc gs
-                -- Apply one candidate, recording its decision the first time.
+                -- Fold every part of ONE effect that lands in this layer, in the
+                -- order the card lists them (CR 613.6: "the parts of the effect").
+                -- The parts share a source and an affected set, so the caller asks
+                -- applicability once and this only writes.
+                applyUnit pc cs = List.foldl' (\p c -> applyModification lyr (gSource c) cands gs oid (gModification c) p) pc (NonEmpty.toList cs)
+                -- Apply one effect, recording its decision the first time.
                 -- Re-inserting an existing key writes the value it just read, so this
                 -- is idempotent rather than a second determination.
-                applyOne (pc, ds) c =
-                  let answer = appliesTo ds pc c
+                applyOne (pc, ds) cs =
+                  let c = NonEmpty.head cs
+                      answer = appliesTo ds pc c
                       ds' = case gEffect c of
                         Nothing -> ds
                         Just k -> Map.insert k answer ds
-                   in (if answer then applyModification lyr (gSource c) cands gs oid (gModification c) pc else pc, ds')
+                   in (if answer then applyUnit pc cs else pc, ds')
                 -- What could move `c`'s affected set, as the aspects its filter reads
                 -- -- or Nothing when nothing can move it at all. Three ways to be
                 -- immovable, none of them an optimization of CR 613.8a so much as its
@@ -1255,30 +1334,37 @@ projectWith admits cands = forObject
                 -- CR 613.8b: an effect that depends on another waits for it, and among
                 -- the effects waiting on nothing, CR 613.7 timestamp order picks the
                 -- next. Re-deriving `ready` each time round IS CR 613.8c ("the order of
-                -- remaining effects is reevaluated"), and removing one candidate per
-                -- pass is what makes it terminate.
+                -- remaining effects is reevaluated"), and removing one effect per
+                -- pass is what makes it terminate: `pending` is finite and strictly
+                -- shorter on every call, and `batch` is never empty, so a choice is
+                -- always available to remove.
                 --
                 -- Applicability is judged HERE, as each effect is applied, rather than
                 -- from `seeded`. That is CR 613.8's premise: "applying the other would
                 -- change ... what it applies to" describes a state that only exists if
                 -- an effect is asked after its predecessor has applied.
                 --
-                -- When `ready` is empty every remaining candidate is waiting on
+                -- When `ready` is empty every remaining effect is waiting on
                 -- another, so somewhere in there is a dependency loop, and CR
                 -- 613.8b's last sentence says to ignore the rule for it: "the
                 -- effects in the dependency loop are applied in timestamp order".
                 -- Only the loop's OWN members escape -- an effect that merely
                 -- waits on the loop keeps waiting, and gets its turn once the loop
-                -- has unwound -- so the fallback is restricted to the candidates
+                -- has unwound -- so the fallback is restricted to the effects
                 -- that sit on a cycle rather than to everything left.
+                --
+                -- `pending` holds EFFECTS (effectUnits), not modifications, because
+                -- that is CR 613.8's unit -- see effectUnits.
                 resolve (pc, ds) pending = case pending of
                   [] -> (pc, ds)
                   _ ->
-                    let -- One applicability answer per candidate per round, shared by
-                        -- the dependency scan rather than recomputed per pair. A
-                        -- candidate that does not apply changes nothing, so it cannot
-                        -- be the `b` of a dependency either.
-                        answered = fmap (\(i, c) -> (i, c, appliesTo ds pc c)) pending
+                    let -- One applicability answer per effect per round, shared by
+                        -- the dependency scan rather than recomputed per pair. An
+                        -- effect that does not apply changes nothing, so it cannot
+                        -- be the `b` of a dependency either. CR 613.6 gives every
+                        -- part of an effect the same affected set, so the head part
+                        -- answers for the unit.
+                        answered = fmap (\(i, cs) -> (i, cs, appliesTo ds pc (NonEmpty.head cs))) pending
                         -- CR 613.8a clause (b), the "what it applies to" half: `a`
                         -- depends on `b` when applying `b` would change whether `a`
                         -- applies. The tentative application is thrown away and only
@@ -1294,13 +1380,19 @@ projectWith admits cands = forObject
                         -- effect's whole affected set and this decides it per projected
                         -- object, which agrees for everything the Filter vocabulary can
                         -- express (#236).
-                        dependsOnOne (i, a, answer) (j, b, bApplies) = case movableReads ds a of
-                          Nothing -> False
-                          Just aspects ->
-                            j /= i
-                              && bApplies
-                              && not (Set.disjoint aspects (modificationWrites (gModification b)))
-                              && appliesTo ds (applyModification lyr (gSource b) cands gs oid (gModification b) pc) a /= answer
+                        --
+                        -- `b` is applied WHOLE here, every part of it that lands in
+                        -- this layer, for the same reason applyOne does: half an
+                        -- effect is not a state CR 613 ever describes.
+                        dependsOnOne (i, as, answer) (j, bs, bApplies) =
+                          let a = NonEmpty.head as
+                           in case movableReads ds a of
+                                Nothing -> False
+                                Just aspects ->
+                                  j /= i
+                                    && bApplies
+                                    && not (Set.disjoint aspects (foldMap (modificationWrites . gModification) bs))
+                                    && appliesTo ds (applyUnit pc bs) a /= answer
                         ready = filter (\a -> not (any (dependsOnOne a) answered)) answered
                         -- The dependency edges, built only when the whole round is
                         -- blocked -- which is the one case that needs to know the
@@ -1317,7 +1409,7 @@ projectWith admits cands = forObject
                         onCycle (i, _, _) = Set.member i (reach Set.empty (Map.findWithDefault [] i edges))
                         batch = case ready of
                           _ : _ -> ready
-                          -- `ready` empty means every remaining candidate has an
+                          -- `ready` empty means every remaining effect has an
                           -- outgoing edge, and a finite graph where every node has
                           -- one contains a cycle -- so `cyclic` is never empty and
                           -- the fallback to `answered` is unreachable. Written out
@@ -1325,7 +1417,10 @@ projectWith admits cands = forObject
                           [] -> case filter onCycle answered of
                             [] -> answered
                             cyclic -> cyclic
-                        (chosen, next, _) = List.minimumBy (Ord.comparing (\(_, c, _) -> gTimestamp c)) batch
+                        -- CR 613.7a gives every part of one ability the source
+                        -- permanent's timestamp, so the head part's stamp is the
+                        -- unit's.
+                        (chosen, next, _) = List.minimumBy (Ord.comparing (\(_, cs, _) -> gTimestamp (NonEmpty.head cs))) batch
                      in resolve (applyOne (pc, ds) next) (filter ((/= chosen) . fst) pending)
                 -- Is there anything at this layer CR 613.8 could reorder? See
                 -- movableLayers above: one Set lookup, almost always in an empty Set.
@@ -1339,7 +1434,7 @@ projectWith admits cands = forObject
                     | gLayer c /= lyr || Map.member k ds -> ds
                     | otherwise -> Map.insert k (affects (gSource c) oid (gAffected c) seeded gs) ds
              in if movableHere
-                  then resolve (seeded, decided) (zip [0 :: Int ..] (filter (\c -> gLayer c == lyr) cands))
+                  then resolve (seeded, decided) (zip [0 :: Int ..] (effectUnits (filter (\c -> gLayer c == lyr) cands)))
                   else
                     -- Nothing here can be moved, so no candidate depends on any other
                     -- (CR 613.8a needs one to change what another applies to) and no
