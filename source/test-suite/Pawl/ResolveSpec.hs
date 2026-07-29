@@ -223,6 +223,24 @@ targetTests registry =
             legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
         HU.assertBool "the Wall is legal" (Set.member (Recipient.ToCreature wallId) legal)
         HU.assertBool "the non-Wall creature is not legal" (not (Set.member (Recipient.ToCreature pikerId) legal)),
+      -- The same "target Wall", against a Wall that Ashaya animated into a land
+      -- and Blood Moon then set to Mountain. CR 305.7 retires the land's OLD LAND
+      -- TYPES and nothing else on the subtype axis, and its fourth sentence keeps
+      -- the card types -- so the Wall is still a creature, still a Wall, and still
+      -- a legal target. This is the gameplay-level half of Pawl.ProjectionSpec's
+      -- "a Blood Moon'd creature-land keeps its creature types".
+      HU.testCase "CR 305.7 an Ashaya-animated, Blood Moon'd Wall of Stone is still a legal \"target Wall\"" $ do
+        wallOfStone <- Registry.printing registry "Wall of Stone"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let (wallId, g1) = S.addCreature wallOfStone S.alice (Setup.emptyGame S.bothPlayers)
+            (_, g2) = S.addCreature ashaya S.alice g1
+            (_, gs) = S.addCreature bloodMoon S.alice g2
+            slot = SlotName.MkSlotName (Text.pack "target")
+            legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
+        HU.assertBool "it really is a Mountain" (Set.member Subtype.Mountain (Projection.subtypesOf wallId gs))
+        HU.assertBool "and still a creature (CR 305.7 removes no card types)" (Projection.isCreatureOf wallId gs)
+        HU.assertBool "so \"target Wall\" still offers it" (Set.member (Recipient.ToCreature wallId) legal),
       HU.testCase "CR 115.1a ArtifactTarget is the battlefield's projected artifacts" $ do
         -- boardWithCreatureArtifactLand: alice has a Piker, a Mindslaver
         -- (Legendary Artifact) and a Mountain.

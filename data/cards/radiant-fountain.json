@@ -1,0 +1,100 @@
+{
+  "activatedAbilities": [
+    {
+      "cost": {
+        "components": [
+          {
+            "type": "TapThis"
+          }
+        ],
+        "mana": []
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "AddMana",
+                "value": {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colorless"
+                  }
+                }
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": null,
+  "name": "Radiant Fountain",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfEnters"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "GainLife",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Land"
+      }
+    ]
+  }
+}

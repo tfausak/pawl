@@ -101,6 +101,7 @@ library
     Pawl.Setup
     Pawl.Slug
     Pawl.Stack
+    Pawl.Subtype
     Pawl.Summoning
     Pawl.Target
     Pawl.Turn

@@ -1382,7 +1382,6 @@ projectedCharacteristicsToJson pc =
       (Text.pack "characteristicPT", maybeTo (\(p, t) -> Array [quantityToJson p, quantityToJson t]) (PC.characteristicPT pc)),
       (Text.pack "cardTypes", setTo cardTypeToJson (PC.cardTypes pc)),
       (Text.pack "subtypes", setTo subtypeToJson (PC.subtypes pc)),
-      (Text.pack "rulesTextActive", Json.jBool (PC.rulesTextActive pc)),
       (Text.pack "activatedAbilities", listTo activatedAbilityToJson (PC.activatedAbilities pc)),
       (Text.pack "replacementEffects", listTo replacementEffectToJson (PC.replacementEffects pc)),
       (Text.pack "triggeredAbilities", listTo triggeredAbilityToJson (PC.triggeredAbilities pc))
@@ -1404,7 +1403,6 @@ jsonToProjectedCharacteristics value = do
   cda <- Json.field (Text.pack "characteristicPT") ps >>= maybeFrom jsonToQuantityPair
   cts <- Json.field (Text.pack "cardTypes") ps >>= setFrom jsonToCardType
   subs <- Json.field (Text.pack "subtypes") ps >>= setFrom jsonToSubtype
-  live <- Json.field (Text.pack "rulesTextActive") ps >>= jsonToBoolDefault True
   acts <- Json.field (Text.pack "activatedAbilities") ps >>= listFrom jsonToActivatedAbility
   reps <- Json.field (Text.pack "replacementEffects") ps >>= listFrom jsonToReplacementEffect
   trigs <- Json.field (Text.pack "triggeredAbilities") ps >>= listFrom jsonToTriggeredAbility
@@ -1419,7 +1417,6 @@ jsonToProjectedCharacteristics value = do
         PC.characteristicPT = cda,
         PC.cardTypes = cts,
         PC.subtypes = subs,
-        PC.rulesTextActive = live,
         PC.activatedAbilities = acts,
         PC.replacementEffects = reps,
         PC.triggeredAbilities = trigs

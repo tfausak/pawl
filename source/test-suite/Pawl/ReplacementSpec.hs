@@ -478,6 +478,26 @@ tests registry =
               let after = castAndResolve (raceAnswer corpsejack piker) gs spellId
                in HU.assertEqual "(1 * 2) + 1" 3 (countersOn CounterKind.PlusOnePlusOne piker after)
             _ -> HU.assertFailure "fixture did not build three permanents",
+        -- CR 305.7: a land whose subtype is set to a basic type "loses all
+        -- abilities generated from its rules text", and a replacement effect is
+        -- one of them. Ashaya makes the Menace a Forest land, Blood Moon sets
+        -- that to Mountain, and the doubling goes with the rest of its text --
+        -- so Battlegrowth's one counter stays one. The Piker is animated too and
+        -- is still a creature (CR 305.7 removes no card types), so it is still a
+        -- legal target for "target creature".
+        HU.testCase "CR 305.7 an Ashaya-animated, Blood Moon'd Corpsejack Menace doubles nothing" $ do
+          forest <- Registry.printing registry "Forest"
+          battlegrowth <- Registry.printing registry "Battlegrowth"
+          corpsejackMenace <- Registry.printing registry "Corpsejack Menace"
+          ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+          bloodMoon <- Registry.printing registry "Blood Moon"
+          pikerPrinting <- Registry.printing registry "Goblin Piker"
+          let (gs, spellId, mine, _) = counterBoard forest battlegrowth [corpsejackMenace, ashaya, bloodMoon, pikerPrinting] []
+          case mine of
+            corpsejack : _ : _ : piker : _ ->
+              let after = castAndResolve (raceAnswer corpsejack piker) gs spellId
+               in HU.assertEqual "one counter, not two" 1 (countersOn CounterKind.PlusOnePlusOne piker after)
+            _ -> HU.assertFailure "fixture did not build four permanents",
         HU.testCase "CR 616.1 the engine ASKS -- it does not proceed on list order" $ do
           forest <- Registry.printing registry "Forest"
           battlegrowth <- Registry.printing registry "Battlegrowth"

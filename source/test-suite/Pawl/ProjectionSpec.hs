@@ -558,6 +558,60 @@ tests registry =
             (ashayaId, gs) = S.addCreature ashaya S.alice g3
         HU.assertEqual "Forest + animated Piker + Ashaya" (Just 3) (Projection.powerOf ashayaId gs)
         HU.assertEqual "toughness the same" (Just 3) (Projection.toughnessOf ashayaId gs),
+      -- CR 305.7's second sentence, in full: "It loses all abilities generated
+      -- from its rules text, ITS OLD LAND TYPES, and any copiable effects
+      -- affecting that land". Only the LAND types go; the fourth sentence spells
+      -- out what stays -- "Setting a land's subtype doesn't add or remove any
+      -- card types (such as creature) or supertypes". A creature type is neither
+      -- a land type nor a card type, so it survives untouched.
+      HU.testCase "CR 305.7 a Blood Moon'd creature-land keeps its creature types" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let (_, pikerId, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
+        -- Goblin Piker is a Creature - Goblin Warrior; Ashaya's Forest and the
+        -- Piker's printed Goblin/Warrior are the two kinds in one set, and only
+        -- the first is a land type.
+        HU.assertEqual "the Forest went, Goblin and Warrior stayed" (Set.fromList [Subtype.Mountain, Subtype.Goblin, Subtype.Warrior]) (Projection.subtypesOf pikerId gs)
+        HU.assertEqual "and Ashaya keeps Elemental" (Set.fromList [Subtype.Mountain, Subtype.Elemental]) (Projection.subtypesOf ashayaId gs),
+      -- CR 305.7's FIRST clause -- "It loses all abilities generated from its
+      -- rules text" -- reaches a characteristic-defining ability like any other:
+      -- CR 604.3 makes a CDA a static ability, and CR 613.6's rescue does not
+      -- apply because Ashaya's */* would first apply at layer 7a, after the layer
+      -- 4 that takes it away.
+      --
+      -- Her power is then Nothing rather than the 0 CR 208.5 asks for ("If a
+      -- creature somehow has no value for its power, its power is 0"), which is
+      -- the read-point gap #65 already tracks -- not something this fixture is
+      -- claiming is right.
+      HU.testCase "CR 305.7 Blood Moon takes Ashaya's CDA with the rest of her rules text" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let (_, _, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
+        HU.assertEqual "no CDA left to define power" Nothing (Projection.powerOf ashayaId gs)
+        HU.assertEqual "nor toughness" Nothing (Projection.toughnessOf ashayaId gs),
+      -- The remaining two ability kinds the strip has to reach, at the projection
+      -- rather than through a game: Corpsejack Menace's counter-doubling
+      -- replacement effect and Goblin Piker's (empty) trigger list are read off
+      -- PC.replacementEffects and PC.triggeredAbilities, and CR 305.7 empties
+      -- both. The gameplay proof of the replacement half is in
+      -- Pawl.ReplacementSpec.
+      HU.testCase "CR 305.7 Blood Moon takes an animated creature's replacement effect" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        corpsejackMenace <- Registry.printing registry "Corpsejack Menace"
+        ashaya <- Registry.printing registry "Ashaya, Soul of the Wild"
+        bloodMoon <- Registry.printing registry "Blood Moon"
+        let base = Setup.emptyGame S.bothPlayers
+            (corpsejackId, g1) = S.addCreature corpsejackMenace S.alice base
+            (_, g2) = S.addCreature piker S.alice g1
+            (_, g3) = S.addCreature ashaya S.alice g2
+        HU.assertEqual "it has one before Blood Moon" 1 (length (Projection.replacementsOf corpsejackId g3))
+        let (_, gs) = S.addCreature bloodMoon S.alice g3
+        HU.assertBool "the Menace is a Mountain now" (Set.member Subtype.Mountain (Projection.subtypesOf corpsejackId gs))
+        HU.assertEqual "and its rules text is gone" [] (Projection.replacementsOf corpsejackId gs),
       HU.testCase "CR 612 hacking Blood Moon Mountain->Island: nonbasic lands become Islands (hack newer)" $ do
         urborg <- Registry.printing registry "Urborg, Tomb of Yawgmoth"
         bloodMoon <- Registry.printing registry "Blood Moon"
@@ -900,13 +954,17 @@ tests registry =
       -- a Swamp to a FIXED set (the Piker) at timestamp 10 -- A's set names an
       -- object id, so applying B cannot change it, so A does not depend on B and
       -- nothing is reordered.
+      --
+      -- Each SetLandSubtype retires the LAND type its predecessor left and no
+      -- more (CR 305.7), so the Piker's printed creature types ride through both
+      -- and the Swamp/Forest pair alone carries the ordering claim.
       HU.testCase "CR 613.7 within layer 4, no dependency leaves timestamp order alone" $ do
         piker <- Registry.printing registry "Goblin Piker"
         mountain <- Registry.printing registry "Mountain"
         let (pikerId, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
             gsA = S.withEffectAt pikerId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Swamp) gs0
             gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.SetLandSubtype Subtype.Forest) gsA
-        HU.assertEqual "the later SetLandSubtype wins" (Set.singleton Subtype.Forest) (Projection.subtypesOf pikerId gs),
+        HU.assertEqual "the later SetLandSubtype wins, and only the land types moved" (Set.fromList [Subtype.Forest, Subtype.Goblin, Subtype.Warrior]) (Projection.subtypesOf pikerId gs),
       -- CR 613.8b's last sentence: "If several dependent effects form a dependency
       -- loop, then this rule is ignored and the effects IN THE DEPENDENCY LOOP are
       -- applied in timestamp order." Only the loop's own members escape the
