@@ -577,6 +577,20 @@ symbolColors symbol = case symbol of
   -- therefore the whole contribution: Flame Javelin ({2/R}{2/R}{2/R}) is red and
   -- only red, however it was paid for.
   ManaSymbol.MonocoloredHybrid t -> Maybe.maybeToList (colorOfManaType t)
+  -- CR 107.4f's first clause: "Phyrexian mana symbols are COLORED mana symbols:
+  -- {W/P} is white, ... and {G/P} is green" -- and CR 202.2d says the object is
+  -- that colour, alongside the hybrids: "An object with one or more hybrid mana
+  -- symbols and/or Phyrexian mana symbols in its mana cost is all of the colors
+  -- of those mana symbols, in addition to any other colors the object might be."
+  --
+  -- A total `[c]` rather than a mapMaybe, because ManaSymbol.Phyrexian carries a
+  -- Color and not a ManaType: there is no colourless Phyrexian symbol. The other
+  -- half of the symbol is LIFE, which is no mana at all and so no colour either,
+  -- exactly as a monocolored hybrid's generic half is none. Mutagenic Growth is
+  -- green even when 2 life paid for it and no green mana was ever made -- proved
+  -- by ManaSpec's "Mutagenic Growth is green on the stack even when 2 life paid
+  -- for it".
+  ManaSymbol.Phyrexian c -> [c]
   ManaSymbol.Generic _ -> []
   ManaSymbol.Variable -> []
 

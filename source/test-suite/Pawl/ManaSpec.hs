@@ -41,6 +41,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.Optionality as Optionality
+import qualified Pawl.Type.Player as Player
 import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.Pool as Pool
 import qualified Pawl.Type.Printing as Printing
@@ -578,6 +579,7 @@ tests registry =
       anyColorTests registry,
       hybridTests registry,
       monocoloredHybridTests registry,
+      phyrexianTests registry,
       upwellingTests registry
     ]
 
@@ -761,8 +763,8 @@ monocoloredHybridTests registry =
                 colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless}
              in HU.assertEqual
                   "the {R} is spent and both {C} remain -- the other half would spend both {C} and leave the {R}"
-                  (Just (Mana.Type.MkMana [colorless, colorless]))
-                  (Mana.spend (ManaCost.MkManaCost [twoOrRed]) (Mana.Type.MkMana [red, colorless, colorless])),
+                  (Just (Mana.Type.MkMana [colorless, colorless], 0))
+                  (Mana.spend 0 (ManaCost.MkManaCost [twoOrRed]) (Mana.Type.MkMana [red, colorless, colorless])),
           -- CR 107.4e's last sentence, as CR 202.2d restates it for the whole
           -- object: a monocolored hybrid's other component is generic mana, which
           -- is no colour, so only the named half counts. Flame Javelin is red
@@ -772,3 +774,193 @@ monocoloredHybridTests registry =
             let (oid, gs) = S.addCreature flameJavelin S.alice (Setup.emptyGame S.bothPlayers)
             HU.assertEqual "red, not colourless" (Set.singleton Color.Red) (Projection.colorsOf oid gs)
         ]
+
+-- Mutagenic Growth's printed cost. Restated rather than read off the card, for
+-- the reason javelinCost gives; CardSpec pins it against
+-- data/cards/mutagenic-growth.json.
+phyrexianCost :: ManaCost.ManaCost
+phyrexianCost = ManaCost.MkManaCost [ManaSymbol.Phyrexian Color.Green]
+
+-- alice at `n` life and nothing else on the board.
+aliceAt :: Integer -> GameState.GameState
+aliceAt n =
+  let gs = Setup.emptyGame S.bothPlayers
+   in gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.alice (GameState.players gs)}
+
+-- CR 107.4f: "A Phyrexian mana symbol represents a cost that can be paid either
+-- with one mana of its color or by paying 2 life."
+--
+-- Mutagenic Growth ({G/P}) throughout -- a plain pump, so every assertion below
+-- is about the symbol and nothing else.
+phyrexianTests :: Registry.Type.Registry -> Tasty.TestTree
+phyrexianTests registry =
+  Tasty.testGroup
+    "Phyrexian"
+    [ -- The mana route. The life assertion is what makes this discriminating:
+      -- both routes are open here, and paying life as WELL as the mana, or
+      -- INSTEAD of it, would each read as "paid" without it.
+      --
+      -- It also pins the elision. Both routes being open is a choice CR 118.13a
+      -- gives the player as they propose the spell, and pawl makes it for them:
+      -- it pays the least life it can, which here is none (#361).
+      HU.testCase "CR 107.4f one {G/P} is paid with one green mana and no life" $ do
+        forest <- Registry.printing registry "Forest"
+        let gs = S.landsInPlay forest 1
+        HU.assertBool "canPay says yes" (Mana.canPay S.alice phyrexianCost gs)
+        let (paid, after) = S.runPureWith S.identityAnswer gs (Mana.payCost S.alice phyrexianCost)
+        HU.assertBool "and it really is paid" paid
+        HU.assertEqual "the Forest is tapped" 1 (S.tappedCount S.alice after)
+        HU.assertEqual "nothing left floating" 0 (poolSize S.alice after)
+        HU.assertEqual "life untouched" (Just 20) (S.lifeOf S.alice after),
+      -- The life route, with a land on the battlefield that cannot help. The tap
+      -- count is the discriminator: a payment path that tapped the Mountain
+      -- first and then paid life would still leave alice at 18.
+      HU.testCase "CR 107.4f one {G/P} is paid by 2 life when no green mana can be made" $ do
+        mountain <- Registry.printing registry "Mountain"
+        let gs = S.landsInPlay mountain 1
+        HU.assertBool "canPay says yes" (Mana.canPay S.alice phyrexianCost gs)
+        let (paid, after) = S.runPureWith S.identityAnswer gs (Mana.payCost S.alice phyrexianCost)
+        HU.assertBool "and it really is paid" paid
+        HU.assertEqual "exactly 2 life" (Just 18) (S.lifeOf S.alice after)
+        HU.assertEqual "the Mountain is untouched" 0 (S.tappedCount S.alice after)
+        HU.assertEqual "nothing left floating" 0 (poolSize S.alice after),
+      -- CR 119.4: "the player may do so only if their life total is greater than
+      -- or equal to the amount of the payment." Two is the boundary, and the
+      -- payment that takes alice to exactly 0 is legal -- CR 704.5a's loss is a
+      -- state-based action afterwards, not a bar on the payment.
+      HU.testCase "CR 119.4 a {G/P} is payable at 2 life and unpayable at 1" $ do
+        HU.assertBool "2 life is enough" (Mana.canPay S.alice phyrexianCost (aliceAt 2))
+        HU.assertBool "1 life is not" (not (Mana.canPay S.alice phyrexianCost (aliceAt 1)))
+        HU.assertBool "0 life is not" (not (Mana.canPay S.alice phyrexianCost (aliceAt 0)))
+        let (paid, after) = S.runPureWith S.identityAnswer (aliceAt 2) (Mana.payCost S.alice phyrexianCost)
+        HU.assertBool "paying at 2 really works" paid
+        HU.assertEqual "and takes her to 0" (Just 0) (S.lifeOf S.alice after)
+        let (failed, unchanged) = S.runPureWith S.identityAnswer (aliceAt 1) (Mana.payCost S.alice phyrexianCost)
+        HU.assertBool "at 1 the payment fails" (not failed)
+        HU.assertEqual "and CR 601.2h leaves the life total alone" (Just 1) (S.lifeOf S.alice unchanged),
+      -- The gameplay-level proof (design.md section 4), mana route: the whole
+      -- card, cast off one Forest and resolved. Goblin Piker is 2/1, so +2/+2 is
+      -- 4/3.
+      HU.testCase "CR 107.4f whole card: Mutagenic Growth casts off one Forest for +2/+2" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        mutagenicGrowth <- Registry.printing registry "Mutagenic Growth"
+        let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+            (g, spellId) = S.handOne mutagenicGrowth withPiker
+            cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
+        HU.assertEqual "power" (Just 4) (Projection.powerOf pikerId resolved)
+        HU.assertEqual "toughness" (Just 3) (Projection.toughnessOf pikerId resolved)
+        HU.assertEqual "the Forest paid for it" 1 (S.tappedCount S.alice resolved)
+        HU.assertEqual "so no life was" (Just 20) (S.lifeOf S.alice resolved),
+      -- The same card with NO lands anywhere. Castability has to see the life
+      -- route or this never reaches the stack at all.
+      HU.testCase "CR 107.4f whole card: Mutagenic Growth casts with no mana at all, for 2 life" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mutagenicGrowth <- Registry.printing registry "Mutagenic Growth"
+        let (pikerId, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (g, spellId) = S.handOne mutagenicGrowth withPiker
+        HU.assertBool "castable with an empty battlefield but for the Piker" (Cast.castable S.alice spellId g)
+        let cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
+            resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
+        HU.assertEqual "power" (Just 4) (Projection.powerOf pikerId resolved)
+        HU.assertEqual "toughness" (Just 3) (Projection.toughnessOf pikerId resolved)
+        HU.assertEqual "exactly 2 life paid" (Just 18) (S.lifeOf S.alice resolved),
+      -- THE discriminating negative: neither route open. One life short, and no
+      -- green mana on the board.
+      HU.testCase "CR 119.4 Mutagenic Growth is uncastable at 1 life with no green mana" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mutagenicGrowth <- Registry.printing registry "Mutagenic Growth"
+        let inHandAt n =
+              let (_, withPiker) = S.addCreature piker S.alice (aliceAt n)
+               in S.handOne mutagenicGrowth withPiker
+            castableAt n = let (g, spellId) = inHandAt n in Cast.castable S.alice spellId g
+            castsAt n =
+              let (g, spellId) = inHandAt n
+               in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))))
+        HU.assertBool "at 1 life it is not castable" (not (castableAt 1))
+        HU.assertEqual "and it does not cast" 0 (castsAt 1)
+        HU.assertBool "at 2 life it is -- the Piker it targets has not moved" (castableAt 2)
+        HU.assertEqual "and it does cast" 1 (castsAt 2),
+      -- CR 107.4f's FIRST clause, the one a payment-only reading loses:
+      -- "Phyrexian mana symbols are colored mana symbols: ... {G/P} is green."
+      -- CR 202.2d says the same of the object: "An object with one or more
+      -- hybrid mana symbols and/or Phyrexian mana symbols in its mana cost is all
+      -- of the colors of those mana symbols, in addition to any other colors the
+      -- object might be."
+      HU.testCase "CR 107.4f/202.2d a Phyrexian mana symbol is a COLOURED mana symbol" $ do
+        mutagenicGrowth <- Registry.printing registry "Mutagenic Growth"
+        let (oid, gs) = S.addCreature mutagenicGrowth S.alice (Setup.emptyGame S.bothPlayers)
+        HU.assertEqual "green, not colourless" (Set.singleton Color.Green) (Projection.colorsOf oid gs),
+      -- And the colour survives the route that produces no green mana at all --
+      -- the reading that would call the card colourless is exactly the one a
+      -- life-paid cast tempts.
+      HU.testCase "CR 202.2d Mutagenic Growth is green on the stack even when 2 life paid for it" $ do
+        piker <- Registry.printing registry "Goblin Piker"
+        mutagenicGrowth <- Registry.printing registry "Mutagenic Growth"
+        let (_, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (g, spellId) = S.handOne mutagenicGrowth withPiker
+            cast = snd (Engine.runGamePure S.identityAnswer g (Cast.castSpell S.alice spellId))
+        HU.assertEqual "2 life paid, no green mana ever made" (Just 18) (S.lifeOf S.alice cast)
+        case GameState.stack cast of
+          [sid] -> HU.assertEqual "and the spell is still green" (Set.singleton Color.Green) (Projection.colorsOf sid cast)
+          _ -> HU.assertFailure "expected exactly one spell on the stack",
+      -- Mana.resolutions' SORT, pinned -- the least-life rule has to hold across
+      -- symbols and not merely within one, and the per-symbol product alone does
+      -- not give that. CR 601.2b's nonhybrid equivalents of {2/R}{G/P} leave the
+      -- product in the order 0, 2, 0, 2 life, so unsorted the first PAYABLE entry
+      -- on this board is the 2-life one.
+      --
+      -- A lone Birds of Paradise and two Islands make all four orderings matter:
+      -- {R}{G} is impossible (one Birds makes one mana), {R} plus 2 life works,
+      -- {G} plus {2} works and costs nothing, and {2} plus 2 life works. The
+      -- least is zero, and pawl must find it.
+      HU.testCase "CR 107.4f the least-life route is found across symbols, not only within one" $ do
+        birds <- Registry.printing registry "Birds of Paradise"
+        island <- Registry.printing registry "Island"
+        mountain <- Registry.printing registry "Mountain"
+        forest <- Registry.printing registry "Forest"
+        let cost = ManaCost.MkManaCost [twoOrRed, ManaSymbol.Phyrexian Color.Green]
+        HU.assertEqual
+          "the {G} plus {2} route, costing no life"
+          (Just 0)
+          (Mana.lifeNeeded S.alice cost (mixedLands island birds 2 1))
+        HU.assertBool "and it is payable" (Mana.canPay S.alice cost (mixedLands island birds 2 1))
+        -- The discriminator: the same cost and the same three permanents, but a
+        -- Mountain in the Birds' place makes no green, so every surviving route
+        -- costs 2 life and the answer really does depend on the board.
+        HU.assertEqual
+          "with a Mountain instead, 2 life is the cheapest there is"
+          (Just 2)
+          (Mana.lifeNeeded S.alice cost (mixedLands island mountain 2 1))
+        HU.assertEqual
+          "and a lone {G/P} off nothing at all is 2 as well"
+          (Just 2)
+          (Mana.lifeNeeded S.alice phyrexianCost (Setup.emptyGame S.bothPlayers))
+        HU.assertEqual
+          "while a lone {G/P} with a Forest is 0"
+          (Just 0)
+          (Mana.lifeNeeded S.alice phyrexianCost (S.landsInPlay forest 1)),
+      -- The budget is recomputed as sources are tapped, not fixed when the
+      -- payment starts, and a Birds of Paradise is what makes the difference
+      -- observable: it COULD make green, so pawl starts with a budget of zero
+      -- life and taps it -- and when the player names blue instead, the mana way
+      -- is gone and CR 107.4f's 2 life is all that is left. pawl pays it rather
+      -- than failing the payment, which is the same MORE PERMISSIVE posture
+      -- Mana.payCost's haddock takes towards a mis-tapped colour (#261, #361).
+      HU.testCase "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
+        birds <- Registry.printing registry "Birds of Paradise"
+        let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
+            (paidBlue, afterBlue) = S.runPureWith (prefersColor Color.Blue) gs (Mana.payCost S.alice phyrexianCost)
+        HU.assertBool "the cost is still paid" paidBlue
+        HU.assertEqual "by 2 life" (Just 18) (S.lifeOf S.alice afterBlue)
+        HU.assertEqual "the Birds was tapped on the way" 1 (S.tappedCount S.alice afterBlue)
+        HU.assertEqual "and its blue mana is still floating" 1 (poolSize S.alice afterBlue)
+        -- The control: the same board and the same card, one different answer.
+        let (paidGreen, afterGreen) = S.runPureWith (prefersColor Color.Green) gs (Mana.payCost S.alice phyrexianCost)
+        HU.assertBool "green pays it too" paidGreen
+        HU.assertEqual "and costs no life at all" (Just 20) (S.lifeOf S.alice afterGreen)
+        HU.assertEqual "with nothing left floating" 0 (poolSize S.alice afterGreen)
+    ]

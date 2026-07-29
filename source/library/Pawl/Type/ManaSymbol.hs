@@ -1,9 +1,10 @@
 module Pawl.Type.ManaSymbol where
 
 import Numeric.Natural (Natural)
+import Pawl.Type.Color (Color)
 import Pawl.Type.ManaType (ManaType)
 
--- CR 107.4. Grows: Phyrexian, snow.
+-- CR 107.4. Grows: hybrid Phyrexian (#364), snow.
 data ManaSymbol
   = Generic Natural
   | OfType ManaType
@@ -13,9 +14,9 @@ data ManaSymbol
     --
     -- ONE MANA PER SYMBOL, whichever half. CR 107.4e's other half -- the
     -- monocolored hybrid {2/B} -- is MonocoloredHybrid below instead, because it
-    -- is the one symbol two mana can pay. Phyrexian (CR 107.4f) is absent for a
-    -- different reason again: it can be paid with life rather than mana at all
-    -- (#263).
+    -- is the one symbol two mana can pay. Phyrexian (CR 107.4f) is separate for a
+    -- different reason again -- it can be paid with life rather than with mana at
+    -- all -- and is Phyrexian below.
     --
     -- A pair rather than a Set, so the printed order survives a round trip. The
     -- two are ALTERNATIVES, so order carries no meaning beyond presentation, and
@@ -41,8 +42,32 @@ data ManaSymbol
     -- cost" is enumerated above the search, so each symbol is still paid one way
     -- at a time and nothing below ever sees a demand that eats two units.
     MonocoloredHybrid ManaType
+  | -- CR 107.4f: "A Phyrexian mana symbol represents a cost that can be paid
+    -- either with one mana of its color or by paying 2 life" (Mutagenic Growth).
+    --
+    -- A Color and not a ManaType, which makes CR 107.4f's FIRST clause true by
+    -- construction: "Phyrexian mana symbols are COLORED mana symbols: {W/P} is
+    -- white, {U/P} is blue, {B/P} is black, {R/P} is red, and {G/P} is green."
+    -- Those five are the whole list -- there is no colourless Phyrexian symbol to
+    -- represent -- so `Phyrexian Colorless` stays unsayable rather than being a
+    -- case every reader of the colour has to rule out. Pawl.Projection's
+    -- symbolColors is the one that cashes it: CR 202.2d makes the OBJECT that
+    -- colour, so Mutagenic Growth is green even when 2 life paid for it and no
+    -- green mana was ever made.
+    --
+    -- The two ways are not two mana. Unlike the hybrids above, one of them spends
+    -- no mana at all, so Pawl.Mana's cost resolution carries an amount of LIFE
+    -- alongside its demands, and CR 119.4's floor ("only if their life total is
+    -- greater than or equal to the amount of the payment") is what decides
+    -- whether that way is open. Which way is taken is pawl's choice and not the
+    -- player's (#361).
+    --
+    -- CR 107.4f's OTHER half -- the ten hybrid Phyrexian symbols, "{G/U/P}", paid
+    -- with either of two colours or with 2 life -- is not this constructor and
+    -- has none of its own (#364).
+    Phyrexian Color
   | -- CR 107.3 / 601.2b: the {X} symbol in a cost. Contributes the chosen value
     -- of X once chosen (0 before, for the CR 601.2b castability floor and for a
-    -- mana value off the stack, CR 202.3b).
+    -- mana value off the stack, CR 202.3e).
     Variable
   deriving (Eq, Ord, Show)

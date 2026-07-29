@@ -96,5 +96,11 @@ symbolValue symbol = case symbol of
   -- worth. Its own example is Flame Javelin's cost: "the mana value of a card
   -- with mana cost {2/B}{2/B}{2/B} is 6."
   ManaSymbol.MonocoloredHybrid _ -> 2
-  -- CR 202.3b: off the stack a variable's contribution to mana value is 0.
+  -- CR 202.3g, a rule of its own rather than CR 202.3f's "largest component":
+  -- "Each Phyrexian mana symbol in a card's mana cost contributes 1 to its mana
+  -- value." The other half is 2 LIFE, not 2 mana, so there is no larger
+  -- component to take, and its own example says so: "The mana value of a card
+  -- with mana cost {1}{W/P}{W/P} is 3." Mutagenic Growth ({G/P}) is 1, not 2.
+  ManaSymbol.Phyrexian _ -> 1
+  -- CR 202.3e: off the stack a variable's contribution to mana value is 0.
   ManaSymbol.Variable -> 0

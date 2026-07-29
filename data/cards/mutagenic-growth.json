@@ -1,0 +1,72 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Phyrexian",
+      "value": {
+        "type": "Green"
+      }
+    }
+  ],
+  "name": "Mutagenic Growth",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [
+          {
+            "type": "ModifyTarget",
+            "value": [
+              {
+                "type": "UntilEndOfTurn"
+              },
+              {
+                "type": "ModifyPowerToughness",
+                "value": [
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
+              },
+              "target"
+            ]
+          }
+        ],
+        "targetSpecs": [
+          {
+            "slot": "target",
+            "spec": {
+              "pool": {
+                "type": "Creatures"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": null,
+  "triggeredAbilities": [],
+  "typeLine": {
+    "subtypes": [],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Instant"
+      }
+    ]
+  }
+}

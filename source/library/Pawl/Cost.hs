@@ -199,6 +199,11 @@ discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid g
 --
 -- CR 118.6: an unpayable cost is never payable ("attempting to pay an unpayable
 -- cost is an illegal action").
+--
+-- The mana part and the components are measured SEPARATELY, so a resource both
+-- could claim is counted twice. CR 107.4f's Phyrexian symbol is the first mana
+-- symbol that spends life, so a cost holding one alongside a PayLife component
+-- can read as payable when CR 118.3 says it is not (#365).
 canPay :: PlayerId -> ObjectId -> Cost -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
@@ -222,12 +227,10 @@ canPayComponent pid oid component gs = case component of
   -- CR 701.21a: only a permanent, and only one this player controls.
   CostComponent.SacrificeThis ->
     Set.member oid (GameState.battlefield gs) && Projection.controllerOf oid gs == Just pid
-  -- CR 119.4: payable only if the life total is at least the amount. CR 119.4b:
-  -- "Players can always pay 0 life, no matter what their ... life total is" --
-  -- which falls out of >= rather than needing a case.
-  CostComponent.PayLife n -> case Map.lookup pid (GameState.players gs) of
-    Nothing -> False
-    Just player -> Player.life player >= toInteger n
+  -- CR 119.4: payable only if the life total is at least the amount. Shared with
+  -- CR 107.4f's Phyrexian mana symbol, which pays life for a MANA symbol and so
+  -- reads the same floor from inside Pawl.Mana.
+  CostComponent.PayLife n -> Mana.canPayLife pid n gs
   -- CR 701.21a: this player must control at least `n` matching permanents.
   -- CR 118.10's "each payment of a cost applies to only one spell, ability, or
   -- effect" is not enforced across two components of ONE cost (#104).
@@ -322,10 +325,10 @@ payComponent pid oid component = case component of
     Event.sacrifice pid oid
     pure Payment.Paid
   -- CR 119.4: "the payment is subtracted from their life total; in other words,
-  -- the player loses that much life." A direct subtraction, and the CR 704.5a
-  -- state-based action that may follow is the existing one in Pawl.Sba.
+  -- the player loses that much life." Shared with CR 107.4f's Phyrexian mana
+  -- symbol, exactly as the payability check above is.
   CostComponent.PayLife n -> do
-    State.modify' (\gs -> gs {GameState.players = Map.adjust (\p -> p {Player.life = Player.life p - toInteger n}) pid (GameState.players gs)})
+    State.modify' (Mana.payLife pid n)
     pure Payment.Paid
   -- CR 701.21a: the player chooses which of their permanents dies, so this is a
   -- prompt. Elided only when forced -- exactly as many candidates as the count.
@@ -492,6 +495,10 @@ applyAdjustments adjustments cost =
         -- it that includes generic mana". With no choice recorded there is
         -- nothing for CR 118.7a to come off, so the symbol is left whole.
         ManaSymbol.MonocoloredHybrid _ -> 0
+        -- CR 107.4f makes this a COLOURED mana symbol, and its other half is 2
+        -- life rather than any amount of mana, so there is no generic component
+        -- for CR 118.7a's reduction to come off either way.
+        ManaSymbol.Phyrexian _ -> 0
         -- Unreachable: CR 601.2b precedes 601.2f, so Mana.substituteX has
         -- already replaced every Variable before a total cost is computed. The
         -- match must be total, so a bare {X} contributes 0 generic.
@@ -508,6 +515,10 @@ applyAdjustments adjustments cost =
         -- printed position, which is the only way an unreducible symbol can
         -- reach Mana.spend intact.
         ManaSymbol.MonocoloredHybrid _ -> True
+        -- Typed for the same reason again: CR 107.4f calls it a coloured mana
+        -- symbol, and it must keep its printed position to reach Mana.spend
+        -- intact.
+        ManaSymbol.Phyrexian _ -> True
         -- Unreachable for the same reason genericOf's Variable arm is: kept
         -- (retained, not stripped) so that if it ever were reachable, a bare
         -- {X} would still be treated as typed and survive the filter below.
@@ -531,6 +542,15 @@ applyAdjustments adjustments cost =
         -- Same two reasons: the {2} half is generic mana and the other half is
         -- one colour, and nothing has announced which is being paid.
         ManaSymbol.MonocoloredHybrid _ -> Nothing
+        -- Nothing for two different reasons, one per side. In the COST it is the
+        -- elision the two arms above make: CR 107.4f's symbol is one green mana
+        -- OR 2 life, and pawl announces which only at payment time (#261, #361),
+        -- so nothing has established there is a green mana here to cancel. In a
+        -- REDUCTION, CR 118.7f needs no announcement at all -- "the cost is
+        -- reduced by one mana of that symbol's color" -- and this arm is simply
+        -- wrong for it, which nothing in the pool can show because no card emits
+        -- a reduction containing a Phyrexian symbol (#362).
+        ManaSymbol.Phyrexian _ -> Nothing
         -- Unreachable for the reason genericOf's Variable arm gives; {X} names
         -- no mana type either way.
         ManaSymbol.Variable -> Nothing
