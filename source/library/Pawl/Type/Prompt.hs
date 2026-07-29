@@ -39,7 +39,15 @@ data Prompt r where
   -- Action constructor) would hand the controller exactly the power CR 723.6
   -- forbids, and leave the controlled player with no channel at all.
   --
-  -- "At any time" is narrowed to "at each priority grant" (#144).
+  -- "At any time" is narrowed to "at each priority grant" (#144). The narrowing
+  -- is not latency: a state-based action check sits in front of every priority
+  -- grant (CR 117.5, CR 704.3), so a concession that lands after it rather than
+  -- before it can name a different winner under CR 104.2a. Pawl.GameSpec's
+  -- "conceding before the settle window and after it name different winners"
+  -- holds both arms of that race.
+  --
+  -- Carries no game identity, so while a CR 729 subgame is running this asks
+  -- about the SUBGAME and a main-game concession cannot be expressed (#397).
   Concede :: PlayerId -> Prompt Concession
   Shuffle :: [ObjectId] -> Prompt [ObjectId]
   -- CR 729.2: "Randomly determine which player goes first." The NonEmpty is the

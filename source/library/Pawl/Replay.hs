@@ -3,14 +3,18 @@
 
 module Pawl.Replay where
 
+import Control.Applicative ((<|>))
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Type.Action as Action
 import qualified Pawl.Type.Concession as Concession
+import Pawl.Type.Desync (Desync)
+import qualified Pawl.Type.Desync as Desync
 import Pawl.Type.Game (Game)
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.MulliganDecision as MulliganDecision
@@ -174,6 +178,12 @@ decode p response = case p of
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
 -- degrades into a deterministic default rather than crashing.
+--
+-- Every arm below is a legal answer, and most are the LEAST EVENTFUL one --
+-- but "least eventful" is a statement about the choice, never a promise that
+-- the game plays out the same. 'replay' therefore reports the first prompt that
+-- reached this function (Pawl.Type.Desync); a caller that ignores the report is
+-- reading a different game's final state.
 defaultAnswer :: Prompt r -> r
 defaultAnswer p = case p of
   Prompt.Shuffle ids -> ids
@@ -184,8 +194,15 @@ defaultAnswer p = case p of
   Prompt.ChooseAction _ _ actions -> case actions of
     h : _ -> h
     [] -> Action.Pass
-  -- CR 104.3a: not conceding is always legal and is the least eventful fallback
-  -- when a transcript runs short.
+  -- CR 104.3a: not conceding is always legal, and continuing is the fallback
+  -- that leaves the game running when a transcript runs short.
+  --
+  -- NOT "least eventful", unlike the arms around it. Every other fallback
+  -- under- or over-fills a choice inside a game that carries on; this one drops
+  -- a departure, and CR 104.2a then hands the win to the other player. A
+  -- transcript whose Concede answer is lost replays to the OTHER winner, in
+  -- silence -- which is why 'replay' reports the desync (#144) rather than
+  -- leaving this arm to be trusted.
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   -- CR 507.1: the first candidate is always a legal answer (the prompt is only
@@ -310,16 +327,36 @@ record answer gs game =
 -- Re-run a game against a recorded transcript. Because the engine is pure and
 -- every decision is a suspension, feeding back the same answers reproduces the
 -- same final state — the M0 determinism criterion.
-replay :: [Response] -> GameState -> Game a -> (a, GameState)
+--
+-- Mirrors 'record': that takes a game and yields a transcript, this takes a
+-- transcript and yields the first point at which it stopped answering (Nothing
+-- when it answered every prompt exactly). The report is a RETURN VALUE rather
+-- than nothing at all because 'defaultAnswer' is total: a transcript that has
+-- drifted out of step still produces a final state, just not the recorded
+-- game's, and for Prompt.Concede that silently decides who wins (#144, and
+-- Pawl.Type.Desync for why only the first is reported).
+--
+-- The desync is not itself an error and does not stop the run. Positional
+-- replay cannot tell a prompt the engine gained from one it lost, so there is
+-- no resync that is right in both directions; consuming nothing on a mismatch
+-- is the conservative half of that, and saying so is this function's job.
+replay :: [Response] -> GameState -> Game a -> ((a, GameState), Maybe Desync)
 replay responses gs game =
-  let step :: Prompt r -> State.State [Response] r
+  let step :: Prompt r -> State.State (Natural, [Response], Maybe Desync) r
       step p = do
-        remaining <- State.get
+        (asked, remaining, desync) <- State.get
+        let stall d = State.put (succ asked, remaining, desync <|> Just d)
         case remaining of
-          [] -> pure (defaultAnswer p)
+          [] -> do
+            stall (Desync.Exhausted asked)
+            pure (defaultAnswer p)
           h : t -> case decode p h of
             Just value -> do
-              State.put t
+              State.put (succ asked, t, desync)
               pure value
-            Nothing -> pure (defaultAnswer p)
-   in State.evalState (Program.foldProgramM step (State.runStateT game gs)) responses
+            Nothing -> do
+              stall (Desync.Mismatched asked h)
+              pure (defaultAnswer p)
+      (outcome, (_, _, reported)) =
+        State.runState (Program.foldProgramM step (State.runStateT game gs)) (0, responses, Nothing)
+   in (outcome, reported)
