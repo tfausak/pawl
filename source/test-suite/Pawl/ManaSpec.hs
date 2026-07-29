@@ -594,7 +594,7 @@ upwellingTests registry =
         case extras of
           [] -> HU.assertFailure "fixture should have an Upwelling on the battlefield"
           oid : _ -> do
-            let gone = S.runPure S.identityAnswer floated (Event.destroy Regenerability.Regenerable oid)
+            let gone = S.runPure S.identityAnswer floated (Event.destroy Regenerability.Regenerable [oid])
             HU.assertEqual "kept while it stands" 1 (poolSize S.alice (Mana.emptyManaPools floated))
             HU.assertEqual "alice loses it once it is gone" 0 (poolSize S.alice (Mana.emptyManaPools gone))
             HU.assertEqual "and so does bob" 0 (poolSize S.bob (Mana.emptyManaPools gone)),

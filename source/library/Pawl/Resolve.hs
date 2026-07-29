@@ -766,10 +766,15 @@ playerRefPlayers chosen legality controller gs ref = case ref of
 -- WHEN: at the moment the caller runs, which is when this instruction is
 -- reached, CR 608.2c ("follows its instructions in the order written"). The list
 -- is then FIXED -- the caller iterates over this answer, so nothing a later
--- element's fate does can add to or remove from it. That is CR 608.2f's "each
--- such action is processed simultaneously" expressed as a frozen set, and it is
--- the whole of the difference between "destroy all creatures" and destroying
--- them one at a time with a fresh look in between.
+-- element's fate does can add to or remove from it. That is one half of CR
+-- 608.2f's "each such action is processed simultaneously": WHICH objects the
+-- instruction names.
+--
+-- The other half is not this function's to keep. Whether each named object is
+-- actually AFFECTED has to be judged before any of them is, or "destroy all
+-- creatures" degrades into destroying them one at a time with a fresh look in
+-- between -- so a caller hands the whole list to its funnel as one batch rather
+-- than calling it once per element. Event.destroy's haddock has that half.
 --
 -- ORDER: APNAP (CR 608.2f's "APNAP order is used to make the primary
 -- determination of the order of those actions"), then ascending ObjectId within
@@ -988,17 +993,18 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         _ -> gs
   Effect.Destroy ref regenerability -> do
     gs <- State.get
-    -- CR 701.8: destroy each through the single funnel -- indestructible (CR
+    -- CR 701.8: destroy them through the single funnel -- indestructible (CR
     -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide. The
     -- card's own CR 701.19c rider rides along, because whether a shield may
     -- apply is a fact about THIS destruction (Terror's), not the victim.
     --
-    -- The victims are enumerated ONCE, before the first one dies (see
-    -- objectRefObjects for the CR 608.2f simultaneity that buys). An illegal
-    -- slot (CR 608.2b), a non-object recipient, or a set that matched nothing
-    -- all arrive here as the empty list and destroy nothing -- one path, not
-    -- three.
-    Monad.mapM_ (Event.destroy regenerability) (objectRefObjects legality chosen controller source gs ref)
+    -- The whole set goes to the funnel as ONE batch rather than one call per
+    -- victim: CR 608.2f's "each such action is processed simultaneously" governs
+    -- which permanents are named (objectRefObjects) and when each one's CR
+    -- 702.12b gate is judged (Event.destroy) alike. An illegal slot (CR 608.2b),
+    -- a non-object recipient, or a set that matched nothing all arrive here as
+    -- the empty list and destroy nothing -- one path, not three.
+    Event.destroy regenerability (objectRefObjects legality chosen controller source gs ref)
   Effect.Sacrifice slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of

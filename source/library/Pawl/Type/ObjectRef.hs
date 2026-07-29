@@ -34,8 +34,10 @@ data ObjectRef
     -- cast, and CR 608.2b therefore has nothing to fizzle (CR 115.10a, above).
     -- The set is swept when the effect executes, per CR 608.2c -- the controller
     -- "follows its instructions in the order written" -- and is then FIXED for
-    -- that instruction, which is CR 608.2f's "each such action is processed
-    -- simultaneously".
+    -- that instruction. That is half of CR 608.2f's "each such action is
+    -- processed simultaneously"; the other half is that whether each swept object
+    -- is affected must be judged before any of them is, which belongs to the
+    -- opcode's funnel rather than to this type (Pawl.Event.destroy).
     --
     -- A one-shot only. A CONTINUOUS effect over a set (Aura Thief's "gain
     -- control of all enchantments") must additionally freeze the swept set into

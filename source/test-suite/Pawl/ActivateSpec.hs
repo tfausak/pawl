@@ -244,9 +244,9 @@ tests registry =
             activated = snd (Engine.runGamePure S.identityAnswer gs0 (Activate.activateAbility S.alice skel ability))
             resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
             -- First Murder: replaced by the shield.
-            firstKill = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable skel))
+            firstKill = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [skel]))
             -- Second Murder: no shield -> dies.
-            secondKill = S.settleSba (S.runPure S.identityAnswer firstKill (Event.destroy Regenerability.Regenerable skel))
+            secondKill = S.settleSba (S.runPure S.identityAnswer firstKill (Event.destroy Regenerability.Regenerable [skel]))
         HU.assertEqual
           "the shield's source is the skeleton itself"
           [skel]

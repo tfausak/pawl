@@ -286,30 +286,49 @@ changeZoneAttaching oid requestedDest seed = do
 -- The single destruction funnel (CR 701.8 / 702.12b): every destruction -- the
 -- Destroy opcode and the CR 704.5g/h state-based actions -- flows through here.
 --
--- CR 702.12b: an indestructible permanent can't be destroyed, and that gate
--- comes BEFORE the replacement loop, which is CR 614.7: "If a replacement
--- effect would replace an event, but that event never happens, the
+-- Takes the WHOLE BATCH of permanents being destroyed together, not one at a
+-- time, because CR 608.2f says the batch happens at once: "Some spells and
+-- abilities include actions taken on multiple players and/or objects. In most
+-- cases, each such action is processed simultaneously." CR 704.3 says the same
+-- of the state-based actions: they are performed "simultaneously as a single
+-- event". A lone destruction is the one-element batch.
+--
+-- CR 702.12b: an indestructible permanent can't be destroyed. The gate is judged
+-- for EVERY member of the batch against the state the batch began in, BEFORE any
+-- of them is moved -- that is the whole reason this takes a list. A permanent
+-- whose static ability grants the others indestructible is still on the
+-- battlefield at that moment even when it is itself in the batch, so it dies
+-- alone. Judging each member against a board its predecessors had already left
+-- would make the answer depend on the batch's order, which CR 608.2f gives
+-- nobody the right to decide -- proved by The Walls of Ba Sing Se under Day of
+-- Judgment, in Pawl.ResolveSpec's DestroyAll group, in both orders.
+--
+-- The gate also comes BEFORE the replacement loop, which is CR 614.7: "If a
+-- replacement effect would replace an event, but that event never happens, the
 -- replacement effect simply doesn't do anything" -- a regeneration shield is
 -- neither applied nor consumed. Otherwise the would-be-destroyed event is
 -- offered to CR 616.1; if it survives, the permanent is put into its owner's
 -- graveyard via changeZone (so Rest in Peace's redirect and a token's CR
 -- 704.5d cease-to-exist still compose). Ungated for CR 701.19c "can't be
 -- regenerated" (#42).
-destroy :: Regenerability.Regenerability -> ObjectId -> Game ()
-destroy regenerability oid = do
+--
+-- What is NOT yet simultaneous: the CR 616.1 loop below runs per victim against
+-- the live board, so it collects its candidates from whichever permanents are
+-- still on the battlefield when it reaches that victim rather than from the ones
+-- that were there when the batch began (#413).
+destroy :: Regenerability.Regenerability -> [ObjectId] -> Game ()
+destroy regenerability oids = do
   gs <- State.get
-  case Game.lookupObject oid gs of
-    Nothing -> pure ()
-    Just _ ->
-      if Projection.hasKeyword Keyword.Type.Indestructible oid gs
-        then pure ()
-        else do
-          settled <- Replacement.resolveDestruction regenerability oid
-          case settled of
-            Nothing -> pure ()
-            -- The graveyard move follows the SETTLED object, not the one asked
-            -- about, so a rewrite that redirects the destruction is honoured.
-            Just target -> changeZone target Zone.Graveyard
+  let doomed = filter (\oid -> Maybe.isJust (Game.lookupObject oid gs) && not (Projection.hasKeyword Keyword.Type.Indestructible oid gs)) oids
+  Monad.forM_ doomed $ \oid -> do
+    settled <- Replacement.resolveDestruction regenerability oid
+    case settled of
+      Nothing -> pure ()
+      -- The graveyard move follows the SETTLED object, not the one asked about,
+      -- so a rewrite that redirects the destruction is honoured. changeZone is a
+      -- no-op for an object that is already gone, which is what makes it safe to
+      -- have named the batch's members before any of them moved.
+      Just target -> changeZone target Zone.Graveyard
 
 -- The single counter-PLACEMENT funnel (CR 122.6: counters as markers on a
 -- permanent -- not to be confused with `counter` below, CR 701.6's countering

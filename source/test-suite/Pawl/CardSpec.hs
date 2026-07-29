@@ -845,6 +845,40 @@ m4bCardTests registry =
           [Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable]
           (Card.allEffects c)
         HU.assertEqual "and no target spec at all" Map.empty (Card.allTargetSpecs c),
+      -- The pool's counterweight to Day of Judgment: a creature that grants
+      -- indestructible to OTHERS and does not have it itself, so it is destroyed
+      -- by the same sweep as the permanents it protects. CR 608.2f is what makes
+      -- that pairing say something -- the grant is still in force when every
+      -- victim's CR 702.12b gate is judged, so the granter dies alone.
+      --
+      -- "Other permanents you control" needs no new filter vocabulary: `Not
+      -- IsSource` is the same spelling of "other" Opalescence's card text uses,
+      -- and `ControlledBy You` the same "you control" Ashaya's does.
+      HU.testCase "The Walls of Ba Sing Se is an {8} 0/30 Legendary Artifact Creature granting indestructible to OTHER permanents you control" $ do
+        walls <- Registry.printing registry "The Walls of Ba Sing Se"
+        let c = Printing.card walls
+        HU.assertEqual "name" (Text.pack "The Walls of Ba Sing Se") (Card.Type.name c)
+        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 8])) (Card.Type.manaCost c)
+        HU.assertEqual "power" (Just (Power.MkPower (Quantity.Type.Literal 0))) (Card.Type.power c)
+        HU.assertEqual "toughness" (Just (Toughness.MkToughness (Quantity.Type.Literal 30))) (Card.Type.toughness c)
+        HU.assertEqual "types" (Set.fromList [CardType.Artifact, CardType.Creature]) (TypeLine.types (Card.Type.typeLine c))
+        HU.assertEqual "supertypes" (Set.singleton Supertype.Legendary) (TypeLine.supertypes (Card.Type.typeLine c))
+        -- Defender is printed on the card; Indestructible is NOT -- the whole
+        -- point is that the granter does not benefit from its own grant.
+        HU.assertEqual "printed keywords" (Set.singleton Keyword.Defender) (Card.Type.keywords c)
+        HU.assertEqual
+          "\"Other permanents you control have indestructible\""
+          [ StaticAbility.MkStaticAbility
+              ( Affected.Matching
+                  ( Filter.Type.And
+                      [ Filter.Type.Not Filter.Type.IsSource,
+                        Filter.Type.ControlledBy PlayerRelation.You
+                      ]
+                  )
+              )
+              (NonEmpty.singleton (Modification.GainKeyword Keyword.Indestructible))
+          ]
+          (Card.Type.staticAbilities c),
       HU.testCase "Unsummon is a {U} Instant that bounces a target creature to hand" $ do
         unsummon <- Registry.printing registry "Unsummon"
         let c = Printing.card unsummon
