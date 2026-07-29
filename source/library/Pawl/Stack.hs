@@ -89,9 +89,17 @@ resolveTopWith runSubgame = do
           -- resolves; if it is no longer true the ability is removed from the
           -- stack and none of its effects happen. Object.owner is the ability's
           -- controller (Engine.placeOne stamps it), which is who "you" means.
+          --
+          -- CR 608.2h supplies the view of `srcId`, for the reason
+          -- Event.interveningHolds spells out at the gather-time half of this
+          -- same rule: a leaves-the-battlefield ability's source is gone by
+          -- construction (CR 603.10a, CR 400.7), and Projection.fullView would
+          -- describe it as an object with no characteristics rather than as the
+          -- permanent it was. The two checks must read alike, or a trigger that
+          -- passed the gather would be removed here for no reason a rule gives.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.fullView gs) (Filter.MkContext (Just (Object.owner obj)) (Just srcId)) gs srcId cond) ->
+              | not (Condition.holds (Projection.viewWithLastKnown srcId gs) (Filter.MkContext (Just (Object.owner obj)) (Just srcId)) gs srcId cond) ->
                   State.modify' (Resolve.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)

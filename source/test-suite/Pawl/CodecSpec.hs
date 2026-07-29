@@ -999,9 +999,13 @@ tests registry =
           HU.testCase "Condition round-trips at every comparison" $
             mapM_
               (roundTrip "condition" Codec.conditionToJson Codec.jsonToCondition)
-              [ Condition.Type.MkCondition zeroSwamps Comparison.Exactly (Quantity.Literal 0),
-                Condition.Type.MkCondition zeroSwamps Comparison.AtLeast (Quantity.Literal 3),
-                Condition.Type.MkCondition zeroSwamps Comparison.AtMost (Quantity.Literal 1)
+              [ Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.Exactly (Quantity.Literal 0),
+                Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.AtLeast (Quantity.Literal 3),
+                Condition.Type.MkCondition (Quantity.Count zeroSwamps) Comparison.AtMost (Quantity.Literal 1),
+                -- Both sides non-Count, which the Count-on-the-left shape could
+                -- not say at all: Deathknell Berserker's "if its power was 3 or
+                -- greater" (CR 603.4).
+                Condition.Type.MkCondition Quantity.Power Comparison.AtLeast (Quantity.Literal 3)
               ]
         ]
     ]
@@ -1020,10 +1024,12 @@ zeroSwamps =
 noZombiesOnBattlefield :: Condition.Type.Condition
 noZombiesOnBattlefield =
   Condition.Type.MkCondition
-    ( Count.Type.MkCount
-        (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-        (Filter.Type.HasSubtype Subtype.Zombie)
-        Aggregation.Objects
+    ( Quantity.Count
+        ( Count.Type.MkCount
+            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+            (Filter.Type.HasSubtype Subtype.Zombie)
+            Aggregation.Objects
+        )
     )
     Comparison.Exactly
     (Quantity.Literal 0)

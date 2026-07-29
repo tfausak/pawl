@@ -57,7 +57,7 @@ check swamp n comparison threshold =
         context
         gs
         (ObjectId.MkObjectId 0)
-        (Condition.Type.MkCondition everyPermanent comparison (Quantity.Type.Literal threshold))
+        (Condition.Type.MkCondition (Quantity.Type.Count everyPermanent) comparison (Quantity.Type.Literal threshold))
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
@@ -76,7 +76,7 @@ tests registry =
         HU.assertBool "0 <= 1" (check swamp 0 Comparison.AtMost 1)
         HU.assertBool "1 <= 1" (check swamp 1 Comparison.AtMost 1)
         HU.assertBool "2 > 1" (not (check swamp 2 Comparison.AtMost 1)),
-      HU.testCase "an undeterminable COUNT is false, never true" $ do
+      HU.testCase "an undeterminable MEASURED side is false, never true" $ do
         -- Relative with no perspective: Count.evaluate is Nothing, and a
         -- total holds must collapse that to False (CR 611.2b's conservative
         -- reading), not to a vacuous True.
@@ -93,8 +93,8 @@ tests registry =
             (Filter.MkContext Nothing Nothing)
             gs
             (ObjectId.MkObjectId 0)
-            (Condition.Type.MkCondition count Comparison.Exactly (Quantity.Type.Literal 0)),
-      HU.testCase "an undeterminable THRESHOLD is false, never true" $ do
+            (Condition.Type.MkCondition (Quantity.Type.Count count) Comparison.Exactly (Quantity.Type.Literal 0)),
+      HU.testCase "an undeterminable THRESHOLD side is false, never true" $ do
         -- Quantity.X with no binding on the object: same collapse.
         swamp <- Registry.printing registry "Swamp"
         let (viewOf, gs) = boardOf swamp 0
@@ -104,5 +104,5 @@ tests registry =
             context
             gs
             (ObjectId.MkObjectId 0)
-            (Condition.Type.MkCondition everyPermanent Comparison.Exactly Quantity.Type.X)
+            (Condition.Type.MkCondition (Quantity.Type.Count everyPermanent) Comparison.Exactly Quantity.Type.X)
     ]
