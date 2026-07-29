@@ -1009,7 +1009,13 @@ resolveTests registry =
         -- battlefield also holds alice's 2 Mountains, so filter by name/creature.
         HU.assertEqual "two Goblin tokens on the battlefield" 2 (S.countOnBattlefieldByName (Text.pack "Goblin") S.alice after)
         HU.assertEqual "alice controls two creatures (the tokens)" 2 (S.creaturesInPlay S.alice after)
-        HU.assertEqual "Dragon Fodder went to the graveyard (CR 608.2n)" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after)),
+        HU.assertEqual "Dragon Fodder went to the graveyard (CR 608.2n)" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+        -- The control leg for Hanweir Garrison's "tapped and attacking" riders
+        -- (CombatSpec's PutOntoBattlefieldAttacking group): a Create that says
+        -- neither takes CR 110.5b's default and joins no combat, so the riders
+        -- are the effect's and not something every token gets.
+        HU.assertEqual "CR 110.5b: the Goblins enter untapped" [TapState.Untapped, TapState.Untapped] (Maybe.mapMaybe (\oid -> fmap Object.tapped (Game.lookupObject oid after)) (S.tokensOf after))
+        HU.assertEqual "and attacking nothing" Map.empty (Combat.Type.attackers (GameState.combat after)),
       HU.testCase "CR 615 Fog prevents combat damage but not spell damage (the gate)" $ do
         forest <- Registry.printing registry "Forest"
         piker <- Registry.printing registry "Goblin Piker"

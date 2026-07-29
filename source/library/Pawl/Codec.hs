@@ -92,7 +92,9 @@ import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.StaticAbility as StaticAbility
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.Supertype as Supertype
+import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TargetSpec as TargetSpec
+import qualified Pawl.Type.TokenEntry as TokenEntry
 import qualified Pawl.Type.TokenPattern as TokenPattern
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
@@ -985,6 +987,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (conditionToJson c2))
   TriggerCondition.SelfDealsCombatDamageToPlayer -> nullary (Text.pack "SelfDealsCombatDamageToPlayer")
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
+  TriggerCondition.SelfAttacks -> nullary (Text.pack "SelfAttacks")
   TriggerCondition.SelfCycled -> nullary (Text.pack "SelfCycled")
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> nullary (Text.pack "SelfPutIntoGraveyardFromLibrary")
 
@@ -998,6 +1001,7 @@ jsonToTriggerCondition value = do
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToCondition v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
+    ("SelfAttacks", _) -> Right TriggerCondition.SelfAttacks
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
@@ -1378,6 +1382,7 @@ gameEventToJson e = case e of
   GameEvent.BecameMonarch pid -> Json.tagged (Text.pack "BecameMonarch") (Just (playerIdToJson pid))
   GameEvent.Cycled oid -> Json.tagged (Text.pack "Cycled") (Just (objectIdToJson oid))
   GameEvent.Revealed pid pc -> Json.tagged (Text.pack "Revealed") (Just (Array [playerIdToJson pid, projectedCharacteristicsToJson pc]))
+  GameEvent.AttackerDeclared oid -> Json.tagged (Text.pack "AttackerDeclared") (Just (objectIdToJson oid))
 
 jsonToGameEvent :: Value -> Either Text GameEvent.GameEvent
 jsonToGameEvent value = do
@@ -1390,6 +1395,7 @@ jsonToGameEvent value = do
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> jsonToPlayerId v
     ("Cycled", Just v) -> GameEvent.Cycled <$> jsonToObjectId v
     ("Revealed", Just (Array [pid, pc])) -> GameEvent.Revealed <$> jsonToPlayerId pid <*> jsonToProjectedCharacteristics pc
+    ("AttackerDeclared", Just v) -> GameEvent.AttackerDeclared <$> jsonToObjectId v
     _ -> Left (Text.pack "unknown GameEvent: " <> t)
 
 -- MonarchTarget ----------------------------------------------------------------
@@ -1406,6 +1412,56 @@ jsonToMonarchTarget =
     [ (Text.pack "TheController", MonarchTarget.TheController),
       (Text.pack "ControllerOfSource", MonarchTarget.ControllerOfSource)
     ]
+
+-- TokenEntry -----------------------------------------------------------------
+
+tapStateToJson :: TapState.TapState -> Value
+tapStateToJson t = nullary . Text.pack $ case t of
+  TapState.Untapped -> "Untapped"
+  TapState.Tapped -> "Tapped"
+
+jsonToTapState :: Value -> Either Text TapState.TapState
+jsonToTapState =
+  decodeNullary
+    (Text.pack "TapState")
+    [ (Text.pack "Untapped", TapState.Untapped),
+      (Text.pack "Tapped", TapState.Tapped)
+    ]
+
+tokenEntryToJson :: TokenEntry.TokenEntry -> Value
+tokenEntryToJson e =
+  Object
+    [ (Text.pack "tapped", tapStateToJson (TokenEntry.tapped e)),
+      (Text.pack "attacking", Json.jBool (TokenEntry.attacking e))
+    ]
+
+jsonToTokenEntry :: Value -> Either Text TokenEntry.TokenEntry
+jsonToTokenEntry value = do
+  ps <- Json.asObject value
+  t <- getOpt (Text.pack "tapped") ps `orDefault` (TapState.Untapped, jsonToTapState)
+  a <- jsonToBoolDefault False (getOpt (Text.pack "attacking") ps)
+  pure
+    TokenEntry.MkTokenEntry
+      { TokenEntry.tapped = t,
+        TokenEntry.attacking = a
+      }
+  where
+    orDefault v (d, f) = case v of
+      Null -> Right d
+      _ -> f v
+
+-- CR 110.5b: "permanents enter the battlefield untapped ... unless a spell or
+-- ability says otherwise", and a creature is attacking only if something says it
+-- is (CR 506.3). So this is what a Create that says nothing extra means, and the
+-- value the encoding ELIDES: a card file carries a TokenEntry only when the
+-- effect really does say otherwise, which is what keeps every token-making file
+-- written before this one byte-identical.
+defaultTokenEntry :: TokenEntry.TokenEntry
+defaultTokenEntry =
+  TokenEntry.MkTokenEntry
+    { TokenEntry.tapped = TapState.Untapped,
+      TokenEntry.attacking = False
+    }
 
 -- Effect ---------------------------------------------------------------------
 
@@ -1431,8 +1487,18 @@ effectToJson e = case e of
   Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
   Effect.LoseLife r q -> Json.tagged (Text.pack "LoseLife") (Just (Array [playerRefToJson r, quantityToJson q]))
   Effect.GainLife r q -> Json.tagged (Text.pack "GainLife") (Just (Array [playerRefToJson r, quantityToJson q]))
-  Effect.Create q c Nothing -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c]))
-  Effect.Create q c (Just s) -> Json.tagged (Text.pack "Create") (Just (Array [quantityToJson q, cardToJson c, slotNameToJson s]))
+  -- Create's payload is positional, and the TokenEntry is ELIDED when it is the
+  -- CR 110.5b default (defaultTokenEntry) -- the same posture `counterability`
+  -- takes, so a card file that says nothing about how its tokens enter stays
+  -- exactly as it was written. The three-element form is therefore two shapes,
+  -- told apart on decode by JSON TYPE rather than by position: a slot name is a
+  -- string (slotNameToJson) and a TokenEntry is an object, so the two can never
+  -- be confused.
+  Effect.Create q c te ms ->
+    Json.tagged (Text.pack "Create") . Just . Array $
+      [quantityToJson q, cardToJson c]
+        <> (if te == defaultTokenEntry then [] else [tokenEntryToJson te])
+        <> fmap slotNameToJson (Maybe.maybeToList ms)
   Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array [durationToJson d, usesToJson u, replacementEffectToJson re]))
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array [playerRefToJson r, playerCounterKindToJson k, quantityToJson q]))
@@ -1493,10 +1559,16 @@ jsonToEffect value = do
     "GainLife" -> case mv of
       Just (Array [r, q]) -> Effect.GainLife <$> jsonToPlayerRef r <*> jsonToQuantity q
       _ -> Left (Text.pack "GainLife expects [playerRef, quantity]")
+    -- The four shapes the encoder above can emit. The three-element one is read
+    -- by JSON type: an Object is the TokenEntry, anything else is the slot name
+    -- (a string), which is what lets the entry be elided when it is the default
+    -- without a hole in the array.
     "Create" -> case mv of
-      Just (Array [q, c]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure Nothing
-      Just (Array [q, c, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> (Just <$> jsonToSlotName s)
-      _ -> Left (Text.pack "Create expects [Quantity, Card] or [Quantity, Card, slot]")
+      Just (Array [q, c]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure defaultTokenEntry <*> pure Nothing
+      Just (Array [q, c, e@(Object _)]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> jsonToTokenEntry e <*> pure Nothing
+      Just (Array [q, c, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure defaultTokenEntry <*> (Just <$> jsonToSlotName s)
+      Just (Array [q, c, e, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> jsonToTokenEntry e <*> (Just <$> jsonToSlotName s)
+      _ -> Left (Text.pack "Create expects [Quantity, Card], optionally with a TokenEntry and/or a slot")
     "ArmDelayedTrigger" -> withValue mv (fmap Effect.ArmDelayedTrigger . jsonToAbilityName)
     "Replace" -> case mv of
       Just (Array [d, u, re]) -> do

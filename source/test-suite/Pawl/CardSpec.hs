@@ -338,6 +338,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.SelfAttacks -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
 
@@ -365,7 +366,7 @@ effectCounts effect = case effect of
   Effect.Discard _ quantity -> quantityCounts quantity
   Effect.LoseLife _ quantity -> quantityCounts quantity
   Effect.GainLife _ quantity -> quantityCounts quantity
-  Effect.Create quantity card _ -> quantityCounts quantity <> cardCounts card
+  Effect.Create quantity card _ _ -> quantityCounts quantity <> cardCounts card
   Effect.Replace duration _ _ -> durationCounts duration
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity

@@ -1,0 +1,142 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 2
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Red"
+        }
+      }
+    }
+  ],
+  "name": "Hanweir Garrison",
+  "power": {
+    "type": "Literal",
+    "value": 2
+  },
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [],
+  "toughness": {
+    "type": "Literal",
+    "value": 3
+  },
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfAttacks"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Create",
+                "value": [
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  },
+                  {
+                    "activatedAbilities": [],
+                    "castingPermissions": [],
+                    "colorIndicator": [
+                      {
+                        "type": "Red"
+                      }
+                    ],
+                    "keywords": [],
+                    "manaCost": null,
+                    "name": "Human",
+                    "power": {
+                      "type": "Literal",
+                      "value": 1
+                    },
+                    "replacementEffects": [],
+                    "spell": {
+                      "modes": [
+                        {
+                          "effects": [],
+                          "targetSpecs": []
+                        }
+                      ],
+                      "selection": {
+                        "type": "ChooseExactly",
+                        "value": 1
+                      }
+                    },
+                    "staticAbilities": [],
+                    "toughness": {
+                      "type": "Literal",
+                      "value": 1
+                    },
+                    "triggeredAbilities": [],
+                    "typeLine": {
+                      "subtypes": [
+                        {
+                          "type": "Human"
+                        }
+                      ],
+                      "supertypes": [],
+                      "types": [
+                        {
+                          "type": "Creature"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "attacking": true,
+                    "tapped": {
+                      "type": "Tapped"
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Human"
+      },
+      {
+        "type": "Soldier"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Creature"
+      }
+    ]
+  }
+}

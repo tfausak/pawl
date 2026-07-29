@@ -1191,7 +1191,7 @@ interveningTests registry =
 zombieTokenOf :: Printing.Printing -> Printing.Printing -> Card.Type.Card
 zombieTokenOf sarcomancy pikerFallback =
   let created effect = case effect of
-        Effect.Create _ card _ -> Just card
+        Effect.Create _ card _ _ -> Just card
         _ -> Nothing
       abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Card.Type.triggeredAbilities (Printing.card sarcomancy))
    in case Maybe.mapMaybe created abilityEffects of

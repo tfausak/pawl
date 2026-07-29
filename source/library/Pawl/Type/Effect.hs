@@ -16,6 +16,7 @@ import Pawl.Type.Regenerability (Regenerability)
 import Pawl.Type.ReplacementEffect (ReplacementEffect)
 import Pawl.Type.SearchDestination (SearchDestination)
 import Pawl.Type.SlotName (SlotName)
+import Pawl.Type.TokenEntry (TokenEntry)
 import Pawl.Type.Uses (Uses)
 import Pawl.Type.Zone (Zone)
 
@@ -198,6 +199,11 @@ data Effect card
     -- Resolve.applyEffect via Event.createTokens. NOT a copy-token (CR 707) and NOT a
     -- predefined token (CR 111.10): given, not derived.
     --
+    -- The TokenEntry is what the effect says about the tokens beyond their text
+    -- -- Hanweir Garrison's "that are tapped and attacking" -- and is not part of
+    -- the embedded card for the reason that type's own comment gives (CR 109.3:
+    -- neither is a characteristic). Resolve reads it; it never cases on it.
+    --
     -- The Maybe SlotName BINDS the minted token into the resolving object's LIVE
     -- Object.bindings, so a delayed ability armed by this same resolution (CR
     -- 603.7c's "it") -- which re-reads that live state when ArmDelayedTrigger
@@ -208,7 +214,7 @@ data Effect card
     -- is not a target and never appears in targetSpecs. Defined only for a
     -- single-token create; a Create that binds a slot while making several tokens
     -- is rejected by the Pawl.CardSpec lint family rather than guessed at (#53).
-    Create Quantity card (Maybe SlotName)
+    Create Quantity card TokenEntry (Maybe SlotName)
   | -- CR 614.3 / 615.3: install a floating replacement effect for a duration, with
     -- a use count. Fog is
     -- `Replace UntilEndOfTurn Unlimited (DamageR (MkDamagePattern (Just Combat)) PreventAll)`;

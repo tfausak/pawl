@@ -226,6 +226,7 @@ library
     Pawl.Type.TapState
     Pawl.Type.TargetSpec
     Pawl.Type.Timestamp
+    Pawl.Type.TokenEntry
     Pawl.Type.TokenPattern
     Pawl.Type.Toughness
     Pawl.Type.TriggerCondition

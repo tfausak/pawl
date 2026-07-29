@@ -1130,6 +1130,25 @@ zoneChangesOf gs = Maybe.mapMaybe Event.movedOf (Foldable.toList (GameState.even
 revealsOf :: GameState.GameState -> [(PlayerId.PlayerId, Text.Text)]
 revealsOf gs = fmap (fmap PC.name) (Maybe.mapMaybe Event.revealOf (Foldable.toList (GameState.events gs)))
 
+-- The battlefield objects that are tokens (CR 111.1) rather than cards.
+tokensOf :: GameState.GameState -> [ObjectId.ObjectId]
+tokensOf gs = filter isToken (Set.toList (GameState.battlefield gs))
+  where
+    isToken oid = case fmap Object.source (Game.lookupObject oid gs) of
+      Just (Source.OfToken _) -> True
+      _ -> False
+
+-- The creatures DECLARED as attackers so far this turn, in order (CR 508.2b).
+-- Deliberately not "who is attacking", which is Combat.attackers: CR 508.3a's
+-- last sentence turns on the difference, since a creature put onto the
+-- battlefield attacking is in that record and never appears here.
+attackerDeclarationsOf :: GameState.GameState -> [ObjectId.ObjectId]
+attackerDeclarationsOf gs = Maybe.mapMaybe declared (Foldable.toList (GameState.events gs))
+  where
+    declared event = case event of
+      GameEvent.AttackerDeclared oid -> Just oid
+      _ -> Nothing
+
 -- The characteristics of nothing: Projection.project on an id with no card in
 -- Setup.emptyGame. The filler snapshot for a hand-built GameEvent.Moved whose
 -- payload no assertion reads.

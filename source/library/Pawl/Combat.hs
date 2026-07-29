@@ -12,6 +12,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.BlockRequirement as BlockRequirement
 import qualified Pawl.Decide as Decide
+import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Summoning as Summoning
@@ -22,6 +23,7 @@ import qualified Pawl.Type.Color as Color
 import Pawl.Type.Combat (Combat)
 import qualified Pawl.Type.Combat as Combat
 import Pawl.Type.Game (Game)
+import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Keyword as Keyword
@@ -56,10 +58,26 @@ emptyCombat =
 clearCombat :: GameState -> GameState
 clearCombat gs = gs {GameState.combat = emptyCombat}
 
--- CR 508.8: if no creatures were declared as attackers, skip the declare
--- blockers and combat damage steps. Called right after declareAttackers, when
--- the attacker set is final. "Put onto the battlefield attacking" (508.8) has no
--- source in the pool, so the attacker set really is final here (#30).
+-- CR 508.8: "If no creatures are declared as attackers or put onto the
+-- battlefield attacking, skip the declare blockers and combat damage steps."
+--
+-- BOTH of that rule's clauses are the same question of Combat.attackers, because
+-- both writers of that map put their creature there: declareAttackers below, and
+-- putOntoBattlefieldAttacking. So this reads the record rather than the
+-- declaration, and Engine.runStepThatBegan asks it as the declare attackers step
+-- ENDS -- after the priority round in which an attack trigger resolves -- rather
+-- than the moment the turn-based action finishes, which is what made the second
+-- clause unrepresentable before.
+--
+-- A creature put onto the battlefield attacking LATER than that step cannot
+-- un-skip anything, and does not need to: the steps this drops are the only ones
+-- it could enter during, so if they were dropped there is no such moment, and if
+-- they were not then nothing is skipped anyway.
+--
+-- No test exercises the second clause on its own -- a creature put onto the
+-- battlefield attacking while nothing was declared. The pool's only source of one
+-- is an attack trigger, which cannot fire unless its own creature was declared
+-- (#370).
 skipEmptyCombat :: GameState -> GameState
 skipEmptyCombat gs =
   if Map.null (Combat.attackers (GameState.combat gs))
@@ -486,8 +504,99 @@ declareAttackers pid = do
             -- creature in `attacking` (CR 508.1a), so the two are the same value
             -- and this one cannot disagree with the legality check.
             joined = Map.fromList (fmap (\oid -> (oid, pid)) attacking)
-            attach g = g {GameState.combat = (GameState.combat g) {Combat.attackers = recorded, Combat.joinedUnder = joined}}
+            -- UNIONED into the record, not written over it. Nothing in the pool
+            -- can have joined combat before this runs -- putOntoBattlefieldAttacking
+            -- is reachable only from a resolution, and the earliest one is the
+            -- priority round after this action -- but "the record is mine alone"
+            -- is exactly the assumption CR 508.8's second clause breaks, and
+            -- replacing the map would silently remove such a creature from combat.
+            attach g =
+              g
+                { GameState.combat =
+                    (GameState.combat g)
+                      { Combat.attackers = Map.union recorded (Combat.attackers (GameState.combat g)),
+                        Combat.joinedUnder = Map.union joined (Combat.joinedUnder (GameState.combat g))
+                      }
+                }
         State.modify' (\g -> attach (List.foldl' tapIt g attacking))
+        -- CR 508.2b: the declaration is what abilities trigger on, and CR 508.3a
+        -- scopes them to a creature that "is declared as an attacker" -- so one
+        -- event per creature chosen HERE, and none at all for a creature put onto
+        -- the battlefield attacking. Recorded after the record is written, so the
+        -- board a trigger's intervening-if clause reads (CR 603.4) already has
+        -- these creatures attacking.
+        State.modify' (\g -> List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid) h) g attacking)
+
+-- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
+-- chooses which defending player, planeswalker a defending player controls, or
+-- battle a defending player protects it's attacking as it enters the
+-- battlefield." Resolve's Create arm calls this for each token an effect says is
+-- attacking; nothing else does.
+--
+-- The creature was never DECLARED, and this function's whole difference from
+-- declareAttackers is what follows from that. It records no
+-- GameEvent.AttackerDeclared, so CR 508.3a's "such abilities won't trigger if a
+-- creature is put onto the battlefield attacking" holds by construction rather
+-- than by a filter. It taps nothing, because CR 508.1f taps what is declared
+-- (the tokens' own tapped status is the creating effect's, applied at entry). And
+-- it asks none of canAttack's questions -- CR 508.4c: "a creature that's put onto
+-- the battlefield attacking ... isn't affected by requirements or restrictions
+-- that apply to the declaration of attackers" -- so summoning sickness (CR 302.6,
+-- whose sentence is "a creature can't ATTACK unless...") and defender (CR 702.3b)
+-- do not reach it. CombatSpec's "the tokens are attacking, and the attack trigger
+-- fired only for the Garrison" proves the trigger half.
+--
+-- What it does check is the three ways the rules say the creature enters WITHOUT
+-- being an attacking creature. CR 506.3a: a noncreature permanent "does enter the
+-- battlefield but it's never considered to be an attacking or blocking
+-- permanent". CR 506.3b: the same for a creature entering "under the control of
+-- any player except an attacking player", which by CR 506.2's first sentence is
+-- the active player.
+-- CR 506.3c and CR 508.4a: the same for one attacking "a player not in the game".
+-- Each is a silent no-op rather than a failure -- the permanent is already on the
+-- battlefield and stays there, which is precisely what those rules say.
+--
+-- Combat.defender being Nothing is the fourth way, and it is CR 506.3c's clause
+-- again rather than a fallback: outside the combat phase there is no defending
+-- player at all (see Pawl.Type.Combat's defender field), so there is nobody for
+-- the creature to be attacking.
+--
+-- CR 508.4's CHOICE is not prompted, because there is exactly one candidate: one
+-- defending player (CR 506.2 at two seats; CR 802's attack-multiple-players
+-- option is unavailable, #175), no planeswalkers (#301) and no battles (#302).
+-- Hanweir Garrison's own ruling is what makes the choice real once any of those
+-- lands -- "You choose which player, planeswalker, or battle each token is
+-- attacking as you create the tokens ... the tokens don't both have to attack the
+-- same one" -- so this becomes a per-token prompt then (#367).
+--
+-- CR 508.4d ("a creature that's put onto the battlefield attacking during the
+-- declare blockers step, combat damage step, or end of combat step enters the
+-- battlefield as an unblocked creature") is not implemented: every source in the
+-- pool enters during the declare attackers step, before blockers exist (#368).
+putOntoBattlefieldAttacking :: ObjectId -> Game ()
+putOntoBattlefieldAttacking oid = do
+  gs <- State.get
+  let c = GameState.combat gs
+  case (Combat.defender c, Projection.controllerOf oid gs) of
+    (Just defender, Just controller)
+      | Set.member oid (GameState.battlefield gs),
+        -- CR 506.3a
+        isCreatureObject oid gs,
+        -- CR 506.3b / CR 506.2: the attacking player is the active player
+        controller == GameState.activePlayer gs,
+        -- CR 506.3c / CR 508.4a
+        List.elem defender (Game.stillPlaying gs) ->
+          State.put
+            gs
+              { GameState.combat =
+                  c
+                    { Combat.attackers = Map.insert oid (AttackTarget.OfPlayer defender) (Combat.attackers c),
+                      -- CR 506.4's comparand, for the same reason declareAttackers
+                      -- takes one: this is where the creature joins combat.
+                      Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c)
+                    }
+              }
+    _ -> pure ()
 
 -- CR 509.1: the defending player declares blockers -- singular. The loop is over
 -- at most one player, and Maybe.maybeToList is what makes "nobody is being
