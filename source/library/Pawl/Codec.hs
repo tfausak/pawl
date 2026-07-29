@@ -67,6 +67,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.ObjectRef as ObjectRef
 import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PhasePattern as PhasePattern
@@ -630,6 +631,21 @@ jsonToPlayerRef value = do
     ("Relative", Just v) -> PlayerRef.Relative <$> jsonToPlayerRelation v
     ("InSlot", Just v) -> PlayerRef.InSlot <$> jsonToSlotName v
     _ -> Left (Text.pack "unknown PlayerRef: " <> t)
+
+-- An ObjectRef is told apart by JSON TYPE rather than by a tag, the shape
+-- Effect.Create's optional TokenEntry already uses: a slot name is a string
+-- (slotNameToJson) and a Filter is an object, so the two can never be confused.
+-- Untagged on purpose -- `"target"` is what an object-affecting effect has always
+-- written, and it goes on meaning the one slot it always meant.
+objectRefToJson :: ObjectRef.ObjectRef -> Value
+objectRefToJson r = case r of
+  ObjectRef.InSlot n -> slotNameToJson n
+  ObjectRef.EachMatching f -> filterToJson f
+
+jsonToObjectRef :: Value -> Either Text ObjectRef.ObjectRef
+jsonToObjectRef value = case value of
+  Object _ -> ObjectRef.EachMatching <$> jsonToFilter value
+  _ -> ObjectRef.InSlot <$> jsonToSlotName value
 
 eventShapeToJson :: EventShape.EventShape -> Value
 eventShapeToJson s = case s of
@@ -1481,7 +1497,7 @@ effectToJson e = case e of
   Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array [slotNameToJson slot, filterToJson f, quantityToJson q]))
   Effect.RestartGame -> nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
-  Effect.Destroy s r -> Json.tagged (Text.pack "Destroy") (Just (Array [slotNameToJson s, regenerabilityToJson r]))
+  Effect.Destroy s r -> Json.tagged (Text.pack "Destroy") (Just (Array [objectRefToJson s, regenerabilityToJson r]))
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
   Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (slotNameToJson s))
   Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array [slotNameToJson s, zoneToJson z]))
@@ -1540,8 +1556,8 @@ jsonToEffect value = do
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
     "Destroy" -> case mv of
-      Just (Array [sv, rv]) -> Effect.Destroy <$> jsonToSlotName sv <*> jsonToRegenerability rv
-      _ -> Left (Text.pack "Destroy expects [slot, regenerability]")
+      Just (Array [sv, rv]) -> Effect.Destroy <$> jsonToObjectRef sv <*> jsonToRegenerability rv
+      _ -> Left (Text.pack "Destroy expects [objectRef, regenerability]")
     "Sacrifice" -> withValue mv (fmap Effect.Sacrifice . jsonToSlotName)
     "Counter" -> withValue mv (fmap Effect.Counter . jsonToSlotName)
     "MoveToZone" -> case mv of

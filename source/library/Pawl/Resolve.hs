@@ -52,6 +52,8 @@ import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.MonarchWatch as MonarchWatch
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
+import Pawl.Type.ObjectRef (ObjectRef)
+import qualified Pawl.Type.ObjectRef as ObjectRef
 import qualified Pawl.Type.OptionalDecision as OptionalDecision
 import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Player as Player
@@ -85,6 +87,16 @@ playerRefSlots ref = case ref of
   PlayerRef.Relative _ -> Set.empty
   PlayerRef.InSlot slot -> Set.singleton slot
 
+-- The slots an ObjectRef reads. Only InSlot names one; EachMatching is swept
+-- from the battlefield at resolution and names nothing at cast -- so a card whose
+-- only object reference is a set declares no target spec, and CR 608.2b has
+-- nothing to fizzle (CR 115.10a: without the word "target" it is not a target).
+-- The object-side twin of playerRefSlots above.
+objectRefSlots :: ObjectRef -> Set SlotName
+objectRefSlots ref = case ref of
+  ObjectRef.InSlot slot -> Set.singleton slot
+  ObjectRef.EachMatching _ -> Set.empty
+
 -- THE ONE LEGITIMATE HOME of `case effect of`: this module is the VM's opcode
 -- semantics (design.md section 1). Everything else asks classifications. The
 -- executor itself arrives with resolution; slotsOf is the read half of the
@@ -102,7 +114,7 @@ slotsOf effect = case effect of
   Effect.PlayerSacrifices slot _ _ -> Set.singleton slot
   Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
-  Effect.Destroy slot _ -> Set.singleton slot
+  Effect.Destroy ref _ -> objectRefSlots ref
   Effect.Sacrifice slot -> Set.singleton slot
   Effect.MoveToZone slot _ -> Set.singleton slot
   Effect.Draw ref _ -> playerRefSlots ref
@@ -712,6 +724,56 @@ playerRefPlayers chosen legality controller gs ref = case ref of
   where
     everyone = Game.stillPlaying gs
 
+-- The objects an ObjectRef names DURING a resolution -- the object-side twin of
+-- playerRefPlayers above, and the ONE place a filter-selected set is swept, so
+-- every opcode that takes an ObjectRef gets the same answer.
+--
+-- InSlot asks legality the way every other slot read does (CR 608.2b): a slot
+-- filled by targeting that has since become illegal names nobody, and a player
+-- recipient names no object.
+--
+-- EachMatching folds the battlefield (CR 109.2: a description with a card type
+-- and no zone "means a permanent of that card type ... on the battlefield")
+-- against the projection, so a permanent that is a creature only because of a
+-- layer-4 effect is in the set and one whose printed line says Creature but is
+-- currently not is out. The filter context is this effect's own -- CR 109.5's
+-- "you" is the ability's controller and IsSource is its source -- because the
+-- filter IS the ability's card text. That is the footing AttachTarget's
+-- destination filter is on, and not PlayerSacrifices', whose filter is read
+-- against the victim instead.
+--
+-- WHEN: at the moment the caller runs, which is when this instruction is
+-- reached, CR 608.2c ("follows its instructions in the order written"). The list
+-- is then FIXED -- the caller iterates over this answer, so nothing a later
+-- element's fate does can add to or remove from it. That is CR 608.2f's "each
+-- such action is processed simultaneously" expressed as a frozen set, and it is
+-- the whole of the difference between "destroy all creatures" and destroying
+-- them one at a time with a fresh look in between.
+--
+-- ORDER: APNAP (CR 608.2f's "APNAP order is used to make the primary
+-- determination of the order of those actions"), then ascending ObjectId within
+-- a controller. That second key is the engine's, not the resolving controller's
+-- as CR 608.2f's secondary sentence would have it (#379). The no-controller
+-- fallback is unreachable: Projection.controllerOf answers Nothing only for an
+-- object that does not exist, and every id here came out of the battlefield.
+objectRefObjects :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
+objectRefObjects legality chosen controller source gs ref = case ref of
+  ObjectRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+    (Just recipient, True) -> Maybe.maybeToList (recipientObject recipient)
+    _ -> []
+  ObjectRef.EachMatching filter_ ->
+    let context = Filter.MkContext (Just controller) (Just source)
+        matching =
+          filter
+            (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+            (Set.toList (GameState.battlefield gs))
+        order = Game.apnapOrder gs
+        last_ = length order
+        seat oid = case Projection.controllerOf oid gs of
+          Nothing -> last_
+          Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
+     in List.sortOn (\oid -> (seat oid, oid)) matching
+
 applyEffectWith :: Game Result -> ObjectId -> PlayerId -> Map.Map SlotName (Subtype, Subtype) -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffectWith runSubgame source controller bound legality chosen effect = case effect of
   Effect.DealDamage slot quantity -> do
@@ -903,17 +965,19 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
-  Effect.Destroy slot regenerability ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case recipientObject recipient of
-        Nothing -> pure ()
-        -- CR 701.8: destroy through the single funnel -- indestructible (CR
-        -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide.
-        -- The card's own CR 701.19c rider rides along, because whether a shield
-        -- may apply is a fact about THIS destruction (Terror's), not the victim.
-        Just target -> Event.destroy regenerability target
-      -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
-      _ -> pure ()
+  Effect.Destroy ref regenerability -> do
+    gs <- State.get
+    -- CR 701.8: destroy each through the single funnel -- indestructible (CR
+    -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide. The
+    -- card's own CR 701.19c rider rides along, because whether a shield may
+    -- apply is a fact about THIS destruction (Terror's), not the victim.
+    --
+    -- The victims are enumerated ONCE, before the first one dies (see
+    -- objectRefObjects for the CR 608.2f simultaneity that buys). An illegal
+    -- slot (CR 608.2b), a non-object recipient, or a set that matched nothing
+    -- all arrive here as the empty list and destroy nothing -- one path, not
+    -- three.
+    Monad.mapM_ (Event.destroy regenerability) (objectRefObjects legality chosen controller source gs ref)
   Effect.Sacrifice slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of
