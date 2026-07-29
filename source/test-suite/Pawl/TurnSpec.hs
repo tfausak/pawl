@@ -4,6 +4,7 @@
 -- CR 500.8's added phases (Aggravated Assault).
 module Pawl.TurnSpec where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -325,6 +326,27 @@ relentlessBoard mountain assault piker =
         bystander
       )
 
+-- alice in her precombat main phase with priority, six untapped Mountains
+-- (exactly Full Throttle's {4}{R}{R}), one Settled creature of the given
+-- printing, and the spell in hand.
+throttleBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId, ObjectId)
+throttleBoard mountain throttle piker =
+  let (attacker, gs1) = S.addCreature piker S.alice (S.landsInPlay mountain 6)
+      (gs2, spell) = S.handOne throttle gs1
+   in ( gs2
+          { GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.remaining = afterPrecombatMain
+          },
+        spell,
+        attacker
+      )
+
 -- Cast a spell from alice's hand through the real path -- Cast.castSpell pays
 -- its cost off the board -- and let it resolve.
 castAndResolve :: ObjectId -> GameState.GameState -> GameState.GameState
@@ -538,6 +560,49 @@ extraPhaseTests registry =
           ran
         -- 3 + 2 in each of the two combats.
         HU.assertEqual "bob took both combats" (Just 10) (S.lifeOf S.bob played),
+      HU.testCase "CR 500.8 whole card: Full Throttle adds two combat phases and NO main phase" $ do
+        -- The one two-element payload in the pool, and the one that adds a
+        -- combat phase directly after a combat phase. CR 500.8 fixes neither the
+        -- number nor the kind, which is why the opcode carries a list.
+        mountain <- Registry.printing registry "Mountain"
+        throttle <- Registry.printing registry "Full Throttle"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, spell, _) = throttleBoard mountain throttle piker
+            after = castAndResolve spell gs
+        HU.assertEqual
+          "two whole combat phases, back to back, then the ordinary rest of the turn"
+          ( Turn.expandExtraPhase ExtraPhase.ExtraCombat
+              <> Turn.expandExtraPhase ExtraPhase.ExtraCombat
+              <> afterPrecombatMain
+          )
+          (GameState.remaining after)
+        HU.assertEqual "one delayed ability armed" 1 (Seq.length (GameState.delayedTriggers after)),
+      HU.testCase "CR 603.7b whole card: Full Throttle's delayed trigger fires at EVERY combat this turn" $ do
+        -- The falsifier for CR 603.7b's one shot. "At the beginning of each
+        -- combat this turn" is a STATED duration, so the ability stays armed and
+        -- fires at all three of the turn's beginning of combat steps -- the two
+        -- it added and the turn's own. Under the old store it would fire once,
+        -- the Piker would stay tapped from its first attack (CR 508.1f), and bob
+        -- would take 2 instead of 6.
+        mountain <- Registry.printing registry "Mountain"
+        throttle <- Registry.printing registry "Full Throttle"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, spell, _) = throttleBoard mountain throttle piker
+            (played, ran) = runTurn (S.attackTo S.bob) (castAndResolve spell gs)
+            combatPhase = Turn.expandExtraPhase ExtraPhase.ExtraCombat
+        HU.assertEqual
+          "three whole combat phases ran"
+          ( [Phase.PrecombatMain]
+              <> concat (replicate 3 (Foldable.toList combatPhase))
+              <> [Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+          )
+          ran
+        -- The Piker attacked in every one of them, which it could only do if the
+        -- delayed ability untapped it before each -- and it found it by
+        -- Filter.AttackedThisTurn, since CR 511.3 had cleared the combat record.
+        HU.assertEqual "bob took 2 in each of the three combats" (Just 14) (S.lifeOf S.bob played)
+        -- CR 514.2 ends the stated duration, so nothing is left armed.
+        HU.assertEqual "and the store is empty by the end of the turn" 0 (Seq.length (GameState.delayedTriggers played)),
       HU.testCase "CR 511.3 Relentless Assault still finds an attacker after clearCombat" $ do
         -- The reason the atom reads the turn-scoped event log rather than the
         -- live combat record. By the postcombat main phase the end of combat
