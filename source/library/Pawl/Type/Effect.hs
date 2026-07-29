@@ -103,6 +103,32 @@ data Effect card
     -- be attached to the target it does not move at all, and attaching it to what
     -- it already holds does nothing.
     Attach SlotName
+  | -- CR 701.3 / 303.4j: attach the SLOT'S TARGET -- an Aura, Equipment or
+    -- Fortification already on the battlefield -- to an object chosen as this
+    -- resolves. Crown of the Ages' "Attach target Aura attached to a creature to
+    -- another creature".
+    --
+    -- The mirror image of Attach above, and a separate opcode rather than a
+    -- field on it because the two differ in WHAT MOVES: equip attaches its own
+    -- source and targets the destination, and this targets the thing that moves
+    -- and does not target the destination at all. Crown of the Ages' Gatherer
+    -- ruling is explicit -- "This only targets the Aura and not either creature"
+    -- -- so the destination is a CHOICE on resolution, outside CR 608.2b's
+    -- illegal-target check, which is why it is a bare Filter here and not a
+    -- TargetSpec.
+    --
+    -- The Filter is the destination's card text ("another CREATURE" is
+    -- `HasCardType Creature`); the candidates it narrows are the permanents on
+    -- the battlefield. The "another" is NOT in the Filter: CR 701.3b's second
+    -- sentence makes attaching a permanent to what it already holds do nothing
+    -- whatever the card says, so the opcode always excludes the current host and
+    -- a card that omitted the word would behave identically.
+    --
+    -- CR 303.4j / 701.3b's FIRST sentence is the failure mode, and it is not a
+    -- fizzle: a destination the subject cannot legally be attached to leaves it
+    -- exactly where it was -- unmoved and unrestamped -- while the rest of the
+    -- ability resolves normally.
+    AttachTarget SlotName Filter
   | -- CR 400.7: move the slot's target object to a zone through the changeZone
     -- funnel. Bounce = MoveToZone slot Hand (owner-relative -- changeZone carries
     -- Object.owner); targeted exile = MoveToZone slot Exile. The destination is

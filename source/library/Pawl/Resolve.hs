@@ -123,6 +123,7 @@ slotsOf effect = case effect of
   Effect.BecomeMonarch {} -> Set.empty
   Effect.ExileUntilMonarch slot -> Set.singleton slot
   Effect.Attach slot -> Set.singleton slot
+  Effect.AttachTarget slot _ -> Set.singleton slot
   -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
   -- bound once the subgame ends), not a read -- same shape as Create's slot.
   Effect.PlaySubgame _ -> Set.empty
@@ -168,6 +169,7 @@ readsX = any effectReadsX
       Effect.BecomeMonarch {} -> False
       Effect.ExileUntilMonarch _ -> False
       Effect.Attach _ -> False
+      Effect.AttachTarget {} -> False
       Effect.PlaySubgame _ -> False
 
 -- CR 605: does this effect add mana, and how is its type decided? The "produces
@@ -212,6 +214,7 @@ manaProduced effect = case effect of
   Effect.BecomeMonarch {} -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
   Effect.Attach _ -> Nothing
+  Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
@@ -251,6 +254,7 @@ searchesLibrary effect = case effect of
   Effect.BecomeMonarch {} -> False
   Effect.ExileUntilMonarch _ -> False
   Effect.Attach _ -> False
+  Effect.AttachTarget {} -> False
   Effect.PlaySubgame _ -> False
 
 -- The target slots of ChangeText effects: the slots whose land-type pair Cast
@@ -345,6 +349,8 @@ rewriteEffect pairs effect = case effect of
   -- No rewritable land-type word.
   Effect.ExileUntilMonarch _ -> effect
   Effect.Attach _ -> effect
+  -- The destination Filter names a card type, never a basic land type.
+  Effect.AttachTarget {} -> effect
   -- No rewritable land-type word.
   Effect.PlaySubgame _ -> effect
 
@@ -614,21 +620,56 @@ cease abilId gs =
 -- passes noSubgame. Only the PlaySubgame arm consults it.
 -- CR 701.3a/701.3b: may `src` legally be attached to `target` right now?
 --
--- CR 301.5 is the only attachment legality this pool can express: "An Equipment
--- can be attached to a creature. It can't legally be attached to anything that
--- isn't a creature", plus CR 301.5c's "An Equipment can't equip itself".
--- Subtype and creature-ness are read through the PROJECTION, so an Equipment
--- that lost the subtype (CR 301.5c's second sentence) and a permanent animated
--- into a creature both answer correctly.
+-- CR 701.3a's last sentence is the whole rule: "An Aura, Equipment, or
+-- Fortification can't be attached to an object or player it couldn't enchant,
+-- equip, or fortify, respectively." So this dispatches on which of those `src`
+-- is, read through the PROJECTION, so an Equipment that lost the subtype (CR
+-- 301.5c's second sentence) and a permanent animated into a creature both answer
+-- correctly.
 --
--- False for a non-Equipment source. An Aura mover would consult that Aura's own
--- enchant spec instead (CR 303.4j), and no card in the pool moves an Aura, so
--- that branch has no producer to prove it (#187).
+-- Equipment: CR 301.5, "An Equipment can be attached to a creature. It can't
+-- legally be attached to anything that isn't a creature."
+--
+-- Aura: CR 303.4, "what an Aura can be attached to is defined by its enchant
+-- keyword ability" -- so this asks the Aura's own enchant spec the question CR
+-- 608.2b asks of a target, through Target.legalRecipients rather than a
+-- hand-rolled creature test, which is what makes an enchant spec that narrows
+-- further (a colour, a controller) honoured here for free. CR 109.5's "you" on
+-- that spec is the AURA's controller, not the moving effect's. An Aura with no
+-- enchant ability answers False and cannot arise: the Pawl.CardSpec lint family
+-- holds the Aura-iff-enchant biconditional in both directions.
+--
+-- The Aura branch's first conjunct is CR 303.4d's "An Aura that's also a creature
+-- can't enchant anything" -- the RESTRICTION half of that rule, whose
+-- state-based half is Pawl.Sba.cannotBeAttached. Unreachable in this pool (such
+-- an Aura is detached by CR 704.5p and buried by CR 704.5m before any player
+-- could target it), written anyway because it costs one comparison. The Equipment
+-- branch has no counterpart: CR 301.5c's matching restriction carries a
+-- reconfigure exception (CR 702.151b) that nothing here can express, and the
+-- Equipment path is not this change's to alter (#193).
+--
+-- The `src /= target` conjunct is CR 301.5c ("An Equipment can't equip itself")
+-- and CR 303.4d ("An Aura can't enchant itself") at once.
+--
+-- False for a source that is neither, which is CR 701.3b's third sentence: "If
+-- an effect tries to attach an object that isn't an Aura, Equipment, or
+-- Fortification to another object or player, the effect does nothing and the
+-- first object doesn't move." There is no Subtype.Fortification to case on.
 attachLegal :: ObjectId -> ObjectId -> GameState -> Bool
-attachLegal src target gs =
-  Set.member Subtype.Equipment (Projection.subtypesOf src gs)
-    && src /= target
-    && Projection.isCreatureOf target gs
+attachLegal src target gs
+  | src == target = False
+  | Set.member Subtype.Equipment subtypes = Projection.isCreatureOf target gs
+  | Set.member Subtype.Aura subtypes =
+      not (Projection.isCreatureOf src gs)
+        && case Game.cardOf src gs >>= Card.Type.enchant of
+          Nothing -> False
+          Just spec ->
+            any
+              (\r -> recipientObject r == Just target)
+              (Target.legalRecipients (Projection.controllerOf src gs) src spec gs)
+  | otherwise = False
+  where
+    subtypes = Projection.subtypesOf src gs
 
 -- The players a PlayerRef names DURING a resolution, read from the slots this
 -- resolution filled rather than from the source's bindings (which is what
@@ -1251,8 +1292,8 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
   -- CR 701.3a / 702.6a: "Attach this permanent to target creature you control."
   -- CR 701.3a is the move itself -- "take it from where it currently is and put
   -- it onto that object" -- so this relocates a source that is already attached
-  -- elsewhere, which is the whole reason the opcode exists: an Aura attaches once,
-  -- as it enters, and nothing could move it afterwards (#187).
+  -- elsewhere. The SOURCE moves here; AttachTarget below is the sibling that
+  -- moves the slot's TARGET instead.
   Effect.Attach slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of
@@ -1274,6 +1315,76 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             let (ts, gs2) = Game.freshTimestamp gs1
                 move o = o {Object.attachedTo = Just target, Object.timestamp = ts}
             State.put gs2 {GameState.objects = Map.adjust move source (GameState.objects gs2)}
+      _ -> pure ()
+  -- CR 701.3a, in the other direction from Attach above: the SLOT's target is
+  -- what moves, and the destination is chosen now rather than targeted. Crown of
+  -- the Ages' "Attach target Aura attached to a creature to another creature",
+  -- whose ruling says in as many words that "this only targets the Aura and not
+  -- either creature".
+  Effect.AttachTarget slot filter_ ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
+      (Just recipient, True) -> case recipientObject recipient of
+        Nothing -> pure () -- a player recipient: nothing on the battlefield moves
+        Just subject -> do
+          gs <- State.get
+          let host = Game.lookupObject subject gs >>= Object.attachedTo
+              -- The destinations the card's own TEXT admits: battlefield
+              -- permanents matching the Filter, less the one the subject already
+              -- holds. That exclusion is CR 701.3b's second sentence -- attaching
+              -- a permanent to what it is already attached to "does nothing" --
+              -- and it is also how Crown of the Ages' "ANOTHER creature" is
+              -- spelled, so a card omitting the word would behave identically.
+              --
+              -- Deliberately NOT narrowed to destinations the move would be
+              -- LEGAL for. "Another creature" is the whole of what the card says;
+              -- pre-filtering past it would answer CR 303.4j's question on the
+              -- player's behalf, and CR 303.4j exists precisely because the
+              -- choice can land somewhere the subject may not go.
+              --
+              -- Ascending, so both the elision below and a transcript are
+              -- deterministic. The filter context is this effect's own -- CR
+              -- 109.5's "you" is the ability's controller and IsSource is its
+              -- source -- because the destination filter IS the ability's card
+              -- text, unlike PlayerSacrifices', which is read against the victim.
+              candidates =
+                List.sort
+                  ( filter
+                      (\oid -> Just oid /= host && Filter.matches (Filter.MkContext (Just controller) (Just source)) (Projection.viewOfObject oid gs) filter_)
+                      (Set.toList (GameState.battlefield gs))
+                  )
+          case candidates of
+            -- CR 609.3: the effect does as much as it can, and with no
+            -- destination the text admits that is nothing.
+            [] -> pure ()
+            first : rest -> do
+              destination <- case rest of
+                -- One destination is no choice at all, and the effect is not a
+                -- "may" -- where the rules leave nothing to ask, don't prompt.
+                -- The elision is not re-derived for an optional attach (#359).
+                [] -> pure first
+                second : more -> do
+                  let offered = first NonEmpty.:| (second : more)
+                  -- FILTERED, NOT TRUSTED, the ChooseBoundToken posture: an
+                  -- answer naming something that was never offered falls back to
+                  -- the first candidate, since the effect is mandatory and must
+                  -- pick something.
+                  answer <- Trans.lift (Program.prompt (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered))
+                  pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
+              gs1 <- State.get
+              -- CR 303.4j, for an Aura -- "the Aura doesn't move" -- and CR
+              -- 701.3b's first sentence for the rest. A FAILURE MODE, not a
+              -- fizzle: the ability resolved, and the only thing that did not
+              -- happen is the move. In particular the subject stays attached to
+              -- its old host rather than becoming unattached, so CR 704.5m has
+              -- nothing to bury.
+              Monad.when (attachLegal subject destination gs1) $ do
+                -- CR 701.3c: attaching to a DIFFERENT object gives it a new
+                -- timestamp, which CR 613.7 orders layer effects by. Always a
+                -- different object here -- the current host was never offered.
+                let (ts, gs2) = Game.freshTimestamp gs1
+                    move o = o {Object.attachedTo = Just destination, Object.timestamp = ts}
+                State.put gs2 {GameState.objects = Map.adjust move subject (GameState.objects gs2)}
       _ -> pure ()
   Effect.ExileUntilMonarch slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

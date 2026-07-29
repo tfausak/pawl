@@ -189,8 +189,8 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 --
 -- CR 303.4d's clause is a RESTRICTION as well as a state-based action ("can't
 -- enchant anything"), and only the state-based half lives here. The restriction
--- half has nowhere to be checked: an Aura is attached as it enters (Pawl.Stack),
--- and no opcode moves one afterwards (#187).
+-- half is Pawl.Resolve.attachLegal's first Aura conjunct, which refuses to attach
+-- an Aura that is also a creature to anything.
 cannotBeAttached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
   Nothing -> False
