@@ -521,7 +521,7 @@ tests registry =
         let gs0 = powderGame powder mountain 20
             ((_, recorded), responses) = Replay.record usePowder gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
             ((_, replayed), desync) = Replay.replay responses gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
-        HU.assertEqual "the transcript answered every prompt (#144)" Nothing desync
+        HU.assertEqual "the transcript answered every prompt" Nothing desync
         HU.assertEqual "alice hand matches" (S.handSize S.alice recorded) (S.handSize S.alice replayed)
         HU.assertEqual "alice exile matches" (Game.zoneMembers Zone.Exile S.alice recorded) (Game.zoneMembers Zone.Exile S.alice replayed)
         HU.assertEqual
@@ -597,7 +597,7 @@ tests registry =
         let gs0 = libraryGame mountain 20
             ((_, recorded), responses) = Replay.record (mulliganUpTo 2) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
             ((_, replayed), desync) = Replay.replay responses gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
-        HU.assertEqual "the transcript answered every prompt (#144)" Nothing desync
+        HU.assertEqual "the transcript answered every prompt" Nothing desync
         HU.assertEqual "alice hand matches" (S.handSize S.alice recorded) (S.handSize S.alice replayed)
         HU.assertEqual "alice library matches" (libSize S.alice recorded) (libSize S.alice replayed)
         HU.assertEqual
@@ -713,7 +713,7 @@ tests registry =
         let gs0 = leylineGame leyline mountain 20
             ((_, recorded), responses) = Replay.record useOpeningAction gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
             ((_, replayed), desync) = Replay.replay responses gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
-        HU.assertEqual "the transcript answered every prompt (#144)" Nothing desync
+        HU.assertEqual "the transcript answered every prompt" Nothing desync
         HU.assertEqual "battlefield matches" (Game.zoneMembers Zone.Battlefield S.alice recorded) (Game.zoneMembers Zone.Battlefield S.alice replayed)
         HU.assertEqual "hand matches" (S.handSize S.alice recorded) (S.handSize S.alice replayed),
       HU.testCase "CR 103.5c: a mulligan that bottoms nothing asks nothing" $ do

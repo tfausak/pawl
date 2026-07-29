@@ -366,7 +366,7 @@ combatReplayTests =
           HU.testCase "a short transcript defaults a Concede to Continues" $
             -- NOT "least eventful", unlike the arms around it: dropping a
             -- concession hands the win to the other player (CR 104.2a), which
-            -- is why Replay.replay reports the desync (#144).
+            -- is why Replay.replay reports the desync.
             HU.assertEqual "the game keeps running" Concession.Continues (Replay.defaultAnswer (Prompt.Concede S.alice))
         ]
 
@@ -402,8 +402,8 @@ replayTests registry =
         (start, game, recorded, _) <- recordedGame registry
         let ((_, replayed), desync) = Replay.replay [] start game
         HU.assertBool "empty log diverges" (recorded /= replayed)
-        -- #144: the divergence is REPORTED rather than silent. An empty log
-        -- runs out at the very first prompt, so the report names index 0.
+        -- The divergence is REPORTED rather than silent. An empty log runs out
+        -- at the very first prompt, so the report names index 0.
         HU.assertEqual "and says where it ran out" (Just (Desync.Exhausted 0)) desync,
       HU.testCase "a recorded goldfish also replays" $ do
         (start, game, _, _) <- recordedGame registry

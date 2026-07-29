@@ -777,7 +777,7 @@ ruleTests registry =
             ((_, after), log_) = Replay.record subgameAnswer gStart Engine.priorityLoop
             ((_, replayed), desync) = Replay.replay log_ gStart Engine.priorityLoop
         HU.assertEqual "a subgame replays deterministically (the reason PlaySubgame is not a Prompt, CR 729 / M0 determinism)" after replayed
-        HU.assertEqual "and the transcript answered every prompt (#144)" Nothing desync,
+        HU.assertEqual "and the transcript answered every prompt" Nothing desync,
       HU.testCase "M5.6b gate: three-player setup -- a free first mulligan (CR 103.5c) and no first-turn draw skip (CR 103.8c)" $ do
         -- A real newGame at three seats: build and shuffle three 60-card
         -- libraries, draw opening hands, run the CR 103.5 round loop with every

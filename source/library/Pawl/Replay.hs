@@ -201,8 +201,8 @@ defaultAnswer p = case p of
   -- under- or over-fills a choice inside a game that carries on; this one drops
   -- a departure, and CR 104.2a then hands the win to the other player. A
   -- transcript whose Concede answer is lost replays to the OTHER winner, in
-  -- silence -- which is why 'replay' reports the desync (#144) rather than
-  -- leaving this arm to be trusted.
+  -- silence -- which is why 'replay' reports the desync rather than leaving this
+  -- arm to be trusted.
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   -- CR 507.1: the first candidate is always a legal answer (the prompt is only
@@ -292,7 +292,7 @@ defaultAnswer p = case p of
   -- the empty list the engine never produces.
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   -- CR 103.5: keeping is always legal and the least-eventful fallback when a
-  -- transcript runs short (mirrors Concede -> Continues).
+  -- transcript runs short.
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   -- A legal ordered subset of the redrawn hand, deterministically the first
   -- `count` -- the least-eventful fallback when a transcript runs short.
@@ -304,8 +304,8 @@ defaultAnswer p = case p of
   -- transcript runs short (mirrors MulliganAction -> Nothing).
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a "may" is always legal and changes nothing, the
-  -- least-eventful fallback when a transcript runs short (mirrors Concede ->
-  -- Continues and MulliganAction -> Nothing).
+  -- least-eventful fallback when a transcript runs short (mirrors MulliganAction
+  -- -> Nothing).
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
   -- CR 118.13a: every offered route is payable (the prompt is raised only where
   -- two are), so the head is a legal answer and the least eventful fallback when
@@ -328,13 +328,14 @@ record answer gs game =
 -- every decision is a suspension, feeding back the same answers reproduces the
 -- same final state — the M0 determinism criterion.
 --
--- Mirrors 'record': that takes a game and yields a transcript, this takes a
--- transcript and yields the first point at which it stopped answering (Nothing
--- when it answered every prompt exactly). The report is a RETURN VALUE rather
--- than nothing at all because 'defaultAnswer' is total: a transcript that has
--- drifted out of step still produces a final state, just not the recorded
--- game's, and for Prompt.Concede that silently decides who wins (#144, and
--- Pawl.Type.Desync for why only the first is reported).
+-- Mirrors 'record', which yields a game's outcome alongside the transcript it
+-- produced: this yields the outcome alongside the first point at which that
+-- transcript stopped answering (Nothing when it answered every prompt exactly).
+-- The report is a RETURN VALUE rather than nothing at all because
+-- 'defaultAnswer' is total: a transcript that has drifted out of step still
+-- produces a final state, just not the recorded game's, and for Prompt.Concede
+-- that silently decides who wins. See Pawl.Type.Desync for why only the first is
+-- reported.
 --
 -- The desync is not itself an error and does not stop the run. Positional
 -- replay cannot tell a prompt the engine gained from one it lost, so there is
