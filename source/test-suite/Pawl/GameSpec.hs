@@ -1236,7 +1236,7 @@ turnOrderTests registry =
         palaceJailer <- Registry.printing registry "Palace Jailer"
         let (victim, g1) = S.addCreature piker S.carol S.threePlayerGame
             (jailer, g2) = S.addCreature palaceJailer S.bob g1
-            entered = ZoneChange.MkZoneChange jailer Zone.Stack Zone.Battlefield
+            entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
             g3 = S.withEvents [GameEvent.Moved entered (Projection.project jailer g2)] g2
             resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 Engine.settleForPriority) Engine.priorityLoop
             -- CR 400.7: exiling the target gives it a new object identity, so the

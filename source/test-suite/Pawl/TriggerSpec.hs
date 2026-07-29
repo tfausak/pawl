@@ -159,7 +159,7 @@ logTests registry =
       HU.testCase "advance settles before handing off, so no unscanned event is discarded" $ do
         restInPeace <- Registry.printing registry "Rest in Peace"
         let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-            entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
+            entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
             gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
             ending = gs1 {GameState.remaining = Seq.empty}
             after = snd (Engine.runGamePure S.identityAnswer ending Engine.advance)
@@ -214,13 +214,13 @@ scanTests registry =
         piker <- Registry.printing registry "Goblin Piker"
         let (_, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             (pikerId, gs1) = S.addCreature piker S.bob gs0
-            entered = ZoneChange.MkZoneChange pikerId Zone.Stack Zone.Battlefield
+            entered = ZoneChange.MkZoneChange pikerId pikerId Zone.Stack Zone.Battlefield
             gs2 = S.withEvents [GameEvent.Moved entered (Projection.project pikerId gs1)] gs1
         HU.assertEqual "no trigger" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2))),
       HU.testCase "CR 603.6a a SelfEnters trigger still fires on its own entry" $ do
         restInPeace <- Registry.printing registry "Rest in Peace"
         let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-            entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
+            entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
             gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
         case fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1) of
           [pt] -> do
@@ -230,12 +230,12 @@ scanTests registry =
       HU.testCase "a graveyard-bound event yields no enters trigger" $ do
         restInPeace <- Registry.printing registry "Rest in Peace"
         let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-            toGrave = ZoneChange.MkZoneChange ripId Zone.Battlefield Zone.Graveyard
+            toGrave = ZoneChange.MkZoneChange ripId ripId Zone.Battlefield Zone.Graveyard
             gs1 = S.withEvents [GameEvent.Moved toGrave (Projection.project ripId gs0)] gs0
         HU.assertEqual "no triggers" 0 (length (fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1))),
       HU.testCase "SelfEnters matches only a battlefield destination" $
         let bearer = ObjectId.MkObjectId 1
-            movedTo zone = GameEvent.Moved (ZoneChange.MkZoneChange bearer Zone.Stack zone) S.emptyCharacteristics
+            movedTo zone = GameEvent.Moved (ZoneChange.MkZoneChange bearer bearer Zone.Stack zone) S.emptyCharacteristics
          in do
               HU.assertBool "enters battlefield matches" $
                 Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Battlefield)
@@ -251,8 +251,8 @@ scanTests registry =
         restInPeace <- Registry.printing registry "Rest in Peace"
         let (rip1, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
             (rip2, gs1) = S.addCreature restInPeace S.alice gs0
-            entered1 = ZoneChange.MkZoneChange rip1 Zone.Stack Zone.Battlefield
-            entered2 = ZoneChange.MkZoneChange rip2 Zone.Stack Zone.Battlefield
+            entered1 = ZoneChange.MkZoneChange rip1 rip1 Zone.Stack Zone.Battlefield
+            entered2 = ZoneChange.MkZoneChange rip2 rip2 Zone.Stack Zone.Battlefield
             gs2 =
               S.withEvents
                 [ GameEvent.Moved entered1 (Projection.project rip1 gs1),
@@ -389,7 +389,7 @@ sacrificeTests registry =
       HU.testCase "CR 113.7 a placed trigger binds its source into the reserved self slot" $ do
         restInPeace <- Registry.printing registry "Rest in Peace"
         let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-            entered = ZoneChange.MkZoneChange ripId Zone.Stack Zone.Battlefield
+            entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
             gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
             placed = snd (Engine.runGamePure S.identityAnswer gs1 Engine.placePendingTriggers)
             bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid placed)
@@ -1018,7 +1018,7 @@ monarchOrderingTests registry =
         let (_, gs1) = S.addCreature piker S.bob base
             (_, gs2) = S.addLibraryCard piker S.alice gs1
             (jailer, gs3) = S.addCreature palaceJailer S.alice gs2
-            entered = ZoneChange.MkZoneChange jailer Zone.Stack Zone.Battlefield
+            entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
          in beginEndStep (resolveAll (S.withEvents [GameEvent.Moved entered (Projection.project jailer gs3)] gs3))
       -- Records every ordering payload offered, verbatim, answering canonically.
       recordPayloads :: Prompt.Prompt r -> State.State [[TriggerSource.TriggerSource]] r
@@ -1137,7 +1137,7 @@ interveningTests registry =
       -- Sarcomancy enters and its ETB resolves, so a Zombie token is out.
       withZombie sarcomancy =
         let (sarcId, gs0) = S.addCreature sarcomancy S.alice (Setup.emptyGame S.bothPlayers)
-            entered = ZoneChange.MkZoneChange sarcId Zone.Stack Zone.Battlefield
+            entered = ZoneChange.MkZoneChange sarcId sarcId Zone.Stack Zone.Battlefield
             gs1 = S.withEvents [GameEvent.Moved entered (Projection.project sarcId gs0)] gs0
          in (sarcId, resolveAll (settle gs1))
    in Tasty.testGroup
@@ -1458,7 +1458,7 @@ permanentEntersTests :: Registry.Type.Registry -> Tasty.TestTree
 permanentEntersTests registry =
   let anyCreature = Filter.Type.HasCardType CardType.Creature
       anotherCreature = Filter.Type.And [anyCreature, Filter.Type.Not Filter.Type.IsSource]
-      enters oid = GameEvent.Moved (ZoneChange.MkZoneChange oid Zone.Stack Zone.Battlefield) S.emptyCharacteristics
+      enters oid = GameEvent.Moved (ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield) S.emptyCharacteristics
       sourcesOf gs = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs))
    in Tasty.testGroup
         "PermanentEnters"
@@ -1534,7 +1534,7 @@ permanentEntersTests registry =
             plains <- Registry.printing registry "Plains"
             let (_, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
                 (landId, gs1) = S.addCreature plains S.alice gs0
-                gs2 = S.withEvents [GameEvent.Moved (ZoneChange.MkZoneChange landId Zone.Stack Zone.Battlefield) (Projection.project landId gs1)] gs1
+                gs2 = S.withEvents [GameEvent.Moved (ZoneChange.MkZoneChange landId landId Zone.Stack Zone.Battlefield) (Projection.project landId gs1)] gs1
             HU.assertEqual "no trigger" [] (sourcesOf gs2),
           -- The destination half: CR 603.6a is an ENTERS-THE-BATTLEFIELD
           -- ability, so a creature card moving to a graveyard is not it.
@@ -1543,7 +1543,7 @@ permanentEntersTests registry =
             piker <- Registry.printing registry "Goblin Piker"
             let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
                 (pikerId, gs1) = S.addCreature piker S.bob gs0
-                toGrave = GameEvent.Moved (ZoneChange.MkZoneChange pikerId Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics
+                toGrave = GameEvent.Moved (ZoneChange.MkZoneChange pikerId pikerId Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics
             HU.assertBool "a graveyard-bound move does not match" $
               not (Event.matchesTrigger gs1 warden S.alice (TriggerCondition.PermanentEnters anotherCreature) toGrave),
           -- CR 603.6a: "EACH TIME an event puts one or more permanents onto the
@@ -1558,8 +1558,8 @@ permanentEntersTests registry =
                 (second, gs2) = S.addCreature piker S.bob gs1
                 gs3 =
                   S.withEvents
-                    [ GameEvent.Moved (ZoneChange.MkZoneChange first Zone.Stack Zone.Battlefield) (Projection.project first gs2),
-                      GameEvent.Moved (ZoneChange.MkZoneChange second Zone.Stack Zone.Battlefield) (Projection.project second gs2)
+                    [ GameEvent.Moved (ZoneChange.MkZoneChange first first Zone.Stack Zone.Battlefield) (Projection.project first gs2),
+                      GameEvent.Moved (ZoneChange.MkZoneChange second second Zone.Stack Zone.Battlefield) (Projection.project second gs2)
                     ]
                     gs2
             HU.assertEqual "twice, both from the one Warden" (replicate 2 (TriggerSource.OfObject warden)) (sourcesOf gs3)
@@ -1664,5 +1664,109 @@ graveyardTriggerTests registry =
             HU.assertEqual "and a creature entering fires nothing" [] (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents entered) entered)))
         ]
 
+-- CR 603.6c: leaves-the-battlefield abilities "trigger when a permanent moves
+-- from the battlefield to another zone ... written as, but aren't limited to,
+-- 'When [this object] leaves the battlefield, . . .' or 'Whenever [something]
+-- is put into a graveyard from the battlefield, . . . .'" Doomed Traveler
+-- prints the second of those in its abbreviated form: CR 700.4 says "the term
+-- dies means 'is put into a graveyard from the battlefield.'"
+--
+-- CR 603.10a is what makes it more than a tenth condition: "Some zone-change
+-- triggers look back in time. These are leaves-the-battlefield abilities ...",
+-- so the match is against the game as it was IMMEDIATELY BEFORE the event. By
+-- the time the scan runs, the Traveler is a card in a graveyard with a fresh id
+-- (CR 400.7) and nothing is on the battlefield to find -- which is what makes
+-- the token appearing at all the discriminating assertion here.
+diesTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+diesTriggerTests registry =
+  let -- alice: one Mountain (Lightning Bolt's {R}), a Doomed Traveler in play,
+      -- and the Bolt in hand. S.identityAnswer targets the least Recipient, and
+      -- Recipient.ToCreature sorts before Recipient.ToPlayer, so the one
+      -- creature on the board is the target without a bespoke interpreter.
+      boltBoard = do
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        doomedTraveler <- Registry.printing registry "Doomed Traveler"
+        let (_, withTraveler) = S.addCreature doomedTraveler S.alice (S.landsInPlay mountain 1)
+        pure (S.handOne lightningBolt withTraveler)
+      -- Cast the Bolt, resolve it (3 damage marked on a 1/1), settle -- CR
+      -- 704.5g's state-based action destroys it and the CR 117.5 settle's OWN
+      -- trigger scan must see that death -- then resolve the trigger.
+      boltIt (gs, spellId) =
+        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+            damaged = S.runPure S.identityAnswer cast Stack.resolveTop
+            settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+      spiritsOf pid gs =
+        filter
+          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Spirit"))
+          (Game.zoneMembers Zone.Battlefield pid gs)
+      travelerName = Text.pack "Doomed Traveler"
+   in Tasty.testGroup
+        "DiesTrigger"
+        [ -- The gameplay-level proof, cast to resolution, through a real
+          -- removal spell and the state-based action it sets up.
+          HU.testCase "CR 603.6c whole card: Lightning Bolt kills Doomed Traveler and its dies trigger makes a flying Spirit" $ do
+            board <- boltBoard
+            let (settled, after) = boltIt board
+            -- The trigger was gathered in the SAME settle that ran the SBA
+            -- (Engine.settleForPriority: performStateBasedActions, then
+            -- placePendingTriggers, then loop).
+            HU.assertEqual "the trigger reached the stack in that settle" 1 (length (GameState.stack settled))
+            -- And it did so with the Traveler already gone: an implementation
+            -- matching against the live battlefield would find nothing here.
+            HU.assertBool "the Traveler is in the graveyard by then" (Set.member travelerName (namesIn Zone.Graveyard S.alice settled))
+            HU.assertBool "and not on the battlefield" (not (Set.member travelerName (namesIn Zone.Battlefield S.alice settled)))
+            case spiritsOf S.alice after of
+              [spirit] -> do
+                HU.assertEqual "power" (Just 1) (Projection.powerOf spirit after)
+                HU.assertEqual "toughness" (Just 1) (Projection.toughnessOf spirit after)
+                HU.assertEqual "white" (Set.singleton Color.White) (Projection.colorsOf spirit after)
+                HU.assertEqual "Spirit" (Set.singleton Subtype.Spirit) (Projection.subtypesOf spirit after)
+                HU.assertBool "with flying" (Projection.hasKeyword Keyword.Type.Flying spirit after)
+              other -> HU.assertFailure ("expected exactly one Spirit token, got " <> show (length other)),
+          -- CR 700.4 doing real work: "dies" is NARROWER than CR 603.6c's
+          -- leaves-the-battlefield. The same permanent moved from the
+          -- battlefield to EXILE has left the battlefield and has not died.
+          HU.testCase "CR 700.4 a Traveler exiled from the battlefield does not trigger" $ do
+            doomedTraveler <- Registry.printing registry "Doomed Traveler"
+            let (traveler, gs) = S.addCreature doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
+                exiled = S.runPure S.identityAnswer gs (Event.changeZone traveler Zone.Exile)
+            HU.assertEqual "nothing triggered" [] (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents exiled) exiled)))
+            HU.assertBool "it is in exile" (Set.member travelerName (namesIn Zone.Exile S.alice exiled)),
+          -- The other half of "from the battlefield": the same card discarded
+          -- reaches the same graveyard and has not died (CR 700.4).
+          HU.testCase "CR 700.4 a Traveler discarded from the HAND does not trigger" $ do
+            doomedTraveler <- Registry.printing registry "Doomed Traveler"
+            let (traveler, gs) = S.addHandCard doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
+                discarded = S.runPure S.identityAnswer gs (Event.changeZone traveler Zone.Graveyard)
+            HU.assertEqual "nothing triggered" [] (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents discarded) discarded))),
+          -- Self-scoped: SOME OTHER creature dying is not this Traveler's
+          -- death, even though the Traveler is right there to see it.
+          HU.testCase "CR 603.6c another creature dying does not fire the Traveler's trigger" $ do
+            doomedTraveler <- Registry.printing registry "Doomed Traveler"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (_, withTraveler) = S.addCreature doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
+                (pikerId, gs) = S.addCreature piker S.alice withTraveler
+                died = S.runPure S.identityAnswer gs (Event.changeZone pikerId Zone.Graveyard)
+            HU.assertEqual "nothing triggered" [] (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents died) died))),
+          -- CR 603.3a through CR 603.10a's look-back: "the player who controlled
+          -- the ability's source at the time it triggered" is read from the game
+          -- as it was immediately BEFORE the death, so a Traveler bob owns but
+          -- alice has stolen with Control Magic hands ALICE the Spirit. Reading
+          -- the graveyard card's owner instead would answer bob.
+          HU.testCase "CR 603.3a the trigger is controlled by whoever controlled the Traveler as it died" $ do
+            doomedTraveler <- Registry.printing registry "Doomed Traveler"
+            controlMagic <- Registry.printing registry "Control Magic"
+            let (traveler, withTraveler) = S.addCreature doomedTraveler S.bob (Setup.emptyGame S.bothPlayers)
+                (aura, withAura) = S.addCreature controlMagic S.alice withTraveler
+                stolen = S.attach aura traveler withAura
+                died = S.runPure S.identityAnswer stolen (Event.changeZone traveler Zone.Graveyard)
+            HU.assertEqual "alice controlled it as it died" (Just S.alice) (Projection.controllerOf traveler stolen)
+            HU.assertEqual "so the trigger is hers, not its owner's" [S.alice] (fmap PendingTrigger.controller (fst (Event.gatherTriggers (Event.unscannedEvents died) died)))
+        ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry]

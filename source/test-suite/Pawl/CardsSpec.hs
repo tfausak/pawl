@@ -166,6 +166,40 @@ tests registry =
         -- melds with Hanweir Battlements, and neither the partner nor the melded
         -- permanent is in the pool (#369).
         HU.assertEqual "no keywords" Set.empty (CardT.keywords c),
+      -- The first card file whose triggered ability watches the battlefield ->
+      -- graveyard pair (CR 603.6c through CR 700.4's "dies"), and the mirror of
+      -- narcomoeba.json's library -> graveyard one above.
+      HU.testCase "doomed-traveler.json loads as a {W} 1/1 whose dies trigger makes a flying white Spirit" $ do
+        c <- Registry.card registry "Doomed Traveler"
+        HU.assertEqual "name" (Text.pack "Doomed Traveler") (CardT.name c)
+        HU.assertEqual "{W}" (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Creature -- Human Soldier"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Human, Subtype.Soldier]))
+          (CardT.typeLine c)
+        HU.assertEqual "1/1" (Just (Power.MkPower (Quantity.Literal 1)), Just (Toughness.MkToughness (Quantity.Literal 1))) (CardT.power c, CardT.toughness c)
+        HU.assertEqual "no keywords of its own" Set.empty (CardT.keywords c)
+        HU.assertEqual
+          "one trigger, on dying"
+          [TriggerCondition.SelfDies]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        case [(q, tc) | ab <- CardT.triggeredAbilities c, Effect.Create q tc _ _ <- concatMap snd (modeShapes (TriggeredAbility.modal ab))] of
+          [(quantity, token)] -> do
+            HU.assertEqual "one token" (Quantity.Literal 1) quantity
+            HU.assertEqual "named Spirit" (Text.pack "Spirit") (CardT.name token)
+            HU.assertEqual
+              "Creature -- Spirit"
+              (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Spirit))
+              (CardT.typeLine token)
+            HU.assertEqual "1/1" (Just (Power.MkPower (Quantity.Literal 1)), Just (Toughness.MkToughness (Quantity.Literal 1))) (CardT.power token, CardT.toughness token)
+            HU.assertEqual "with flying" (Set.singleton Keyword.Flying) (CardT.keywords token)
+            -- CR 202.2e: "An object may have a color indicator printed to the
+            -- left of the type line. That object is each color denoted by that
+            -- color indicator." A token has no mana cost, so CR 202.2's
+            -- mana-symbol rule would leave it colorless (CR 202.2b); the
+            -- indicator is what makes this one white.
+            HU.assertEqual "and white by colour indicator" (Set.singleton Color.White) (CardT.colorIndicator token)
+          other -> HU.assertFailure ("expected exactly one Create, got " <> show (length other)),
       HU.testCase "leyline-of-the-void.json loads with a CR 103.6a action and an Opponents redirect" $ do
         c <- Registry.card registry "Leyline of the Void"
         HU.assertEqual "name" (Text.pack "Leyline of the Void") (CardT.name c)

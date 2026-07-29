@@ -707,7 +707,7 @@ tests registry =
           HU.testCase "GameEvent.Moved round-trips with its snapshot" $ do
             typhoidRats <- Registry.printing registry "Typhoid Rats"
             let (ratId, gs) = S.addCreature typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
-                zc = ZoneChange.MkZoneChange ratId Zone.Battlefield Zone.Graveyard
+                zc = ZoneChange.MkZoneChange ratId ratId Zone.Battlefield Zone.Graveyard
                 snapshot = Projection.project ratId gs
             roundTrip "moved" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Moved zc snapshot),
           -- The snapshot's keywords are counted per keyword (CR 702.164b), so a
@@ -721,7 +721,7 @@ tests registry =
             let (oid, gs0) = S.addCreature stalker S.alice (Setup.emptyGame S.bothPlayers)
                 grant ts = S.withEffectAt oid (Timestamp.MkTimestamp ts) (Modification.GainKeyword (Keyword.Toxic 1))
                 snapshot = Projection.project oid (grant 101 (grant 100 gs0))
-                zc = ZoneChange.MkZoneChange oid Zone.Battlefield Zone.Graveyard
+                zc = ZoneChange.MkZoneChange oid oid Zone.Battlefield Zone.Graveyard
             HU.assertEqual "the fixture really does carry toxic 1 twice" (Just 2) (Map.lookup (Keyword.Toxic 1) (PC.keywords snapshot))
             roundTrip "moved" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Moved zc snapshot),
           HU.testCase "GameEvent.DamageDealt round-trips" $
@@ -792,6 +792,9 @@ tests registry =
           -- pair rather than the battlefield.
           HU.testCase "TriggerCondition.SelfPutIntoGraveyardFromLibrary round-trips" $
             roundTrip "spigfl" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfPutIntoGraveyardFromLibrary,
+          -- CR 603.6c's condition (Doomed Traveler's), the other zone pair.
+          HU.testCase "TriggerCondition.SelfDies round-trips" $
+            roundTrip "dies" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfDies,
           -- CR 603.6a's "[type]" is a whole Filter, so the nested And/Not that
           -- spells Soul Warden's "another creature" has to survive the trip.
           HU.testCase "TriggerCondition.PermanentEnters round-trips with its Filter" $

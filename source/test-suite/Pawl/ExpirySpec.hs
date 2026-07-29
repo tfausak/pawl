@@ -345,7 +345,7 @@ masterThiefBoard darksteelMyr masterThief =
   let gs0 = Setup.emptyGame S.bothPlayers
       (myrId, gs1) = S.addCreature darksteelMyr S.bob gs0
       (thiefId, gs2) = S.addCreature masterThief S.alice gs1
-      entered = ZoneChange.MkZoneChange thiefId Zone.Stack Zone.Battlefield
+      entered = ZoneChange.MkZoneChange thiefId thiefId Zone.Stack Zone.Battlefield
       gs3 = S.withEvents [GameEvent.Moved entered (Projection.project thiefId gs2)] gs2
    in (thiefId, myrId, gs3)
 
@@ -359,7 +359,7 @@ masterThiefThreeWay :: Printing.Printing -> Printing.Printing -> (ObjectId.Objec
 masterThiefThreeWay darksteelMyr masterThief =
   let (myrId, gs1) = S.addCreature darksteelMyr S.bob S.threePlayerGame
       (thiefId, gs2) = S.addCreature masterThief S.alice gs1
-      entered = ZoneChange.MkZoneChange thiefId Zone.Stack Zone.Battlefield
+      entered = ZoneChange.MkZoneChange thiefId thiefId Zone.Stack Zone.Battlefield
       gs3 = S.withEvents [GameEvent.Moved entered (Projection.project thiefId gs2)] gs2
    in (thiefId, myrId, masterThiefResolveAll (masterThiefSettle gs3))
 
@@ -549,7 +549,7 @@ monarchTests registry =
         let gs0 = Setup.emptyGame S.bothPlayers
             (victim, gs1) = S.addCreature piker S.bob gs0
             (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
-            entered = ZoneChange.MkZoneChange jailer Zone.Stack Zone.Battlefield
+            entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
             gs3 = S.withEvents [GameEvent.Moved entered (Projection.project jailer gs2)] gs2
             afterEtb = monarchResolveAll (monarchSettle gs3)
             -- caster stays monarch across a turn boundary: exile holds.
@@ -585,7 +585,7 @@ monarchTests registry =
         palaceJailer <- Registry.printing registry "Palace Jailer"
         let (victim, gs1) = S.addCreature piker S.bob S.threePlayerGame
             (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
-            entered = ZoneChange.MkZoneChange jailer Zone.Stack Zone.Battlefield
+            entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
             gs3 = S.withEvents [GameEvent.Moved entered (Projection.project jailer gs2)] gs2
             afterEtb = monarchResolveAll (monarchSettle (gs3 {GameState.activePlayer = S.carol}))
             gone = Departure.depart Departure.Type.Conceded S.alice afterEtb

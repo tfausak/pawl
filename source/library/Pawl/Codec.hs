@@ -298,6 +298,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Demon -> "Demon"
   Subtype.Cleric -> "Cleric"
   Subtype.Illusion -> "Illusion"
+  Subtype.Spirit -> "Spirit"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -347,7 +348,8 @@ jsonToSubtype =
       (Text.pack "Shaman", Subtype.Shaman),
       (Text.pack "Demon", Subtype.Demon),
       (Text.pack "Cleric", Subtype.Cleric),
-      (Text.pack "Illusion", Subtype.Illusion)
+      (Text.pack "Illusion", Subtype.Illusion),
+      (Text.pack "Spirit", Subtype.Spirit)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -990,6 +992,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.SelfAttacks -> nullary (Text.pack "SelfAttacks")
   TriggerCondition.SelfCycled -> nullary (Text.pack "SelfCycled")
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> nullary (Text.pack "SelfPutIntoGraveyardFromLibrary")
+  TriggerCondition.SelfDies -> nullary (Text.pack "SelfDies")
 
 jsonToTriggerCondition :: Value -> Either Text TriggerCondition.TriggerCondition
 jsonToTriggerCondition value = do
@@ -1004,6 +1007,7 @@ jsonToTriggerCondition value = do
     ("SelfAttacks", _) -> Right TriggerCondition.SelfAttacks
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
+    ("SelfDies", _) -> Right TriggerCondition.SelfDies
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
 
 castingPermissionToJson :: CastingPermission.CastingPermission -> Value
@@ -1300,7 +1304,8 @@ jsonToDamageEvent value = do
 zoneChangeToJson :: ZoneChange.ZoneChange -> Value
 zoneChangeToJson zc =
   Object
-    [ (Text.pack "object", objectIdToJson (ZoneChange.object zc)),
+    [ (Text.pack "departed", objectIdToJson (ZoneChange.departed zc)),
+      (Text.pack "object", objectIdToJson (ZoneChange.object zc)),
       (Text.pack "from", zoneToJson (ZoneChange.from zc)),
       (Text.pack "to", zoneToJson (ZoneChange.to zc))
     ]
@@ -1308,10 +1313,11 @@ zoneChangeToJson zc =
 jsonToZoneChange :: Value -> Either Text ZoneChange.ZoneChange
 jsonToZoneChange value = do
   ps <- Json.asObject value
+  d <- Json.field (Text.pack "departed") ps >>= jsonToObjectId
   o <- Json.field (Text.pack "object") ps >>= jsonToObjectId
   f <- Json.field (Text.pack "from") ps >>= jsonToZone
   t <- Json.field (Text.pack "to") ps >>= jsonToZone
-  pure (ZoneChange.MkZoneChange o f t)
+  pure (ZoneChange.MkZoneChange d o f t)
 
 projectedCharacteristicsToJson :: PC.ProjectedCharacteristics -> Value
 projectedCharacteristicsToJson pc =
