@@ -68,11 +68,17 @@ to agents as written. What it doesn't say:
   unit at a time in the single checkout, since two branches would contend for
   `HEAD`.
 - **Most of what's left is card-driven** — it fires when a card demands it, so
-  the backlog is a menu rather than a queue. Never build one speculatively. Per
-  `design.md` §4, an effect is not done until a card exercises it in a
-  gameplay-level test: the card is the proof, not the deliverable. The useful
-  issue labels are `elision`, `gap`, `rules-correctness`, `bug`, and the expiry
-  triggers `expires:milestone` and `expires:card-driven`.
+  the backlog is a menu rather than a queue. Working one means **finding the
+  real card and adding it to `data/cards/`**; that is expected, not a side
+  quest, and "no producer in the pool" is a description of the work rather than
+  a reason to skip. What is forbidden is building a capability no card
+  exercises. Per `design.md` §4, an effect is not done until a card exercises it
+  in a gameplay-level test: the card is the proof, not the deliverable. The one
+  good reason to stop is a *rules* reason — the card turns out not to exercise
+  the thing after all. The useful issue labels are `elision`, `gap`,
+  `rules-correctness`, `bug`, and the expiry triggers `expires:milestone` and
+  `expires:card-driven`. Priority labels (`priority-high` and friends) are the
+  owner's; prefer high-priority issues when picking, and never set one yourself.
 - **File the issue, cite it inline.** When you elide something, open an issue
   carrying the status, rationale and expiry trigger, then leave a comment at the
   code site stating only what is *not* implemented, plus `(#N)`. Never write the
