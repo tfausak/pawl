@@ -1,16 +1,22 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Mana: mana payment and castability.
+-- Covers Pawl.Mana: mana payment and castability. CR 118.13a's announcement lives
+-- here too (Mana.announcePhyrexian), so the cases that reach it through
+-- Cast.castSpell and Activate.activateAbility are in this spec rather than in
+-- CastSpec or ActivateSpec -- the module under test is this one, and the two entry
+-- points are how the rule is reached.
 module Pawl.ManaSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Activate as Activate
 import qualified Pawl.Cast as Cast
 import qualified Pawl.Cost as Cost
 import qualified Pawl.Engine as Engine
@@ -25,6 +31,7 @@ import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.ActivationTiming as ActivationTiming
+import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.Cost as Cost.Type
@@ -646,6 +653,9 @@ tests registry =
       hybridTests registry,
       monocoloredHybridTests registry,
       phyrexianTests registry,
+      totalCostTests registry,
+      dismemberTests registry,
+      moltensteelTests registry,
       upwellingTests registry
     ]
 
@@ -860,11 +870,17 @@ announces way p = case p of
 
 -- Was CR 118.13a's announcement actually asked for, or did the engine decide?
 wasAskedHowToPayPhyrexian :: [Response.Response] -> Bool
-wasAskedHowToPayPhyrexian responses =
-  let isAnnouncement r = case r of
-        Response.AnnouncedPhyrexianPayment _ -> True
-        _ -> False
-   in any isAnnouncement responses
+wasAskedHowToPayPhyrexian = not . null . phyrexianAnnouncements
+
+-- Every announcement the engine asked for, in the order it asked -- which is CR
+-- 601.2b's "for each of those symbols", so the LENGTH is how many of a cost's
+-- Phyrexian symbols were a real choice and how many were forced.
+phyrexianAnnouncements :: [Response.Response] -> [PhyrexianPayment.PhyrexianPayment]
+phyrexianAnnouncements responses =
+  let announcement r = case r of
+        Response.AnnouncedPhyrexianPayment way -> Just way
+        _ -> Nothing
+   in Maybe.mapMaybe announcement responses
 
 -- The board issue #361 named: alice controls one untapped Forest and a Goblin Piker for
 -- Mutagenic Growth to target, and holds Mutagenic Growth ({G/P}) and Llanowar
@@ -1151,3 +1167,323 @@ phyrexianTests registry =
         HU.assertEqual "the Forest paid for it" 1 (S.tappedCount S.alice resolved)
         HU.assertEqual "and the life total is untouched" (Just 1) (S.lifeOf S.alice resolved)
     ]
+
+-- The single activated ability of a printing that has exactly one -- Moltensteel
+-- Dragon's "{R/P}: This creature gets +1/+0 until end of turn." Total because
+-- HUnit needs a value; a printing with no ability would fail the assertions that
+-- follow rather than this lookup.
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+theAbility p = case Card.Type.activatedAbilities (Printing.card p) of
+  ab : _ -> ab
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime
+
+-- `printing` on the battlefield, settled and untapped, on a board of `n`
+-- `land`s -- the shape every board below wants and none of Support's helpers
+-- spells directly.
+withPermanent :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+withPermanent land printing n = snd (S.addCreature printing S.alice (S.landsInPlay land n))
+
+-- CR 601.2f: "The total cost is the mana cost or alternative cost (as determined
+-- in rule 601.2b), plus all additional costs and cost increases, and minus all
+-- cost reductions."
+--
+-- So CR 118.13a's announcement (CR 601.2b) comes FIRST and the total comes after
+-- it -- but the routes the announcement may take are decided by what the TOTAL
+-- will cost, not by the printed cost. Getting that backwards is the engine
+-- choosing again, one step further on than #361 reached.
+--
+-- Two directions, and only one of them is merely untidy:
+--
+--   * a REDUCTION makes the printed cost dearer than the total, so a route the
+--     total could pay reads as unpayable. Where that leaves one route standing,
+--     the prompt is elided and the engine pays for the player. Sapphire Medallion
+--     and Spined Thopter, below.
+--   * an INCREASE makes the printed cost cheaper, so a route the total cannot pay
+--     is offered. The player answers it and the payment fails, which CR 601.2's
+--     own "the game returns to the moment before the casting of that spell was
+--     proposed" would also do -- but the answer was never a real option. Thalia
+--     and Mutagenic Growth, below.
+totalCostTests :: Registry.Type.Registry -> Tasty.TestTree
+totalCostTests registry =
+  Tasty.testGroup
+    "TotalCost"
+    [ -- THE reduction case. Sapphire Medallion is "Blue spells you cast cost {1}
+      -- less to cast", Spined Thopter is {2}{U/P}, and two Islands are exactly
+      -- the board where the reduction decides the question: the total {1}{U/P}
+      -- can be paid with {1}{U} off both Islands, while the printed {2}{U/P}
+      -- cannot be paid with mana at all. So the coloured-mana route IS available
+      -- and the player must be asked for it.
+      HU.testCase "CR 601.2f a reduction opens the coloured-mana route, so the announcement is asked" $ do
+        island <- Registry.printing registry "Island"
+        medallion <- Registry.printing registry "Sapphire Medallion"
+        thopter <- Registry.printing registry "Spined Thopter"
+        let (gs, thopterId) = S.handOne thopter (withPermanent island medallion 2)
+        HU.assertBool "castable" (Cast.castable S.alice thopterId gs)
+        let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs thopterId
+        -- The outcome first, because it is the thing that was wrong: the engine
+        -- used to take CR 107.4f's life route here without asking.
+        HU.assertEqual "no life was paid" (Just 20) (S.lifeOf S.alice resolved)
+        HU.assertEqual "both Islands paid the reduced {1}{U}" 2 (S.tappedCount S.alice resolved)
+        HU.assertBool "and the engine asked rather than deciding" (wasAskedHowToPayPhyrexian asked)
+        HU.assertEqual "the Thopter resolved" 0 (length (GameState.stack resolved)),
+      -- The control, one answer different on the same board: CR 107.4f's life
+      -- route leaves an Island up. Both legs are needed -- either alone would
+      -- pass against an engine that ignored the answer.
+      HU.testCase "CR 601.2f the same board's life route pays 2 and spares an Island" $ do
+        island <- Registry.printing registry "Island"
+        medallion <- Registry.printing registry "Sapphire Medallion"
+        thopter <- Registry.printing registry "Spined Thopter"
+        let (gs, thopterId) = S.handOne thopter (withPermanent island medallion 2)
+            (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs thopterId
+        HU.assertBool "asked here too" (wasAskedHowToPayPhyrexian asked)
+        HU.assertEqual "the Thopter resolved" 0 (length (GameState.stack resolved))
+        HU.assertEqual "one Island paid the reduced {1}" 1 (S.tappedCount S.alice resolved)
+        HU.assertEqual "and 2 life paid the symbol" (Just 18) (S.lifeOf S.alice resolved),
+      -- THE increase case. Thalia is "Noncreature spells cost {1} more to cast",
+      -- Mutagenic Growth is an instant, and one Forest is exactly the board where
+      -- the increase decides the question: the total {1}{G/P} cannot be paid with
+      -- {1}{G} off one Forest, so the coloured-mana route is NOT available and
+      -- must not be offered. The interpreter asks for it and does not get it.
+      HU.testCase "CR 601.2f an increase closes the coloured-mana route, so nothing is asked" $ do
+        forest <- Registry.printing registry "Forest"
+        piker <- Registry.printing registry "Goblin Piker"
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        growth <- Registry.printing registry "Mutagenic Growth"
+        -- The Piker goes down BEFORE Thalia, because S.identityAnswer's
+        -- ChooseTargets takes the lowest object id and both are 2/1 creatures --
+        -- so with Thalia first the Growth would pump HER and the assertion below
+        -- would be reading the wrong permanent.
+        let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+            (_, withThalia) = S.addCreature thalia S.alice withPiker
+            (gs, growthId) = S.handOne growth withThalia
+        HU.assertBool "castable, by CR 107.4f's life route" (Cast.castable S.alice growthId gs)
+        let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs growthId
+        -- The outcome first again: answering the route the engine used to offer
+        -- made the whole cast a no-op, so the Piker went unpumped and no life was
+        -- paid at all.
+        HU.assertEqual "2 life paid the symbol" (Just 18) (S.lifeOf S.alice resolved)
+        HU.assertEqual "the Piker really was pumped" (Just 4) (Projection.powerOf (pikerOn resolved) resolved)
+        HU.assertEqual "the Forest paid Thalia's {1}" 1 (S.tappedCount S.alice resolved)
+        HU.assertBool "and no route existed, so none was asked" (not (wasAskedHowToPayPhyrexian asked))
+        HU.assertEqual "the Growth resolved rather than evaporating" 0 (length (GameState.stack resolved)),
+      -- The increase again, with TWO symbols, which is what makes it a cast lost
+      -- rather than a cast made awkwardly: Dismember's total under Thalia is
+      -- {2}{B/P}{B/P}, and two Swamps pay that only by CR 107.4f's life route
+      -- twice. Measured against the printed {1}{B/P}{B/P} the first symbol looks
+      -- like a real choice, and taking its mana route strands the payment.
+      HU.testCase "CR 601.2f Dismember under Thalia forces both symbols to life, and the cast survives" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        dismember <- Registry.printing registry "Dismember"
+        -- Piker before Thalia, for the reason the case above gives: both are 2/1
+        -- creatures and identityAnswer targets the lowest object id.
+        let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay swamp 2)
+            (_, withThalia) = S.addCreature thalia S.alice withPiker
+            (gs, dismemberId) = S.handOne dismember withThalia
+        HU.assertBool "castable, by two life routes" (Cast.castable S.alice dismemberId gs)
+        let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
+        HU.assertEqual "4 life paid both symbols" (Just 16) (S.lifeOf S.alice resolved)
+        HU.assertEqual "both Swamps paid Thalia's {2}" 2 (S.tappedCount S.alice resolved)
+        HU.assertEqual "and neither symbol was a choice" [] (phyrexianAnnouncements asked)
+        HU.assertEqual "Dismember resolved rather than evaporating" 0 (length (GameState.stack resolved))
+    ]
+
+-- Dismember ({1}{B/P}{B/P}) -- the first card in the pool with more than one
+-- Phyrexian mana symbol, and so the first to exercise CR 601.2b's "for each of
+-- those symbols" at all. Everything Mutagenic Growth proves about ONE symbol it
+-- proves once; what only two symbols can show is the LOOP: one prompt per symbol
+-- in printed order, each asked knowing the answers before it, and an earlier
+-- answer narrowing a later one's offer -- CR 601.2b's last sentence, "previously
+-- made choices ... may restrict the player's options when making these choices."
+dismemberTests :: Registry.Type.Registry -> Tasty.TestTree
+dismemberTests registry =
+  Tasty.testGroup
+    "Dismember"
+    [ -- Two Swamps: the first symbol is a real choice, and answering MANA leaves
+      -- {1}{B} to pay off two Swamps -- which the second symbol's mana route
+      -- would push to three. So the second symbol is forced to life and is not
+      -- asked. One prompt, not two, and that count is the assertion.
+      HU.testCase "CR 601.2b announcing mana for the first {B/P} forces the second to life" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        dismember <- Registry.printing registry "Dismember"
+        let (gs, dismemberId) = dismemberBoard swamp piker dismember 2
+            (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
+        HU.assertEqual "one symbol was a choice, the other was forced" [PhyrexianPayment.PaysMana] (phyrexianAnnouncements asked)
+        HU.assertEqual "both Swamps paid {1}{B}" 2 (S.tappedCount S.alice resolved)
+        HU.assertEqual "and 2 life paid the second symbol" (Just 18) (S.lifeOf S.alice resolved),
+      -- The same board, the other answer: paying the first symbol with life keeps
+      -- both Swamps available, so the SECOND symbol is a real choice too and is
+      -- asked. Two prompts, and the answers are 2 life each.
+      HU.testCase "CR 601.2b announcing life for the first {B/P} leaves the second a real choice" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        dismember <- Registry.printing registry "Dismember"
+        let (gs, dismemberId) = dismemberBoard swamp piker dismember 2
+            (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs dismemberId
+        HU.assertEqual
+          "both symbols were asked, in printed order"
+          [PhyrexianPayment.PaysLife, PhyrexianPayment.PaysLife]
+          (phyrexianAnnouncements asked)
+        HU.assertEqual "one Swamp paid the {1}" 1 (S.tappedCount S.alice resolved)
+        HU.assertEqual "and 4 life paid both symbols" (Just 16) (S.lifeOf S.alice resolved),
+      -- One Swamp: neither symbol can be paid with mana, since the Swamp is
+      -- needed for the {1}. Nothing is asked at all, and CR 107.4f's example
+      -- arithmetic for two symbols -- 4 life -- is what comes out.
+      HU.testCase "CR 107.4f off one Swamp both symbols are forced to life, for 4" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        dismember <- Registry.printing registry "Dismember"
+        let (gs, dismemberId) = dismemberBoard swamp piker dismember 1
+            (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
+        HU.assertEqual "no choice existed either time" [] (phyrexianAnnouncements asked)
+        HU.assertEqual "the Swamp paid the {1}" 1 (S.tappedCount S.alice resolved)
+        HU.assertEqual "and 4 life paid both symbols" (Just 16) (S.lifeOf S.alice resolved),
+      -- The gameplay-level proof (design.md section 4): the whole card, cast and
+      -- resolved. A Goblin Piker is 2/1, so -5/-5 is -3/-4 and CR 704.5f's
+      -- state-based action puts it into its owner's graveyard.
+      HU.testCase "CR 107.4f whole card: Dismember kills a Goblin Piker for 4 life" $ do
+        swamp <- Registry.printing registry "Swamp"
+        piker <- Registry.printing registry "Goblin Piker"
+        dismember <- Registry.printing registry "Dismember"
+        let (gs, dismemberId) = dismemberBoard swamp piker dismember 1
+            (_, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
+            pikerId = pikerOn resolved
+        HU.assertEqual "-5/-5 applied" (Just (-3)) (Projection.powerOf pikerId resolved)
+        HU.assertEqual "toughness too" (Just (-4)) (Projection.toughnessOf pikerId resolved)
+        let settled = S.settleSba resolved
+        HU.assertBool "CR 704.5f buried it" (not (Set.member pikerId (GameState.battlefield settled)))
+        HU.assertEqual "and 4 life paid for it" (Just 16) (S.lifeOf S.alice settled)
+    ]
+
+-- Alice with `n` Swamps, a Goblin Piker for Dismember to target, and Dismember in
+-- hand.
+dismemberBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (GameState.GameState, ObjectId.ObjectId)
+dismemberBoard swamp piker dismember n =
+  let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay swamp n)
+   in S.handOne dismember withPiker
+
+-- The one Goblin Piker on the battlefield. The Piker is added before the spell is
+-- cast and never moves, so this is a lookup and not a choice; a board with no
+-- Piker would fail the assertion that reads it.
+pikerOn :: GameState.GameState -> ObjectId.ObjectId
+pikerOn gs =
+  let isPiker oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Goblin Piker")
+   in case filter isPiker (Set.toAscList (GameState.battlefield gs)) of
+        oid : _ -> oid
+        [] -> ObjectId.MkObjectId 0
+
+-- Moltensteel Dragon ({4}{R/P}{R/P}, with "{R/P}: This creature gets +1/+0 until
+-- end of turn") -- the first card in the pool with a Phyrexian mana symbol
+-- OUTSIDE a spell's mana cost.
+--
+-- CR 602.2b: "The remainder of the process for activating an ability is identical
+-- to the process for casting a spell listed in rules 601.2b-i", and CR 118.13a
+-- names "the activation cost of an activated ability" in its own words -- so the
+-- announcement happens at CR 601.2b's position for an activation too. Until this
+-- card there was nothing in the pool for Pawl.Activate's Cost.announce call to do.
+moltensteelTests :: Registry.Type.Registry -> Tasty.TestTree
+moltensteelTests registry =
+  Tasty.testGroup
+    "Moltensteel"
+    [ -- The activation cost's symbol IS a choice off a Mountain, and answering
+      -- mana taps it. CR 118.13b/c are not what governs this -- the cost is an
+      -- activation cost, so CR 118.13a is, and the choice belongs at proposal
+      -- rather than at payment (#373 is the other two clauses).
+      HU.testCase "CR 118.13a/602.2b an activation cost's {R/P} is asked, and mana taps the Mountain" $ do
+        mountain <- Registry.printing registry "Mountain"
+        dragon <- Registry.printing registry "Moltensteel Dragon"
+        let (dragonId, gs) = dragonBoard mountain dragon 1
+            (asked, activated) = activateAndResolve (announces PhyrexianPayment.PaysMana) gs dragonId (theAbility dragon)
+        HU.assertEqual "one symbol, one prompt" [PhyrexianPayment.PaysMana] (phyrexianAnnouncements asked)
+        HU.assertEqual "the Mountain paid it" 1 (S.tappedCount S.alice activated)
+        HU.assertEqual "no life paid" (Just 20) (S.lifeOf S.alice activated)
+        HU.assertEqual "+1/+0" (Just 5) (Projection.powerOf dragonId activated)
+        HU.assertEqual "toughness unchanged" (Just 4) (Projection.toughnessOf dragonId activated),
+      -- The control, one answer different on the same board: 2 life instead, and
+      -- the Mountain is still up for something else.
+      HU.testCase "CR 118.13a the same activation's life route spares the Mountain" $ do
+        mountain <- Registry.printing registry "Mountain"
+        dragon <- Registry.printing registry "Moltensteel Dragon"
+        let (dragonId, gs) = dragonBoard mountain dragon 1
+            (asked, activated) = activateAndResolve (announces PhyrexianPayment.PaysLife) gs dragonId (theAbility dragon)
+        HU.assertEqual "asked here too" [PhyrexianPayment.PaysLife] (phyrexianAnnouncements asked)
+        HU.assertEqual "the Mountain is untouched" 0 (S.tappedCount S.alice activated)
+        HU.assertEqual "2 life paid it" (Just 18) (S.lifeOf S.alice activated)
+        HU.assertEqual "+1/+0 all the same" (Just 5) (Projection.powerOf dragonId activated),
+      -- No red source: CR 107.4f's mana route cannot be completed, so there is
+      -- nothing to ask and the life route is taken. The activation still happens,
+      -- which is the half a payment-time reading would get right by accident.
+      HU.testCase "CR 118.13a with no red source the activation's life route is forced" $ do
+        mountain <- Registry.printing registry "Mountain"
+        dragon <- Registry.printing registry "Moltensteel Dragon"
+        let (dragonId, gs) = dragonBoard mountain dragon 0
+            (asked, activated) = activateAndResolve (announces PhyrexianPayment.PaysMana) gs dragonId (theAbility dragon)
+        HU.assertEqual "no choice existed, so none was asked" [] (phyrexianAnnouncements asked)
+        HU.assertEqual "2 life paid it" (Just 18) (S.lifeOf S.alice activated)
+        HU.assertEqual "+1/+0" (Just 5) (Projection.powerOf dragonId activated),
+      -- The gameplay-level proof, and the second board where two symbols in ONE
+      -- cost are both real choices: six Mountains pay {4}{R}{R} outright, so both
+      -- announcements are asked and neither costs life.
+      HU.testCase "CR 107.4f whole card: Moltensteel Dragon casts off six Mountains for no life" $ do
+        mountain <- Registry.printing registry "Mountain"
+        dragon <- Registry.printing registry "Moltensteel Dragon"
+        let (gs, dragonId) = S.handOne dragon (S.landsInPlay mountain 6)
+            (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dragonId
+        HU.assertEqual
+          "both symbols were asked"
+          [PhyrexianPayment.PaysMana, PhyrexianPayment.PaysMana]
+          (phyrexianAnnouncements asked)
+        HU.assertEqual "all six Mountains paid {4}{R}{R}" 6 (S.tappedCount S.alice resolved)
+        HU.assertEqual "and no life did" (Just 20) (S.lifeOf S.alice resolved)
+        HU.assertEqual "a 4/4 arrived" (Just 4) (Projection.powerOf (dragonOn resolved) resolved)
+        HU.assertEqual "CR 202.2d: red, from the Phyrexian symbols" (Set.singleton Color.Red) (Projection.colorsOf (dragonOn resolved) resolved),
+      -- Four Mountains cannot pay {4}{R}{R}, so both symbols are forced to life
+      -- and CR 107.4f's arithmetic for two symbols is 4 -- the same card, one
+      -- fewer land, and the whole announcement disappears.
+      HU.testCase "CR 107.4f whole card: off four Mountains both symbols are forced, for 4 life" $ do
+        mountain <- Registry.printing registry "Mountain"
+        dragon <- Registry.printing registry "Moltensteel Dragon"
+        let (gs, dragonId) = S.handOne dragon (S.landsInPlay mountain 4)
+            (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dragonId
+        HU.assertEqual "no choice existed either time" [] (phyrexianAnnouncements asked)
+        HU.assertEqual "all four Mountains paid the {4}" 4 (S.tappedCount S.alice resolved)
+        HU.assertEqual "and 4 life paid both symbols" (Just 16) (S.lifeOf S.alice resolved)
+        HU.assertEqual "a 4/4 arrived all the same" (Just 4) (Projection.powerOf (dragonOn resolved) resolved)
+    ]
+
+-- Alice with a settled Moltensteel Dragon on the battlefield, `n` Mountains, and
+-- priority -- which Activate.activateAbility needs and Setup.emptyGame leaves
+-- unset.
+dragonBoard :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+dragonBoard mountain dragon n =
+  let (dragonId, gs) = S.addCreature dragon S.alice (S.landsInPlay mountain n)
+   in (dragonId, gs {GameState.priority = Just S.alice})
+
+-- The one Moltensteel Dragon on the battlefield -- pikerOn's shape, for the card
+-- a cast has just put there under a fresh CR 400.7 id.
+dragonOn :: GameState.GameState -> ObjectId.ObjectId
+dragonOn gs =
+  let isDragon oid = fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Moltensteel Dragon")
+   in case filter isDragon (Set.toAscList (GameState.battlefield gs)) of
+        oid : _ -> oid
+        [] -> ObjectId.MkObjectId 0
+
+-- Activate `ability` on `oid` under `answer` and resolve what it put on the
+-- stack, returning the transcript alongside the final state -- castAndResolve for
+-- an activation.
+activateAndResolve ::
+  (forall r. Prompt.Prompt r -> r) ->
+  GameState.GameState ->
+  ObjectId.ObjectId ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card ->
+  ([Response.Response], GameState.GameState)
+activateAndResolve answer gs oid ability =
+  let ((_, activated), asked) = Replay.record answer gs (Activate.activateAbility S.alice oid ability)
+   in (asked, snd (S.runPureWith answer activated Stack.resolveTop))

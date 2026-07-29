@@ -127,8 +127,15 @@ costsFor oid gs = case Game.lookupObject oid gs of
 -- increased by an effect or an additional cost is imposed, the cost is still
 -- unpayable" -- fmap over the Maybe leaves Nothing as Nothing.
 total :: PlayerId -> ObjectId -> Cost -> GameState -> Cost
-total pid oid cost gs =
-  cost {Cost.mana = fmap (applyAdjustments (PlayerEffect.costAdjustments pid oid gs)) (Cost.mana cost)}
+total pid oid cost gs = cost {Cost.mana = fmap (totalMana pid oid gs) (Cost.mana cost)}
+
+-- CR 601.2f's totalling of the MANA part alone, curried so that it is a function
+-- of one mana cost. `total` above is this fmapped over a whole Cost's mana part;
+-- what wants it separately is `announce`, which has to ask "what will this cost
+-- once 601.2f has run?" of candidate costs that do not exist yet and never become
+-- a Cost of their own.
+totalMana :: PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
+totalMana pid oid gs = applyAdjustments (PlayerEffect.costAdjustments pid oid gs)
 
 -- CR 601.2b: substitute the chosen value of X into the mana part. Identity on a
 -- Variable-free cost, and on an unpayable one.
@@ -164,12 +171,25 @@ hasVariable cost = case Cost.mana cost of
 -- why #365 survives this change unaltered: Cost.canPay measures each component
 -- separately, so two PayLife components of one cost can together outrun a life
 -- total that admits each of them.
-announce :: PlayerId -> ObjectId -> Cost -> Game Cost
-announce pid oid cost = case Cost.mana cost of
+--
+-- `total` is CR 601.2f's totalling, and it is the CALLER's to supply rather than
+-- this function's to compute, because the two callers genuinely differ. Pawl.Cast
+-- passes `totalMana`, so a spell's announcement is measured against the same
+-- adjusted cost `Cast.payableCost` gated on -- measuring it against the printed
+-- cost instead let a reduction hide a route and this function elide the prompt
+-- (ManaSpec's Mana.TotalCost group). Pawl.Activate passes `id`, because an
+-- activation cost is deliberately not routed through `total` at all (#90), so the
+-- printed cost IS what `Activate.activatable` checked and what will be paid. When
+-- #90 lands both sites change together, which is the point of the parameter.
+--
+-- Named `total_` rather than `total` only because this module's own `total` is in
+-- scope, the `filter_` convention elsewhere here.
+announce :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> ManaCost.ManaCost) -> Cost -> Game Cost
+announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
   Just manaCost -> do
-    (announced, life) <- Mana.announcePhyrexian pid oid manaCost
+    (announced, life) <- Mana.announcePhyrexian pid oid total_ manaCost
     pure
       cost
         { Cost.mana = Just announced,
@@ -580,10 +600,15 @@ applyAdjustments adjustments cost =
         -- Nothing for two different reasons, one per side. In the COST the
         -- symbol is necessarily UNANNOUNCED, or it would not be a Phyrexian
         -- symbol any more: CR 601.2b's announcement precedes CR 601.2f's total,
-        -- so a cast has already turned it into an OfType or into life, and the
-        -- one caller that reaches this arm is Cast.payableCost measuring
-        -- castability against the printed cost -- where nothing has established
-        -- there is a green mana here to cancel. In a REDUCTION, CR 118.7f needs
+        -- so a cast has already turned it into an OfType or into life. Two
+        -- callers reach this arm, and neither has established that there is a
+        -- green mana here to cancel -- Cast.payableCost, measuring castability
+        -- against the printed cost, and `announce`'s own payability probe, which
+        -- totals the symbols a completion has NOT yet committed to mana. That
+        -- second one is Edgewalker's ruling read the right way round: "if you
+        -- choose to pay such a cost with {W} or {B}, Edgewalker can reduce that
+        -- part of the cost" -- so an uncommitted symbol getting no reduction is
+        -- the rule and not an elision. In a REDUCTION, CR 118.7f needs
         -- no announcement at all -- "the cost is
         -- reduced by one mana of that symbol's color" -- and this arm is simply
         -- wrong for it, which nothing in the pool can show because no card emits

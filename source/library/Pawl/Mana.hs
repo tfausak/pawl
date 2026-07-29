@@ -126,6 +126,8 @@ subtypeMana subtype = case subtype of
   Subtype.Angel -> Nothing
   Subtype.Insect -> Nothing
   Subtype.Berserker -> Nothing
+  Subtype.Thopter -> Nothing
+  Subtype.Dragon -> Nothing
 
 -- CR 105.4: "If a player is asked to choose a color, they must choose one of the
 -- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an
@@ -567,6 +569,21 @@ phyrexianLife = 2
 -- board rather than as a rule: "previously made choices ... may restrict the
 -- player's options when making these choices."
 --
+-- Measured through `total`, which is CR 601.2f's totalling supplied by the caller
+-- -- because the cost that decides whether a route is payable is the one that will
+-- actually be paid, not the printed one. CR 601.2b comes first and 601.2f second,
+-- so the ANNOUNCEMENT stays here; only the payability probe reaches forward. Get
+-- that wrong and a cost reduction hides a route the player was entitled to and
+-- this function elides the prompt, which is the engine choosing -- proved by
+-- ManaSpec's "CR 601.2f a reduction opens the coloured-mana route, so the
+-- announcement is asked".
+--
+-- Every remaining announcement is COMPLETED before totalling (`completions`),
+-- because CR 601.2f is defined over a nonhybrid equivalent cost: a reduction that
+-- names a mana type can only cancel a symbol some announcement has committed to
+-- mana, so leaving the tail's symbols Phyrexian would silently withhold reductions
+-- a later answer is entitled to.
+--
 -- Measured against the BOARD and not the pool: canPayCommitting counts an
 -- untapped source as the mana it could make (payableResolutions), so a Forest
 -- still in play offers the mana route before anything is tapped. A player who
@@ -575,27 +592,39 @@ phyrexianLife = 2
 --
 -- FILTERED, NOT TRUSTED, the chooseSource posture: an answer outside the offered
 -- set is rejected and the head used instead.
-announcePhyrexian :: PlayerId -> ObjectId -> ManaCost -> Game (ManaCost, Natural)
-announcePhyrexian pid oid (ManaCost.MkManaCost symbols) = go [] 0 symbols
+announcePhyrexian :: PlayerId -> ObjectId -> (ManaCost -> ManaCost) -> ManaCost -> Game (ManaCost, Natural)
+announcePhyrexian pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
   where
     go done committed remaining = case remaining of
       [] -> pure (ManaCost.MkManaCost (reverse done), committed)
       ManaSymbol.Phyrexian color : rest -> do
         gs <- State.get
         let asMana = ManaSymbol.OfType (ManaType.Colored color)
-            -- The symbols not yet announced are left exactly as they are, so
-            -- "payable" here means "SOME completion of the remaining
-            -- announcements pays it" -- which is what canPay already enumerates.
+            -- "Payable" here means "SOME completion of the remaining
+            -- announcements pays it", which is what CR 601.2b's last sentence
+            -- makes the question. Enumerated here rather than left to canPay's own
+            -- `resolutions` so that each completion is a Phyrexian-free cost by
+            -- the time `total` sees it.
             stillPayable extra ways =
-              canPayCommitting pid extra (ManaCost.MkManaCost (reverse done <> ways <> rest)) gs
+              let candidate (tail_, life) =
+                    canPayCommitting pid (extra + life) (total (ManaCost.MkManaCost (reverse done <> ways <> tail_))) gs
+               in any candidate (completions rest)
             offers =
               [PhyrexianPayment.PaysMana | stillPayable committed [asMana]]
                 <> [PhyrexianPayment.PaysLife | stillPayable (committed + phyrexianLife) []]
         announced <- case offers of
           -- Neither route pays, so the cost is unpayable and there is nothing to
           -- announce: the printed symbol stands and the payment fails (CR 118.6,
-          -- CR 601.2h). Reachable only from a caller announcing on a cost
-          -- Cast.castable and Activate.activatable never admitted.
+          -- CR 601.2h).
+          --
+          -- Reachable only from a caller announcing on a cost Cast.castable and
+          -- Activate.activatable never admitted, and it is `total` above that makes
+          -- that true rather than merely plausible: both gates measure payability
+          -- through the same totalling, so no completion payable here can be one
+          -- they refused, and none they admitted can be missing here. The one
+          -- remaining wedge is {X}: Cast.payableCost gates at X=0 while the
+          -- announcement runs on the value the player named, and no card in the
+          -- pool prints {X} beside a Phyrexian symbol (#417).
           [] -> pure PhyrexianPayment.PaysMana
           [only] -> pure only
           first : others -> do
@@ -606,6 +635,27 @@ announcePhyrexian pid oid (ManaCost.MkManaCost symbols) = go [] 0 symbols
           PhyrexianPayment.PaysMana -> go (asMana : done) committed rest
           PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) rest
       other : rest -> go (other : done) committed rest
+
+-- Every way the Phyrexian symbols of a cost's UNANNOUNCED tail could go, as the
+-- symbols that leaves and the life those choices commit -- CR 601.2b's own
+-- "nonhybrid equivalent cost", one entry per combination. Exactly the product
+-- `resolutions` takes over CR 107.4f's ways, lifted to the SYMBOL level so that a
+-- caller can hand each completion to CR 601.2f's totalling before asking whether
+-- it is payable.
+--
+-- One entry for a Phyrexian-free tail, so this is the identity case for every cost
+-- announcePhyrexian leaves untouched, and 2^(number of Phyrexian symbols)
+-- otherwise -- the same small bound resolutions already carries. Non-Phyrexian
+-- symbols ride through in place, which is what keeps a completion a cost and not
+-- merely a set of choices.
+completions :: [ManaSymbol] -> [([ManaSymbol], Natural)]
+completions symbols = case symbols of
+  [] -> [([], 0)]
+  ManaSymbol.Phyrexian color : rest ->
+    let asMana = ManaSymbol.OfType (ManaType.Colored color)
+     in [(asMana : tail_, life) | (tail_, life) <- completions rest]
+          <> [(tail_, life + phyrexianLife) | (tail_, life) <- completions rest]
+  other : rest -> [(other : tail_, life) | (tail_, life) <- completions rest]
 
 -- CR 118.3: can this cost be paid at all? Pure, because Action.legalActions asks
 -- it while merely ENUMERATING actions, where prompting would be absurd -- so it
@@ -618,10 +668,11 @@ announcePhyrexian pid oid (ManaCost.MkManaCost symbols) = go [] 0 symbols
 canPay :: PlayerId -> ManaCost -> GameState -> Bool
 canPay pid = canPayCommitting pid 0
 
--- The same question asked mid-announcement, where CR 118.13a's choices already
--- made have committed `committed` life that CR 119.4's floor must still admit
--- alongside whatever the rest of the cost costs. Zero everywhere else, which is
--- what `canPay` is.
+-- The same question asked mid-announcement, where CR 118.13a's choices -- both
+-- those already made and those a `completions` entry is standing in for -- have
+-- committed `committed` life that CR 119.4's floor must still admit alongside
+-- whatever the rest of the cost costs. Zero everywhere else, which is what
+-- `canPay` is.
 canPayCommitting :: PlayerId -> Natural -> ManaCost -> GameState -> Bool
 canPayCommitting pid committed cost gs = not (null (payableResolutions pid committed cost gs))
 

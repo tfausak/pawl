@@ -83,6 +83,12 @@ targetable pid oid gs = case Game.cardOf oid gs of
 -- payment lets the player underpay; taxing payment without taxing castability
 -- offers a cast that cannot be afforded, and there is no mid-announcement
 -- rewind (#56).
+--
+-- CR 118.13a's announcement is measured against the same total, and castSpell
+-- hands Cost.totalMana in for exactly that reason: a gate and an offer that
+-- disagree about what a cost is are two ways of getting the same question wrong.
+-- The X=0 floor is the one place they still can disagree, since the announcement
+-- runs on the value the player named (#417).
 payableCost :: PlayerId -> ObjectId -> GameState -> Cost -> Bool
 payableCost pid oid gs cost = Cost.canPay pid oid (Cost.total pid oid (Cost.substituteX 0 cost) gs) gs
 
@@ -253,8 +259,17 @@ castWhileSearching pid = do
 -- CR 601.2b then 601.2c: choose modes, THEN targets (601.2c), pay (601.2f-h),
 -- move to the stack (601.2a), stamp the choices on the NEW stack incarnation
 -- (CR 400.7). Prompting before payment is 601.2's own order; there is no rewind
--- for mid-announcement failure (#56) -- legalActions only offers affordable,
--- fully-fillable casts, so a legal answer cannot fail after the prompt.
+-- for mid-announcement failure (#56), and legalActions only offers affordable,
+-- fully-fillable casts -- so every prompt below is answerable.
+--
+-- A legal answer CAN still fail after the prompt, and one class of it is
+-- deliberate: castability asks whether SOME sequence of choices pays the cost,
+-- and the mana window then asks the player to make them. A player who taps their
+-- only Birds of Paradise for the wrong colour cannot pay, and Mana.payCost's own
+-- haddock argues at length that the engine must let them. What must NOT happen is
+-- pawl offering a route it can already see the total cost cannot pay, which is why
+-- Cost.announce is handed CR 601.2f's totalling below.
+--
 -- An illegal answer at ANY step makes the
 -- whole cast a no-op: reject-not-repair, the AssignCombatDamage posture. A
 -- spell with no slots (in its chosen modes) asks nothing.
@@ -302,7 +317,12 @@ castSpell pid oid = do
             -- the player announces whether they intend to pay 2 life or a
             -- corresponding colored mana cost for each of those symbols." CR
             -- 118.13a is what forbids deferring it to payment time.
-            announcedCost <- Cost.announce pid oid (maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount)
+            --
+            -- Cost.totalMana is handed in so that the routes offered are the ones
+            -- CR 601.2f's total can pay -- the same adjusted cost payableCost
+            -- gated this cast on, and read from the same `gs` the total below is
+            -- (ManaSpec's Mana.TotalCost group).
+            announcedCost <- Cost.announce pid oid (Cost.totalMana pid oid gs) (maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount)
             chosen <-
               if Map.null sets
                 then pure Map.empty

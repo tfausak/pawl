@@ -74,4 +74,8 @@ data Subtype
     Insect
   | -- CR 205.3m (a creature type; Deathknell Berserker's own, and its token's).
     Berserker
+  | -- CR 205.3m (a creature type; Spined Thopter's).
+    Thopter
+  | -- CR 205.3m (a creature type; Moltensteel Dragon's).
+    Dragon
   deriving (Eq, Ord, Show)
