@@ -626,6 +626,30 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Revealed _ _ -> False
+  -- CR 603.6: a zone-change trigger, matched on BOTH ends of the move -- library
+  -- to graveyard. The bearer is the incarnation the card became on arrival, and
+  -- that is CR 400.7e rather than an accident of which id the log happens to
+  -- carry: "Abilities that trigger when an object moves from one zone to another
+  -- ... can find the new object that it became in the zone it moved to when the
+  -- ability triggered, if that zone is a public zone" -- and a graveyard is
+  -- public (CR 400.2). It is also the object the graveyard candidates below
+  -- offer. The from and to together are what make CR 113.6k put this ability in
+  -- the graveyard rather than on the battlefield.
+  --
+  -- Both ends are load-bearing, and `from` is the half that does the work: the
+  -- same card discarded out of a hand or dying off the battlefield reaches the
+  -- same graveyard and must not trigger.
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> case event of
+    GameEvent.Moved zc _ ->
+      ZoneChange.object zc == bearer
+        && ZoneChange.from zc == Zone.Library
+        && ZoneChange.to zc == Zone.Graveyard
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Cycled _ -> False
+    GameEvent.Revealed _ _ -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
 -- the environment in which the ability's "that player" / "that creature" is
@@ -679,8 +703,9 @@ isPlayerRecipient r = case r of
 -- trigger scan quadratic in board size. Projection.projectAll runs `gather`
 -- exactly once and shares the result across the whole scan.
 --
--- The battlefield is the ONLY scanned zone; an ability that functions from a
--- graveyard, hand or exile is never scanned (#45).
+-- The battlefield is not the only scanned zone: every GRAVEYARD is scanned too,
+-- for the abilities CR 113.6k puts there. The hand, exile, the stack and the
+-- command zone are still unscanned (#348).
 --
 -- CR 603.10, FIRST sentence -- the NORMAL rule, not the "looks back in time"
 -- exception list that follows it (603.10a-g are leaves-the-battlefield,
@@ -817,18 +842,111 @@ eventTriggers events gs =
         -- hang an ability on; a card that triggers on a reveal would need a
         -- TriggerCondition first, and none exists (#322).
         GameEvent.Revealed _ _ -> Map.empty
+      -- CR 113.6k: the fourth candidate source -- every card in every graveyard
+      -- that carries at least one ability CR 113.6k puts there. The one source
+      -- that widens the SCANNED ZONE rather than recovering an object a single
+      -- event names, which is why it is computed ONCE, outside the event loop,
+      -- exactly as `onBattlefield` is: the set of graveyard cards is the same
+      -- for every event in the batch.
+      --
+      -- Narrow by construction, which is what keeps a large graveyard cheap.
+      -- Membership is decided by `functionsInGraveyard` over each PRINTED
+      -- triggered ability's CONDITION -- a total case over a closed type, no
+      -- projection, no board walk -- so the whole pass is O(cards in graveyards
+      -- x abilities per card), and the common case (a card with no triggered
+      -- ability at all, or with only battlefield ones) costs two object-map
+      -- lookups and an empty-list check.
+      -- Cards contributing nothing are dropped rather than carried as empty
+      -- entries, so the candidate map stays proportional to the cards that can
+      -- actually fire and not to graveyard size.
+      --
+      -- Abilities come from the PRINTED card and the controller is the OWNER,
+      -- both for the reasons `cycledCard` above spells out (CR 613's layers stop
+      -- at the battlefield; CR 108.4 leaves a graveyard card with no controller,
+      -- so CR 113.8's second clause names the owner).
+      --
+      -- CR 603.10a does NOT apply to what this source serves. Its look-back list
+      -- is "leaves-the-battlefield abilities, abilities that trigger when a
+      -- player sacrifices a permanent, abilities that trigger when a card leaves
+      -- a graveyard, and abilities that trigger when an object that all players
+      -- can see is put into a hand or library" -- a card ENTERING a graveyard is
+      -- none of those, so CR 603.10's normal first sentence governs and the
+      -- reading is of the game as it stands, which is what this live read of
+      -- GameState.graveyard is. A card that arrives in a graveyard and is gone
+      -- again before the CR 117.5 boundary is lost by this reading (#349).
+      graveyardCandidate oid = case (Game.lookupObject oid gs, Game.cardOf oid gs) of
+        (Just obj, Just card) ->
+          case filter (functionsInGraveyard . TriggeredAbility.condition) (Card.triggeredAbilities card) of
+            [] -> Nothing
+            abilities -> Just (oid, (Object.owner obj, abilities))
+        _ -> Nothing
+      inGraveyards =
+        Map.fromList
+          (concatMap (Maybe.mapMaybe graveyardCandidate . Foldable.toList) (Map.elems (GameState.graveyard gs)))
       forOne event (oid, (ctrl, abilities)) =
         let fires ab = matchesTrigger gs oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
          in fmap pend (filter fires abilities)
       -- Map.unions is left-biased, so a live battlefield reading always wins over
-      -- a last-known one, and over a cycled card. Belt and braces: the three sets
-      -- are disjoint by construction -- goneEntrant files only an id that no
-      -- longer exists, and cycledCard only one the funnel just minted in a
-      -- graveyard -- and this is what makes that a property of the code rather
-      -- than of the argument above it.
-      candidates event = Map.toAscList (Map.unions [onBattlefield, goneEntrant event, cycledCard event])
+      -- a last-known one, over a cycled card, and over a graveyard reading. That
+      -- is what rules out a double fire: one entry per id means one pass of
+      -- `forOne` per id, whatever the id's abilities came from.
+      --
+      -- The first three sets are disjoint by construction -- goneEntrant files
+      -- only an id that no longer exists, and cycledCard only one the funnel just
+      -- minted in a graveyard -- and the left-bias is belt and braces over that.
+      -- `inGraveyards` genuinely OVERLAPS `cycledCard`, and does so on purpose:
+      -- CR 702.29c's "these abilities trigger from whatever zone the card winds up
+      -- in after it's cycled" is CR 113.6k for a SelfCycled condition, so a card
+      -- cycled into a graveyard is honestly a member of both. The result is the
+      -- same either way -- cycledCard's entry, which wins, offers the same card's
+      -- printed abilities unfiltered, a superset of what inGraveyards offers for
+      -- that id -- but the bias is what makes it one entry rather than two.
+      candidates event = Map.toAscList (Map.unions [onBattlefield, goneEntrant event, cycledCard event, inGraveyards])
    in concatMap (\event -> concatMap (forOne event) (candidates event)) events
+
+-- CR 113.6k: "A trigger condition that can't trigger from the battlefield
+-- functions in all zones it can trigger from. Other trigger conditions of the
+-- same triggered ability may function in different zones." Answered for one
+-- zone, the graveyard, which is the only non-battlefield zone eventTriggers
+-- scans (#348).
+--
+-- A CLASSIFICATION of a trigger condition, not of an effect: this asks which
+-- zone a rule 603 condition functions in, the same kind of question as "is this
+-- a mana ability". It never reaches the ability's payload.
+--
+-- The default is False, and that is CR 113.6's own default in its second
+-- sentence: "Abilities of all other objects usually function only while that
+-- object is on the battlefield." Every arm below that answers False is that
+-- sentence, not an omission -- a Soul Warden in a graveyard does not see a
+-- creature enter.
+functionsInGraveyard :: TriggerCondition -> Bool
+functionsInGraveyard cond = case cond of
+  -- CR 603.6a is an enters-the-battlefield ability; its bearer is on the
+  -- battlefield when it fires. Both written forms take CR 113.6's default.
+  TriggerCondition.SelfEnters -> False
+  TriggerCondition.PermanentEnters _ -> False
+  TriggerCondition.StepBegins _ _ -> False
+  -- CR 603.8's state triggers are not event triggers at all -- matchesTrigger's
+  -- StateIs arm never matches a log entry -- so this scan is not their reader in
+  -- any zone. They are gathered by stateTriggers below, which walks the
+  -- battlefield and nothing else.
+  TriggerCondition.StateIs _ -> False
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+  -- CR 702.29c: "these abilities trigger from whatever zone the card winds up in
+  -- after it's cycled" -- the graveyard for every printing in this pool. A
+  -- cycled card cannot be on the battlefield (cycling discards it from a hand),
+  -- so CR 113.6k reaches this condition too, and answering honestly is what
+  -- keeps the classification true rather than merely convenient. eventTriggers'
+  -- own `cycledCard` is the source that actually serves it, and the overlap is
+  -- documented at the Map.unions there.
+  TriggerCondition.SelfCycled -> True
+  -- CR 113.6k, the condition this predicate exists for: a card cannot be put
+  -- into a graveyard from a library while it is on the battlefield, so this
+  -- condition can never trigger from the battlefield, and the one zone it can
+  -- trigger from is the graveyard it lands in. Narcomoeba.
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> True
 
 -- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
 -- is currently TRUE and which has no instance already on the stack.
@@ -902,6 +1020,7 @@ stateTriggers gs =
                 TriggerCondition.SelfDealsCombatDamageToPlayer -> False
                 TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
                 TriggerCondition.SelfCycled -> False
+                TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
               pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
            in fmap pend (filter live (Projection.triggeredAbilitiesOf oid gs))
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))

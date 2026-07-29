@@ -14,7 +14,9 @@
 -- batch) -- `monarchOrderingTests`. The CR 603.4 / 608.2a intervening "if" --
 -- `interveningTests`. Also Pawl.Keyword: CR
 -- 702.70 poisonous, the keyword whose rule text IS a triggered ability, and the
--- reserved "that player" slot the scan stamps for it -- `poisonousTests`.
+-- reserved "that player" slot the scan stamps for it -- `poisonousTests`. CR
+-- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
+-- Narcomoeba -- `graveyardTriggerTests`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -67,6 +69,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.OptionalDecision as OptionalDecision
 import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
@@ -1562,5 +1565,104 @@ permanentEntersTests registry =
             HU.assertEqual "twice, both from the one Warden" (replicate 2 (TriggerSource.OfObject warden)) (sourcesOf gs3)
         ]
 
+-- CR 113.6k: "A trigger condition that can't trigger from the battlefield
+-- functions in all zones it can trigger from." Narcomoeba's "When this card is
+-- put into your graveyard from your library" is such a condition -- the bearer
+-- is in a graveyard when it fires, never on the battlefield -- so the scan has
+-- to look somewhere other than the battlefield to find it.
+--
+-- The proving pair is Tome Scour ("target player mills five cards") and
+-- Narcomoeba; Soul Warden rides along in the same graveyard as the control,
+-- because its CR 603.6a trigger functions ONLY on the battlefield and so must
+-- stay silent even when a creature enters right in front of it.
+graveyardTriggerTests :: Registry.Type.Registry -> Tasty.TestTree
+graveyardTriggerTests registry =
+  let -- alice: one Island in play (Tome Scour's {U}), Tome Scour in hand, and a
+      -- three-card library of Narcomoeba, Soul Warden and a Goblin Piker. Five
+      -- mills a three-card library empty (CR 701.17b), so every one of them
+      -- lands in the graveyard in one event batch and the scan has to pick the
+      -- one card whose ability functions there.
+      milledBoard = do
+        island <- Registry.printing registry "Island"
+        tomeScour <- Registry.printing registry "Tome Scour"
+        narcomoeba <- Registry.printing registry "Narcomoeba"
+        soulWarden <- Registry.printing registry "Soul Warden"
+        piker <- Registry.printing registry "Goblin Piker"
+        let base = S.landsInPlay island 1
+            (_, g1) = S.addLibraryCard narcomoeba S.alice base
+            (_, g2) = S.addLibraryCard soulWarden S.alice g1
+            (_, g3) = S.addLibraryCard piker S.alice g2
+            (g4, spellId) = S.handOne tomeScour g3
+        pure (g4 {GameState.priority = Just S.alice}, spellId)
+      -- Takes every "may". There is exactly one in this scenario -- Narcomoeba's
+      -- -- so this is not a blanket yes standing in for a specific answer.
+      takeOptional :: Prompt.Prompt r -> r
+      takeOptional p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      -- Cast Tome Scour at alice herself (S.identityAnswer's ChooseTargets picks
+      -- the least id in each set, and alice is player 0), resolve it, settle so
+      -- any trigger reaches the stack, then resolve that trigger.
+      millSelf :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, GameState.GameState)
+      millSelf answer (gs, spellId) =
+        let cast = S.runPure answer gs (Cast.castSpell S.alice spellId)
+            milled = S.runPure answer cast Stack.resolveTop
+            placed = S.runPure answer milled Engine.settleForPriority
+         in (placed, S.runPure answer placed Stack.resolveTop)
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+      narcomoebaName = Text.pack "Narcomoeba"
+   in Tasty.testGroup
+        "GraveyardTrigger"
+        [ -- The gameplay-level proof, cast to resolution.
+          HU.testCase "CR 113.6k whole card: Tome Scour mills Narcomoeba and its trigger puts it onto the battlefield" $ do
+            board <- milledBoard
+            let (placed, after) = millSelf takeOptional board
+            HU.assertEqual "the trigger reached the stack" 1 (length (GameState.stack placed))
+            HU.assertBool "Narcomoeba is on the battlefield" (Set.member narcomoebaName (namesIn Zone.Battlefield S.alice after))
+            HU.assertBool "and no longer in the graveyard" (not (Set.member narcomoebaName (namesIn Zone.Graveyard S.alice after)))
+            -- The control, in the same graveyard: Soul Warden's "whenever
+            -- another creature enters" functions only on the battlefield (CR
+            -- 113.6's default), and a creature entered right in front of it.
+            HU.assertEqual "the Soul Warden in the graveyard gained nothing" (Just 20) (S.lifeOf S.alice after),
+          -- CR 603.5: the "may" is a real choice, and declining is the other
+          -- half of it. The trigger still went on the stack and still resolved.
+          HU.testCase "CR 603.5 declining the may leaves Narcomoeba in the graveyard" $ do
+            board <- milledBoard
+            let (placed, after) = millSelf S.identityAnswer board
+            HU.assertEqual "the trigger reached the stack anyway" 1 (length (GameState.stack placed))
+            HU.assertBool "Narcomoeba is still in the graveyard" (Set.member narcomoebaName (namesIn Zone.Graveyard S.alice after))
+            HU.assertBool "and not on the battlefield" (not (Set.member narcomoebaName (namesIn Zone.Battlefield S.alice after)))
+            HU.assertEqual "and the ability left the stack -- a declined may is not a fizzle" 0 (length (GameState.stack after)),
+          -- "from your library" doing real work, half one: the same card moved
+          -- out of a HAND reaches the same graveyard and must not trigger.
+          HU.testCase "CR 113.6k Narcomoeba put into the graveyard from the HAND does not trigger" $ do
+            narcomoeba <- Registry.printing registry "Narcomoeba"
+            let (handCard, gs) = S.addHandCard narcomoeba S.alice (Setup.emptyGame S.bothPlayers)
+                buried = S.runPure S.identityAnswer gs (Event.changeZone handCard Zone.Graveyard)
+            HU.assertEqual "nothing triggered" [] (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents buried) buried)))
+            HU.assertBool "it is in the graveyard" (Set.member narcomoebaName (namesIn Zone.Graveyard S.alice buried)),
+          -- "from your library" doing real work, half two: dying is a move to
+          -- the same graveyard from the battlefield, and is not this trigger.
+          HU.testCase "CR 113.6k Narcomoeba dying from the BATTLEFIELD does not trigger" $ do
+            narcomoeba <- Registry.printing registry "Narcomoeba"
+            let (creature, gs) = S.addCreature narcomoeba S.alice (Setup.emptyGame S.bothPlayers)
+                died = S.runPure S.identityAnswer gs (Event.changeZone creature Zone.Graveyard)
+            HU.assertEqual "nothing triggered" [] (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents died) died)))
+            HU.assertBool "it is in the graveyard" (Set.member narcomoebaName (namesIn Zone.Graveyard S.alice died)),
+          -- The zone half, isolated from the mill: a graveyard card whose only
+          -- trigger functions on the battlefield (CR 113.6's default) is not
+          -- scanned into firing by an event it would have seen from play.
+          HU.testCase "CR 113.6 a battlefield-only trigger in a graveyard is not scanned" $ do
+            soulWarden <- Registry.printing registry "Soul Warden"
+            piker <- Registry.printing registry "Goblin Piker"
+            let (wardenCard, gs0) = S.addLibraryCard soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+                buried = S.runPure S.identityAnswer gs0 (Event.changeZone wardenCard Zone.Graveyard)
+                (pikerCard, gs1) = S.addHandCard piker S.alice buried
+                entered = S.runPure S.identityAnswer gs1 (Event.changeZone pikerCard Zone.Battlefield)
+            HU.assertBool "the Warden is in the graveyard" (Set.member (Text.pack "Soul Warden") (namesIn Zone.Graveyard S.alice entered))
+            HU.assertEqual "and a creature entering fires nothing" [] (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents entered) entered)))
+        ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry]

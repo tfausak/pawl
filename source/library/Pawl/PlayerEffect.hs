@@ -169,6 +169,7 @@ prohibitsCasting pid gs =
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.DontLoseUnspentMana -> False
    in any prohibits (applying pid gs)
 
 -- Does this spell match the cost-adjustment Filter? Evaluated against the
@@ -206,12 +207,14 @@ costAdjustments pid oid gs =
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.DontLoseUnspentMana -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.DontLoseUnspentMana -> Nothing
       effects = applying pid gs
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
 
@@ -233,6 +236,33 @@ maximumHandSize pid gs =
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.DontLoseUnspentMana -> False
    in if any removes (applying pid gs)
         then Nothing
         else Just defaultMaximumHandSize
+
+-- CR 500.5 / 106.4 / 613.11: does this player keep the unspent mana in their
+-- mana pool as a step or phase ends (Upwelling)? The typed question
+-- Pawl.Mana.emptyManaPools asks, so the turn-based action of CR 703.4q never
+-- learns which effect answered it.
+--
+-- A Bool about the WHOLE pool, which is exactly as much as today's carrier can
+-- say. A card that keeps only mana of a stated type (Omnath, Locus of Mana)
+-- needs this to become a per-unit predicate (#351), and one that keeps only the
+-- mana it just added (Shizuko, Karn) needs the retention to leave this carrier
+-- altogether (#352).
+--
+-- Read LIVE through `applying`, like every other question here, so an Upwelling
+-- destroyed earlier in the step is simply not found and the pools empty with
+-- nothing to unwind (CR 604.2). Pinned by ManaSpec's "CR 604.2 destroying
+-- Upwelling restores the emptying in the same step".
+keepsUnspentMana :: PlayerId -> GameState -> Bool
+keepsUnspentMana pid gs =
+  let keeps effect = case effect of
+        PlayerEffect.DontLoseUnspentMana -> True
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.IncreaseSpellCost _ _ -> False
+        PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+   in any keeps (applying pid gs)

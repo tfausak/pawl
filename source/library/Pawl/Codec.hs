@@ -295,6 +295,7 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Shaman -> "Shaman"
   Subtype.Demon -> "Demon"
   Subtype.Cleric -> "Cleric"
+  Subtype.Illusion -> "Illusion"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -343,7 +344,8 @@ jsonToSubtype =
       (Text.pack "Nomad", Subtype.Nomad),
       (Text.pack "Shaman", Subtype.Shaman),
       (Text.pack "Demon", Subtype.Demon),
-      (Text.pack "Cleric", Subtype.Cleric)
+      (Text.pack "Cleric", Subtype.Cleric),
+      (Text.pack "Illusion", Subtype.Illusion)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -727,6 +729,7 @@ playerEffectToJson e = case e of
   PlayerEffect.IncreaseSpellCost c n -> Json.tagged (Text.pack "IncreaseSpellCost") (Just (Array [filterToJson c, natTo n]))
   PlayerEffect.ReduceSpellCost c m -> Json.tagged (Text.pack "ReduceSpellCost") (Just (Array [filterToJson c, manaCostToJson m]))
   PlayerEffect.NoMaximumHandSize -> nullary (Text.pack "NoMaximumHandSize")
+  PlayerEffect.DontLoseUnspentMana -> nullary (Text.pack "DontLoseUnspentMana")
 
 jsonToPlayerEffect :: Value -> Either Text PlayerEffect.PlayerEffect
 jsonToPlayerEffect value = do
@@ -737,6 +740,7 @@ jsonToPlayerEffect value = do
     ("IncreaseSpellCost", Just (Array [c, n])) -> PlayerEffect.IncreaseSpellCost <$> jsonToFilter c <*> natFrom n
     ("ReduceSpellCost", Just (Array [c, m])) -> PlayerEffect.ReduceSpellCost <$> jsonToFilter c <*> jsonToManaCost m
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
+    ("DontLoseUnspentMana", _) -> Right PlayerEffect.DontLoseUnspentMana
     _ -> Left (Text.pack "unknown PlayerEffect: " <> t)
 
 damageRewriteToJson :: DamageRewrite.DamageRewrite -> Value
@@ -982,6 +986,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.SelfDealsCombatDamageToPlayer -> nullary (Text.pack "SelfDealsCombatDamageToPlayer")
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
   TriggerCondition.SelfCycled -> nullary (Text.pack "SelfCycled")
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> nullary (Text.pack "SelfPutIntoGraveyardFromLibrary")
 
 jsonToTriggerCondition :: Value -> Either Text TriggerCondition.TriggerCondition
 jsonToTriggerCondition value = do
@@ -994,6 +999,7 @@ jsonToTriggerCondition value = do
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
+    ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
     _ -> Left (Text.pack "unknown TriggerCondition: " <> t)
 
 castingPermissionToJson :: CastingPermission.CastingPermission -> Value

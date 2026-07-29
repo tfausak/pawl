@@ -130,6 +130,10 @@ castEngineTests registry =
       HU.testCase "a casting game conserves objects" $ do
         gs <- castGameState registry
         HU.assertEqual "objects" 120 (Game.objectCount gs),
+      -- CR 500.5 is no longer unconditional: Upwelling keeps unspent mana across
+      -- every step and phase end. It holds here because none of the hand-tuned
+      -- decks in Pawl.Cards plays one, so a future deck that does must expect
+      -- this assertion to change rather than treat it as a regression.
       HU.testCase "CR 500.5 no mana floats at the end of a game" $ do
         gs <- castGameState registry
         HU.assertEqual "pools empty" Map.empty (GameState.manaPool gs)

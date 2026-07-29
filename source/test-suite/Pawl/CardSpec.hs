@@ -339,6 +339,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.SelfCycled -> []
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -1514,8 +1515,29 @@ entersCardTests registry =
           abilities -> HU.assertFailure ("expected one triggered ability, got " <> show (length abilities))
     ]
 
+unspentManaCardTests :: Registry.Type.Registry -> Tasty.TestTree
+unspentManaCardTests registry =
+  Tasty.testGroup
+    "Unspent mana"
+    [ -- The modern Oracle wording is "don't LOSE unspent mana", CR 106.4's verb,
+      -- not "mana pools don't empty" -- and it is symmetric, which is why the
+      -- scope is EachPlayer and the effect needs no mana-type argument.
+      HU.testCase "Upwelling is a {3}{G} Enchantment with one EachPlayer DontLoseUnspentMana ability" $ do
+        p <- Registry.printing registry "Upwelling"
+        let c = Printing.card p
+            green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+        HU.assertEqual "name" (Text.pack "Upwelling") (Card.Type.name c)
+        HU.assertEqual "cost" (costOf [ManaSymbol.Generic 3, green]) (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Enchantment) (TypeLine.types (Card.Type.typeLine c))
+        HU.assertEqual "no object-axis static abilities" [] (Card.Type.staticAbilities c)
+        HU.assertEqual
+          "one player ability"
+          [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer PlayerEffect.DontLoseUnspentMana]
+          (Card.Type.playerAbilities c)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry]

@@ -59,4 +59,31 @@ data TriggerCondition
     -- continues "these abilities trigger from whatever zone the card winds up in
     -- after it's cycled" -- the graveyard, for every printing today.
     SelfCycled
+  | -- CR 603.6 (a zone-change trigger): "when this card is put into your
+    -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters
+    -- and SelfCycled: the scan visits every candidate source, so the bearer
+    -- being the card that arrived is part of the match.
+    --
+    -- The bearer is the card AS IT NOW IS IN THE GRAVEYARD -- CR 400.7's new
+    -- incarnation, which CR 400.7e says such an ability may find ("can find the
+    -- new object that it became in the zone it moved to when the ability
+    -- triggered, if that zone is a public zone"; a graveyard is public, CR
+    -- 400.2) -- because CR 113.6k puts the ability there: "A trigger
+    -- condition that can't trigger from the battlefield functions in all zones
+    -- it can trigger from." A card cannot be put into a graveyard from a library
+    -- while it is on the battlefield, so this condition can never trigger from
+    -- the battlefield, and the one zone it can trigger from is the graveyard it
+    -- lands in.
+    --
+    -- No zone pair is carried, so this is not a general "moved from A to B".
+    -- Narcomoeba is the only card in the pool with the shape, and the two zones
+    -- are exactly what makes CR 113.6k apply to it; a second card wanting a
+    -- different pair is the one that must generalise this.
+    --
+    -- The printed "your ... your" needs no controller check. A card is always
+    -- put into its OWNER's graveyard from its OWNER's library, and a card in a
+    -- graveyard has no controller (CR 108.4), so CR 113.8 makes the ability's
+    -- controller that same owner: the two "your"s can only ever name the player
+    -- the scan already picks.
+    SelfPutIntoGraveyardFromLibrary
   deriving (Eq, Ord, Show)

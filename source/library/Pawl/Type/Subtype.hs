@@ -64,4 +64,6 @@ data Subtype
   | -- CR 205.3m (a creature type; Edgewalker's own, and the tribe its cost
     -- reduction names).
     Cleric
+  | -- CR 205.3m (a creature type; Narcomoeba's).
+    Illusion
   deriving (Eq, Ord, Show)
