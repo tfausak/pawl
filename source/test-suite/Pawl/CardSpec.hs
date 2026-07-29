@@ -374,7 +374,7 @@ effectCounts effect = case effect of
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
   Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
   Effect.Untap _ -> []
-  Effect.AddCombatAndMainPhase -> []
+  Effect.AddPhases _ -> []
   Effect.GainControl duration _ -> durationCounts duration
   Effect.ArmDelayedTrigger _ -> []
   Effect.AffectPlayers duration _ _ -> durationCounts duration

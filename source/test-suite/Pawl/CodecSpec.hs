@@ -48,6 +48,7 @@ import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.EventShape as EventShape
+import qualified Pawl.Type.ExtraPhase as ExtraPhase
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
 -- evaluator module Pawl.Filter is not imported here today, but the alias
 -- convention is fixed project-wide so a later import never collides.
@@ -250,8 +251,12 @@ tests registry =
             roundTrip "e4" Codec.effectToJson Codec.jsonToEffect Effect.ExileAllGraveyards,
           HU.testCase "Proliferate" $
             roundTrip "e4b" Codec.effectToJson Codec.jsonToEffect Effect.Proliferate,
-          HU.testCase "AddCombatAndMainPhase" $
-            roundTrip "e4c" Codec.effectToJson Codec.jsonToEffect Effect.AddCombatAndMainPhase,
+          -- Both shapes in the pool: Aggravated Assault's pair and Full
+          -- Throttle's two combat phases with no main phase between them.
+          HU.testCase "AddPhases round-trips the pair" $
+            roundTrip "e4c" Codec.effectToJson Codec.jsonToEffect (Effect.AddPhases [ExtraPhase.ExtraCombat, ExtraPhase.ExtraMain]),
+          HU.testCase "AddPhases round-trips a repeated phase" $
+            roundTrip "e4c1" Codec.effectToJson Codec.jsonToEffect (Effect.AddPhases [ExtraPhase.ExtraCombat, ExtraPhase.ExtraCombat]),
           -- Untap takes the same untagged ObjectRef Destroy does, so both arms
           -- have to survive the trip: Act of Treason's slot and Aggravated
           -- Assault's swept set.

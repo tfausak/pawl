@@ -20,6 +20,7 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.ExtraPhase as ExtraPhase
 import qualified Pawl.Type.GameState as GameState
 import qualified Pawl.Type.Object as Object
 import Pawl.Type.ObjectId (ObjectId)
@@ -300,7 +301,47 @@ extraPhaseTests :: Registry.Type.Registry -> Tasty.TestTree
 extraPhaseTests registry =
   Tasty.testGroup
     "ExtraPhase"
-    [ HU.testCase "CR 500.8 whole card: Aggravated Assault untaps your creatures and adds a combat and a main phase" $ do
+    [ HU.testCase "CR 500.8 splicePhases from a MAIN phase goes at the head" $
+        -- CR 505.2: a main phase has no steps, so nothing of it is left in the
+        -- schedule and "directly after the specified phase" is the head. This is
+        -- Aggravated Assault's case, and the reason its behaviour is unchanged.
+        let remaining = Seq.fromList [Phase.Combat CombatStep.BeginningOfCombat, Phase.PostcombatMain]
+         in HU.assertEqual
+              "directly after this phase"
+              (Turn.combatAndMainPhase <> remaining)
+              (Turn.splicePhases Phase.PrecombatMain [ExtraPhase.ExtraCombat, ExtraPhase.ExtraMain] remaining),
+      HU.testCase "CR 500.8 splicePhases from INSIDE a combat phase goes after its end of combat" $
+        -- Aurelia, the Warleader's case. Her trigger resolves in the declare
+        -- attackers step, where this phase's own later steps are still in
+        -- `remaining` -- so the head is INSIDE the phase the added one must
+        -- follow, and CR 511.3's boundary is what puts it in the right place.
+        let remaining =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain
+                ]
+            expected =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat
+                ]
+                <> Turn.expandExtraPhase ExtraPhase.ExtraCombat
+                <> Seq.fromList [Phase.PostcombatMain]
+         in HU.assertEqual
+              "not inside the current phase"
+              expected
+              (Turn.splicePhases (Phase.Combat CombatStep.DeclareAttackers) [ExtraPhase.ExtraCombat] remaining),
+      HU.testCase "CR 500.8 splicePhases inserts a multi-phase list in written order" $
+        -- Full Throttle's "there are two additional combat phases": two whole
+        -- combat phases, back to back, and no main phase between them.
+        HU.assertEqual
+          "two combat phases, back to back"
+          (Turn.expandExtraPhase ExtraPhase.ExtraCombat <> Turn.expandExtraPhase ExtraPhase.ExtraCombat)
+          (Turn.splicePhases Phase.PrecombatMain [ExtraPhase.ExtraCombat, ExtraPhase.ExtraCombat] Seq.empty),
+      HU.testCase "CR 500.8 whole card: Aggravated Assault untaps your creatures and adds a combat and a main phase" $ do
         mountain <- Registry.printing registry "Mountain"
         assault <- Registry.printing registry "Aggravated Assault"
         piker <- Registry.printing registry "Goblin Piker"

@@ -5,6 +5,8 @@ import qualified Data.Sequence as Seq
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.EndingStep as EndingStep
+import Pawl.Type.ExtraPhase (ExtraPhase)
+import qualified Pawl.Type.ExtraPhase as ExtraPhase
 import Pawl.Type.GameState (GameState)
 import qualified Pawl.Type.GameState as GameState
 import Pawl.Type.Phase (Phase)
@@ -137,32 +139,46 @@ dropSkippedCombatSteps phase remaining =
 spliceSecondDamage :: Seq Phase -> Seq Phase
 spliceSecondDamage remaining = Phase.Combat CombatStep.CombatDamage Seq.<| remaining
 
--- CR 500.8: an additional combat phase followed by an additional main phase,
--- added "directly after the specified phase" -- and the specified phase is
--- always the current one, because the only card that says this ("After this main
--- phase ...") can only be activated as a sorcery (CR 307.5), so it resolves in
--- the phase it names. Directly after the current phase IS the head of the
--- remaining schedule, the shape spliceSecondDamage already has, and CR 500.8's
--- "the most recently created phase will occur first" is again cons-at-head.
---
--- The combat phase's steps are CR 506.1's five, in that order. The main phase is
--- PostcombatMain by CR 505.1a: "Only the first main phase of the turn is a
--- precombat main phase. All other main phases are postcombat main phases ... It
--- is also true of a turn in which an effect has caused an additional combat
--- phase and an additional main phase to be created."
-spliceCombatAndMainPhase :: Seq Phase -> Seq Phase
-spliceCombatAndMainPhase remaining = combatAndMainPhase <> remaining
+-- The steps one added phase expands to. CR 506.1 fixes the combat phase's five
+-- and their order; CR 505.2 ("The main phase has no steps") is why a main phase
+-- is one element.
+expandExtraPhase :: ExtraPhase -> Seq Phase
+expandExtraPhase extra = case extra of
+  ExtraPhase.ExtraCombat ->
+    Seq.fromList
+      [ Phase.Combat CombatStep.BeginningOfCombat,
+        Phase.Combat CombatStep.DeclareAttackers,
+        Phase.Combat CombatStep.DeclareBlockers,
+        Phase.Combat CombatStep.CombatDamage,
+        Phase.Combat CombatStep.EndOfCombat
+      ]
+  ExtraPhase.ExtraMain -> Seq.singleton Phase.PostcombatMain
 
--- One whole combat phase (CR 506.1) followed by one whole main phase (CR 505.2:
--- "the main phase has no steps"). Named apart from the splice so a test can say
--- what it expects to be inserted without restating CR 506.1's order.
+-- CR 500.8: add phases "directly after the specified phase", and the specified
+-- phase is always the one the effect resolves in.
+--
+-- Where that phase ends is `thisPhase`'s question -- which is what makes this
+-- correct for an effect resolving inside a STEPPED phase, where the head of
+-- `remaining` is still this phase's own later steps rather than the next phase.
+-- Aurelia, the Warleader's trigger resolves in the declare attackers step, with
+-- this combat phase's declare blockers, combat damage and end of combat steps
+-- all still ahead of it.
+--
+-- The list is inserted as one block, in written order. CR 500.8's "if multiple
+-- extra phases are created after the same phase, the most recently created phase
+-- will occur first" governs two SEPARATE effects adding phases after the same
+-- phase -- which stays true here, since each such effect splices at the same
+-- boundary and the later one lands in front of the earlier one's phases. The
+-- phases within ONE effect's list are created together, so that clause has
+-- nothing to order and they simply run as the card writes them (Full Throttle's
+-- "there are two additional combat phases").
+splicePhases :: Phase -> [ExtraPhase] -> Seq Phase -> Seq Phase
+splicePhases phase extras remaining =
+  let (current, rest) = thisPhase phase remaining
+   in current <> foldMap expandExtraPhase extras <> rest
+
+-- One whole combat phase followed by one whole main phase -- what Aggravated
+-- Assault and Relentless Assault add. Named apart from the splice so a test can
+-- say what it expects to be inserted without restating CR 506.1's order.
 combatAndMainPhase :: Seq Phase
-combatAndMainPhase =
-  Seq.fromList
-    [ Phase.Combat CombatStep.BeginningOfCombat,
-      Phase.Combat CombatStep.DeclareAttackers,
-      Phase.Combat CombatStep.DeclareBlockers,
-      Phase.Combat CombatStep.CombatDamage,
-      Phase.Combat CombatStep.EndOfCombat,
-      Phase.PostcombatMain
-    ]
+combatAndMainPhase = foldMap expandExtraPhase [ExtraPhase.ExtraCombat, ExtraPhase.ExtraMain]

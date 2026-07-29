@@ -131,7 +131,7 @@ slotsOf effect = case effect of
   Effect.PutCounters _ _ slot -> Set.singleton slot
   Effect.GainPlayerCounters ref _ _ -> playerRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
-  Effect.AddCombatAndMainPhase -> Set.empty
+  Effect.AddPhases _ -> Set.empty
   Effect.GainControl _ slot -> Set.singleton slot
   Effect.ArmDelayedTrigger _ -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
@@ -178,7 +178,7 @@ readsX = any effectReadsX
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
       Effect.Untap _ -> False
-      Effect.AddCombatAndMainPhase -> False
+      Effect.AddPhases _ -> False
       Effect.GainControl _ _ -> False
       Effect.ArmDelayedTrigger _ -> False
       Effect.AffectPlayers {} -> False
@@ -224,7 +224,7 @@ manaProduced effect = case effect of
   Effect.PutCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
   Effect.Untap _ -> Nothing
-  Effect.AddCombatAndMainPhase -> Nothing
+  Effect.AddPhases _ -> Nothing
   Effect.GainControl _ _ -> Nothing
   Effect.ArmDelayedTrigger _ -> Nothing
   Effect.AffectPlayers {} -> Nothing
@@ -265,7 +265,7 @@ searchesLibrary effect = case effect of
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
   Effect.Untap _ -> False
-  Effect.AddCombatAndMainPhase -> False
+  Effect.AddPhases _ -> False
   Effect.GainControl _ _ -> False
   Effect.ArmDelayedTrigger _ -> False
   Effect.AffectPlayers {} -> False
@@ -360,7 +360,7 @@ rewriteEffect pairs effect = case effect of
   Effect.GainPlayerCounters {} -> effect
   Effect.Untap _ -> effect
   -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
-  Effect.AddCombatAndMainPhase -> effect
+  Effect.AddPhases _ -> effect
   Effect.GainControl _ _ -> effect
   Effect.ArmDelayedTrigger _ -> effect
   -- A player effect carries no basic-land-type word for CR 612 to rewrite.
@@ -1620,18 +1620,17 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
             { GameState.objects =
                 foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
             }
-  -- CR 500.8: add the phases, directly after the phase this is resolving in --
-  -- GameState.remaining is exactly what is left after the current one, so
-  -- Turn.spliceCombatAndMainPhase's cons-at-head puts them there.
+  -- CR 500.8: add the phases, directly after the phase this is resolving in.
   --
-  -- Cons-at-head means "directly after this PHASE" only because the phase this
-  -- can resolve in has no steps: what is left of a stepped phase would sit in
-  -- `remaining` too, and the new phases would go inside it rather than after it.
-  -- Turn.spliceCombatAndMainPhase's own comment carries the CR 307.5 argument
-  -- for why the resolving phase is always a main phase (CR 505.2: no steps).
-  Effect.AddCombatAndMainPhase ->
+  -- Turn.splicePhases is handed GameState.phase because "directly after this
+  -- phase" is NOT the head of `remaining` when the resolving phase still has
+  -- steps to come: Aurelia, the Warleader's trigger resolves in the declare
+  -- attackers step, where this combat phase's own declare blockers, combat
+  -- damage and end of combat steps are all still ahead. CR 511.3 is what bounds
+  -- the phase, and Turn.thisPhase is where that lives.
+  Effect.AddPhases extras ->
     State.modify' $ \gs ->
-      gs {GameState.remaining = Turn.spliceCombatAndMainPhase (GameState.remaining gs)}
+      gs {GameState.remaining = Turn.splicePhases (GameState.phase gs) extras (GameState.remaining gs)}
   Effect.GainControl duration slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

@@ -154,6 +154,7 @@ library
     Pawl.Type.EntryRewrite
     Pawl.Type.EventShape
     Pawl.Type.Expiry
+    Pawl.Type.ExtraPhase
     Pawl.Type.Filter
     Pawl.Type.Game
     Pawl.Type.GameEvent

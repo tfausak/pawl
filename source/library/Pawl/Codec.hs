@@ -52,6 +52,7 @@ import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.EventShape as EventShape
+import qualified Pawl.Type.ExtraPhase as ExtraPhase
 import qualified Pawl.Type.Filter as Filter
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.Json (Value (Array, Boolean, Null, Object))
@@ -1087,6 +1088,11 @@ regenerabilityToJson r = nullary . Text.pack $ case r of
   Regenerability.Regenerable -> "Regenerable"
   Regenerability.CantBeRegenerated -> "CantBeRegenerated"
 
+extraPhaseToJson :: ExtraPhase.ExtraPhase -> Value
+extraPhaseToJson e = nullary . Text.pack $ case e of
+  ExtraPhase.ExtraCombat -> "ExtraCombat"
+  ExtraPhase.ExtraMain -> "ExtraMain"
+
 counterabilityToJson :: Counterability.Counterability -> Value
 counterabilityToJson c = nullary . Text.pack $ case c of
   Counterability.Counterable -> "Counterable"
@@ -1113,6 +1119,14 @@ jsonToRegenerability =
     (Text.pack "Regenerability")
     [ (Text.pack "Regenerable", Regenerability.Regenerable),
       (Text.pack "CantBeRegenerated", Regenerability.CantBeRegenerated)
+    ]
+
+jsonToExtraPhase :: Value -> Either Text ExtraPhase.ExtraPhase
+jsonToExtraPhase =
+  decodeNullary
+    (Text.pack "ExtraPhase")
+    [ (Text.pack "ExtraCombat", ExtraPhase.ExtraCombat),
+      (Text.pack "ExtraMain", ExtraPhase.ExtraMain)
     ]
 
 manaProductionToJson :: ManaProduction.ManaProduction -> Value
@@ -1530,7 +1544,7 @@ effectToJson e = case e of
   Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
   Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array [playerRefToJson r, playerCounterKindToJson k, quantityToJson q]))
   Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (objectRefToJson r))
-  Effect.AddCombatAndMainPhase -> nullary (Text.pack "AddCombatAndMainPhase")
+  Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (fmap extraPhaseToJson ps)))
   Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array [durationToJson d, slotNameToJson s]))
   Effect.ArmDelayedTrigger n -> Json.tagged (Text.pack "ArmDelayedTrigger") (Just (abilityNameToJson n))
   Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array [durationToJson d, playerScopeToJson s, playerEffectToJson pe]))
@@ -1612,7 +1626,9 @@ jsonToEffect value = do
       Just (Array [r, k, q]) -> Effect.GainPlayerCounters <$> jsonToPlayerRef r <*> jsonToPlayerCounterKind k <*> jsonToQuantity q
       _ -> Left (Text.pack "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]")
     "Untap" -> withValue mv (fmap Effect.Untap . jsonToObjectRef)
-    "AddCombatAndMainPhase" -> Right Effect.AddCombatAndMainPhase
+    "AddPhases" -> case mv of
+      Just (Array ps) -> Effect.AddPhases <$> traverse jsonToExtraPhase ps
+      _ -> Left (Text.pack "AddPhases expects [ExtraPhase]")
     "GainControl" -> case mv of
       Just (Array [d, s]) -> Effect.GainControl <$> jsonToDuration d <*> jsonToSlotName s
       _ -> Left (Text.pack "GainControl expects [duration, slot]")
