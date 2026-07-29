@@ -1,6 +1,9 @@
+{-# LANGUAGE GADTs #-}
+
 -- Covers Pawl.Replay: record/replay transcript round-trips.
 module Pawl.ReplaySpec where
 
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -19,6 +22,7 @@ import qualified Pawl.Type.Concession as Concession
 import qualified Pawl.Type.Cost as Cost.Type
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.Decider as Decider
+import qualified Pawl.Type.Desync as Desync
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.Game as Game.Type
 import qualified Pawl.Type.GameState as GameState
@@ -30,6 +34,7 @@ import qualified Pawl.Type.MulliganDecision as MulliganDecision
 import qualified Pawl.Type.MulliganOffer as MulliganOffer
 import qualified Pawl.Type.ObjectId as ObjectId
 import qualified Pawl.Type.OptionalDecision as OptionalDecision
+import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Prompt as Prompt
@@ -359,8 +364,18 @@ combatReplayTests =
                   HU.assertEqual "concedes" (Just Concession.Concedes) (Replay.decode p (Replay.encode p Concession.Concedes))
                   HU.assertEqual "continues" (Just Concession.Continues) (Replay.decode p (Replay.encode p Concession.Continues)),
           HU.testCase "a short transcript defaults a Concede to Continues" $
-            HU.assertEqual "least eventful" Concession.Continues (Replay.defaultAnswer (Prompt.Concede S.alice))
+            -- NOT "least eventful", unlike the arms around it: dropping a
+            -- concession hands the win to the other player (CR 104.2a), which
+            -- is why Replay.replay reports the desync.
+            HU.assertEqual "the game keeps running" Concession.Continues (Replay.defaultAnswer (Prompt.Concede S.alice))
         ]
+
+-- Concedes whenever asked, and otherwise takes the identity answer. Delegating
+-- through a wildcard keeps this out of the -Werror exhaustiveness net.
+concedeAnswer :: Prompt.Prompt r -> r
+concedeAnswer p = case p of
+  Prompt.Concede _ -> Concession.Concedes
+  _ -> S.identityAnswer p
 
 -- The starting state, the game program, and a transcript recorded with
 -- playLandAnswer (whose choices differ from Replay's exhausted-transcript
@@ -380,14 +395,57 @@ replayTests registry =
     "Replay"
     [ HU.testCase "replaying a recorded game reproduces the final state" $ do
         (start, game, recorded, transcript) <- recordedGame registry
-        HU.assertEqual "final states equal" recorded (snd (Replay.replay transcript start game)),
+        let ((_, replayed), desync) = Replay.replay transcript start game
+        HU.assertEqual "final states equal" recorded replayed
+        HU.assertEqual "and the transcript answered every prompt" Nothing desync,
       HU.testCase "the transcript is what carries the decisions" $ do
         (start, game, recorded, _) <- recordedGame registry
-        HU.assertBool "empty log diverges" (recorded /= snd (Replay.replay [] start game)),
+        let ((_, replayed), desync) = Replay.replay [] start game
+        HU.assertBool "empty log diverges" (recorded /= replayed)
+        -- The divergence is REPORTED rather than silent. An empty log runs out
+        -- at the very first prompt, so the report names index 0.
+        HU.assertEqual "and says where it ran out" (Just (Desync.Exhausted 0)) desync,
       HU.testCase "a recorded goldfish also replays" $ do
         (start, game, _, _) <- recordedGame registry
         let ((_, gf), gfLog) = Replay.record S.identityAnswer start game
-        HU.assertEqual "goldfish" gf (snd (Replay.replay gfLog start game)),
+            ((_, replayed), desync) = Replay.replay gfLog start game
+        HU.assertEqual "goldfish" gf replayed
+        HU.assertEqual "no desync" Nothing desync,
+      -- #144. Pawl.Replay.defaultAnswer is deliberately total, so a transcript
+      -- that has drifted out of step with the prompts the engine actually asks
+      -- does not crash -- it silently answers everything from the fallback and
+      -- plays out a DIFFERENT game. For Prompt.Concede that fallback is
+      -- Concession.Continues, so a dropped concession changes who WINS (CR
+      -- 104.2a), not merely how a choice was filled. These pin the report that
+      -- makes that visible: replay names the first prompt the transcript failed
+      -- to answer, and nothing after it can be trusted.
+      HU.testCase "a truncated transcript reports where it ran out" $ do
+        (start, game, _, transcript) <- recordedGame registry
+        let (_, desync) = Replay.replay (List.init transcript) start game
+        case desync of
+          Just (Desync.Exhausted _) -> pure ()
+          _ -> HU.assertFailure ("expected an Exhausted report, got " <> show desync),
+      HU.testCase "a mismatched entry is reported, not silently defaulted" $ do
+        (start, game, recorded, transcript) <- recordedGame registry
+        -- A response of the wrong SHAPE for the first prompt, which is the
+        -- opening Prompt.Shuffle: Response.ChoseX answers Prompt.ChooseX and
+        -- nothing else, so decode rejects it.
+        let bogus = Response.ChoseX 0
+            ((_, replayed), desync) = Replay.replay (bogus : transcript) start game
+        HU.assertEqual "reported at index 0, carrying the offending entry" (Just (Desync.Mismatched 0 bogus)) desync
+        HU.assertBool "and the replay is not the recorded game" (recorded /= replayed),
+      -- The one that matters: a dropped concession replays to the OTHER winner.
+      HU.testCase "#144 a concession lost to a desync silently flips the winner" $
+        let base = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
+            ((_, conceded), transcript) = Replay.record concedeAnswer base Engine.runStep
+            -- One spurious entry ahead of the log is enough: decode rejects it,
+            -- replay does not consume it, and every later prompt meets the same
+            -- entry -- so the whole transcript is stranded behind it.
+            ((_, drifted), desync) = Replay.replay (Response.ChoseX 0 : transcript) base Engine.runStep
+         in do
+              HU.assertEqual "recorded: alice conceded, bob wins" (Just (Result.Won S.bob)) (GameState.result conceded)
+              HU.assertEqual "replayed: the concession is gone" Nothing (GameState.result drifted)
+              HU.assertEqual "and the report says so" (Just (Desync.Mismatched 0 (Response.ChoseX 0))) desync,
       HU.testCase "a ChooseTargets answer round-trips through the transcript" $
         let sets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.singleton (Recipient.ToPlayer S.bob))
             p = Prompt.ChooseTargets (Decider.MkDecider S.alice) S.alice (ObjectId.MkObjectId 0) sets

@@ -775,8 +775,9 @@ ruleTests registry =
             (_spellId, g3) = S.addHandCard syntheticSubgame S.alice g2
             gStart = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
             ((_, after), log_) = Replay.record subgameAnswer gStart Engine.priorityLoop
-            (_, replayed) = Replay.replay log_ gStart Engine.priorityLoop
-        HU.assertEqual "a subgame replays deterministically (the reason PlaySubgame is not a Prompt, CR 729 / M0 determinism)" after replayed,
+            ((_, replayed), desync) = Replay.replay log_ gStart Engine.priorityLoop
+        HU.assertEqual "a subgame replays deterministically (the reason PlaySubgame is not a Prompt, CR 729 / M0 determinism)" after replayed
+        HU.assertEqual "and the transcript answered every prompt" Nothing desync,
       HU.testCase "M5.6b gate: three-player setup -- a free first mulligan (CR 103.5c) and no first-turn draw skip (CR 103.8c)" $ do
         -- A real newGame at three seats: build and shuffle three 60-card
         -- libraries, draw opening hands, run the CR 103.5 round loop with every
@@ -884,6 +885,44 @@ concedeTests registry =
         HU.assertEqual "every Concede ask reached bob himself, not his controller" [S.bob, S.bob] concedeAsks
         HU.assertEqual "bob left by his own concession" (Just (Status.Departed Departure.Type.Conceded)) (fmap Player.status (Map.lookup S.bob (GameState.players after)))
         HU.assertEqual "alice wins" (Just (Result.Won S.alice)) (GameState.result after),
+      -- #144, and the proof that the elision is NOT cosmetic latency. CR 104.3a
+      -- says a player may concede "at any time"; Engine.priorityLoop offers the
+      -- ask only at a priority the conceder themselves holds, and CR 117.5 /
+      -- CR 704.3 put a state-based action check in front of every priority
+      -- grant. So the two are in a race, and the race decides the game.
+      --
+      -- alice is at 0 life and it is her turn, with nothing yet settled. bob
+      -- wants out.
+      --
+      --   * conceding BEFORE the settle: bob leaves immediately (CR 104.3a),
+      --     alice's opponents have all left, and CR 104.2a hands her the win --
+      --     "immediately and overrides all effects that would preclude that
+      --     player from winning the game", her own 0 life included.
+      --   * conceding at bob's NEXT priority: settleForPriority runs first,
+      --     CR 104.3b takes alice at 0 life, and bob wins before he is ever
+      --     asked.
+      --
+      -- Same start state, two different winners, differing only in WHEN the
+      -- concession lands. This pins both arms rather than picking one: no set
+      -- of poll points a pull channel can offer is "any time", so widening the
+      -- poll would move this race rather than end it.
+      HU.testCase "#144 conceding before the settle window and after it name different winners" $
+        let base = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
+            gs = base {GameState.players = Map.adjust (\p -> p {Player.life = 0}) S.alice (GameState.players base)}
+            -- The engine as it stands. concedeOrderAnswer records every Concede
+            -- ask, so the test does not have to take the narrowness of the
+            -- window on trust: bob is asked nothing at all.
+            ((_, atOwnPriority), asks) = State.runState (Engine.runGame (concedeOrderAnswer S.bob) gs Engine.runStep) []
+            -- The counterfactual, reached through the same door the engine
+            -- uses (Departure.leaveGame IS priorityLoop's concede arm): bob's
+            -- concession lands before the settle instead of after it.
+            conceded = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.bob)
+            beforeSettle = S.runPure (concedeAnswer S.bob) conceded Engine.runStep
+         in do
+              HU.assertEqual "the settle got there first: nobody was ever asked" [] asks
+              HU.assertEqual "CR 104.3b takes alice first, so bob wins" (Just (Result.Won S.bob)) (GameState.result atOwnPriority)
+              HU.assertEqual "CR 104.2a: had bob got out first, alice wins" (Just (Result.Won S.alice)) (GameState.result beforeSettle)
+              HU.assertBool "the race decides the game, not its timing" (GameState.result atOwnPriority /= GameState.result beforeSettle),
       HU.testCase "CR 104.3a concede does not use the stack: a spell on it never resolves" $ do
         -- A Lightning Bolt is on the stack targeting nothing in particular. alice
         -- concedes at her priority; the game ends without the stack resolving.

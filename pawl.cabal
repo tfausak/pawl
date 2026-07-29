@@ -146,6 +146,7 @@ library
     Pawl.Type.DelayedTrigger
     Pawl.Type.Departure
     Pawl.Type.DestructionRewrite
+    Pawl.Type.Desync
     Pawl.Type.Duration
     Pawl.Type.Effect
     Pawl.Type.EndingStep

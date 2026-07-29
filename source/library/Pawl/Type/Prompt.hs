@@ -31,15 +31,20 @@ data Prompt r where
   -- leaves the game immediately." Asked before ChooseAction wherever a player
   -- would receive priority.
   --
-  -- This constructor deliberately carries NO Decider, and is the only one that
-  -- does not. That asymmetry IS the CR 723.6 mechanism: a controller may not make
-  -- a controlled player concede, but the controlled player may still concede
-  -- themselves -- so the ask must reach the true player, and there must be
-  -- nowhere to put a controller. Routing concede through ChooseAction (as an
-  -- Action constructor) would hand the controller exactly the power CR 723.6
-  -- forbids, and leave the controlled player with no channel at all.
+  -- This is the only CHOICE prompt that carries no Decider, and that asymmetry
+  -- IS the CR 723.6 mechanism: "The controller of another player can't make that
+  -- player concede. A player may concede the game at any time, even if they are
+  -- controlled by another player." So the ask must reach the true player, and
+  -- there must be nowhere to put a controller. Folding concede into ChooseAction
+  -- as an Action constructor -- the obvious way to save a prompt -- would hand
+  -- the controller exactly the power CR 723.6 forbids and leave the controlled
+  -- player with no channel at all. (Shuffle and RandomFirstPlayer carry no
+  -- Decider either, for the unrelated reason that randomness is not a choice.)
   --
-  -- "At any time" is narrowed to "at each priority grant" (#144).
+  -- "At any time" is narrowed to "at each priority grant", and while a CR 729
+  -- subgame is running this asks about the SUBGAME rather than the main game
+  -- (#144, #397). Pawl.GameSpec's "conceding before the settle window and after
+  -- it name different winners" pins what the first narrowing costs.
   Concede :: PlayerId -> Prompt Concession
   Shuffle :: [ObjectId] -> Prompt [ObjectId]
   -- CR 729.2: "Randomly determine which player goes first." The NonEmpty is the
@@ -47,12 +52,14 @@ data Prompt r where
   -- to begin with them (CR 103.1: "the game's default turn order begins with the
   -- starting player and proceeds clockwise").
   --
-  -- Carries no Decider, and Shuffle is the only other constructor that does not:
-  -- this is randomness, not a choice, so there is no player whose decision could
-  -- be usurped and nowhere for a controller (CR 723) to sit. Asked only where the
-  -- rules call for randomness -- a subgame's start. A MAIN game's starting player
-  -- is settled before the game begins, by any mutually agreeable method (CR
-  -- 103.1), which is the caller-supplied turn order Setup.emptyGame takes.
+  -- Carries no Decider, and neither does Shuffle: this is randomness, not a
+  -- choice, so there is no player whose decision could be usurped and nowhere for
+  -- a controller (CR 723) to sit. Concede is the only other constructor without
+  -- one, for the opposite reason -- it IS a choice, and CR 723.6 bars the
+  -- controller specifically from making it. Asked only where the rules call for
+  -- randomness -- a subgame's start. A MAIN game's starting player is settled
+  -- before the game begins, by any mutually agreeable method (CR 103.1), which is
+  -- the caller-supplied turn order Setup.emptyGame takes.
   --
   -- NonEmpty, not [], for the same reason Setup.emptyGame takes one: the answer
   -- has to come from somewhere, and a fallback must be total.
