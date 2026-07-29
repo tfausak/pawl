@@ -70,4 +70,8 @@ data Subtype
     Spirit
   | -- CR 205.3m (a creature type; Aurelia, the Warleader's).
     Angel
+  | -- CR 205.3m (a creature type; Endless Cockroaches').
+    Insect
+  | -- CR 205.3m (a creature type; Deathknell Berserker's own, and its token's).
+    Berserker
   deriving (Eq, Ord, Show)

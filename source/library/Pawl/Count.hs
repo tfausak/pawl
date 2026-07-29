@@ -42,8 +42,9 @@ type ViewOf = ObjectId -> Maybe Filter.View
 -- Reads a per-object quantity off one candidate. INJECTED for exactly the
 -- module-cycle reason ViewOf is: Pawl.Quantity imports this module, so nothing
 -- here can call Pawl.Quantity.evaluate. Pawl.Quantity ties the knot at its own
--- Count arm, and Pawl.Condition at its threshold. Every aggregation but
--- Aggregation.Greatest ignores it.
+-- Count arm, and it is the only module that does -- Pawl.Condition reaches this
+-- fold only THROUGH Pawl.Quantity, since both sides of a Condition are
+-- Quantities. Every aggregation but Aggregation.Greatest ignores it.
 type QuantityOf quantity = ObjectId -> quantity -> Maybe Integer
 
 -- Nothing when the count cannot be determined -- an unresolvable PlayerRef, or

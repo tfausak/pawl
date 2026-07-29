@@ -16,6 +16,8 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as CardT
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.Comparison as Comparison
+import qualified Pawl.Type.Condition as Condition
 import qualified Pawl.Type.ControllerRelation as ControllerRelation
 import qualified Pawl.Type.Cost as Cost
 import qualified Pawl.Type.Effect as Effect
@@ -200,6 +202,68 @@ tests registry =
             -- mana-symbol rule would leave it colorless (CR 202.2b); the
             -- indicator is what makes this one white.
             HU.assertEqual "and white by colour indicator" (Set.singleton Color.White) (CardT.colorIndicator token)
+          other -> HU.assertFailure ("expected exactly one Create, got " <> show (length other)),
+      -- The pool's first card whose dies trigger acts on ITSELF, and so the
+      -- first that has to tell CR 113.7a's source apart from CR 400.7e's "new
+      -- object that it became". The effect is narcomoeba.json's opcode with a
+      -- different slot, which is precisely the distinction: that card's "self"
+      -- IS the arriving graveyard card, and this one's is not.
+      HU.testCase "endless-cockroaches.json loads as a {1}{B}{B} 1/1 whose dies trigger returns the card it became to hand" $ do
+        c <- Registry.card registry "Endless Cockroaches"
+        HU.assertEqual "name" (Text.pack "Endless Cockroaches") (CardT.name c)
+        HU.assertEqual
+          "{1}{B}{B}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Black), ManaSymbol.OfType (ManaType.Colored Color.Black)]))
+          (CardT.manaCost c)
+        HU.assertEqual
+          "Creature -- Insect"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.singleton Subtype.Insect))
+          (CardT.typeLine c)
+        HU.assertEqual "1/1" (Just (Power.MkPower (Quantity.Literal 1)), Just (Toughness.MkToughness (Quantity.Literal 1))) (CardT.power c, CardT.toughness c)
+        HU.assertEqual "no keywords" Set.empty (CardT.keywords c)
+        HU.assertEqual
+          "one trigger, on dying"
+          [TriggerCondition.SelfDies]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual "and no intervening if" [Nothing] (fmap TriggeredAbility.intervening (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "returning the became slot to its owner's hand"
+          [[(Optionality.Mandatory, [Effect.MoveToZone Binding.became Zone.Hand])]]
+          (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
+      -- The pool's first INTERVENING "if" on a look-back trigger (CR 603.4 read
+      -- against CR 608.2h last known information), and the first condition whose
+      -- measured side is not a Count at all.
+      HU.testCase "deathknell-berserker.json loads as a {1}{B} 2/2 whose dies trigger is gated on its own power" $ do
+        c <- Registry.card registry "Deathknell Berserker"
+        HU.assertEqual "name" (Text.pack "Deathknell Berserker") (CardT.name c)
+        HU.assertEqual "{1}{B}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Black)])) (CardT.manaCost c)
+        HU.assertEqual
+          "Creature -- Elf Berserker"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Elf, Subtype.Berserker]))
+          (CardT.typeLine c)
+        HU.assertEqual "2/2" (Just (Power.MkPower (Quantity.Literal 2)), Just (Toughness.MkToughness (Quantity.Literal 2))) (CardT.power c, CardT.toughness c)
+        HU.assertEqual
+          "one trigger, on dying"
+          [TriggerCondition.SelfDies]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          "gated on its own power being 3 or greater"
+          [Just (Condition.MkCondition Quantity.Power Comparison.AtLeast (Quantity.Literal 3))]
+          (fmap TriggeredAbility.intervening (CardT.triggeredAbilities c))
+        case [(q, tc) | ab <- CardT.triggeredAbilities c, Effect.Create q tc _ _ <- concatMap snd (modeShapes (TriggeredAbility.modal ab))] of
+          [(quantity, token)] -> do
+            HU.assertEqual "one token" (Quantity.Literal 1) quantity
+            HU.assertEqual "named Zombie Berserker" (Text.pack "Zombie Berserker") (CardT.name token)
+            HU.assertEqual
+              "Creature -- Zombie Berserker"
+              (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Zombie, Subtype.Berserker]))
+              (CardT.typeLine token)
+            HU.assertEqual "2/2" (Just (Power.MkPower (Quantity.Literal 2)), Just (Toughness.MkToughness (Quantity.Literal 2))) (CardT.power token, CardT.toughness token)
+            HU.assertEqual "no keywords" Set.empty (CardT.keywords token)
+            -- CR 202.2b/202.2e, exactly as doomed-traveler.json's Spirit: a
+            -- token has no mana cost, so only the colour indicator makes it
+            -- black.
+            HU.assertEqual "and black by colour indicator" (Set.singleton Color.Black) (CardT.colorIndicator token)
           other -> HU.assertFailure ("expected exactly one Create, got " <> show (length other)),
       HU.testCase "leyline-of-the-void.json loads with a CR 103.6a action and an Opponents redirect" $ do
         c <- Registry.card registry "Leyline of the Void"

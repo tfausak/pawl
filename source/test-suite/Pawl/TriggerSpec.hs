@@ -16,7 +16,11 @@
 -- 702.70 poisonous, the keyword whose rule text IS a triggered ability, and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousTests`. CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
--- Narcomoeba -- `graveyardTriggerTests`.
+-- Narcomoeba -- `graveyardTriggerTests`. CR 400.7e's OTHER reference inside a
+-- look-back trigger, the card it became in the first zone it went to, with
+-- Endless Cockroaches -- `becameSlotTests`. CR 603.4's intervening "if" read
+-- against a source that no longer exists (CR 608.2h), with Deathknell Berserker
+-- -- `lookBackInterveningTests`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -80,14 +84,17 @@ import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.PendingTrigger as PendingTrigger
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Type.Power as Power
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
+import qualified Pawl.Type.Quantity as Quantity.Type
 import qualified Pawl.Type.Recipient as Recipient
 import qualified Pawl.Type.Regenerability as Regenerability
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
 import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Type.TriggerSource as TriggerSource
@@ -1851,6 +1858,180 @@ diesTriggerTests registry =
             HU.assertEqual "so the trigger is hers, not its owner's" [S.alice] (fmap PendingTrigger.controller (fst (Event.gatherTriggers (Event.unscannedEvents died) died)))
         ]
 
+-- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
+-- to the card that left the battlefield checks for it only in the first zone
+-- that it went to" -- said positively by CR 400.7e: "Abilities that trigger when
+-- an object moves from one zone to another ... can find the new object that it
+-- became in the zone it moved to when the ability triggered, if that zone is a
+-- public zone."
+--
+-- Endless Cockroaches, {1}{B}{B} Creature -- Insect 1/1, "When this creature
+-- dies, return it to its owner's hand." Two different objects hide inside that
+-- one printed word "it": the ability's SOURCE (CR 113.7a -- the permanent that
+-- died, which CR 603.10a's look-back reads from CR 608.2h last known
+-- information) and the CARD it became in the graveyard, which is what the
+-- effect has to move. CR 400.7 minted a fresh id for the second, so the two are
+-- not interchangeable and they are not one slot.
+--
+-- The structural twin is Narcomoeba's `MoveToZone "self" Battlefield` in
+-- graveyardTriggerTests: same opcode, same slot shape. There "self" IS the
+-- arriving card, because SelfPutIntoGraveyardFromLibrary matches on the
+-- ARRIVING incarnation; here it is not, because CR 603.10a makes this condition
+-- match on the DEPARTING one. That contrast is why there are two slots.
+becameSlotTests :: Registry.Type.Registry -> Tasty.TestTree
+becameSlotTests registry =
+  let -- alice: one Mountain (Lightning Bolt's {R}), the Cockroaches in play, and
+      -- the Bolt in hand. S.identityAnswer targets the least Recipient, and
+      -- Recipient.ToCreature sorts before Recipient.ToPlayer, so the one
+      -- creature on the board is the target without a bespoke interpreter.
+      roachBoard = do
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        cockroaches <- Registry.printing registry "Endless Cockroaches"
+        let (roachId, withRoaches) = S.addCreature cockroaches S.alice (S.landsInPlay mountain 1)
+        pure (roachId, S.handOne lightningBolt withRoaches)
+      -- Cast the Bolt, resolve it (3 damage marked on a 1/1), settle -- CR
+      -- 704.5g destroys it and the same CR 117.5 settle's trigger scan sees the
+      -- death -- then resolve the trigger.
+      boltIt (gs, spellId) =
+        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+            damaged = S.runPure S.identityAnswer cast Stack.resolveTop
+            settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Card.Type.name (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+      roachName = Text.pack "Endless Cockroaches"
+   in Tasty.testGroup
+        "CR 400.7e the card it became"
+        [ -- The gameplay-level proof, cast to resolution. The discriminating
+          -- assertion is the HAND: an effect reading the trigger's source would
+          -- name the dead battlefield id and move nothing, leaving the card in
+          -- the graveyard where the state-based action put it.
+          HU.testCase "CR 603.6c whole card: Lightning Bolt kills Endless Cockroaches and its dies trigger returns the card to hand" $ do
+            (_, board) <- roachBoard
+            let (settled, after) = boltIt board
+            HU.assertEqual "the trigger reached the stack in that settle" 1 (length (GameState.stack settled))
+            HU.assertBool "the card is in the graveyard when the trigger is placed" (Set.member roachName (namesIn Zone.Graveyard S.alice settled))
+            HU.assertBool "and in hand once it resolves" (Set.member roachName (namesIn Zone.Hand S.alice after))
+            HU.assertBool "no longer in the graveyard" (not (Set.member roachName (namesIn Zone.Graveyard S.alice after)))
+            -- The Bolt itself is the graveyard's only remaining tenant, so the
+            -- assertion above cannot be passing because the graveyard is read
+            -- from the wrong player's zone.
+            HU.assertEqual "only the Bolt is left there" (Set.singleton (Text.pack "Lightning Bolt")) (namesIn Zone.Graveyard S.alice after),
+          -- The two slots, side by side on the placed trigger. CR 113.7a's
+          -- source is the id that DIED and no longer resolves; CR 400.7e's
+          -- "became" is the graveyard card, which does.
+          HU.testCase "CR 113.7a the self slot keeps the departed id while became names the graveyard card" $ do
+            (roachId, board) <- roachBoard
+            let (settled, _) = boltIt board
+                bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid settled)
+                slots = concatMap (Map.toList . Binding.targetsOf . bindingsOn) (GameState.stack settled)
+                slotFor name = lookup name slots
+            HU.assertEqual "self is the permanent that died" (Just (Recipient.ToObject roachId)) (slotFor Binding.triggerSource)
+            HU.assertBool "and that id is gone (CR 400.7)" (Maybe.isNothing (Game.lookupObject roachId settled))
+            case slotFor Binding.became of
+              Just (Recipient.ToObject graveyardId) -> do
+                HU.assertBool "became is a different id" (graveyardId /= roachId)
+                HU.assertEqual "and it is the graveyard card" (Just roachName) (fmap Card.Type.name (Game.cardOf graveyardId settled))
+                -- The spent Bolt is in that graveyard too, so membership is the
+                -- assertion rather than the whole zone.
+                HU.assertBool "in alice's graveyard" (elem graveyardId (Game.zoneMembers Zone.Graveyard S.alice settled))
+              other -> HU.assertFailure ("expected became to name an object, got " <> show other),
+          -- eventBindings in isolation, so the binding is pinned to the rule
+          -- rather than to one card's payload. CR 400.7e's "the new object that
+          -- it became in the zone it moved to" is ZoneChange.object, never
+          -- ZoneChange.departed, which is what matchesTrigger matched on.
+          HU.testCase "CR 400.7e eventBindings binds the ARRIVING id, not the departed one" $
+            let departed = ObjectId.MkObjectId 1
+                arrived = ObjectId.MkObjectId 2
+                died = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics
+             in HU.assertEqual
+                  "became names the graveyard incarnation"
+                  (Map.singleton Binding.became (Binding.toObject arrived))
+                  (Event.eventBindings TriggerCondition.SelfDies died),
+          -- A condition that is not a look-back gets no such slot: Narcomoeba's
+          -- bearer IS the arriving card, so binding it again would be a second
+          -- name for the same object.
+          HU.testCase "CR 113.6k a library-to-graveyard trigger binds nothing" $
+            let oid = ObjectId.MkObjectId 1
+                milled = GameEvent.Moved (ZoneChange.MkZoneChange oid oid Zone.Library Zone.Graveyard) S.emptyCharacteristics
+             in HU.assertEqual
+                  "no became slot"
+                  Map.empty
+                  (Event.eventBindings TriggerCondition.SelfPutIntoGraveyardFromLibrary milled)
+        ]
+
+-- CR 603.4's intervening "if" on a LOOK-BACK trigger, which is the one shape
+-- where the clause has to be read against an object that no longer exists:
+-- "When the trigger event occurs, the ability checks whether the stated
+-- condition is true. The ability triggers only if it is." CR 608.2a repeats the
+-- check as the ability resolves.
+--
+-- Deathknell Berserker, {1}{B} Creature -- Elf Berserker 2/2: "When this
+-- creature dies, if its power was 3 or greater, create a 2/2 black Zombie
+-- Berserker creature token." Both readings of "its power" that are available
+-- without CR 608.2h are wrong -- the id is gone, so a live projection describes
+-- nothing at all, and the card sitting in the graveyard has its printed 2.
+-- Only last known information answers 3.
+--
+-- Bad Moon supplies the third power, and it does so through the LAYERS
+-- (CR 613.4c, layer 7c), which is what makes the graveyard card's printed value
+-- visibly the wrong answer rather than merely a different route to the same one.
+lookBackInterveningTests :: Registry.Type.Registry -> Tasty.TestTree
+lookBackInterveningTests registry =
+  let berserkerBoard withBadMoon = do
+        mountain <- Registry.printing registry "Mountain"
+        lightningBolt <- Registry.printing registry "Lightning Bolt"
+        berserker <- Registry.printing registry "Deathknell Berserker"
+        badMoon <- Registry.printing registry "Bad Moon"
+        let lands = S.landsInPlay mountain 1
+            moonAdded = if withBadMoon then snd (S.addCreature badMoon S.alice lands) else lands
+            (berserkerId, withBerserker) = S.addCreature berserker S.alice moonAdded
+        pure (berserkerId, S.handOne lightningBolt withBerserker)
+      -- The Bolt targets the least Recipient, and S.addCreature hands out
+      -- ascending ids, so Bad Moon (added first) would sort before the
+      -- Berserker if it were a legal target -- it is an enchantment, and
+      -- Lightning Bolt's pool is AnyTarget, so the Berserker is the only
+      -- creature and the Bolt finds it.
+      boltIt (gs, spellId) =
+        let cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice spellId)
+            damaged = S.runPure S.identityAnswer cast Stack.resolveTop
+            settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+      tokensOf pid gs =
+        filter
+          (\oid -> fmap Card.Type.name (Game.cardOf oid gs) == Just (Text.pack "Zombie Berserker"))
+          (Game.zoneMembers Zone.Battlefield pid gs)
+   in Tasty.testGroup
+        "CR 603.4 an intervening if over last known information"
+        [ HU.testCase "CR 603.4 with Bad Moon the Berserker died at power 3 and its trigger fires" $ do
+            (berserkerId, board) <- berserkerBoard True
+            let (settled, after) = boltIt board
+            HU.assertEqual "it was a 3/3 while it lived" (Just 3) (Projection.powerOf berserkerId (fst board))
+            HU.assertEqual "the trigger reached the stack" 1 (length (GameState.stack settled))
+            case tokensOf S.alice after of
+              [token] -> do
+                -- Printed 2/2, and 3/3 on this board: the token is black, so
+                -- the same Bad Moon that made its maker a 3/3 pumps it in turn
+                -- (CR 613.4c, layer 7c). Asserting the projection rather than
+                -- the printed pair is what keeps the two facts from being
+                -- confused for one another.
+                HU.assertEqual "printed 2/2" (Just (Power.MkPower (Quantity.Type.Literal 2)), Just (Toughness.MkToughness (Quantity.Type.Literal 2))) (maybe (Nothing, Nothing) (\c -> (Card.Type.power c, Card.Type.toughness c)) (Game.cardOf token after))
+                HU.assertEqual "3/3 under Bad Moon" (Just 3, Just 3) (Projection.powerOf token after, Projection.toughnessOf token after)
+                HU.assertEqual "black" (Set.singleton Color.Black) (Projection.colorsOf token after)
+                HU.assertEqual "Zombie Berserker" (Set.fromList [Subtype.Zombie, Subtype.Berserker]) (Projection.subtypesOf token after)
+              other -> HU.assertFailure ("expected exactly one token, got " <> show (length other)),
+          -- CR 603.4's "otherwise it does nothing" -- and "does nothing" means
+          -- the ability never reaches the stack at all, not that it resolves to
+          -- no effect.
+          HU.testCase "CR 603.4 without Bad Moon it died at power 2 and does not trigger at all" $ do
+            (berserkerId, board) <- berserkerBoard False
+            let (settled, after) = boltIt board
+            HU.assertEqual "a 2/2 while it lived" (Just 2) (Projection.powerOf berserkerId (fst board))
+            HU.assertEqual "nothing reached the stack" [] (GameState.stack settled)
+            HU.assertEqual "and no token was made" [] (tokensOf S.alice after)
+        ]
+
 -- Radiant Fountain, a Land: "When this land enters, you gain 2 life. / {T}: Add
 -- {C}." A nonbasic land whose whole text box is one triggered ability and one
 -- activated one, which is what makes it the pool's witness for CR 305.7's
@@ -1892,4 +2073,4 @@ strippedTriggerTests registry =
         ]
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, strippedTriggerTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry]

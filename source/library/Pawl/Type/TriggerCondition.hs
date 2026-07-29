@@ -134,6 +134,13 @@ data TriggerCondition
     -- characteristics taken from the pre-move projection say so, and CR 603.3a's
     -- controller is the player who controlled the permanent as it left.
     --
+    -- The arriving incarnation is not lost, though: CR 400.7e lets the ability
+    -- "find the new object that it became in the zone it moved to", and
+    -- Pawl.Event.eventBindings binds that id under Pawl.Binding.became. So the
+    -- bearer and the object the payload acts on are deliberately two different
+    -- ids, and the one printed word "it" means whichever of them the sentence
+    -- is about.
+    --
     -- The contrast with SelfPutIntoGraveyardFromLibrary above is exact, and the
     -- two must not be conflated: that one is library to graveyard, functions IN
     -- the graveyard (CR 113.6k, since it can never trigger from the

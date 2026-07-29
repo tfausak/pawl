@@ -295,11 +295,11 @@ countCounts (Count.Type.MkCount _ _ aggregation) = case aggregation of
   Aggregation.DistinctCardTypes -> []
   Aggregation.Greatest quantity -> quantityCounts quantity
 
--- Every Count reachable from a Condition: its own count, plus any inside its
--- threshold Quantity.
+-- Every Count reachable from a Condition: both sides are Quantities, and either
+-- may embed one (Pawl.Type.Condition).
 conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Quantity]
-conditionCounts (Condition.Type.MkCondition count _ threshold) =
-  count : quantityCounts threshold
+conditionCounts (Condition.Type.MkCondition measured _ threshold) =
+  quantityCounts measured <> quantityCounts threshold
 
 -- Every Count reachable from a Duration: only ForAsLongAs (CR 611.2b) carries
 -- a Condition.
@@ -553,6 +553,19 @@ lintTests registry =
                 (Map.member Binding.you . Card.allTargetSpecs . Printing.card)
                 ps
         HU.assertEqual "no card names the you slot" [] (fmap (Card.Type.name . Printing.card) offenders),
+      -- CR 400.7e's arriving incarnation is stamped by Event.eventBindings, not
+      -- chosen, so a card declaring it as a target spec would be prompted for a
+      -- target and then have the answer clobbered. Same SCOPE limit as the three
+      -- above -- Card.allTargetSpecs walks a card's SPELL modes only, so a
+      -- triggered ability declaring the slot still slips through, which is the
+      -- gap Pawl.Binding's `you` comment documents for the whole family.
+      HU.testCase "the reserved became slot is never a declared target slot" $ do
+        ps <- S.allPrintings registry
+        let offenders =
+              filter
+                (Map.member Binding.became . Card.allTargetSpecs . Printing.card)
+                ps
+        HU.assertEqual "no card names the became slot" [] (fmap (Card.Type.name . Printing.card) offenders),
       HU.testCase "Lightning Bolt is in the red pool with one AnyTarget slot" $ do
         lightningBolt <- Registry.printing registry "Lightning Bolt"
         let card = Printing.card lightningBolt
@@ -1257,10 +1270,12 @@ auraCardTests registry =
 sourceOnBattlefield :: Condition.Type.Condition
 sourceOnBattlefield =
   Condition.Type.MkCondition
-    ( Count.Type.MkCount
-        (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-        Filter.Type.IsSource
-        Aggregation.Objects
+    ( Quantity.Type.Count
+        ( Count.Type.MkCount
+            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+            Filter.Type.IsSource
+            Aggregation.Objects
+        )
     )
     Comparison.Exactly
     (Quantity.Type.Literal 1)

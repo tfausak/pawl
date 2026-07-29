@@ -66,9 +66,9 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 -- EQUALITY-style D4 lint (declared == read, the spell-mode lint's own shape)
 -- widened to run over a triggered/activated/delayed ability's modes. That
 -- extension MUST subtract the reserved slot names (this one, variableX,
--- chosenModes, copySource, you) from the read-slots side before comparing --
--- loosening the equality to a subset would silently retire its "declared but
--- never read" half instead.
+-- chosenModes, copySource, you, thatPlayer, became) from the read-slots side
+-- before comparing -- loosening the equality to a subset would silently retire
+-- its "declared but never read" half instead.
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 
@@ -109,6 +109,43 @@ you = SlotName.MkSlotName (Text.pack "you")
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 
+-- CR 400.7e: the reserved slot under which a zone-change trigger's ARRIVING
+-- incarnation is bound -- "the new object that it became in the zone it moved
+-- to when the ability triggered, if that zone is a public zone". CR 603.6c says
+-- the same thing from the other side: "An ability that attempts to do something
+-- to the card that left the battlefield checks for it only in the first zone
+-- that it went to."
+--
+-- A SECOND name for what one printed word calls "it", and the two are not
+-- interchangeable. CR 400.7 mints a fresh id on every zone change, so a
+-- leaves-the-battlefield trigger has two objects to talk about at once:
+--
+--   * `triggerSource` above is CR 113.7a's SOURCE -- the permanent as it was on
+--     the battlefield, which CR 603.10a's look-back is about and which
+--     Projection.viewWithLastKnown reads from CR 608.2h last known information.
+--     Everything the ability says ABOUT itself ("its power", "if it had a
+--     counter on it") is that object.
+--   * this slot is the CARD, wherever the move put it. Everything the ability
+--     DOES to itself ("return it to its owner's hand", "exile it") is this one,
+--     because the other no longer exists to be moved.
+--
+-- Collapsing them either way is a silent wrong answer rather than a type error:
+-- binding only the source makes every such effect a no-op on a dead id, and
+-- rebinding the source to the arrival would redirect viewWithLastKnown at all
+-- of Pawl.Resolve's quantity reads onto the graveyard card's printed
+-- characteristics.
+--
+-- Stamped by Pawl.Event.eventBindings as the trigger is gathered, alongside
+-- `triggerPlayer`, and not a target -- the same CR 608.2b posture that slot's
+-- comment spells out: Resolve's legalSlot answers True for any slot with no
+-- target spec, which is how this one stays readable at resolution, and CR
+-- 608.2b's fizzle asks only about the targeted slots so it cannot rescue a
+-- spell either. "No card's targetSpecs may name it" is checked by CardSpec.hs
+-- for a card's SPELL modes only, exactly as it is for `you` -- the scope limit
+-- that comment describes applies here unchanged.
+became :: SlotName
+became = SlotName.MkSlotName (Text.pack "became")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -136,6 +173,12 @@ setYou pid = Map.insert you (toPlayer pid)
 -- posture).
 setTriggerPlayer :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
 setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
+
+-- Bind an object under the reserved became slot (CR 400.7e). A dedicated
+-- single-purpose slot, so this insert never clobbers another binding (setCopy's
+-- posture).
+setBecame :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setBecame oid = Map.insert became (toObject oid)
 
 -- The modes chosen for a spell, read from its binding environment. Empty when
 -- absent (defensive; cast always stamps it, forced or prompted).

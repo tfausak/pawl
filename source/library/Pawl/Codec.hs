@@ -304,6 +304,8 @@ subtypeToJson s = nullary . Text.pack $ case s of
   Subtype.Illusion -> "Illusion"
   Subtype.Spirit -> "Spirit"
   Subtype.Angel -> "Angel"
+  Subtype.Insect -> "Insect"
+  Subtype.Berserker -> "Berserker"
 
 jsonToSubtype :: Value -> Either Text Subtype.Subtype
 jsonToSubtype =
@@ -355,7 +357,9 @@ jsonToSubtype =
       (Text.pack "Cleric", Subtype.Cleric),
       (Text.pack "Illusion", Subtype.Illusion),
       (Text.pack "Spirit", Subtype.Spirit),
-      (Text.pack "Angel", Subtype.Angel)
+      (Text.pack "Angel", Subtype.Angel),
+      (Text.pack "Insect", Subtype.Insect),
+      (Text.pack "Berserker", Subtype.Berserker)
     ]
 
 -- CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
@@ -725,15 +729,21 @@ jsonToCount value = do
     ("Count", Just (Array [s, f, a])) -> Count.Type.MkCount <$> jsonToScope s <*> jsonToFilter f <*> jsonToAggregation a
     _ -> Left (Text.pack "unknown Count: " <> t)
 
+-- Both sides go through quantityToJson, and that is BACKWARD COMPATIBLE with
+-- the Count-on-the-left shape rather than merely similar to it: quantityToJson's
+-- Count arm delegates to countToJson and emits no wrapper of its own, so a
+-- `Quantity.Count c` is byte-for-byte the JSON `countToJson c` used to produce.
+-- Every committed card file that carries a condition therefore round-trips
+-- untouched.
 conditionToJson :: Condition.Type.Condition -> Value
-conditionToJson (Condition.Type.MkCondition c cmp q) =
-  Json.tagged (Text.pack "Condition") (Just (Array [countToJson c, comparisonToJson cmp, quantityToJson q]))
+conditionToJson (Condition.Type.MkCondition m cmp q) =
+  Json.tagged (Text.pack "Condition") (Just (Array [quantityToJson m, comparisonToJson cmp, quantityToJson q]))
 
 jsonToCondition :: Value -> Either Text Condition.Type.Condition
 jsonToCondition value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("Condition", Just (Array [c, cmp, q])) -> Condition.Type.MkCondition <$> jsonToCount c <*> jsonToComparison cmp <*> jsonToQuantity q
+    ("Condition", Just (Array [m, cmp, q])) -> Condition.Type.MkCondition <$> jsonToQuantity m <*> jsonToComparison cmp <*> jsonToQuantity q
     _ -> Left (Text.pack "unknown Condition: " <> t)
 
 playerScopeToJson :: PlayerScope.PlayerScope -> Value

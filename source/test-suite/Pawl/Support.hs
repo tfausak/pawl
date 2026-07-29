@@ -640,10 +640,12 @@ giveControl oid pid gs =
 youControlSource :: Condition.Type.Condition
 youControlSource =
   Condition.Type.MkCondition
-    ( Count.Type.MkCount
-        (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-        (Filter.Type.And [Filter.Type.IsSource, Filter.Type.ControlledBy PlayerRelation.You])
-        Aggregation.Objects
+    ( Quantity.Type.Count
+        ( Count.Type.MkCount
+            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+            (Filter.Type.And [Filter.Type.IsSource, Filter.Type.ControlledBy PlayerRelation.You])
+            Aggregation.Objects
+        )
     )
     Comparison.Exactly
     (Quantity.Type.Literal 1)
@@ -656,10 +658,12 @@ youControlSource =
 youControlNoSwamps :: Condition.Type.Condition
 youControlNoSwamps =
   Condition.Type.MkCondition
-    ( Count.Type.MkCount
-        (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-        (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
-        Aggregation.Objects
+    ( Quantity.Type.Count
+        ( Count.Type.MkCount
+            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+            (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
+            Aggregation.Objects
+        )
     )
     Comparison.Exactly
     (Quantity.Type.Literal 0)

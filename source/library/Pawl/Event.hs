@@ -776,6 +776,35 @@ eventBindings cond event = case (cond, event) of
       Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid Map.empty
       Recipient.ToCreature _ -> Map.empty
       Recipient.ToObject _ -> Map.empty
+  -- CR 400.7e: "Abilities that trigger when an object moves from one zone to
+  -- another ... can find the new object that it became in the zone it moved to
+  -- when the ability triggered, if that zone is a public zone." CR 603.6c says
+  -- it from the other side -- "an ability that attempts to do something to the
+  -- card that left the battlefield checks for it only in the first zone that it
+  -- went to" -- and CR 603.6e repeats it for an Aura watching its host leave.
+  --
+  -- ZoneChange.object, NOT ZoneChange.departed. The two are the whole point of
+  -- this arm: `departed` is what matchesTrigger just matched the bearer against
+  -- (CR 603.10a's look-back reads the permanent as it was on the battlefield),
+  -- and it names an id CR 400.7 has already deleted, so an effect handed that
+  -- id would move nothing. `object` is the card in the graveyard, which is what
+  -- "return it to its owner's hand" has to act on.
+  --
+  -- Bound ALONGSIDE the source rather than instead of it. Engine.placeBorne
+  -- stamps Binding.triggerSource over these, and it must keep stamping the
+  -- departed id: that slot is CR 113.7a's source, and it is what
+  -- Projection.viewWithLastKnown reads CR 608.2h last known information for at
+  -- every quantity-evaluating arm of Pawl.Resolve. One printed "it", two
+  -- objects -- see Pawl.Binding.became.
+  --
+  -- CR 400.7e's public-zone proviso is satisfied by construction here and is
+  -- therefore not a branch: matchesTrigger's SelfDies arm has already required
+  -- `to == Graveyard` (CR 700.4), and CR 400.2 lists the graveyard among the
+  -- public zones. A wider leaves-the-battlefield condition, whose destination
+  -- may be a hand or a library, is where the proviso becomes a real test (#384)
+  -- -- and Pawl.Activate.isHiddenZone is the classifier it would reach for.
+  (TriggerCondition.SelfDies, GameEvent.Moved zc _) ->
+    Binding.setBecame (ZoneChange.object zc) Map.empty
   _ -> Map.empty
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
@@ -950,10 +979,12 @@ eventTriggers events gs =
       -- recordTokenEntry emits for a new token is not a departure.
       --
       -- The departing id is also what the placed trigger carries as its SOURCE,
-      -- and so what Binding.triggerSource binds. CR 603.6c's "an ability that
+      -- and so what Binding.triggerSource binds -- CR 113.7a, and the id
+      -- Projection.viewWithLastKnown answers for. CR 603.6c's "an ability that
       -- attempts to do something to the card that left the battlefield checks
-      -- for it only in the first zone that it went to" asks for the ARRIVING
-      -- incarnation there instead; that split is not made (#387).
+      -- for it only in the first zone that it went to" wants the ARRIVING
+      -- incarnation instead, and that is a SECOND slot rather than a different
+      -- value in this one: eventBindings binds it under Binding.became.
       --
       -- Only the departure event's own permanent is recovered. A BYSTANDER that
       -- was on the battlefield when some other event in the same batch happened
@@ -1286,6 +1317,18 @@ gatherTriggers events gs =
 -- "the ability triggers" is the right answer for every sourceless ability that
 -- exists. A sourceless ability that DID carry one would have no subject object
 -- for Condition.holds to read, and is the case that must revisit this.
+--
+-- CR 608.2h supplies the view, not Projection.fullView, and for a look-back
+-- trigger that is the difference between reading the clause and reading nothing.
+-- CR 603.10a makes a leaves-the-battlefield ability's source the permanent as it
+-- was IMMEDIATELY BEFORE the event, so by the time this filter runs that id has
+-- been deleted (CR 400.7) -- and fullView describes a deleted id as an object
+-- with no characteristics at all, which quietly answers False to every clause
+-- that asks about one. viewWithLastKnown is scoped to `oid`, so a source still
+-- on the battlefield reads live exactly as before; the fallback is CR 608.2h's,
+-- never the default. Pawl.Stack's CR 608.2a re-check reads the same way, and the
+-- two must agree or a trigger would be placed and then removed for disagreeing
+-- with itself.
 interveningHolds :: GameState -> PendingTrigger -> Bool
 interveningHolds gs pending =
   case (TriggeredAbility.intervening (PendingTrigger.ability pending), PendingTrigger.source pending) of
@@ -1293,7 +1336,7 @@ interveningHolds gs pending =
     (Just _, TriggerSource.Sourceless) -> True
     (Just cond, TriggerSource.OfObject oid) ->
       Condition.holds
-        (Projection.fullView gs)
+        (Projection.viewWithLastKnown oid gs)
         (Filter.MkContext (Just (PendingTrigger.controller pending)) (Just oid))
         gs
         oid
