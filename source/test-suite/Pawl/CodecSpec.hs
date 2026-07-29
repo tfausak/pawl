@@ -66,6 +66,7 @@ import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.ObjectRef as ObjectRef
 import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PhasePattern as PhasePattern
@@ -109,6 +110,14 @@ import qualified Test.Tasty.HUnit as HU
 
 roundTrip :: (Eq a, Show a) => String -> (a -> Json.Value) -> (Json.Value -> Either Text a) -> a -> HU.Assertion
 roundTrip label enc dec x = HU.assertEqual label (Right x) (dec (enc x))
+
+-- The first element of an encoded effect's positional payload -- for Destroy,
+-- the ObjectRef. Json.Null when the effect is nullary or the payload is not an
+-- array, neither of which any caller passes.
+payloadHead :: Json.Value -> Json.Value
+payloadHead value = case J.tag value of
+  Right (_, Just (Json.Array (h : _))) -> h
+  _ -> Json.Null
 
 -- The `optionality` key of an encoded Mode, or Nothing when it was omitted (CR
 -- 603.5's Mandatory default).
@@ -242,8 +251,24 @@ tests registry =
           HU.testCase "Proliferate" $
             roundTrip "e4b" Codec.effectToJson Codec.jsonToEffect Effect.Proliferate,
           HU.testCase "Destroy carries its CR 701.19c rider both ways" $ do
-            roundTrip "e5a" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (SlotName.MkSlotName (Text.pack "t")) Regenerability.Regenerable)
-            roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (SlotName.MkSlotName (Text.pack "t")) Regenerability.CantBeRegenerated),
+            roundTrip "e5a" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable)
+            roundTrip "e5b" Codec.effectToJson Codec.jsonToEffect (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated),
+          -- An ObjectRef is untagged and told apart by JSON type, so the two arms
+          -- have to be pinned together: a string is the slot, an object is the
+          -- filter-selected set. A round trip alone would not catch a decoder that
+          -- read every payload as one arm, so the wire form is spelled out.
+          HU.testCase "ObjectRef's two arms are told apart by JSON type, not by a tag" $ do
+            let slotted = Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable
+                swept = Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable
+            roundTrip "e5c" Codec.effectToJson Codec.jsonToEffect swept
+            HU.assertEqual
+              "a slot is still a bare string, so every Destroy card on disk is unchanged"
+              (J.jText (Text.pack "target"))
+              (payloadHead (Codec.effectToJson slotted))
+            HU.assertEqual
+              "and a set is the Filter object"
+              (Codec.filterToJson (Filter.Type.HasCardType CardType.Creature))
+              (payloadHead (Codec.effectToJson swept)),
           HU.testCase "ExileHandThenDraw" $
             roundTrip "e-powder" Codec.effectToJson Codec.jsonToEffect Effect.ExileHandThenDraw,
           HU.testCase "PlayerSacrifices" $

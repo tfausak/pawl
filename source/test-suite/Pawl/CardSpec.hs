@@ -55,6 +55,7 @@ import qualified Pawl.Type.Modal as Modal
 import qualified Pawl.Type.Mode as Mode
 import qualified Pawl.Type.ModeSelection as ModeSelection
 import qualified Pawl.Type.Modification as Modification
+import qualified Pawl.Type.ObjectRef as ObjectRef
 import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
@@ -809,8 +810,27 @@ m4bCardTests registry =
         HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black, black])) (Card.Type.manaCost c)
         HU.assertBool "an instant" (Card.isInstant c)
         -- Murder carries no CR 701.19c rider, unlike Terror and Reprisal.
-        HU.assertEqual "effect destroys the target slot" [Effect.Destroy (SlotName.MkSlotName (Text.pack "target")) Regenerability.Regenerable] (Card.allEffects c)
+        HU.assertEqual "effect destroys the target slot" [Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable] (Card.allEffects c)
         HU.assertEqual "one CreatureTarget slot" (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures Nothing)) (Card.allTargetSpecs c),
+      -- Murder's opposite number on the one axis this pair exists to pin: the
+      -- SAME Destroy opcode, with the SAME CR 701.19c rider, differing only in
+      -- whether its ObjectRef names a cast-time slot or a resolution-time set.
+      -- CR 115.10a is why the second declares no target spec: "Unless that object
+      -- or player is identified by the word 'target' ..., it's not a target."
+      HU.testCase "Day of Judgment is a {2}{W}{W} Sorcery that destroys every creature and targets nothing" $ do
+        dayOfJudgment <- Registry.printing registry "Day of Judgment"
+        let c = Printing.card dayOfJudgment
+            white = ManaSymbol.OfType (ManaType.Colored Color.White)
+        HU.assertEqual "name" (Text.pack "Day of Judgment") (Card.Type.name c)
+        HU.assertEqual "cost" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, white, white])) (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Sorcery) (TypeLine.types (Card.Type.typeLine c))
+        -- CR 109.2 supplies the battlefield and the word "permanent"; the card
+        -- text is only "all creatures", so the Filter is only HasCardType.
+        HU.assertEqual
+          "one Destroy over the creatures, with no can't-be-regenerated rider"
+          [Effect.Destroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable]
+          (Card.allEffects c)
+        HU.assertEqual "and no target spec at all" Map.empty (Card.allTargetSpecs c),
       HU.testCase "Unsummon is a {U} Instant that bounces a target creature to hand" $ do
         unsummon <- Registry.printing registry "Unsummon"
         let c = Printing.card unsummon
