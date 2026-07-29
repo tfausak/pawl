@@ -181,6 +181,7 @@ library
     Pawl.Type.MulliganOffer
     Pawl.Type.Object
     Pawl.Type.ObjectId
+    Pawl.Type.ObjectRef
     Pawl.Type.OptionalDecision
     Pawl.Type.Optionality
     Pawl.Type.Payment

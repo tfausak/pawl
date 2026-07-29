@@ -73,6 +73,7 @@ import qualified Pawl.Type.Modification as Modification
 import qualified Pawl.Type.MonarchTarget as MonarchTarget
 import qualified Pawl.Type.Object as Object
 import qualified Pawl.Type.ObjectId as ObjectId
+import qualified Pawl.Type.ObjectRef as ObjectRef
 import qualified Pawl.Type.OptionalDecision as OptionalDecision
 import qualified Pawl.Type.Optionality as Optionality
 import qualified Pawl.Type.Phase as Phase
@@ -1344,7 +1345,7 @@ fizzleTests registry =
             -- illegal (it's no longer a legal CreatureTarget), while the
             -- reserved slot -- never targeted -- stays vacuously legal.
             gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-            mode = Mode.MkMode (Seq.fromList [Effect.Destroy targetSlot Regenerability.Regenerable, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory
+            mode = Mode.MkMode (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory
             run = Resolve.resolveModes abilId source [(ModeIndex.MkModeIndex 0, mode)]
             after = snd (Engine.runGamePure S.identityAnswer gone run)
         HU.assertEqual "the targetless Draw did not run: the ability fizzled" handBefore (S.handSize S.alice after),
@@ -2721,5 +2722,118 @@ isOptionalResponse r = case r of
   Response.ChoseOptional _ -> True
   _ -> False
 
+-- Day of Judgment, cast off four Plains from alice's hand and resolved. Every
+-- test in the group below goes through the whole card -- cast, pay, resolve --
+-- because "Destroy all creatures" has nothing to exercise at the opcode level
+-- that the card does not exercise better: it takes no target and prompts for
+-- nothing, so a hand-built applyEffect call would differ from a real cast only
+-- in the mana.
+castDayOfJudgment :: Printing.Printing -> Printing.Printing -> GameState.GameState -> GameState.GameState
+castDayOfJudgment plains dayOfJudgment board =
+  let (withSpell, spell) = S.handOne dayOfJudgment (List.foldl' (\gs _ -> snd (S.addCreature plains S.alice gs)) board [1 :: Int .. 4])
+      afterCast = S.runPure S.identityAnswer withSpell (Cast.castSpell S.alice spell)
+   in S.runPure S.identityAnswer afterCast Stack.resolveTop
+
+destroyAllTests :: Registry.Type.Registry -> Tasty.TestTree
+destroyAllTests registry =
+  Tasty.testGroup
+    "DestroyAll"
+    [ -- CR 109.2: "Destroy all creatures" includes no "card" or "spell", so it
+      -- means every CREATURE PERMANENT on the battlefield -- both players' and,
+      -- pointedly, the caster's own. Nothing else on the battlefield is touched.
+      HU.testCase "Day of Judgment destroys every creature, the caster's own included, and leaves noncreature permanents alone" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        dayOfJudgment <- Registry.printing registry "Day of Judgment"
+        let (hers, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+            (his, g2) = S.addCreature piker S.bob g1
+            (equipment, g3) = S.addCreature bonesplitter S.alice g2
+            resolved = castDayOfJudgment plains dayOfJudgment g3
+        HU.assertEqual "stack empty" 0 (length (GameState.stack resolved))
+        HU.assertBool "bob's creature died" (not (S.onBattlefield his resolved))
+        HU.assertBool "and so did alice's own" (not (S.onBattlefield hers resolved))
+        HU.assertBool "the Equipment is not a creature and stands" (S.onBattlefield equipment resolved)
+        HU.assertEqual "no creatures left at all" 0 (Set.size (Set.filter (`Projection.isCreatureOf` resolved) (GameState.battlefield resolved))),
+      -- CR 702.12b: "A permanent with indestructible can't be destroyed." The
+      -- mass form goes through Event.destroy exactly as the single-target form
+      -- does, so it inherits that gate rather than bypassing it.
+      HU.testCase "CR 702.12b an indestructible creature survives Day of Judgment" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        darksteelMyr <- Registry.printing registry "Darksteel Myr"
+        dayOfJudgment <- Registry.printing registry "Day of Judgment"
+        let (myr, g1) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
+            (his, g2) = S.addCreature piker S.bob g1
+            resolved = castDayOfJudgment plains dayOfJudgment g2
+        HU.assertBool "the Myr can't be destroyed" (S.onBattlefield myr resolved)
+        HU.assertBool "the Piker can" (not (S.onBattlefield his resolved)),
+      -- CR 701.19a: a regeneration shield "protects the permanent the next time
+      -- it would be destroyed this turn". Day of Judgment says nothing about
+      -- regeneration, so it carries Regenerability.Regenerable and the shield
+      -- applies -- the creature is instead tapped and stays.
+      HU.testCase "CR 701.19a a regeneration shield saves its creature from Day of Judgment" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        dayOfJudgment <- Registry.printing registry "Day of Judgment"
+        let (shielded, g1) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+            (bare, g2) = S.addCreature piker S.bob g1
+            resolved = castDayOfJudgment plains dayOfJudgment (S.addRegenShield shielded g2)
+        HU.assertBool "the shielded creature stands" (S.onBattlefield shielded resolved)
+        HU.assertEqual "and CR 701.19a taps it" (Just TapState.Tapped) (fmap Object.tapped (Game.lookupObject shielded resolved))
+        HU.assertBool "its unshielded twin died" (not (S.onBattlefield bare resolved)),
+      -- CR 608.2f: "Some spells and abilities include actions taken on multiple
+      -- players and/or objects. In most cases, each such action is processed
+      -- simultaneously." So the affected set is fixed once, before the first
+      -- creature dies, and a creature that only IS one because of another
+      -- creature dies with it rather than being spared.
+      --
+      -- Opalescence animates March of the Machines (a non-Aura enchantment);
+      -- March in turn animates the Bonesplitter (a noncreature artifact). March
+      -- is added BEFORE the Bonesplitter on purpose: it therefore has the lower
+      -- ObjectId and is swept first, so an implementation that re-derived "is it
+      -- a creature?" after each destruction would spare the Bonesplitter. Both
+      -- die. Opalescence itself is never a creature ("each OTHER") and stands.
+      HU.testCase "CR 608.2f the affected set is fixed before the first destruction: March of the Machines and the Bonesplitter it animates die together" $ do
+        plains <- Registry.printing registry "Plains"
+        opalescence <- Registry.printing registry "Opalescence"
+        march <- Registry.printing registry "March of the Machines"
+        bonesplitter <- Registry.printing registry "Bonesplitter"
+        dayOfJudgment <- Registry.printing registry "Day of Judgment"
+        let (opal, g1) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
+            (animator, g2) = S.addCreature march S.alice g1
+            (equipment, board) = S.addCreature bonesplitter S.alice g2
+        HU.assertBool "setup: March is a creature via Opalescence" (Projection.isCreatureOf animator board)
+        HU.assertBool "setup: the Bonesplitter is a creature via March" (Projection.isCreatureOf equipment board)
+        HU.assertBool "setup: March is swept first" (animator < equipment)
+        let resolved = castDayOfJudgment plains dayOfJudgment board
+        HU.assertBool "March died" (not (S.onBattlefield animator resolved))
+        HU.assertBool "and so did the Bonesplitter it animated" (not (S.onBattlefield equipment resolved))
+        HU.assertBool "Opalescence animates each OTHER enchantment, so it was never a creature" (S.onBattlefield opal resolved),
+      -- CR 115.10a: "Unless that object or player is identified by the word
+      -- 'target' ... it's not a target." "All creatures" is not a target, so the
+      -- card declares no target spec and the cast never raises a target prompt
+      -- -- and CR 608.2b, which is about targets, has nothing to fizzle.
+      HU.testCase "CR 115.10a Day of Judgment targets nothing: no target spec and no target prompt" $ do
+        plains <- Registry.printing registry "Plains"
+        piker <- Registry.printing registry "Goblin Piker"
+        dayOfJudgment <- Registry.printing registry "Day of Judgment"
+        let card = Printing.card dayOfJudgment
+            (his, g1) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+            (withSpell, spell) = S.handOne dayOfJudgment (List.foldl' (\gs _ -> snd (S.addCreature plains S.alice gs)) g1 [1 :: Int .. 4])
+            countingAnswer :: Prompt.Prompt r -> State.State Int r
+            countingAnswer p = case p of
+              Prompt.ChooseTargets {} -> do
+                State.modify (+ 1)
+                pure (S.identityAnswer p)
+              _ -> pure (S.identityAnswer p)
+            asked = State.execState (Engine.runGame countingAnswer withSpell (Cast.castSpell S.alice spell)) 0
+        HU.assertEqual "no target spec anywhere on the card" Map.empty (Modal.allTargetSpecs (Card.Type.spell card))
+        HU.assertEqual "and nothing was asked to target" 0 asked
+        -- The board still resolves the way the first test says it does, from the
+        -- same cast -- so "targets nothing" is not "affects nothing".
+        HU.assertBool "the creature still died" (not (S.onBattlefield his (castDayOfJudgment plains dayOfJudgment g1)))
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry, optionalEffectTests registry]
+tests registry = Tasty.testGroup "Resolve" [targetTests registry, resolveTests registry, fizzleTests registry, indestructibleTests registry, zoneChangeTests registry, drawCardTests registry, loseLifeTests registry, greatestTests registry, counterTests registry, countersTests registry, untapTests registry, gainControlTests registry, gainPlayerCountersTests registry, proliferateTests registry, playerSacrificesTests registry, createEmblemTests registry, becomeMonarchTests registry, exileUntilMonarchTests registry, actOfTreasonTests registry, optionalEffectTests registry, destroyAllTests registry]

@@ -7,6 +7,7 @@ import Pawl.Type.Filter (Filter)
 import Pawl.Type.ManaProduction (ManaProduction)
 import Pawl.Type.Modification (Modification)
 import Pawl.Type.MonarchTarget (MonarchTarget)
+import Pawl.Type.ObjectRef (ObjectRef)
 import Pawl.Type.PlayerCounterKind (PlayerCounterKind)
 import Pawl.Type.PlayerEffect (PlayerEffect)
 import Pawl.Type.PlayerRef (PlayerRef)
@@ -73,17 +74,27 @@ data Effect card
     -- Installs pending control keyed to the slot's chosen player, with the
     -- ability's controller as the decider. Mindslaver's exact shape.
     ControlPlayerNextTurn SlotName
-  | -- CR 701.8 / 702.12b: destroy the slot's target permanent -- move it to its
-    -- owner's graveyard via the changeZone funnel UNLESS it is indestructible.
-    -- NOT MoveToZone slot Graveyard: the indestructible check is why this is its
-    -- own opcode (Murder vs Darksteel Myr). Indestructible aside, the destruction
-    -- is itself interceptable: Pawl.Event.destroy offers a WouldBeDestroyed event
-    -- to the CR 616.1 replacement loop before the graveyard move, which is how a
-    -- regeneration shield (CR 701.19a) intercepts it.
+  | -- CR 701.8 / 702.12b: destroy the permanents the ObjectRef names -- move each
+    -- to its owner's graveyard via the changeZone funnel UNLESS it is
+    -- indestructible. NOT MoveToZone slot Graveyard: the indestructible check is
+    -- why this is its own opcode (Murder vs Darksteel Myr). Indestructible aside,
+    -- the destruction is itself interceptable: Pawl.Event.destroy offers a
+    -- WouldBeDestroyed event to the CR 616.1 replacement loop before the
+    -- graveyard move, which is how a regeneration shield (CR 701.19a) intercepts
+    -- it.
     -- The Regenerability is CR 701.19c's "It can't be regenerated" rider, carried
     -- by the destruction rather than looked up on the victim -- Terror has it and
     -- the state-based action of CR 704.5g does not, for the same creature.
-    Destroy SlotName Regenerability
+    --
+    -- ObjectRef rather than a SlotName is what lets ONE opcode be both Murder's
+    -- "destroy target creature" (InSlot, chosen at cast) and Day of Judgment's
+    -- "destroy all creatures" (EachMatching, swept at resolution). A sibling
+    -- DestroyAll opcode was the alternative, and it would have had to carry its
+    -- own copy of the CR 702.12b gate, the CR 616.1 funnel and the CR 701.19c
+    -- rider -- the duplication PlayerRef already exists to avoid on the player
+    -- side (Draw's comment). The other object-affecting opcodes still take a bare
+    -- SlotName; none of them has a card that names a set (#378).
+    Destroy ObjectRef Regenerability
   | -- CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction: CR 701.21a
     -- says so explicitly, so this consults neither indestructible (CR 702.12b) nor
