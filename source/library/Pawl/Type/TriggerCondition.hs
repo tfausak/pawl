@@ -3,6 +3,7 @@ module Pawl.Type.TriggerCondition where
 import Pawl.Type.Condition (Condition)
 import Pawl.Type.Filter (Filter)
 import Pawl.Type.Phase (Phase)
+import Pawl.Type.TriggerFrequency (TriggerFrequency)
 import Pawl.Type.TurnScope (TurnScope)
 
 -- CR 603.2: the pattern that fires a triggered ability. Only Pawl.Event may case
@@ -74,7 +75,13 @@ data TriggerCondition
     -- No attack TARGET is carried. CR 508.3a's second sentence ("Whenever [a
     -- creature] attacks [a player, planeswalker, or battle]") is a different
     -- condition, and no card in the pool has it.
-    SelfAttacks
+    --
+    -- The TriggerFrequency is Aurelia, the Warleader's "for the first time each
+    -- turn" -- a payload rather than a sibling condition, because it narrows this
+    -- same trigger event rather than naming a different one. Hanweir Garrison is
+    -- EveryTime. See Pawl.Type.TriggerFrequency for why no rule number is cited
+    -- for the phrase.
+    SelfAttacks TriggerFrequency
   | -- CR 603.6 (a zone-change trigger): "when this card is put into your
     -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters
     -- and SelfCycled: the scan visits every candidate source, so the bearer

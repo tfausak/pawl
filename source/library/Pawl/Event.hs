@@ -56,6 +56,7 @@ import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.Timestamp as Timestamp
 import Pawl.Type.TriggerCondition (TriggerCondition)
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Type.TriggerSource as TriggerSource
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
@@ -543,6 +544,18 @@ reveal pid oid = do
 -- names. This module is the sole home of casing on TriggerCondition for RULES
 -- purposes; Pawl.Codec also cases on every constructor, but only as the JSON
 -- data boundary (encode/decode), not to decide game behaviour.
+-- CR 508.3a / 608.2i: how many times this object has been declared as an
+-- attacker so far this turn, read out of the turn-scoped event log. Only
+-- Combat.declareAttackers appends the event, which is what keeps CR 508.4's
+-- creature put onto the battlefield attacking -- one that "never attacked" --
+-- out of the count.
+declarationsOf :: ObjectId -> GameState -> Int
+declarationsOf bearer gs =
+  let declaredIt event = case event of
+        GameEvent.AttackerDeclared oid -> oid == bearer
+        _ -> False
+   in length (Seq.filter declaredIt (GameState.events gs))
+
 matchesTrigger :: GameState -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
 matchesTrigger gs bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
@@ -660,8 +673,23 @@ matchesTrigger gs bearer you cond event = case cond of
   -- attacking is in that record and has no event here. CombatSpec's "the tokens
   -- are attacking, and the attack trigger fired only for the Garrison" is the
   -- test that proves it.
-  TriggerCondition.SelfAttacks -> case event of
-    GameEvent.AttackerDeclared oid -> oid == bearer
+  TriggerCondition.SelfAttacks frequency -> case event of
+    GameEvent.AttackerDeclared oid ->
+      oid == bearer && case frequency of
+        TriggerFrequency.EveryTime -> True
+        -- Aurelia, the Warleader's "for the first time each turn". The
+        -- declaration being matched is already in GameState.events when the scan
+        -- reaches here, so "the first time" is "this is the only one so far",
+        -- and the log being cleared at turn handoff is what makes it "each
+        -- turn".
+        --
+        -- Counted per BEARER, so two creatures declared in the same attack are
+        -- each attacking for the first time.
+        --
+        -- CR 400.7 mints a new object on a zone change, so a creature that left
+        -- the battlefield and returned is a different id and attacks for the
+        -- first time again -- which is what the rules say happened.
+        TriggerFrequency.FirstTimeEachTurn -> declarationsOf bearer gs <= 1
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
@@ -1086,7 +1114,7 @@ functionsInGraveyard cond = case cond of
   -- CR 302.6 and CR 508.1a: only a permanent on the battlefield can be declared
   -- as an attacker, so this condition triggers from the battlefield and CR
   -- 113.6k never reaches it.
-  TriggerCondition.SelfAttacks -> False
+  TriggerCondition.SelfAttacks _ -> False
   -- CR 702.29c: "these abilities trigger from whatever zone the card winds up in
   -- after it's cycled" -- the graveyard for every printing in this pool. A
   -- cycled card cannot be on the battlefield (cycling discards it from a hand),
@@ -1182,7 +1210,7 @@ stateTriggers gs =
                 TriggerCondition.StepBegins _ _ -> False
                 TriggerCondition.SelfDealsCombatDamageToPlayer -> False
                 TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
-                TriggerCondition.SelfAttacks -> False
+                TriggerCondition.SelfAttacks _ -> False
                 TriggerCondition.SelfCycled -> False
                 TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
                 TriggerCondition.SelfDies -> False

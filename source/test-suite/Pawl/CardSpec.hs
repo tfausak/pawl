@@ -339,7 +339,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
-  TriggerCondition.SelfAttacks -> []
+  TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfDies -> []

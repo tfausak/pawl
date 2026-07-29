@@ -99,6 +99,7 @@ import qualified Pawl.Type.Timestamp as Timestamp
 import qualified Pawl.Type.TokenEntry as TokenEntry
 import qualified Pawl.Type.TokenPattern as TokenPattern
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.TypeLine as TypeLine
@@ -801,8 +802,9 @@ tests registry =
             roundTrip "revealed" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.Revealed S.alice (Projection.project ratId gs)),
           HU.testCase "TriggerCondition.SelfCycled round-trips" $
             roundTrip "sc" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfCycled,
-          HU.testCase "TriggerCondition.SelfAttacks round-trips" $
-            roundTrip "sa" Codec.triggerConditionToJson Codec.jsonToTriggerCondition TriggerCondition.SelfAttacks,
+          HU.testCase "TriggerCondition.SelfAttacks round-trips both frequencies" $ do
+            roundTrip "sa" Codec.triggerConditionToJson Codec.jsonToTriggerCondition (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime)
+            roundTrip "sa1" Codec.triggerConditionToJson Codec.jsonToTriggerCondition (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn),
           HU.testCase "GameEvent.AttackerDeclared round-trips" $
             roundTrip "ad" Codec.gameEventToJson Codec.jsonToGameEvent (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3)),
           -- Create's TokenEntry is ELIDED when it is the CR 110.5b default, so

@@ -100,6 +100,7 @@ import qualified Pawl.Type.TokenEntry as TokenEntry
 import qualified Pawl.Type.TokenPattern as TokenPattern
 import qualified Pawl.Type.Toughness as Toughness
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
 import qualified Pawl.Type.TypeLine as TypeLine
@@ -1010,7 +1011,7 @@ triggerConditionToJson c = case c of
   TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (conditionToJson c2))
   TriggerCondition.SelfDealsCombatDamageToPlayer -> nullary (Text.pack "SelfDealsCombatDamageToPlayer")
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
-  TriggerCondition.SelfAttacks -> nullary (Text.pack "SelfAttacks")
+  TriggerCondition.SelfAttacks f -> Json.tagged (Text.pack "SelfAttacks") (Just (triggerFrequencyToJson f))
   TriggerCondition.SelfCycled -> nullary (Text.pack "SelfCycled")
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> nullary (Text.pack "SelfPutIntoGraveyardFromLibrary")
   TriggerCondition.SelfDies -> nullary (Text.pack "SelfDies")
@@ -1025,7 +1026,7 @@ jsonToTriggerCondition value = do
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToCondition v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
-    ("SelfAttacks", _) -> Right TriggerCondition.SelfAttacks
+    ("SelfAttacks", Just v) -> TriggerCondition.SelfAttacks <$> jsonToTriggerFrequency v
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
     ("SelfDies", _) -> Right TriggerCondition.SelfDies
@@ -1090,6 +1091,11 @@ regenerabilityToJson r = nullary . Text.pack $ case r of
   Regenerability.Regenerable -> "Regenerable"
   Regenerability.CantBeRegenerated -> "CantBeRegenerated"
 
+triggerFrequencyToJson :: TriggerFrequency.TriggerFrequency -> Value
+triggerFrequencyToJson f = nullary . Text.pack $ case f of
+  TriggerFrequency.EveryTime -> "EveryTime"
+  TriggerFrequency.FirstTimeEachTurn -> "FirstTimeEachTurn"
+
 extraPhaseToJson :: ExtraPhase.ExtraPhase -> Value
 extraPhaseToJson e = nullary . Text.pack $ case e of
   ExtraPhase.ExtraCombat -> "ExtraCombat"
@@ -1121,6 +1127,14 @@ jsonToRegenerability =
     (Text.pack "Regenerability")
     [ (Text.pack "Regenerable", Regenerability.Regenerable),
       (Text.pack "CantBeRegenerated", Regenerability.CantBeRegenerated)
+    ]
+
+jsonToTriggerFrequency :: Value -> Either Text TriggerFrequency.TriggerFrequency
+jsonToTriggerFrequency =
+  decodeNullary
+    (Text.pack "TriggerFrequency")
+    [ (Text.pack "EveryTime", TriggerFrequency.EveryTime),
+      (Text.pack "FirstTimeEachTurn", TriggerFrequency.FirstTimeEachTurn)
     ]
 
 jsonToExtraPhase :: Value -> Either Text ExtraPhase.ExtraPhase

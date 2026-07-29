@@ -51,6 +51,7 @@ import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
+import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
@@ -83,6 +84,7 @@ import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.Source as Source
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TriggerCondition as TriggerCondition
+import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Type.TriggerSource as TriggerSource
 import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Type.TurnScope as TurnScope
@@ -241,6 +243,40 @@ scanTests registry =
                 Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Battlefield)
               HU.assertBool "enters graveyard does not" $
                 not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard)),
+      -- CR 508.3a plus Aurelia, the Warleader's "for the first time each turn".
+      -- The declaration being matched is already in the log when the scan runs,
+      -- so "the first time" is "this is the only one so far".
+      HU.testCase "SelfAttacks FirstTimeEachTurn matches only the first declaration" $
+        let bearer = ObjectId.MkObjectId 1
+            declared = GameEvent.AttackerDeclared bearer
+            gsWith events = S.withEvents events (Setup.emptyGame S.bothPlayers)
+            matches frequency events =
+              Event.matchesTrigger (gsWith events) bearer S.alice (TriggerCondition.SelfAttacks frequency) declared
+         in do
+              HU.assertBool "the first declaration matches" $
+                matches TriggerFrequency.FirstTimeEachTurn [declared]
+              HU.assertBool "a second declaration this turn does not" $
+                not (matches TriggerFrequency.FirstTimeEachTurn [declared, declared])
+              -- Hanweir Garrison's shape is untouched by the narrowing.
+              HU.assertBool "EveryTime matches the first" $
+                matches TriggerFrequency.EveryTime [declared]
+              HU.assertBool "EveryTime matches the second too" $
+                matches TriggerFrequency.EveryTime [declared, declared]
+              -- The count is per bearer, not per turn: two creatures declared
+              -- together are each attacking for the first time.
+              HU.assertBool "another creature's declaration does not spend this one's first time" $
+                matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (ObjectId.MkObjectId 2), declared]
+              -- CR 508.3a's last sentence, unchanged by the frequency: a
+              -- non-declaration event never matches.
+              HU.assertBool "a step beginning is not an attack" $
+                not
+                  ( Event.matchesTrigger
+                      (gsWith [declared])
+                      bearer
+                      S.alice
+                      (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn)
+                      (GameEvent.StepBegan (Phase.Combat CombatStep.DeclareAttackers) S.alice)
+                  ),
       -- Pins the canonical emission order this module's `eventTriggers` comment
       -- documents ("events outer, permanents inner, ascending by id"), which a
       -- later task's CR 603.3b ordering prompt indexes into. Two RiP bearers
