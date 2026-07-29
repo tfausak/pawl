@@ -376,7 +376,7 @@ effectCounts effect = case effect of
   Effect.Untap _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl duration _ -> durationCounts duration
-  Effect.ArmDelayedTrigger _ -> []
+  Effect.ArmDelayedTrigger _ _ -> []
   Effect.AffectPlayers duration _ _ -> durationCounts duration
   Effect.CreateEmblem card -> cardCounts card
   Effect.BecomeMonarch _ -> []

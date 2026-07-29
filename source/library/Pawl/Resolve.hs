@@ -133,7 +133,7 @@ slotsOf effect = case effect of
   Effect.Untap ref -> objectRefSlots ref
   Effect.AddPhases _ -> Set.empty
   Effect.GainControl _ slot -> Set.singleton slot
-  Effect.ArmDelayedTrigger _ -> Set.empty
+  Effect.ArmDelayedTrigger _ _ -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
@@ -180,7 +180,7 @@ readsX = any effectReadsX
       Effect.Untap _ -> False
       Effect.AddPhases _ -> False
       Effect.GainControl _ _ -> False
-      Effect.ArmDelayedTrigger _ -> False
+      Effect.ArmDelayedTrigger _ _ -> False
       Effect.AffectPlayers {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
@@ -226,7 +226,7 @@ manaProduced effect = case effect of
   Effect.Untap _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.GainControl _ _ -> Nothing
-  Effect.ArmDelayedTrigger _ -> Nothing
+  Effect.ArmDelayedTrigger _ _ -> Nothing
   Effect.AffectPlayers {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
@@ -267,7 +267,7 @@ searchesLibrary effect = case effect of
   Effect.Untap _ -> False
   Effect.AddPhases _ -> False
   Effect.GainControl _ _ -> False
-  Effect.ArmDelayedTrigger _ -> False
+  Effect.ArmDelayedTrigger _ _ -> False
   Effect.AffectPlayers {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
@@ -291,7 +291,7 @@ textChangeSlots card =
 armedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
 armedAbilities effects =
   let named effect = case effect of
-        Effect.ArmDelayedTrigger name -> Just name
+        Effect.ArmDelayedTrigger name _ -> Just name
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe named effects)
 
@@ -362,7 +362,7 @@ rewriteEffect pairs effect = case effect of
   -- CR 500.8's added phases carry no basic-land-type word for CR 612 to rewrite.
   Effect.AddPhases _ -> effect
   Effect.GainControl _ _ -> effect
-  Effect.ArmDelayedTrigger _ -> effect
+  Effect.ArmDelayedTrigger _ _ -> effect
   -- A player effect carries no basic-land-type word for CR 612 to rewrite.
   Effect.AffectPlayers {} -> effect
   -- An emblem's embedded card carries no basic-land-type word here (as Create's
@@ -1277,7 +1277,7 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                 let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
                 State.modify' (bindSlot source slot named)
       _ -> pure ()
-  Effect.ArmDelayedTrigger name -> do
+  Effect.ArmDelayedTrigger name duration -> do
     gs <- State.get
     case Game.cardOf source gs >>= (Map.lookup name . Card.Type.delayedAbilities) of
       -- The dataflow lint makes a dangling name a failing test, never a silent
@@ -1294,7 +1294,17 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                 { DelayedTrigger.ability = ability,
                   DelayedTrigger.source = source,
                   DelayedTrigger.controller = controller,
-                  DelayedTrigger.bindings = captured
+                  DelayedTrigger.bindings = captured,
+                  -- CR 603.7b's stated duration, armed the way a continuous
+                  -- effect's is. The two Maybes meet here and mean different
+                  -- things: the OUTER one is the card printing no duration at
+                  -- all, and the inner one is Expiry.arm reporting that a
+                  -- printed duration never STARTED (CR 611.2b's "if the 'for as
+                  -- long as' duration never starts, the effect does nothing").
+                  -- Both collapse to Nothing, and both should: an ability whose
+                  -- stated duration never began has no duration to outlive its
+                  -- first firing, so CR 603.7b's default is exactly right for it.
+                  DelayedTrigger.expiry = duration >>= \d -> Expiry.arm controller source d gs
                 }
          in State.put gs {GameState.delayedTriggers = GameState.delayedTriggers gs Seq.|> entry}
   Effect.Replace duration uses re ->

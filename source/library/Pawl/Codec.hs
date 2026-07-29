@@ -52,6 +52,7 @@ import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.EventShape as EventShape
+import qualified Pawl.Type.Expiry as Expiry
 import qualified Pawl.Type.ExtraPhase as ExtraPhase
 import qualified Pawl.Type.Filter as Filter
 import qualified Pawl.Type.GameEvent as GameEvent
@@ -1564,7 +1565,13 @@ effectToJson e = case e of
   Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (objectRefToJson r))
   Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (fmap extraPhaseToJson ps)))
   Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array [durationToJson d, slotNameToJson s]))
-  Effect.ArmDelayedTrigger n -> Json.tagged (Text.pack "ArmDelayedTrigger") (Just (abilityNameToJson n))
+  -- The duration is ELIDED when absent, which is CR 603.7b's default -- so
+  -- Tidal Wave's one-shot entry stays a bare ability name and only a card that
+  -- states a duration writes the two-element form.
+  Effect.ArmDelayedTrigger n md ->
+    Json.tagged (Text.pack "ArmDelayedTrigger") . Just $ case md of
+      Nothing -> abilityNameToJson n
+      Just d -> Array [abilityNameToJson n, durationToJson d]
   Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array [durationToJson d, playerScopeToJson s, playerEffectToJson pe]))
   Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (cardToJson c))
   Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (monarchTargetToJson t))
@@ -1629,7 +1636,9 @@ jsonToEffect value = do
       Just (Array [q, c, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure defaultTokenEntry <*> (Just <$> jsonToSlotName s)
       Just (Array [q, c, e, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> jsonToTokenEntry e <*> (Just <$> jsonToSlotName s)
       _ -> Left (Text.pack "Create expects [Quantity, Card], optionally with a TokenEntry and/or a slot")
-    "ArmDelayedTrigger" -> withValue mv (fmap Effect.ArmDelayedTrigger . jsonToAbilityName)
+    "ArmDelayedTrigger" -> case mv of
+      Just (Array [n, d]) -> Effect.ArmDelayedTrigger <$> jsonToAbilityName n <*> fmap Just (jsonToDuration d)
+      _ -> withValue mv (fmap (`Effect.ArmDelayedTrigger` Nothing) . jsonToAbilityName)
     "Replace" -> case mv of
       Just (Array [d, u, re]) -> do
         duration <- jsonToDuration d
@@ -1939,13 +1948,37 @@ jsonToBindings value =
         pure (k, b)
    in Map.fromList <$> listFrom decodeEntry value
 
+-- CR 611.2: the STORED duration, which unlike every other type in this module
+-- never appears in card JSON -- a card carries a Duration and Pawl.Expiry.arm
+-- turns it into this. The one thing that serialises an Expiry is a
+-- DelayedTrigger, below, because CR 603.7b lets a delayed ability state one.
+expiryToJson :: Expiry.Expiry -> Value
+expiryToJson e = case e of
+  Expiry.AtCleanup -> nullary (Text.pack "AtCleanup")
+  Expiry.Never -> nullary (Text.pack "Never")
+  Expiry.While p c -> Json.tagged (Text.pack "While") (Just (Array [playerIdToJson p, conditionToJson c]))
+  Expiry.AtTurnOf p -> Json.tagged (Text.pack "AtTurnOf") (Just (playerIdToJson p))
+
+jsonToExpiry :: Value -> Either Text Expiry.Expiry
+jsonToExpiry value = do
+  (t, mv) <- Json.tag value
+  case (Text.unpack t, mv) of
+    ("AtCleanup", _) -> Right Expiry.AtCleanup
+    ("Never", _) -> Right Expiry.Never
+    ("While", Just (Array [p, c])) -> Expiry.While <$> jsonToPlayerId p <*> jsonToCondition c
+    ("AtTurnOf", Just v) -> Expiry.AtTurnOf <$> jsonToPlayerId v
+    _ -> Left (Text.pack "unknown Expiry: " <> t)
+
 delayedTriggerToJson :: DelayedTrigger.DelayedTrigger -> Value
 delayedTriggerToJson d =
   Object
     [ (Text.pack "ability", triggeredAbilityToJson (DelayedTrigger.ability d)),
       (Text.pack "source", objectIdToJson (DelayedTrigger.source d)),
       (Text.pack "controller", playerIdToJson (DelayedTrigger.controller d)),
-      (Text.pack "bindings", bindingsToJson (DelayedTrigger.bindings d))
+      (Text.pack "bindings", bindingsToJson (DelayedTrigger.bindings d)),
+      -- CR 603.7b: absent for an ability with no stated duration, which is the
+      -- rule's default and every entry in the pool but Full Throttle's.
+      (Text.pack "expiry", maybeTo expiryToJson (DelayedTrigger.expiry d))
     ]
 
 jsonToDelayedTrigger :: Value -> Either Text DelayedTrigger.DelayedTrigger
@@ -1955,12 +1988,14 @@ jsonToDelayedTrigger value = do
   s <- Json.field (Text.pack "source") ps >>= jsonToObjectId
   c <- Json.field (Text.pack "controller") ps >>= jsonToPlayerId
   b <- Json.field (Text.pack "bindings") ps >>= jsonToBindings
+  e <- maybeFrom jsonToExpiry (getOpt (Text.pack "expiry") ps)
   pure
     DelayedTrigger.MkDelayedTrigger
       { DelayedTrigger.ability = a,
         DelayedTrigger.source = s,
         DelayedTrigger.controller = c,
-        DelayedTrigger.bindings = b
+        DelayedTrigger.bindings = b,
+        DelayedTrigger.expiry = e
       }
 
 -- Modal -----------------------------------------------------------------------

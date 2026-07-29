@@ -311,7 +311,13 @@ data Effect card
     -- type parameter. The resolving object's binding environment is captured as
     -- the ability is armed, which is how "it" / "that card" (CR 603.7c) is
     -- remembered after this resolution ends.
-    ArmDelayedTrigger AbilityName
+    --
+    -- The Duration is CR 603.7b's "stated duration, such as 'this turn'" --
+    -- Full Throttle's "at the beginning of each combat this turn". Nothing is
+    -- that rule's default, "only once, the next time its trigger event occurs"
+    -- (Tidal Wave), and it is Nothing rather than a Duration arm meaning "once"
+    -- because the rule words once-ness as the ABSENCE of a duration.
+    ArmDelayedTrigger AbilityName (Maybe Duration)
   | -- CR 611.1 / 613.11: install a stored PLAYER or RULES-modifying continuous
     -- effect on a class of players for a duration. Silence is
     -- `AffectPlayers UntilEndOfTurn Opponents CantCastSpells`.

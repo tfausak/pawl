@@ -1218,12 +1218,15 @@ stateTriggers gs =
            in fmap pend (filter live (Projection.triggeredAbilitiesOf oid gs))
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))
 
--- CR 603.7: delayed abilities whose trigger event is among these events. Each one
--- that fires is REMOVED from the store (CR 603.7b: "only once, the next time its
--- trigger event occurs"); the survivors are returned so the caller can store them
--- back. CR 603.7d-f: the controller travels with the entry, so a delayed ability
--- resolves under the player who controlled the spell that created it even if that
--- spell's source object is long gone.
+-- CR 603.7: delayed abilities whose trigger event is among these events. An
+-- entry that fires is REMOVED from the store -- CR 603.7b: "only once, the next
+-- time its trigger event occurs" -- UNLESS it carries a stated duration, which
+-- is the same rule's own exception ("unless it has a stated duration, such as
+-- 'this turn'"). One of Pawl.Expiry's sweeps ends those instead; CR 514.2's
+-- cleanup, for Full Throttle. The survivors are returned so the caller can store
+-- them back. CR 603.7d-f: the controller travels with the entry, so a delayed
+-- ability resolves under the player who controlled the spell that created it
+-- even if that spell's source object is long gone.
 --
 -- `fires` matches only against EVENTS (`matchesTrigger`), never against live
 -- game state, so a stored entry whose condition is TriggerCondition.StateIs would
@@ -1251,7 +1254,9 @@ delayedPending events gs =
           (DelayedTrigger.ability entry)
           (DelayedTrigger.bindings entry)
       store = GameState.delayedTriggers gs
-   in (fmap pend (Foldable.toList (Seq.filter fires store)), Seq.filter (not . fires) store)
+      -- Firing spends the one shot only for an entry with no stated duration.
+      spent entry = fires entry && Maybe.isNothing (DelayedTrigger.expiry entry)
+   in (fmap pend (Foldable.toList (Seq.filter fires store)), Seq.filter (not . spent) store)
 
 -- Everything that has triggered and is not yet on the stack, from all three
 -- sources, plus the delayed store as it stands afterwards. One function, so

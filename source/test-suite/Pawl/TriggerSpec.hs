@@ -37,6 +37,7 @@ import qualified Pawl.Cost as Cost
 import qualified Pawl.Departure as Departure
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Event as Event
+import qualified Pawl.Expiry as Expiry
 import qualified Pawl.Game as Game
 import qualified Pawl.Keyword as Keyword
 import qualified Pawl.Modal as Modal
@@ -56,9 +57,11 @@ import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
 import qualified Pawl.Type.DamageKind as DamageKind
+import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.Departure as Departure.Type
 import qualified Pawl.Type.Effect as Effect
 import qualified Pawl.Type.EndingStep as EndingStep
+import qualified Pawl.Type.Expiry as Expiry.Type
 import qualified Pawl.Type.Filter as Filter.Type
 import qualified Pawl.Type.GameEvent as GameEvent
 import qualified Pawl.Type.GameState as GameState
@@ -688,6 +691,13 @@ delayedTests registry =
       -- Answers Prompt.ChooseBoundToken with an object that was never minted, so
       -- the engine's filter is what decides the binding. Id 999 names nothing --
       -- the same posture S.noSource takes.
+      -- Stamp an expiry onto every armed delayed ability, so the CR 603.7b
+      -- stated-duration mechanism can be exercised on a real armed entry.
+      withExpiry expiry gs =
+        gs
+          { GameState.delayedTriggers =
+              fmap (\entry -> entry {DelayedTrigger.expiry = expiry}) (GameState.delayedTriggers gs)
+          }
       chooseUnmintedToken :: Prompt.Prompt r -> r
       chooseUnmintedToken p = case p of
         Prompt.ChooseBoundToken {} -> ObjectId.MkObjectId 999
@@ -721,6 +731,41 @@ delayedTests registry =
             let after = resolveAll (settle (beginEndStep (castWave tidalWave island)))
             HU.assertEqual "no Wall left" [] (walls after)
             HU.assertEqual "the store is empty" 0 (Seq.length (GameState.delayedTriggers after)),
+          -- CR 603.7b's other half: "unless it has a stated duration, such as
+          -- 'this turn.'" Tidal Wave's entry is reused with an expiry stamped on
+          -- it, so the mechanism is tested without inventing a card; Full
+          -- Throttle is the card that actually prints one.
+          HU.testCase "CR 603.7b a stated-duration delayed ability stays armed after firing" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let armed = castWave tidalWave island
+                stated = withExpiry (Just Expiry.Type.AtCleanup) armed
+                began = [GameEvent.StepBegan endStep S.alice]
+                (firedOnce, survivors) = Event.delayedPending began stated
+                (firedAgain, _) = Event.delayedPending began stated {GameState.delayedTriggers = survivors}
+            HU.assertEqual "it fired" 1 (length firedOnce)
+            HU.assertEqual "and stayed armed" 1 (Seq.length survivors)
+            HU.assertEqual "so the next end step fires it again" 1 (length firedAgain),
+          HU.testCase "CR 603.7b without a stated duration firing still spends it" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let armed = castWave tidalWave island
+                (fired, survivors) = Event.delayedPending [GameEvent.StepBegan endStep S.alice] armed
+            HU.assertEqual "it fired" 1 (length fired)
+            HU.assertEqual "and was evicted" 0 (Seq.length survivors),
+          -- CR 514.2: "all 'until end of turn' and 'this turn' effects end"
+          -- during the cleanup step -- which is what ends the stated duration,
+          -- and the reason an armed entry cannot outlive the turn that made it.
+          HU.testCase "CR 514.2 cleanup drops a stated-duration delayed ability" $ do
+            tidalWave <- Registry.printing registry "Tidal Wave"
+            island <- Registry.printing registry "Island"
+            let armed = castWave tidalWave island
+                swept expiry = GameState.delayedTriggers (Expiry.dropAtCleanup (withExpiry expiry armed))
+            HU.assertEqual "an 'this turn' entry is gone" 0 (Seq.length (swept (Just Expiry.Type.AtCleanup)))
+            HU.assertEqual "an end-of-game entry stays" 1 (Seq.length (swept (Just Expiry.Type.Never)))
+            -- CR 603.7b's one shot is spent by FIRING, not by time, so an entry
+            -- on no duration at all must survive every sweep.
+            HU.assertEqual "and a one-shot entry stays" 1 (Seq.length (swept Nothing)),
           HU.testCase "CR 603.7b a second end step does not re-fire it" $ do
             tidalWave <- Registry.printing registry "Tidal Wave"
             island <- Registry.printing registry "Island"

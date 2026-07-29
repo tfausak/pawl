@@ -48,6 +48,7 @@ import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.EntryOption as EntryOption
 import qualified Pawl.Type.EntryRewrite as EntryRewrite
 import qualified Pawl.Type.EventShape as EventShape
+import qualified Pawl.Type.Expiry as Expiry
 import qualified Pawl.Type.ExtraPhase as ExtraPhase
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
 -- evaluator module Pawl.Filter is not imported here today, but the alias
@@ -867,7 +868,11 @@ tests registry =
           HU.testCase "AbilityName round-trips" $
             roundTrip "name" Codec.abilityNameToJson Codec.jsonToAbilityName (AbilityName.MkAbilityName (Text.pack "sacrifice it")),
           HU.testCase "ArmDelayedTrigger round-trips" $
-            roundTrip "arm" Codec.effectToJson Codec.jsonToEffect (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it"))),
+            roundTrip "arm" Codec.effectToJson Codec.jsonToEffect (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "sacrifice it")) Nothing),
+          -- CR 603.7b's stated duration takes the two-element form; the absent
+          -- one above must keep the bare shape, so both have to survive.
+          HU.testCase "ArmDelayedTrigger round-trips a stated duration" $
+            roundTrip "arm1" Codec.effectToJson Codec.jsonToEffect (Effect.ArmDelayedTrigger (AbilityName.MkAbilityName (Text.pack "each combat")) (Just Duration.UntilEndOfTurn)),
           -- M-5 (fix pass 1): the "DelayedTrigger round-trips" test below exercises
           -- only a Binding's `target` field via Binding.toObject. The codec is
           -- meant to be total over every Binding field -- subtypes, amount, modes,
@@ -898,9 +903,15 @@ tests registry =
                     { DelayedTrigger.ability = ability,
                       DelayedTrigger.source = ObjectId.MkObjectId 4,
                       DelayedTrigger.controller = S.alice,
-                      DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.toObject (ObjectId.MkObjectId 9))
+                      DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.toObject (ObjectId.MkObjectId 9)),
+                      DelayedTrigger.expiry = Nothing
                     }
-             in roundTrip "delayed" Codec.delayedTriggerToJson Codec.jsonToDelayedTrigger entry,
+             in do
+                  -- CR 603.7b's default and its stated-duration exception both
+                  -- have to survive: the absent expiry is elided to null, and a
+                  -- present one must come back as itself.
+                  roundTrip "delayed" Codec.delayedTriggerToJson Codec.jsonToDelayedTrigger entry
+                  roundTrip "delayed1" Codec.delayedTriggerToJson Codec.jsonToDelayedTrigger entry {DelayedTrigger.expiry = Just Expiry.AtCleanup},
           HU.testCase "a TriggeredAbility with an intervening if round-trips" $
             let ability =
                   TriggeredAbility.MkTriggeredAbility
