@@ -4,10 +4,13 @@
 -- CR 500.8's added phases (Aggravated Assault).
 module Pawl.TurnSpec where
 
+import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Pawl.Activate as Activate
+import qualified Pawl.Cast as Cast
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Registry as Registry
@@ -18,6 +21,7 @@ import qualified Pawl.Turn as Turn
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
+import qualified Pawl.Type.Combat as Combat
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.ExtraPhase as ExtraPhase
@@ -293,10 +297,47 @@ runTurn answer gs0 =
              in (final, GameState.phase g : later)
    in go 32 gs0
 
--- CR 500.8's added phases, end to end, through the one card in the pool that
--- adds any: Aggravated Assault ({3}{R}{R}: Untap all creatures you control.
--- After this main phase, there is an additional combat phase followed by an
--- additional main phase. Activate only as a sorcery.)
+-- alice at her declare attackers step, defending player bob, with two Settled
+-- creatures of the given printing -- the first untapped and free to attack, the
+-- second TAPPED so CR 508.1a keeps it out of combat -- four untapped Mountains
+-- (exactly Relentless Assault's {2}{R}{R}) and the spell in hand.
+relentlessBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId, ObjectId, ObjectId)
+relentlessBoard mountain assault piker =
+  let (base, ours, _) = S.combatBoardOf [piker, piker] []
+      (attacker, bystander) = case ours of
+        [a, b] -> (a, b)
+        _ -> error "combatBoardOf should return two creatures"
+      withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) base [1 :: Int .. 4]
+      (gs, spell) = S.handOne assault (S.tapObject bystander withLands)
+   in ( gs
+          { GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = GameState.combat base,
+            GameState.remaining = GameState.remaining base
+          },
+        spell,
+        attacker,
+        bystander
+      )
+
+-- Cast a spell from alice's hand through the real path -- Cast.castSpell pays
+-- its cost off the board -- and let it resolve.
+castAndResolve :: ObjectId -> GameState.GameState -> GameState.GameState
+castAndResolve spell gs =
+  let cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice spell))
+   in snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+
+-- CR 500.8's added phases, end to end, through the cards in the pool that add
+-- any: Aggravated Assault ({3}{R}{R}: Untap all creatures you control. After
+-- this main phase, there is an additional combat phase followed by an additional
+-- main phase. Activate only as a sorcery.) and Relentless Assault ({2}{R}{R}:
+-- Untap all creatures that attacked this turn. After this main phase, there is
+-- an additional combat phase followed by an additional main phase.)
 extraPhaseTests :: Registry.Type.Registry -> Tasty.TestTree
 extraPhaseTests registry =
   Tasty.testGroup
@@ -426,7 +467,42 @@ extraPhaseTests registry =
                 Phase.Ending EndingStep.Cleanup
               ]
               ran
-            HU.assertEqual "bob took 2 in each of the two combats" (Just 16) (S.lifeOf S.bob played)
+            HU.assertEqual "bob took 2 in each of the two combats" (Just 16) (S.lifeOf S.bob played),
+      HU.testCase "CR 500.8 whole card: Relentless Assault untaps only what ATTACKED" $ do
+        -- The assertion that distinguishes Filter.AttackedThisTurn from
+        -- "creatures you control": both creatures are alice's and both are
+        -- tapped by the time the spell resolves, and only the one that was
+        -- DECLARED as an attacker (CR 508.3a) may untap.
+        mountain <- Registry.printing registry "Mountain"
+        assault <- Registry.printing registry "Relentless Assault"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, spell, attacker, bystander) = relentlessBoard mountain assault piker
+            fought = S.runCombat (S.attackTo S.bob) gs
+            after = castAndResolve spell fought
+        HU.assertEqual "the spell was cast in the postcombat main phase" Phase.PostcombatMain (GameState.phase fought)
+        HU.assertEqual "it really attacked" [attacker] (S.attackerDeclarationsOf fought)
+        HU.assertEqual "the attacker untapped" (Just TapState.Untapped) (fmap Object.tapped (Game.lookupObject attacker after))
+        HU.assertEqual "the non-attacker stayed tapped" (Just TapState.Tapped) (fmap Object.tapped (Game.lookupObject bystander after))
+        HU.assertEqual
+          "and the phases went in directly after this main phase"
+          (Turn.combatAndMainPhase <> Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup])
+          (GameState.remaining after),
+      HU.testCase "CR 511.3 Relentless Assault still finds an attacker after clearCombat" $ do
+        -- The reason the atom reads the turn-scoped event log rather than the
+        -- live combat record. By the postcombat main phase the end of combat
+        -- step has ended, so CR 511.3 has removed every creature from combat and
+        -- Combat.attackers is empty -- an IsAttacking-shaped implementation would
+        -- untap nothing here and this test would fail.
+        mountain <- Registry.printing registry "Mountain"
+        assault <- Registry.printing registry "Relentless Assault"
+        piker <- Registry.printing registry "Goblin Piker"
+        let (gs, spell, attacker, _) = relentlessBoard mountain assault piker
+            fought = S.runCombat (S.attackTo S.bob) gs
+        HU.assertEqual "combat really was cleared" [] (Map.keys (Combat.attackers (GameState.combat fought)))
+        HU.assertEqual
+          "and the attacker untapped anyway"
+          (Just TapState.Untapped)
+          (fmap Object.tapped (Game.lookupObject attacker (castAndResolve spell fought)))
     ]
 
 dedupe :: (Eq a) => [a] -> [a]

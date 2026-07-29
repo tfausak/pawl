@@ -67,6 +67,32 @@ data Filter
     -- type. What the invariant forbids is casing on an EFFECT's identity, which
     -- this arm still does not do.
     IsAttacking
+  | -- CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
+    -- Relentless Assault's "all creatures that attacked this turn". A look-back
+    -- read of the turn-scoped GameEvent log, which is what CR 608.2i sanctions:
+    -- "Some effects look back in time and require information about previous
+    -- game states and actions rather than considering the current game state."
+    -- Never a stamp on the object.
+    --
+    -- NOT a synonym for IsAttacking, and not expressible in terms of it:
+    -- Combat.attackers is wiped by Combat.clearCombat as the end of combat step
+    -- ends (CR 511.3), so by the time a postcombat main phase resolves this
+    -- spell the combat's attackers are gone from the live record. The event log
+    -- is the right footing because it is cleared at turn handoff, which is
+    -- exactly the span "this turn" names.
+    --
+    -- DECLARED, like TriggerCondition.SelfAttacks and for that arm's reason: CR
+    -- 508.4 says a creature put onto the battlefield attacking "never attacked",
+    -- and only Combat.declareAttackers appends GameEvent.AttackerDeclared.
+    --
+    -- The fourth atom, after IsAttacking, IsAttachedToCreature and IsToken,
+    -- reading something CR 109.3 leaves off the characteristic list. Their
+    -- defence covers this one: what happened earlier this turn is a RULES record
+    -- the closed half owns outright (CR 608.2i, Pawl.Type.GameEvent), so reading
+    -- it is the same kind of act as reading a card type, and casing on an
+    -- EFFECT's identity is still what the invariant forbids and still not what
+    -- this does.
+    AttackedThisTurn
   | -- CR 303.4b / 701.3a: the candidate is ATTACHED to a creature -- "the object
     -- or player an Aura is attached to is called enchanted" -- which is what
     -- Crown of the Ages' "target Aura attached to a creature" narrows by.

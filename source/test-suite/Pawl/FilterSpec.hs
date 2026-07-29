@@ -29,6 +29,7 @@ blackCreature =
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
+      Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.token = False
     }
@@ -46,6 +47,7 @@ devoidBigCreature =
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
+      Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.token = False
     }
@@ -147,6 +149,36 @@ tests =
             . HU.assertBool "player"
             . not
             $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.IsAttacking
+        ],
+      Tasty.testGroup
+        "AttackedThisTurn"
+        [ HU.testCase "matches a view whose history says so"
+            . HU.assertBool "attacked"
+            $ Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.AttackedThisTurn,
+          HU.testCase "does not match a creature that never attacked"
+            . HU.assertBool "did not attack"
+            . not
+            $ Filter.matches self blackCreature Filter.Type.AttackedThisTurn,
+          -- The two axes are independent in BOTH directions, which is the whole
+          -- reason this atom exists. A creature attacking right now may not have
+          -- been declared this turn (CR 508.4 puts one onto the battlefield
+          -- attacking without it ever having attacked), and one that attacked
+          -- earlier this turn is no longer attacking once CR 511.3 has removed it
+          -- from combat -- which is Relentless Assault's whole case.
+          HU.testCase "is not implied by attacking right now"
+            . HU.assertBool "attacking does not imply attacked"
+            . not
+            $ Filter.matches self (blackCreature {Filter.attacking = True}) Filter.Type.AttackedThisTurn,
+          HU.testCase "does not imply attacking right now"
+            . HU.assertBool "attacked does not imply attacking"
+            . not
+            $ Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.IsAttacking,
+          -- CR 506.3: only a creature can be declared as an attacker, and a
+          -- player is not one.
+          HU.testCase "a player candidate is vacuously false"
+            . HU.assertBool "player"
+            . not
+            $ Filter.matches self (Filter.playerView (PlayerId.MkPlayerId 0)) Filter.Type.AttackedThisTurn
         ],
       Tasty.testGroup
         "IsAttachedToCreature"

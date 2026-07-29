@@ -159,6 +159,12 @@ snapshotView shape event = case event of
                 -- not one (CR 109.3) -- so IsAttacking is vacuously False over a
                 -- past event, the posture controller already takes here.
                 Filter.attacking = False,
+                -- Nor does the snapshot record what the object DID: it holds the
+                -- characteristics the object last had (CR 608.2h), not the
+                -- turn's event log, and this view is built from one event rather
+                -- than from the game -- so AttackedThisTurn is vacuously False
+                -- here, the posture attacking takes.
+                Filter.attackedThisTurn = False,
                 -- Nor is what a permanent was attached to (CR 109.3 names it
                 -- explicitly), and the snapshot records no attachment either --
                 -- so IsAttachedToCreature is vacuously False here too.

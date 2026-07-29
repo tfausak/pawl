@@ -596,6 +596,7 @@ filterToJson filter_ = case filter_ of
   Filter.IsPlayer r -> Json.tagged (Text.pack "IsPlayer") (Just (playerRelationToJson r))
   Filter.IsSource -> nullary (Text.pack "IsSource")
   Filter.IsAttacking -> nullary (Text.pack "IsAttacking")
+  Filter.AttackedThisTurn -> nullary (Text.pack "AttackedThisTurn")
   Filter.IsAttachedToCreature -> nullary (Text.pack "IsAttachedToCreature")
   Filter.IsToken -> nullary (Text.pack "IsToken")
   Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (fmap filterToJson fs)))
@@ -615,6 +616,7 @@ jsonToFilter value = do
     ("IsPlayer", Just v) -> Filter.IsPlayer <$> jsonToPlayerRelation v
     ("IsSource", _) -> Right Filter.IsSource
     ("IsAttacking", _) -> Right Filter.IsAttacking
+    ("AttackedThisTurn", _) -> Right Filter.AttackedThisTurn
     ("IsAttachedToCreature", _) -> Right Filter.IsAttachedToCreature
     ("IsToken", _) -> Right Filter.IsToken
     ("And", Just (Array vs)) -> Filter.And <$> traverse jsonToFilter vs

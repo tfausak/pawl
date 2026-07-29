@@ -461,10 +461,11 @@ tests registry =
                 isSource = Filter.Type.IsSource
                 ravenousRats = Filter.Type.IsPlayer PlayerRelation.Opponent
                 killShot = Filter.Type.IsAttacking
+                relentlessAssault = Filter.Type.AttackedThisTurn
                 crownOfTheAges = Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.IsAttachedToCreature]
              in mapM_
                   (roundTrip "filter" Codec.filterToJson Codec.jsonToFilter)
-                  [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot, crownOfTheAges],
+                  [doomBlade, terror, reprisal, basicLand, angelicEdict, controlled, bySubtype, isSource, ravenousRats, killShot, relentlessAssault, crownOfTheAges],
           HU.testCase "PlayerRelation round-trips" $
             mapM_
               (roundTrip "relation" Codec.playerRelationToJson Codec.jsonToPlayerRelation)
