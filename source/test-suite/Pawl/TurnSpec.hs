@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Turn: turn structure, the phase schedule, the CR 508.8 skips, and
@@ -14,6 +15,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Pawl.Activate as Activate
 import qualified Pawl.Cast as Cast
+import qualified Pawl.Combat as Combat
 import qualified Pawl.Engine as Engine
 import qualified Pawl.Game as Game
 import qualified Pawl.Registry as Registry
@@ -21,10 +23,11 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
+import qualified Pawl.Type.Action as Action
 import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Type.BeginningStep as BeginningStep
 import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.Combat as Combat
+import qualified Pawl.Type.Combat as Combat.Type
 import qualified Pawl.Type.CombatStep as CombatStep
 import qualified Pawl.Type.EndingStep as EndingStep
 import qualified Pawl.Type.ExtraPhase as ExtraPhase
@@ -228,8 +231,59 @@ skipTests registry =
             after = snd (Engine.runGamePure S.identityAnswer armed Engine.runStep)
             remaining = foldr (:) [] (GameState.remaining after)
         HU.assertBool "no blockers step" (notElem (Phase.Combat CombatStep.DeclareBlockers) remaining)
-        HU.assertBool "no damage step" (notElem (Phase.Combat CombatStep.CombatDamage) remaining)
+        HU.assertBool "no damage step" (notElem (Phase.Combat CombatStep.CombatDamage) remaining),
+      HU.testCase "CR 508.8 an attacker removed from combat still keeps the two steps" $ do
+        -- The whole card: alice attacks with her only creature, and bob answers
+        -- with Ray of Command, whose "gain control of it" is CR 506.4's
+        -- control-change clause -- so the Goblin Piker is REMOVED FROM COMBAT
+        -- before the step ends and Combat.Type.attackers is empty when CR 508.8 is
+        -- asked.
+        --
+        -- The steps stay anyway, because CR 508.8's condition is HISTORICAL: "if
+        -- no creatures are DECLARED as attackers". One was. CR 508.1k is the
+        -- rule that keeps the two apart -- a declared creature "remains an
+        -- attacking creature until it's removed from combat", which ends its
+        -- attacking, not its having been declared.
+        piker <- Registry.printing registry "Goblin Piker"
+        island <- Registry.printing registry "Island"
+        ray <- Registry.printing registry "Ray of Command"
+        let (base, _, _) = S.combatBoardOf [piker] []
+            -- {3}{U}, so four.
+            withLands = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) base [1 :: Int .. 4]
+            (_, armed) = S.addHandCard ray S.bob withLands
+            after = snd (Engine.runGamePure castingDefender armed Engine.runStep)
+        HU.assertEqual "the attacker really left combat" [] (Map.keys (Combat.Type.attackers (GameState.combat after)))
+        HU.assertEqual "declare blockers still next" (Phase.Combat CombatStep.DeclareBlockers) (GameState.phase after),
+      HU.testCase "CR 508.8 a creature put onto the battlefield attacking keeps the two steps" $ do
+        -- The rule's SECOND clause on its own, with nothing declared. Direct
+        -- call, because no card in the pool can put a creature onto the
+        -- battlefield attacking without first attacking with something (#370);
+        -- this is the strongest statement of the clause available, and it is
+        -- what stops the fix above from being narrowed to the declaration.
+        piker <- Registry.printing registry "Goblin Piker"
+        let (base, ours, _) = S.combatBoardOf [piker] []
+            joined = S.runPure S.identityAnswer base (Foldable.traverse_ Combat.putOntoBattlefieldAttacking ours)
+            after = Combat.skipEmptyCombat joined
+            remaining = foldr (:) [] (GameState.remaining after)
+        HU.assertEqual "no declaration was made" [] (S.attackerDeclarationsOf after)
+        HU.assertBool "blockers step kept" (elem (Phase.Combat CombatStep.DeclareBlockers) remaining)
+        HU.assertBool "damage step kept" (elem (Phase.Combat CombatStep.CombatDamage) remaining)
     ]
+
+-- aggressiveAnswer, except that it takes any cast on offer instead of passing --
+-- the shape the Ray of Command fixture above needs, where alice must attack and
+-- bob must then cast. Pawl.Support's castAnswer is the other half of the same
+-- pair and declines to attack, so neither one alone will do.
+castingDefender :: Prompt.Prompt r -> r
+castingDefender p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    let isCast a = case a of
+          Action.Cast _ -> True
+          _ -> False
+     in case filter isCast actions of
+          h : _ -> h
+          [] -> Action.Pass
+  _ -> S.aggressiveAnswer p
 
 -- The schedule Engine.advance leaves once the precombat main phase is current:
 -- everything after it in an ordinary turn (Turn.allPhases).
@@ -609,14 +663,14 @@ extraPhaseTests registry =
         -- The reason the atom reads the turn-scoped event log rather than the
         -- live combat record. By the postcombat main phase the end of combat
         -- step has ended, so CR 511.3 has removed every creature from combat and
-        -- Combat.attackers is empty -- an IsAttacking-shaped implementation would
+        -- Combat.Type.attackers is empty -- an IsAttacking-shaped implementation would
         -- untap nothing here and this test would fail.
         mountain <- Registry.printing registry "Mountain"
         assault <- Registry.printing registry "Relentless Assault"
         piker <- Registry.printing registry "Goblin Piker"
         let (gs, spell, attacker, _) = relentlessBoard mountain assault piker
             fought = S.runCombat (S.attackTo S.bob) gs
-        HU.assertEqual "combat really was cleared" [] (Map.keys (Combat.attackers (GameState.combat fought)))
+        HU.assertEqual "combat really was cleared" [] (Map.keys (Combat.Type.attackers (GameState.combat fought)))
         HU.assertEqual
           "and the attacker untapped anyway"
           (Just TapState.Untapped)

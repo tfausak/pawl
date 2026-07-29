@@ -1074,6 +1074,7 @@ combatLegalityTests registry =
                           Combat.Type.blockers = Map.empty,
                           Combat.Type.struckFirst = Nothing,
                           Combat.Type.joinedUnder = Map.singleton oid S.alice,
+                          Combat.Type.attackersJoined = True,
                           Combat.Type.defender = Just S.bob
                         }
                   }

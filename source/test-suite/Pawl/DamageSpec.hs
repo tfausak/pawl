@@ -1170,6 +1170,7 @@ departedAttackerTests registry =
                         -- controller, which is what a declaration would have
                         -- recorded and what CR 506.4 compares against.
                         Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
+                        Combat.Type.attackersJoined = True,
                         Combat.Type.defender = Just S.bob
                       }
                 }
@@ -1233,6 +1234,7 @@ departedDefenderTests registry =
                         Combat.Type.blockers = Map.empty,
                         Combat.Type.struckFirst = Nothing,
                         Combat.Type.joinedUnder = Map.singleton attacker S.alice,
+                        Combat.Type.attackersJoined = True,
                         Combat.Type.defender = Just S.bob
                       }
                 }
@@ -1272,6 +1274,7 @@ departedDefenderTests registry =
                         Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker),
                         Combat.Type.struckFirst = Nothing,
                         Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
+                        Combat.Type.attackersJoined = True,
                         Combat.Type.defender = Just S.carol
                       }
                 }

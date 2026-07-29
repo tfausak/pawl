@@ -62,6 +62,32 @@ data Combat = MkCombat
     -- permanent's own controller either way, so the snapshot states the rule the
     -- rule states, for one map.
     joinedUnder :: Map ObjectId PlayerId,
+    -- CR 508.8: whether one or more creatures have joined this combat as
+    -- attackers -- "declared as attackers or put onto the battlefield attacking".
+    -- Written by Pawl.Combat.declareAttackers and
+    -- Pawl.Combat.putOntoBattlefieldAttacking, the two things that can do either,
+    -- and by nothing else.
+    --
+    -- SEPARATE from `attackers`, and monotone within the combat phase, because
+    -- CR 508.8 asks a HISTORICAL question and that map is current state. CR 508.1k
+    -- is the rule that separates them: a declared creature "remains an attacking
+    -- creature until it's removed from combat", so CR 506.4's removal ends its
+    -- attacking and leaves its having been declared untouched. Reading
+    -- Map.null on `attackers` instead answered the rule wrong for a lone attacker
+    -- that a Ray of Command took (CR 506.4's control-change clause) or that
+    -- regenerated (CR 701.19a) during the declare attackers step -- both of which
+    -- delete the entry, and neither of which un-declares anything.
+    --
+    -- A Bool and not a set of ids: the rule asks how many joined only to compare
+    -- against zero, nothing else reads it, and a set here would shadow
+    -- `attackers`' key set and invite the two to be confused.
+    --
+    -- Its lifetime is this record's, which is exact rather than lucky. CR 508.8
+    -- scopes the question to one declare attackers step; a combat phase has
+    -- exactly one of those, and Pawl.Combat.clearCombat resets the record as each
+    -- end of combat step ends (CR 511.3), so a CR 500.8 additional combat phase
+    -- asks the question again from False.
+    attackersJoined :: Bool,
     -- CR 506.2/506.2a: the one player being attacked this combat phase. Chosen as
     -- a turn-based action immediately after the beginning of combat step begins
     -- (CR 703.4h, CR 507.1) by Pawl.Combat.chooseDefender.
