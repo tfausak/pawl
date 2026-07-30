@@ -18,8 +18,10 @@
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
 -- Narcomoeba -- `graveyardTriggerTests`. CR 400.7e's OTHER reference inside a
 -- look-back trigger, the card it became in the first zone it went to, with
--- Endless Cockroaches -- `becameSlotTests`. CR 603.4's intervening "if" read
--- against a source that no longer exists (CR 608.2h), with Deathknell Berserker
+-- Endless Cockroaches -- `becameSlotTests`, which also pins
+-- Event.eventBindingSlots (the per-condition slot set the card lint asks)
+-- against the keys eventBindings actually stamps. CR 603.4's intervening "if"
+-- read against a source that no longer exists (CR 608.2h), with Deathknell Berserker
 -- -- `lookBackInterveningTests`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
@@ -58,6 +60,11 @@ import qualified Pawl.Type.Card as Card.Type
 import qualified Pawl.Type.CardType as CardType
 import qualified Pawl.Type.Color as Color
 import qualified Pawl.Type.CombatStep as CombatStep
+import qualified Pawl.Type.Comparison as Comparison
+-- Aliased Condition.Type, not Condition, per the project-wide convention
+-- (CardSpec's note): the evaluator module Pawl.Condition may later be imported
+-- and must not collide.
+import qualified Pawl.Type.Condition as Condition.Type
 import qualified Pawl.Type.CostComponent as CostComponent
 import qualified Pawl.Type.CounterKind as CounterKind
 import qualified Pawl.Type.DamageEvent as DamageEvent
@@ -1858,6 +1865,55 @@ diesTriggerTests registry =
             HU.assertEqual "so the trigger is hers, not its owner's" [S.alice] (fmap PendingTrigger.controller (fst (Event.gatherTriggers (Event.unscannedEvents died) died)))
         ]
 
+-- One event per trigger condition, chosen to be an event that GENUINELY fires
+-- that condition (Event.matchesTrigger's own arms are the spec), so
+-- eventBindings is exercised through its matching arm rather than through its
+-- `_ -> Map.empty` fallthrough. A pair that did not match would pin nothing:
+-- both sides would read empty for every condition.
+--
+-- Exhaustive with no wildcard, which is half of what keeps the pin honest -- a
+-- new TriggerCondition fails to compile here. The other half, the list below, is
+-- hand-kept and cannot be forced; add the new constructor there too.
+representativeEvent :: TriggerCondition.TriggerCondition -> GameEvent.GameEvent
+representativeEvent cond =
+  let departed = ObjectId.MkObjectId 1
+      arrived = ObjectId.MkObjectId 2
+      moved from to = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics
+      combatDamage =
+        GameEvent.DamageDealt
+          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False 0 DamageKind.Combat)
+   in case cond of
+        TriggerCondition.SelfEnters -> moved Zone.Stack Zone.Battlefield
+        TriggerCondition.PermanentEnters _ -> moved Zone.Stack Zone.Battlefield
+        TriggerCondition.StepBegins phase _ -> GameEvent.StepBegan phase S.alice
+        -- CR 603.8: a state trigger matches a game STATE, so no log entry fires
+        -- it at all (Event.matchesTrigger's StateIs arm answers False for every
+        -- event). Any event is therefore as representative as any other.
+        TriggerCondition.StateIs _ -> GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice
+        TriggerCondition.SelfDealsCombatDamageToPlayer -> combatDamage
+        TriggerCondition.CreatureDealtCombatDamageToMonarch -> combatDamage
+        TriggerCondition.SelfCycled -> GameEvent.Cycled departed
+        TriggerCondition.SelfAttacks _ -> GameEvent.AttackerDeclared departed
+        TriggerCondition.SelfPutIntoGraveyardFromLibrary -> moved Zone.Library Zone.Graveyard
+        TriggerCondition.SelfDies -> moved Zone.Battlefield Zone.Graveyard
+
+-- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
+-- eventBindings and eventBindingSlots both ignore them, which is itself part of
+-- what the pin asserts.
+everyTriggerCondition :: [TriggerCondition.TriggerCondition]
+everyTriggerCondition =
+  [ TriggerCondition.SelfEnters,
+    TriggerCondition.PermanentEnters Filter.Type.IsSource,
+    TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn,
+    TriggerCondition.StateIs (Condition.Type.MkCondition (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0)),
+    TriggerCondition.SelfDealsCombatDamageToPlayer,
+    TriggerCondition.CreatureDealtCombatDamageToMonarch,
+    TriggerCondition.SelfCycled,
+    TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+    TriggerCondition.SelfPutIntoGraveyardFromLibrary,
+    TriggerCondition.SelfDies
+  ]
+
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
 -- to the card that left the battlefield checks for it only in the first zone
 -- that it went to" -- said positively by CR 400.7e: "Abilities that trigger when
@@ -1872,6 +1928,10 @@ diesTriggerTests registry =
 -- information) and the CARD it became in the graveyard, which is what the
 -- effect has to move. CR 400.7 minted a fresh id for the second, so the two are
 -- not interchangeable and they are not one slot.
+--
+-- Also the home of the pin on Event.eventBindingSlots (the last case): that
+-- classification restates in one dimension what eventBindings says in two, so
+-- the two are compared here rather than trusted to agree.
 --
 -- The structural twin is Narcomoeba's `MoveToZone "self" Battlefield` in
 -- graveyardTriggerTests: same opcode, same slot shape. There "self" IS the
@@ -1958,7 +2018,25 @@ becameSlotTests registry =
              in HU.assertEqual
                   "no became slot"
                   Map.empty
-                  (Event.eventBindings TriggerCondition.SelfPutIntoGraveyardFromLibrary milled)
+                  (Event.eventBindings TriggerCondition.SelfPutIntoGraveyardFromLibrary milled),
+          -- The pin on Event.eventBindingSlots, the per-CONDITION slot set the
+          -- card lint asks (CardSpec's "every slot a triggered ability reads is
+          -- bound for its condition"). That function is a second statement of
+          -- what eventBindings already says, and eventBindings cases on
+          -- (condition, event) PAIRS, so nothing in the types keeps the two
+          -- agreeing: a new binding arm added there and forgotten here would
+          -- silently un-lint the new slot. Comparing the keys eventBindings
+          -- actually produces against what the classification claims is what
+          -- makes the drift a failing test.
+          HU.testCase "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps" $
+            mapM_
+              ( \cond ->
+                  HU.assertEqual
+                    ("the slots bound for " <> show cond)
+                    (Map.keysSet (Event.eventBindings cond (representativeEvent cond)))
+                    (Event.eventBindingSlots cond)
+              )
+              everyTriggerCondition
         ]
 
 -- CR 603.4's intervening "if" on a LOOK-BACK trigger, which is the one shape
