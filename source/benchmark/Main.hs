@@ -268,15 +268,47 @@ loadControlDeck registry = do
   control <- Registry.printing registry "Control Magic"
   pure (Deck.MkDeck (Map.fromList [(island, 53), (myr, 4), (control, 3)]))
 
+-- loadControlDeck's PAIRED CONTROL: the same 60 cards and the same 4 Darksteel
+-- Myr, with the 3 Control Magic replaced by 3 more Islands -- so the only
+-- difference between the two scenarios is the Aura (#200).
+--
+-- Without a control, "fighting 2p aura" is a baseline rather than a diagnostic:
+-- its number folds together what an Aura costs the engine (per-Aura
+-- re-derivation in Sba.fallsOff, and the control-grant walk
+-- Projection.controlGrants adds to every controllerOf) with what its WORKLOAD
+-- costs (a 4v4 board that never dies, over 108 turns). Only the difference
+-- between the two attributes anything.
+--
+-- Deck size and creature count are held fixed on purpose, because both drive
+-- the workload. 60 cards means the same number of turns: both decks are observed
+-- (via 'cabal repl bench:pawl-benchmark', reading 'GameState.turnNumber' after
+-- 'Engine.runMatchPure fightAnswer') to deck out on turn 108, and to leave a
+-- battlefield of comparable size -- 115 permanents here against 120 there. And 4
+-- Darksteel Myr a side is the same attack/block/damage cycle, since a 0/1
+-- indestructible never dies and so never stops attacking.
+--
+-- What the missing Aura does change is WHO controls those 8 Myr. Measured the
+-- same way: 4 and 4 at the end here, 5 and 3 there, because each Control Magic
+-- that resolves steals one. That drift is the Aura's own doing and is part of
+-- what the pair measures, not a flaw in the control.
+loadNoAuraDeck :: Registry.Type.Registry -> IO Deck.Deck
+loadNoAuraDeck registry = do
+  island <- Registry.printing registry "Island"
+  myr <- Registry.printing registry "Darksteel Myr"
+  pure (Deck.MkDeck (Map.fromList [(island, 56), (myr, 4)]))
+
 main :: IO ()
 main = do
   root <- Registry.defaultRoot
   registry <- Registry.new root
   deck <- loadRedDeck registry
   controlDeck <- loadControlDeck registry
+  noAuraDeck <- loadNoAuraDeck registry
   Bench.defaultMain
     [ Bench.bench "goldfish 2p" $ Bench.whnf (goldfish deck) 0,
       Bench.bench "casting 2p" $ Bench.whnf (casting deck) 0,
       Bench.bench "fighting 2p" $ Bench.whnf (fighting deck) 0,
-      Bench.bench "fighting 2p aura" $ Bench.whnf (fighting controlDeck) 0
+      Bench.bench "fighting 2p aura" $ Bench.whnf (fighting controlDeck) 0,
+      -- The line above's paired control: same board, no Aura (loadNoAuraDeck).
+      Bench.bench "fighting 2p no aura" $ Bench.whnf (fighting noAuraDeck) 0
     ]

@@ -20,6 +20,7 @@ import qualified Pawl.Type.ModeIndex as ModeIndex
 import Pawl.Type.ObjectId (ObjectId)
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Pool as Pool
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
 import Pawl.Type.SlotName (SlotName)
@@ -66,6 +67,20 @@ legalRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set 
 legalRecipients perspective source spec gs =
   let TargetSpec.MkTargetSpec pool restriction = spec
       context = Filter.MkContext perspective (Just source)
+      -- ONE whole-board projection and ONE control-grant walk for the whole
+      -- slot: both the base pool's creature test and the Filter's per-candidate
+      -- view are asked of every object on the battlefield, and each was a fresh
+      -- Projection.gather (#200). The hoist Sba.performStateBasedActions takes
+      -- for the CR 704.3 sweep, whose stillLegalEnchant haddock argues at length
+      -- why re-deriving the board per candidate is the shape to avoid; the
+      -- snapshot argument is at Projection.projectGiven, and holds here because
+      -- this is a pure function of one GameState.
+      --
+      -- Thunks, so a slot that asks neither question pays for neither: a
+      -- Pool.Players or Pool.Permanents spec with no Filter forces neither, which
+      -- is what it cost before.
+      pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
       keep recipient = case recipient of
         -- CR 115.1: a player candidate is narrowed too ("target opponent"), by a
         -- Filter that asks about the player rather than about an object -- the
@@ -73,21 +88,24 @@ legalRecipients perspective source spec gs =
         -- against a player view, so a spec that says "target creature you
         -- control" cannot accidentally admit a player.
         Recipient.ToPlayer pid -> against (Filter.playerView pid)
-        Recipient.ToCreature oid -> against (Projection.viewOfObject oid gs)
-        Recipient.ToObject oid -> against (Projection.viewOfObject oid gs)
+        Recipient.ToCreature oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
+        Recipient.ToObject oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
       against view = case restriction of
         Nothing -> True
         Just f -> Filter.matches context view f
-   in Set.filter keep (basePool pool gs)
+   in Set.filter keep (basePoolGiven pcs pool gs)
 
 -- The closed part: build the pool's base recipient set over zones, tagging each
 -- candidate with how it is referenced (CR 115). The per-zone member expressions
 -- are exactly those the old per-constructor arms used.
 basePool :: Pool.Pool -> GameState -> Set Recipient
-basePool pool gs = case pool of
-  Pool.Creatures -> creatureRecipients gs
+basePool pool gs = basePoolGiven (Projection.projectAll gs) pool gs
+
+basePoolGiven :: Map ObjectId PC.ProjectedCharacteristics -> Pool.Pool -> GameState -> Set Recipient
+basePoolGiven pcs pool gs = case pool of
+  Pool.Creatures -> creatureRecipientsGiven pcs gs
   Pool.Players -> playerRecipients gs
-  Pool.AnyTarget -> Set.union (creatureRecipients gs) (playerRecipients gs)
+  Pool.AnyTarget -> Set.union (creatureRecipientsGiven pcs gs) (playerRecipients gs)
   Pool.Permanents -> permanentRecipients gs
   Pool.Spells -> spellRecipients gs
   Pool.SpellsAndPermanents -> Set.union (spellRecipients gs) (permanentRecipients gs)
@@ -96,8 +114,11 @@ basePool pool gs = case pool of
 -- ToCreature. Reads Projection.isCreatureOf so a permanent made a creature by the
 -- layer system (M3c) counts and one that lost the type does not.
 creatureRecipients :: GameState -> Set Recipient
-creatureRecipients gs =
-  let isCreatureId oid = Projection.isCreatureOf oid gs
+creatureRecipients gs = creatureRecipientsGiven (Projection.projectAll gs) gs
+
+creatureRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> GameState -> Set Recipient
+creatureRecipientsGiven pcs gs =
+  let isCreatureId oid = Projection.isCreatureGiven pcs oid gs
    in Set.fromList
         . fmap Recipient.ToCreature
         $ concatMap

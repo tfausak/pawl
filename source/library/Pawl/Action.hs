@@ -45,8 +45,22 @@ legalActions pid gs =
       -- where is Activate.abilitiesFor's question, not this one's; this list only
       -- says where to look. The two are disjoint, since an object is in exactly
       -- one zone.
+      --
+      -- ONE control-grant walk and ONE whole-board projection for the whole
+      -- enumeration, threaded into both halves of the loop -- the hoist
+      -- Sba.performStateBasedActions takes for the CR 704.3 sweep and
+      -- Projection.controls takes for the grant list. Each object here is asked
+      -- for its projection three times over (the ability list this builds, the
+      -- membership check inside activatable, the sickness gate) plus a grant walk
+      -- for its controller, at a boundary the priority loop reaches on every
+      -- pass; sharing them was GHC's job before, resting on an INLINE pragma and
+      -- CSE (#315), and is now stated (#200, #316). The board is a snapshot of
+      -- this one `gs` and this is a pure function of it, so nothing can move
+      -- between the projection and its uses; see Projection.projectGiven.
       activations =
-        let forObject oid =
-              fmap (Action.Activate oid) (filter (\ab -> Activate.activatable pid oid ab gs) (Activate.abilitiesFor oid gs))
-         in concatMap forObject (Projection.controls pid gs <> Game.zoneMembers Zone.Hand pid gs)
+        let grants = Projection.controlGrants gs
+            pcs = Projection.projectAll gs
+            forObject oid =
+              fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
+         in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs)
    in Action.Pass : lands <> spells <> activations

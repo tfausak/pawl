@@ -29,6 +29,7 @@ import Pawl.Type.ObjectId (ObjectId)
 import qualified Pawl.Type.Payment as Payment
 import Pawl.Type.PlayerId (PlayerId)
 import qualified Pawl.Type.Program as Program
+import qualified Pawl.Type.ProjectedCharacteristics as PC
 import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Sickness as Sickness
 import qualified Pawl.Type.Source as Source
@@ -49,10 +50,13 @@ import qualified Pawl.Type.Zone as Zone
 -- tap symbol (CR 107.5) and the untap symbol (CR 107.6) alike, so this function
 -- never learns which one a cost carries.
 sicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
-sicknessOk pid srcId ability gs =
+sicknessOk = sicknessOkGiven Map.empty
+
+sicknessOkGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+sicknessOkGiven pcs pid srcId ability gs =
   let needsCheck = Cost.requiresSicknessCheck (ActivatedAbility.cost ability)
-      isCreature = Set.member CardType.Creature (Projection.cardTypesOf srcId gs)
-   in not (needsCheck && isCreature && not (Summoning.settledOrHasty pid srcId gs))
+      isCreature = Set.member CardType.Creature (Projection.cardTypesGiven pcs srcId gs)
+   in not (needsCheck && isCreature && not (Summoning.settledOrHastyGiven pcs pid srcId gs))
 
 -- The abilities to consider activating, which depends on WHERE the object is --
 -- the one place that zone question is asked, so no caller repeats it.
@@ -81,20 +85,37 @@ sicknessOk pid srcId ability gs =
 -- than this function, which deliberately answers a narrower one.
 --
 -- INLINE, and not for the usual reason. This body reaches Projection.project,
--- which sicknessOk below and activatable's membership check also compute FOR THE
+-- which sicknessOk above and activatable's membership check also compute FOR THE
 -- SAME OBJECT. Inlined, GHC shares those; opaque, it cannot, and
 -- Projection.gather -- the sweep its own haddock warns is superlinear -- runs
 -- again per object per enumeration. Measured on "a three-seat lands-only mirror
 -- needs TWO deck-outs to find a winner": 10.4s inlined, 29.3s not, which was the
 -- whole of a 2x regression in the suite.
 --
--- The sharing is NOT explicit here, the way Projection.controllerOfGiven and
--- Sba's one-projection-per-pass make it (#316). Until it is, a future zone arm
--- that makes this function too big to inline costs that 2x silently.
+-- The ENUMERATION path no longer rests on that: Action.legalActions projects the
+-- whole board once and threads it through abilitiesForGiven and
+-- activatableGiven, so the sharing there is explicit, the way
+-- Projection.controllerOfGiven and Sba's one-projection-per-pass make it (#200,
+-- and #316's own prescription). The pragma stays for the LONE-QUERY path -- the
+-- wrapper here, which precomputes nothing and where GHC's sharing is still all
+-- there is.
 {-# INLINE abilitiesFor #-}
 abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
-abilitiesFor oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
-  Just Zone.Battlefield -> Projection.abilitiesOf oid gs
+abilitiesFor = abilitiesForGiven Map.empty
+
+-- The zone question -- asked in exactly ONE place, here, whichever board it is
+-- answered against. Only the battlefield arm reads the board at all: CR 613's
+-- layer system does not reach a hand, so a hand's abilities are minted from the
+-- printed card and a hand object's absence from the board is not a miss (see
+-- Projection.projectGiven).
+--
+-- This carries the pragma too, and is what makes the wrapper's one effective: the
+-- wrapper is a partial application of this, so inlining it exposes nothing for
+-- GHC to share unless this body comes with it.
+{-# INLINE abilitiesForGiven #-}
+abilitiesForGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
+abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
+  Just Zone.Battlefield -> Projection.abilitiesGiven pcs oid gs
   Just Zone.Hand -> case Game.cardOf oid gs of
     Nothing -> []
     Just card -> Keyword.handAbilitiesOf (Card.keywords card)
@@ -114,10 +135,17 @@ abilitiesFor oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
 -- Nothing for every other zone, matching abilitiesFor's silence there: a zone
 -- that offers no ability needs no activator.
 activatorOf :: ObjectId -> GameState -> Maybe PlayerId
-activatorOf oid gs = case Game.lookupObject oid gs of
+activatorOf oid gs = activatorOfGiven (Projection.controlGrants gs) oid gs
+
+-- activatorOf with the control-grant list PRECOMPUTED, so an enumeration over
+-- every permanent walks the battlefield for control-granting statics once rather
+-- than once per permanent (#200) -- the reason Projection.controls threads the
+-- same list.
+activatorOfGiven :: [Projection.ControlGrant] -> ObjectId -> GameState -> Maybe PlayerId
+activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
   Just obj -> case Object.zone obj of
-    Zone.Battlefield -> Projection.controllerOf oid gs
+    Zone.Battlefield -> Projection.controllerOfGiven grants Set.empty oid gs
     Zone.Hand -> Just (Object.owner obj)
     _ -> Nothing
 
@@ -147,12 +175,27 @@ timingOk pid ability gs = case ActivatedAbility.timing ability of
 --
 -- The cost is the PRINTED one: an activated ability's cost is deliberately not
 -- routed through Cost.total (#90).
+--
+-- activatableGiven is the half Action.legalActions wants: `grants` is one
+-- control-grant walk and `pcs` one whole-board projection, taken once for the
+-- enumeration instead of once per permanent per ability (#200, #316). See
+-- Projection.projectGiven for what the board is and why passing Map.empty here
+-- is the same answer at a lone query's cost.
+--
+-- Two of the conjuncts are deliberately NOT given the board: Target.fillableModes
+-- and Cost.canPay ask about OTHER objects (the target pool, the mana sources), so
+-- each hoists its own board for its own sweep -- Target.legalRecipients and
+-- Mana.manaSources both do. #316 draws that same line for Cost.canPay, and calls
+-- it a different fold and a separate question.
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
-activatable pid srcId ability gs =
-  activatorOf srcId gs == Just pid
-    && elem ability (abilitiesFor srcId gs)
+activatable pid srcId ability gs = activatableGiven (Projection.controlGrants gs) Map.empty pid srcId ability gs
+
+activatableGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+activatableGiven grants pcs pid srcId ability gs =
+  activatorOfGiven grants srcId gs == Just pid
+    && elem ability (abilitiesForGiven pcs srcId gs)
     && not (Mana.isManaAbility ability)
-    && sicknessOk pid srcId ability gs
+    && sicknessOkGiven pcs pid srcId ability gs
     && timingOk pid ability gs
     && Natural.length (Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
       >= Modal.selectionCount (ActivatedAbility.modal ability)
