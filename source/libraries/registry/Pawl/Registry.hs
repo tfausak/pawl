@@ -71,7 +71,7 @@ new rt = do
 -- 'new' still takes an explicit FilePath, so this is something callers opt
 -- into, and a future CLI's --cards-dir can pass something else entirely.
 defaultRoot :: IO FilePath
-defaultRoot = Paths.getDataFileName "data/cards"
+defaultRoot = Paths.getDataFileName "cards"
 
 -- Every card in the pool, by slug, ascending. The listing IS the pool: a
 -- deckbuilder, a linter, a scenario loader and "load every card" all need it,

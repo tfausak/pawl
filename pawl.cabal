@@ -9,7 +9,8 @@ category: Game
 license: 0BSD
 maintainer: Taylor Fausak
 license-file: LICENSE.txt
-data-files: data/cards/*.json
+data-dir: data
+data-files: cards/*.json
 extra-doc-files:
   CHANGELOG.md
   README.md
