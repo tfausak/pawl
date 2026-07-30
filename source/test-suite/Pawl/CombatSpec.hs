@@ -1706,7 +1706,7 @@ effectRemovalTests registry =
 -- declare attackers step like every combatBoardOf board, so the ENGINE declares
 -- the attack: no test here writes the combat record.
 --
--- Returns alice's three declared permanents in printing order alongside the
+-- Returns alice's three combatBoardOf permanents in printing order alongside the
 -- Forest, which is added separately because it is not one of them.
 unmakeBoard ::
   Printing.Printing ->
@@ -1723,10 +1723,10 @@ unmakeBoard opalescence livingPlane piker forest swamp doomBlade =
    in (snd (S.addHandCard doomBlade S.bob (addSwamps 2 gs1)), mine, land)
 
 -- alice attacks with `land` alone, nobody blocks, and whoever is offered a cast
--- takes it and aims every target at `victim`. The shape of `steal` above, and it
--- declines blocks for the same reason: bob's own lands are 1/1 creatures while
--- Living Plane lives, so an aggressive blocker answer would route the attack
--- through CR 509.1 and hide the question this asks.
+-- takes it and aims every target at `victim`. The shape of `steal` above, with a
+-- reason of its own for declining blocks: bob's own lands are 1/1 creatures while
+-- Living Plane lives, so an aggressive blocker answer would put them in front of
+-- the attacker and hide the question this asks behind CR 509.1's routing.
 unmake :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 unmake land victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
@@ -1836,7 +1836,8 @@ typeChangeRemovalTests registry =
             HU.assertBool "CR 611.3b: so the Forest stopped being a creature" (not (Projection.isCreatureOf land atEnd))
             HU.assertBool "and is still on the battlefield, so this is the types clause and not the leaves-the-battlefield one" (S.onBattlefield land atEnd)
             -- The discriminating assertion: the unfixed engine leaves the Forest
-            -- in the record, still attacking a player it can no longer attack.
+            -- in the record as an attacking creature, which CR 506.3 says a
+            -- noncreature permanent cannot be.
             HU.assertBool "CR 506.4: it is no longer an attacking creature" (Map.notMember land attackers)
             HU.assertEqual "CR 510.1: and bob takes nothing" (Just 20) (S.lifeOf S.bob atEnd)
           _ -> HU.assertFailure "fixture should give alice Opalescence, Living Plane and a Piker",

@@ -636,14 +636,17 @@ settleForPriority = do
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
   -- Last, and for the same reason the conditional sweep runs first: both read
-  -- state this settle can still change, and must see what it leaves behind rather
-  -- than what some earlier step saw. Both read CONTROL; the CR 506.4 scan also
-  -- reads CARD TYPES, and that is the half with teeth, because a "for as long as"
-  -- animation ending is exactly what the conditional sweep removes. Running the
-  -- scan before the sweep would leave an attacker that has stopped being a
-  -- creature in the combat record for one more pass. Outside the recursion guard
-  -- on purpose -- neither makes further work, so neither is a reason to loop, and
-  -- both must run even on a pass where nothing fired.
+  -- state this settle can still change, and are placed to see what it leaves
+  -- behind rather than what some earlier step saw. Both read CONTROL, and the
+  -- CR 506.4 scan also reads CARD TYPES -- where the sweep is what ends a "for as
+  -- long as" animation, and so what makes an attacker stop being a creature.
+  --
+  -- Outside the recursion guard on purpose -- neither makes further work, so
+  -- neither is a reason to loop, and both must run even on a pass where nothing
+  -- fired. That last part is also what keeps the placement a matter of doing the
+  -- work in ONE pass rather than of correctness: the settle stops only on a pass
+  -- where nothing fired, and these two ran on that pass, against the finished
+  -- board, before priority is granted.
   --
   -- Order between the two does not matter and is not load-bearing: CR 506.4 asks
   -- about combat and CR 302.6 about summoning sickness, and neither reads what the
