@@ -109,6 +109,8 @@ library json
     Pawl.Json.PairSpec
     Pawl.Json.String
     Pawl.Json.StringSpec
+    Pawl.Json.Value
+    Pawl.Json.ValueSpec
 
   hs-source-dirs: source/libraries/json
 
