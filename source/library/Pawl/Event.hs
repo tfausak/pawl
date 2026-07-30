@@ -903,6 +903,76 @@ eventBindings cond event = case (cond, event) of
     Binding.setBecame (ZoneChange.object zc) Map.empty
   _ -> Map.empty
 
+-- Which slots eventBindings above can stamp for a condition, as a set. A
+-- CLASSIFICATION of a rule 603 trigger condition -- the sibling of
+-- functionsInGraveyard below, which asks the other structural question about the
+-- same closed type -- so it never reaches an ability's payload and no reader of
+-- it learns what any effect IS.
+--
+-- Its customer is the card lint (CardSpec's "every slot a triggered ability
+-- reads is bound for its condition"): an effect naming CR 400.7e's `became` or
+-- CR 702.70a's `thatPlayer` under a condition that binds neither would place its
+-- trigger, miss the lookup and silently do nothing, which is the worst failure
+-- mode card data has.
+--
+-- Exhaustive with no wildcard, deliberately unlike eventBindings' own
+-- `_ -> Map.empty`: that case is over (condition, event) PAIRS, where a wildcard
+-- is the only way to say "this pair does not match", while a new CONDITION here
+-- must force a decision rather than defaulting to "binds nothing" -- the default
+-- that would silently un-lint whatever slot the new condition binds.
+--
+-- A PARALLEL STATEMENT, PINNED BY A TEST. This says in one dimension what
+-- eventBindings says in two, so the two can drift out of agreement. Deriving
+-- this from that would mean fabricating a representative GameEvent per condition
+-- inside the rules core, which is fixture work the engine has no other use for;
+-- the agreement is therefore pinned from the test side instead, by TriggerSpec's
+-- "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps",
+-- which runs every condition against an event that genuinely fires it and
+-- compares Map.keysSet of the result against the answer here.
+--
+-- Both slots are unconditional GIVEN A MATCH, and that is what makes a
+-- per-CONDITION set sound at all: matchesTrigger's SelfDies arm has already
+-- required the graveyard destination (so CR 400.7e's public-zone proviso holds
+-- by construction, CR 400.2), and its SelfDealsCombatDamageToPlayer arm has
+-- already required a player recipient (isPlayerRecipient). #384's wider
+-- leaves-the-battlefield condition is where that stops being true: its
+-- destination may be a hand or a library, so `became` would be bound only for a
+-- PUBLIC destination and the answer would become per-condition-AND-destination,
+-- which this signature cannot express.
+eventBindingSlots :: TriggerCondition -> Set.Set SlotName.SlotName
+eventBindingSlots cond = case cond of
+  -- CR 603.6a's entrant is named by no slot, so an enters trigger cannot refer
+  -- back to it -- eventBindings' own PermanentEnters note, from this side
+  -- (#330).
+  TriggerCondition.SelfEnters -> Set.empty
+  TriggerCondition.PermanentEnters _ -> Set.empty
+  -- CR 603.2b's step beginning names no object and no player but the active one,
+  -- and the active player is not what CR 109.5's `you` means.
+  TriggerCondition.StepBegins _ _ -> Set.empty
+  -- CR 603.8: a state trigger matches a game STATE rather than an event
+  -- (matchesTrigger's StateIs arm answers False for every event), so no event
+  -- contributes anything to one.
+  TriggerCondition.StateIs _ -> Set.empty
+  -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> Set.singleton Binding.triggerPlayer
+  -- CR 725.2's inherent ability is minted by Pawl.Monarch and borne by no card,
+  -- and its bindings come from Monarch.inherentMatch rather than from
+  -- eventBindings -- which is why the answer here is eventBindings' own, empty.
+  -- A card that declared this condition would get nothing from the event, which
+  -- is the honest answer rather than an omission.
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> Set.empty
+  -- CR 702.29c's cycled card is the bearer itself, already bound as CR 113.7's
+  -- source, and rule 508.3a's declared attacker likewise.
+  TriggerCondition.SelfCycled -> Set.empty
+  TriggerCondition.SelfAttacks _ -> Set.empty
+  -- CR 113.6k: the bearer of a library-to-graveyard trigger IS the arriving
+  -- incarnation, so binding it again under `became` would be a second name for
+  -- one object. Narcomoeba reads the source slot instead.
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Set.empty
+  -- CR 400.7e: the incarnation the card became, which CR 603.10a's look-back
+  -- keeps out of the source slot.
+  TriggerCondition.SelfDies -> Set.singleton Binding.became
+
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
 isPlayerRecipient :: Recipient.Recipient -> Bool

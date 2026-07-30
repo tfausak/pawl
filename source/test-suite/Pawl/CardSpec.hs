@@ -11,6 +11,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
+import qualified Pawl.Event as Event
 -- The logic module, alongside Pawl.Type.Modal below: unambiguous under one
 -- alias because the two modules export disjoint names (TriggerSpec's
 -- precedent), and Modal.allEffects is how this lint reaches an activated or
@@ -459,6 +460,66 @@ cardOffendsSharedZoneScope :: Card.Type.Card -> Bool
 cardOffendsSharedZoneScope card =
   any (\(Count.Type.MkCount scope _ _) -> scopeOffends scope) (cardCounts card)
 
+-- The TRIGGERED-ability half of the D4 dataflow lint: every slot one of a
+-- triggered ability's effects READS must be a slot something binds for that
+-- ability. Without it, an effect naming CR 400.7e's `became` under a condition
+-- that never binds it loads, places its trigger, misses the lookup and silently
+-- no-ops (Resolve's MoveToZone arm falls through to `pure ()`).
+--
+-- A SUBSET check, never the spell lint's equality, and that is forced rather
+-- than chosen: Pawl.Binding.triggerSource's comment spells out that an
+-- equality-style lint widened over an ability's modes is mutually unsatisfiable
+-- with the "a reserved slot is never a declared target slot" rule unless it
+-- first subtracts every reserved name from the read side. The delayed-ability
+-- lint below took the subset shape for the same reason, and this follows it.
+--
+-- The available side, and why each part of it is available:
+--
+--   * Binding.triggerSource (CR 113.7, the object whose ability triggered) and
+--     Binding.you (CR 109.5, the ability's controller) are stamped for EVERY
+--     triggered ability as it is placed (Engine.placeBorne, Binding.setYou), so
+--     they need no agreement with the condition.
+--   * Event.eventBindingSlots is the condition-SPECIFIC half -- CR 400.7e's
+--     `became`, CR 702.70a's `thatPlayer` -- and is the whole point of this
+--     lint.
+--   * Resolve.definedSlots covers a slot the ability's own effects MINT rather
+--     than read: a Create's token (CR 603.7c's "it"), a PlaySubgame's loser.
+--     The same exemption both existing lints take.
+--   * the ability's own declared target specs (CR 601.2c / 700.2c) are the
+--     ordinary chosen targets, unioned across its modes exactly as the
+--     delayed-ability lint unions across a card.
+triggeredAbilityOffends :: TriggeredAbility.TriggeredAbility Card.Type.Card -> Bool
+triggeredAbilityOffends ability =
+  let effects = Modal.allEffects (TriggeredAbility.modal ability)
+      available =
+        Set.unions
+          [ Set.fromList [Binding.triggerSource, Binding.you],
+            Event.eventBindingSlots (TriggeredAbility.condition ability),
+            Resolve.definedSlots effects,
+            Map.keysSet (Modal.allTargetSpecs (TriggeredAbility.modal ability))
+          ]
+      wanted = Set.unions (fmap Resolve.slotsOf effects)
+   in not (Set.isSubsetOf wanted available)
+
+-- A one-mode, targetless triggered ability running one effect under one
+-- condition -- the fixture the lint's own self-test misauthors on purpose. Kept
+-- here rather than in data/cards, because a committed card that offends the lint
+-- would fail the corpus sweep: the offender has to live where only the self-test
+-- sees it.
+oneEffectTrigger ::
+  TriggerCondition.TriggerCondition ->
+  Effect.Effect Card.Type.Card ->
+  TriggeredAbility.TriggeredAbility Card.Type.Card
+oneEffectTrigger condition effect =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = condition,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+
 -- The D4 dataflow lint: every slot an effect reads is declared, and every
 -- declared slot is read. Equality, not subset: a spec no effect reads is a
 -- card announcing a target it ignores -- representable in Magic, not in this
@@ -559,7 +620,9 @@ lintTests registry =
       -- target and then have the answer clobbered. Same SCOPE limit as the three
       -- above -- Card.allTargetSpecs walks a card's SPELL modes only, so a
       -- triggered ability declaring the slot still slips through, which is the
-      -- gap Pawl.Binding's `you` comment documents for the whole family.
+      -- gap Pawl.Binding's `you` comment documents for the whole family (#428).
+      -- The READ direction over a triggered ability's modes is a separate lint,
+      -- below.
       HU.testCase "the reserved became slot is never a declared target slot" $ do
         ps <- S.allPrintings registry
         let offenders =
@@ -605,6 +668,43 @@ lintTests registry =
                in not (Set.isSubsetOf wanted available)
             offenders = filter (cardOffends . Printing.card) ps
         HU.assertEqual "no dangling delayed-ability slot" [] (fmap (Card.Type.name . Printing.card) offenders),
+      -- The same subset shape over a card's TRIGGERED abilities, which is where
+      -- the condition-specific reserved slots live -- CR 400.7e's `became` and
+      -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for the available
+      -- side and for why this cannot be an equality check.
+      HU.testCase "every slot a triggered ability reads is bound for its condition" $ do
+        ps <- S.allPrintings registry
+        let cardOffends = any triggeredAbilityOffends . Card.Type.triggeredAbilities
+            offenders = filter (cardOffends . Printing.card) ps
+        HU.assertEqual "no dangling triggered-ability slot" [] (fmap (Card.Type.name . Printing.card) offenders),
+      -- The sweep above passes VACUOUSLY: no committed card misauthors the
+      -- pairing, so the sweep proves nothing about the lint. Both directions are
+      -- proven here instead, against a hand-built offender (never a card file --
+      -- a misauthored card must not be loadable) and against the real pairing.
+      --
+      -- Both reserved event slots, because a classification that answered "every
+      -- slot, always" would pass the offending half of either one alone.
+      HU.testCase "the lint itself catches a reserved event slot the condition never binds" $ do
+        roaches <- Registry.printing registry "Endless Cockroaches"
+        let -- Endless Cockroaches' own payload: "return it to its owner's hand".
+            returnIt = Effect.MoveToZone Binding.became Zone.Hand
+            -- Rule 702.70a's shape, as a targetless read of "that player".
+            thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
+        HU.assertBool
+          "CR 400.7e became under an enters trigger is rejected"
+          (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfEnters returnIt))
+        HU.assertBool
+          "and under a dies trigger it is accepted"
+          (not (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDies returnIt)))
+        HU.assertBool
+          "CR 702.70a thatPlayer under a dies trigger is rejected"
+          (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDies thatPlayerDraws))
+        HU.assertBool
+          "and under a combat-damage trigger it is accepted"
+          (not (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDealsCombatDamageToPlayer thatPlayerDraws)))
+        HU.assertBool
+          "the real card's dies trigger is accepted"
+          (not (any triggeredAbilityOffends (Card.Type.triggeredAbilities (Printing.card roaches)))),
       -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
       -- of them. Rejected rather than guessed (#53).
       HU.testCase "no Create binds a slot while making more than one token" $ do

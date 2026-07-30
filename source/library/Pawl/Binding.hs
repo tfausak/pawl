@@ -49,23 +49,24 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 -- Binding.triggerSource), so a "declared slots == read slots" equality check
 -- run over that effect's OWN mode would demand a matching targetSpecs entry
 -- -- which the "never a declared target slot" rule above then forbids,
--- making the two lints mutually unsatisfiable. CardSpec.hs's D4 lint avoids
--- this today because `cardOffends` walks only `Modal.modes (Card.Type.spell
--- card)` -- a card's SPELL modes -- and every `Sacrifice Binding.triggerSource`
--- in this phase lives in a TRIGGERED ability, whose modes the lint never
--- visits.
+-- making the two lints mutually unsatisfiable. CardSpec.hs's EQUALITY lint
+-- ("every mode's slot reads equal its declared slots") avoids this today because
+-- `cardOffends` walks only `Modal.modes (Card.Type.spell card)` -- a card's
+-- SPELL modes -- and every `Sacrifice Binding.triggerSource` in this phase lives
+-- in a TRIGGERED ability, whose modes that lint never visits.
 --
--- The delayed-ability lint that now exists (CardSpec.hs, "every slot a
--- delayed ability reads is bound by its card") already covers a delayed
--- ability's OWN reads of this slot, and it does NOT run into the equality
--- trap above: it adds Binding.triggerSource to the AVAILABLE side (the slots
--- a Create binds, plus this one) and checks the read slots are a SUBSET of
--- that, never an equality. A subset check has no "declared but never read"
--- half to retire, so reserved-slot subtraction is not needed there. This
--- warning is about a DIFFERENT, still-hypothetical extension: an
--- EQUALITY-style D4 lint (declared == read, the spell-mode lint's own shape)
--- widened to run over a triggered/activated/delayed ability's modes. That
--- extension MUST subtract the reserved slot names (this one, variableX,
+-- Two lints that now exist cover an ability's OWN reads of this slot -- the
+-- delayed one (CardSpec.hs, "every slot a delayed ability reads is bound by its
+-- card") and the triggered one ("every slot a triggered ability reads is bound
+-- for its condition") -- and neither runs into the equality trap above: both add
+-- Binding.triggerSource to the AVAILABLE side (the slots a Create binds, plus
+-- this one, plus the condition's own event slots for the triggered lint) and
+-- check the read slots are a SUBSET of that, never an equality. A subset check
+-- has no "declared but never read" half to retire, so reserved-slot subtraction
+-- is not needed in either. This warning is about a DIFFERENT, still-hypothetical
+-- extension: an EQUALITY-style D4 lint (declared == read, the spell-mode lint's
+-- own shape) widened to run over a triggered/activated/delayed ability's modes.
+-- That extension MUST subtract the reserved slot names (this one, variableX,
 -- chosenModes, copySource, you, thatPlayer, became) from the read-slots side
 -- before comparing -- loosening the equality to a subset would silently retire
 -- its "declared but never read" half instead.
@@ -77,17 +78,18 @@ triggerSource = SlotName.MkSlotName (Text.pack "self")
 -- damage to you" -- is a slot read rather than a new opcode.
 --
 -- Unlike variableX / chosenModes / triggerSource above, "no card's targetSpecs
--- may name it" is NOT lint-enforced here. The D4 lint that exists only walks a
--- card's SPELL modes (Card.allTargetSpecs is Modal.allTargetSpecs (Card.spell
--- card), CardSpec.hs) -- the same scope limit triggerSource's comment above
--- documents. "you" is stamped exclusively on TRIGGERED abilities (setYou below
--- is called only when a triggered ability is placed, Pawl.Engine), whose modes
--- that lint never visits. So a card declaring a "you" target spec on a
--- triggered ability would pass the lint today, be prompted for a target, and
--- have the answer silently clobbered by setYou's insert. The fix is extending
--- the delayed-ability lint's subset shape to Card.triggeredAbilities (out of
--- scope for this phase); until then this is a documented gap, not an enforced
--- guarantee.
+-- may name it" is NOT lint-enforced here. The declaration lints that exist only
+-- walk a card's SPELL modes (Card.allTargetSpecs is Modal.allTargetSpecs
+-- (Card.spell card), CardSpec.hs) -- the same scope limit triggerSource's comment
+-- above documents. "you" is stamped exclusively on TRIGGERED abilities (setYou
+-- below is called only when a triggered ability is placed, Pawl.Engine), whose
+-- target specs those lints never visit. So a card declaring a "you" target spec
+-- on a triggered ability would pass them today, be prompted for a target, and
+-- have the answer silently clobbered by setYou's insert (#428).
+--
+-- The triggered-ability READ lint that now exists does not close this: it is a
+-- subset check, and "you" sits on its AVAILABLE side precisely because every
+-- triggered ability has it bound.
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
 
@@ -105,7 +107,13 @@ you = SlotName.MkSlotName (Text.pack "you")
 -- Resolve.resolveEffects' legalSlot answers True for any slot with no target
 -- spec, which is how this slot stays readable at resolution. The same "no
 -- card's targetSpecs may name it" caveat `you` carries applies here, and is
--- unenforced for the same reason.
+-- unenforced for the same reason (#428).
+--
+-- That an effect READING this slot sits under a condition that binds it IS
+-- enforced, by Pawl.Event.eventBindingSlots and CardSpec's "every slot a
+-- triggered ability reads is bound for its condition": only CR 702.70a's
+-- combat-damage condition stamps it, so reading it under any other is a failing
+-- test rather than a silent no-op.
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 
@@ -142,7 +150,9 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- 608.2b's fizzle asks only about the targeted slots so it cannot rescue a
 -- spell either. "No card's targetSpecs may name it" is checked by CardSpec.hs
 -- for a card's SPELL modes only, exactly as it is for `you` -- the scope limit
--- that comment describes applies here unchanged.
+-- that comment describes applies here unchanged (#428). Reading it under a
+-- condition that never binds it is the direction that IS enforced, by
+-- Pawl.Event.eventBindingSlots (see `triggerPlayer` above).
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 
