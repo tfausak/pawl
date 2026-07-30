@@ -22,11 +22,13 @@ import qualified Pawl.EventSpec as EventSpec
 import qualified Pawl.ExpirySpec as ExpirySpec
 import qualified Pawl.Extra.BuilderSpec
 import qualified Pawl.Extra.EitherSpec
+import qualified Pawl.Extra.IntSpec
+import qualified Pawl.Extra.IntegerSpec
 import qualified Pawl.Extra.MonoidSpec
+import qualified Pawl.Extra.NaturalSpec
 import qualified Pawl.Extra.OrdSpec
 import qualified Pawl.Extra.ParsecSpec
 import qualified Pawl.Extra.SemigroupSpec
-import qualified Pawl.ExtraSpec as ExtraSpec
 import qualified Pawl.FilterSpec as FilterSpec
 import qualified Pawl.GameSpec as GameSpec
 import qualified Pawl.Json.ArraySpec
@@ -112,7 +114,6 @@ testTree registry =
       TriggerSpec.tests registry,
       FilterSpec.tests,
       RegistrySpec.tests,
-      ExtraSpec.tests,
       AuraSpec.tests registry,
       Tasty.testGroup "spec" . Writer.execWriter $ spec tasty
     ]
@@ -122,7 +123,10 @@ spec s = do
   Pawl.DecimalSpec.spec s
   Pawl.Extra.BuilderSpec.spec s
   Pawl.Extra.EitherSpec.spec s
+  Pawl.Extra.IntSpec.spec s
+  Pawl.Extra.IntegerSpec.spec s
   Pawl.Extra.MonoidSpec.spec s
+  Pawl.Extra.NaturalSpec.spec s
   Pawl.Extra.OrdSpec.spec s
   Pawl.Extra.ParsecSpec.spec s
   Pawl.Extra.SemigroupSpec.spec s

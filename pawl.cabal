@@ -87,8 +87,14 @@ library extra
     Pawl.Extra.BuilderSpec
     Pawl.Extra.Either
     Pawl.Extra.EitherSpec
+    Pawl.Extra.Int
+    Pawl.Extra.Integer
+    Pawl.Extra.IntegerSpec
+    Pawl.Extra.IntSpec
     Pawl.Extra.Monoid
     Pawl.Extra.MonoidSpec
+    Pawl.Extra.Natural
+    Pawl.Extra.NaturalSpec
     Pawl.Extra.Ord
     Pawl.Extra.OrdSpec
     Pawl.Extra.Parsec
@@ -332,9 +338,6 @@ library
     Pawl.Engine
     Pawl.Event
     Pawl.Expiry
-    Pawl.Extra.Int
-    Pawl.Extra.Integer
-    Pawl.Extra.Natural
     Pawl.Filter
     Pawl.Game
     Pawl.Json
@@ -411,7 +414,6 @@ test-suite pawl-test-suite
     Pawl.DepartureSpec
     Pawl.EventSpec
     Pawl.ExpirySpec
-    Pawl.ExtraSpec
     Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.JsonSpec
