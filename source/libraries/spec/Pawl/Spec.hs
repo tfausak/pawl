@@ -1,12 +1,11 @@
 {-# LANGUAGE RankNTypes #-}
 
--- | This module defines an abstract interface for writing tests.
 module Pawl.Spec where
 
 import qualified Control.Monad as Monad
 import qualified GHC.Stack as Stack
 
--- | A test specification parameterized by two monads:
+-- | An abstract specification parameterized by two monads:
 --
 -- - @m@: assertions (individual test actions)
 -- - @n@: test structure (grouping and registration)

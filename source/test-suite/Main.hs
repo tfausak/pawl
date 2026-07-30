@@ -1,4 +1,5 @@
 import qualified Control.Monad.Trans.Writer as Writer
+import qualified Data.List as List
 import qualified Pawl.ActivateSpec as ActivateSpec
 import qualified Pawl.AuraSpec as AuraSpec
 import qualified Pawl.BindingSpec as BindingSpec
@@ -15,14 +16,17 @@ import qualified Pawl.CostSpec as CostSpec
 import qualified Pawl.CountSpec as CountSpec
 import qualified Pawl.DamageSpec as DamageSpec
 import qualified Pawl.DecideSpec as DecideSpec
-import qualified Pawl.DecimalSpec as DecimalSpec
+import qualified Pawl.DecimalSpec
 import qualified Pawl.DepartureSpec as DepartureSpec
 import qualified Pawl.EventSpec as EventSpec
 import qualified Pawl.ExpirySpec as ExpirySpec
-import qualified Pawl.Extra.EitherSpec as EitherSpec
+import qualified Pawl.Extra.BuilderSpec
+import qualified Pawl.Extra.EitherSpec
+import qualified Pawl.Extra.ParsecSpec
 import qualified Pawl.ExtraSpec as ExtraSpec
 import qualified Pawl.FilterSpec as FilterSpec
 import qualified Pawl.GameSpec as GameSpec
+import qualified Pawl.Json.NullSpec
 import qualified Pawl.JsonSpec as JsonSpec
 import qualified Pawl.ManaSpec as ManaSpec
 import qualified Pawl.ModalSpec as ModalSpec
@@ -55,8 +59,8 @@ tasty :: Spec.Spec IO (Writer.Writer [Tasty.TestTree])
 tasty =
   Spec.MkSpec
     { Spec.assertFailure = HU.assertFailure,
-      Spec.describe = \s -> Writer.tell . pure . Tasty.testGroup s . Writer.execWriter,
-      Spec.it = \s -> Writer.tell . pure . HU.testCase s
+      Spec.describe = \s -> Writer.tell . List.singleton . Tasty.testGroup s . Writer.execWriter,
+      Spec.it = \s -> Writer.tell . List.singleton . HU.testCase s
     }
 
 testTree :: Registry.Type.Registry -> Tasty.TestTree
@@ -101,7 +105,13 @@ testTree registry =
       SlugSpec.tests,
       ExtraSpec.tests,
       AuraSpec.tests registry,
-      Tasty.testGroup "spec" . Writer.execWriter $ do
-        DecimalSpec.spec tasty
-        EitherSpec.spec tasty
+      Tasty.testGroup "spec" . Writer.execWriter $ spec tasty
     ]
+
+spec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()
+spec s = do
+  Pawl.DecimalSpec.spec s
+  Pawl.Extra.BuilderSpec.spec s
+  Pawl.Extra.EitherSpec.spec s
+  Pawl.Extra.ParsecSpec.spec s
+  Pawl.Json.NullSpec.spec s

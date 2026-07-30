@@ -1,4 +1,3 @@
--- | This module defines arbitrary precision decimal numbers.
 module Pawl.Decimal where
 
 import qualified Data.Function as Function

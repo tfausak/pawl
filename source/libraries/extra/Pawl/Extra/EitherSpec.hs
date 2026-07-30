@@ -11,4 +11,4 @@ spec s = Spec.describe s "Pawl.Extra.Either" $ do
       Spec.assertEq s (Either.hush (Left 1 :: Either Int Void.Void)) Nothing
 
     Spec.it s "converts right to just" $ do
-      Spec.assertEq s (Either.hush (Right 2 :: Either Void.Void Int)) (Just 2)
+      Spec.assertEq s (Either.hush (Right 2 :: Either Void.Void Int)) $ Just 2
