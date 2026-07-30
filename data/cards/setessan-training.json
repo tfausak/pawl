@@ -1,0 +1,123 @@
+{
+  "activatedAbilities": [],
+  "castingPermissions": [],
+  "enchant": {
+    "filter": {
+      "type": "ControlledBy",
+      "value": {
+        "type": "You"
+      }
+    },
+    "pool": {
+      "type": "Creatures"
+    }
+  },
+  "keywords": [],
+  "manaCost": [
+    {
+      "type": "Generic",
+      "value": 1
+    },
+    {
+      "type": "OfType",
+      "value": {
+        "type": "Colored",
+        "value": {
+          "type": "Green"
+        }
+      }
+    }
+  ],
+  "name": "Setessan Training",
+  "power": null,
+  "replacementEffects": [],
+  "spell": {
+    "modes": [
+      {
+        "effects": [],
+        "targetSpecs": []
+      }
+    ],
+    "selection": {
+      "type": "ChooseExactly",
+      "value": 1
+    }
+  },
+  "staticAbilities": [
+    {
+      "affected": {
+        "type": "Attached"
+      },
+      "modifications": [
+        {
+          "type": "ModifyPowerToughness",
+          "value": [
+            {
+              "type": "Literal",
+              "value": 1
+            },
+            {
+              "type": "Literal",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "type": "GainKeyword",
+          "value": {
+            "type": "Trample"
+          }
+        }
+      ]
+    }
+  ],
+  "toughness": null,
+  "triggeredAbilities": [
+    {
+      "condition": {
+        "type": "SelfEnters"
+      },
+      "modal": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": []
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 1
+        }
+      }
+    }
+  ],
+  "typeLine": {
+    "subtypes": [
+      {
+        "type": "Aura"
+      }
+    ],
+    "supertypes": [],
+    "types": [
+      {
+        "type": "Enchantment"
+      }
+    ]
+  }
+}

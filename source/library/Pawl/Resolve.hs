@@ -675,9 +675,12 @@ cease abilId gs =
 -- 608.2b asks of a target, through Target.legalRecipients rather than a
 -- hand-rolled creature test, which is what makes an enchant spec that narrows
 -- further (a colour, a controller) honoured here for free. CR 109.5's "you" on
--- that spec is the AURA's controller, not the moving effect's. An Aura with no
--- enchant ability answers False and cannot arise: the Pawl.CardSpec lint family
--- holds the Aura-iff-enchant biconditional in both directions.
+-- that spec is the AURA's controller, not the moving effect's -- proven by
+-- Pawl.AuraSpec's "CR 303.4j whole cards", where Crown of the Ages cannot move
+-- Setessan Training ("Enchant creature you control") onto an opponent's
+-- creature. An Aura with no enchant ability answers False and cannot arise: the
+-- Pawl.CardSpec lint family holds the Aura-iff-enchant biconditional in both
+-- directions.
 --
 -- The Aura branch's first conjunct is CR 303.4d's "An Aura that's also a creature
 -- can't enchant anything" -- the RESTRICTION half of that rule, whose
