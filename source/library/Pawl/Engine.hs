@@ -38,34 +38,34 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
-import qualified Pawl.Type.Action as Action.Type
-import qualified Pawl.Type.BeginningStep as BeginningStep
-import qualified Pawl.Type.CombatStep as CombatStep
-import qualified Pawl.Type.Concession as Concession
-import qualified Pawl.Type.Decider as Decider
-import qualified Pawl.Type.Deck as Deck
-import qualified Pawl.Type.Departure as Departure.Type
-import qualified Pawl.Type.EndingStep as EndingStep
-import Pawl.Type.Game (Game)
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.PendingTrigger as PendingTrigger
-import qualified Pawl.Type.Phase as Phase
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Program as Program
-import Pawl.Type.Prompt (Prompt)
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.RestartSignal as RestartSignal
-import Pawl.Type.Result (Result)
-import qualified Pawl.Type.Sickness as Sickness
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.TriggerSource as TriggerSource
-import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Concession as Concession
+import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.EndingStep as EndingStep
+import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.Phase as Phase
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Program as Program
+import Pawl.Types.Prompt (Prompt)
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.RestartSignal as RestartSignal
+import Pawl.Types.Result (Result)
+import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.Zone as Zone
 
 -- The interpreter seam: every decision the engine suspends on is answered here.
 runGame :: (Monad m) => (forall r. Prompt r -> m r) -> GameState -> Game a -> m (a, GameState)
@@ -100,7 +100,7 @@ nextInOrder order pid = case dropWhile (/= pid) order of
 -- still in the game."
 --
 -- The seat is looked up in the FULL seating order (GameState.turnOrder is never
--- shortened -- see Pawl.Type.GameState), so a player who has ALREADY departed
+-- shortened -- see Pawl.Types.GameState), so a player who has ALREADY departed
 -- still has a position from which to find their successor. That is exactly the
 -- case priorityLoop's concede arm calls this in, and it is simultaneously the
 -- correct implementation for the ordinary pass case, where `pid` is still
@@ -255,7 +255,7 @@ discardToHandSize pid = do
 --
 -- CR 800.1: "A multiplayer game is a game that begins with more than two
 -- players." GameState.turnOrder is the permanent seating roster (see
--- Pawl.Type.GameState), so counting seats answers "begins with" directly: a
+-- Pawl.Types.GameState), so counting seats answers "begins with" directly: a
 -- three-player game that has dropped to two survivors still does not skip, and a
 -- rebuilt game (CR 727.1, CR 729.2) is seated from the players who were in the
 -- game it came from and so answers for itself. Not more than two seats is CR
@@ -294,7 +294,7 @@ runTurnBasedActions phase = do
   -- and hand, and declare attackers over their creatures, all of which CR 800.4a
   -- took, so those three are vacuous; only the defending-player choice is real,
   -- and it is unobservable rather than vacuous for the reason on
-  -- Pawl.Type.Combat's defender field.
+  -- Pawl.Types.Combat's defender field.
   hasActive <- State.gets (\gs -> List.elem active (Game.stillPlaying gs))
   case phase of
     Phase.Beginning BeginningStep.Untap -> Monad.when hasActive $ do
@@ -781,7 +781,7 @@ priorityLoop = do
   loop
 
 -- CR 800.4k / CR 800.4m: hand the turn to the next SEAT in the seating order
--- (GameState.turnOrder, which is never shortened -- see Pawl.Type.GameState)
+-- (GameState.turnOrder, which is never shortened -- see Pawl.Types.GameState)
 -- whose player is still in the game.
 --
 -- CR 800.4k: "If a player who has left the game would begin a turn, that turn

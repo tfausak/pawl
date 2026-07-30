@@ -14,13 +14,13 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Extra.Natural as Natural
-import Pawl.Type.Effect (Effect)
-import qualified Pawl.Type.Modal as Modal
-import qualified Pawl.Type.Mode as Mode
-import qualified Pawl.Type.ModeIndex as ModeIndex
-import qualified Pawl.Type.ModeSelection as ModeSelection
-import Pawl.Type.SlotName (SlotName)
-import Pawl.Type.TargetSpec (TargetSpec)
+import Pawl.Types.Effect (Effect)
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeSelection as ModeSelection
+import Pawl.Types.SlotName (SlotName)
+import Pawl.Types.TargetSpec (TargetSpec)
 
 -- Every effect across all modes, printed (mode, then written) order (CR 608.2c).
 allEffects :: Modal.Modal card -> [Effect card]

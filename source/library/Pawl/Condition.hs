@@ -1,6 +1,6 @@
 -- CR 603.8 / 603.4 / 611.2b: is this Condition currently true? The only module
--- that may evaluate a Pawl.Type.Condition -- the standing Pawl.Expiry has over
--- Pawl.Type.Expiry and Pawl.Projection over Modification.
+-- that may evaluate a Pawl.Types.Condition -- the standing Pawl.Expiry has over
+-- Pawl.Types.Expiry and Pawl.Projection over Modification.
 --
 -- Total, so it must collapse the Maybe its two inputs carry: an undeterminable
 -- quantity on EITHER side makes the condition FALSE. That matches the retired
@@ -20,10 +20,10 @@ module Pawl.Condition where
 import qualified Pawl.Count as Count
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Quantity as Quantity
-import qualified Pawl.Type.Comparison as Comparison
-import qualified Pawl.Type.Condition as Condition.Type
-import Pawl.Type.GameState (GameState)
-import Pawl.Type.ObjectId (ObjectId)
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition.Type
+import Pawl.Types.GameState (GameState)
+import Pawl.Types.ObjectId (ObjectId)
 
 holds :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Condition.Type.Condition -> Bool
 holds viewOf context gs oid (Condition.Type.MkCondition measured comparison threshold) =

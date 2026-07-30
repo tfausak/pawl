@@ -1,41 +1,58 @@
--- | Rendering, construction, normalization, and extraction for 'Value'. Ported from scrod's
--- JSON encoder (a 'Builder', UTF-8-decoded to 'Text' at the boundary) plus the
--- small tagged-object helpers the codec (§2 of the M3.5 spec) builds on. Parsing
--- is added alongside in a later task.
+-- | Construction, normalization, and extraction helpers over the @json@
+-- sublibrary's 'Value', plus the small tagged-object convention the codec (§2 of
+-- the M3.5 spec) builds on. Encoding and decoding themselves live in
+-- 'Pawl.Json.Value'; this module only adapts them to the codec's @Either Text@
+-- error channel.
+--
+-- 'jObject' and 'asObject' trade in assoc lists, which is the shape the codec
+-- wants: it writes fields in a readable order rather than an alphabetical one,
+-- and reads them back by name. That order is incidental -- JSON objects are
+-- unordered, nothing checks the bytes of a card file, and 'sortKeys' exists to
+-- compare two values regardless of it.
 module Pawl.Json where
 
-import qualified Data.Bifunctor as Bifunctor
-import qualified Data.ByteString.Builder as Builder
-import qualified Data.ByteString.Lazy as LazyByteString
-import qualified Data.Char as Char
-import qualified Data.Functor.Identity as Identity
 import qualified Data.List as List
-import qualified Data.Maybe as Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Encoding
-import qualified Pawl.Type.Decimal as Decimal
-import Pawl.Type.Json (Value)
-import qualified Pawl.Type.Json as Json
+import qualified Pawl.Decimal as Decimal
+import qualified Pawl.Extra.Builder as Builder
+import qualified Pawl.Json.Array as Array
+import qualified Pawl.Json.Boolean as Boolean
+import qualified Pawl.Json.Null as Null
+import qualified Pawl.Json.Number as Number
+import qualified Pawl.Json.Object as Object
+import qualified Pawl.Json.Pair as Pair
+import qualified Pawl.Json.String as String
+import Pawl.Json.Value (Value)
+import qualified Pawl.Json.Value as Value
 import qualified Text.Parsec as Parsec
 
 -- Construction helpers -------------------------------------------------------
 
+jNull :: Value
+jNull = Value.Null (Null.MkNull ())
+
 jInt :: Integer -> Value
-jInt n = Json.Number (Decimal.mkDecimal n 0)
+jInt n = Value.Number (Number.MkNumber (Decimal.mkDecimal n 0))
 
 jText :: Text -> Value
-jText = Json.String
+jText = Value.String . String.MkString
 
 jBool :: Bool -> Value
-jBool = Json.Boolean
+jBool = Value.Boolean . Boolean.MkBoolean
+
+jArray :: [Value] -> Value
+jArray = Value.Array . Array.MkArray
+
+jObject :: [(Text, Value)] -> Value
+jObject = Value.Object . Object.MkObject . fmap (\(k, v) -> Pair.MkPair (String.MkString k) v)
 
 tagged :: Text -> Maybe Value -> Value
 tagged t mv =
-  let base = [(Text.pack "type", Json.String t)]
-   in case mv of
-        Nothing -> Json.Object base
-        Just v -> Json.Object (base <> [(Text.pack "value", v)])
+  let base = [(Text.pack "type", jText t)]
+   in jObject $ case mv of
+        Nothing -> base
+        Just v -> base <> [(Text.pack "value", v)]
 
 -- Normalization --------------------------------------------------------------
 
@@ -51,91 +68,42 @@ tagged t mv =
 -- helpers take the first match, so the two agree.
 sortKeys :: Value -> Value
 sortKeys value = case value of
-  Json.Array xs -> Json.Array (fmap sortKeys xs)
-  Json.Object ps -> Json.Object (List.sortOn fst (fmap (Bifunctor.second sortKeys) ps))
+  Value.Array a -> Value.Array (Array.MkArray (fmap sortKeys (Array.unwrap a)))
+  Value.Object o ->
+    Value.Object
+      . Object.MkObject
+      . List.sortOn (String.unwrap . Pair.name)
+      . fmap (\p -> Pair.MkPair (Pair.name p) (sortKeys (Pair.value p)))
+      $ Object.unwrap o
   _ -> value
 
 -- Rendering ------------------------------------------------------------------
 
 render :: Value -> Text
-render = Encoding.decodeUtf8Lenient . LazyByteString.toStrict . Builder.toLazyByteString . encode
-
-encode :: Value -> Builder.Builder
-encode value = case value of
-  Json.Null -> Builder.stringUtf8 "null"
-  Json.Boolean b -> Builder.stringUtf8 (if b then "true" else "false")
-  Json.Number n -> encodeNumber n
-  Json.String s -> encodeString s
-  Json.Array xs -> surround '[' ']' (fmap encode xs)
-  Json.Object ps -> surround '{' '}' (fmap encodePair ps)
-
-encodePair :: (Text, Value) -> Builder.Builder
-encodePair (k, v) = encodeString k <> Builder.charUtf8 ':' <> encode v
-
-surround :: Char -> Char -> [Builder.Builder] -> Builder.Builder
-surround open close items =
-  Builder.charUtf8 open <> commaSep items <> Builder.charUtf8 close
-
-commaSep :: [Builder.Builder] -> Builder.Builder
-commaSep bs = case bs of
-  [] -> mempty
-  first : rest -> foldl (\acc b -> acc <> Builder.charUtf8 ',' <> b) first rest
-
-encodeNumber :: Decimal.Decimal -> Builder.Builder
-encodeNumber d =
-  let e = Decimal.exponent d
-   in Builder.integerDec (Decimal.mantissa d)
-        <> if e == 0 then mempty else Builder.charUtf8 'e' <> Builder.integerDec e
-
-encodeString :: Text -> Builder.Builder
-encodeString s =
-  Builder.charUtf8 '"' <> Text.foldr (\c acc -> escape c <> acc) mempty s <> Builder.charUtf8 '"'
-
-escape :: Char -> Builder.Builder
-escape c = case c of
-  '"' -> Builder.stringUtf8 "\\\""
-  '\\' -> Builder.stringUtf8 "\\\\"
-  '\n' -> Builder.stringUtf8 "\\n"
-  '\r' -> Builder.stringUtf8 "\\r"
-  '\t' -> Builder.stringUtf8 "\\t"
-  _ ->
-    if c < ' '
-      then Builder.stringUtf8 ("\\u" <> pad (showHexChar c))
-      else Builder.charUtf8 c
-
-pad :: String -> String
-pad h = replicate (4 - length h) '0' <> h
-
-showHexChar :: Char -> String
-showHexChar c =
-  let hexDigit d = Maybe.fromMaybe '0' (lookup d (zip [0 ..] "0123456789abcdef"))
-      go n acc =
-        if n == 0
-          then if null acc then "0" else acc
-          else go (div n 16) (hexDigit (mod n 16) : acc)
-   in go (Char.ord c) ""
+render = Text.pack . Builder.toString . Value.encode
 
 -- Extraction helpers ---------------------------------------------------------
 
 asObject :: Value -> Either Text [(Text, Value)]
 asObject value = case value of
-  Json.Object ps -> Right ps
+  Value.Object o -> Right (fmap (\p -> (String.unwrap (Pair.name p), Pair.value p)) (Object.unwrap o))
   _ -> Left (Text.pack "expected object")
 
 asArray :: Value -> Either Text [Value]
 asArray value = case value of
-  Json.Array xs -> Right xs
+  Value.Array a -> Right (Array.unwrap a)
   _ -> Left (Text.pack "expected array")
 
 asText :: Value -> Either Text Text
 asText value = case value of
-  Json.String s -> Right s
+  Value.String s -> Right (String.unwrap s)
   _ -> Left (Text.pack "expected string")
 
 asInteger :: Value -> Either Text Integer
 asInteger value = case value of
-  Json.Number d ->
-    let e = Decimal.exponent d
+  Value.Number n ->
+    let d = Number.unwrap n
+        e = Decimal.exponent d
      in if e >= 0
           then Right (Decimal.mantissa d * (10 ^ e))
           else Left (Text.pack "expected integer, got fraction")
@@ -157,110 +125,9 @@ tag value = do
 
 -- Parsing --------------------------------------------------------------------
 
+-- | 'Value.decode' already consumes the blanks around a document, so this only
+-- has to pin the end of input and adapt the error to the codec's channel.
 parse :: Text -> Either Text Value
-parse input = case Parsec.parse (whole document) "" input of
+parse input = case Parsec.parse (Value.decode <* Parsec.eof) "" input of
   Left err -> Left (Text.pack (show err))
-  Right v -> Right v
-
-type P a = Parsec.ParsecT Text () Identity.Identity a
-
-whole :: P a -> P a
-whole p = spaces *> p <* spaces <* Parsec.eof
-
-spaces :: P ()
-spaces = Parsec.skipMany (Parsec.oneOf " \t\n\r")
-
-document :: P Value
-document =
-  Parsec.choice
-    [ Json.Null <$ Parsec.try (Parsec.string "null"),
-      Json.Boolean True <$ Parsec.try (Parsec.string "true"),
-      Json.Boolean False <$ Parsec.try (Parsec.string "false"),
-      Json.Number <$> pNumber,
-      Json.String <$> pString,
-      Json.Array <$> pArray,
-      Json.Object <$> pObject
-    ]
-
-lexeme :: P a -> P a
-lexeme p = p <* spaces
-
-pArray :: P [Value]
-pArray = Parsec.between (lexeme (Parsec.char '[')) (Parsec.char ']') (Parsec.sepBy (lexeme document) (lexeme (Parsec.char ',')))
-
-pObject :: P [(Text, Value)]
-pObject = Parsec.between (lexeme (Parsec.char '{')) (Parsec.char '}') (Parsec.sepBy (lexeme pPair) (lexeme (Parsec.char ',')))
-
-pPair :: P (Text, Value)
-pPair = do
-  k <- lexeme pString
-  _ <- lexeme (Parsec.char ':')
-  v <- lexeme document
-  pure (k, v)
-
-pString :: P Text
-pString = do
-  _ <- Parsec.char '"'
-  chars <- Parsec.many pChar
-  _ <- Parsec.char '"'
-  pure (Text.pack chars)
-
-pChar :: P Char
-pChar =
-  Parsec.choice
-    [ Parsec.char '\\' *> pEscape,
-      Parsec.satisfy (\c -> c /= '"' && c /= '\\')
-    ]
-
-pEscape :: P Char
-pEscape =
-  Parsec.choice
-    [ '"' <$ Parsec.char '"',
-      '\\' <$ Parsec.char '\\',
-      '/' <$ Parsec.char '/',
-      '\n' <$ Parsec.char 'n',
-      '\r' <$ Parsec.char 'r',
-      '\t' <$ Parsec.char 't',
-      '\b' <$ Parsec.char 'b',
-      '\f' <$ Parsec.char 'f',
-      Parsec.char 'u' *> pUnicode
-    ]
-
-pUnicode :: P Char
-pUnicode = do
-  ds <- Parsec.count 4 Parsec.hexDigit
-  -- Char.chr is total here: Parsec.count 4 bounds the value at 0xffff, and
-  -- every code point up to that is a Char (surrogates included).
-  pure (Char.chr (foldl (\acc d -> acc * 16 + hexVal d) 0 ds))
-
-hexVal :: Char -> Int
-hexVal c = Maybe.fromMaybe 0 (lookup c (zip "0123456789abcdefABCDEF" ([0 .. 15] <> [10 .. 15])))
-
-pNumber :: P Decimal.Decimal
-pNumber = do
-  signF <- Parsec.option id (negate <$ Parsec.char '-')
-  intPart <- pInt
-  (fracPart, fracExp) <- Parsec.option (0, 0) pFrac
-  expPart <- Parsec.option 0 pExp
-  pure (Decimal.mkDecimal (signF (intPart * (10 ^ abs fracExp) + fracPart)) (fracExp + expPart))
-
-pInt :: P Integer
-pInt =
-  Parsec.choice
-    [ 0 <$ Parsec.char '0' <* Parsec.notFollowedBy Parsec.digit,
-      digitsToInteger <$> ((:) <$> Parsec.satisfy (\c -> c >= '1' && c <= '9') <*> Parsec.many Parsec.digit)
-    ]
-
-pFrac :: P (Integer, Integer)
-pFrac = do
-  ds <- Parsec.char '.' *> Parsec.many1 Parsec.digit
-  pure (digitsToInteger ds, negate (toInteger (length ds)))
-
-pExp :: P Integer
-pExp = do
-  _ <- Parsec.oneOf "eE"
-  signF <- Parsec.option id (Parsec.choice [id <$ Parsec.char '+', negate <$ Parsec.char '-'])
-  signF . digitsToInteger <$> Parsec.many1 Parsec.digit
-
-digitsToInteger :: String -> Integer
-digitsToInteger = foldl (\acc c -> acc * 10 + toInteger (Char.ord c - Char.ord '0')) 0
+  Right value -> Right value

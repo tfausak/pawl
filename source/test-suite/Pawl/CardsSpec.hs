@@ -12,50 +12,49 @@ import qualified Pawl.Json as Json
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
-import qualified Pawl.Type.BeginningStep as BeginningStep
-import qualified Pawl.Type.Card as CardT
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.Comparison as Comparison
-import qualified Pawl.Type.Condition as Condition
-import qualified Pawl.Type.ControllerRelation as ControllerRelation
-import qualified Pawl.Type.Cost as Cost
-import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.EntryRewrite as EntryRewrite
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.ManaType as ManaType
-import qualified Pawl.Type.Modal as Modal
-import qualified Pawl.Type.Mode as Mode
-import qualified Pawl.Type.Optionality as Optionality
-import qualified Pawl.Type.Phase as Phase
-import qualified Pawl.Type.PhasePattern as PhasePattern
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.Power as Power
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Quantity as Quantity
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.Slug as Slug.Type
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.TokenEntry as TokenEntry
-import qualified Pawl.Type.Toughness as Toughness
-import qualified Pawl.Type.TriggerCondition as TriggerCondition
-import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
-import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.TypeLine as TypeLine
-import qualified Pawl.Type.Zone as Zone
-import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
+import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Card as CardT
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TokenEntry as TokenEntry
+import qualified Pawl.Types.Toughness as Toughness
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-slugOf :: Printing.Printing -> Maybe Slug.Type.Slug
-slugOf = Slug.slugify . CardT.name . Printing.card
+slugOf :: Printing.Printing -> Slug.Slug
+slugOf = Slug.fromText . CardT.name . Printing.card
 
 -- Each mode of a payload as (is it optional, what does it do) -- the shape the
 -- CR 603.5 assertions below compare against.
@@ -319,29 +318,25 @@ tests registry =
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion
-checkFile registry p =
-  case slugOf p of
-    -- Unreachable: every committed card's name slugifies, since Registry.card
-    -- already had to slugify it (via Pawl.Slug.slugify) to fetch this printing.
-    Nothing -> HU.assertFailure (Text.unpack (CardT.name (Printing.card p)) <> ": does not slugify")
-    Just slug -> do
-      let path = Registry.Type.root registry <> "/" <> Text.unpack (Slug.Type.toText slug) <> ".json"
-      -- Read as bytes and decoded as UTF-8 explicitly, matching Pawl.Registry.load:
-      -- Data.Text.IO.readFile decodes using the locale encoding, which is ASCII
-      -- under LC_ALL=C, so this would otherwise die on khabal-ghoul.json's "á".
-      bytes <- ByteString.readFile path
-      case Encoding.decodeUtf8' bytes of
-        Left err -> HU.assertFailure (path <> ": not valid UTF-8: " <> show err)
-        Right contents ->
-          case Json.parse contents of
-            -- Unreachable: S.allPrintings would have failed in IO first.
-            Left err -> HU.assertFailure (path <> ": " <> Text.unpack err)
-            Right value ->
-              -- The loader reads everything the file says and invents nothing:
-              -- re-encoding the loaded printing reproduces the file's meaning. Compared
-              -- up to key order and whitespace, because JSON objects are unordered and
-              -- formatting is not part of the contract. The corpus is committed
-              -- pretty-printed (`jq -S .`) while Json.render emits compact output, so
-              -- this can never quietly regress into a byte comparison: every file would
-              -- fail at once.
-              HU.assertEqual path (Json.sortKeys value) (Json.sortKeys (Codec.printingToJson p))
+checkFile registry p = do
+  let slug = slugOf p
+  let path = Registry.Type.root registry <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
+  -- Read as bytes and decoded as UTF-8 explicitly, matching Pawl.Registry.load:
+  -- Data.Text.IO.readFile decodes using the locale encoding, which is ASCII
+  -- under LC_ALL=C, so this would otherwise die on khabal-ghoul.json's "á".
+  bytes <- ByteString.readFile path
+  case Encoding.decodeUtf8' bytes of
+    Left err -> HU.assertFailure (path <> ": not valid UTF-8: " <> show err)
+    Right contents ->
+      case Json.parse contents of
+        -- Unreachable: S.allPrintings would have failed in IO first.
+        Left err -> HU.assertFailure (path <> ": " <> Text.unpack err)
+        Right value ->
+          -- The loader reads everything the file says and invents nothing:
+          -- re-encoding the loaded printing reproduces the file's meaning. Compared
+          -- up to key order and whitespace, because JSON objects are unordered and
+          -- formatting is not part of the contract. The corpus is committed
+          -- pretty-printed (`jq -S .`) while Json.render emits compact output, so
+          -- this can never quietly regress into a byte comparison: every file would
+          -- fail at once.
+          HU.assertEqual path (Json.sortKeys value) (Json.sortKeys (Codec.printingToJson p))

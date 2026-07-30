@@ -1,7 +1,7 @@
 -- Covers Pawl.PlayerEffect and Pawl.Cost, plus the types they case on
--- (Pawl.Type.PlayerEffect, PlayerScope, PlayerStaticAbility) and
--- the stored carrier Pawl.Type.ActivePlayerEffect. The spell match runs through
--- the identity-blind Pawl.Filter over a Pawl.Type.Filter. CR 613.10/613.11: the
+-- (Pawl.Types.PlayerEffect, PlayerScope, PlayerStaticAbility) and
+-- the stored carrier Pawl.Types.ActivePlayerEffect. The spell match runs through
+-- the identity-blind Pawl.Filter over a Pawl.Types.Filter. CR 613.10/613.11: the
 -- continuous effects that affect PLAYERS and the RULES OF THE GAME, which sit
 -- outside the CR 613 layer system entirely.
 --
@@ -24,30 +24,30 @@ import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Action as Action.Type
-import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.Cost as Cost.Type
-import qualified Pawl.Type.EndingStep as EndingStep
-import qualified Pawl.Type.Expiry as Expiry.Type
+import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Expiry as Expiry.Type
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator Pawl.Filter already claims the alias Filter.
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.GameEvent as GameEvent
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.ManaType as ManaType
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.Phase as Phase
-import qualified Pawl.Type.PlayerEffect as PlayerEffect.Type
-import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.PlayerScope as PlayerScope
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Regenerability as Regenerability
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

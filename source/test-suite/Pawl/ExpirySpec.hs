@@ -1,4 +1,4 @@
--- Covers Pawl.Expiry and Pawl.Type.Expiry: the printed Duration -> stored Expiry
+-- Covers Pawl.Expiry and Pawl.Types.Expiry: the printed Duration -> stored Expiry
 -- arming (CR 611.2), the sweeps that end a duration (CR 514.2, 611.2a, 611.2b),
 -- and the two gate cards (Master Thief, Hag of Inner Weakness).
 module Pawl.ExpirySpec where
@@ -17,35 +17,35 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Type.Affected as Affected
-import qualified Pawl.Type.BeginningStep as BeginningStep
-import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Type.DamageEvent as DamageEvent
-import qualified Pawl.Type.DamageKind as DamageKind
-import qualified Pawl.Type.Departure as Departure.Type
-import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
-import qualified Pawl.Type.Duration as Duration
-import qualified Pawl.Type.EndingStep as EndingStep
-import qualified Pawl.Type.Expiry as Expiry.Type
-import qualified Pawl.Type.GameEvent as GameEvent
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.MonarchWatch as MonarchWatch
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.Phase as Phase
-import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Regenerability as Regenerability
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Type.Sickness as Sickness
-import qualified Pawl.Type.Uses as Uses
-import qualified Pawl.Type.Zone as Zone
-import qualified Pawl.Type.ZoneChange as ZoneChange
+import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.MonarchWatch as MonarchWatch
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

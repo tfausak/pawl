@@ -12,13 +12,13 @@ module Pawl.Summoning where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Sickness as Sickness
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Sickness as Sickness
 
 -- CR 302.6: has `pid` controlled `oid` continuously since their most recent turn
 -- began -- or, failing that, does it have haste?

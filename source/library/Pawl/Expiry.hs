@@ -1,5 +1,5 @@
 -- CR 611.2: the life cycle of a stored effect's duration. This module is the
--- ONLY module that may case on Pawl.Type.Expiry -- the standing Pawl.Resolve
+-- ONLY module that may case on Pawl.Types.Expiry -- the standing Pawl.Resolve
 -- has over Effect, Pawl.Projection over Modification and Pawl.Event over
 -- TriggerCondition. It owns the transformation from the PRINTED Duration to the
 -- STORED Expiry (`arm`) and every sweep that ends one, over FOUR carriers:
@@ -15,19 +15,19 @@ import qualified Data.Sequence as Seq
 import qualified Pawl.Condition as Condition
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
-import qualified Pawl.Type.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
-import Pawl.Type.Duration (Duration)
-import qualified Pawl.Type.Duration as Duration
-import Pawl.Type.Expiry (Expiry)
-import qualified Pawl.Type.Expiry as Expiry
-import Pawl.Type.Game (Game)
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.PlayerId (PlayerId)
+import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import Pawl.Types.Duration (Duration)
+import qualified Pawl.Types.Duration as Duration
+import Pawl.Types.Expiry (Expiry)
+import qualified Pawl.Types.Expiry as Expiry
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
 
 -- CR 611.2: the moment a duration BEGINS. `controller` is the effect's
 -- controller -- CR 109.5's "you" -- and `source` is the object the effect comes

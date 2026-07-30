@@ -22,20 +22,20 @@ import qualified Pawl.Replay as Replay
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Departure as Departure.Type
-import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.MulliganDecision as MulliganDecision
-import qualified Pawl.Type.MulliganOffer as MulliganOffer
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.ObjectId as ObjectId
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.Response as Response
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.MulliganOffer as MulliganOffer
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

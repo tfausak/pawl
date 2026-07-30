@@ -1,11 +1,11 @@
--- Classifications over Pawl.Type.Subtype: which of CR 205.3's disjoint subtype
+-- Classifications over Pawl.Types.Subtype: which of CR 205.3's disjoint subtype
 -- families a subtype belongs to. The rulebook owns these lists outright (CR
 -- 205.3i names the land types by name), so casing on a Subtype here is the same
 -- kind of act as casing on a Phase -- it is a subtype's IDENTITY, never an
 -- effect's.
 module Pawl.Subtype where
 
-import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Types.Subtype as Subtype
 
 -- CR 205.3i: "Lands have their own unique set of subtypes; these subtypes are
 -- called land types. The land types are Cave, Desert, Forest, Gate, Island,

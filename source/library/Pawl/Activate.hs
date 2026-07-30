@@ -17,24 +17,24 @@ import qualified Pawl.Projection as Projection
 import qualified Pawl.Summoning as Summoning
 import qualified Pawl.Target as Target
 import qualified Pawl.Turn as Turn
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.ActivationTiming as ActivationTiming
-import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.CardType as CardType
-import Pawl.Type.Game (Game)
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.Payment as Payment
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Sickness as Sickness
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardType as CardType
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Payment as Payment
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 302.6: a creature's {T}-cost ability can't be activated while summoning
 -- sick. Reads projected creature-ness -- a land (Evolving Wilds) is never sick-

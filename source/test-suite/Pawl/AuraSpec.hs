@@ -1,4 +1,4 @@
--- Pattern matching on Pawl.Type.Prompt, a GADT, in aimAt below.
+-- Pattern matching on Pawl.Types.Prompt, a GADT, in aimAt below.
 {-# LANGUAGE GADTs #-}
 
 -- Covers Pawl.Stack's Aura branch and Pawl.Resolve.targetsAllIllegal -- a
@@ -27,22 +27,22 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Target as Target
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.TargetSpec as TargetSpec
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

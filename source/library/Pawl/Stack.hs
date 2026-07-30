@@ -13,17 +13,17 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Modal as Modal
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Resolve as Resolve
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import Pawl.Type.Game (Game)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Recipient as Recipient
-import Pawl.Type.Result (Result)
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Recipient as Recipient
+import Pawl.Types.Result (Result)
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.Zone as Zone
 
 -- The runner-aware resolve-the-top-of-stack: a resolving SPELL may play a subgame
 -- (CR 729), so the spell branch takes the injected runner; abilities do not (an

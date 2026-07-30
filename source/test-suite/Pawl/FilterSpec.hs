@@ -1,18 +1,18 @@
--- Covers Pawl.Type.Filter, Pawl.Type.PlayerRelation, Pawl.Filter.
+-- Covers Pawl.Types.Filter, Pawl.Types.PlayerRelation, Pawl.Filter.
 module Pawl.FilterSpec where
 
 import qualified Data.Set as Set
 import qualified Pawl.Filter as Filter
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.Color as Color
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 -- Aliased Filter.Type, not Type, because the evaluator module Pawl.Filter
 -- already claims the alias Filter (a documented exception to alias-to-last-
 -- component, per the M4.5 P9 plan's global constraints).
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

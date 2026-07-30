@@ -4,22 +4,22 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
-import Pawl.Type.Card (Card)
-import qualified Pawl.Type.Combat as Combat
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.Object (Object)
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.Player as Player
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.Status as Status
-import qualified Pawl.Type.Timestamp as Timestamp
-import Pawl.Type.Zone (Zone)
-import qualified Pawl.Type.Zone as Zone
+import Pawl.Types.Card (Card)
+import qualified Pawl.Types.Combat as Combat
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.Object (Object)
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Player as Player
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.Timestamp as Timestamp
+import Pawl.Types.Zone (Zone)
+import qualified Pawl.Types.Zone as Zone
 
 lookupObject :: ObjectId -> GameState -> Maybe Object
 lookupObject oid gs = Map.lookup oid (GameState.objects gs)
@@ -172,7 +172,7 @@ stillPlaying gs =
 --
 -- stillPlaying reads the players map, so it comes back in PlayerId order.
 -- GameState.turnOrder is the permanent seating roster (CR 800.5, CR 806.3; see
--- Pawl.Type.GameState), so anything that REBUILDS a turn order or walks seats
+-- Pawl.Types.GameState), so anything that REBUILDS a turn order or walks seats
 -- needs this instead. The order is load-bearing, not cosmetic: CR 103.5 has the
 -- starting player declare their mulligan first, then each other player in turn
 -- order, and CR 727.1a / CR 729.2 rotate the rebuilt order to begin with the

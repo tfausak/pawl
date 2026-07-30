@@ -8,17 +8,17 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import Pawl.Type.Binding (Binding)
-import qualified Pawl.Type.Binding as Binding
-import Pawl.Type.ModeIndex (ModeIndex)
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.PlayerId (PlayerId)
-import Pawl.Type.ProjectedCharacteristics (ProjectedCharacteristics)
-import Pawl.Type.Recipient (Recipient)
-import qualified Pawl.Type.Recipient as Recipient
-import Pawl.Type.SlotName (SlotName)
-import qualified Pawl.Type.SlotName as SlotName
-import Pawl.Type.Subtype (Subtype)
+import Pawl.Types.Binding (Binding)
+import qualified Pawl.Types.Binding as Binding
+import Pawl.Types.ModeIndex (ModeIndex)
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
+import Pawl.Types.Recipient (Recipient)
+import qualified Pawl.Types.Recipient as Recipient
+import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.SlotName as SlotName
+import Pawl.Types.Subtype (Subtype)
 
 -- CR 601.2b: the reserved slot under which a spell's single chosen X is stored.
 -- No card's targetSpecs may name it (the D4 lint enforces this): X is not a

@@ -3,7 +3,7 @@
 -- whether it can be paid (canPay, CR 118.3) and paying it (pay, CR 601.2g/h).
 -- Pawl.Mana keeps pools, production and spending; this module keeps the cost.
 --
--- The SOLE casing home for Pawl.Type.CostComponent. Pawl.Cast and Pawl.Activate
+-- The SOLE casing home for Pawl.Types.CostComponent. Pawl.Cast and Pawl.Activate
 -- learn nothing about which components exist: they ask "can this be paid" and
 -- "pay it", and read one classification (requiresSicknessCheck) for CR 302.6.
 module Pawl.Cost where
@@ -25,29 +25,29 @@ import qualified Pawl.Keyword as Keyword
 import qualified Pawl.Mana as Mana
 import qualified Pawl.PlayerEffect as PlayerEffect
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Type.Card as Card
-import Pawl.Type.Cost (Cost)
-import qualified Pawl.Type.Cost as Cost
-import qualified Pawl.Type.CostComponent as CostComponent
-import qualified Pawl.Type.Filter as Filter.Type
-import Pawl.Type.Game (Game)
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.Payment as Payment
-import qualified Pawl.Type.Player as Player
-import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Card as Card
+import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Filter as Filter.Type
+import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 118.6: the cost of an object with no mana cost. Also the total answer the
 -- ChooseCost fallback needs when no candidate was offered -- a state the engine

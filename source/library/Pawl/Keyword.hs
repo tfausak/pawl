@@ -9,37 +9,37 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
-import Pawl.Type.ActivatedAbility (ActivatedAbility)
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.ActivationTiming as ActivationTiming
-import Pawl.Type.Card (Card)
-import Pawl.Type.CastingPermission (CastingPermission)
-import qualified Pawl.Type.CastingPermission as CastingPermission
-import qualified Pawl.Type.ControllerRelation as ControllerRelation
-import Pawl.Type.Cost (Cost)
-import qualified Pawl.Type.Cost as Cost
-import qualified Pawl.Type.CostComponent as CostComponent
-import qualified Pawl.Type.Effect as Effect
-import Pawl.Type.Filter (Filter)
-import Pawl.Type.Keyword (Keyword)
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Modal as Modal
-import qualified Pawl.Type.Mode as Mode
-import qualified Pawl.Type.ModeSelection as ModeSelection
-import qualified Pawl.Type.Optionality as Optionality
-import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.Quantity as Quantity
-import Pawl.Type.ReplacementEffect (ReplacementEffect)
-import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Type.SearchDestination as SearchDestination
-import qualified Pawl.Type.TriggerCondition as TriggerCondition
-import Pawl.Type.TriggeredAbility (TriggeredAbility)
-import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.Zone as Zone
-import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
+import Pawl.Types.ActivatedAbility (ActivatedAbility)
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import Pawl.Types.Card (Card)
+import Pawl.Types.CastingPermission (CastingPermission)
+import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Effect as Effect
+import Pawl.Types.Filter (Filter)
+import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Quantity as Quantity
+import Pawl.Types.ReplacementEffect (ReplacementEffect)
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import Pawl.Types.TriggeredAbility (TriggeredAbility)
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 -- Rule 702 in its OTHER voice. Most keywords this pool has are read where they
 -- matter -- Projection.hasKeyword for an evasion or combat bit, Pawl.Damage for
@@ -49,7 +49,7 @@ import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
 -- would print, so it has to be MINTED and handed to the ordinary CR 603
 -- machinery rather than merely consulted.
 --
--- Casing on Keyword here is legitimate for the reason Pawl.Type.Keyword's own
+-- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
 -- this module must never do is grow an arm for a CARD.
 --
@@ -195,7 +195,7 @@ cycling cost searchFor =
     -- CR 702.29e searches instead: "Search your library for a [type] card,
     -- reveal it, and put it into your hand." The reveal is part of the
     -- destination because it is part of that sentence -- see
-    -- Pawl.Type.SearchDestination, and CR 701.23e for why a search does not
+    -- Pawl.Types.SearchDestination, and CR 701.23e for why a search does not
     -- reveal on its own.
     effect = case searchFor of
       Nothing -> Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
@@ -267,7 +267,7 @@ flashbackCost keywords =
 -- spell itself and no other object.
 --
 -- The destination is Graveyard rather than "anywhere else": a
--- Pawl.Type.ZoneChangePattern names ONE destination, and the graveyard is the
+-- Pawl.Types.ZoneChangePattern names ONE destination, and the graveyard is the
 -- only place a spell leaves the stack for in this pool (resolution CR 608.2n,
 -- the CR 608.2b fizzle, and CR 701.6a's counter all call Event.changeZone with
 -- it) (#293).

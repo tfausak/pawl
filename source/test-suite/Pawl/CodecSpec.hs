@@ -10,125 +10,129 @@ import qualified Data.Text as Text
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Codec as Codec
+import qualified Pawl.Decimal as Decimal
 import qualified Pawl.Json as J
+-- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
+-- evaluator module Pawl.Filter is not imported here today, but the alias
+-- convention is fixed project-wide so a later import never collides.
+
+import qualified Pawl.Json.Array as Array
+import qualified Pawl.Json.Number as Number
+import qualified Pawl.Json.String as String
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.AbilityName as AbilityName
-import qualified Pawl.Type.ActivationTiming as ActivationTiming
-import qualified Pawl.Type.Affected as Affected
-import qualified Pawl.Type.Aggregation as Aggregation
-import qualified Pawl.Type.BeginningStep as BeginningStep
-import qualified Pawl.Type.Binding as Binding.Type
-import qualified Pawl.Type.Card as CardT
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.CastingPermission as CastingPermission
-import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.CombatStep as CombatStep
-import qualified Pawl.Type.Comparison as Comparison
-import qualified Pawl.Type.Condition as Condition.Type
-import qualified Pawl.Type.ControllerRelation as ControllerRelation
-import qualified Pawl.Type.Cost as Cost.Type
-import qualified Pawl.Type.CostComponent as CostComponent
-import qualified Pawl.Type.Count as Count.Type
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.CounterPattern as CounterPattern
-import qualified Pawl.Type.Counterability as Counterability
-import qualified Pawl.Type.DamageEvent as DamageEvent
-import qualified Pawl.Type.DamageKind as DamageKind
-import qualified Pawl.Type.DamagePattern as DamagePattern
-import qualified Pawl.Type.DamageRewrite as DamageRewrite
-import qualified Pawl.Type.Decimal as Decimal
-import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
-import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
-import qualified Pawl.Type.Duration as Duration
-import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.EndingStep as EndingStep
-import qualified Pawl.Type.EntryOption as EntryOption
-import qualified Pawl.Type.EntryRewrite as EntryRewrite
-import qualified Pawl.Type.EventShape as EventShape
-import qualified Pawl.Type.Expiry as Expiry
-import qualified Pawl.Type.ExtraPhase as ExtraPhase
--- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
--- evaluator module Pawl.Filter is not imported here today, but the alias
--- convention is fixed project-wide so a later import never collides.
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.GameEvent as GameEvent
-import qualified Pawl.Type.Json as Json
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaProduction as ManaProduction
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.ManaType as ManaType
-import qualified Pawl.Type.Modal as Modal
-import qualified Pawl.Type.Mode as Mode
-import qualified Pawl.Type.ModeIndex as ModeIndex
-import qualified Pawl.Type.ModeSelection as ModeSelection
-import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.MonarchTarget as MonarchTarget
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.ObjectRef as ObjectRef
-import qualified Pawl.Type.Optionality as Optionality
-import qualified Pawl.Type.Phase as Phase
-import qualified Pawl.Type.PhasePattern as PhasePattern
-import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
-import qualified Pawl.Type.PlayerEffect as PlayerEffect
-import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.PlayerScope as PlayerScope
-import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
-import qualified Pawl.Type.Pool as Pool
-import qualified Pawl.Type.Power as Power
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Quantity as Quantity
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Regenerability as Regenerability
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Type.Scaling as Scaling
-import qualified Pawl.Type.Scope as Scope
-import qualified Pawl.Type.SearchDestination as SearchDestination
-import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.StaticAbility as StaticAbility
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.Supertype as Supertype
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.TargetSpec as TargetSpec
-import qualified Pawl.Type.Timestamp as Timestamp
-import qualified Pawl.Type.TokenEntry as TokenEntry
-import qualified Pawl.Type.TokenPattern as TokenPattern
-import qualified Pawl.Type.TriggerCondition as TriggerCondition
-import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
-import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.TurnScope as TurnScope
-import qualified Pawl.Type.TypeLine as TypeLine
-import qualified Pawl.Type.Zone as Zone
-import qualified Pawl.Type.ZoneChange as ZoneChange
-import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
+import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Binding as Binding.Type
+import qualified Pawl.Types.Card as CardT
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterPattern as CounterPattern
+import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.EventShape as EventShape
+import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.ExtraPhase as ExtraPhase
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.MonarchTarget as MonarchTarget
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Scaling as Scaling
+import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TokenEntry as TokenEntry
+import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
-roundTrip :: (Eq a, Show a) => String -> (a -> Json.Value) -> (Json.Value -> Either Text a) -> a -> HU.Assertion
+roundTrip :: (Eq a, Show a) => String -> (a -> Value.Value) -> (Value.Value -> Either Text a) -> a -> HU.Assertion
 roundTrip label enc dec x = HU.assertEqual label (Right x) (dec (enc x))
 
 -- The first element of an encoded effect's positional payload -- for Destroy,
--- the ObjectRef. Json.Null when the effect is nullary or the payload is not an
+-- the ObjectRef. JSON null when the effect is nullary or the payload is not an
 -- array, neither of which any caller passes.
-payloadHead :: Json.Value -> Json.Value
+payloadHead :: Value.Value -> Value.Value
 payloadHead value = case J.tag value of
-  Right (_, Just (Json.Array (h : _))) -> h
-  _ -> Json.Null
+  Right (_, Just (Value.Array (Array.MkArray (h : _)))) -> h
+  _ -> J.jNull
 
 -- The `optionality` key of an encoded Mode, or Nothing when it was omitted (CR
 -- 603.5's Mandatory default).
-optionalityKey :: Json.Value -> Maybe Json.Value
-optionalityKey value = case value of
-  Json.Object ps -> J.optField (Text.pack "optionality") ps
-  _ -> Nothing
+optionalityKey :: Value.Value -> Maybe Value.Value
+optionalityKey value = case J.asObject value of
+  Right ps -> J.optField (Text.pack "optionality") ps
+  Left _ -> Nothing
 
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
@@ -184,7 +188,7 @@ tests registry =
           HU.testCase "Zone.Command" $
             roundTrip "command" Codec.zoneToJson Codec.jsonToZone Zone.Command,
           HU.testCase "unknown tag fails" $
-            HU.assertBool "left" (either (const True) (const False) (Codec.jsonToColor (Json.Object [])))
+            HU.assertBool "left" (either (const True) (const False) (Codec.jsonToColor (J.jObject [])))
         ],
       Tasty.testGroup
         "newtypes"
@@ -198,7 +202,7 @@ tests registry =
         [ HU.testCase "Quantity.Literal is a tagged object with numeric value" $
             HU.assertEqual
               "shape"
-              (Json.Object [(Text.pack "type", Json.String (Text.pack "Literal")), (Text.pack "value", Json.Number (Decimal.mkDecimal 3 0))])
+              (J.jObject [(Text.pack "type", Value.String (String.MkString (Text.pack "Literal"))), (Text.pack "value", Value.Number (Number.MkNumber (Decimal.mkDecimal 3 0)))])
               (Codec.quantityToJson (Quantity.Literal 3)),
           HU.testCase "Quantity.ManaValue is nullary tagged" $
             roundTrip "mv" Codec.quantityToJson Codec.jsonToQuantity Quantity.ManaValue,
@@ -387,9 +391,9 @@ tests registry =
           -- this pins that the boundary really says no.
           HU.testCase "a static ability with an empty modifications array is rejected" $ do
             let value =
-                  Json.Object
+                  J.jObject
                     [ (Text.pack "affected", Codec.affectedToJson Affected.Attached),
-                      (Text.pack "modifications", Json.Array [])
+                      (Text.pack "modifications", J.jArray [])
                     ]
             HU.assertBool
               "an empty array does not decode"
@@ -537,7 +541,7 @@ tests registry =
               -- the footgun the corpus migration exists to avoid, pinned so a future
               -- card file cannot lose its mana field unnoticed.
               HU.testCase "an omitted mana field decodes to Nothing, not to {0}" $
-                let value = Json.Object [(Text.pack "components", Json.Array [])]
+                let value = J.jObject [(Text.pack "components", J.jArray [])]
                  in HU.assertEqual
                       "unpayable"
                       (Right Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})
@@ -704,7 +708,7 @@ tests registry =
               ( either
                   (const True)
                   (const False)
-                  (Codec.jsonToModal (Json.Object [(Text.pack "modes", Json.Array []), (Text.pack "selection", Codec.modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
+                  (Codec.jsonToModal (J.jObject [(Text.pack "modes", J.jArray []), (Text.pack "selection", Codec.modeSelectionToJson (ModeSelection.ChooseExactly 1))]))
               )
         ],
       Tasty.testGroup
@@ -844,7 +848,7 @@ tests registry =
             HU.assertEqual
               "a default TokenEntry is not written"
               (Codec.effectToJson (Effect.Create (Quantity.Literal 2) card plain Nothing))
-              (J.tagged (Text.pack "Create") (Just (Json.Array [Codec.quantityToJson (Quantity.Literal 2), Codec.cardToJson card]))),
+              (J.tagged (Text.pack "Create") (Just (J.jArray [Codec.quantityToJson (Quantity.Literal 2), Codec.cardToJson card]))),
           -- CR 113.6k's condition (Narcomoeba's), the first that names a zone
           -- pair rather than the battlefield.
           HU.testCase "TriggerCondition.SelfPutIntoGraveyardFromLibrary round-trips" $
@@ -983,7 +987,7 @@ tests registry =
           -- One with the Machine's aggregation, and the arm that proves the
           -- payload is a whole Quantity rather than a nullary tag: a Greatest
           -- whose per-member quantity is itself a Count round-trips, which is
-          -- the recursion Pawl.Type.Quantity's parameter exists to permit.
+          -- the recursion Pawl.Types.Quantity's parameter exists to permit.
           HU.testCase "Greatest round-trips, including a nested Count payload" $ do
             roundTrip
               "greatest"

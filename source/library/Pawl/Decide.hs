@@ -1,10 +1,10 @@
 module Pawl.Decide where
 
-import Pawl.Type.Decider (Decider)
-import qualified Pawl.Type.Decider as Decider
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.PlayerId (PlayerId)
+import Pawl.Types.Decider (Decider)
+import qualified Pawl.Types.Decider as Decider
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.PlayerId (PlayerId)
 
 -- Who actually decides for a player (CR 722/723). A player controlled during
 -- their turn (CR 723.1) has their decisions made by the controller; everyone

@@ -332,8 +332,8 @@ mechanically forbids a closure from ever entering the card model (§2.7's
 Two steps, **A** then **B**:
 
 - **A — the codec and the honesty round-trip.** A hand-rolled JSON
-  parser/renderer (`Pawl.Type.Json` for the value; `Pawl.Json` for parse and
-  render) plus a `Card ⇆ Json` codec. The payoff is a structural round-trip
+  parser/renderer (the `json` sublibrary for the value and its codec;
+  `Pawl.Json` for the codec-facing helpers) plus a `Card ⇆ Json` codec. The payoff is a structural round-trip
   property over `allPrintings`: `jsonToCard . cardToJson ≡ Right`. This is the
   "keeps us honest" check — it proves the card model is fully first-order data,
   and fails loudly the day a lambda is smuggled in. Self-contained; does not
@@ -459,7 +459,7 @@ Do 732 and 733 eventually. Nobody plans for them; everybody needs them.
 
 An interstitial, lettered like M3.5 and M4.5: not a new rules nightmare, but the
 last piece of vocabulary the transpiler cannot do without. M4.5 P9 built a
-per-object predicate (`Pawl.Type.Filter`) and deliberately stopped short of the
+per-object predicate (`Pawl.Types.Filter`) and deliberately stopped short of the
 layer above it — a **scope** (which objects, over which zones, from whose
 perspective), an **aggregation** (how many; how many distinct card types), and a
 **comparison to a threshold**. Two hand-carved per-card types stood in for that

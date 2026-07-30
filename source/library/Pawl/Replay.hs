@@ -11,21 +11,21 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Cost as Cost
-import qualified Pawl.Type.Action as Action
-import qualified Pawl.Type.Concession as Concession
-import Pawl.Type.Desync (Desync)
-import qualified Pawl.Type.Desync as Desync
-import Pawl.Type.Game (Game)
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.MulliganDecision as MulliganDecision
-import qualified Pawl.Type.OptionalDecision as OptionalDecision
-import qualified Pawl.Type.Program as Program
-import Pawl.Type.Prompt (Prompt)
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Recipient as Recipient
-import Pawl.Type.Response (Response)
-import qualified Pawl.Type.Response as Response
-import qualified Pawl.Type.Subtype as Subtype
+import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.Concession as Concession
+import Pawl.Types.Desync (Desync)
+import qualified Pawl.Types.Desync as Desync
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Program as Program
+import Pawl.Types.Prompt (Prompt)
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
+import Pawl.Types.Response (Response)
+import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Subtype as Subtype
 
 -- Flatten an answer into the log. The GADT refines 'r' per branch, so each
 -- constructor pairs with the response that carries its payload.
@@ -182,7 +182,7 @@ decode p response = case p of
 -- Every arm below is a legal answer, and most are the LEAST EVENTFUL one --
 -- but "least eventful" is a statement about the choice, never a promise that
 -- the game plays out the same. 'replay' therefore reports the first prompt that
--- reached this function (Pawl.Type.Desync); a caller that ignores the report is
+-- reached this function (Pawl.Types.Desync); a caller that ignores the report is
 -- reading a different game's final state.
 defaultAnswer :: Prompt r -> r
 defaultAnswer p = case p of
@@ -334,7 +334,7 @@ record answer gs game =
 -- The report is a RETURN VALUE rather than nothing at all because
 -- 'defaultAnswer' is total: a transcript that has drifted out of step still
 -- produces a final state, just not the recorded game's, and for Prompt.Concede
--- that silently decides who wins. See Pawl.Type.Desync for why only the first is
+-- that silently decides who wins. See Pawl.Types.Desync for why only the first is
 -- reported.
 --
 -- The desync is not itself an error and does not stop the run. Positional

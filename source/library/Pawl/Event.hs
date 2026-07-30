@@ -24,46 +24,46 @@ import qualified Pawl.Game as Game
 import qualified Pawl.Keyword as Keyword
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
-import Pawl.Type.Binding (Binding)
-import Pawl.Type.Card (Card)
-import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.Counterability as Counterability
-import Pawl.Type.DamageEvent (DamageEvent)
-import qualified Pawl.Type.DamageEvent as DamageEvent
-import qualified Pawl.Type.DamageKind as DamageKind
-import Pawl.Type.DelayedTrigger (DelayedTrigger)
-import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
-import Pawl.Type.Game (Game)
-import Pawl.Type.GameEvent (GameEvent)
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Keyword as Keyword.Type
-import qualified Pawl.Type.LastKnown as LastKnown
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.PendingTrigger (PendingTrigger)
-import qualified Pawl.Type.PendingTrigger as PendingTrigger
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Regenerability as Regenerability
-import qualified Pawl.Type.Sickness as Sickness
-import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.Timestamp as Timestamp
-import Pawl.Type.TriggerCondition (TriggerCondition)
-import qualified Pawl.Type.TriggerCondition as TriggerCondition
-import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
-import qualified Pawl.Type.TriggerSource as TriggerSource
-import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.TurnScope as TurnScope
-import Pawl.Type.Zone (Zone)
-import qualified Pawl.Type.Zone as Zone
-import Pawl.Type.ZoneChange (ZoneChange)
-import qualified Pawl.Type.ZoneChange as ZoneChange
+import Pawl.Types.Binding (Binding)
+import Pawl.Types.Card (Card)
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Counterability as Counterability
+import Pawl.Types.DamageEvent (DamageEvent)
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
+import Pawl.Types.DelayedTrigger (DelayedTrigger)
+import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameEvent (GameEvent)
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PendingTrigger (PendingTrigger)
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Timestamp as Timestamp
+import Pawl.Types.TriggerCondition (TriggerCondition)
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
+import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnScope as TurnScope
+import Pawl.Types.Zone (Zone)
+import qualified Pawl.Types.Zone as Zone
+import Pawl.Types.ZoneChange (ZoneChange)
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- CR 608.2i: append one entry to the turn-scoped log. The single APPEND point --
 -- Engine.handoffTurn clears the log at turn end, Setup.emptyGame and the test
@@ -260,7 +260,7 @@ changeZoneAttaching asOf oid requestedDest seed = do
       -- state AFTER that loop, not carry the pre-loop ones across unexamined.
       -- Both ids are `oid` in the PROPOSED event: nothing has moved yet, so the
       -- object that will leave is the only one that exists (see
-      -- Pawl.Type.ZoneChange).
+      -- Pawl.Types.ZoneChange).
       resolved <- Replacement.resolveZoneChange asOf (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
       case resolved of
         -- CR 614.6: nothing survived the loop, so no zone change happens. No
@@ -1429,7 +1429,7 @@ stateTriggers gs =
 -- game state, so a stored entry whose condition is TriggerCondition.StateIs would
 -- never match here -- it would never fire, and unless it states a duration for a
 -- Pawl.Expiry sweep to end, never leave the store either. Not a live gap:
--- TriggerCondition is a closed type (Pawl.Type.TriggerCondition) and no card in
+-- TriggerCondition is a closed type (Pawl.Types.TriggerCondition) and no card in
 -- this pool arms a delayed ability with a StateIs condition (CR 603.7's few
 -- state-triggered delayed abilities, e.g. "at the beginning of the next end
 -- step" clauses, are all StepBegins in this pool). Noted because a later P4 task

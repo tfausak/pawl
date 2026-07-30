@@ -1,7 +1,7 @@
 -- | The sole authority for @Card ⇆ Json@ (§2 of the M3.5 spec), mirroring
 -- 'Pawl.Resolve' (the sole @case@-on-@Effect@ home). Free @xToJson@\/@jsonToX@
 -- functions -- no type classes -- over the transitive closure of @Card@'s
--- fields. Every @Pawl.Type.*@ module stays JSON-free; casing on an effect's
+-- fields. Every @Pawl.Types.*@ module stays JSON-free; casing on an effect's
 -- identity here is open-half machinery, not the rules core.
 module Pawl.Codec where
 
@@ -18,98 +18,100 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Json as Json
-import qualified Pawl.Type.AbilityName as AbilityName
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.ActivationTiming as ActivationTiming
-import qualified Pawl.Type.Affected as Affected
-import qualified Pawl.Type.Aggregation as Aggregation
-import qualified Pawl.Type.BeginningStep as BeginningStep
-import qualified Pawl.Type.Binding as Binding
-import qualified Pawl.Type.BlockRequirement as BlockRequirement
-import qualified Pawl.Type.Card as CardT
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.CastingPermission as CastingPermission
-import qualified Pawl.Type.Color as Color
-import qualified Pawl.Type.CombatStep as CombatStep
-import qualified Pawl.Type.Comparison as Comparison
-import qualified Pawl.Type.Condition as Condition.Type
-import qualified Pawl.Type.ControllerRelation as ControllerRelation
-import qualified Pawl.Type.Cost as Cost
-import qualified Pawl.Type.CostComponent as CostComponent
-import qualified Pawl.Type.Count as Count.Type
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.CounterPattern as CounterPattern
-import qualified Pawl.Type.Counterability as Counterability
-import qualified Pawl.Type.DamageEvent as DamageEvent
-import qualified Pawl.Type.DamageKind as DamageKind
-import qualified Pawl.Type.DamagePattern as DamagePattern
-import qualified Pawl.Type.DamageRewrite as DamageRewrite
-import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
-import qualified Pawl.Type.DestructionRewrite as DestructionRewrite
-import qualified Pawl.Type.Duration as Duration
-import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.EndingStep as EndingStep
-import qualified Pawl.Type.EntryOption as EntryOption
-import qualified Pawl.Type.EntryRewrite as EntryRewrite
-import qualified Pawl.Type.EventShape as EventShape
-import qualified Pawl.Type.Expiry as Expiry
-import qualified Pawl.Type.ExtraPhase as ExtraPhase
-import qualified Pawl.Type.Filter as Filter
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.Json (Value (Array, Boolean, Null, Object))
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.ManaCost as ManaCost
-import qualified Pawl.Type.ManaProduction as ManaProduction
-import qualified Pawl.Type.ManaSymbol as ManaSymbol
-import qualified Pawl.Type.ManaType as ManaType
-import qualified Pawl.Type.Modal as Modal
-import qualified Pawl.Type.Mode as Mode
-import qualified Pawl.Type.ModeIndex as ModeIndex
-import qualified Pawl.Type.ModeSelection as ModeSelection
-import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.MonarchTarget as MonarchTarget
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.ObjectRef as ObjectRef
-import qualified Pawl.Type.Optionality as Optionality
-import qualified Pawl.Type.Phase as Phase
-import qualified Pawl.Type.PhasePattern as PhasePattern
-import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
-import qualified Pawl.Type.PlayerEffect as PlayerEffect
-import qualified Pawl.Type.PlayerId as PlayerId
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.PlayerScope as PlayerScope
-import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
-import qualified Pawl.Type.Pool as Pool
-import qualified Pawl.Type.Power as Power
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Quantity as Quantity
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Regenerability as Regenerability
-import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Type.Scaling as Scaling
-import qualified Pawl.Type.Scope as Scope
-import qualified Pawl.Type.SearchDestination as SearchDestination
-import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.StaticAbility as StaticAbility
-import qualified Pawl.Type.Subtype as Subtype
-import qualified Pawl.Type.Supertype as Supertype
-import qualified Pawl.Type.TapState as TapState
-import qualified Pawl.Type.TargetSpec as TargetSpec
-import qualified Pawl.Type.TokenEntry as TokenEntry
-import qualified Pawl.Type.TokenPattern as TokenPattern
-import qualified Pawl.Type.Toughness as Toughness
-import qualified Pawl.Type.TriggerCondition as TriggerCondition
-import qualified Pawl.Type.TriggerFrequency as TriggerFrequency
-import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.TurnScope as TurnScope
-import qualified Pawl.Type.TypeLine as TypeLine
-import qualified Pawl.Type.Uses as Uses
-import qualified Pawl.Type.Zone as Zone
-import qualified Pawl.Type.ZoneChange as ZoneChange
-import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
+import Pawl.Json.Array (Array (MkArray))
+import qualified Pawl.Json.Boolean as Boolean
+import Pawl.Json.Value (Value (Array, Boolean, Null, Object))
+import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Binding as Binding
+import qualified Pawl.Types.BlockRequirement as BlockRequirement
+import qualified Pawl.Types.Card as CardT
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterPattern as CounterPattern
+import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.EventShape as EventShape
+import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.ExtraPhase as ExtraPhase
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.MonarchTarget as MonarchTarget
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Scaling as Scaling
+import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TokenEntry as TokenEntry
+import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.Toughness as Toughness
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 -- Helpers --------------------------------------------------------------------
 
@@ -124,7 +126,7 @@ decodeNullary tyName table value = do
     Nothing -> Left (Text.pack "unknown " <> tyName <> Text.pack ": " <> t)
 
 listTo :: (a -> Value) -> [a] -> Value
-listTo f = Array . fmap f
+listTo f = Array . MkArray . fmap f
 
 listFrom :: (Value -> Either Text a) -> Value -> Either Text [a]
 listFrom f value = Json.asArray value >>= mapM f
@@ -142,7 +144,7 @@ nonEmptyFrom f value = do
     Just ne -> pure ne
 
 seqTo :: (a -> Value) -> Seq.Seq a -> Value
-seqTo f = Array . fmap f . Foldable.toList
+seqTo f = Array . MkArray . fmap f . Foldable.toList
 
 seqFrom :: (Value -> Either Text a) -> Value -> Either Text (Seq.Seq a)
 seqFrom f value = Seq.fromList <$> listFrom f value
@@ -165,11 +167,11 @@ multisetFrom :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Map
 multisetFrom f value = Map.fromListWith (+) . fmap (\k -> (k, 1)) <$> listFrom f value
 
 maybeTo :: (a -> Value) -> Maybe a -> Value
-maybeTo = maybe Null
+maybeTo = maybe Json.jNull
 
 maybeFrom :: (Value -> Either Text a) -> Value -> Either Text (Maybe a)
 maybeFrom f value = case value of
-  Null -> Right Nothing
+  Null _ -> Right Nothing
   _ -> Just <$> f value
 
 natTo :: Natural -> Value
@@ -372,7 +374,7 @@ jsonToSubtype =
 -- omitted key, because this rides inside a positional pair.
 optionalFilter :: Value -> Either Text (Maybe Filter.Filter)
 optionalFilter value = case value of
-  Null -> Right Nothing
+  Null _ -> Right Nothing
   _ -> fmap Just (jsonToFilter value)
 
 searchDestinationToJson :: SearchDestination.SearchDestination -> Value
@@ -418,7 +420,7 @@ keywordToJson k = case k of
   Keyword.Reach -> nullary (Text.pack "Reach")
   Keyword.Trample -> nullary (Text.pack "Trample")
   Keyword.Vigilance -> nullary (Text.pack "Vigilance")
-  Keyword.Cycling cost searchFor -> Json.tagged (Text.pack "Cycling") (Just (Array [costToJson cost, maybe Null filterToJson searchFor]))
+  Keyword.Cycling cost searchFor -> Json.tagged (Text.pack "Cycling") (Just (Array (MkArray [costToJson cost, maybe Json.jNull filterToJson searchFor])))
   Keyword.Flashback cost -> Json.tagged (Text.pack "Flashback") (Just (costToJson cost))
   Keyword.Fear -> nullary (Text.pack "Fear")
   Keyword.Poisonous n -> Json.tagged (Text.pack "Poisonous") (Just (natTo n))
@@ -440,7 +442,7 @@ jsonToKeyword value = do
     ("Reach", _) -> Right Keyword.Reach
     ("Trample", _) -> Right Keyword.Trample
     ("Vigilance", _) -> Right Keyword.Vigilance
-    ("Cycling", Just (Array [c, f])) -> Keyword.Cycling <$> jsonToCost c <*> optionalFilter f
+    ("Cycling", Just (Array (MkArray [c, f]))) -> Keyword.Cycling <$> jsonToCost c <*> optionalFilter f
     ("Flashback", Just v) -> Keyword.Flashback <$> jsonToCost v
     ("Fear", _) -> Right Keyword.Fear
     ("Poisonous", Just v) -> Keyword.Poisonous <$> natFrom v
@@ -614,8 +616,8 @@ filterToJson filter_ = case filter_ of
   Filter.AttackedThisTurn -> nullary (Text.pack "AttackedThisTurn")
   Filter.IsAttachedToCreature -> nullary (Text.pack "IsAttachedToCreature")
   Filter.IsToken -> nullary (Text.pack "IsToken")
-  Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (fmap filterToJson fs)))
-  Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (fmap filterToJson fs)))
+  Filter.And fs -> Json.tagged (Text.pack "And") (Just (Array (MkArray (fmap filterToJson fs))))
+  Filter.Or fs -> Json.tagged (Text.pack "Or") (Just (Array (MkArray (fmap filterToJson fs))))
   Filter.Not f -> Json.tagged (Text.pack "Not") (Just (filterToJson f))
 
 jsonToFilter :: Value -> Either Text Filter.Filter
@@ -635,8 +637,8 @@ jsonToFilter value = do
     ("AttackedThisTurn", _) -> Right Filter.AttackedThisTurn
     ("IsAttachedToCreature", _) -> Right Filter.IsAttachedToCreature
     ("IsToken", _) -> Right Filter.IsToken
-    ("And", Just (Array vs)) -> Filter.And <$> traverse jsonToFilter vs
-    ("Or", Just (Array vs)) -> Filter.Or <$> traverse jsonToFilter vs
+    ("And", Just (Array (MkArray vs))) -> Filter.And <$> traverse jsonToFilter vs
+    ("Or", Just (Array (MkArray vs))) -> Filter.Or <$> traverse jsonToFilter vs
     ("Not", Just v) -> Filter.Not <$> jsonToFilter v
     _ -> Left (Text.pack "unknown Filter: " <> t)
 
@@ -672,25 +674,25 @@ jsonToObjectRef value = case value of
 
 eventShapeToJson :: EventShape.EventShape -> Value
 eventShapeToJson s = case s of
-  EventShape.MovedBetween from to -> Json.tagged (Text.pack "MovedBetween") (Just (Array [zoneToJson from, zoneToJson to]))
+  EventShape.MovedBetween from to -> Json.tagged (Text.pack "MovedBetween") (Just (Array (MkArray [zoneToJson from, zoneToJson to])))
 
 jsonToEventShape :: Value -> Either Text EventShape.EventShape
 jsonToEventShape value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("MovedBetween", Just (Array [f, u])) -> EventShape.MovedBetween <$> jsonToZone f <*> jsonToZone u
+    ("MovedBetween", Just (Array (MkArray [f, u]))) -> EventShape.MovedBetween <$> jsonToZone f <*> jsonToZone u
     _ -> Left (Text.pack "unknown EventShape: " <> t)
 
 scopeToJson :: Scope.Scope -> Value
 scopeToJson s = case s of
-  Scope.InZone z r -> Json.tagged (Text.pack "InZone") (Just (Array [zoneToJson z, playerRefToJson r]))
+  Scope.InZone z r -> Json.tagged (Text.pack "InZone") (Just (Array (MkArray [zoneToJson z, playerRefToJson r])))
   Scope.InHistory e -> Json.tagged (Text.pack "InHistory") (Just (eventShapeToJson e))
 
 jsonToScope :: Value -> Either Text Scope.Scope
 jsonToScope value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("InZone", Just (Array [z, r])) -> Scope.InZone <$> jsonToZone z <*> jsonToPlayerRef r
+    ("InZone", Just (Array (MkArray [z, r]))) -> Scope.InZone <$> jsonToZone z <*> jsonToPlayerRef r
     ("InHistory", Just v) -> Scope.InHistory <$> jsonToEventShape v
     _ -> Left (Text.pack "unknown Scope: " <> t)
 
@@ -728,13 +730,13 @@ jsonToComparison =
 
 countToJson :: Count.Type.Count Quantity.Quantity -> Value
 countToJson (Count.Type.MkCount s f a) =
-  Json.tagged (Text.pack "Count") (Just (Array [scopeToJson s, filterToJson f, aggregationToJson a]))
+  Json.tagged (Text.pack "Count") (Just (Array (MkArray [scopeToJson s, filterToJson f, aggregationToJson a])))
 
 jsonToCount :: Value -> Either Text (Count.Type.Count Quantity.Quantity)
 jsonToCount value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("Count", Just (Array [s, f, a])) -> Count.Type.MkCount <$> jsonToScope s <*> jsonToFilter f <*> jsonToAggregation a
+    ("Count", Just (Array (MkArray [s, f, a]))) -> Count.Type.MkCount <$> jsonToScope s <*> jsonToFilter f <*> jsonToAggregation a
     _ -> Left (Text.pack "unknown Count: " <> t)
 
 -- Both sides go through quantityToJson, and that is BACKWARD COMPATIBLE with
@@ -745,13 +747,13 @@ jsonToCount value = do
 -- untouched.
 conditionToJson :: Condition.Type.Condition -> Value
 conditionToJson (Condition.Type.MkCondition m cmp q) =
-  Json.tagged (Text.pack "Condition") (Just (Array [quantityToJson m, comparisonToJson cmp, quantityToJson q]))
+  Json.tagged (Text.pack "Condition") (Just (Array (MkArray [quantityToJson m, comparisonToJson cmp, quantityToJson q])))
 
 jsonToCondition :: Value -> Either Text Condition.Type.Condition
 jsonToCondition value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("Condition", Just (Array [m, cmp, q])) -> Condition.Type.MkCondition <$> jsonToQuantity m <*> jsonToComparison cmp <*> jsonToQuantity q
+    ("Condition", Just (Array (MkArray [m, cmp, q]))) -> Condition.Type.MkCondition <$> jsonToQuantity m <*> jsonToComparison cmp <*> jsonToQuantity q
     _ -> Left (Text.pack "unknown Condition: " <> t)
 
 playerScopeToJson :: PlayerScope.PlayerScope -> Value
@@ -773,8 +775,8 @@ playerEffectToJson :: PlayerEffect.PlayerEffect -> Value
 playerEffectToJson e = case e of
   PlayerEffect.CantCastSpells -> nullary (Text.pack "CantCastSpells")
   PlayerEffect.CantCastMoreThan n -> Json.tagged (Text.pack "CantCastMoreThan") (Just (natTo n))
-  PlayerEffect.IncreaseSpellCost c n -> Json.tagged (Text.pack "IncreaseSpellCost") (Just (Array [filterToJson c, natTo n]))
-  PlayerEffect.ReduceSpellCost c m -> Json.tagged (Text.pack "ReduceSpellCost") (Just (Array [filterToJson c, manaCostToJson m]))
+  PlayerEffect.IncreaseSpellCost c n -> Json.tagged (Text.pack "IncreaseSpellCost") (Just (Array (MkArray [filterToJson c, natTo n])))
+  PlayerEffect.ReduceSpellCost c m -> Json.tagged (Text.pack "ReduceSpellCost") (Just (Array (MkArray [filterToJson c, manaCostToJson m])))
   PlayerEffect.NoMaximumHandSize -> nullary (Text.pack "NoMaximumHandSize")
   PlayerEffect.DontLoseUnspentMana -> nullary (Text.pack "DontLoseUnspentMana")
 
@@ -784,8 +786,8 @@ jsonToPlayerEffect value = do
   case (Text.unpack t, mv) of
     ("CantCastSpells", _) -> Right PlayerEffect.CantCastSpells
     ("CantCastMoreThan", Just v) -> PlayerEffect.CantCastMoreThan <$> natFrom v
-    ("IncreaseSpellCost", Just (Array [c, n])) -> PlayerEffect.IncreaseSpellCost <$> jsonToFilter c <*> natFrom n
-    ("ReduceSpellCost", Just (Array [c, m])) -> PlayerEffect.ReduceSpellCost <$> jsonToFilter c <*> jsonToManaCost m
+    ("IncreaseSpellCost", Just (Array (MkArray [c, n]))) -> PlayerEffect.IncreaseSpellCost <$> jsonToFilter c <*> natFrom n
+    ("ReduceSpellCost", Just (Array (MkArray [c, m]))) -> PlayerEffect.ReduceSpellCost <$> jsonToFilter c <*> jsonToManaCost m
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
     ("DontLoseUnspentMana", _) -> Right PlayerEffect.DontLoseUnspentMana
     _ -> Left (Text.pack "unknown PlayerEffect: " <> t)
@@ -821,7 +823,7 @@ jsonToScaling value = do
 
 entryOptionToJson :: EntryOption.EntryOption -> Value
 entryOptionToJson o =
-  Object
+  Json.jObject
     [ (Text.pack "power", Json.jInt (EntryOption.power o)),
       (Text.pack "toughness", Json.jInt (EntryOption.toughness o)),
       (Text.pack "keywords", setTo keywordToJson (EntryOption.keywords o))
@@ -855,7 +857,7 @@ jsonToEntryRewrite value = do
 
 zoneChangePatternToJson :: ZoneChangePattern.ZoneChangePattern -> Value
 zoneChangePatternToJson p =
-  Object
+  Json.jObject
     [ (Text.pack "whenDestination", zoneToJson (ZoneChangePattern.whenDestination p)),
       (Text.pack "whichObject", zoneChangeSubjectToJson (ZoneChangePattern.whichObject p)),
       (Text.pack "whoseObject", controllerRelationToJson (ZoneChangePattern.whoseObject p))
@@ -889,7 +891,7 @@ jsonToZoneChangeSubject =
 
 counterPatternToJson :: CounterPattern.CounterPattern -> Value
 counterPatternToJson p =
-  Object
+  Json.jObject
     [ (Text.pack "whichKind", maybeTo counterKindToJson (CounterPattern.whichKind p)),
       (Text.pack "whose", controllerRelationToJson (CounterPattern.whose p)),
       (Text.pack "onWhat", filterToJson (CounterPattern.onWhat p))
@@ -910,7 +912,7 @@ jsonToCounterPattern value = do
 
 tokenPatternToJson :: TokenPattern.TokenPattern -> Value
 tokenPatternToJson p =
-  Object [(Text.pack "whose", controllerRelationToJson (TokenPattern.whose p))]
+  Json.jObject [(Text.pack "whose", controllerRelationToJson (TokenPattern.whose p))]
 
 jsonToTokenPattern :: Value -> Either Text TokenPattern.TokenPattern
 jsonToTokenPattern value = do
@@ -924,7 +926,7 @@ jsonToTokenPattern value = do
 -- (#437). Same treatment, and same reason, as SetController's PlayerId above.
 phasePatternToJson :: PhasePattern.PhasePattern -> Value
 phasePatternToJson p =
-  Object
+  Json.jObject
     [ (Text.pack "whichPhase", phaseToJson (PhasePattern.whichPhase p)),
       (Text.pack "whosePhase", maybeTo playerIdToJson (PhasePattern.whosePhase p))
     ]
@@ -938,7 +940,7 @@ jsonToPhasePattern value = do
 
 damagePatternToJson :: DamagePattern.DamagePattern -> Value
 damagePatternToJson p =
-  Object [(Text.pack "whichKind", maybeTo damageKindToJson (DamagePattern.whichKind p))]
+  Json.jObject [(Text.pack "whichKind", maybeTo damageKindToJson (DamagePattern.whichKind p))]
 
 jsonToDamagePattern :: Value -> Either Text DamagePattern.DamagePattern
 jsonToDamagePattern value = do
@@ -955,7 +957,7 @@ costComponentToJson c = case c of
   CostComponent.UntapThis -> nullary (Text.pack "UntapThis")
   CostComponent.SacrificeThis -> nullary (Text.pack "SacrificeThis")
   CostComponent.PayLife n -> Json.tagged (Text.pack "PayLife") (Just (natTo n))
-  CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array [natTo n, filterToJson c_]))
+  CostComponent.Sacrifice n c_ -> Json.tagged (Text.pack "Sacrifice") (Just (Array (MkArray [natTo n, filterToJson c_])))
   CostComponent.DiscardCards n -> Json.tagged (Text.pack "DiscardCards") (Just (natTo n))
   CostComponent.DiscardThis -> nullary (Text.pack "DiscardThis")
   CostComponent.PayEnergy n -> Json.tagged (Text.pack "PayEnergy") (Just (natTo n))
@@ -968,7 +970,7 @@ jsonToCostComponent value = do
     ("UntapThis", _) -> Right CostComponent.UntapThis
     ("SacrificeThis", _) -> Right CostComponent.SacrificeThis
     ("PayLife", Just v) -> fmap CostComponent.PayLife (natFrom v)
-    ("Sacrifice", Just (Array [n, c_])) -> do
+    ("Sacrifice", Just (Array (MkArray [n, c_]))) -> do
       count <- natFrom n
       filter_ <- jsonToFilter c_
       pure (CostComponent.Sacrifice count filter_)
@@ -1008,7 +1010,7 @@ targetSpecToJson (TargetSpec.MkTargetSpec pool restriction) =
       withFilter = case restriction of
         Nothing -> base
         Just f -> base <> [(Text.pack "filter", filterToJson f)]
-   in Object withFilter
+   in Json.jObject withFilter
 
 jsonToTargetSpec :: Value -> Either Text TargetSpec.TargetSpec
 jsonToTargetSpec value = do
@@ -1036,7 +1038,7 @@ triggerConditionToJson :: TriggerCondition.TriggerCondition -> Value
 triggerConditionToJson c = case c of
   TriggerCondition.SelfEnters -> nullary (Text.pack "SelfEnters")
   TriggerCondition.PermanentEnters f -> Json.tagged (Text.pack "PermanentEnters") (Just (filterToJson f))
-  TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array [phaseToJson p, turnScopeToJson s]))
+  TriggerCondition.StepBegins p s -> Json.tagged (Text.pack "StepBegins") (Just (Array (MkArray [phaseToJson p, turnScopeToJson s])))
   TriggerCondition.StateIs c2 -> Json.tagged (Text.pack "StateIs") (Just (conditionToJson c2))
   TriggerCondition.SelfDealsCombatDamageToPlayer -> nullary (Text.pack "SelfDealsCombatDamageToPlayer")
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> nullary (Text.pack "CreatureDealtCombatDamageToMonarch")
@@ -1051,7 +1053,7 @@ jsonToTriggerCondition value = do
   case (Text.unpack t, mv) of
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
     ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> jsonToFilter v
-    ("StepBegins", Just (Array [p, s])) -> TriggerCondition.StepBegins <$> jsonToPhase p <*> jsonToTurnScope s
+    ("StepBegins", Just (Array (MkArray [p, s]))) -> TriggerCondition.StepBegins <$> jsonToPhase p <*> jsonToTurnScope s
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> jsonToCondition v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
@@ -1139,7 +1141,7 @@ counterabilityToJson c = nullary . Text.pack $ case c of
 -- does not), the shape jsonToBoolDefault gives the other defaulted keys.
 jsonToCounterabilityDefault :: Value -> Either Text Counterability.Counterability
 jsonToCounterabilityDefault value = case value of
-  Null -> Right Counterability.Counterable
+  Null _ -> Right Counterability.Counterable
   _ -> jsonToCounterability value
 
 jsonToCounterability :: Value -> Either Text Counterability.Counterability
@@ -1191,7 +1193,7 @@ manaSymbolToJson :: ManaSymbol.ManaSymbol -> Value
 manaSymbolToJson ms = case ms of
   ManaSymbol.Generic n -> Json.tagged (Text.pack "Generic") (Just (natTo n))
   ManaSymbol.OfType mt -> Json.tagged (Text.pack "OfType") (Just (manaTypeToJson mt))
-  ManaSymbol.Hybrid a b -> Json.tagged (Text.pack "Hybrid") (Just (Array [manaTypeToJson a, manaTypeToJson b]))
+  ManaSymbol.Hybrid a b -> Json.tagged (Text.pack "Hybrid") (Just (Array (MkArray [manaTypeToJson a, manaTypeToJson b])))
   ManaSymbol.MonocoloredHybrid mt -> Json.tagged (Text.pack "MonocoloredHybrid") (Just (manaTypeToJson mt))
   -- A Color, not a ManaType: CR 107.4f's five Phyrexian symbols are all coloured.
   ManaSymbol.Phyrexian c -> Json.tagged (Text.pack "Phyrexian") (Just (colorToJson c))
@@ -1203,7 +1205,7 @@ jsonToManaSymbol value = do
   case (Text.unpack t, mv) of
     ("Generic", Just v) -> ManaSymbol.Generic <$> natFrom v
     ("OfType", Just v) -> ManaSymbol.OfType <$> jsonToManaType v
-    ("Hybrid", Just (Array [av, bv])) -> ManaSymbol.Hybrid <$> jsonToManaType av <*> jsonToManaType bv
+    ("Hybrid", Just (Array (MkArray [av, bv]))) -> ManaSymbol.Hybrid <$> jsonToManaType av <*> jsonToManaType bv
     ("MonocoloredHybrid", Just v) -> ManaSymbol.MonocoloredHybrid <$> jsonToManaType v
     ("Phyrexian", Just v) -> ManaSymbol.Phyrexian <$> jsonToColor v
     ("Variable", _) -> Right ManaSymbol.Variable
@@ -1228,7 +1230,7 @@ quantityToJson q = case q of
   Quantity.Power -> nullary (Text.pack "Power")
   Quantity.X -> nullary (Text.pack "X")
   Quantity.Star -> nullary (Text.pack "Star")
-  Quantity.Plus a b -> Json.tagged (Text.pack "Plus") (Just (Array [quantityToJson a, quantityToJson b]))
+  Quantity.Plus a b -> Json.tagged (Text.pack "Plus") (Just (Array (MkArray [quantityToJson a, quantityToJson b])))
   Quantity.Count c -> countToJson c
 
 jsonToQuantity :: Value -> Either Text Quantity.Quantity
@@ -1240,7 +1242,7 @@ jsonToQuantity value = do
     ("Power", _) -> Right Quantity.Power
     ("X", _) -> Right Quantity.X
     ("Star", _) -> Right Quantity.Star
-    ("Plus", Just (Array [x, y])) -> Quantity.Plus <$> jsonToQuantity x <*> jsonToQuantity y
+    ("Plus", Just (Array (MkArray [x, y]))) -> Quantity.Plus <$> jsonToQuantity x <*> jsonToQuantity y
     -- jsonToCount re-derives the tag from the WHOLE value (see the comment on
     -- quantityToJson) rather than from `mv`, which has already had it
     -- stripped.
@@ -1265,12 +1267,12 @@ modificationToJson :: Modification.Modification -> Value
 modificationToJson m = case m of
   Modification.GainKeyword k -> Json.tagged (Text.pack "GainKeyword") (Just (keywordToJson k))
   Modification.LoseAllAbilities -> nullary (Text.pack "LoseAllAbilities")
-  Modification.SetBasePowerToughness p t -> Json.tagged (Text.pack "SetBasePowerToughness") (Just (Array [quantityToJson p, quantityToJson t]))
-  Modification.ModifyPowerToughness p t -> Json.tagged (Text.pack "ModifyPowerToughness") (Just (Array [quantityToJson p, quantityToJson t]))
+  Modification.SetBasePowerToughness p t -> Json.tagged (Text.pack "SetBasePowerToughness") (Just (Array (MkArray [quantityToJson p, quantityToJson t])))
+  Modification.ModifyPowerToughness p t -> Json.tagged (Text.pack "ModifyPowerToughness") (Just (Array (MkArray [quantityToJson p, quantityToJson t])))
   Modification.SetLandSubtype s -> Json.tagged (Text.pack "SetLandSubtype") (Just (subtypeToJson s))
   Modification.AddLandSubtype s -> Json.tagged (Text.pack "AddLandSubtype") (Just (subtypeToJson s))
   Modification.AddCardType c -> Json.tagged (Text.pack "AddCardType") (Just (cardTypeToJson c))
-  Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array [subtypeToJson a, subtypeToJson b]))
+  Modification.ChangeSubtypeWord a b -> Json.tagged (Text.pack "ChangeSubtypeWord") (Just (Array (MkArray [subtypeToJson a, subtypeToJson b])))
   Modification.SetController p -> Json.tagged (Text.pack "SetController") (Just (playerIdToJson p))
   Modification.SetControllerToSource -> nullary (Text.pack "SetControllerToSource")
   Modification.SetColor cs -> Json.tagged (Text.pack "SetColor") (Just (setTo colorToJson cs))
@@ -1280,7 +1282,7 @@ jsonToModification :: Value -> Either Text Modification.Modification
 jsonToModification value = do
   (t, mv) <- Json.tag value
   let pair v = case v of
-        Just (Array [x, y]) -> Right (x, y)
+        Just (Array (MkArray [x, y])) -> Right (x, y)
         _ -> Left (Text.pack "expected a two-element array")
   case Text.unpack t of
     "GainKeyword" -> withValue mv (fmap Modification.GainKeyword . jsonToKeyword)
@@ -1347,7 +1349,7 @@ jsonToDamageKind =
 
 damageEventToJson :: DamageEvent.DamageEvent -> Value
 damageEventToJson ev =
-  Object
+  Json.jObject
     [ (Text.pack "source", objectIdToJson (DamageEvent.source ev)),
       (Text.pack "target", recipientToJson (DamageEvent.target ev)),
       (Text.pack "amount", natTo (DamageEvent.amount ev)),
@@ -1380,7 +1382,7 @@ jsonToDamageEvent value = do
 
 zoneChangeToJson :: ZoneChange.ZoneChange -> Value
 zoneChangeToJson zc =
-  Object
+  Json.jObject
     [ (Text.pack "departed", objectIdToJson (ZoneChange.departed zc)),
       (Text.pack "object", objectIdToJson (ZoneChange.object zc)),
       (Text.pack "from", zoneToJson (ZoneChange.from zc)),
@@ -1398,14 +1400,14 @@ jsonToZoneChange value = do
 
 projectedCharacteristicsToJson :: PC.ProjectedCharacteristics -> Value
 projectedCharacteristicsToJson pc =
-  Object
+  Json.jObject
     [ (Text.pack "name", Json.jText (PC.name pc)),
       (Text.pack "supertypes", setTo supertypeToJson (PC.supertypes pc)),
       (Text.pack "keywords", multisetTo keywordToJson (PC.keywords pc)),
       (Text.pack "colors", setTo colorToJson (PC.colors pc)),
       (Text.pack "power", maybeTo Json.jInt (PC.power pc)),
       (Text.pack "toughness", maybeTo Json.jInt (PC.toughness pc)),
-      (Text.pack "characteristicPT", maybeTo (\(p, t) -> Array [quantityToJson p, quantityToJson t]) (PC.characteristicPT pc)),
+      (Text.pack "characteristicPT", maybeTo (\(p, t) -> Array (MkArray [quantityToJson p, quantityToJson t])) (PC.characteristicPT pc)),
       (Text.pack "cardTypes", setTo cardTypeToJson (PC.cardTypes pc)),
       (Text.pack "subtypes", setTo subtypeToJson (PC.subtypes pc)),
       (Text.pack "activatedAbilities", listTo activatedAbilityToJson (PC.activatedAbilities pc)),
@@ -1450,7 +1452,7 @@ jsonToProjectedCharacteristics value = do
 
 jsonToQuantityPair :: Value -> Either Text (Quantity.Quantity, Quantity.Quantity)
 jsonToQuantityPair value = case value of
-  Array [p, t] -> do
+  Array (MkArray [p, t]) -> do
     p_ <- jsonToQuantity p
     t_ <- jsonToQuantity t
     pure (p_, t_)
@@ -1458,26 +1460,26 @@ jsonToQuantityPair value = case value of
 
 gameEventToJson :: GameEvent.GameEvent -> Value
 gameEventToJson e = case e of
-  GameEvent.Moved zc pc -> Json.tagged (Text.pack "Moved") (Just (Array [zoneChangeToJson zc, projectedCharacteristicsToJson pc]))
+  GameEvent.Moved zc pc -> Json.tagged (Text.pack "Moved") (Just (Array (MkArray [zoneChangeToJson zc, projectedCharacteristicsToJson pc])))
   GameEvent.DamageDealt ev -> Json.tagged (Text.pack "DamageDealt") (Just (damageEventToJson ev))
-  GameEvent.StepBegan p pid -> Json.tagged (Text.pack "StepBegan") (Just (Array [phaseToJson p, playerIdToJson pid]))
+  GameEvent.StepBegan p pid -> Json.tagged (Text.pack "StepBegan") (Just (Array (MkArray [phaseToJson p, playerIdToJson pid])))
   GameEvent.SpellCast pid -> Json.tagged (Text.pack "SpellCast") (Just (playerIdToJson pid))
   GameEvent.BecameMonarch pid -> Json.tagged (Text.pack "BecameMonarch") (Just (playerIdToJson pid))
   GameEvent.Cycled oid -> Json.tagged (Text.pack "Cycled") (Just (objectIdToJson oid))
-  GameEvent.Revealed pid pc -> Json.tagged (Text.pack "Revealed") (Just (Array [playerIdToJson pid, projectedCharacteristicsToJson pc]))
+  GameEvent.Revealed pid pc -> Json.tagged (Text.pack "Revealed") (Just (Array (MkArray [playerIdToJson pid, projectedCharacteristicsToJson pc])))
   GameEvent.AttackerDeclared oid -> Json.tagged (Text.pack "AttackerDeclared") (Just (objectIdToJson oid))
 
 jsonToGameEvent :: Value -> Either Text GameEvent.GameEvent
 jsonToGameEvent value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("Moved", Just (Array [zc, pc])) -> GameEvent.Moved <$> jsonToZoneChange zc <*> jsonToProjectedCharacteristics pc
+    ("Moved", Just (Array (MkArray [zc, pc]))) -> GameEvent.Moved <$> jsonToZoneChange zc <*> jsonToProjectedCharacteristics pc
     ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> jsonToDamageEvent v
-    ("StepBegan", Just (Array [p, pid])) -> GameEvent.StepBegan <$> jsonToPhase p <*> jsonToPlayerId pid
+    ("StepBegan", Just (Array (MkArray [p, pid]))) -> GameEvent.StepBegan <$> jsonToPhase p <*> jsonToPlayerId pid
     ("SpellCast", Just v) -> GameEvent.SpellCast <$> jsonToPlayerId v
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> jsonToPlayerId v
     ("Cycled", Just v) -> GameEvent.Cycled <$> jsonToObjectId v
-    ("Revealed", Just (Array [pid, pc])) -> GameEvent.Revealed <$> jsonToPlayerId pid <*> jsonToProjectedCharacteristics pc
+    ("Revealed", Just (Array (MkArray [pid, pc]))) -> GameEvent.Revealed <$> jsonToPlayerId pid <*> jsonToProjectedCharacteristics pc
     ("AttackerDeclared", Just v) -> GameEvent.AttackerDeclared <$> jsonToObjectId v
     _ -> Left (Text.pack "unknown GameEvent: " <> t)
 
@@ -1513,7 +1515,7 @@ jsonToTapState =
 
 tokenEntryToJson :: TokenEntry.TokenEntry -> Value
 tokenEntryToJson e =
-  Object
+  Json.jObject
     [ (Text.pack "tapped", tapStateToJson (TokenEntry.tapped e)),
       (Text.pack "attacking", Json.jBool (TokenEntry.attacking e))
     ]
@@ -1530,7 +1532,7 @@ jsonToTokenEntry value = do
       }
   where
     orDefault v (d, f) = case v of
-      Null -> Right d
+      Null _ -> Right d
       _ -> f v
 
 -- CR 110.5b: "permanents enter the battlefield untapped ... unless a spell or
@@ -1550,27 +1552,27 @@ defaultTokenEntry =
 
 effectToJson :: Effect.Effect CardT.Card -> Value
 effectToJson e = case e of
-  Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array [slotNameToJson s, quantityToJson q]))
-  Effect.ModifyTarget d m s -> Json.tagged (Text.pack "ModifyTarget") (Just (Array [durationToJson d, modificationToJson m, slotNameToJson s]))
+  Effect.DealDamage s q -> Json.tagged (Text.pack "DealDamage") (Just (Array (MkArray [slotNameToJson s, quantityToJson q])))
+  Effect.ModifyTarget d m s -> Json.tagged (Text.pack "ModifyTarget") (Just (Array (MkArray [durationToJson d, modificationToJson m, slotNameToJson s])))
   Effect.ChangeText s -> Json.tagged (Text.pack "ChangeText") (Just (slotNameToJson s))
   Effect.AddMana production -> Json.tagged (Text.pack "AddMana") (Just (manaProductionToJson production))
-  Effect.Search f d -> Json.tagged (Text.pack "Search") (Just (Array [filterToJson f, searchDestinationToJson d]))
+  Effect.Search f d -> Json.tagged (Text.pack "Search") (Just (Array (MkArray [filterToJson f, searchDestinationToJson d])))
   Effect.ExileAllGraveyards -> nullary (Text.pack "ExileAllGraveyards")
   Effect.Proliferate -> nullary (Text.pack "Proliferate")
   Effect.ExileHandThenDraw -> nullary (Text.pack "ExileHandThenDraw")
-  Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array [slotNameToJson slot, filterToJson f, quantityToJson q]))
+  Effect.PlayerSacrifices slot f q -> Json.tagged (Text.pack "PlayerSacrifices") (Just (Array (MkArray [slotNameToJson slot, filterToJson f, quantityToJson q])))
   Effect.RestartGame -> nullary (Text.pack "RestartGame")
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
-  Effect.Destroy s r -> Json.tagged (Text.pack "Destroy") (Just (Array [objectRefToJson s, regenerabilityToJson r]))
+  Effect.Destroy s r -> Json.tagged (Text.pack "Destroy") (Just (Array (MkArray [objectRefToJson s, regenerabilityToJson r])))
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
   Effect.RemoveFromCombat s -> Json.tagged (Text.pack "RemoveFromCombat") (Just (slotNameToJson s))
   Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (slotNameToJson s))
-  Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array [slotNameToJson s, zoneToJson z]))
-  Effect.Draw r q -> Json.tagged (Text.pack "Draw") (Just (Array [playerRefToJson r, quantityToJson q]))
-  Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array [slotNameToJson s, quantityToJson q]))
-  Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array [slotNameToJson s, quantityToJson q]))
-  Effect.LoseLife r q -> Json.tagged (Text.pack "LoseLife") (Just (Array [playerRefToJson r, quantityToJson q]))
-  Effect.GainLife r q -> Json.tagged (Text.pack "GainLife") (Just (Array [playerRefToJson r, quantityToJson q]))
+  Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array (MkArray [slotNameToJson s, zoneToJson z])))
+  Effect.Draw r q -> Json.tagged (Text.pack "Draw") (Just (Array (MkArray [playerRefToJson r, quantityToJson q])))
+  Effect.Mill s q -> Json.tagged (Text.pack "Mill") (Just (Array (MkArray [slotNameToJson s, quantityToJson q])))
+  Effect.Discard s q -> Json.tagged (Text.pack "Discard") (Just (Array (MkArray [slotNameToJson s, quantityToJson q])))
+  Effect.LoseLife r q -> Json.tagged (Text.pack "LoseLife") (Just (Array (MkArray [playerRefToJson r, quantityToJson q])))
+  Effect.GainLife r q -> Json.tagged (Text.pack "GainLife") (Just (Array (MkArray [playerRefToJson r, quantityToJson q])))
   -- Create's payload is positional, and the TokenEntry is ELIDED when it is the
   -- CR 110.5b default (defaultTokenEntry) -- the same posture `counterability`
   -- takes, so a card file that says nothing about how its tokens enter stays
@@ -1579,30 +1581,30 @@ effectToJson e = case e of
   -- string (slotNameToJson) and a TokenEntry is an object, so the two can never
   -- be confused.
   Effect.Create q c te ms ->
-    Json.tagged (Text.pack "Create") . Just . Array $
+    Json.tagged (Text.pack "Create") . Just . Array . MkArray $
       [quantityToJson q, cardToJson c]
         <> (if te == defaultTokenEntry then [] else [tokenEntryToJson te])
         <> fmap slotNameToJson (Maybe.maybeToList ms)
-  Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array [durationToJson d, usesToJson u, replacementEffectToJson re]))
-  Effect.SkipNextPhase r ph -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array [playerRefToJson r, phaseToJson ph]))
-  Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array [counterKindToJson k, quantityToJson q, slotNameToJson s]))
-  Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array [playerRefToJson r, playerCounterKindToJson k, quantityToJson q]))
+  Effect.Replace d u re -> Json.tagged (Text.pack "Replace") (Just (Array (MkArray [durationToJson d, usesToJson u, replacementEffectToJson re])))
+  Effect.SkipNextPhase r ph -> Json.tagged (Text.pack "SkipNextPhase") (Just (Array (MkArray [playerRefToJson r, phaseToJson ph])))
+  Effect.PutCounters k q s -> Json.tagged (Text.pack "PutCounters") (Just (Array (MkArray [counterKindToJson k, quantityToJson q, slotNameToJson s])))
+  Effect.GainPlayerCounters r k q -> Json.tagged (Text.pack "GainPlayerCounters") (Just (Array (MkArray [playerRefToJson r, playerCounterKindToJson k, quantityToJson q])))
   Effect.Untap r -> Json.tagged (Text.pack "Untap") (Just (objectRefToJson r))
-  Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (fmap extraPhaseToJson ps)))
-  Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array [durationToJson d, slotNameToJson s]))
+  Effect.AddPhases ps -> Json.tagged (Text.pack "AddPhases") (Just (Array (MkArray (fmap extraPhaseToJson ps))))
+  Effect.GainControl d s -> Json.tagged (Text.pack "GainControl") (Just (Array (MkArray [durationToJson d, slotNameToJson s])))
   -- The duration is ELIDED when absent, which is CR 603.7b's default -- so
   -- Tidal Wave's one-shot entry stays a bare ability name and only a card that
   -- states a duration writes the two-element form.
   Effect.ArmDelayedTrigger n md ->
     Json.tagged (Text.pack "ArmDelayedTrigger") . Just $ case md of
       Nothing -> abilityNameToJson n
-      Just d -> Array [abilityNameToJson n, durationToJson d]
-  Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array [durationToJson d, playerScopeToJson s, playerEffectToJson pe]))
+      Just d -> Array (MkArray [abilityNameToJson n, durationToJson d])
+  Effect.AffectPlayers d s pe -> Json.tagged (Text.pack "AffectPlayers") (Just (Array (MkArray [durationToJson d, playerScopeToJson s, playerEffectToJson pe])))
   Effect.CreateEmblem c -> Json.tagged (Text.pack "CreateEmblem") (Just (cardToJson c))
   Effect.BecomeMonarch t -> Json.tagged (Text.pack "BecomeMonarch") (Just (monarchTargetToJson t))
   Effect.ExileUntilMonarch s -> Json.tagged (Text.pack "ExileUntilMonarch") (Just (slotNameToJson s))
   Effect.Attach s -> Json.tagged (Text.pack "Attach") (Just (slotNameToJson s))
-  Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array [slotNameToJson s, filterToJson f]))
+  Effect.AttachTarget s f -> Json.tagged (Text.pack "AttachTarget") (Just (Array (MkArray [slotNameToJson s, filterToJson f])))
   Effect.PlaySubgame s -> Json.tagged (Text.pack "PlaySubgame") (Just (slotNameToJson s))
 
 jsonToEffect :: Value -> Either Text (Effect.Effect CardT.Card)
@@ -1610,93 +1612,93 @@ jsonToEffect value = do
   (t, mv) <- Json.tag value
   case Text.unpack t of
     "DealDamage" -> case mv of
-      Just (Array [s, q]) -> Effect.DealDamage <$> jsonToSlotName s <*> jsonToQuantity q
+      Just (Array (MkArray [s, q])) -> Effect.DealDamage <$> jsonToSlotName s <*> jsonToQuantity q
       _ -> Left (Text.pack "DealDamage expects [slot, quantity]")
     "ModifyTarget" -> case mv of
-      Just (Array [d, m, s]) -> Effect.ModifyTarget <$> jsonToDuration d <*> jsonToModification m <*> jsonToSlotName s
+      Just (Array (MkArray [d, m, s])) -> Effect.ModifyTarget <$> jsonToDuration d <*> jsonToModification m <*> jsonToSlotName s
       _ -> Left (Text.pack "ModifyTarget expects [duration, modification, slot]")
     "ChangeText" -> withValue mv (fmap Effect.ChangeText . jsonToSlotName)
     "AddMana" -> withValue mv (fmap Effect.AddMana . jsonToManaProduction)
     "Search" -> case mv of
-      Just (Array [f, d]) -> Effect.Search <$> jsonToFilter f <*> jsonToSearchDestination d
+      Just (Array (MkArray [f, d])) -> Effect.Search <$> jsonToFilter f <*> jsonToSearchDestination d
       _ -> Left (Text.pack "Search expects [filter, destination]")
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "PlayerSacrifices" -> case mv of
-      Just (Array [sv, fv, qv]) -> Effect.PlayerSacrifices <$> jsonToSlotName sv <*> jsonToFilter fv <*> jsonToQuantity qv
+      Just (Array (MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> jsonToSlotName sv <*> jsonToFilter fv <*> jsonToQuantity qv
       _ -> Left (Text.pack "PlayerSacrifices expects [slot, filter, quantity]")
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> withValue mv (fmap Effect.ControlPlayerNextTurn . jsonToSlotName)
     "Destroy" -> case mv of
-      Just (Array [sv, rv]) -> Effect.Destroy <$> jsonToObjectRef sv <*> jsonToRegenerability rv
+      Just (Array (MkArray [sv, rv])) -> Effect.Destroy <$> jsonToObjectRef sv <*> jsonToRegenerability rv
       _ -> Left (Text.pack "Destroy expects [objectRef, regenerability]")
     "Sacrifice" -> withValue mv (fmap Effect.Sacrifice . jsonToSlotName)
     "RemoveFromCombat" -> withValue mv (fmap Effect.RemoveFromCombat . jsonToSlotName)
     "Counter" -> withValue mv (fmap Effect.Counter . jsonToSlotName)
     "MoveToZone" -> case mv of
-      Just (Array [s, z]) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z
+      Just (Array (MkArray [s, z])) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z
       _ -> Left (Text.pack "MoveToZone expects [slot, zone]")
     "Draw" -> case mv of
-      Just (Array [r, q]) -> Effect.Draw <$> jsonToPlayerRef r <*> jsonToQuantity q
+      Just (Array (MkArray [r, q])) -> Effect.Draw <$> jsonToPlayerRef r <*> jsonToQuantity q
       _ -> Left (Text.pack "Draw expects [playerRef, quantity]")
     "Mill" -> case mv of
-      Just (Array [s, q]) -> Effect.Mill <$> jsonToSlotName s <*> jsonToQuantity q
+      Just (Array (MkArray [s, q])) -> Effect.Mill <$> jsonToSlotName s <*> jsonToQuantity q
       _ -> Left (Text.pack "Mill expects [slot, quantity]")
     "Discard" -> case mv of
-      Just (Array [s, q]) -> Effect.Discard <$> jsonToSlotName s <*> jsonToQuantity q
+      Just (Array (MkArray [s, q])) -> Effect.Discard <$> jsonToSlotName s <*> jsonToQuantity q
       _ -> Left (Text.pack "Discard expects [slot, quantity]")
     "LoseLife" -> case mv of
-      Just (Array [r, q]) -> Effect.LoseLife <$> jsonToPlayerRef r <*> jsonToQuantity q
+      Just (Array (MkArray [r, q])) -> Effect.LoseLife <$> jsonToPlayerRef r <*> jsonToQuantity q
       _ -> Left (Text.pack "LoseLife expects [playerRef, quantity]")
     "GainLife" -> case mv of
-      Just (Array [r, q]) -> Effect.GainLife <$> jsonToPlayerRef r <*> jsonToQuantity q
+      Just (Array (MkArray [r, q])) -> Effect.GainLife <$> jsonToPlayerRef r <*> jsonToQuantity q
       _ -> Left (Text.pack "GainLife expects [playerRef, quantity]")
     -- The four shapes the encoder above can emit. The three-element one is read
     -- by JSON type: an Object is the TokenEntry, anything else is the slot name
     -- (a string), which is what lets the entry be elided when it is the default
     -- without a hole in the array.
     "Create" -> case mv of
-      Just (Array [q, c]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure defaultTokenEntry <*> pure Nothing
-      Just (Array [q, c, e@(Object _)]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> jsonToTokenEntry e <*> pure Nothing
-      Just (Array [q, c, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure defaultTokenEntry <*> (Just <$> jsonToSlotName s)
-      Just (Array [q, c, e, s]) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> jsonToTokenEntry e <*> (Just <$> jsonToSlotName s)
+      Just (Array (MkArray [q, c])) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure defaultTokenEntry <*> pure Nothing
+      Just (Array (MkArray [q, c, e@(Object _)])) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> jsonToTokenEntry e <*> pure Nothing
+      Just (Array (MkArray [q, c, s])) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> pure defaultTokenEntry <*> (Just <$> jsonToSlotName s)
+      Just (Array (MkArray [q, c, e, s])) -> Effect.Create <$> jsonToQuantity q <*> jsonToCard c <*> jsonToTokenEntry e <*> (Just <$> jsonToSlotName s)
       _ -> Left (Text.pack "Create expects [Quantity, Card], optionally with a TokenEntry and/or a slot")
     "ArmDelayedTrigger" -> case mv of
-      Just (Array [n, d]) -> Effect.ArmDelayedTrigger <$> jsonToAbilityName n <*> fmap Just (jsonToDuration d)
+      Just (Array (MkArray [n, d])) -> Effect.ArmDelayedTrigger <$> jsonToAbilityName n <*> fmap Just (jsonToDuration d)
       _ -> withValue mv (fmap (`Effect.ArmDelayedTrigger` Nothing) . jsonToAbilityName)
     "Replace" -> case mv of
-      Just (Array [d, u, re]) -> do
+      Just (Array (MkArray [d, u, re])) -> do
         duration <- jsonToDuration d
         uses <- jsonToUses u
         effect <- jsonToReplacementEffect re
         pure (Effect.Replace duration uses effect)
       _ -> Left (Text.pack "Replace expects [Duration, Uses, ReplacementEffect]")
     "SkipNextPhase" -> case mv of
-      Just (Array [r, ph]) -> Effect.SkipNextPhase <$> jsonToPlayerRef r <*> jsonToPhase ph
+      Just (Array (MkArray [r, ph])) -> Effect.SkipNextPhase <$> jsonToPlayerRef r <*> jsonToPhase ph
       _ -> Left (Text.pack "SkipNextPhase expects [playerRef, phase]")
     "PutCounters" -> case mv of
-      Just (Array [k, q, s]) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s
+      Just (Array (MkArray [k, q, s])) -> Effect.PutCounters <$> jsonToCounterKind k <*> jsonToQuantity q <*> jsonToSlotName s
       _ -> Left (Text.pack "PutCounters expects [counterKind, quantity, slot]")
     "GainPlayerCounters" -> case mv of
-      Just (Array [r, k, q]) -> Effect.GainPlayerCounters <$> jsonToPlayerRef r <*> jsonToPlayerCounterKind k <*> jsonToQuantity q
+      Just (Array (MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> jsonToPlayerRef r <*> jsonToPlayerCounterKind k <*> jsonToQuantity q
       _ -> Left (Text.pack "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]")
     "Untap" -> withValue mv (fmap Effect.Untap . jsonToObjectRef)
     "AddPhases" -> case mv of
-      Just (Array ps) -> Effect.AddPhases <$> traverse jsonToExtraPhase ps
+      Just (Array (MkArray ps)) -> Effect.AddPhases <$> traverse jsonToExtraPhase ps
       _ -> Left (Text.pack "AddPhases expects [ExtraPhase]")
     "GainControl" -> case mv of
-      Just (Array [d, s]) -> Effect.GainControl <$> jsonToDuration d <*> jsonToSlotName s
+      Just (Array (MkArray [d, s])) -> Effect.GainControl <$> jsonToDuration d <*> jsonToSlotName s
       _ -> Left (Text.pack "GainControl expects [duration, slot]")
     "AffectPlayers" -> case mv of
-      Just (Array [d, s, pe]) -> Effect.AffectPlayers <$> jsonToDuration d <*> jsonToPlayerScope s <*> jsonToPlayerEffect pe
+      Just (Array (MkArray [d, s, pe])) -> Effect.AffectPlayers <$> jsonToDuration d <*> jsonToPlayerScope s <*> jsonToPlayerEffect pe
       _ -> Left (Text.pack "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]")
     "CreateEmblem" -> withValue mv (fmap Effect.CreateEmblem . jsonToCard)
     "BecomeMonarch" -> withValue mv (fmap Effect.BecomeMonarch . jsonToMonarchTarget)
     "ExileUntilMonarch" -> withValue mv (fmap Effect.ExileUntilMonarch . jsonToSlotName)
     "Attach" -> withValue mv (fmap Effect.Attach . jsonToSlotName)
     "AttachTarget" -> case mv of
-      Just (Array [s, f]) -> Effect.AttachTarget <$> jsonToSlotName s <*> jsonToFilter f
+      Just (Array (MkArray [s, f])) -> Effect.AttachTarget <$> jsonToSlotName s <*> jsonToFilter f
       _ -> Left (Text.pack "AttachTarget expects [slot, filter]")
     "PlaySubgame" -> withValue mv (fmap Effect.PlaySubgame . jsonToSlotName)
     _ -> Left (Text.pack "unknown Effect: " <> t)
@@ -1705,7 +1707,7 @@ jsonToEffect value = do
 
 targetSpecsToJson :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value
 targetSpecsToJson m =
-  listTo (\(k, v) -> Object [(Text.pack "slot", slotNameToJson k), (Text.pack "spec", targetSpecToJson v)]) (Map.toAscList m)
+  listTo (\(k, v) -> Json.jObject [(Text.pack "slot", slotNameToJson k), (Text.pack "spec", targetSpecToJson v)]) (Map.toAscList m)
 
 jsonToTargetSpecs :: Value -> Either Text (Map.Map SlotName.SlotName TargetSpec.TargetSpec)
 jsonToTargetSpecs value =
@@ -1718,7 +1720,7 @@ jsonToTargetSpecs value =
 
 typeLineToJson :: TypeLine.TypeLine -> Value
 typeLineToJson tl =
-  Object
+  Json.jObject
     [ (Text.pack "supertypes", setTo supertypeToJson (TypeLine.supertypes tl)),
       (Text.pack "types", setTo cardTypeToJson (TypeLine.types tl)),
       (Text.pack "subtypes", setTo subtypeToJson (TypeLine.subtypes tl))
@@ -1736,7 +1738,7 @@ jsonToTypeLine value = do
 -- is one affected set and an ARRAY of modifications -- never one entry per layer.
 staticAbilityToJson :: StaticAbility.StaticAbility -> Value
 staticAbilityToJson sa =
-  Object
+  Json.jObject
     [ (Text.pack "affected", affectedToJson (StaticAbility.affected sa)),
       (Text.pack "modifications", nonEmptyTo modificationToJson (StaticAbility.modifications sa))
     ]
@@ -1750,7 +1752,7 @@ jsonToStaticAbility value = do
 
 playerStaticAbilityToJson :: PlayerStaticAbility.PlayerStaticAbility -> Value
 playerStaticAbilityToJson pa =
-  Object
+  Json.jObject
     [ (Text.pack "scope", playerScopeToJson (PlayerStaticAbility.scope pa)),
       (Text.pack "effect", playerEffectToJson (PlayerStaticAbility.effect pa))
     ]
@@ -1764,7 +1766,7 @@ jsonToPlayerStaticAbility value = do
 
 blockRequirementToJson :: BlockRequirement.BlockRequirement -> Value
 blockRequirementToJson br =
-  Object [(Text.pack "attacker", affectedToJson (BlockRequirement.attacker br))]
+  Json.jObject [(Text.pack "attacker", affectedToJson (BlockRequirement.attacker br))]
 
 jsonToBlockRequirement :: Value -> Either Text BlockRequirement.BlockRequirement
 jsonToBlockRequirement value = do
@@ -1774,7 +1776,7 @@ jsonToBlockRequirement value = do
 
 costToJson :: Cost.Cost -> Value
 costToJson c =
-  Object
+  Json.jObject
     [ (Text.pack "mana", maybeTo manaCostToJson (Cost.mana c)),
       (Text.pack "components", listTo costComponentToJson (Cost.components c))
     ]
@@ -1791,7 +1793,7 @@ jsonToCost value = do
 
 activatedAbilityToJson :: ActivatedAbility.ActivatedAbility CardT.Card -> Value
 activatedAbilityToJson aa =
-  Object $
+  Json.jObject $
     [ (Text.pack "cost", costToJson (ActivatedAbility.cost aa)),
       (Text.pack "modal", modalToJson (ActivatedAbility.modal aa))
     ]
@@ -1829,17 +1831,17 @@ jsonToActivatedAbility value = do
 replacementEffectToJson :: ReplacementEffect.ReplacementEffect -> Value
 replacementEffectToJson re = case re of
   ReplacementEffect.ZoneChangeR p z ->
-    Json.tagged (Text.pack "ZoneChangeR") (Just (Array [zoneChangePatternToJson p, zoneToJson z]))
+    Json.tagged (Text.pack "ZoneChangeR") (Just (Array (MkArray [zoneChangePatternToJson p, zoneToJson z])))
   ReplacementEffect.EntryR r ->
     Json.tagged (Text.pack "EntryR") (Just (entryRewriteToJson r))
   ReplacementEffect.DamageR p r ->
-    Json.tagged (Text.pack "DamageR") (Just (Array [damagePatternToJson p, damageRewriteToJson r]))
+    Json.tagged (Text.pack "DamageR") (Just (Array (MkArray [damagePatternToJson p, damageRewriteToJson r])))
   ReplacementEffect.DestructionR r ->
     Json.tagged (Text.pack "DestructionR") (Just (destructionRewriteToJson r))
   ReplacementEffect.CounterR p s ->
-    Json.tagged (Text.pack "CounterR") (Just (Array [counterPatternToJson p, scalingToJson s]))
+    Json.tagged (Text.pack "CounterR") (Just (Array (MkArray [counterPatternToJson p, scalingToJson s])))
   ReplacementEffect.TokenR p s ->
-    Json.tagged (Text.pack "TokenR") (Just (Array [tokenPatternToJson p, scalingToJson s]))
+    Json.tagged (Text.pack "TokenR") (Just (Array (MkArray [tokenPatternToJson p, scalingToJson s])))
   ReplacementEffect.PhaseR p ->
     Json.tagged (Text.pack "PhaseR") (Just (phasePatternToJson p))
 
@@ -1847,21 +1849,21 @@ jsonToReplacementEffect :: Value -> Either Text ReplacementEffect.ReplacementEff
 jsonToReplacementEffect value = do
   (t, mv) <- Json.tag value
   case (Text.unpack t, mv) of
-    ("ZoneChangeR", Just (Array [p, z])) -> do
+    ("ZoneChangeR", Just (Array (MkArray [p, z]))) -> do
       pattern_ <- jsonToZoneChangePattern p
       dest <- jsonToZone z
       pure (ReplacementEffect.ZoneChangeR pattern_ dest)
     ("EntryR", Just v) -> fmap ReplacementEffect.EntryR (jsonToEntryRewrite v)
-    ("DamageR", Just (Array [p, r])) -> do
+    ("DamageR", Just (Array (MkArray [p, r]))) -> do
       pattern_ <- jsonToDamagePattern p
       rewrite <- jsonToDamageRewrite r
       pure (ReplacementEffect.DamageR pattern_ rewrite)
     ("DestructionR", Just v) -> fmap ReplacementEffect.DestructionR (jsonToDestructionRewrite v)
-    ("CounterR", Just (Array [p, s])) -> do
+    ("CounterR", Just (Array (MkArray [p, s]))) -> do
       pattern_ <- jsonToCounterPattern p
       scaling <- jsonToScaling s
       pure (ReplacementEffect.CounterR pattern_ scaling)
-    ("TokenR", Just (Array [p, s])) -> do
+    ("TokenR", Just (Array (MkArray [p, s]))) -> do
       pattern_ <- jsonToTokenPattern p
       scaling <- jsonToScaling s
       pure (ReplacementEffect.TokenR pattern_ scaling)
@@ -1870,7 +1872,7 @@ jsonToReplacementEffect value = do
 
 triggeredAbilityToJson :: TriggeredAbility.TriggeredAbility CardT.Card -> Value
 triggeredAbilityToJson ta =
-  Object
+  Json.jObject
     ( [ (Text.pack "condition", triggerConditionToJson (TriggeredAbility.condition ta)),
         (Text.pack "modal", modalToJson (TriggeredAbility.modal ta))
       ]
@@ -1904,7 +1906,7 @@ jsonToAbilityName value = AbilityName.MkAbilityName <$> Json.asText value
 delayedAbilitiesToJson :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility CardT.Card) -> Value
 delayedAbilitiesToJson m =
   listTo
-    (\(k, v) -> Object [(Text.pack "name", abilityNameToJson k), (Text.pack "ability", triggeredAbilityToJson v)])
+    (\(k, v) -> Json.jObject [(Text.pack "name", abilityNameToJson k), (Text.pack "ability", triggeredAbilityToJson v)])
     (Map.toAscList m)
 
 jsonToDelayedAbilities :: Value -> Either Text (Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility CardT.Card))
@@ -1921,7 +1923,7 @@ jsonToDelayedAbilities value =
 -- colorIndicator follow).
 mapFromDefault :: (Value -> Either Text (Map.Map k v)) -> Value -> Either Text (Map.Map k v)
 mapFromDefault f value = case value of
-  Null -> Right Map.empty
+  Null _ -> Right Map.empty
   _ -> f value
 
 -- Runtime-only, never in card JSON -- covered for the same reason SetController's
@@ -1929,9 +1931,9 @@ mapFromDefault f value = case value of
 -- game state carries.
 bindingToJson :: Binding.Binding -> Value
 bindingToJson b =
-  Object
+  Json.jObject
     [ (Text.pack "target", maybeTo recipientToJson (Binding.target b)),
-      (Text.pack "subtypes", maybeTo (\(f, t) -> Array [subtypeToJson f, subtypeToJson t]) (Binding.subtypes b)),
+      (Text.pack "subtypes", maybeTo (\(f, t) -> Array (MkArray [subtypeToJson f, subtypeToJson t])) (Binding.subtypes b)),
       (Text.pack "amount", maybeTo natTo (Binding.amount b)),
       (Text.pack "modes", maybeTo (setTo modeIndexToJson) (Binding.modes b)),
       (Text.pack "copy", maybeTo projectedCharacteristicsToJson (Binding.copy b))
@@ -1956,7 +1958,7 @@ jsonToBinding value = do
 
 jsonToSubtypePair :: Value -> Either Text (Subtype.Subtype, Subtype.Subtype)
 jsonToSubtypePair value = case value of
-  Array [f, t] -> do
+  Array (MkArray [f, t]) -> do
     f_ <- jsonToSubtype f
     t_ <- jsonToSubtype t
     pure (f_, t_)
@@ -1965,7 +1967,7 @@ jsonToSubtypePair value = case value of
 bindingsToJson :: Map.Map SlotName.SlotName Binding.Binding -> Value
 bindingsToJson m =
   listTo
-    (\(k, v) -> Object [(Text.pack "slot", slotNameToJson k), (Text.pack "binding", bindingToJson v)])
+    (\(k, v) -> Json.jObject [(Text.pack "slot", slotNameToJson k), (Text.pack "binding", bindingToJson v)])
     (Map.toAscList m)
 
 jsonToBindings :: Value -> Either Text (Map.Map SlotName.SlotName Binding.Binding)
@@ -1985,7 +1987,7 @@ expiryToJson :: Expiry.Expiry -> Value
 expiryToJson e = case e of
   Expiry.AtCleanup -> nullary (Text.pack "AtCleanup")
   Expiry.Never -> nullary (Text.pack "Never")
-  Expiry.While p c -> Json.tagged (Text.pack "While") (Just (Array [playerIdToJson p, conditionToJson c]))
+  Expiry.While p c -> Json.tagged (Text.pack "While") (Just (Array (MkArray [playerIdToJson p, conditionToJson c])))
   Expiry.AtTurnOf p -> Json.tagged (Text.pack "AtTurnOf") (Just (playerIdToJson p))
 
 jsonToExpiry :: Value -> Either Text Expiry.Expiry
@@ -1994,13 +1996,13 @@ jsonToExpiry value = do
   case (Text.unpack t, mv) of
     ("AtCleanup", _) -> Right Expiry.AtCleanup
     ("Never", _) -> Right Expiry.Never
-    ("While", Just (Array [p, c])) -> Expiry.While <$> jsonToPlayerId p <*> jsonToCondition c
+    ("While", Just (Array (MkArray [p, c]))) -> Expiry.While <$> jsonToPlayerId p <*> jsonToCondition c
     ("AtTurnOf", Just v) -> Expiry.AtTurnOf <$> jsonToPlayerId v
     _ -> Left (Text.pack "unknown Expiry: " <> t)
 
 delayedTriggerToJson :: DelayedTrigger.DelayedTrigger -> Value
 delayedTriggerToJson d =
-  Object
+  Json.jObject
     [ (Text.pack "ability", triggeredAbilityToJson (DelayedTrigger.ability d)),
       (Text.pack "source", objectIdToJson (DelayedTrigger.source d)),
       (Text.pack "controller", playerIdToJson (DelayedTrigger.controller d)),
@@ -2064,12 +2066,12 @@ jsonToOptionality =
 -- required key would have meant editing every card file to say nothing.
 jsonToOptionalityDefault :: Value -> Either Text Optionality.Optionality
 jsonToOptionalityDefault value = case value of
-  Null -> Right Optionality.Mandatory
+  Null _ -> Right Optionality.Mandatory
   _ -> jsonToOptionality value
 
 modeToJson :: Mode.Mode CardT.Card -> Value
 modeToJson m =
-  Object
+  Json.jObject
     ( [ (Text.pack "effects", seqTo effectToJson (Mode.effects m)),
         (Text.pack "targetSpecs", targetSpecsToJson (Mode.targetSpecs m))
       ]
@@ -2090,7 +2092,7 @@ jsonToMode value = do
 
 modalToJson :: Modal.Modal CardT.Card -> Value
 modalToJson m =
-  Object
+  Json.jObject
     [ (Text.pack "modes", seqTo modeToJson (Modal.modes m)),
       (Text.pack "selection", modeSelectionToJson (Modal.selection m))
     ]
@@ -2109,7 +2111,7 @@ jsonToModal value = do
 
 cardToJson :: CardT.Card -> Value
 cardToJson c =
-  Object
+  Json.jObject
     ( [ (Text.pack "name", Json.jText (CardT.name c)),
         (Text.pack "manaCost", maybeTo manaCostToJson (CardT.manaCost c)),
         (Text.pack "typeLine", typeLineToJson (CardT.typeLine c)),
@@ -2174,12 +2176,12 @@ cardToJson c =
     )
 
 getOpt :: Text -> [(Text, Value)] -> Value
-getOpt k ps = Maybe.fromMaybe Null (Json.optField k ps)
+getOpt k ps = Maybe.fromMaybe Json.jNull (Json.optField k ps)
 
 jsonToBoolDefault :: Bool -> Value -> Either Text Bool
 jsonToBoolDefault d value = case value of
-  Null -> Right d
-  Boolean b -> Right b
+  Null _ -> Right d
+  Boolean b -> Right (Boolean.unwrap b)
   _ -> Left (Text.pack "expected a boolean")
 
 -- An omitted set field decodes to empty. Lets an all-default field stay OUT of
@@ -2187,7 +2189,7 @@ jsonToBoolDefault d value = case value of
 -- precedent delayedAbilities and characteristicPT follow, P2/P4).
 setFromDefault :: (Ord a) => (Value -> Either Text a) -> Value -> Either Text (Set a)
 setFromDefault f value = case value of
-  Null -> Right Set.empty
+  Null _ -> Right Set.empty
   _ -> setFrom f value
 
 -- An omitted list field decodes to empty, the list counterpart of
@@ -2195,7 +2197,7 @@ setFromDefault f value = case value of
 -- every existing card file remains byte-identical.
 listFromDefault :: (Value -> Either Text a) -> Value -> Either Text [a]
 listFromDefault f value = case value of
-  Null -> Right []
+  Null _ -> Right []
   _ -> listFrom f value
 
 jsonToCard :: Value -> Either Text CardT.Card

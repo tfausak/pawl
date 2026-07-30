@@ -1,4 +1,4 @@
--- Covers Pawl.Setup and Pawl.Type.Deck: setup, deck composition, opening hands.
+-- Covers Pawl.Setup and Pawl.Types.Deck: setup, deck composition, opening hands.
 module Pawl.SetupSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -19,19 +19,19 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
-import qualified Pawl.Type.Deck as Deck
-import qualified Pawl.Type.Departure as Departure.Type
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.Player as Player
-import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.Result as Result
-import qualified Pawl.Type.Status as Status
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

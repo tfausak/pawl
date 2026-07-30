@@ -12,44 +12,44 @@ import qualified Pawl.Binding as Binding
 import qualified Pawl.Event as Event
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import Pawl.Type.Binding (Binding)
-import Pawl.Type.Card (Card)
-import qualified Pawl.Type.DamageEvent as DamageEvent
-import qualified Pawl.Type.DamageKind as DamageKind
-import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.EndingStep as EndingStep
-import Pawl.Type.Game (Game)
-import Pawl.Type.GameEvent (GameEvent)
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Modal as Modal
-import qualified Pawl.Type.Mode as Mode
-import qualified Pawl.Type.ModeIndex as ModeIndex
-import qualified Pawl.Type.ModeSelection as ModeSelection
-import qualified Pawl.Type.MonarchTarget as MonarchTarget
-import qualified Pawl.Type.MonarchWatch as MonarchWatch
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.Optionality as Optionality
-import Pawl.Type.PendingTrigger (PendingTrigger)
-import qualified Pawl.Type.PendingTrigger as PendingTrigger
-import qualified Pawl.Type.Phase as Phase
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.PlayerRelation as PlayerRelation
-import qualified Pawl.Type.Quantity as Quantity
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Sickness as Sickness
-import qualified Pawl.Type.SlotName as SlotName
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.TapState as TapState
-import Pawl.Type.TriggerCondition (TriggerCondition)
-import qualified Pawl.Type.TriggerCondition as TriggerCondition
-import qualified Pawl.Type.TriggerSource as TriggerSource
-import Pawl.Type.TriggeredAbility (TriggeredAbility)
-import qualified Pawl.Type.TriggeredAbility as TriggeredAbility
-import qualified Pawl.Type.TurnScope as TurnScope
-import qualified Pawl.Type.Zone as Zone
+import Pawl.Types.Binding (Binding)
+import Pawl.Types.Card (Card)
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameEvent (GameEvent)
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.MonarchTarget as MonarchTarget
+import qualified Pawl.Types.MonarchWatch as MonarchWatch
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.Optionality as Optionality
+import Pawl.Types.PendingTrigger (PendingTrigger)
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.Phase as Phase
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TapState as TapState
+import Pawl.Types.TriggerCondition (TriggerCondition)
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerSource as TriggerSource
+import Pawl.Types.TriggeredAbility (TriggeredAbility)
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.Zone as Zone
 
 -- A single-mode, single-effect triggered ability (the shape all monarch inherent
 -- abilities take): one Mode with no targets, forced (ChooseExactly 1). intervening

@@ -20,14 +20,14 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Regenerability as Regenerability
-import qualified Pawl.Type.Registry as Registry.Type
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Registry as Registry.Type
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

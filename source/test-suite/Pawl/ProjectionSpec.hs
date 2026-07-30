@@ -1,4 +1,4 @@
--- Pattern matching on Pawl.Type.Prompt, a GADT, in aimAtObject below.
+-- Pattern matching on Pawl.Types.Prompt, a GADT, in aimAtObject below.
 {-# LANGUAGE GADTs #-}
 
 -- Covers Pawl.Projection: the layer fold -- CR 613 layer order, CR 613.7
@@ -26,40 +26,40 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Subtype as Subtype
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Affected as Affected
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.CardType as CardType
-import qualified Pawl.Type.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Type.ControllerRelation as ControllerRelation
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.Effect as Effect
-import qualified Pawl.Type.EndingStep as EndingStep
-import qualified Pawl.Type.Expiry as Expiry
--- Pawl.Type.Filter aliased Filter.Type: the evaluator Pawl.Filter already claims
--- the alias Filter above (documented phase exception). Pawl.Type.Subtype is
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Expiry as Expiry
+-- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Filter already claims
+-- the alias Filter above (documented phase exception). Pawl.Types.Subtype is
 -- aliased Subtype.Type below for the same reason, against Pawl.Subtype.
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Layer as Layer
-import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.Object as Object
-import qualified Pawl.Type.ObjectId as ObjectId
-import qualified Pawl.Type.Phase as Phase
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Quantity as Quantity
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Type.Source as Source
-import qualified Pawl.Type.Subtype as Subtype.Type
-import qualified Pawl.Type.Supertype as Supertype
-import qualified Pawl.Type.Timestamp as Timestamp
-import qualified Pawl.Type.Zone as Zone
-import qualified Pawl.Type.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Type.ZoneChangeSubject as ZoneChangeSubject
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Subtype as Subtype.Type
+import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

@@ -12,19 +12,19 @@ import qualified Pawl.Decide as Decide
 import qualified Pawl.Event as Event
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Game as Game
-import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.Decider as Decider
-import Pawl.Type.Effect (Effect)
-import Pawl.Type.Game (Game)
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.HandActionPerformer (HandActionPerformer)
-import qualified Pawl.Type.MulliganDecision as MulliganDecision
-import qualified Pawl.Type.MulliganOffer as MulliganOffer
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.PlayerId (PlayerId)
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Decider as Decider
+import Pawl.Types.Effect (Effect)
+import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.HandActionPerformer (HandActionPerformer)
+import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.MulliganOffer as MulliganOffer
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 103.5: the starting hand size, "normally seven." Deliberately NOT shared
 -- with CR 402.2's maximum hand size (PlayerEffect.defaultMaximumHandSize), which
@@ -171,7 +171,7 @@ mulliganRounds perform counts deciding = do
 --
 -- CR 800.1: "A multiplayer game is a game that begins with more than two
 -- players." BEGINS with, not currently has. GameState.turnOrder is the permanent
--- seating roster (see Pawl.Type.GameState), so counting seats answers that
+-- seating roster (see Pawl.Types.GameState), so counting seats answers that
 -- directly, and a game that drops to two players by departure keeps its free
 -- mulligan. A rebuilt game (CR 727.1 restart, CR 729.2 subgame) is seated from
 -- the players who were in the game it came from, so it answers for itself.

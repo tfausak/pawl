@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: pawl
-version: 0.2026.7.29
+version: 0.2026.7.30
 synopsis: Magic: the Gathering rules engine
 description:
   Pawl is a Magic: the Gathering rules engine.
@@ -48,6 +48,272 @@ common executable
   build-depends: pawl
   ghc-options: -rtsopts
 
+-- An arbitrary precision decimal number, in the spirit of the Decimal and
+-- scientific packages.
+library decimal
+  import: library
+  build-depends: pawl:spec
+  -- cabal-gild: discover source/libraries/decimal
+  exposed-modules:
+    Pawl.Decimal
+    Pawl.DecimalSpec
+
+  hs-source-dirs: source/libraries/decimal
+
+-- The catalog of every exception Pawl can throw, and nothing else.
+library exceptions
+  import: library
+  build-depends:
+    pawl:slug,
+    text ^>=2.1.3,
+
+  -- cabal-gild: discover source/libraries/exceptions
+  exposed-modules:
+    Pawl.Exceptions.CorruptCard
+    Pawl.Exceptions.MisfiledCard
+    Pawl.Exceptions.MissingRoot
+    Pawl.Exceptions.UnknownCard
+
+  hs-source-dirs: source/libraries/exceptions
+
+-- Quality of life improvements for packages Pawl doesn't own, in the spirit of
+-- Neil Mitchell's extra package.
+library extra
+  import: library
+  build-depends:
+    bytestring ^>=0.12.2,
+    parsec ^>=3.1.18,
+    pawl:spec,
+    text ^>=2.1.3,
+
+  -- cabal-gild: discover source/libraries/extra
+  exposed-modules:
+    Pawl.Extra.Builder
+    Pawl.Extra.BuilderSpec
+    Pawl.Extra.Either
+    Pawl.Extra.EitherSpec
+    Pawl.Extra.Int
+    Pawl.Extra.Integer
+    Pawl.Extra.IntegerSpec
+    Pawl.Extra.IntSpec
+    Pawl.Extra.Monoid
+    Pawl.Extra.MonoidSpec
+    Pawl.Extra.Natural
+    Pawl.Extra.NaturalSpec
+    Pawl.Extra.Ord
+    Pawl.Extra.OrdSpec
+    Pawl.Extra.Parsec
+    Pawl.Extra.ParsecSpec
+    Pawl.Extra.Semigroup
+    Pawl.Extra.SemigroupSpec
+
+  hs-source-dirs: source/libraries/extra
+
+-- RFC compliant JSON types and codecs. Similar to aeson, but much simpler.
+library json
+  import: library
+  build-depends:
+    bytestring ^>=0.12.2,
+    parsec ^>=3.1.18,
+    pawl:decimal,
+    pawl:extra,
+    pawl:spec,
+    text ^>=2.1.3,
+
+  -- cabal-gild: discover source/libraries/json
+  exposed-modules:
+    Pawl.Json.Array
+    Pawl.Json.ArraySpec
+    Pawl.Json.Boolean
+    Pawl.Json.BooleanSpec
+    Pawl.Json.Null
+    Pawl.Json.NullSpec
+    Pawl.Json.Number
+    Pawl.Json.NumberSpec
+    Pawl.Json.Object
+    Pawl.Json.ObjectSpec
+    Pawl.Json.Pair
+    Pawl.Json.PairSpec
+    Pawl.Json.String
+    Pawl.Json.StringSpec
+    Pawl.Json.Value
+    Pawl.Json.ValueSpec
+
+  hs-source-dirs: source/libraries/json
+
+-- Slugifying text: a card name in, a file-name key out.
+library slug
+  import: library
+  build-depends:
+    pawl:spec,
+    text ^>=2.1.3,
+
+  -- cabal-gild: discover source/libraries/slug
+  exposed-modules:
+    Pawl.Slug
+    Pawl.SlugSpec
+
+  hs-source-dirs: source/libraries/slug
+
+-- An abstract testing interface, identical to the heck package. Base-only, which
+-- is why every other sublibrary can afford to expose its specs.
+library spec
+  import: library
+  -- cabal-gild: discover source/libraries/spec
+  exposed-modules: Pawl.Spec
+  hs-source-dirs: source/libraries/spec
+
+-- All of the type definitions, without any behavior.
+library types
+  import: library
+  build-depends:
+    containers ^>=0.8,
+    pawl:slug,
+    text ^>=2.1.3,
+    transformers ^>=0.6.1,
+
+  -- cabal-gild: discover source/libraries/types
+  exposed-modules:
+    Pawl.Types.AbilityName
+    Pawl.Types.Action
+    Pawl.Types.ActivatedAbility
+    Pawl.Types.ActivationTiming
+    Pawl.Types.ActivePlayerEffect
+    Pawl.Types.ActiveReplacement
+    Pawl.Types.Affected
+    Pawl.Types.Aggregation
+    Pawl.Types.AttackTarget
+    Pawl.Types.BeginningStep
+    Pawl.Types.Binding
+    Pawl.Types.BlockRequirement
+    Pawl.Types.CandidateId
+    Pawl.Types.Card
+    Pawl.Types.CardType
+    Pawl.Types.CastingPermission
+    Pawl.Types.Color
+    Pawl.Types.Combat
+    Pawl.Types.CombatStep
+    Pawl.Types.Comparison
+    Pawl.Types.Concession
+    Pawl.Types.Condition
+    Pawl.Types.ContinuousEffect
+    Pawl.Types.ControllerRelation
+    Pawl.Types.Cost
+    Pawl.Types.CostComponent
+    Pawl.Types.Count
+    Pawl.Types.Counterability
+    Pawl.Types.CounterKind
+    Pawl.Types.CounterPattern
+    Pawl.Types.DamageEvent
+    Pawl.Types.DamageKind
+    Pawl.Types.DamagePattern
+    Pawl.Types.DamageRewrite
+    Pawl.Types.Decider
+    Pawl.Types.DecisionLog
+    Pawl.Types.Deck
+    Pawl.Types.DelayedTrigger
+    Pawl.Types.Departure
+    Pawl.Types.DestructionRewrite
+    Pawl.Types.Desync
+    Pawl.Types.Duration
+    Pawl.Types.Effect
+    Pawl.Types.EndingStep
+    Pawl.Types.EntryOption
+    Pawl.Types.EntryRewrite
+    Pawl.Types.EventShape
+    Pawl.Types.Expiry
+    Pawl.Types.ExtraPhase
+    Pawl.Types.Filter
+    Pawl.Types.Game
+    Pawl.Types.GameEvent
+    Pawl.Types.GameState
+    Pawl.Types.HandActionPerformer
+    Pawl.Types.Keyword
+    Pawl.Types.LastKnown
+    Pawl.Types.Layer
+    Pawl.Types.Mana
+    Pawl.Types.ManaCost
+    Pawl.Types.ManaProduction
+    Pawl.Types.ManaSymbol
+    Pawl.Types.ManaType
+    Pawl.Types.ManaUnit
+    Pawl.Types.Modal
+    Pawl.Types.Mode
+    Pawl.Types.ModeIndex
+    Pawl.Types.ModeSelection
+    Pawl.Types.Modification
+    Pawl.Types.MonarchTarget
+    Pawl.Types.MonarchWatch
+    Pawl.Types.MulliganDecision
+    Pawl.Types.MulliganOffer
+    Pawl.Types.Object
+    Pawl.Types.ObjectId
+    Pawl.Types.ObjectRef
+    Pawl.Types.OptionalDecision
+    Pawl.Types.Optionality
+    Pawl.Types.Payment
+    Pawl.Types.PendingTrigger
+    Pawl.Types.Phase
+    Pawl.Types.PhasePattern
+    Pawl.Types.PhyrexianPayment
+    Pawl.Types.Player
+    Pawl.Types.PlayerCounterKind
+    Pawl.Types.PlayerEffect
+    Pawl.Types.PlayerId
+    Pawl.Types.PlayerRef
+    Pawl.Types.PlayerRelation
+    Pawl.Types.PlayerScope
+    Pawl.Types.PlayerStaticAbility
+    Pawl.Types.Pool
+    Pawl.Types.Power
+    Pawl.Types.Printing
+    Pawl.Types.Program
+    Pawl.Types.ProjectedCharacteristics
+    Pawl.Types.Prompt
+    Pawl.Types.ProposedEvent
+    Pawl.Types.Quantity
+    Pawl.Types.Recipient
+    Pawl.Types.Regenerability
+    Pawl.Types.Registry
+    Pawl.Types.ReplacementBucket
+    Pawl.Types.ReplacementCandidate
+    Pawl.Types.ReplacementEffect
+    Pawl.Types.Response
+    Pawl.Types.RestartSignal
+    Pawl.Types.Result
+    Pawl.Types.Scaling
+    Pawl.Types.Scope
+    Pawl.Types.SearchDestination
+    Pawl.Types.Sickness
+    Pawl.Types.SlotName
+    Pawl.Types.Source
+    Pawl.Types.StaticAbility
+    Pawl.Types.Status
+    Pawl.Types.Subtype
+    Pawl.Types.Supertype
+    Pawl.Types.TapState
+    Pawl.Types.TargetSpec
+    Pawl.Types.Timestamp
+    Pawl.Types.TokenEntry
+    Pawl.Types.TokenPattern
+    Pawl.Types.Toughness
+    Pawl.Types.TriggerCondition
+    Pawl.Types.TriggeredAbility
+    Pawl.Types.TriggerFrequency
+    Pawl.Types.TriggerSource
+    Pawl.Types.TurnScope
+    Pawl.Types.TypeLine
+    Pawl.Types.Uses
+    Pawl.Types.Zone
+    Pawl.Types.ZoneChange
+    Pawl.Types.ZoneChangePattern
+    Pawl.Types.ZoneChangeSubject
+
+  hs-source-dirs: source/libraries/types
+
+-- The engine: the comprehensive rules, plus the codec and registry that load
+-- cards as data. Belongs in a sublibrary of its own, and will get one once a
+-- second consumer (a client, a CLI) exists to make the split pay.
 library
   import: library
   autogen-modules: Paths_pawl
@@ -56,6 +322,12 @@ library
     containers ^>=0.8,
     directory ^>=1.3.10,
     parsec ^>=3.1.18,
+    pawl:decimal,
+    pawl:exceptions,
+    pawl:extra,
+    pawl:json,
+    pawl:slug,
+    pawl:types,
     text ^>=2.1.3,
     transformers ^>=0.6.1,
 
@@ -79,9 +351,6 @@ library
     Pawl.Engine
     Pawl.Event
     Pawl.Expiry
-    Pawl.Extra.Int
-    Pawl.Extra.Integer
-    Pawl.Extra.Natural
     Pawl.Filter
     Pawl.Game
     Pawl.Json
@@ -99,155 +368,11 @@ library
     Pawl.Resolve
     Pawl.Sba
     Pawl.Setup
-    Pawl.Slug
     Pawl.Stack
     Pawl.Subtype
     Pawl.Summoning
     Pawl.Target
     Pawl.Turn
-    Pawl.Type.AbilityName
-    Pawl.Type.Action
-    Pawl.Type.ActivatedAbility
-    Pawl.Type.ActivationTiming
-    Pawl.Type.ActivePlayerEffect
-    Pawl.Type.ActiveReplacement
-    Pawl.Type.Affected
-    Pawl.Type.Aggregation
-    Pawl.Type.AttackTarget
-    Pawl.Type.BeginningStep
-    Pawl.Type.Binding
-    Pawl.Type.BlockRequirement
-    Pawl.Type.CandidateId
-    Pawl.Type.Card
-    Pawl.Type.CardType
-    Pawl.Type.CastingPermission
-    Pawl.Type.Color
-    Pawl.Type.Combat
-    Pawl.Type.CombatStep
-    Pawl.Type.Comparison
-    Pawl.Type.Concession
-    Pawl.Type.Condition
-    Pawl.Type.ContinuousEffect
-    Pawl.Type.ControllerRelation
-    Pawl.Type.CorruptCard
-    Pawl.Type.Cost
-    Pawl.Type.CostComponent
-    Pawl.Type.Count
-    Pawl.Type.Counterability
-    Pawl.Type.CounterKind
-    Pawl.Type.CounterPattern
-    Pawl.Type.DamageEvent
-    Pawl.Type.DamageKind
-    Pawl.Type.DamagePattern
-    Pawl.Type.DamageRewrite
-    Pawl.Type.Decider
-    Pawl.Type.Decimal
-    Pawl.Type.DecisionLog
-    Pawl.Type.Deck
-    Pawl.Type.DelayedTrigger
-    Pawl.Type.Departure
-    Pawl.Type.DestructionRewrite
-    Pawl.Type.Desync
-    Pawl.Type.Duration
-    Pawl.Type.Effect
-    Pawl.Type.EndingStep
-    Pawl.Type.EntryOption
-    Pawl.Type.EntryRewrite
-    Pawl.Type.EventShape
-    Pawl.Type.Expiry
-    Pawl.Type.ExtraPhase
-    Pawl.Type.Filter
-    Pawl.Type.Game
-    Pawl.Type.GameEvent
-    Pawl.Type.GameState
-    Pawl.Type.HandActionPerformer
-    Pawl.Type.Json
-    Pawl.Type.Keyword
-    Pawl.Type.LastKnown
-    Pawl.Type.Layer
-    Pawl.Type.Mana
-    Pawl.Type.ManaCost
-    Pawl.Type.ManaProduction
-    Pawl.Type.ManaSymbol
-    Pawl.Type.ManaType
-    Pawl.Type.ManaUnit
-    Pawl.Type.MisfiledCard
-    Pawl.Type.MissingRoot
-    Pawl.Type.Modal
-    Pawl.Type.Mode
-    Pawl.Type.ModeIndex
-    Pawl.Type.ModeSelection
-    Pawl.Type.Modification
-    Pawl.Type.MonarchTarget
-    Pawl.Type.MonarchWatch
-    Pawl.Type.MulliganDecision
-    Pawl.Type.MulliganOffer
-    Pawl.Type.Object
-    Pawl.Type.ObjectId
-    Pawl.Type.ObjectRef
-    Pawl.Type.OptionalDecision
-    Pawl.Type.Optionality
-    Pawl.Type.Payment
-    Pawl.Type.PendingTrigger
-    Pawl.Type.Phase
-    Pawl.Type.PhasePattern
-    Pawl.Type.PhyrexianPayment
-    Pawl.Type.Player
-    Pawl.Type.PlayerCounterKind
-    Pawl.Type.PlayerEffect
-    Pawl.Type.PlayerId
-    Pawl.Type.PlayerRef
-    Pawl.Type.PlayerRelation
-    Pawl.Type.PlayerScope
-    Pawl.Type.PlayerStaticAbility
-    Pawl.Type.Pool
-    Pawl.Type.Power
-    Pawl.Type.Printing
-    Pawl.Type.Program
-    Pawl.Type.ProjectedCharacteristics
-    Pawl.Type.Prompt
-    Pawl.Type.ProposedEvent
-    Pawl.Type.Quantity
-    Pawl.Type.Recipient
-    Pawl.Type.Regenerability
-    Pawl.Type.Registry
-    Pawl.Type.ReplacementBucket
-    Pawl.Type.ReplacementCandidate
-    Pawl.Type.ReplacementEffect
-    Pawl.Type.Response
-    Pawl.Type.RestartSignal
-    Pawl.Type.Result
-    Pawl.Type.Scaling
-    Pawl.Type.Scope
-    Pawl.Type.SearchDestination
-    Pawl.Type.Sickness
-    Pawl.Type.SlotName
-    Pawl.Type.Slug
-    Pawl.Type.Source
-    Pawl.Type.StaticAbility
-    Pawl.Type.Status
-    Pawl.Type.Subtype
-    Pawl.Type.Supertype
-    Pawl.Type.TapState
-    Pawl.Type.TargetSpec
-    Pawl.Type.Timestamp
-    Pawl.Type.TokenEntry
-    Pawl.Type.TokenPattern
-    Pawl.Type.Toughness
-    Pawl.Type.TriggerCondition
-    Pawl.Type.TriggeredAbility
-    Pawl.Type.TriggerFrequency
-    Pawl.Type.TriggerSource
-    Pawl.Type.TurnScope
-    Pawl.Type.TypeLine
-    Pawl.Type.UnknownCard
-    Pawl.Type.UnslugifiableFile
-    Pawl.Type.UnslugifiableName
-    Pawl.Type.Uses
-    Pawl.Type.Zone
-    Pawl.Type.ZoneChange
-    Pawl.Type.ZoneChangePattern
-    Pawl.Type.ZoneChangeSubject
 
   hs-source-dirs: source/library
   other-modules: Paths_pawl
@@ -264,6 +389,13 @@ test-suite pawl-test-suite
     bytestring ^>=0.12,
     containers ^>=0.8,
     directory ^>=1.3.10,
+    pawl:decimal,
+    pawl:exceptions,
+    pawl:extra,
+    pawl:json,
+    pawl:slug,
+    pawl:spec,
+    pawl:types,
     random ^>=1.3.1,
     tasty ^>=1.5.4,
     tasty-hunit ^>=0.10.2,
@@ -295,7 +427,6 @@ test-suite pawl-test-suite
     Pawl.DepartureSpec
     Pawl.EventSpec
     Pawl.ExpirySpec
-    Pawl.ExtraSpec
     Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.JsonSpec
@@ -311,7 +442,6 @@ test-suite pawl-test-suite
     Pawl.ReplaySpec
     Pawl.ResolveSpec
     Pawl.SetupSpec
-    Pawl.SlugSpec
     Pawl.Support
     Pawl.TriggerSpec
     Pawl.TurnSpec
@@ -322,6 +452,7 @@ benchmark pawl-benchmark
   import: executable
   build-depends:
     containers ^>=0.8,
+    pawl:types,
     tasty-bench ^>=0.5.1,
 
   hs-source-dirs: source/benchmark

@@ -15,25 +15,25 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
 import qualified Pawl.Replacement as Replacement
-import Pawl.Type.AttackTarget (AttackTarget)
-import qualified Pawl.Type.AttackTarget as AttackTarget
-import qualified Pawl.Type.Combat as Combat.Type
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.DamageEvent as DamageEvent
-import qualified Pawl.Type.DamageKind as DamageKind
-import Pawl.Type.Game (Game)
-import qualified Pawl.Type.GameEvent as GameEvent
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Keyword as Keyword
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import qualified Pawl.Type.Player as Player
-import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
-import qualified Pawl.Type.Program as Program
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Recipient as Recipient
-import qualified Pawl.Type.Zone as Zone
+import Pawl.Types.AttackTarget (AttackTarget)
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
+import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 514.2: during the cleanup step, all damage marked on permanents is removed.
 --

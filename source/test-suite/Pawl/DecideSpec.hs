@@ -4,8 +4,8 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Decide as Decide
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Decider as Decider
-import qualified Pawl.Type.GameState as GameState
+import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.GameState as GameState
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 

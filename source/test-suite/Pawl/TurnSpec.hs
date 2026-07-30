@@ -23,23 +23,23 @@ import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
 import qualified Pawl.Turn as Turn
-import qualified Pawl.Type.Action as Action
-import qualified Pawl.Type.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Type.BeginningStep as BeginningStep
-import qualified Pawl.Type.Card as Card.Type
-import qualified Pawl.Type.Combat as Combat.Type
-import qualified Pawl.Type.CombatStep as CombatStep
-import qualified Pawl.Type.EndingStep as EndingStep
-import qualified Pawl.Type.ExtraPhase as ExtraPhase
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Object as Object
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.Phase (Phase)
-import qualified Pawl.Type.Phase as Phase
-import qualified Pawl.Type.Printing as Printing
-import qualified Pawl.Type.Prompt as Prompt
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.TapState as TapState
+import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.ExtraPhase as ExtraPhase
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.Phase (Phase)
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.TapState as TapState
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 import qualified Test.Tasty.QuickCheck as QC

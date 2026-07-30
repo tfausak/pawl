@@ -10,8 +10,8 @@
 -- controller, CR 604.2's "has the ability"), while Pawl.Projection is untouched
 -- by this module and never sees these types.
 --
--- This module is the ONLY module that may case on Pawl.Type.PlayerEffect and
--- Pawl.Type.PlayerScope -- the standing Pawl.Resolve
+-- This module is the ONLY module that may case on Pawl.Types.PlayerEffect and
+-- Pawl.Types.PlayerScope -- the standing Pawl.Resolve
 -- has over Effect, Pawl.Projection over Modification, Pawl.Event over
 -- TriggerCondition and Pawl.Expiry over Expiry. Every consumer asks a TYPED
 -- QUESTION and never sees a constructor.
@@ -25,19 +25,19 @@ import qualified Pawl.Event as Event
 import qualified Pawl.Filter as Filter
 import qualified Pawl.Game as Game
 import qualified Pawl.Projection as Projection
-import qualified Pawl.Type.ActivePlayerEffect as ActivePlayerEffect
-import qualified Pawl.Type.Card as Card
-import Pawl.Type.Filter (Filter)
-import Pawl.Type.GameState (GameState)
-import qualified Pawl.Type.GameState as GameState
-import Pawl.Type.ManaCost (ManaCost)
-import Pawl.Type.ObjectId (ObjectId)
-import Pawl.Type.PlayerEffect (PlayerEffect)
-import qualified Pawl.Type.PlayerEffect as PlayerEffect
-import Pawl.Type.PlayerId (PlayerId)
-import Pawl.Type.PlayerScope (PlayerScope)
-import qualified Pawl.Type.PlayerScope as PlayerScope
-import qualified Pawl.Type.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Types.Card as Card
+import Pawl.Types.Filter (Filter)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.ManaCost (ManaCost)
+import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerEffect (PlayerEffect)
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.PlayerScope (PlayerScope)
+import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 
 -- CR 109.5: "the words 'you' and 'your' on an object refer to the object's
 -- controller ... for a static ability, this is the current controller of the
@@ -66,7 +66,7 @@ inScope pid controller scope = case scope of
 -- Projection.gather takes for staticAbilities -- which is why Rule of Law
 -- leaving the battlefield lifts its restriction with nothing to unwind.
 --
--- The scope is resolved DYNAMICALLY (see Pawl.Type.PlayerScope): CR 611.2c
+-- The scope is resolved DYNAMICALLY (see Pawl.Types.PlayerScope): CR 611.2c
 -- classifies a rules-modifying effect as one that "can affect objects that
 -- weren't affected when that continuous effect began", so no set is ever frozen
 -- on this axis.
@@ -115,7 +115,7 @@ applying pid gs =
                 else []
       printed = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       -- CR 611.2c: the stored carrier. Its controller is read off the record and
-      -- never re-derived -- see Pawl.Type.ActivePlayerEffect -- while its scope is
+      -- never re-derived -- see Pawl.Types.ActivePlayerEffect -- while its scope is
       -- resolved live, exactly as the printed carrier's is.
       --
       -- Neither gate above touches it, because it is not an ability for CR 613.1f

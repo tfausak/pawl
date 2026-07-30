@@ -14,18 +14,18 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Setup as Setup
 import qualified Pawl.Stack as Stack
 import qualified Pawl.Support as S
-import qualified Pawl.Type.Aggregation as Aggregation
-import qualified Pawl.Type.Count as Count.Type
-import qualified Pawl.Type.CounterKind as CounterKind
-import qualified Pawl.Type.Filter as Filter.Type
-import qualified Pawl.Type.GameState as GameState
-import qualified Pawl.Type.Modification as Modification
-import qualified Pawl.Type.PlayerRef as PlayerRef
-import qualified Pawl.Type.ProjectedCharacteristics as PC
-import qualified Pawl.Type.Quantity as Quantity.Type
-import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.Scope as Scope
-import qualified Pawl.Type.Zone as Zone
+import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Registry as Registry.Type
+import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -117,7 +117,7 @@ tests registry =
         -- it proves the clearing.
         --
         -- What WOULD distinguish: a "loses all abilities" card that does not also
-        -- set P/T. Attachment itself has landed (Pawl.Type.Object.attachedTo,
+        -- set P/T. Attachment itself has landed (Pawl.Types.Object.attachedTo,
         -- Affected.Attached), but the Darksteel Mutation family still needs
         -- layer-4 card-type REPLACEMENT (turning the enchanted creature into a
         -- 0/0), which does not exist yet; Soul Sculptor needs the same
