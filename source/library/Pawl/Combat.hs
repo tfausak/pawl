@@ -471,7 +471,10 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 -- the gathered candidate list each cost a whole-battlefield scan
 -- (Projection.controlGrants, Projection.gather), both hoisted out of the
 -- per-combatant loop, and this runs on every settle pass alongside
--- checkControlContinuity's own.
+-- checkControlContinuity's own. The gather is NOT shared with the one
+-- Sba.performStateBasedActions makes earlier in the same settle pass: a
+-- state-based action can change the board between the two, and a sample has to
+-- gather against the state it is judging (Projection.projectGiven's own caveat).
 removeChanged :: GameState -> GameState
 removeChanged gs =
   let c = GameState.combat gs
