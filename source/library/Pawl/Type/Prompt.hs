@@ -192,11 +192,40 @@ data Prompt r where
   -- activation to pay.
   CastWhileSearching :: Decider -> PlayerId -> [ObjectId] -> Prompt (Maybe ObjectId)
   -- CR 601.2b: choose the value of X while casting (the ObjectId is the spell).
-  -- Any Natural; payment (reject-not-repair) rejects an unaffordable choice, so
-  -- the engine computes no maximum. Prompted before targets (CR 601.2b precedes
-  -- 601.2c), and only when the cost contains a Variable symbol -- a spell with no
-  -- {X} is not asked (where the rules leave nothing to choose, don't prompt).
-  ChooseX :: Decider -> PlayerId -> ObjectId -> Prompt Natural
+  -- The Natural is the greatest value this player could actually PAY for right
+  -- now: the largest X at which the cost being cast, totalled at CR 601.2f, is
+  -- still payable (Cast.affordableX, which climbs the very predicate
+  -- Cast.payableCost gated this cast on at CR 601.2b's X=0 floor).
+  --
+  -- ADVISORY, not a limit, and emphatically not a clamp. The answer is filtered
+  -- against it nowhere: CR 601.2b lets the player announce the value of the
+  -- variable freely, and an announcement the total cost cannot pay is answered by
+  -- CR 601.2 reversing the whole casting -- "the game returns to the moment
+  -- before the casting of that spell was proposed" -- which is pawl's no-op,
+  -- minus the prompts (#56). What the bound adds is the INFORMATION a player at a
+  -- table has and an answerer, which sees only this payload and never the
+  -- GameState, did not (#417) -- the shape #176 gave DeclareMulligan.
+  --
+  -- COUNTS LIFE, not only mana: Cost.canPay measures CR 601.2b's nonhybrid
+  -- resolutions, so a Phyrexian symbol's 2 life (CR 107.4f) is one of the routes
+  -- the climb can find, and the bound is the greatest X payable by ANY route the
+  -- cast itself would accept. It inherits that predicate's caveats with its
+  -- reading -- notably #365, where the mana part and a PayLife component are
+  -- measured separately. It is measured BEFORE this cost's Phyrexian symbols are
+  -- announced, which is CR 601.2b's own order (X precedes the Phyrexian
+  -- announcement), so the routes it counts are exactly the ones still open to the
+  -- player being asked.
+  --
+  -- A bare Natural rather than a Maybe: this prompt is issued only for a
+  -- candidate cost that already passed the X=0 floor, so a greatest payable X
+  -- always exists, and 0 is a real answer (cast the spell for its X-free
+  -- remainder) rather than an absent one. There is no "unbounded" case to
+  -- represent -- a player's mana is finite, and every {X} spends it.
+  --
+  -- Prompted before targets (CR 601.2b precedes 601.2c), and only when the cost
+  -- contains a Variable symbol -- a spell with no {X} is not asked (where the
+  -- rules leave nothing to choose, don't prompt).
+  ChooseX :: Decider -> PlayerId -> ObjectId -> Natural -> Prompt Natural
   -- CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
   -- spell). The Set ModeIndex is the LEGAL modes -- the engine pre-filters to modes
   -- whose targets are all fillable (CR 700.2a). The Natural is how many to choose.

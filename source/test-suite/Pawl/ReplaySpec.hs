@@ -68,8 +68,12 @@ combatReplayTests =
              in HU.assertEqual "round trip" (Just answer) (Replay.decode damagePrompt (Replay.encode damagePrompt answer)),
           HU.testCase "a mismatched response decodes to Nothing" $
             HU.assertEqual "mismatch" Nothing (Replay.decode attackPrompt (Response.Shuffled [oid])),
+          -- The recorded answer is 4 while the prompt's bound is 2: the transcript
+          -- carries what the player SAID, and CR 601.2b lets them say more than
+          -- the board can pay. A codec that folded the bound into the response
+          -- would replay a different game (#417).
           HU.testCase "ChooseX records and replays a Natural" $
-            let p = Prompt.ChooseX decider S.alice oid
+            let p = Prompt.ChooseX decider S.alice oid 2
              in HU.assertEqual "round trip" (Just (4 :: Natural.Natural)) (Replay.decode p (Replay.encode p 4)),
           -- CR 601.2b / 700.2a: a modal choice (Response.ChoseModes, a Set
           -- ModeIndex) round-trips through the DecisionLog exactly like every

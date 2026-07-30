@@ -5,6 +5,7 @@ import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Binding as Binding
 import qualified Pawl.Card as Card
 import qualified Pawl.Cost as Cost
@@ -90,7 +91,65 @@ targetable pid oid gs = case Game.cardOf oid gs of
 -- The X=0 floor is the one place they still can disagree, since the announcement
 -- runs on the value the player named (#417).
 payableCost :: PlayerId -> ObjectId -> GameState -> Cost -> Bool
-payableCost pid oid gs cost = Cost.canPay pid oid (Cost.total pid oid (Cost.substituteX 0 cost) gs) gs
+payableCost = payableCostAt 0
+
+-- The same question asked at some OTHER value of X. `payableCost` is this at CR
+-- 601.2b's floor, and `affordableX` is this climbed; one predicate, so what the
+-- gate measures and what the bound reports cannot drift apart.
+payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost -> Bool
+payableCostAt x pid oid gs cost = Cost.canPay pid oid (Cost.total pid oid (Cost.substituteX x cost) gs) gs
+
+-- CR 601.2b: the greatest value of X this player could actually pay for, which is
+-- what Prompt.ChooseX carries. Measured on the cost the cast is measuring -- the
+-- candidate chosen at CR 601.2b, totalled at CR 601.2f -- and with the same
+-- predicate castability was gated on, never a freshly derived one.
+--
+-- Advisory, and nothing here clamps: see Prompt.ChooseX for why announcing past
+-- this is legal (CR 601.2b) and what it costs the player (CR 601.2, #56).
+--
+-- FOUND BY ASCENDING SEARCH from 0, which is only sound because payability is
+-- MONOTONE in X -- unpayable at n means unpayable at every value above n. It is,
+-- and for reasons that hold structurally rather than by inspection of the pool:
+--
+--   1. X reaches a cost ONLY as generic mana. Mana.substituteX rewrites each
+--      Variable symbol to Generic x and touches nothing else, and Cost.substituteX
+--      rewrites the mana part alone -- so raising X raises the generic demand (by
+--      one per {X} symbol) while every typed symbol, and every CostComponent, is
+--      exactly what it was. Cost.canPay's component half therefore answers the
+--      same at every X.
+--   2. CR 601.2f's totalling cannot undo that. Cost.total's increases and
+--      reductions come from PlayerEffect.costAdjustments, which reads the player,
+--      the object and the state and never the cost, so the amount added and the
+--      amount taken off are the same at every X. applyAdjustments pools them into
+--      the one generic component, which is monotone in the cost's own generic sum
+--      and floored at 0 by CR 601.2f ("It can't be reduced to less than {0}"); the
+--      typed cancellation it performs does not read the generic part at all.
+--   3. More generic mana is never easier to pay. Mana.canPay asks of each of CR
+--      601.2b's nonhybrid resolutions that CR 119.4 admit the life, that Hall's
+--      condition hold for the typed demands, and that the supplies left over cover
+--      the generic part. Only that last one reads the generic count, and it reads
+--      it on the demanding side of a >= whose supply side X cannot move.
+--
+-- The same three facts are why the climb TERMINATES. Each step raises the cost's
+-- own generic sum by at least one (one per {X} symbol) while the amount the
+-- reductions take off is a constant, so the TOTALLED generic demand grows without
+-- bound -- the CR 601.2f floor delays that but cannot stop it -- and the supplies
+-- are finite, so the generic comparison in (3) fails at some X no greater than
+-- the mana available plus whatever the reductions forgive.
+--
+-- The one cost that would climb forever is one whose payability X cannot affect at
+-- all -- a cost with no {X} in it -- so that one answers 0 without climbing. That
+-- is a totality guard rather than a rule: such a cost has no X to name, so there
+-- is no greatest value of it to report, and castSpell never asks (the prompt is
+-- gated on the same Cost.hasVariable).
+--
+-- Answers 0 for a cost unpayable even at X=0 too, where no value of X is
+-- affordable and 0 is the least misleading number to report. Unreachable from
+-- castSpell, which asks only about a candidate that already passed payableCost.
+affordableX :: PlayerId -> ObjectId -> GameState -> Cost -> Natural
+affordableX pid oid gs cost =
+  let climb x = if payableCostAt (x + 1) pid oid gs cost then climb (x + 1) else x
+   in if Cost.hasVariable cost then climb 0 else 0
 
 -- CR 601.3: the zones a spell can be cast from at all, in the engine's
 -- canonical order -- what castableSpells scans, and the list castableZones
@@ -307,9 +366,14 @@ castSpell pid oid = do
             _ -> Trans.lift (Program.prompt (Prompt.ChooseCost decider pid oid payable))
           Monad.when (elem chosenCost payable) $ do
             let sets = Target.legalSets (Just pid) oid (Card.modesTargetSpecs chosenModes card) gs
+            -- CR 601.2b's announcement is free -- any Natural -- but the player
+            -- making it is told what the board can pay. The bound rides the
+            -- CHOSEN cost, so an alternative cost or a CR 601.2f adjustment moves
+            -- it, and nothing filters the answer against it: an unaffordable
+            -- announcement still reverses the whole cast (#417).
             mAmount <-
               if Cost.hasVariable chosenCost
-                then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid)))
+                then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid oid (affordableX pid oid gs chosenCost))))
                 else pure Nothing
             -- CR 601.2b's own order puts the Phyrexian announcement AFTER the
             -- value of X and before CR 601.2c's targets: "If a cost that will be

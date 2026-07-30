@@ -561,6 +561,27 @@ answerX0 p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
   _ -> S.identityAnswer p
 
+-- Answers Prompt.ChooseX with the affordability bound the prompt carries, and
+-- records that bound in the State. The log is how a test sees a payload nothing
+-- on the board records; answering WITH it is what proves the bound is payable
+-- rather than merely reported. Aims every target slot at bob, and takes the
+-- identity fallback elsewhere (the liar pattern answerX3 uses).
+answerAtBound :: Prompt.Prompt r -> State.State [Natural] r
+answerAtBound p = case p of
+  Prompt.ChooseX _ _ _ bound -> do
+    State.modify' (\seen -> seen <> [bound])
+    pure bound
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
+  _ -> pure (S.identityAnswer p)
+
+-- Announces ONE MORE than the bound -- legal under CR 601.2b and unaffordable by
+-- construction, whatever the board is.
+answerAboveBound :: Prompt.Prompt r -> r
+answerAboveBound p = case p of
+  Prompt.ChooseX _ _ _ bound -> bound + 1
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  _ -> S.identityAnswer p
+
 -- How many Blazes sit in alice's hand (the reject-not-repair no-op check).
 blazeInHand :: GameState.GameState -> Int
 blazeInHand gs = length (filter (nameOnStack (Text.pack "Blaze") gs) (Game.zoneMembers Zone.Hand S.alice gs))
@@ -595,7 +616,60 @@ blazeTests registry =
             after = snd (Engine.runGamePure answerX3 gs0 (Cast.castSpell S.alice oid))
         HU.assertEqual "still in hand" 1 (blazeInHand after)
         HU.assertEqual "no mana spent" 0 (S.tappedCount S.alice after)
-        HU.assertEqual "Bob unharmed" (Just 20) (S.lifeOf S.bob after)
+        HU.assertEqual "Bob unharmed" (Just 20) (S.lifeOf S.bob after),
+      -- The bound is what the BOARD can pay, so it moves with the board: {X}{R}
+      -- off four Mountains admits X=3, off six admits X=5, and off the one
+      -- Mountain that only just makes Blaze castable admits nothing but CR
+      -- 601.2b's floor. No constant, and nothing read off the printed cost,
+      -- satisfies all three (#417).
+      HU.testCase "CR 601.2b the ChooseX bound is the greatest X the board can pay" $ do
+        blaze <- Registry.printing registry "Blaze"
+        mountain <- Registry.printing registry "Mountain"
+        let boundsOff n =
+              let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain n)
+               in State.execState (Engine.runGame answerAtBound gs0 (Cast.castSpell S.alice oid)) []
+        HU.assertEqual "four Mountains bound X at 3" [3] (boundsOff 4)
+        HU.assertEqual "six Mountains bound X at 5" [5] (boundsOff 6)
+        HU.assertEqual "one Mountain bounds X at 0" [0] (boundsOff 1),
+      -- The bound is PAYABLE and not merely reported: announcing exactly it casts
+      -- the spell, pays every Mountain, and resolves. An off-by-one bound would
+      -- reverse the cast here instead (CR 601.2) and leave bob at 20.
+      HU.testCase "CR 601.2b announcing X at the bound casts Blaze and resolves it" $ do
+        blaze <- Registry.printing registry "Blaze"
+        mountain <- Registry.printing registry "Mountain"
+        let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
+            after = snd (State.evalState (Engine.runGame answerAtBound gs0 (do Cast.castSpell S.alice oid; Stack.resolveTop)) [])
+        HU.assertEqual "Bob at 17, so the bound of 3 was announced and paid" (Just 17) (S.lifeOf S.bob after)
+        HU.assertEqual "all four Mountains paid {3}{R}" 4 (S.tappedCount S.alice after)
+        HU.assertEqual "Blaze resolved out of hand" 0 (blazeInHand after),
+      -- The assertion that keeps the bound honest. It is ADVISORY: CR 601.2b lets
+      -- the player announce the value of the variable freely, so one more than the
+      -- bound is announced, is unaffordable, and reverses the whole casting (CR
+      -- 601.2) exactly as any other unaffordable value does. A bound quietly
+      -- turned into a clamp would deal 3 damage and tap four Mountains here.
+      HU.testCase "CR 601.2b the bound does not clamp: X one above it is a no-op" $ do
+        blaze <- Registry.printing registry "Blaze"
+        mountain <- Registry.printing registry "Mountain"
+        let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
+            after = snd (Engine.runGamePure answerAboveBound gs0 (Cast.castSpell S.alice oid))
+        HU.assertEqual "still in hand" 1 (blazeInHand after)
+        HU.assertEqual "no mana spent" 0 (S.tappedCount S.alice after)
+        HU.assertEqual "Bob unharmed" (Just 20) (S.lifeOf S.bob after),
+      -- The bound is measured at CR 601.2f's TOTAL, not on the printed cost:
+      -- Thalia's "noncreature spells cost {1} more" (EachPlayer-scoped, so her own
+      -- controller pays it too) eats one of the four Mountains, and the board that
+      -- admitted X=3 above admits only X=2.
+      HU.testCase "CR 601.2f a cost increase lowers the ChooseX bound" $ do
+        blaze <- Registry.printing registry "Blaze"
+        mountain <- Registry.printing registry "Mountain"
+        thalia <- Registry.printing registry "Thalia, Guardian of Thraben"
+        let (gs0, oid) = S.handOne blaze (snd (S.addCreature thalia S.alice (S.landsInPlay mountain 4)))
+            cast = do Cast.castSpell S.alice oid; Stack.resolveTop
+            bounds = State.execState (Engine.runGame answerAtBound gs0 cast) []
+            after = snd (State.evalState (Engine.runGame answerAtBound gs0 cast) [])
+        HU.assertEqual "the taxed bound is 2" [2] bounds
+        HU.assertEqual "Bob at 18" (Just 18) (S.lifeOf S.bob after)
+        HU.assertEqual "four Mountains paid {2}{R} plus Thalia's {1}" 4 (S.tappedCount S.alice after)
     ]
 
 -- CR 700.2a: an illegal mode can't be chosen, so a modal spell is castable when
