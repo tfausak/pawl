@@ -22,7 +22,10 @@
 -- Event.eventBindingSlots (the per-condition slot set the card lint asks)
 -- against the keys eventBindings actually stamps. CR 603.4's intervening "if"
 -- read against a source that no longer exists (CR 608.2h), with Deathknell Berserker
--- -- `lookBackInterveningTests`.
+-- -- `lookBackInterveningTests`. CR 603.10's first sentence for a BYSTANDER -- a
+-- permanent that was on the battlefield when some OTHER event in the same batch
+-- happened and is gone by the CR 117.5 boundary -- with Lightning Skelemental
+-- and Khabál Ghoul -- `bystanderTests`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -30,6 +33,7 @@ module Pawl.TriggerSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -1608,7 +1612,7 @@ permanentEntersTests registry =
           -- -- here moved straight on to the graveyard -- is read from last known
           -- information, which for a permanent that left the battlefield is the
           -- battlefield reading. The event happened; the trigger is not lost with
-          -- the object. Same fallback eventTriggers' own `goneEntrant` takes for
+          -- the object. Same fallback eventTriggers' own `bystanders` takes for
           -- the bearer side.
           HU.testCase "CR 608.2h a creature that enters and leaves again still fires the trigger" $ do
             soulWarden <- Registry.printing registry "Soul Warden"
@@ -2150,5 +2154,103 @@ strippedTriggerTests registry =
             HU.assertBool "colorless gone" (ManaType.Colorless `notElem` Mana.manaTypesOf fountainId after)
         ]
 
+-- CR 702.19b: assign each blocker exactly its lethal threshold and let the
+-- excess trample through to the defending player. S.aggressiveAnswer cannot be
+-- used here -- its AssignCombatDamage arm dumps the whole amount onto the first
+-- CREATURE recipient it finds, so nothing would ever reach a player and the
+-- trigger under test would never have an event to match.
+tramplingAnswer :: Prompt.Prompt r -> r
+tramplingAnswer p = case p of
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    let blockerEntries = Map.toList (Map.filterWithKey (\r _ -> S.isCreatureRecipient r) thresholds)
+        spent = sum (fmap snd blockerEntries)
+        leftover = if n >= spent then n - spent else 0
+        toBlockers = Map.fromList blockerEntries
+     in case filter (not . S.isCreatureRecipient) (Map.keys thresholds) of
+          d : _ -> Map.insert d leftover toBlockers
+          [] -> toBlockers
+  _ -> S.aggressiveAnswer p
+
+-- CR 603.10's FIRST sentence for a BYSTANDER: "objects that exist immediately
+-- after an event are checked to see if the event matched any trigger
+-- conditions". The scan runs once, at the CR 117.5 boundary, after CR 704.3's
+-- state-based actions -- so a permanent that was on the battlefield when some
+-- OTHER event in the same batch happened, and is gone by the time the scan
+-- looks, has to be recovered from CR 608.2h last known information exactly as
+-- the event's own object already was.
+--
+-- Lightning Skelemental is the card: {B}{R}{R} Creature -- Elemental Skeleton
+-- 6/1, "Trample, haste / Whenever this creature deals combat damage to a
+-- player, that player discards two cards. / At the beginning of the end step,
+-- sacrifice this creature." Its 1 toughness and CR 702.19b's trample are what
+-- put the trigger's event and the bearer's death in ONE batch: the excess
+-- reaches bob while the blocker's damage kills the Skelemental at the very next
+-- CR 704.5g check, before any player gets priority.
+bystanderTests :: Registry.Type.Registry -> Tasty.TestTree
+bystanderTests registry =
+  Tasty.testGroup
+    "Bystander"
+    [ -- The proving test. bob holds THREE cards, so "discarded once" (one left)
+      -- is distinguishable from "discarded twice" (none) and from "not at all"
+      -- (three).
+      HU.testCase "CR 603.10 whole cards: Lightning Skelemental dies to its blocker and STILL makes bob discard two" $ do
+        skelemental <- Registry.printing registry "Lightning Skelemental"
+        piker <- Registry.printing registry "Goblin Piker"
+        case S.combatBoardOf [skelemental] [piker] of
+          (base, [attacker], [blocker]) -> do
+            let gs = List.foldl' (\g _ -> snd (S.addHandCard piker S.bob g)) base [(), (), ()]
+                after = S.runCombat tramplingAnswer gs
+            HU.assertEqual "bob starts with three cards" 3 (S.handSize S.bob gs)
+            HU.assertEqual "CR 702.19b: five trampled through to bob" (Just 15) (S.lifeOf S.bob after)
+            HU.assertBool "CR 704.5g: the Piker's two killed the 6/1" (not (S.onBattlefield attacker after))
+            HU.assertBool "and the Piker died to its one" (not (S.onBattlefield blocker after))
+            HU.assertEqual "the Skelemental is in alice's graveyard" 1 (length (Game.zoneMembers Zone.Graveyard S.alice after))
+            HU.assertEqual "and bob discarded two, exactly once" 1 (S.handSize S.bob after)
+          _ -> HU.assertFailure "fixture should give alice one attacker and bob one blocker",
+      -- The control leg, which passes with or without the bystander recovery:
+      -- unblocked, the Skelemental is still on the battlefield at the boundary,
+      -- so `onBattlefield` carries it and the same trigger fires from the
+      -- ordinary candidate source. It is what makes the card data and the
+      -- reserved "that player" slot innocent when the leg above fails.
+      HU.testCase "CR 702.70a-style control: an UNBLOCKED Skelemental survives and makes bob discard two the ordinary way" $ do
+        skelemental <- Registry.printing registry "Lightning Skelemental"
+        piker <- Registry.printing registry "Goblin Piker"
+        case S.combatBoardOf [skelemental] [] of
+          (base, [attacker], []) -> do
+            let gs = List.foldl' (\g _ -> snd (S.addHandCard piker S.bob g)) base [(), (), ()]
+                after = S.runCombat tramplingAnswer gs
+            HU.assertBool "the Skelemental is still on the battlefield" (S.onBattlefield attacker after)
+            HU.assertEqual "bob took all six" (Just 14) (S.lifeOf S.bob after)
+            HU.assertEqual "and discarded two" 1 (S.handSize S.bob after)
+          _ -> HU.assertFailure "fixture should give alice one attacker and bob no blockers",
+      -- The OTHER shape the rule reaches, at the gather rather than through a
+      -- whole turn: a CR 603.2b step trigger whose bearer is gone by the
+      -- boundary. Khabál Ghoul ("At the beginning of each end step, put a +1/+1
+      -- counter on Khabál Ghoul for each creature that died this turn") is the
+      -- bearer; the end step's beginning and the Ghoul's own death are two
+      -- events in one unscanned batch, and the step event comes FIRST, so
+      -- nothing about the Ghoul's own departure event can be what recovers it.
+      HU.testCase "CR 603.10 a StepBegins bearer that dies later in the same batch still triggers" $ do
+        khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+        let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+            began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
+            dead = S.runPure S.identityAnswer began (Event.destroy Regenerability.Regenerable [ghoul])
+            triggers = fst (Event.gatherTriggers (Event.unscannedEvents dead) dead)
+        HU.assertEqual "the Ghoul really did leave the battlefield" Nothing (Game.lookupObject ghoul dead)
+        HU.assertEqual "its step trigger still fired" [TriggerSource.OfObject ghoul] (fmap PendingTrigger.source triggers)
+        HU.assertEqual "under alice, who controlled it as it left (CR 603.3a)" [S.alice] (fmap PendingTrigger.controller triggers),
+      -- The discriminating twin: a bearer that left the battlefield BEFORE the
+      -- step began did not exist immediately after that event, and gets nothing.
+      -- Same board, same two events, opposite order.
+      HU.testCase "CR 603.10 a bearer that had already left before the event does NOT trigger" $ do
+        khabalGhoul <- Registry.printing registry "Khabál Ghoul"
+        let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+            dead = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [ghoul])
+            began = S.runPure S.identityAnswer dead (State.modify' (Event.recordEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)))
+            triggers = fst (Event.gatherTriggers (Event.unscannedEvents began) began)
+        HU.assertEqual "the Ghoul is gone" Nothing (Game.lookupObject ghoul began)
+        HU.assertEqual "and nothing triggered" [] (fmap PendingTrigger.source triggers)
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
-tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry]
+tests registry = Tasty.testGroup "Pawl.TriggerSpec" [logTests registry, scanTests registry, permanentEntersTests registry, sacrificeTests registry, stateTriggerTests registry, historyTests registry, delayedTests registry, orderingTests registry, monarchOrderingTests registry, interveningTests registry, poisonousTests registry, cyclingTriggerTests registry, graveyardTriggerTests registry, diesTriggerTests registry, becameSlotTests registry, lookBackInterveningTests registry, strippedTriggerTests registry, bystanderTests registry]

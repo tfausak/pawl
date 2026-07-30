@@ -21,6 +21,7 @@ import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -46,6 +47,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -265,6 +267,39 @@ tests registry =
             -- black.
             HU.assertEqual "and black by colour indicator" (Set.singleton Color.Black) (CardT.colorIndicator token)
           other -> HU.assertFailure ("expected exactly one Create, got " <> show (length other)),
+      -- CR 702.19 trample plus CR 603.2's combat-damage condition on one card,
+      -- which is what makes the trigger's event and the bearer's death land in a
+      -- single CR 117.5 batch. The 1 toughness is load-bearing and pinned here so
+      -- a future edit cannot quietly make the Skelemental survive its blocker:
+      -- TriggerSpec's bystander group would then prove nothing.
+      HU.testCase "lightning-skelemental.json loads as a {B}{R}{R} 6/1 trampler that makes the damaged player discard two" $ do
+        c <- Registry.card registry "Lightning Skelemental"
+        HU.assertEqual "name" (Text.pack "Lightning Skelemental") (CardT.name c)
+        HU.assertEqual
+          "{B}{R}{R}"
+          (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Black), ManaSymbol.OfType (ManaType.Colored Color.Red), ManaSymbol.OfType (ManaType.Colored Color.Red)]))
+          (CardT.manaCost c)
+        HU.assertEqual "6/1" (Just (Power.MkPower (Quantity.Literal 6)), Just (Toughness.MkToughness (Quantity.Literal 1))) (CardT.power c, CardT.toughness c)
+        HU.assertEqual "trample and haste" (Set.fromList [Keyword.Trample, Keyword.Haste]) (CardT.keywords c)
+        HU.assertEqual
+          "Creature -- Elemental Skeleton"
+          (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) (Set.fromList [Subtype.Elemental, Subtype.Skeleton]))
+          (CardT.typeLine c)
+        HU.assertEqual
+          "two triggers: the combat-damage one and the end-step sacrifice"
+          [ TriggerCondition.SelfDealsCombatDamageToPlayer,
+            TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn
+          ]
+          (fmap TriggeredAbility.condition (CardT.triggeredAbilities c))
+        HU.assertEqual
+          -- CR 702.70a's reserved "that player" slot, read by a card for the
+          -- first time: the discard names the slot Event.eventBindings stamps
+          -- for this condition, not a target and not the controller.
+          "the damaged player discards two, then the Skelemental sacrifices itself"
+          [ [(Optionality.Mandatory, [Effect.Discard Binding.triggerPlayer (Quantity.Literal 2)])],
+            [(Optionality.Mandatory, [Effect.Sacrifice Binding.triggerSource])]
+          ]
+          (fmap (modeShapes . TriggeredAbility.modal) (CardT.triggeredAbilities c)),
       HU.testCase "leyline-of-the-void.json loads with a CR 103.6a action and an Opponents redirect" $ do
         c <- Registry.card registry "Leyline of the Void"
         HU.assertEqual "name" (Text.pack "Leyline of the Void") (CardT.name c)
