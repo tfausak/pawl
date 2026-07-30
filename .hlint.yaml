@@ -1,6 +1,7 @@
 - extensions:
   - default: false
   - name:
+    - FlexibleContexts
     - GADTs
     - RankNTypes
 

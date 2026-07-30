@@ -60,6 +60,34 @@ library decimal
 
   hs-source-dirs: source/libraries/decimal
 
+library extra
+  import: library
+  build-depends:
+    pawl:spec
+
+  -- cabal-gild: discover source/libraries/extra
+  exposed-modules:
+    Pawl.Extra.Either
+    Pawl.Extra.EitherSpec
+
+  hs-source-dirs: source/libraries/extra
+
+library json
+  import: library
+  build-depends:
+    bytestring ^>=0.12.2,
+    parsec ^>=3.1.18,
+    pawl:decimal,
+    pawl:spec,
+
+  -- cabal-gild: discover source/libraries/json
+  exposed-modules:
+    Pawl.Json
+    Pawl.Json.Null
+    Pawl.Json.NullSpec
+
+  hs-source-dirs: source/libraries/json
+
 library spec
   import: library
   -- cabal-gild: discover source/libraries/spec
@@ -285,6 +313,7 @@ test-suite pawl-test-suite
     containers ^>=0.8,
     directory ^>=1.3.10,
     pawl:decimal,
+    pawl:extra,
     pawl:spec,
     random ^>=1.3.1,
     tasty ^>=1.5.4,

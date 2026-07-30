@@ -19,6 +19,7 @@ import qualified Pawl.DecimalSpec as DecimalSpec
 import qualified Pawl.DepartureSpec as DepartureSpec
 import qualified Pawl.EventSpec as EventSpec
 import qualified Pawl.ExpirySpec as ExpirySpec
+import qualified Pawl.Extra.EitherSpec as EitherSpec
 import qualified Pawl.ExtraSpec as ExtraSpec
 import qualified Pawl.FilterSpec as FilterSpec
 import qualified Pawl.GameSpec as GameSpec
@@ -100,5 +101,7 @@ testTree registry =
       SlugSpec.tests,
       ExtraSpec.tests,
       AuraSpec.tests registry,
-      Tasty.testGroup "decimal" . Writer.execWriter $ DecimalSpec.spec tasty
+      Tasty.testGroup "spec" . Writer.execWriter $ do
+        DecimalSpec.spec tasty
+        EitherSpec.spec tasty
     ]
