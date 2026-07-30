@@ -74,6 +74,7 @@ import qualified Pawl.Type.Phase as Phase
 import qualified Pawl.Type.PhasePattern as PhasePattern
 import qualified Pawl.Type.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Type.PlayerEffect as PlayerEffect
+import qualified Pawl.Type.PlayerId as PlayerId
 import qualified Pawl.Type.PlayerRef as PlayerRef
 import qualified Pawl.Type.PlayerRelation as PlayerRelation
 import qualified Pawl.Type.PlayerScope as PlayerScope
@@ -303,6 +304,11 @@ tests registry =
               Codec.effectToJson
               Codec.jsonToEffect
               (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells),
+          -- CR 614.10a: Fatigue's slot read, plus the self-scoped arm Avizoa's
+          -- "you skip your next untap step" would write.
+          HU.testCase "SkipNextPhase" $ do
+            roundTrip "skip slot" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Phase.Beginning BeginningStep.DrawStep))
+            roundTrip "skip you" Codec.effectToJson Codec.jsonToEffect (Effect.SkipNextPhase (PlayerRef.Relative PlayerRelation.You) (Phase.Beginning BeginningStep.Untap)),
           -- Every PlayerRef shape the opcode accepts: the self-scoped one every
           -- card in the pool uses, and the slot read CR 702.70a's "that player"
           -- needs.
@@ -640,9 +646,17 @@ tests registry =
              in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re)),
           -- CR 614.1b: a skip carries a pattern and no rewrite, so the payload is
           -- the pattern itself rather than the usual two-element array.
-          HU.testCase "a PhaseR replacement round-trips" $
-            let re = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = Phase.Beginning BeginningStep.Upkeep}
-             in HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re))
+          --
+          -- Both `whosePhase` shapes: Eon Hub's symmetric Nothing, which is what
+          -- card JSON writes, and the baked Just that only Resolve's
+          -- SkipNextPhase arm produces (Fatigue). The second is runtime-only, and
+          -- is covered here for the same reason SetController's PlayerId is --
+          -- the codec has to carry it either way.
+          HU.testCase "a PhaseR replacement round-trips" $ do
+            let re = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = Phase.Beginning BeginningStep.Upkeep, PhasePattern.whosePhase = Nothing}
+            HU.assertEqual "preserved" (Right re) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson re))
+            let scoped = ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = Phase.Beginning BeginningStep.DrawStep, PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
+            HU.assertEqual "and so does a player-scoped one" (Right scoped) (Codec.jsonToReplacementEffect (Codec.replacementEffectToJson scoped))
         ],
       Tasty.testGroup
         "modal"

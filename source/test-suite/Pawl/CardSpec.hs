@@ -370,6 +370,8 @@ effectCounts effect = case effect of
   Effect.GainLife _ quantity -> quantityCounts quantity
   Effect.Create quantity card _ _ -> quantityCounts quantity <> cardCounts card
   Effect.Replace duration _ _ -> durationCounts duration
+  -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
+  Effect.SkipNextPhase _ _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity

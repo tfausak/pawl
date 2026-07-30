@@ -38,6 +38,7 @@ import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Quantity as Quantity
 import qualified Pawl.Type.Registry as Registry.Type
 import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Type.SlotName as SlotName
 import qualified Pawl.Type.Slug as Slug.Type
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
@@ -287,10 +288,34 @@ tests registry =
         HU.assertEqual "name" (Text.pack "Eon Hub") (CardT.name c)
         HU.assertEqual "{5}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 5])) (CardT.manaCost c)
         HU.assertEqual
+          -- whosePhase = Nothing is the SYMMETRY: "PLAYERS skip their upkeep
+          -- steps" names nobody, so the pattern reads no PlayerId and the skip
+          -- takes every player's upkeep. Fatigue is the Just.
           "players skip their upkeep steps"
-          [ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = Phase.Beginning BeginningStep.Upkeep}]
+          [ ReplacementEffect.PhaseR
+              PhasePattern.MkPhasePattern
+                { PhasePattern.whichPhase = Phase.Beginning BeginningStep.Upkeep,
+                  PhasePattern.whosePhase = Nothing
+                }
+          ]
           (CardT.replacementEffects c)
-        HU.assertEqual "and it is not a continuous effect" [] (CardT.staticAbilities c)
+        HU.assertEqual "and it is not a continuous effect" [] (CardT.staticAbilities c),
+      -- CR 614.10a: the first card whose skip is created by an EFFECT rather
+      -- than printed on a permanent. Nothing is in `replacementEffects` -- a
+      -- sorcery has no ability that exists on the battlefield -- which is the
+      -- structural contrast with Eon Hub just above.
+      HU.testCase "fatigue.json loads as a {1}{U} sorcery whose only effect is a SkipNextPhase" $ do
+        c <- Registry.card registry "Fatigue"
+        HU.assertEqual "name" (Text.pack "Fatigue") (CardT.name c)
+        HU.assertEqual "{1}{U}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue)])) (CardT.manaCost c)
+        HU.assertEqual
+          "target player skips their next draw step"
+          [ ( Optionality.Mandatory,
+              [Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Phase.Beginning BeginningStep.DrawStep)]
+            )
+          ]
+          (modeShapes (CardT.spell c))
+        HU.assertEqual "nothing of it survives on the battlefield" [] (CardT.replacementEffects c)
     ]
 
 checkFile :: Registry.Type.Registry -> Printing.Printing -> HU.Assertion

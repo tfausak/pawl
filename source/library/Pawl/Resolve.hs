@@ -40,6 +40,7 @@ import qualified Pawl.Type.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Type.Duration as Duration
 import Pawl.Type.Effect (Effect)
 import qualified Pawl.Type.Effect as Effect
+import qualified Pawl.Type.Expiry as Expiry.Type
 import Pawl.Type.Game (Game)
 import qualified Pawl.Type.GameEvent as GameEvent
 import Pawl.Type.GameState (GameState)
@@ -57,6 +58,7 @@ import Pawl.Type.ObjectRef (ObjectRef)
 import qualified Pawl.Type.ObjectRef as ObjectRef
 import qualified Pawl.Type.OptionalDecision as OptionalDecision
 import qualified Pawl.Type.Optionality as Optionality
+import qualified Pawl.Type.PhasePattern as PhasePattern
 import qualified Pawl.Type.Player as Player
 import Pawl.Type.PlayerId (PlayerId)
 import Pawl.Type.PlayerRef (PlayerRef)
@@ -67,6 +69,7 @@ import qualified Pawl.Type.Prompt as Prompt
 import qualified Pawl.Type.Quantity as Quantity.Type
 import Pawl.Type.Recipient (Recipient)
 import qualified Pawl.Type.Recipient as Recipient
+import qualified Pawl.Type.ReplacementEffect as ReplacementEffect
 import Pawl.Type.Result (Result)
 import qualified Pawl.Type.Result as Result
 import qualified Pawl.Type.SearchDestination as SearchDestination
@@ -77,6 +80,7 @@ import Pawl.Type.Subtype (Subtype)
 import qualified Pawl.Type.Subtype as Subtype
 import qualified Pawl.Type.TapState as TapState
 import qualified Pawl.Type.TokenEntry as TokenEntry
+import qualified Pawl.Type.Uses as Uses
 import qualified Pawl.Type.Zone as Zone
 
 -- The slots a PlayerRef reads. Only InSlot names one; EachPlayer and Relative
@@ -128,6 +132,8 @@ slotsOf effect = case effect of
   -- lint must not see it here.
   Effect.Create {} -> Set.empty
   Effect.Replace {} -> Set.empty
+  -- The PlayerRef may name a target slot -- Fatigue's "target player".
+  Effect.SkipNextPhase ref _ -> playerRefSlots ref
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ _ slot -> Set.singleton slot
   Effect.GainPlayerCounters ref _ _ -> playerRefSlots ref
@@ -176,6 +182,7 @@ readsX = any effectReadsX
       Effect.GainLife _ quantity -> quantity == Quantity.Type.X
       Effect.Create quantity _ _ _ -> quantity == Quantity.Type.X
       Effect.Replace {} -> False
+      Effect.SkipNextPhase {} -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
@@ -223,6 +230,7 @@ manaProduced effect = case effect of
   Effect.GainLife {} -> Nothing
   Effect.Create {} -> Nothing
   Effect.Replace {} -> Nothing
+  Effect.SkipNextPhase {} -> Nothing
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
@@ -265,6 +273,7 @@ searchesLibrary effect = case effect of
   Effect.GainLife {} -> False
   Effect.Create {} -> False
   Effect.Replace {} -> False
+  Effect.SkipNextPhase {} -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
@@ -370,6 +379,8 @@ rewriteEffect pairs effect = case effect of
   -- A text-changer does not reach a token's embedded card here (spec section 8).
   Effect.Create {} -> effect
   Effect.Replace {} -> effect
+  -- A Phase carries no basic-land-type word for CR 612 to rewrite.
+  Effect.SkipNextPhase {} -> effect
   -- No rewritable land-type word.
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
@@ -1367,6 +1378,47 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
                   ActiveReplacement.uses = uses
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
+  Effect.SkipNextPhase ref phase -> do
+    -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
+    -- this installs one -- floating, because a sorcery's skip outlives the
+    -- sorcery (CR 614.3: floating replacements "last until they're used up").
+    --
+    -- CR 614.10a: one instance PER NAMED PLAYER, each with Uses.Once, and each
+    -- PREPENDED as its own row rather than merged into any it finds. That is
+    -- where "if two effects each cause a player to skip their next occurrence,
+    -- that player must skip the next two" comes from: two Fatigues on one player
+    -- are two rows with two timestamps, and Pawl.Replacement.consume spends
+    -- exactly the one it applied.
+    --
+    -- Expiry.Never, and no Duration on the opcode to derive anything else from:
+    -- Fatigue states no duration, so CR 614.3's other terminator ("or their
+    -- duration has expired") never fires and the skip waits however many turns it
+    -- must. That is CR 614.10a's own answer for a "next" that has not come round
+    -- yet -- "the other will remain until another occurrence can be skipped".
+    --
+    -- CR 113.7: the SOURCE is this effect's source, as Replace's is.
+    gs <- State.get
+    let named = playerRefPlayers chosen legality controller gs ref
+        install pid g =
+          let (ts, g1) = Game.freshTimestamp g
+              active =
+                ActiveReplacement.MkActiveReplacement
+                  { ActiveReplacement.effect =
+                      ReplacementEffect.PhaseR
+                        PhasePattern.MkPhasePattern
+                          { PhasePattern.whichPhase = phase,
+                            -- The player the resolution named, baked now. Card
+                            -- data cannot name one (see
+                            -- Pawl.Type.PhasePattern).
+                            PhasePattern.whosePhase = Just pid
+                          },
+                    ActiveReplacement.source = source,
+                    ActiveReplacement.timestamp = ts,
+                    ActiveReplacement.expiry = Expiry.Type.Never,
+                    ActiveReplacement.uses = Uses.Once
+                  }
+           in g1 {GameState.replacements = active : GameState.replacements g1}
+    State.modify' (\g -> List.foldl' (flip install) g named)
   Effect.AffectPlayers duration scope playerEffect ->
     -- CR 611.1 / 613.11: install the stored player effect. Targetless and
     -- unprompted. CR 109.5: the CONTROLLER is baked in now, because the source

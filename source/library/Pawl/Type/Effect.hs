@@ -9,6 +9,7 @@ import Pawl.Type.ManaProduction (ManaProduction)
 import Pawl.Type.Modification (Modification)
 import Pawl.Type.MonarchTarget (MonarchTarget)
 import Pawl.Type.ObjectRef (ObjectRef)
+import Pawl.Type.Phase (Phase)
 import Pawl.Type.PlayerCounterKind (PlayerCounterKind)
 import Pawl.Type.PlayerEffect (PlayerEffect)
 import Pawl.Type.PlayerRef (PlayerRef)
@@ -242,6 +243,30 @@ data Effect card
     -- with this effect's SOURCE (CR 113.7) and a fresh timestamp; Pawl.Replacement
     -- applies it.
     Replace Duration Uses ReplacementEffect
+  | -- CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
+    -- this step or phase. Fatigue is
+    -- `SkipNextPhase (InSlot "target") (Beginning DrawStep)`.
+    --
+    -- NOT a Replace carrying a PhaseR, and not for want of trying: CR 614.1b
+    -- makes this a replacement effect and Replace already installs floating ones,
+    -- but the pattern has to name a player who is only known at resolution, and a
+    -- ReplacementEffect written on a card cannot. Exactly the reason GainControl
+    -- is its own opcode rather than a ModifyTarget carrying SetController --
+    -- Resolve bakes the PlayerId, and the alternative (a slot name inside the
+    -- pattern, resolved later) would make Pawl.Resolve case on a
+    -- ReplacementEffect's identity, which Pawl.Replacement's header reserves to
+    -- itself.
+    --
+    -- No Duration and no Uses, unlike Replace: CR 614.10a's "next" IS the use
+    -- count (one occurrence, then gone), and Fatigue states no duration, so CR
+    -- 614.3's "until they're used up" is the whole of the lifetime. Resolve
+    -- installs one floating replacement PER NAMED PLAYER with Uses.Once and
+    -- Expiry.Never.
+    --
+    -- Targetless in itself, like GainPlayerCounters: the slot a PlayerRef reads
+    -- may have been filled by targeting (CR 601.2c), which is how Fatigue writes
+    -- "target player", but nothing here demands it.
+    SkipNextPhase PlayerRef Phase
   | -- CR 701.6: counter the slot's target spell -- remove it from the stack and
     -- put it into its owner's graveyard (CR 701.6a) via the Event.counter funnel,
     -- so it does not resolve. Distinct from MoveToZone slot Graveyard the way
