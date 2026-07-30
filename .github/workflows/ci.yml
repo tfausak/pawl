@@ -22,10 +22,10 @@ jobs:
           - runner: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - id: haskell
-        uses: haskell-actions/setup@v2
+      - uses: haskell/ghcup-setup@v1
         with:
-          ghc-version: 9.14.1
+          cabal: latest
+          ghc: 9.14.1
       - id: info
         run: |
           echo "os=$(ghc -e 'putStrLn System.Info.os')" >> "$GITHUB_OUTPUT"
@@ -41,11 +41,6 @@ jobs:
       - run: cat cabal.project.freeze
       - run: cp cabal.project.freeze artifact
       - run: cabal outdated --v2-freeze-file
-      - uses: actions/cache@v6
-        with:
-          key: ${{ steps.info.outputs.os }}-${{ steps.info.outputs.arch }}-${{ hashFiles('cabal.project.freeze') }}
-          path: ${{ steps.haskell.outputs.cabal-store }}
-          restore-keys: ${{ steps.info.outputs.os }}-${{ steps.info.outputs.arch }}-
       - run: cabal build --only-download
       - run: cabal build --only-dependencies
       - run: cabal build
