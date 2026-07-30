@@ -259,6 +259,7 @@ cardTests registry =
                   Card.Type.triggeredAbilities = [],
                   Card.Type.delayedAbilities = Map.empty,
                   Card.Type.castingPermissions = [],
+                  Card.Type.castingRestrictions = [],
                   Card.Type.characteristicPT = Nothing,
                   Card.Type.playerAbilities = [],
                   Card.Type.blockRequirements = [],

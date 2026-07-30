@@ -23,6 +23,8 @@ import qualified Pawl.Turn as Turn
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.CastingRestriction as CastingRestriction
+import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Expiry as Expiry
 import Pawl.Types.Game (Game)
@@ -222,6 +224,62 @@ controlsLegendaryCreature pid gs =
           && Projection.isCreatureOf oid gs
    in any qualifies (GameState.battlefield gs)
 
+-- CR 601.3's PROHIBITION half -- "no rule or effect prohibits that player from
+-- casting it" -- as printed on the card about ITSELF. Rally the Troops' "Cast
+-- this spell only during the declare attackers step and only if you've been
+-- attacked this step."
+--
+-- The exact counterweight to permissionsOf above, and read the same way: off the
+-- card, never through the projection, since a restriction is consulted while the
+-- object is in a hand (CR 113.6) where the CR 613 layer system does not reach.
+-- ALL of them must hold, which is what CR 601.3's "no ... prohibits" means; one
+-- permission, by contrast, suffices.
+--
+-- Casing on the arms is a classification, not an effect's identity: Pawl.Cast is
+-- the sole reader of Pawl.Types.CastingRestriction exactly as it is of
+-- CastingPermission.
+printedRestrictionsOk :: PlayerId -> ObjectId -> GameState -> Bool
+printedRestrictionsOk pid oid gs = case Game.cardOf oid gs of
+  Nothing -> False
+  Just card -> all (restrictionMet pid gs) (Card.Type.castingRestrictions card)
+
+-- Does the game state satisfy this one printed clause?
+restrictionMet :: PlayerId -> GameState -> CastingRestriction.CastingRestriction -> Bool
+restrictionMet pid gs restriction = case restriction of
+  -- CR 500.1: a step or a stepless phase, compared against the one the game is
+  -- in. Reading GameState.phase is the same closed-half act as CR 307.1's
+  -- main-phase test above.
+  CastingRestriction.DuringPhase phase -> GameState.phase gs == phase
+  CastingRestriction.AttackedThisStep -> attackedThisStep pid gs
+
+-- "only if you've been attacked this step", asked of the CASTING player.
+--
+-- CR 506.2: "During the combat phase of a two-player game, the nonactive player
+-- is the defending player; that player, planeswalkers they control, and battles
+-- they protect may be attacked." Combat.defender is that player, so being
+-- attacked at all requires being them. CR 508.8's Combat.attackersJoined is the
+-- other half -- whether "creatures [have been] declared as attackers or put onto
+-- the battlefield attacking" -- and it is the HISTORICAL flag rather than
+-- Combat.attackers, because CR 506.4 removing the lone attacker from combat does
+-- not un-attack anybody.
+--
+-- Eightfold Maze's ruling is the reading pinned here: "To cast it, a creature
+-- needs to have attacked _you_." Its companion ruling carves out an attack aimed
+-- at a planeswalker, which pawl has no card type for (#301), so with one defending
+-- player (CR 802's attack-multiple-players option is unavailable, #175) the two
+-- conjuncts are the whole question.
+--
+-- "THIS STEP" is read off the combat record, which CR 511.3 scopes to the whole
+-- combat PHASE. The two spans coincide for every card in the pool -- the flag is
+-- written only by Pawl.Combat.declareAttackers (CR 508.1, the declare attackers
+-- step's turn-based action) and by putOntoBattlefieldAttacking, whose only
+-- producer is a CR 508.3a attack trigger resolving in that same step -- but that
+-- is a fact about the pool rather than a rule (#447).
+attackedThisStep :: PlayerId -> GameState -> Bool
+attackedThisStep pid gs =
+  let combat = GameState.combat gs
+   in Combat.defender combat == Just pid && Combat.attackersJoined combat
+
 -- Affordable and correctly timed, actually in a zone this player may cast it
 -- from, fillable, and not prohibited. CR 601.2b: affordable means at least ONE
 -- candidate cost is payable -- a spell may have alternative costs, and only one
@@ -234,6 +292,7 @@ castable pid oid gs =
     -- (Rule of Law, Silence). Gated HERE, upstream of Action.legalActions,
     -- because the engine never offers an illegal action and then rejects it.
     && not (PlayerEffect.prohibitsCasting pid gs)
+    && printedRestrictionsOk pid oid gs
     && legendaryRestrictionOk pid oid gs
     && any (payableCost pid oid gs) (Cost.costsFor oid gs)
     && targetable pid oid gs
@@ -283,11 +342,25 @@ permissionsOf card =
 -- permission does not reach it either. Unobservable in this pool (no card both
 -- searches this way and is a legendary instant or sorcery) and written anyway,
 -- because the alternative is a cast the rules forbid.
+--
+-- printedRestrictionsOk rides along too, and it is the closest call of the three:
+-- a "Cast this spell only during the declare attackers step" IS about timing, so
+-- the ruling's "except for timing" could be read to lift it. pawl takes the
+-- narrower reading -- the ruling excepts the RULES' own timing window (CR 302.1 /
+-- 307.1), not a prohibition the card prints on itself, which is what CR 601.3's
+-- second half covers. Unobservable in this pool for the same reason as CR 205.4e:
+-- Panglacial Wurm is the only card with the permission and it prints no
+-- restriction.
 castableWhileSearching :: PlayerId -> GameState -> [ObjectId]
 castableWhileSearching pid gs =
   let permitted oid = maybe False permitsCastWhileSearching (Game.cardOf oid gs)
       affordable oid = any (payableCost pid oid gs) (Cost.costsFor oid gs)
-      allowed oid = permitted oid && affordable oid && legendaryRestrictionOk pid oid gs && targetable pid oid gs
+      allowed oid =
+        permitted oid
+          && affordable oid
+          && printedRestrictionsOk pid oid gs
+          && legendaryRestrictionOk pid oid gs
+          && targetable pid oid gs
    in if PlayerEffect.prohibitsCasting pid gs
         then []
         else filter allowed (Game.zoneMembers Zone.Library pid gs)

@@ -7,6 +7,7 @@ import Pawl.Types.AbilityName (AbilityName)
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import Pawl.Types.BlockRequirement (BlockRequirement)
 import Pawl.Types.CastingPermission (CastingPermission)
+import Pawl.Types.CastingRestriction (CastingRestriction)
 import Pawl.Types.Color (Color)
 import Pawl.Types.Cost (Cost)
 import Pawl.Types.CostComponent (CostComponent)
@@ -106,6 +107,26 @@ data Card = MkCard
     -- (permissionsOf) is the one place the two are put together; a reader that
     -- wants every permission a card has must do the same.
     castingPermissions :: [CastingPermission],
+    -- CR 601.3: this card's PRINTED casting restrictions -- the clauses of a
+    -- "Cast this spell only during ..." that WITHHOLD a cast the rules would
+    -- otherwise allow. Rally the Troops is
+    -- `[DuringPhase (Combat DeclareAttackers), AttackedThisStep]`; empty for
+    -- every other printing.
+    --
+    -- The mirror of castingPermissions above, running the other way, which is why
+    -- it is a second field and not more arms on that one: CR 601.3 is one sentence
+    -- with two halves ("a rule or effect allows" / "no rule or effect prohibits"),
+    -- and Pawl.Cast has to know which half an entry belongs to. ALL of these must
+    -- hold for a cast to be legal, where one permission suffices.
+    --
+    -- Read directly from the card and never through the projection, the
+    -- castingPermissions precedent: the restriction is consulted while the object
+    -- is in a hand (CR 113.6), where the CR 613 layer system does not reach.
+    --
+    -- Printed-only. An EFFECT that prohibits casting is a player-axis continuous
+    -- effect instead (PlayerEffect.CantCastSpells, Silence), which is the other
+    -- producer CR 601.3's "rule or effect" names and has no business on a card.
+    castingRestrictions :: [CastingRestriction],
     -- CR 702.5a: this card's `enchant` ability -- "Enchant [object or player]"
     -- -- which "restricts what an Aura spell can target and what an Aura can
     -- enchant". Nothing for every card that is not an Aura; the CardSpec lint
