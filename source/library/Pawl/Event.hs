@@ -1177,6 +1177,14 @@ eventTriggers events gs =
       -- empty union after the final event, and entry i is the union over the
       -- events from i ONWARD. Dropping the head shifts it to "from i+1 onward",
       -- which is what pairs with events !! i.
+      --
+      -- CR 603.3a's controller, and the abilities themselves, are the ones the
+      -- permanent had as it LEFT -- one moment after the event that triggered
+      -- them, not at it. That is #47's elision, on a nearer boundary than the
+      -- live path's: `onBattlefield` reads both at the CR 117.5 scan, and this
+      -- reads them at the departure, which is somewhere between the event and
+      -- the scan. Nothing in this pool moves control or grants an ability in
+      -- that window, which is why the two coincide today.
       bystanders = drop 1 (List.scanr (\event acc -> Map.union (leftBattlefield event) acc) Map.empty events)
       -- CR 702.29c: the card that was just cycled, wherever it landed. The
       -- candidate source that is neither on the battlefield nor a permanent that
