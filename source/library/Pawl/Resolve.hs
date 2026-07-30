@@ -117,6 +117,7 @@ slotsOf effect = case effect of
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
   Effect.Destroy ref _ -> objectRefSlots ref
   Effect.Sacrifice slot -> Set.singleton slot
+  Effect.RemoveFromCombat slot -> Set.singleton slot
   Effect.MoveToZone slot _ -> Set.singleton slot
   Effect.Draw ref _ -> playerRefSlots ref
   Effect.Mill slot _ -> Set.singleton slot
@@ -166,6 +167,7 @@ readsX = any effectReadsX
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy {} -> False
       Effect.Sacrifice _ -> False
+      Effect.RemoveFromCombat _ -> False
       Effect.MoveToZone {} -> False
       Effect.Draw _ quantity -> quantity == Quantity.Type.X
       Effect.Mill _ quantity -> quantity == Quantity.Type.X
@@ -212,6 +214,7 @@ manaProduced effect = case effect of
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
+  Effect.RemoveFromCombat _ -> Nothing
   Effect.MoveToZone {} -> Nothing
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
@@ -253,6 +256,7 @@ searchesLibrary effect = case effect of
   Effect.ControlPlayerNextTurn _ -> False
   Effect.Destroy {} -> False
   Effect.Sacrifice _ -> False
+  Effect.RemoveFromCombat _ -> False
   Effect.MoveToZone {} -> False
   Effect.Draw {} -> False
   Effect.Mill {} -> False
@@ -354,6 +358,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy ref regenerability -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability
   Effect.Sacrifice _ -> effect
+  Effect.RemoveFromCombat _ -> effect
   Effect.MoveToZone {} -> effect
   Effect.Draw {} -> effect
   Effect.Mill {} -> effect
@@ -1017,6 +1022,24 @@ applyEffectWith runSubgame source controller bound legality chosen effect = case
         Just target -> Event.sacrifice controller target
       -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
       _ -> pure ()
+  Effect.RemoveFromCombat slot ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just recipient, True) -> case recipientObject recipient of
+          Nothing -> gs -- a player recipient is not in combat
+          -- CR 506.4: through Game.removeFromCombat, the one performer of every
+          -- clause of that rule -- so this clause takes CR 509.1h's asymmetry
+          -- with it for free, an attacker losing its whole entry while a blocker
+          -- leaves only the set inside a surviving one. Argued in full there.
+          --
+          -- Unprompted and undirected: CR 506.4's second sentence says what
+          -- removal does, and leaves nothing to ask or to choose.
+          Just target -> Game.removeFromCombat target gs
+        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op. A target
+        -- that has already left combat needs no guard either -- removing a
+        -- creature that is not in the record is what Game.removeFromCombat
+        -- already does to it, which is nothing.
+        _ -> gs
   Effect.MoveToZone slot zone ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case recipientObject recipient of

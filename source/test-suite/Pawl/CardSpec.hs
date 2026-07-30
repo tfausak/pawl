@@ -370,6 +370,7 @@ effectCounts effect = case effect of
   Effect.GainLife _ quantity -> quantityCounts quantity
   Effect.Create quantity card _ _ -> quantityCounts quantity <> cardCounts card
   Effect.Replace duration _ _ -> durationCounts duration
+  Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
   Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
@@ -1659,8 +1660,46 @@ phyrexianCardTests registry =
         HU.assertEqual "one" 1 (Quantity.manaValueOf (Printing.card p))
     ]
 
+-- CR 506.4's "an effect specifically removes it from combat", as printed.
+-- Labyrinth of Skophos is a Land with two activated abilities and no mana cost:
+-- "{T}: Add {C}. / {4}, {T}: Remove target attacking or blocking creature from
+-- combat." (Murders at Karlov Manor Commander; oracle text checked against
+-- Scryfall.) The gameplay proof is Pawl.CombatSpec's EffectRemoval group.
+removeFromCombatCardTests :: Registry.Type.Registry -> Tasty.TestTree
+removeFromCombatCardTests registry =
+  Tasty.testGroup
+    "RemoveFromCombat"
+    [ HU.testCase "Labyrinth of Skophos is a Land with a {T} colorless mana ability and a {4}, {T} removal ability" $ do
+        labyrinth <- Registry.printing registry "Labyrinth of Skophos"
+        let c = Printing.card labyrinth
+            target = SlotName.MkSlotName (Text.pack "target")
+        HU.assertEqual "name" (Text.pack "Labyrinth of Skophos") (Card.Type.name c)
+        HU.assertEqual "no mana cost" Nothing (Card.Type.manaCost c)
+        HU.assertEqual "types" (Set.singleton CardType.Land) (TypeLine.types (Card.Type.typeLine c))
+        HU.assertEqual "not basic, so Blood Moon reaches it (CR 305.8)" Set.empty (TypeLine.supertypes (Card.Type.typeLine c))
+        HU.assertEqual "no land types of its own" Set.empty (TypeLine.subtypes (Card.Type.typeLine c))
+        HU.assertEqual "nothing on the spell half: a land is never cast (CR 305.1)" [] (Card.allEffects c)
+        case Card.Type.activatedAbilities c of
+          [mana, removal] -> do
+            -- CR 605.1a: the mana half. Tap only, one colorless.
+            HU.assertEqual "the mana ability's cost is the tap alone" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost mana))
+            HU.assertEqual "and it names no mana" (Just (ManaCost.MkManaCost [])) (Cost.Type.mana (ActivatedAbility.cost mana))
+            HU.assertEqual "adds colorless" [Effect.AddMana (ManaProduction.OfType ManaType.Colorless)] (Modal.allEffects (ActivatedAbility.modal mana))
+            -- The removal half: {4} on top of the same tap.
+            HU.assertEqual "the removal ability taps too" [CostComponent.TapThis] (Cost.Type.components (ActivatedAbility.cost removal))
+            HU.assertEqual "and costs {4}" (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) (Cost.Type.mana (ActivatedAbility.cost removal))
+            HU.assertEqual "removes the target from combat" [Effect.RemoveFromCombat target] (Modal.allEffects (ActivatedAbility.modal removal))
+            -- CR 508.1k / CR 509.1g: "attacking or blocking" is two atoms under
+            -- one Or, over the creature pool.
+            HU.assertEqual
+              "target attacking or blocking creature"
+              (Map.singleton target (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Or [Filter.Type.IsAttacking, Filter.Type.IsBlocking]))))
+              (Modal.allTargetSpecs (ActivatedAbility.modal removal))
+          _ -> HU.assertFailure "expected exactly two activated abilities"
+    ]
+
 tests :: Registry.Type.Registry -> Tasty.TestTree
 tests registry =
   Tasty.testGroup
     "Card"
-    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry, phyrexianCardTests registry]
+    [cardTests registry, lintTests registry, m2aCardTests registry, m2bCardTests registry, m2cCardTests registry, basicLandTests registry, m3cCardTests registry, m3eCardTests registry, m4bCardTests registry, m45p6CardTests registry, m45p7CardTests registry, m45p11CardTests registry, m55CardTests registry, auraCardTests registry, animatorCardTests registry, worldCardTests registry, cyclingCardTests registry, revealCardTests registry, entersCardTests registry, unspentManaCardTests registry, phyrexianCardTests registry, removeFromCombatCardTests registry]

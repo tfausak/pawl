@@ -409,6 +409,8 @@ viewOfCard card =
           -- CR 506.3: only a creature can attack, and a card in a library or hand
           -- is not one -- so it has no combat status either.
           Filter.attacking = False,
+          -- CR 509.1a: nor can it block, for the same reason.
+          Filter.blocking = False,
           -- And it was never on the battlefield to be declared as one, so the
           -- turn's event log holds nothing about it either.
           Filter.attackedThisTurn = False,
@@ -448,6 +450,12 @@ viewOfCharacteristics oid pc controller gs =
       -- so it comes straight off the combat record and not from the projection
       -- this function is otherwise assembling.
       Filter.attacking = Map.member oid (Combat.attackers (GameState.combat gs)),
+      -- CR 509.1g: likewise a combat status and not a characteristic, read off
+      -- the OTHER map. Combat.blockers is keyed by ATTACKER, so being a blocking
+      -- creature is membership in some attacker's set rather than a key lookup --
+      -- and deliberately not Map.member, which is Pawl.Combat.isBlocked's
+      -- question about the attacker (CR 509.1h).
+      Filter.blocking = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs))),
       -- CR 608.2i: a look-back read of the turn's event log rather than of the
       -- combat record, because the record does not survive the phase -- CR 511.3
       -- removes every creature from combat as the end of combat step ends, and
@@ -1163,12 +1171,16 @@ data Aspect
 -- (Combat.removeControlChanged, from Engine.settleForPriority) rather than inside
 -- one. So the record is a fixed INPUT to any single projection: applying one
 -- modification before another cannot change what this arm answers, which is
--- exactly the question CR 613.8a asks. The arm stays empty when the remaining
--- CR 506.4 clauses land (#246), because they will be sampled the same way.
+-- exactly the question CR 613.8a asks. CR 506.4's "an effect specifically
+-- removes it from combat" clause does not disturb that: Effect.RemoveFromCombat
+-- edits the same record from Resolve.applyEffect, which is a RESOLUTION and so
+-- between projections just as squarely as a settle is. The remaining clauses
+-- (#246) arrive by one of those two doors as well.
 --
 -- What that costs is TIMING, not dependency: the rules remove the permanent the
 -- instant control changes, and pawl removes it at the next settle. That window is
--- argued where the sampling happens.
+-- argued where the sampling happens. The effect clause has no such window at
+-- all, because a resolving effect edits the record on the spot.
 filterReads :: Filter.Type.Filter -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
@@ -1180,6 +1192,21 @@ filterReads f = case f of
   Filter.Type.IsSource -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
   Filter.Type.IsAttacking -> Set.empty
+  -- Reads nothing, for IsAttacking's reason and no weaker version of it. The
+  -- argument above is about the RECORD, not about attacking-ness in particular,
+  -- and Combat.blockers is the same kind of record: written by the CR 509.1
+  -- declaration, edited by CR 506.4's removals through Game.removeFromCombat,
+  -- and emptied at CR 511.3 -- every one of those between projections rather
+  -- than inside one, so it is a fixed input to any single projection too.
+  --
+  -- Checked rather than copied, because blocking has an input attacking does
+  -- not: CR 509.1b's evasion restrictions gate the DECLARATION on projected
+  -- characteristics (flying, CR 702.9b). That changes nothing here. The
+  -- declaration is a turn-based action (CR 509.1) that writes the record once
+  -- and then is over; no projection runs inside it, and re-ordering two
+  -- modifications cannot reach back into a declaration that has already
+  -- happened.
+  Filter.Type.IsBlocking -> Set.empty
   -- Reads nothing, for IsToken's strong reason rather than IsAttacking's. No
   -- Modification writes GameState.events -- CR 608.2i's record is appended by
   -- the change-and-emit funnels and never edited -- so no CR 613 layer can move

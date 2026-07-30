@@ -608,6 +608,7 @@ filterToJson filter_ = case filter_ of
   Filter.IsPlayer r -> Json.tagged (Text.pack "IsPlayer") (Just (playerRelationToJson r))
   Filter.IsSource -> nullary (Text.pack "IsSource")
   Filter.IsAttacking -> nullary (Text.pack "IsAttacking")
+  Filter.IsBlocking -> nullary (Text.pack "IsBlocking")
   Filter.AttackedThisTurn -> nullary (Text.pack "AttackedThisTurn")
   Filter.IsAttachedToCreature -> nullary (Text.pack "IsAttachedToCreature")
   Filter.IsToken -> nullary (Text.pack "IsToken")
@@ -628,6 +629,7 @@ jsonToFilter value = do
     ("IsPlayer", Just v) -> Filter.IsPlayer <$> jsonToPlayerRelation v
     ("IsSource", _) -> Right Filter.IsSource
     ("IsAttacking", _) -> Right Filter.IsAttacking
+    ("IsBlocking", _) -> Right Filter.IsBlocking
     ("AttackedThisTurn", _) -> Right Filter.AttackedThisTurn
     ("IsAttachedToCreature", _) -> Right Filter.IsAttachedToCreature
     ("IsToken", _) -> Right Filter.IsToken
@@ -1551,6 +1553,7 @@ effectToJson e = case e of
   Effect.ControlPlayerNextTurn s -> Json.tagged (Text.pack "ControlPlayerNextTurn") (Just (slotNameToJson s))
   Effect.Destroy s r -> Json.tagged (Text.pack "Destroy") (Just (Array [objectRefToJson s, regenerabilityToJson r]))
   Effect.Sacrifice s -> Json.tagged (Text.pack "Sacrifice") (Just (slotNameToJson s))
+  Effect.RemoveFromCombat s -> Json.tagged (Text.pack "RemoveFromCombat") (Just (slotNameToJson s))
   Effect.Counter s -> Json.tagged (Text.pack "Counter") (Just (slotNameToJson s))
   Effect.MoveToZone s z -> Json.tagged (Text.pack "MoveToZone") (Just (Array [slotNameToJson s, zoneToJson z]))
   Effect.Draw r q -> Json.tagged (Text.pack "Draw") (Just (Array [playerRefToJson r, quantityToJson q]))
@@ -1618,6 +1621,7 @@ jsonToEffect value = do
       Just (Array [sv, rv]) -> Effect.Destroy <$> jsonToObjectRef sv <*> jsonToRegenerability rv
       _ -> Left (Text.pack "Destroy expects [objectRef, regenerability]")
     "Sacrifice" -> withValue mv (fmap Effect.Sacrifice . jsonToSlotName)
+    "RemoveFromCombat" -> withValue mv (fmap Effect.RemoveFromCombat . jsonToSlotName)
     "Counter" -> withValue mv (fmap Effect.Counter . jsonToSlotName)
     "MoveToZone" -> case mv of
       Just (Array [s, z]) -> Effect.MoveToZone <$> jsonToSlotName s <*> jsonToZone z
