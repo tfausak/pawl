@@ -82,6 +82,7 @@ library json
   build-depends:
     bytestring ^>=0.12.2,
     parsec ^>=3.1.18,
+    pawl:decimal,
     pawl:extra,
     pawl:spec,
 
@@ -91,6 +92,8 @@ library json
     Pawl.Json.BooleanSpec
     Pawl.Json.Null
     Pawl.Json.NullSpec
+    Pawl.Json.Number
+    Pawl.Json.NumberSpec
 
   hs-source-dirs: source/libraries/json
 
