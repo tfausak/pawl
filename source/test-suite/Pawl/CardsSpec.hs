@@ -267,11 +267,12 @@ tests registry =
             -- black.
             HU.assertEqual "and black by colour indicator" (Set.singleton Color.Black) (CardT.colorIndicator token)
           other -> HU.assertFailure ("expected exactly one Create, got " <> show (length other)),
-      -- CR 702.19 trample plus CR 603.2's combat-damage condition on one card,
-      -- which is what makes the trigger's event and the bearer's death land in a
-      -- single CR 117.5 batch. The 1 toughness is load-bearing and pinned here so
-      -- a future edit cannot quietly make the Skelemental survive its blocker:
-      -- TriggerSpec's bystander group would then prove nothing.
+      -- CR 702.19 trample plus the CR 510.1b combat-damage-to-a-player trigger
+      -- condition on one card, which is what makes the trigger's event and the
+      -- bearer's death land in a single CR 117.5 batch. The 1 toughness is
+      -- load-bearing and pinned here so a future edit cannot quietly make the
+      -- Skelemental survive its blocker: TriggerSpec's bystander group would
+      -- then prove nothing.
       HU.testCase "lightning-skelemental.json loads as a {B}{R}{R} 6/1 trampler that makes the damaged player discard two" $ do
         c <- Registry.card registry "Lightning Skelemental"
         HU.assertEqual "name" (Text.pack "Lightning Skelemental") (CardT.name c)

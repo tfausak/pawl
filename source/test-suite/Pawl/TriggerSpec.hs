@@ -2212,7 +2212,7 @@ bystanderTests registry =
       -- so `onBattlefield` carries it and the same trigger fires from the
       -- ordinary candidate source. It is what makes the card data and the
       -- reserved "that player" slot innocent when the leg above fails.
-      HU.testCase "CR 702.70a-style control: an UNBLOCKED Skelemental survives and makes bob discard two the ordinary way" $ do
+      HU.testCase "CR 510.1b control: an UNBLOCKED Skelemental survives and makes bob discard two the ordinary way" $ do
         skelemental <- Registry.printing registry "Lightning Skelemental"
         piker <- Registry.printing registry "Goblin Piker"
         case S.combatBoardOf [skelemental] [] of
