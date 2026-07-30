@@ -2915,6 +2915,36 @@ destroyAllTests registry =
         let resolved = castDayOfJudgment plains dayOfJudgment board
         HU.assertBool "the Walls are destroyed" (not (S.onBattlefield granter resolved))
         HU.assertBool "the creature they protected stands" (S.onBattlefield protected resolved),
+      -- CR 608.2f a third time, now about the CR 616.1 loop each victim's
+      -- put-into-graveyard runs rather than about the CR 702.12b gate above. The
+      -- batch is one simultaneous event, so the replacement effects in force for
+      -- it are the ones on the battlefield when it began -- including one
+      -- belonging to a permanent the batch is itself killing.
+      --
+      -- Opalescence animates Rest in Peace (a non-Aura enchantment) into a 2/2,
+      -- so Day of Judgment sweeps it alongside bob's Piker. Rest in Peace is
+      -- added FIRST on purpose: it holds the lower ObjectId and is swept first,
+      -- so an implementation that re-collected each victim's candidates from the
+      -- live board would find it already gone by the time it reached the Piker
+      -- and bury the Piker instead of exiling it.
+      HU.testCase "CR 608.2f a Rest in Peace dying in the sweep still exiles the cards the sweep puts into graveyards" $ do
+        plains <- Registry.printing registry "Plains"
+        opalescence <- Registry.printing registry "Opalescence"
+        restInPeace <- Registry.printing registry "Rest in Peace"
+        piker <- Registry.printing registry "Goblin Piker"
+        dayOfJudgment <- Registry.printing registry "Day of Judgment"
+        let (opal, g1) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
+            (rip, g2) = S.addCreature restInPeace S.alice g1
+            (his, board) = S.addCreature piker S.bob g2
+        HU.assertBool "setup: Opalescence animates Rest in Peace" (Projection.isCreatureOf rip board)
+        HU.assertBool "setup: Rest in Peace is swept before the Piker" (rip < his)
+        let resolved = castDayOfJudgment plains dayOfJudgment board
+        HU.assertBool "Rest in Peace died" (not (S.onBattlefield rip resolved))
+        HU.assertBool "and so did the Piker" (not (S.onBattlefield his resolved))
+        HU.assertEqual "the Piker was exiled, not buried" 0 (length (Game.zoneMembers Zone.Graveyard S.bob resolved))
+        HU.assertEqual "the Piker's card is in exile" 1 (length (Game.zoneMembers Zone.Exile S.bob resolved))
+        HU.assertEqual "and Rest in Peace exiled its own card too" 1 (length (Game.zoneMembers Zone.Exile S.alice resolved))
+        HU.assertBool "Opalescence animates each OTHER enchantment, so it stands" (S.onBattlefield opal resolved),
       -- CR 115.10a: "Unless that object or player is identified by the word
       -- 'target' ... it's not a target." "All creatures" is not a target, so the
       -- card declares no target spec and the cast never raises a target prompt

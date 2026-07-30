@@ -67,7 +67,7 @@ resolveTopWith runSubgame = do
                           -- CR 303.4: an Aura ENTERS attached, so the target is
                           -- seeded into the new incarnation rather than written
                           -- after the move (see Event.changeZoneAttaching).
-                          Monad.void (Event.changeZoneAttaching oid Zone.Battlefield (enchantedBy oid gs))
+                          Monad.void (Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs))
         -- A token is never on the stack (created onto the battlefield, never cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
         Source.OfAbility srcId ability -> do

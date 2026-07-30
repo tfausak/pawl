@@ -159,12 +159,25 @@ placeObject pid mkObj dest = do
 changeZone :: ObjectId -> Zone -> Game ()
 changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest)
 
+-- changeZone for one member of a batch of moves that CR 608.2f or CR 704.3
+-- processes SIMULTANEOUSLY -- the destroy funnel's graveyard moves below, and CR
+-- 704.3's put-into-graveyard batch in Pawl.Sba. `asOf` is the board the batch
+-- began in, which is what its members' CR 616.1 loops collect their replacement
+-- candidates from; see Pawl.Replacement's applyReplacementsIn for why the loop
+-- needs a board rather than a filter, and what stays live.
+--
+-- A separate door rather than a fourth parameter on changeZone: a batch is the
+-- rare case, and the ~30 callers that move a single object have no footing to
+-- name -- for them the board the move begins on IS the live one.
+changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
+changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing)
+
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
 -- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
 -- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching oid requestedDest Nothing
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing
 
 -- changeZoneReturning with an attachment seed. CR 303.4: "An Aura enters the
 -- battlefield attached to an object or player" -- attachment is a property of
@@ -179,8 +192,11 @@ changeZoneReturning oid requestedDest = changeZoneAttaching oid requestedDest No
 -- unattached and is buried on the next SBA pass by CR 704.5m -- where CR 303.4g
 -- says such an Aura should instead just stay in its current zone. That
 -- divergence is #188.
-changeZoneAttaching :: ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)
-changeZoneAttaching oid requestedDest seed = do
+--
+-- `asOf` is the CR 608.2f / 704.3 batch board changeZoneInBatch above supplies,
+-- and Nothing for every other caller.
+changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe ObjectId -> Game (Maybe ObjectId)
+changeZoneAttaching asOf oid requestedDest seed = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -243,7 +259,7 @@ changeZoneAttaching oid requestedDest seed = do
       -- Both ids are `oid` in the PROPOSED event: nothing has moved yet, so the
       -- object that will leave is the only one that exists (see
       -- Pawl.Type.ZoneChange).
-      resolved <- Replacement.resolveZoneChange (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
+      resolved <- Replacement.resolveZoneChange asOf (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
       case resolved of
         -- CR 614.6: nothing survived the loop, so no zone change happens. No
         -- producer today -- no card in the pool cancels a zone change outright --
@@ -312,23 +328,35 @@ changeZoneAttaching oid requestedDest seed = do
 -- 704.5d cease-to-exist still compose). Ungated for CR 701.19c "can't be
 -- regenerated" (#42).
 --
--- What is NOT yet simultaneous: the CR 616.1 loop below runs per victim against
--- the live board, so it collects its candidates from whichever permanents are
--- still on the battlefield when it reaches that victim rather than from the ones
--- that were there when the batch began (#413).
+-- `gs` is the batch's whole footing, not just the CR 702.12b gate's: both CR
+-- 616.1 loops each victim runs -- the destruction, and the put-into-graveyard
+-- that follows it -- collect their candidates from it rather than from the board
+-- the earlier victims have already left. So Rest in Peace, animated by
+-- Opalescence and swept by Day of Judgment, exiles every card the sweep puts
+-- into a graveyard and not merely the ones ahead of it in the sweep. Both loops
+-- get the same board because both are parts of the one CR 608.2f event.
+--
+-- Only the graveyard move's loop can observe the difference today. The
+-- destruction loop's only candidates are DestructionR, and every DestructionR in
+-- the pool is a regeneration shield the Replace opcode put in the FLOATING store
+-- -- which stays live for CR 614.3's use count -- rather than a permanent's
+-- printed ability, so the frozen board holds nothing for it to find. It is
+-- passed anyway because the rule, not the pool, is what says the two loops are
+-- one event. See Pawl.Replacement's applyReplacementsIn for what the frozen
+-- board covers and what stays live.
 destroy :: Regenerability.Regenerability -> [ObjectId] -> Game ()
 destroy regenerability oids = do
   gs <- State.get
   let doomed = filter (\oid -> Maybe.isJust (Game.lookupObject oid gs) && not (Projection.hasKeyword Keyword.Type.Indestructible oid gs)) oids
   Monad.forM_ doomed $ \oid -> do
-    settled <- Replacement.resolveDestruction regenerability oid
+    settled <- Replacement.resolveDestruction (Just gs) regenerability oid
     case settled of
       Nothing -> pure ()
       -- The graveyard move follows the SETTLED object, not the one asked about,
       -- so a rewrite that redirects the destruction is honoured. changeZone is a
       -- no-op for an object that is already gone, which is what makes it safe to
       -- have named the batch's members before any of them moved.
-      Just target -> changeZone target Zone.Graveyard
+      Just target -> changeZoneInBatch gs target Zone.Graveyard
 
 -- The single counter-PLACEMENT funnel (CR 122.6: counters as markers on a
 -- permanent -- not to be confused with `counter` below, CR 701.6's countering
