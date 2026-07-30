@@ -45,7 +45,6 @@ common library
 
 common executable
   import: library
-  build-depends: pawl
   ghc-options: -rtsopts
 
 -- JSON encoders and decoders for Pawl's types.
@@ -78,6 +77,56 @@ library decimal
   exposed-modules:
     Pawl.Decimal
     Pawl.DecimalSpec
+
+-- The game engine itself.
+library engine
+  import: library
+  build-depends:
+    containers ^>=0.8,
+    pawl:extra,
+    pawl:types,
+    text ^>=2.1.3,
+    transformers ^>=0.6.1,
+
+  hs-source-dirs: source/libraries/engine
+  -- cabal-gild: discover source/libraries/engine
+  exposed-modules:
+    Pawl.Action
+    Pawl.Activate
+    Pawl.Binding
+    Pawl.BlockRequirement
+    Pawl.Card
+    Pawl.Cast
+    Pawl.Combat
+    Pawl.Condition
+    Pawl.Cost
+    Pawl.Count
+    Pawl.Damage
+    Pawl.Decide
+    Pawl.Departure
+    Pawl.Engine
+    Pawl.Event
+    Pawl.Expiry
+    Pawl.Filter
+    Pawl.Game
+    Pawl.Keyword
+    Pawl.Mana
+    Pawl.Modal
+    Pawl.Monarch
+    Pawl.Mulligan
+    Pawl.PlayerEffect
+    Pawl.Projection
+    Pawl.Quantity
+    Pawl.Replacement
+    Pawl.Replay
+    Pawl.Resolve
+    Pawl.Sba
+    Pawl.Setup
+    Pawl.Stack
+    Pawl.Subtype
+    Pawl.Summoning
+    Pawl.Target
+    Pawl.Turn
 
 -- The catalog of every exception Pawl can throw, and nothing else.
 library exceptions
@@ -346,59 +395,6 @@ library types
     Pawl.Types.ZoneChangePattern
     Pawl.Types.ZoneChangeSubject
 
--- The engine: the comprehensive rules, plus the registry that loads cards as
--- data. Belongs in a sublibrary of its own, and will get one once a second
--- consumer (a client, a CLI) exists to make the split pay.
-library
-  import: library
-  build-depends:
-    containers ^>=0.8,
-    pawl:extra,
-    pawl:types,
-    text ^>=2.1.3,
-    transformers ^>=0.6.1,
-
-  hs-source-dirs: source/library
-  -- cabal-gild: discover source/library
-  exposed-modules:
-    Pawl
-    Pawl.Action
-    Pawl.Activate
-    Pawl.Binding
-    Pawl.BlockRequirement
-    Pawl.Card
-    Pawl.Cast
-    Pawl.Combat
-    Pawl.Condition
-    Pawl.Cost
-    Pawl.Count
-    Pawl.Damage
-    Pawl.Decide
-    Pawl.Departure
-    Pawl.Engine
-    Pawl.Event
-    Pawl.Expiry
-    Pawl.Filter
-    Pawl.Game
-    Pawl.Keyword
-    Pawl.Mana
-    Pawl.Modal
-    Pawl.Monarch
-    Pawl.Mulligan
-    Pawl.PlayerEffect
-    Pawl.Projection
-    Pawl.Quantity
-    Pawl.Replacement
-    Pawl.Replay
-    Pawl.Resolve
-    Pawl.Sba
-    Pawl.Setup
-    Pawl.Stack
-    Pawl.Subtype
-    Pawl.Summoning
-    Pawl.Target
-    Pawl.Turn
-
 executable pawl
   import: executable
   ghc-options: -threaded
@@ -408,11 +404,12 @@ executable pawl
 test-suite pawl-test-suite
   import: executable
   build-depends:
-    bytestring ^>=0.12,
+    bytestring ^>=0.12.2,
     containers ^>=0.8,
     directory ^>=1.3.10,
     pawl:codec,
     pawl:decimal,
+    pawl:engine,
     pawl:exceptions,
     pawl:extra,
     pawl:json,
@@ -476,6 +473,7 @@ benchmark pawl-benchmark
   import: executable
   build-depends:
     containers ^>=0.8,
+    pawl:engine,
     pawl:registry,
     pawl:types,
     tasty-bench ^>=0.5.1,
