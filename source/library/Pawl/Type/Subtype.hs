@@ -78,4 +78,6 @@ data Subtype
     Thopter
   | -- CR 205.3m (a creature type; Moltensteel Dragon's).
     Dragon
+  | -- CR 205.3m (a creature type; Prized Unicorn's).
+    Unicorn
   deriving (Eq, Ord, Show)
