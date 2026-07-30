@@ -72,6 +72,8 @@ library extra
     Pawl.Extra.BuilderSpec
     Pawl.Extra.Either
     Pawl.Extra.EitherSpec
+    Pawl.Extra.Monoid
+    Pawl.Extra.MonoidSpec
     Pawl.Extra.Ord
     Pawl.Extra.OrdSpec
     Pawl.Extra.Parsec
@@ -93,6 +95,8 @@ library json
 
   -- cabal-gild: discover source/libraries/json
   exposed-modules:
+    Pawl.Json.Array
+    Pawl.Json.ArraySpec
     Pawl.Json.Boolean
     Pawl.Json.BooleanSpec
     Pawl.Json.Null

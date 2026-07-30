@@ -22,12 +22,14 @@ import qualified Pawl.EventSpec as EventSpec
 import qualified Pawl.ExpirySpec as ExpirySpec
 import qualified Pawl.Extra.BuilderSpec
 import qualified Pawl.Extra.EitherSpec
+import qualified Pawl.Extra.MonoidSpec
 import qualified Pawl.Extra.OrdSpec
 import qualified Pawl.Extra.ParsecSpec
 import qualified Pawl.Extra.SemigroupSpec
 import qualified Pawl.ExtraSpec as ExtraSpec
 import qualified Pawl.FilterSpec as FilterSpec
 import qualified Pawl.GameSpec as GameSpec
+import qualified Pawl.Json.ArraySpec
 import qualified Pawl.Json.BooleanSpec
 import qualified Pawl.Json.NullSpec
 import qualified Pawl.Json.NumberSpec
@@ -118,9 +120,11 @@ spec s = do
   Pawl.DecimalSpec.spec s
   Pawl.Extra.BuilderSpec.spec s
   Pawl.Extra.EitherSpec.spec s
+  Pawl.Extra.MonoidSpec.spec s
   Pawl.Extra.OrdSpec.spec s
   Pawl.Extra.ParsecSpec.spec s
   Pawl.Extra.SemigroupSpec.spec s
+  Pawl.Json.ArraySpec.spec s
   Pawl.Json.BooleanSpec.spec s
   Pawl.Json.NullSpec.spec s
   Pawl.Json.NumberSpec.spec s
