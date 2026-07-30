@@ -1427,7 +1427,7 @@ snatch victim p = case p of
 -- INSTANT, "Untap target creature an opponent controls and gain control of it
 -- until end of turn. That creature gains haste until end of turn." Act of Treason
 -- has the same three effects and cannot reach this window at all, because it is a
--- sorcery -- which is why #246 was filed card-driven rather than built
+-- sorcery -- which is why this clause was worked card-driven rather than built
 -- speculatively. Ray of Command's remaining sentence, the delayed trigger that
 -- taps the creature when its controller loses it, is not implemented (#287).
 --
@@ -1801,8 +1801,8 @@ unblock blocker victim p = case p of
 --     creature in addition to its other types and has base power and base
 --     toughness each equal to its mana value") is what puts Living Plane itself
 --     within reach of a creature-removal spell. Without it nothing in the pool
---     can touch an enchantment at instant speed, which is why this clause was
---     filed card-driven rather than built speculatively (#246).
+--     can touch an enchantment at instant speed, which is why this clause waited
+--     on a producer rather than being built speculatively.
 --   * Doom Blade ({1}{B} Instant, "Destroy target nonblack creature") kills the
 --     green Living Plane in the priority round after the declaration.
 --
