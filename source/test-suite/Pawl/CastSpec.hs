@@ -1056,6 +1056,12 @@ printedCastingRestrictionTests registry =
             resolved = S.runPure S.identityAnswer cast Stack.resolveTop
         HU.assertEqual "tapped before" (Just TapState.Tapped) (tapStateOf bobsPiker attacked)
         HU.assertEqual "untapped after" (Just TapState.Untapped) (tapStateOf bobsPiker resolved)
+        -- "creatures YOU control" is the CASTER's, not everyone's. CR 508.1f taps
+        -- alice's attacker as it is declared, and alice's only other permanent is
+        -- an untapped Plains, so her tapped count is exactly her attacker -- before
+        -- the spell and after it.
+        HU.assertEqual "alice's attacker was tapped to attack" 1 (S.tappedCount S.alice attacked)
+        HU.assertEqual "and Rally did not untap it" 1 (S.tappedCount S.alice resolved)
     ]
 
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
