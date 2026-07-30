@@ -20,15 +20,15 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Paths_pawl as Paths
 import qualified Pawl.Codec as Codec
+import qualified Pawl.Exceptions.CorruptCard as CorruptCard
+import qualified Pawl.Exceptions.MisfiledCard as MisfiledCard
+import qualified Pawl.Exceptions.MissingRoot as MissingRoot
+import qualified Pawl.Exceptions.UnknownCard as UnknownCard
 import qualified Pawl.Json as Json
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.CorruptCard as CorruptCard
-import qualified Pawl.Type.MisfiledCard as MisfiledCard
-import qualified Pawl.Type.MissingRoot as MissingRoot
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Registry as Registry
-import qualified Pawl.Type.UnknownCard as UnknownCard
 import qualified System.Directory as Directory
 import qualified System.IO.Error as IOError
 
@@ -39,7 +39,7 @@ new :: FilePath -> IO Registry.Registry
 new root = do
   exists <- Directory.doesDirectoryExist root
   if not exists
-    then Exception.throwIO (MissingRoot.MkMissingRoot root)
+    then Exception.throwIO MissingRoot.MkMissingRoot {MissingRoot.path = root}
     else do
       cache <- MVar.newMVar Map.empty
       pure
@@ -117,7 +117,12 @@ pathIn registry name = Registry.root registry <> "/" <> name
 load :: Registry.Registry -> Slug.Slug -> IO Card.Card
 load registry slug =
   let path = pathIn registry (Text.unpack (Slug.unwrap slug) <> ".json")
-      corrupt reason = Exception.throwIO (CorruptCard.MkCorruptCard path reason)
+      corrupt reason =
+        Exception.throwIO
+          CorruptCard.MkCorruptCard
+            { CorruptCard.path = path,
+              CorruptCard.reason = reason
+            }
    in do
         result <- IOError.tryIOError (ByteString.readFile path)
         case result of
@@ -126,7 +131,7 @@ load registry slug =
           -- the IOError it already is.
           Left err ->
             if IOError.isDoesNotExistError err
-              then Exception.throwIO (UnknownCard.MkUnknownCard slug path)
+              then Exception.throwIO UnknownCard.MkUnknownCard {UnknownCard.slug = slug, UnknownCard.path = path}
               else Exception.throwIO err
           Right bytes -> case Encoding.decodeUtf8' bytes of
             Left err -> corrupt (Text.pack ("not valid UTF-8: " <> show err))
@@ -137,4 +142,11 @@ load registry slug =
                   let actual = Slug.fromText (Card.name c)
                    in if actual == slug
                         then pure c
-                        else Exception.throwIO (MisfiledCard.MkMisfiledCard path slug (Card.name c) (Just actual))
+                        else
+                          Exception.throwIO
+                            MisfiledCard.MkMisfiledCard
+                              { MisfiledCard.path = path,
+                                MisfiledCard.name = Card.name c,
+                                MisfiledCard.expected = slug,
+                                MisfiledCard.actual = actual
+                              }

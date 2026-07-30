@@ -10,15 +10,15 @@ import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
+import qualified Pawl.Exceptions.CorruptCard as CorruptCard
+import qualified Pawl.Exceptions.MisfiledCard as MisfiledCard
+import qualified Pawl.Exceptions.MissingRoot as MissingRoot
+import qualified Pawl.Exceptions.UnknownCard as UnknownCard
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Type.Card as Card
-import qualified Pawl.Type.CorruptCard as CorruptCard
-import qualified Pawl.Type.MisfiledCard as MisfiledCard
-import qualified Pawl.Type.MissingRoot as MissingRoot
 import qualified Pawl.Type.Printing as Printing
 import qualified Pawl.Type.Registry as Registry.Type
-import qualified Pawl.Type.UnknownCard as UnknownCard
 import qualified System.Directory as Directory
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -148,9 +148,9 @@ tests =
             "misfiled card"
             ( \err -> do
                 HU.assertEqual "names the path" (Registry.Type.root registry <> "/bird-maiden.json") (MisfiledCard.path err)
-                HU.assertEqual "names the file's slug" (Text.pack "bird-maiden") (Slug.unwrap (MisfiledCard.filedUnder err))
                 HU.assertEqual "names the card" (Text.pack "Goblin Piker") (MisfiledCard.name err)
-                HU.assertEqual "names the card's slug" (Just (Text.pack "goblin-piker")) (fmap Slug.unwrap (MisfiledCard.slugifiesTo err))
+                HU.assertEqual "names the file's slug" (Text.pack "bird-maiden") (Slug.unwrap (MisfiledCard.expected err))
+                HU.assertEqual "names the card's slug" (Text.pack "goblin-piker") (Slug.unwrap (MisfiledCard.actual err))
             )
             (Registry.card registry "Bird Maiden"),
       HU.testCase "a file with invalid UTF-8 bytes raises CorruptCard naming the path and the decode failure"
@@ -187,7 +187,7 @@ tests =
         tmp <- Directory.getTemporaryDirectory
         let missing = tmp <> "/pawl-registry-spec-no-such-root"
         Directory.removePathForcibly missing
-        expectException "missing root" (MissingRoot.MkMissingRoot missing) (Registry.new missing),
+        expectException "missing root" MissingRoot.MkMissingRoot {MissingRoot.path = missing} (Registry.new missing),
       -- (a) A CLI, a scenario loader, a deckbuilder and a linter all want "every
       -- card in this pool", which only the test suite could express before.
       HU.testCase "slugs enumerates the pool in ascending order, ignoring non-.json entries" $ do

@@ -55,7 +55,7 @@ understand, debug, and modify.
 - [Prefer short identifiers](#prefer-short-identifiers)
 - [Prefer unqualified operators](#prefer-unqualified-operators)
 - [Use camel case names](#use-camel-case-names)
-- [Use descriptive unwrapping names](#use-descriptive-unwrapping-names)
+- [Use descriptive conversion names](#use-descriptive-conversion-names)
 - [Use `newtype` liberally](#use-newtype-liberally)
 - [Use smart constructors](#use-smart-constructors)
 
@@ -505,20 +505,21 @@ data Person = MkPerson { name :: Text }
 
 <https://www.yesodweb.com/book/settings-types>
 
-## Use descriptive unwrapping names
+## Use descriptive conversion names
 
-If the function that removes a `newtype` wrapper starts with `unwrap`, that
-implies the result is essentially the internal representation of that type.
-That may be true now, but it might change as time goes on. Also using a more
-descriptive function names makes call sites easier to understand. So instead of
-`unwrapX` use `toX`.
+For `newtype`s, using the name `unwrap` is fine. For other conversions,
+consider using `fromX` or `toY` instead.
 
 ``` hs
 -- bad
-unwrapEmail :: Email -> Text
+emailToText :: Email -> Text
 
 -- good
-toText :: Email -> Text
+Email.toText :: Email -> Text
+Text.fromEmail :: Email -> Text
+
+-- also good
+newtype Name = MkName { unwrap :: String }
 ```
 
 ## Avoid list comprehensions
