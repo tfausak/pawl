@@ -42,6 +42,7 @@ emptyCombat =
       Combat.blockers = Map.empty,
       Combat.struckFirst = Nothing,
       Combat.joinedUnder = Map.empty,
+      Combat.attackersJoined = False,
       Combat.defender = Nothing
     }
 
@@ -61,13 +62,22 @@ clearCombat gs = gs {GameState.combat = emptyCombat}
 -- CR 508.8: "If no creatures are declared as attackers or put onto the
 -- battlefield attacking, skip the declare blockers and combat damage steps."
 --
--- BOTH of that rule's clauses are the same question of Combat.attackers, because
--- both writers of that map put their creature there: declareAttackers below, and
--- putOntoBattlefieldAttacking. So this reads the record rather than the
--- declaration, and Engine.runStepThatBegan asks it as the declare attackers step
--- ENDS -- after the priority round in which an attack trigger resolves -- rather
--- than the moment the turn-based action finishes, which is what made the second
--- clause unrepresentable before.
+-- BOTH of that rule's clauses are the same question of Combat.attackersJoined,
+-- because both things that can make one true write that flag: declareAttackers
+-- below, and putOntoBattlefieldAttacking. Engine.runStepThatBegan asks it as the
+-- declare attackers step ENDS -- after the priority round in which an attack
+-- trigger resolves -- rather than the moment the turn-based action finishes,
+-- which is what made the second clause unrepresentable before.
+--
+-- The flag and NOT Map.null on Combat.attackers, which is the same question only
+-- while nothing leaves combat. CR 508.8 asks whether a creature WAS declared or
+-- put onto the battlefield attacking, and CR 508.1k makes that a different
+-- question from whether one is attacking now: a declared creature "remains an
+-- attacking creature until it's removed from combat", and CR 506.4's removal
+-- takes away the attacking, never the declaration. Asking the map skipped both
+-- steps for a lone attacker that a Ray of Command took during the step, which is
+-- TurnSpec's proving test; Pawl.Replacement's CR 701.19a regeneration reaches the
+-- same Game.removeFromCombat door.
 --
 -- A creature put onto the battlefield attacking LATER than that step cannot
 -- un-skip anything, and does not need to: the steps this drops are the only ones
@@ -77,13 +87,14 @@ clearCombat gs = gs {GameState.combat = emptyCombat}
 -- and Turn.dropSkippedCombatSteps does not touch it -- that phase reaches its
 -- own declare attackers step and asks this question again for itself.
 --
--- No test exercises the second clause on its own -- a creature put onto the
--- battlefield attacking while nothing was declared. The pool's only source of one
--- is an attack trigger, which cannot fire unless its own creature was declared
--- (#370).
+-- No GAMEPLAY-level test exercises the second clause on its own -- a creature put
+-- onto the battlefield attacking while nothing was declared. The pool's only
+-- source of one is an attack trigger, which cannot fire unless its own creature
+-- was declared, so TurnSpec proves that clause by calling
+-- putOntoBattlefieldAttacking directly (#370).
 skipEmptyCombat :: GameState -> GameState
 skipEmptyCombat gs =
-  if Map.null (Combat.attackers (GameState.combat gs))
+  if not (Combat.attackersJoined (GameState.combat gs))
     then gs {GameState.remaining = Turn.dropSkippedCombatSteps (GameState.phase gs) (GameState.remaining gs)}
     else gs
 
@@ -518,7 +529,13 @@ declareAttackers pid = do
                 { GameState.combat =
                     (GameState.combat g)
                       { Combat.attackers = Map.union recorded (Combat.attackers (GameState.combat g)),
-                        Combat.joinedUnder = Map.union joined (Combat.joinedUnder (GameState.combat g))
+                        Combat.joinedUnder = Map.union joined (Combat.joinedUnder (GameState.combat g)),
+                        -- CR 508.8's first clause, recorded here because here is
+                        -- where the declaration happens. Never cleared, so a
+                        -- CR 506.4 removal later in the step cannot un-declare
+                        -- these creatures.
+                        Combat.attackersJoined =
+                          Combat.attackersJoined (GameState.combat g) || not (null attacking)
                       }
                 }
         State.modify' (\g -> attach (List.foldl' tapIt g attacking))
@@ -596,7 +613,14 @@ putOntoBattlefieldAttacking oid = do
                     { Combat.attackers = Map.insert oid (AttackTarget.OfPlayer defender) (Combat.attackers c),
                       -- CR 506.4's comparand, for the same reason declareAttackers
                       -- takes one: this is where the creature joins combat.
-                      Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c)
+                      Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c),
+                      -- CR 508.8's SECOND clause -- "or put onto the battlefield
+                      -- attacking". Set inside the guards, and so here rather
+                      -- than in Resolve's Create arm: CR 506.3a-c and CR 508.4a
+                      -- each let the permanent enter while it is "never
+                      -- considered to be an attacking creature", and one that
+                      -- never became an attacker cannot answer this rule.
+                      Combat.attackersJoined = True
                     }
               }
     _ -> pure ()
