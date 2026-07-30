@@ -459,7 +459,7 @@ Do 732 and 733 eventually. Nobody plans for them; everybody needs them.
 
 An interstitial, lettered like M3.5 and M4.5: not a new rules nightmare, but the
 last piece of vocabulary the transpiler cannot do without. M4.5 P9 built a
-per-object predicate (`Pawl.Type.Filter`) and deliberately stopped short of the
+per-object predicate (`Pawl.Types.Filter`) and deliberately stopped short of the
 layer above it — a **scope** (which objects, over which zones, from whose
 perspective), an **aggregation** (how many; how many distinct card types), and a
 **comparison to a threshold**. Two hand-carved per-card types stood in for that

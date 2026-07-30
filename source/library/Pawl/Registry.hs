@@ -3,12 +3,11 @@
 -- performs IO: it is the shell around the pure codec, and the only place in the
 -- library that touches a file system.
 --
--- Every way this can fail has its own type (Pawl.Types.{MissingRoot,
--- UnslugifiableName, UnknownCard, CorruptCard, MisfiledCard,
--- UnslugifiableFile}), thrown as an exception. A caller that wants to say
--- "unknown card X, did you mean...?" catches UnknownCard; one that wants "that
--- file is broken" catches CorruptCard. Before that they were all IOErrors
--- distinguishable only by matching their message prose.
+-- Every way this can fail has its own type (Pawl.Exceptions.{MissingRoot,
+-- UnknownCard, CorruptCard, MisfiledCard}), thrown as an exception. A caller
+-- that wants to say "unknown card X, did you mean...?" catches UnknownCard; one
+-- that wants "that file is broken" catches CorruptCard. Before that they were
+-- all IOErrors distinguishable only by matching their message prose.
 module Pawl.Registry where
 
 import qualified Control.Concurrent.MVar as MVar
@@ -60,10 +59,11 @@ defaultRoot = Paths.getDataFileName "data/cards"
 -- deckbuilder, a linter, a scenario loader and "load every card" all need it,
 -- and a hand-kept list is exactly what forgets the file nobody loads.
 --
--- A .json file whose stem is not already a slug is an error, not a skip: a
--- lookup builds its path FROM a slug, so nothing could ever open that file by
--- name, and quietly omitting it would report a pool larger than the loadable
--- one. Non-.json entries are ignored outright -- a README is not a broken card.
+-- A file name is slugified, not validated, so a stem that is not already a slug
+-- yields a slug naming a DIFFERENT path -- and loading it fails as UnknownCard
+-- rather than reporting the mismatch here. Pawl.CardSpec pins every committed
+-- file name to its own slug so that never arises in the corpus. Non-.json
+-- entries are ignored outright -- a README is not a broken card.
 slugs :: Registry.Registry -> IO [Slug.Slug]
 slugs registry =
   let json = ".json"

@@ -3,6 +3,7 @@
 module Pawl.CardSpec where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -23,6 +24,7 @@ import qualified Pawl.Quantity as Quantity
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Resolve as Resolve
 import qualified Pawl.Setup as Setup
+import qualified Pawl.Slug as Slug
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
@@ -83,6 +85,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
+import qualified System.Directory as Directory
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -559,13 +562,22 @@ lintTests registry =
       -- then builds a path from that slug -- so a file whose stem is not itself a
       -- slugify fixed point is never opened by that path; a lookup would quietly
       -- open some OTHER file (or none) instead of raising the mismatch above.
-      -- Every committed file name must therefore already be its own slug, which
-      -- Registry.slugs enforces since #167: it raises UnslugifiableFile rather
-      -- than enumerating past such a file. Not sweeping over a listing here, then
-      -- -- succeeding at all IS the assertion, and it covers the whole directory.
+      -- Every committed file name must therefore already be its own slug.
+      -- Slug.fromText normalizes rather than validates, so the assertion is that
+      -- it is the identity on every stem -- read the listing directly, because
+      -- Registry.slugs has already normalized the evidence away.
       HU.testCase "every file name in data/cards is already a slug" $ do
-        found <- Registry.slugs registry
-        HU.assertBool "the corpus is not empty" (not (null found)),
+        entries <- Directory.listDirectory (Registry.Type.root registry)
+        let stems = fmap (reverse . drop (length ".json") . reverse) (filter (List.isSuffixOf ".json") entries)
+        HU.assertBool "the corpus is not empty" (not (null stems))
+        mapM_
+          ( \stem ->
+              HU.assertEqual
+                ("file name is its own slug: " <> stem)
+                (Text.pack stem)
+                (Slug.unwrap (Slug.fromText (Text.pack stem)))
+          )
+          stems,
       HU.testCase "Blaze is a {X}{R} Sorcery dealing X to any target" $ do
         blaze <- Registry.printing registry "Blaze"
         let card = Printing.card blaze

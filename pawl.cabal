@@ -48,6 +48,8 @@ common executable
   build-depends: pawl
   ghc-options: -rtsopts
 
+-- An arbitrary precision decimal number, in the spirit of the Decimal and
+-- scientific packages.
 library decimal
   import: library
   build-depends: pawl:spec
@@ -58,6 +60,7 @@ library decimal
 
   hs-source-dirs: source/libraries/decimal
 
+-- The catalog of every exception Pawl can throw, and nothing else.
 library exceptions
   import: library
   build-depends:
@@ -73,6 +76,8 @@ library exceptions
 
   hs-source-dirs: source/libraries/exceptions
 
+-- Quality of life improvements for packages Pawl doesn't own, in the spirit of
+-- Neil Mitchell's extra package.
 library extra
   import: library
   build-depends:
@@ -104,6 +109,7 @@ library extra
 
   hs-source-dirs: source/libraries/extra
 
+-- RFC compliant JSON types and codecs. Similar to aeson, but much simpler.
 library json
   import: library
   build-depends:
@@ -135,6 +141,7 @@ library json
 
   hs-source-dirs: source/libraries/json
 
+-- Slugifying text: a card name in, a file-name key out.
 library slug
   import: library
   build-depends:
@@ -148,12 +155,15 @@ library slug
 
   hs-source-dirs: source/libraries/slug
 
+-- An abstract testing interface, identical to the heck package. Base-only, which
+-- is why every other sublibrary can afford to expose its specs.
 library spec
   import: library
   -- cabal-gild: discover source/libraries/spec
   exposed-modules: Pawl.Spec
   hs-source-dirs: source/libraries/spec
 
+-- All of the type definitions, without any behavior.
 library types
   import: library
   build-depends:
@@ -301,6 +311,9 @@ library types
 
   hs-source-dirs: source/libraries/types
 
+-- The engine: the comprehensive rules, plus the codec and registry that load
+-- cards as data. Belongs in a sublibrary of its own, and will get one once a
+-- second consumer (a client, a CLI) exists to make the split pay.
 library
   import: library
   autogen-modules: Paths_pawl
