@@ -26,6 +26,7 @@ jobs:
         with:
           cabal: latest
           ghc: 9.14.1
+      - run: cabal update
       - id: info
         run: |
           echo "os=$(ghc -e 'putStrLn System.Info.os')" >> "$GITHUB_OUTPUT"
