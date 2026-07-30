@@ -33,6 +33,7 @@ import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as CardT
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
@@ -174,6 +175,13 @@ tests registry =
           HU.testCase "CastingPermission" $ do
             roundTrip "library" Codec.castingPermissionToJson Codec.jsonToCastingPermission CastingPermission.CastFromLibraryWhileSearching
             roundTrip "graveyard" Codec.castingPermissionToJson Codec.jsonToCastingPermission CastingPermission.CastFromGraveyard,
+          HU.testCase "CastingRestriction" $ do
+            let declareAttackers = CastingRestriction.DuringPhase (Phase.Combat CombatStep.DeclareAttackers)
+                upkeep = CastingRestriction.DuringPhase (Phase.Beginning BeginningStep.Upkeep)
+            roundTrip "declare attackers" Codec.castingRestrictionToJson Codec.jsonToCastingRestriction declareAttackers
+            roundTrip "upkeep" Codec.castingRestrictionToJson Codec.jsonToCastingRestriction upkeep
+            roundTrip "attacked" Codec.castingRestrictionToJson Codec.jsonToCastingRestriction CastingRestriction.AttackedThisStep
+            HU.assertBool "the phase is part of the encoding" (Codec.castingRestrictionToJson declareAttackers /= Codec.castingRestrictionToJson upkeep),
           HU.testCase "ZoneChangeSubject" $ do
             roundTrip "any" Codec.zoneChangeSubjectToJson Codec.jsonToZoneChangeSubject ZoneChangeSubject.AnyObject
             roundTrip "source" Codec.zoneChangeSubjectToJson Codec.jsonToZoneChangeSubject ZoneChangeSubject.TheSource,
